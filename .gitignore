@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
@@ -29,9 +27,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+dev-output.txt
+npm-install-output.txt
+prisma-generate-output.txt
+prisma-migrate-output.txt
+prisma-seed-output.txt
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +43,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated
+/app/generated/prisma
+/generated
+
+# local working artifacts
+/baseline-backups
+/PROJECT-SCAN-WEBAPP.txt
+/SCAN-01-ADMIN-ROUTES.txt
+/SCAN-02-ADMIN-COMPONENTS.txt
+/SCAN-03-RUNTIME-ENV.txt
+/SCAN-04-CONFIG-AUTH.txt

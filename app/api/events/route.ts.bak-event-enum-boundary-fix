@@ -1,0 +1,533 @@
+﻿import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { hasPermission } from "@/lib/permissions/has-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
+import { logAction } from "@/lib/audit/log-action";
+import { resolveEventReviewDecision } from "@/lib/workflow/event-review-policy";
+
+const ALLOWED_TYPES = ["MATCH", "TOURNAMENT", "TRAINING", "OTHER"] as const;
+const ALLOWED_SOURCES = ["CLUBCORNER_FVNWS", "MANUAL", "CSV_EXCEL_IMPORT"] as const;
+const ALLOWED_STATUSES = ["DRAFT", "SCHEDULED", "LIVE", "COMPLETED", "CANCELLED", "POSTPONED", "ARCHIVED"] as const;
+const MAX_RECURRING_OCCURRENCES = 104;
+
+function addDays(date: Date, days: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function parseRecurrenceUntilEndOfDay(value: string) {
+  const trimmed = String(value ?? "").trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = new Date(trimmed + "T23:59:59.999");
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function buildRecurringDates(startAt: Date, recurrenceUntil: Date) {
+  const dates: Date[] = [];
+  let current = new Date(startAt);
+
+  while (current.getTime() <= recurrenceUntil.getTime()) {
+    dates.push(new Date(current));
+
+    if (dates.length > MAX_RECURRING_OCCURRENCES) {
+      throw new Error("Zu viele Wiederholungen. Bitte den Zeitraum verkürzen.");
+    }
+
+    current = addDays(current, 7);
+  }
+
+  return dates;
+}
+
+export async function GET() {
+  const access = await requireApiAnyPermission(ROUTE_PERMISSION_SETS.EVENTS_READ);
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const events = await prisma.event.findMany({
+    orderBy: [
+      { startAt: "asc" },
+      { sortOrder: "asc" },
+      { createdAt: "desc" },
+    ],
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      source: true,
+      status: true,
+      reviewStage: true,
+      reviewRequestedAt: true,
+      reviewedAt: true,
+      publishedAt: true,
+      startAt: true,
+      endAt: true,
+      location: true,
+      season: {
+        select: {
+          id: true,
+          key: true,
+          name: true,
+        },
+      },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(events);
+}
+
+export async function POST(request: NextRequest) {
+  const access = await requireApiPermission(PERMISSIONS.EVENTS_MANAGE);
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  try {
+    const body = await request.json();
+
+    const type = String(body.type ?? "").trim();
+    const source = String(body.source ?? "MANUAL").trim();
+    const status = String(body.status ?? "SCHEDULED").trim();
+    const seasonId = String(body.seasonId ?? "").trim();
+    const teamId =
+      body.teamId === null || body.teamId === undefined || body.teamId === ""
+        ? null
+        : String(body.teamId).trim();
+
+    const title = String(body.title ?? "").trim();
+    const description =
+      body.description === null || body.description === undefined
+        ? null
+        : String(body.description).trim() || null;
+    const location =
+      body.location === null || body.location === undefined
+        ? null
+        : String(body.location).trim() || null;
+
+    const organizerName =
+      body.organizerName === null || body.organizerName === undefined
+        ? null
+        : String(body.organizerName).trim() || null;
+
+    const opponentName =
+      body.opponentName === null || body.opponentName === undefined
+        ? null
+        : String(body.opponentName).trim() || null;
+
+    const competitionLabel =
+      body.competitionLabel === null || body.competitionLabel === undefined
+        ? null
+        : String(body.competitionLabel).trim() || null;
+
+    const homeAway =
+      body.homeAway === null || body.homeAway === undefined
+        ? null
+        : String(body.homeAway).trim() || null;
+
+    const resultLabel =
+      body.resultLabel === null || body.resultLabel === undefined
+        ? null
+        : String(body.resultLabel).trim() || null;
+
+    const remarks =
+      body.remarks === null || body.remarks === undefined
+        ? null
+        : String(body.remarks).trim() || null;
+
+    const sortOrder =
+      body.sortOrder === null || body.sortOrder === undefined || body.sortOrder === ""
+        ? 0
+        : Number(body.sortOrder);
+
+    const startAtRaw = String(body.startAt ?? "").trim();
+    const endAtRaw =
+      body.endAt === null || body.endAt === undefined || body.endAt === ""
+        ? null
+        : String(body.endAt).trim();
+
+    const meetingTimeRaw =
+      body.meetingTime === null || body.meetingTime === undefined || body.meetingTime === ""
+        ? null
+        : String(body.meetingTime).trim();
+
+    const isRecurring = Boolean(body.isRecurring);
+    const recurrenceUntilRaw =
+      body.recurrenceUntil === null || body.recurrenceUntil === undefined || body.recurrenceUntil === ""
+        ? null
+        : String(body.recurrenceUntil).trim();
+
+    const websiteVisible =
+      body.websiteVisible === null || body.websiteVisible === undefined
+        ? true
+        : Boolean(body.websiteVisible);
+
+    const infoboardVisible =
+      body.infoboardVisible === null || body.infoboardVisible === undefined
+        ? false
+        : Boolean(body.infoboardVisible);
+
+    const homepageVisible =
+      body.homepageVisible === null || body.homepageVisible === undefined
+        ? false
+        : Boolean(body.homepageVisible);
+
+    const wochenplanVisible =
+      body.wochenplanVisible === null || body.wochenplanVisible === undefined
+        ? false
+        : Boolean(body.wochenplanVisible);
+
+    const trainingsplanVisible =
+      body.trainingsplanVisible === null || body.trainingsplanVisible === undefined
+        ? false
+        : Boolean(body.trainingsplanVisible);
+
+    const teamPageVisible =
+      body.teamPageVisible === null || body.teamPageVisible === undefined
+        ? false
+        : Boolean(body.teamPageVisible);
+
+    if (!ALLOWED_TYPES.includes(type as (typeof ALLOWED_TYPES)[number])) {
+      return NextResponse.json({ error: "Ungültiger Event-Typ." }, { status: 400 });
+    }
+
+    if (!ALLOWED_SOURCES.includes(source as (typeof ALLOWED_SOURCES)[number])) {
+      return NextResponse.json({ error: "Ungültige Event-Quelle." }, { status: 400 });
+    }
+
+    if (!ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
+      return NextResponse.json({ error: "Ungültiger Event-Status." }, { status: 400 });
+    }
+
+    if (!seasonId) {
+      return NextResponse.json({ error: "Saison ist erforderlich." }, { status: 400 });
+    }
+
+    if (!title) {
+      return NextResponse.json({ error: "Titel ist erforderlich." }, { status: 400 });
+    }
+
+    if (!startAtRaw) {
+      return NextResponse.json({ error: "Startdatum ist erforderlich." }, { status: 400 });
+    }
+
+    if (!Number.isFinite(sortOrder)) {
+      return NextResponse.json({ error: "Sortierung muss eine Zahl sein." }, { status: 400 });
+    }
+
+    if (isRecurring && type !== "TRAINING") {
+      return NextResponse.json({ error: "Serientermine sind aktuell nur für Trainings verfügbar." }, { status: 400 });
+    }
+
+    if (isRecurring && !recurrenceUntilRaw) {
+      return NextResponse.json({ error: "Serien-Enddatum ist erforderlich." }, { status: 400 });
+    }
+
+    const startAt = new Date(startAtRaw);
+    const endAt = endAtRaw ? new Date(endAtRaw) : null;
+    const meetingTime = meetingTimeRaw ? new Date(meetingTimeRaw) : null;
+    const recurrenceUntil = isRecurring && recurrenceUntilRaw ? parseRecurrenceUntilEndOfDay(recurrenceUntilRaw) : null;
+
+    if (Number.isNaN(startAt.getTime())) {
+      return NextResponse.json({ error: "Startdatum ist ungültig." }, { status: 400 });
+    }
+
+    if (endAt && Number.isNaN(endAt.getTime())) {
+      return NextResponse.json({ error: "Enddatum ist ungültig." }, { status: 400 });
+    }
+
+    if (meetingTime && Number.isNaN(meetingTime.getTime())) {
+      return NextResponse.json({ error: "Treffpunkt-Zeit ist ungültig." }, { status: 400 });
+    }
+
+    if (isRecurring && !recurrenceUntil) {
+      return NextResponse.json({ error: "Serien-Enddatum ist ungültig." }, { status: 400 });
+    }
+
+    if (endAt && endAt.getTime() < startAt.getTime()) {
+      return NextResponse.json({ error: "Ende darf nicht vor dem Start liegen." }, { status: 400 });
+    }
+
+    if (meetingTime && meetingTime.getTime() > startAt.getTime()) {
+      return NextResponse.json({ error: "Treffpunkt-Zeit darf nicht nach dem Start liegen." }, { status: 400 });
+    }
+
+    if (isRecurring && recurrenceUntil && recurrenceUntil.getTime() < startAt.getTime()) {
+      return NextResponse.json({ error: "Serien-Enddatum darf nicht vor dem ersten Training liegen." }, { status: 400 });
+    }
+
+    const season = await prisma.season.findUnique({
+      where: { id: seasonId },
+      select: {
+        id: true,
+        key: true,
+        name: true,
+      },
+    });
+
+    if (!season) {
+      return NextResponse.json({ error: "Saison nicht gefunden." }, { status: 404 });
+    }
+
+    if (teamId) {
+      const team = await prisma.team.findUnique({
+        where: { id: teamId },
+        select: { id: true },
+      });
+
+      if (!team) {
+        return NextResponse.json({ error: "Team nicht gefunden." }, { status: 404 });
+      }
+    }
+
+    const session = access.session;
+    const actorUserId =
+      session?.user?.effectiveUserId ??
+      session?.user?.id ??
+      null;
+
+    const hasLeadingEventCapability =
+      hasPermission(session, PERMISSIONS.EVENTS_PUBLISH_WEBSITE) ||
+      hasPermission(session, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD);
+
+    const eventReviewDecision = resolveEventReviewDecision("create_event", {
+      canCreate: true,
+      canReview: hasLeadingEventCapability,
+      canApprove: hasLeadingEventCapability,
+      canPublish: hasLeadingEventCapability,
+      canDirectManage: hasLeadingEventCapability,
+      canReviewSeries: hasLeadingEventCapability,
+    });
+
+    const initialReviewStage = eventReviewDecision.allowsDirectExecution
+      ? "APPROVED"
+      : "SUBMITTED";
+
+    const reviewRequestedAt = eventReviewDecision.requiresReview ? new Date() : null;
+    const reviewedAt = eventReviewDecision.allowsDirectExecution ? new Date() : null;
+    const approvedByUserId = eventReviewDecision.allowsDirectExecution ? actorUserId : null;
+    const reviewedByUserId = eventReviewDecision.allowsDirectExecution ? actorUserId : null;
+
+    const durationMs = endAt ? endAt.getTime() - startAt.getTime() : null;
+    const meetingOffsetMs = meetingTime ? startAt.getTime() - meetingTime.getTime() : null;
+
+    const occurrenceStarts = isRecurring && recurrenceUntil
+      ? buildRecurringDates(startAt, recurrenceUntil)
+      : [startAt];
+
+    const createdEvents = await prisma.$transaction(async (tx) => {
+      const created: Array<{
+        id: string;
+        title: string;
+        type: string;
+        source: string;
+        status: string;
+        reviewStage: string;
+        reviewRequestedAt: Date | null;
+        reviewedAt: Date | null;
+        seasonId: string;
+        teamId: string | null;
+        startAt: Date;
+        endAt: Date | null;
+        meetingTime: Date | null;
+      }> = [];
+
+      for (const occurrenceStart of occurrenceStarts) {
+        const occurrenceEnd =
+          durationMs === null
+            ? null
+            : new Date(occurrenceStart.getTime() + durationMs);
+
+        const occurrenceMeetingTime =
+          meetingOffsetMs === null
+            ? null
+            : new Date(occurrenceStart.getTime() - meetingOffsetMs);
+
+        const createdEvent = await tx.event.create({
+          data: {
+            seasonId,
+            teamId,
+            type,
+            source,
+            status,
+            reviewStage: initialReviewStage,
+            reviewRequestedAt,
+            reviewedAt,
+            createdByUserId: actorUserId,
+            reviewedByUserId,
+            approvedByUserId,
+            title,
+            description,
+            location,
+            startAt: occurrenceStart,
+            endAt: occurrenceEnd,
+            organizerName,
+            opponentName,
+            competitionLabel,
+            homeAway,
+            resultLabel,
+            meetingTime: occurrenceMeetingTime,
+            websiteVisible,
+            infoboardVisible,
+            homepageVisible,
+            wochenplanVisible,
+            trainingsplanVisible,
+            teamPageVisible,
+            sortOrder,
+            remarks,
+          },
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            source: true,
+            status: true,
+            reviewStage: true,
+            reviewRequestedAt: true,
+            reviewedAt: true,
+            seasonId: true,
+            teamId: true,
+            startAt: true,
+            endAt: true,
+            meetingTime: true,
+          },
+        });
+
+        created.push(createdEvent);
+      }
+
+      return created;
+    });
+
+    const auditAction = eventReviewDecision.allowsDirectExecution
+      ? "CREATE_DIRECT"
+      : "SUBMIT_FOR_REVIEW";
+
+    for (const created of createdEvents) {
+      await logAction({
+        actorUserId,
+        moduleKey: "events",
+        entityType: "Event",
+        entityId: created.id,
+        action: auditAction,
+        afterJson: {
+          seasonId,
+          teamId,
+          type,
+          source,
+          status,
+          reviewStage: created.reviewStage,
+          reviewRequestedAt: created.reviewRequestedAt?.toISOString() ?? null,
+          reviewedAt: created.reviewedAt?.toISOString() ?? null,
+          title,
+          description,
+          location,
+          startAt: created.startAt.toISOString(),
+          endAt: created.endAt ? created.endAt.toISOString() : null,
+          organizerName,
+          opponentName,
+          competitionLabel,
+          homeAway,
+          resultLabel,
+          meetingTime: created.meetingTime ? created.meetingTime.toISOString() : null,
+          websiteVisible,
+          infoboardVisible,
+          homepageVisible,
+          wochenplanVisible,
+          trainingsplanVisible,
+          teamPageVisible,
+          sortOrder,
+          remarks,
+          recurrence: isRecurring
+            ? {
+                enabled: true,
+                until: recurrenceUntilRaw,
+                interval: "WEEKLY",
+                occurrences: createdEvents.length,
+              }
+            : {
+                enabled: false,
+              },
+          workflowDecision: {
+            requiresReview: eventReviewDecision.requiresReview,
+            allowsDirectExecution: eventReviewDecision.allowsDirectExecution,
+            allowsReview: eventReviewDecision.allowsReview,
+            allowsApproval: eventReviewDecision.allowsApproval,
+            allowsPublish: eventReviewDecision.allowsPublish,
+            allowsSeriesReview: eventReviewDecision.allowsSeriesReview,
+          },
+        },
+        metadataJson: {
+          seasonKey: season.key,
+          seasonName: season.name,
+          workflow: {
+            policy: "events.review_required",
+            action: "create_event",
+            submittedByUserId: actorUserId,
+            reviewStage: created.reviewStage,
+            requiresReview: eventReviewDecision.requiresReview,
+            allowsDirectExecution: eventReviewDecision.allowsDirectExecution,
+          },
+        },
+      });
+    }
+
+    const occurrenceCount = createdEvents.length;
+    const createdLabel =
+      occurrenceCount === 1
+        ? "Event"
+        : String(occurrenceCount) + " Events";
+
+    const message = eventReviewDecision.allowsDirectExecution
+      ? createdLabel + " wurden direkt erstellt."
+      : createdLabel + " wurden zur Prüfung eingereicht.";
+
+    return NextResponse.json(
+      {
+        message,
+        eventIds: createdEvents.map((event) => event.id),
+        reviewStage: initialReviewStage,
+        occurrenceCount,
+        requiresReview: eventReviewDecision.requiresReview,
+        allowsDirectExecution: eventReviewDecision.allowsDirectExecution,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Create event failed:", error);
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: "Technischer Fehler: " + error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Event konnte nicht eingereicht werden." },
+      { status: 500 }
+    );
+  }
+}

@@ -1,0 +1,195 @@
+import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db/prisma";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { logAction } from "@/lib/audit/log-action";
+
+type Context = {
+  params: Promise<{ teamId: string }>;
+};
+
+const ALLOWED_STATUSES = ["ACTIVE", "INACTIVE", "ARCHIVED"] as const;
+
+export async function POST(request: NextRequest, context: Context) {
+  const access = await requireApiPermission(PERMISSIONS.TEAMS_MANAGE);
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  try {
+    const { teamId } = await context.params;
+    const body = await request.json();
+
+    const seasonId = String(body.seasonId ?? "").trim();
+    const displayName = String(body.displayName ?? "").trim();
+    const shortName =
+      body.shortName === null || body.shortName === undefined
+        ? null
+        : String(body.shortName).trim() || null;
+    const status = String(body.status ?? "ACTIVE").trim();
+    const websiteVisible = Boolean(body.websiteVisible);
+    const infoboardVisible = Boolean(body.infoboardVisible);
+
+    if (!seasonId) {
+      return NextResponse.json(
+        { error: "Bitte eine Saison auswaehlen." },
+        { status: 400 }
+      );
+    }
+
+    if (!displayName) {
+      return NextResponse.json(
+        { error: "Display Name ist erforderlich." },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
+      return NextResponse.json(
+        { error: "Ungueltiger Saison-Status." },
+        { status: 400 }
+      );
+    }
+
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    });
+
+    if (!team) {
+      return NextResponse.json(
+        { error: "Team nicht gefunden." },
+        { status: 404 }
+      );
+    }
+
+    const season = await prisma.season.findUnique({
+      where: { id: seasonId },
+      select: {
+        id: true,
+        key: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        isActive: true,
+      },
+    });
+
+    if (!season) {
+      return NextResponse.json(
+        { error: "Saison nicht gefunden." },
+        { status: 404 }
+      );
+    }
+
+    const existingTeamSeason = await prisma.teamSeason.findUnique({
+      where: {
+        teamId_seasonId: {
+          teamId,
+          seasonId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingTeamSeason) {
+      return NextResponse.json(
+        { error: "Dieses Team hat bereits einen Eintrag fuer diese Saison." },
+        { status: 409 }
+      );
+    }
+
+    const created = await prisma.teamSeason.create({
+      data: {
+        teamId,
+        seasonId,
+        displayName,
+        shortName,
+        status,
+        websiteVisible,
+        infoboardVisible,
+      },
+      include: {
+        season: true,
+      },
+    });
+
+    await logAction({
+      actorUserId:
+        access.session?.user?.effectiveUserId ??
+        access.session?.user?.id ??
+        null,
+      moduleKey: "teams",
+      entityType: "TeamSeason",
+      entityId: created.id,
+      action: "CREATE",
+      afterJson: {
+        teamId,
+        teamName: team.name,
+        seasonId: season.id,
+        seasonKey: season.key,
+        seasonName: season.name,
+        displayName,
+        shortName,
+        status,
+        websiteVisible,
+        infoboardVisible,
+      },
+    });
+
+    revalidatePath("/dashboard/teams");
+    revalidatePath("/dashboard/teams/" + teamId);
+
+    return NextResponse.json(
+      {
+        message: "Team-Saison erfolgreich erstellt.",
+        teamSeason: created,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Create team season failed:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          { error: "Dieses Team hat bereits einen Eintrag fuer diese Saison." },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: "Datenbankfehler: " + error.code + "." },
+        { status: 500 }
+      );
+    }
+
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return NextResponse.json(
+        { error: "Prisma Validierungsfehler. Wahrscheinlich stimmen Schema, Migration und generierter Client aktuell nicht ueberein." },
+        { status: 500 }
+      );
+    }
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: "Technischer Fehler: " + error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Team-Saison konnte nicht erstellt werden." },
+      { status: 500 }
+    );
+  }
+}

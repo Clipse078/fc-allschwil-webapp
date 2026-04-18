@@ -1,0 +1,327 @@
+﻿import { prisma } from "@/lib/db/prisma";
+
+export type PublicEventSurface =
+  | "all"
+  | "homepage"
+  | "wochenplan"
+  | "trainingsplan"
+  | "team-page"
+  | "infoboard";
+
+export type GetPublicEventsInput = {
+  surface: PublicEventSurface;
+  seasonKey?: string | null;
+  teamSlug?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  limit?: number | null;
+};
+
+export type PublicEventItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  type: string;
+  source: string;
+  status: string;
+  startAt: Date;
+  endAt: Date | null;
+  opponentName: string | null;
+  organizerName: string | null;
+  competitionLabel: string | null;
+  homeAway: string | null;
+  resultLabel: string | null;
+  meetingTime: Date | null;
+  visibility: {
+    website: boolean;
+    infoboard: boolean;
+    homepage: boolean;
+    wochenplan: boolean;
+    trainingsplan: boolean;
+    teamPage: boolean;
+  };
+  remarks: string | null;
+  season: {
+    id: string;
+    key: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    isActive: boolean;
+  };
+  team: {
+    id: string;
+    name: string;
+    slug: string;
+    category: string;
+    genderGroup: string | null;
+    ageGroup: string | null;
+  } | null;
+};
+
+
+type PublicEventQueryRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  type: string;
+  source: string;
+  status: string;
+  startAt: Date;
+  endAt: Date | null;
+  opponentName: string | null;
+  organizerName: string | null;
+  competitionLabel: string | null;
+  homeAway: string | null;
+  resultLabel: string | null;
+  meetingTime: Date | null;
+  websiteVisible: boolean;
+  infoboardVisible: boolean;
+  homepageVisible: boolean;
+  wochenplanVisible: boolean;
+  trainingsplanVisible: boolean;
+  teamPageVisible: boolean;
+  remarks: string | null;
+  season: {
+    id: string;
+    key: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    isActive: boolean;
+  };
+  team: {
+    id: string;
+    name: string;
+    slug: string;
+    category: string;
+    genderGroup: string | null;
+    ageGroup: string | null;
+  } | null;
+};
+function normalizeLimit(value?: number | null) {
+  if (!value || Number.isNaN(value)) {
+    return 100;
+  }
+
+  return Math.max(1, Math.min(250, value));
+}
+
+function buildSurfaceWhere(surface: PublicEventSurface) {
+  switch (surface) {
+    case "homepage":
+      return { websiteVisible: true, homepageVisible: true };
+    case "wochenplan":
+      return { websiteVisible: true, wochenplanVisible: true };
+    case "trainingsplan":
+      return { websiteVisible: true, trainingsplanVisible: true };
+    case "team-page":
+      return { websiteVisible: true, teamPageVisible: true };
+    case "infoboard":
+      return { infoboardVisible: true };
+    case "all":
+    default:
+      return { websiteVisible: true };
+  }
+}
+
+function toPublicEventItem(event: PublicEventQueryRow): PublicEventItem {
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description,
+    location: event.location,
+    type: event.type,
+    source: event.source,
+    status: event.status,
+    startAt: event.startAt,
+    endAt: event.endAt,
+    opponentName: event.opponentName,
+    organizerName: event.organizerName,
+    competitionLabel: event.competitionLabel,
+    homeAway: event.homeAway,
+    resultLabel: event.resultLabel,
+    meetingTime: event.meetingTime,
+    visibility: {
+      website: event.websiteVisible,
+      infoboard: event.infoboardVisible,
+      homepage: event.homepageVisible,
+      wochenplan: event.wochenplanVisible,
+      trainingsplan: event.trainingsplanVisible,
+      teamPage: event.teamPageVisible,
+    },
+    remarks: event.remarks,
+    season: event.season,
+    team: event.team,
+  };
+}
+
+export async function getPublicEvents(input: GetPublicEventsInput): Promise<PublicEventItem[]> {
+  const limit = normalizeLimit(input.limit);
+
+  const where: Record<string, unknown> = {
+    ...buildSurfaceWhere(input.surface),
+    status: {
+      in: ["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED"],
+    },
+  };
+
+  if (input.seasonKey) {
+    where.season = {
+      key: input.seasonKey,
+    };
+  }
+
+  if (input.teamSlug) {
+    where.team = {
+      slug: input.teamSlug,
+    };
+  }
+
+  if (input.dateFrom || input.dateTo) {
+    const startAt: Record<string, string> = {};
+
+    if (input.dateFrom) {
+      startAt.gte = input.dateFrom;
+    }
+
+    if (input.dateTo) {
+      startAt.lte = input.dateTo;
+    }
+
+    where.startAt = startAt;
+  }
+
+  const events = await prisma.event.findMany({
+    where,
+    orderBy: [
+      { startAt: "asc" },
+      { sortOrder: "asc" },
+      { title: "asc" },
+    ],
+    take: limit,
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      location: true,
+      type: true,
+      source: true,
+      status: true,
+      startAt: true,
+      endAt: true,
+      opponentName: true,
+      organizerName: true,
+      competitionLabel: true,
+      homeAway: true,
+      resultLabel: true,
+      meetingTime: true,
+      websiteVisible: true,
+      infoboardVisible: true,
+      homepageVisible: true,
+      wochenplanVisible: true,
+      trainingsplanVisible: true,
+      teamPageVisible: true,
+      remarks: true,
+      season: {
+        select: {
+          id: true,
+          key: true,
+          name: true,
+          startDate: true,
+          endDate: true,
+          isActive: true,
+        },
+      },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          category: true,
+          genderGroup: true,
+          ageGroup: true,
+        },
+      },
+    },
+  });
+
+  return events.map((event) => toPublicEventItem(event));
+}
+
+function toSwissDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function getCalendarWeek(value: Date) {
+  const date = new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+export async function getGroupedWochenplan(input: Omit<GetPublicEventsInput, "surface">) {
+  const events = await getPublicEvents({
+    ...input,
+    surface: "wochenplan",
+  });
+
+  const grouped = new Map<string, {
+    date: string;
+    calendarWeek: number;
+    weekdayLabel: string;
+    events: PublicEventItem[];
+  }>();
+
+  for (const event of events) {
+    const key = toSwissDateKey(event.startAt);
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        date: key,
+        calendarWeek: getCalendarWeek(event.startAt),
+        weekdayLabel: event.startAt.toLocaleDateString("de-CH", {
+          weekday: "long",
+        }),
+        events: [],
+      });
+    }
+
+    grouped.get(key)!.events.push(event);
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function getInfoboardFeed(input: Omit<GetPublicEventsInput, "surface">) {
+  const events = await getPublicEvents({
+    ...input,
+    surface: "infoboard",
+  });
+
+  return events.map((event) => ({
+    id: event.id,
+    type: event.type,
+    title: event.title,
+    teamName: event.team?.name ?? null,
+    teamSlug: event.team?.slug ?? null,
+    opponentName: event.opponentName,
+    organizerName: event.organizerName,
+    competitionLabel: event.competitionLabel,
+    homeAway: event.homeAway,
+    location: event.location,
+    startAt: event.startAt,
+    endAt: event.endAt,
+    meetingTime: event.meetingTime,
+    resultLabel: event.resultLabel,
+    status: event.status,
+    seasonKey: event.season.key,
+    seasonName: event.season.name,
+  }));
+}

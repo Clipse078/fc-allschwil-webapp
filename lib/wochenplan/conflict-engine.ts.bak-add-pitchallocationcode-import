@@ -1,0 +1,144 @@
+﻿import { validatePitchAllocationForEventType } from "@/lib/facilities/allocation-rules";
+import {
+  dressingRoomConflict,
+  pitchAllocationsConflict,
+  timeRangesOverlap,
+} from "@/lib/facilities/allocation-rules";
+import type {
+  WochenplanConflict,
+  WochenplanEventItem,
+} from "@/lib/wochenplan/types";
+
+function getEventLabel(event: WochenplanEventItem) {
+  return event.teamName ?? event.title;
+}
+
+function addConflict(
+  list: WochenplanConflict[],
+  conflict: WochenplanConflict,
+) {
+  list.push(conflict);
+}
+
+export function getWochenplanConflicts(
+  events: WochenplanEventItem[],
+): WochenplanConflict[] {
+  const conflicts: WochenplanConflict[] = [];
+
+  for (const event of events) {
+    const pitchValidation = validatePitchAllocationForEventType({
+      eventType: event.eventType,
+      pitchCode: event.allocation.pitchCode as PitchAllocationCode | null | undefined,
+    });
+
+    if (!event.allocation.pitchCode) {
+      addConflict(conflicts, {
+        type: "MISSING_PITCH",
+        severity: "warning",
+        eventId: event.id,
+        relatedEventId: null,
+        message: 'FÃ¼r "' + getEventLabel(event) + '" ist noch kein Platz zugeteilt.',
+      });
+    }
+
+    if (
+      (event.eventType === "MATCH" || event.eventType === "TOURNAMENT") &&
+      !event.allocation.homeDressingRoomCode
+    ) {
+      addConflict(conflicts, {
+        type: "MISSING_DRESSING_ROOM",
+        severity: "warning",
+        eventId: event.id,
+        relatedEventId: null,
+        message: 'FÃ¼r "' + getEventLabel(event) + '" fehlt noch eine Heim-Garderobe.',
+      });
+    }
+
+    if (
+      (event.eventType === "MATCH" || event.eventType === "TOURNAMENT") &&
+      !event.allocation.awayDressingRoomCode
+    ) {
+      addConflict(conflicts, {
+        type: "MISSING_DRESSING_ROOM",
+        severity: "warning",
+        eventId: event.id,
+        relatedEventId: null,
+        message: 'FÃ¼r "' + getEventLabel(event) + '" fehlt noch eine GÃ¤ste-Garderobe.',
+      });
+    }
+
+    if (!pitchValidation.ok) {
+      addConflict(conflicts, {
+        type: "INVALID_PITCH_MODE",
+        severity: "error",
+        eventId: event.id,
+        relatedEventId: null,
+        message: pitchValidation.reason ?? "UngÃ¼ltige Platzzuordnung.",
+      });
+    }
+  }
+
+  for (let i = 0; i < events.length; i++) {
+    for (let j = i + 1; j < events.length; j++) {
+      const first = events[i];
+      const second = events[j];
+
+      const overlaps = timeRangesOverlap({
+        startA: first.startAt,
+        endA: first.endAt,
+        startB: second.startAt,
+        endB: second.endAt,
+      });
+
+      if (!overlaps) {
+        continue;
+      }
+
+      if (
+        pitchAllocationsConflict(
+          first.allocation.pitchCode,
+          second.allocation.pitchCode,
+        )
+      ) {
+        addConflict(conflicts, {
+          type: "PITCH_CONFLICT",
+          severity: "error",
+          eventId: first.id,
+          relatedEventId: second.id,
+          message:
+            'Platzkonflikt zwischen "' +
+            getEventLabel(first) +
+            '" und "' +
+            getEventLabel(second) +
+            '".',
+        });
+      }
+
+      const roomPairs: Array<[string | null, string | null]> = [
+        [first.allocation.homeDressingRoomCode, second.allocation.homeDressingRoomCode],
+        [first.allocation.homeDressingRoomCode, second.allocation.awayDressingRoomCode],
+        [first.allocation.awayDressingRoomCode, second.allocation.homeDressingRoomCode],
+        [first.allocation.awayDressingRoomCode, second.allocation.awayDressingRoomCode],
+      ];
+
+      const hasRoomConflict = roomPairs.some(([a, b]) => dressingRoomConflict(a, b));
+
+      if (hasRoomConflict) {
+        addConflict(conflicts, {
+          type: "DRESSING_ROOM_CONFLICT",
+          severity: "error",
+          eventId: first.id,
+          relatedEventId: second.id,
+          message:
+            'Garderobenkonflikt zwischen "' +
+            getEventLabel(first) +
+            '" und "' +
+            getEventLabel(second) +
+            '".',
+        });
+      }
+    }
+  }
+
+  return conflicts;
+}
