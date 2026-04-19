@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 import { auth } from "@/auth";
 
 const LOGIN_PATH = "/login";
@@ -36,8 +37,8 @@ const proxyHandler = auth((request) => {
   return NextResponse.redirect(loginUrl);
 });
 
-export function proxy(request: Request) {
-  return proxyHandler(request as Parameters<typeof proxyHandler>[0]);
+export function proxy(request: NextRequest, event: NextFetchEvent) {
+  return proxyHandler(request, event);
 }
 
 export const config = {
