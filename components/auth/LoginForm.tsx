@@ -42,6 +42,19 @@ function getInitialEmail(): string {
   return DEFAULT_EMAIL;
 }
 
+function isSameOriginUrl(url: string): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 export default function LoginForm() {
   const [email, setEmail] = useState(getInitialEmail);
   const [password, setPassword] = useState(DEFAULT_PASSWORD);
@@ -78,6 +91,11 @@ export default function LoginForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage("");
 
@@ -89,20 +107,38 @@ export default function LoginForm() {
       window.localStorage.removeItem(REMEMBER_EMAIL_KEY);
     }
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl: "/dashboard",
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl: "/dashboard",
+      });
 
-    if (result?.error) {
-      setErrorMessage("Login fehlgeschlagen. Bitte prüfe E-Mail und Passwort.");
+      if (!result) {
+        setErrorMessage("Login fehlgeschlagen. Bitte versuche es erneut.");
+        return;
+      }
+
+      if (result.error) {
+        setErrorMessage("Login fehlgeschlagen. Bitte prüfe E-Mail und Passwort.");
+        return;
+      }
+
+      if (!result.ok) {
+        setErrorMessage("Anmeldung konnte nicht abgeschlossen werden.");
+        return;
+      }
+
+      const targetUrl =
+        result.url && isSameOriginUrl(result.url) ? result.url : "/dashboard";
+
+      window.location.assign(targetUrl);
+    } catch {
+      setErrorMessage("Während der Anmeldung ist ein Fehler aufgetreten.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    window.location.href = "/dashboard";
   }
 
   return (
