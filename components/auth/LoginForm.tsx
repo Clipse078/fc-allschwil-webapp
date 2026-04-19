@@ -1,49 +1,56 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import FcaBrandCrest from "@/components/shared/FcaBrandCrest";
+import { KeyRound, Lock, Mail, Shield } from "lucide-react";
+import { useState, type FormEvent } from "react";
+
+const REMEMBER_EMAIL_KEY = "fca-login-remember-email";
+const REMEMBER_ENABLED_KEY = "fca-login-remember-enabled";
+
+function getInitialRememberMe(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(REMEMBER_ENABLED_KEY) === "true";
+}
+
+function getInitialEmail(): string {
+  if (typeof window === "undefined") {
+    return "admin@fcallschwil.ch";
+  }
+
+  const rememberEnabled = window.localStorage.getItem(REMEMBER_ENABLED_KEY) === "true";
+  const rememberedEmail = window.localStorage.getItem(REMEMBER_EMAIL_KEY);
+
+  if (rememberEnabled && rememberedEmail) {
+    return rememberedEmail;
+  }
+
+  return "admin@fcallschwil.ch";
+}
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("admin@fcallschwil.ch");
+  const [email, setEmail] = useState(getInitialEmail);
   const [password, setPassword] = useState("ChangeMe123!");
+  const [rememberMe, setRememberMe] = useState(getInitialRememberMe);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [now, setNow] = useState<Date>(new Date());
-
-  useEffect(() => {
-    const update = () => setNow(new Date());
-
-    update();
-
-    const interval = window.setInterval(update, 30000);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
-  const formattedDate = useMemo(() => {
-    const raw = new Intl.DateTimeFormat("de-CH", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    }).format(now);
-
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
-  }, [now]);
-
-  const formattedTime = useMemo(() => {
-    return new Intl.DateTimeFormat("de-CH", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(now);
-  }, [now]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     setErrorMessage("");
+
+    if (rememberMe) {
+      window.localStorage.setItem(REMEMBER_ENABLED_KEY, "true");
+      window.localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+    } else {
+      window.localStorage.removeItem(REMEMBER_ENABLED_KEY);
+      window.localStorage.removeItem(REMEMBER_EMAIL_KEY);
+    }
 
     const result = await signIn("credentials", {
       email,
@@ -62,122 +69,128 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden text-[#111827]">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#eef3ff] via-white to-[#f7f9fc] text-[#1f2937]">
       <div className="absolute inset-0">
-        <Image
-          src="/images/branding/fca-bg.jpg"
-          alt="FC Allschwil Background"
-          fill
-          priority
-          className="object-cover opacity-[0.6]"
-        />
+        <div className="absolute left-[-120px] top-[-120px] h-[300px] w-[300px] rounded-full bg-[#4f67e8]/10 blur-3xl" />
+        <div className="absolute bottom-[-140px] right-[-120px] h-[320px] w-[320px] rounded-full bg-[#4f67e8]/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(79,103,232,0.08),transparent_34%)]" />
       </div>
 
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(255,255,255,0.68)_38%,rgba(248,250,252,0.80)_100%)]" />
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
+        <div className="w-full max-w-[360px] rounded-[14px] border border-slate-200 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="mb-8 flex items-center justify-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4f67e8] text-white shadow-[0_8px_20px_rgba(79,103,232,0.25)]">
+              <Shield className="h-5 w-5" />
+            </div>
 
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-[-120px] top-[-120px] h-[420px] w-[420px] rounded-full bg-[#0b5db3]/10 blur-3xl" />
-        <div className="absolute bottom-[-140px] right-[-120px] h-[420px] w-[420px] rounded-full bg-[#cf2027]/10 blur-3xl" />
-
-        <div className="absolute left-1/2 top-1/2 h-[920px] w-[920px] -translate-x-1/2 -translate-y-1/2 opacity-[0.05]">
-          <FcaBrandCrest className="h-full w-full" variant="watermark" />
-        </div>
-
-        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#0b5db3]/35 to-[#cf2027]/35" />
-      </div>
-
-      <div className="relative z-10 min-h-screen">
-        <div className="flex justify-end px-8 pt-5 lg:px-14">
-          <div className="text-right">
-            <p className="text-[18px] font-medium tracking-tight text-slate-700 lg:text-[22px]">
-              {formattedDate}
-            </p>
-            <p className="mt-1 text-[44px] font-black leading-none tracking-tight text-[#111827] lg:text-[58px]">
-              {formattedTime}
-            </p>
-          </div>
-        </div>
-
-        <div className="mx-auto flex min-h-[calc(100vh-110px)] max-w-[1600px] flex-col items-center justify-center px-6 pb-16 pt-10 lg:px-10 lg:pb-20 lg:pt-6">
-          <div className="w-full max-w-[980px] text-center">
-            <div className="mx-auto mb-6 w-[88px] lg:mb-8 lg:w-[120px]">
+            <div className="flex items-center gap-2">
               <Image
                 src="/images/logos/fc-allschwil.png"
                 alt="FC Allschwil"
-                width={120}
-                height={120}
+                width={28}
+                height={28}
                 priority
-                className="h-auto w-full object-contain drop-shadow-[0_8px_20px_rgba(15,23,42,0.15)]"
+                className="h-7 w-7 object-contain"
               />
+              <span className="text-[18px] font-semibold tracking-tight text-[#4f67e8]">
+                FC Allschwil
+              </span>
+            </div>
+          </div>
+
+          <div className="mb-7 text-center">
+            <h1 className="text-[18px] font-semibold text-[#1f2937]">Anmelden</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Bitte geben Sie Ihre Zugangsdaten ein, um auf das System zuzugreifen.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm font-medium text-[#374151]"
+              >
+                E-Mail
+              </label>
+
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="name@fcallschwil.ch"
+                  required
+                  className="w-full rounded-md border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#4f67e8] focus:ring-2 focus:ring-[#4f67e8]/15"
+                />
+              </div>
             </div>
 
-            <h1 className="text-[72px] font-black uppercase leading-[0.9] tracking-[-0.04em] text-[#111827] lg:text-[104px]">
-              Willkommen
-            </h1>
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-2 block text-sm font-medium text-[#374151]"
+              >
+                Passwort
+              </label>
 
-            <h2 className="text-[64px] font-black uppercase leading-[0.9] tracking-[-0.05em] text-[#0b5db3] lg:text-[96px]">
-              beim FC Allschwil
-            </h2>
-
-            <h3 className="text-[56px] font-black uppercase leading-[0.9] tracking-[-0.05em] text-[#cf2027] lg:text-[88px]">
-              Clubmanager
-            </h3>
-
-            <div className="mx-auto mt-10 w-full max-w-[520px] rounded-[32px] border border-white/70 bg-white/86 p-6 text-left shadow-[0_20px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="mb-2 block text-sm font-medium text-slate-700"
-                  >
-                    E-Mail
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b5db3] focus:ring-2 focus:ring-blue-100"
-                    placeholder="admin@fcallschwil.ch"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="password"
-                    className="mb-2 block text-sm font-medium text-slate-700"
-                  >
-                    Passwort
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#cf2027] focus:ring-2 focus:ring-red-100"
-                    placeholder="Passwort"
-                    required
-                  />
-                </div>
-
-                {errorMessage ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessage}
-                  </div>
-                ) : null}
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full rounded-full bg-[#cf2027] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-200 transition hover:bg-[#b51b22] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSubmitting ? "Anmeldung läuft..." : "Einloggen"}
-                </button>
-              </form>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Passwort"
+                  required
+                  className="w-full rounded-md border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#4f67e8] focus:ring-2 focus:ring-[#4f67e8]/15"
+                />
+              </div>
             </div>
+
+            {errorMessage ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-500">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-[#4f67e8] focus:ring-[#4f67e8]/30"
+                />
+                <span>Angemeldet bleiben</span>
+              </label>
+
+              <Link
+                href="mailto:admin@fcallschwil.ch?subject=Passwort%20Reset%20anfragen"
+                className="text-sm font-medium text-[#4f67e8] transition hover:text-[#3f55cb]"
+              >
+                Reset beim Admin anfragen
+              </Link>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-md bg-[#4f67e8] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(79,103,232,0.24)] transition hover:bg-[#4459d2] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? "Anmeldung läuft..." : "Anmelden"}
+            </button>
+          </form>
+
+          <div className="my-6 h-px bg-slate-200" />
+
+          <div className="flex items-center justify-center gap-2 text-center text-xs text-slate-500">
+            <Lock className="h-3.5 w-3.5" />
+            <span>2FA-geschützter Bereich für interne Vorgänge</span>
           </div>
         </div>
       </div>

@@ -47,45 +47,14 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     Credentials({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: "E-Mail", type: "email" },
+        password: { label: "Passwort", type: "password" },
       },
       authorize: async (credentials) => {
         const email = String(credentials?.email ?? "").trim().toLowerCase();
         const password = String(credentials?.password ?? "");
 
-        console.log("[auth-debug] authorize:start", {
-          email,
-          hasPassword: Boolean(password),
-          nodeEnv: process.env.NODE_ENV ?? null,
-          appEnv: process.env.APP_ENV ?? null,
-          hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
-          databaseUrlHost: process.env.DATABASE_URL
-            ? (() => {
-                try {
-                  return new URL(process.env.DATABASE_URL).host;
-                } catch {
-                  return "invalid";
-                }
-              })()
-            : null,
-          databaseUrlPath: process.env.DATABASE_URL
-            ? (() => {
-                try {
-                  return new URL(process.env.DATABASE_URL).pathname;
-                } catch {
-                  return "invalid";
-                }
-              })()
-            : null,
-        });
-
         if (!email || !password) {
-          console.log("[auth-debug] authorize:missing-credentials", {
-            hasEmail: Boolean(email),
-            hasPassword: Boolean(password),
-          });
-
           return null;
         }
 
@@ -108,37 +77,15 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           },
         });
 
-        console.log("[auth-debug] authorize:user-query-result", {
-          email,
-          userFound: Boolean(user),
-          userId: user?.id ?? null,
-          isActive: user?.isActive ?? null,
-          firstName: user?.firstName ?? null,
-          lastName: user?.lastName ?? null,
-          roleCount: user?.userRoles?.length ?? 0,
-          passwordHashPrefix: user?.passwordHash ? user.passwordHash.slice(0, 7) : null,
-        });
-
-        if (!user) {
-          console.log("[auth-debug] authorize:user-not-found", { email });
+        if (!user || !user.isActive) {
           return null;
         }
 
-        if (!user.isActive) {
-          console.log("[auth-debug] authorize:user-inactive", {
-            email,
-            userId: user.id,
-          });
+        if (user.accessState !== "ACTIVE") {
           return null;
         }
 
         const isPasswordValid = await verifyPassword(password, user.passwordHash);
-
-        console.log("[auth-debug] authorize:password-check", {
-          email,
-          userId: user.id,
-          isPasswordValid,
-        });
 
         if (!isPasswordValid) {
           return null;
@@ -153,19 +100,10 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const permissionKeys = Array.from(
           new Set(
             user.userRoles.flatMap((userRole) =>
-              userRole.role.rolePermissions.map(
-                (rolePermission) => rolePermission.permission.key
-              )
+              userRole.role.rolePermissions.map((rolePermission) => rolePermission.permission.key)
             )
           )
         );
-
-        console.log("[auth-debug] authorize:success", {
-          email,
-          userId: user.id,
-          roleKeys,
-          permissionKeys,
-        });
 
         const authUser: SessionUserShape = {
           id: user.id,

@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createPasswordResetToken } from "@/lib/auth/password-reset";
-import { buildPasswordResetUrl, sendPasswordResetMail } from "@/lib/mail/mailer";
+import { createInviteToken } from "@/lib/auth/invite";
+import { buildInviteUrl, sendInviteMail } from "@/lib/mail/mailer";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { logAction } from "@/lib/audit/log-action";
@@ -29,6 +29,12 @@ export async function POST(_request: Request, context: RouteContext) {
         firstName: true,
         email: true,
         isActive: true,
+        accessState: true,
+        userRoles: {
+          select: {
+            roleId: true,
+          },
+        },
       },
     });
 
@@ -38,7 +44,14 @@ export async function POST(_request: Request, context: RouteContext) {
 
     if (!user.isActive) {
       return NextResponse.json(
-        { error: "Inaktive Benutzer können keinen Reset-Link erhalten." },
+        { error: "Inaktive Benutzer können nicht eingeladen werden." },
+        { status: 400 }
+      );
+    }
+
+    if (user.userRoles.length === 0) {
+      return NextResponse.json(
+        { error: "Vor dem Versand der Einladung muss mindestens eine Rolle zugewiesen werden." },
         { status: 400 }
       );
     }
@@ -48,53 +61,55 @@ export async function POST(_request: Request, context: RouteContext) {
       access.session?.user?.id ??
       null;
 
-    const reset = await createPasswordResetToken({
+    const invite = await createInviteToken({
       userId: user.id,
       createdByUserId: actorUserId,
     });
 
-    const resetUrl = buildPasswordResetUrl(reset.token);
+    const inviteUrl = buildInviteUrl(invite.token);
 
-    await sendPasswordResetMail({
+    await sendInviteMail({
       to: user.email,
       firstName: user.firstName,
-      resetUrl,
+      inviteUrl,
     });
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        passwordResetSentAt: new Date(),
+        accessState: "INVITED",
+        invitedAt: new Date(),
       },
     });
 
     await logAction({
       actorUserId,
       moduleKey: "users",
-      entityType: "UserPasswordReset",
+      entityType: "UserInvite",
       entityId: user.id,
-      action: "SEND_RESET",
+      action: "SEND_INVITE",
       afterJson: {
+        accessState: "INVITED",
         email: user.email,
-        expiresAt: reset.expiresAt.toISOString(),
+        expiresAt: invite.expiresAt.toISOString(),
       },
     });
 
     return NextResponse.json({
-      message: "Reset-Link erfolgreich versendet.",
+      message: "Einladung erfolgreich versendet.",
     });
   } catch (error) {
-    console.error("Send password reset failed:", error);
+    console.error("Send invite failed:", error);
 
     if (error instanceof Error) {
       return NextResponse.json(
-        { error: "Reset-Link konnte nicht versendet werden: " + error.message },
+        { error: "Einladung konnte nicht versendet werden: " + error.message },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
-      { error: "Reset-Link konnte nicht versendet werden." },
+      { error: "Einladung konnte nicht versendet werden." },
       { status: 500 }
     );
   }

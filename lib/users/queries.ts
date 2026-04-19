@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
 
 export async function getUsersListData() {
   const users = await prisma.user.findMany({
@@ -9,6 +9,11 @@ export async function getUsersListData() {
       lastName: true,
       email: true,
       isActive: true,
+      accessState: true,
+      invitedAt: true,
+      inviteAcceptedAt: true,
+      passwordResetSentAt: true,
+      lastLoginAt: true,
       userRoles: {
         select: {
           role: {
@@ -26,6 +31,11 @@ export async function getUsersListData() {
     name: user.firstName + " " + user.lastName,
     email: user.email,
     isActive: user.isActive,
+    accessState: user.accessState,
+    invitedAt: user.invitedAt,
+    inviteAcceptedAt: user.inviteAcceptedAt,
+    passwordResetSentAt: user.passwordResetSentAt,
+    lastLoginAt: user.lastLoginAt,
     roles: user.userRoles.map((userRole) => userRole.role.name),
   }));
 }
@@ -39,6 +49,12 @@ export async function getUserDetailData(userId: string) {
       lastName: true,
       email: true,
       isActive: true,
+      accessState: true,
+      invitedAt: true,
+      inviteAcceptedAt: true,
+      passwordSetAt: true,
+      passwordResetSentAt: true,
+      lastLoginAt: true,
       userRoles: {
         select: {
           role: {

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -26,7 +26,6 @@ export default function UserForm({
   const [lastName, setLastName] = useState(initialValues?.lastName ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? true);
-  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +40,7 @@ export default function UserForm({
 
       const payload =
         mode === "create"
-          ? { firstName, lastName, email, password }
+          ? { firstName, lastName, email }
           : { firstName, lastName, email, isActive };
 
       const response = await fetch(url, {
@@ -52,13 +51,18 @@ export default function UserForm({
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data.error ?? "Speichern fehlgeschlagen.");
+        throw new Error(data?.error ?? "Speichern fehlgeschlagen.");
       }
 
-      router.push("/dashboard/users");
+      if (mode === "create" && data?.id) {
+        router.push("/dashboard/users/" + data.id);
+      } else {
+        router.push("/dashboard/users");
+      }
+
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
@@ -104,17 +108,9 @@ export default function UserForm({
         </label>
 
         {mode === "create" ? (
-          <label className="block space-y-2">
-            <span className="fca-label">Temporäres Passwort</span>
-            <input
-              type="password"
-              className="fca-input"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength={8}
-            />
-          </label>
+          <div className="fca-status-box fca-status-box-muted">
+            Der Benutzer wird zunächst ohne Login-Zugang erstellt. Danach Rollen zuweisen und anschliessend Einladung senden.
+          </div>
         ) : (
           <label className="fca-toggle-row">
             <span className="text-sm text-slate-700">Benutzer ist aktiv</span>
