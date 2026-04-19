@@ -69,17 +69,11 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#eef3ff] via-white to-[#f7f9fc] text-[#1f2937]">
-      <div className="absolute inset-0">
-        <div className="absolute left-[-120px] top-[-120px] h-[300px] w-[300px] rounded-full bg-[#4f67e8]/10 blur-3xl" />
-        <div className="absolute bottom-[-140px] right-[-120px] h-[320px] w-[320px] rounded-full bg-[#4f67e8]/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(79,103,232,0.08),transparent_34%)]" />
-      </div>
-
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
-        <div className="w-full max-w-[360px] rounded-[14px] border border-slate-200 bg-white/95 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur">
+    <main className="min-h-screen bg-[#f3f4f6] px-4 py-8 text-[#1f2937]">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[360px] items-center justify-center">
+        <div className="w-full rounded-[4px] border border-slate-300 bg-white p-6 shadow-sm">
           <div className="mb-8 flex items-center justify-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4f67e8] text-white shadow-[0_8px_20px_rgba(79,103,232,0.25)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#4f67e8] text-white shadow-[0_8px_20px_rgba(79,103,232,0.25)]">
               <Shield className="h-5 w-5" />
             </div>
 
@@ -87,12 +81,12 @@ export default function LoginForm() {
               <Image
                 src="/images/logos/fc-allschwil.png"
                 alt="FC Allschwil"
-                width={28}
-                height={28}
+                width={26}
+                height={26}
                 priority
-                className="h-7 w-7 object-contain"
+                className="h-6 w-6 object-contain"
               />
-              <span className="text-[18px] font-semibold tracking-tight text-[#4f67e8]">
+              <span className="text-[17px] font-semibold tracking-tight text-[#4f67e8]">
                 FC Allschwil
               </span>
             </div>
@@ -124,7 +118,7 @@ export default function LoginForm() {
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="name@fcallschwil.ch"
                   required
-                  className="w-full rounded-md border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#4f67e8] focus:ring-2 focus:ring-[#4f67e8]/15"
+                  className="w-full rounded-[4px] border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#4f67e8] focus:ring-2 focus:ring-[#4f67e8]/15"
                 />
               </div>
             </div>
@@ -147,13 +141,13 @@ export default function LoginForm() {
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="Passwort"
                   required
-                  className="w-full rounded-md border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#4f67e8] focus:ring-2 focus:ring-[#4f67e8]/15"
+                  className="w-full rounded-[4px] border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#4f67e8] focus:ring-2 focus:ring-[#4f67e8]/15"
                 />
               </div>
             </div>
 
             {errorMessage ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="rounded-[4px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {errorMessage}
               </div>
             ) : null}
@@ -170,17 +164,17 @@ export default function LoginForm() {
               </label>
 
               <Link
-                href="mailto:admin@fcallschwil.ch?subject=Passwort%20Reset%20anfragen"
+                href="mailto:admin@fcallschwil.ch?subject=Passwort%20vergessen"
                 className="text-sm font-medium text-[#4f67e8] transition hover:text-[#3f55cb]"
               >
-                Reset beim Admin anfragen
+                Passwort vergessen?
               </Link>
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-md bg-[#4f67e8] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(79,103,232,0.24)] transition hover:bg-[#4459d2] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-[4px] bg-[#4f67e8] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#4459d2] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? "Anmeldung läuft..." : "Anmelden"}
             </button>
