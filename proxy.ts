@@ -1,5 +1,4 @@
 ﻿import { NextResponse } from "next/server";
-import type { NextFetchEvent, NextRequest } from "next/server";
 import { auth } from "@/auth";
 
 const LOGIN_PATH = "/login";
@@ -12,13 +11,12 @@ function isProtectedPath(pathname: string): boolean {
   });
 }
 
-const proxyHandler = auth((request) => {
-  const { nextUrl, auth: session } = request;
-  const pathname = nextUrl.pathname;
-  const isLoggedIn = Boolean(session?.user);
+export const proxy = auth((request) => {
+  const pathname = request.nextUrl.pathname;
+  const isLoggedIn = Boolean(request.auth?.user);
 
   if (pathname === LOGIN_PATH && isLoggedIn) {
-    return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_PATH, nextUrl));
+    return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_PATH, request.nextUrl));
   }
 
   if (!isProtectedPath(pathname)) {
@@ -29,17 +27,11 @@ const proxyHandler = auth((request) => {
     return NextResponse.next();
   }
 
-  const loginUrl = new URL(LOGIN_PATH, nextUrl);
-  const callbackTarget = pathname + nextUrl.search;
-
-  loginUrl.searchParams.set("callbackUrl", callbackTarget);
+  const loginUrl = new URL(LOGIN_PATH, request.nextUrl.origin);
+  loginUrl.searchParams.set("callbackUrl", pathname + request.nextUrl.search);
 
   return NextResponse.redirect(loginUrl);
 });
-
-export function proxy(request: NextRequest, event: NextFetchEvent) {
-  return proxyHandler(request, event);
-}
 
 export const config = {
   matcher: ["/login", "/dashboard/:path*", "/vereinsleitung/:path*"],
