@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+﻿import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
@@ -37,6 +37,7 @@ function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUse
 }
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
+  trustHost: true,
   session: {
     strategy: "jwt",
   },
@@ -77,11 +78,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           },
         });
 
-        if (!user || !user.isActive) {
-          return null;
-        }
-
-        if (user.accessState !== "ACTIVE") {
+        if (!user || !user.isActive || user.accessState !== "ACTIVE" || !user.passwordHash) {
           return null;
         }
 
@@ -140,7 +137,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
       if (trigger === "update" && session?.user) {
         const updatedUser = normalizeSessionUserShape(
-          session.user as Partial<SessionUserShape>
+          session.user as Partial<SessionUserShape>,
         );
 
         token.id = updatedUser.id;
@@ -183,6 +180,23 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
       return session;
     },
+    redirect: async ({ url, baseUrl }) => {
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+
+      try {
+        const targetUrl = new URL(url);
+        const targetBaseUrl = new URL(baseUrl);
+
+        if (targetUrl.origin === targetBaseUrl.origin) {
+          return targetUrl.toString();
+        }
+      } catch {
+        return `${baseUrl}/dashboard`;
+      }
+
+      return `${baseUrl}/dashboard`;
+    },
   },
-  trustHost: true,
 });
