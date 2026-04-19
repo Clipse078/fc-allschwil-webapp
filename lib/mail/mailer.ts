@@ -1,4 +1,4 @@
-﻿type MailMessageInput = {
+type MailMessageInput = {
   to: string;
   subject: string;
   html: string;
@@ -17,6 +17,14 @@ function getBaseUrl() {
   return fallback.replace(/\/$/, "");
 }
 
+function getMailProvider() {
+  return process.env.MAIL_PROVIDER?.trim()?.toLowerCase() ?? "log";
+}
+
+export function isLogMailMode() {
+  return getMailProvider() === "log";
+}
+
 export function buildInviteUrl(token: string) {
   return getBaseUrl() + "/invite/" + encodeURIComponent(token);
 }
@@ -26,7 +34,7 @@ export function buildPasswordResetUrl(token: string) {
 }
 
 export async function sendMail(input: MailMessageInput) {
-  const provider = process.env.MAIL_PROVIDER?.trim()?.toLowerCase() ?? "log";
+  const provider = getMailProvider();
 
   if (provider === "log") {
     console.log("[mail-log]", {
@@ -35,7 +43,7 @@ export async function sendMail(input: MailMessageInput) {
       text: input.text,
     });
 
-    return { ok: true as const };
+    return { ok: true as const, provider: "log" as const };
   }
 
   if (provider === "resend") {
@@ -66,7 +74,7 @@ export async function sendMail(input: MailMessageInput) {
       throw new Error("Mailversand fehlgeschlagen: " + body);
     }
 
-    return { ok: true as const };
+    return { ok: true as const, provider: "resend" as const };
   }
 
   throw new Error("MAIL_PROVIDER nicht unterstützt.");

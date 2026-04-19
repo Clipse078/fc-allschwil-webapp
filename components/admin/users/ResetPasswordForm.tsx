@@ -28,7 +28,17 @@ export default function ResetPasswordForm({ userId }: ResetPasswordFormProps) {
         throw new Error(data?.error ?? "Reset-Link konnte nicht versendet werden.");
       }
 
-      setMessage(data?.message ?? "Reset-Link erfolgreich versendet.");
+      const debugUrl =
+        typeof data?.debugUrl === "string" && data.debugUrl.trim().length > 0
+          ? data.debugUrl
+          : null;
+
+      if (debugUrl) {
+        window.prompt("STAGE Test-Link für Passwort-Reset", debugUrl);
+        setMessage("Reset-Link wurde im Testmodus erzeugt.");
+      } else {
+        setMessage(data?.message ?? "Reset-Link erfolgreich versendet.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
     } finally {

@@ -39,7 +39,17 @@ export default function SendInviteButton({
         throw new Error(data?.error ?? "Einladung konnte nicht versendet werden.");
       }
 
-      window.alert(data?.message ?? "Einladung erfolgreich versendet.");
+      const debugUrl =
+        typeof data?.debugUrl === "string" && data.debugUrl.trim().length > 0
+          ? data.debugUrl
+          : null;
+
+      if (debugUrl) {
+        window.prompt("STAGE Test-Link für Einladung", debugUrl);
+      } else {
+        window.alert(data?.message ?? "Einladung erfolgreich versendet.");
+      }
+
       window.location.reload();
     } catch (error) {
       window.alert(

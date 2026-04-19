@@ -1,7 +1,11 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { createPasswordResetToken } from "@/lib/auth/password-reset";
-import { buildPasswordResetUrl, sendPasswordResetMail } from "@/lib/mail/mailer";
+import {
+  buildPasswordResetUrl,
+  isLogMailMode,
+  sendPasswordResetMail,
+} from "@/lib/mail/mailer";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { logAction } from "@/lib/audit/log-action";
@@ -82,6 +86,8 @@ export async function POST(_request: Request, context: RouteContext) {
 
     return NextResponse.json({
       message: "Reset-Link erfolgreich versendet.",
+      debugUrl: isLogMailMode() ? resetUrl : null,
+      debugMode: isLogMailMode(),
     });
   } catch (error) {
     console.error("Send password reset failed:", error);
