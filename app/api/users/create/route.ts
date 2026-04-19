@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/db/prisma";
@@ -18,10 +18,22 @@ export async function POST(request: NextRequest) {
     const firstName = String(body.firstName ?? "").trim();
     const lastName = String(body.lastName ?? "").trim();
     const email = String(body.email ?? "").trim().toLowerCase();
+    const roleIds: string[] = Array.isArray(body.roleIds)
+      ? body.roleIds
+          .map((value: unknown) => String(value).trim())
+          .filter((value: string) => Boolean(value))
+      : [];
 
     if (!firstName || !lastName || !email) {
       return NextResponse.json(
         { error: "Vorname, Nachname und E-Mail sind erforderlich." },
+        { status: 400 }
+      );
+    }
+
+    if (roleIds.length === 0) {
+      return NextResponse.json(
+        { error: "Vor dem Erstellen muss mindestens eine Rolle zugewiesen werden." },
         { status: 400 }
       );
     }
@@ -38,6 +50,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const validRoles = await prisma.role.findMany({
+      where: {
+        id: {
+          in: roleIds,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (validRoles.length !== roleIds.length) {
+      return NextResponse.json(
+        { error: "Mindestens eine ausgewählte Rolle ist ungültig." },
+        { status: 400 }
+      );
+    }
+
     const placeholderPasswordHash = await hashPassword(crypto.randomUUID() + "-invite-only");
 
     const actorUserId =
@@ -45,44 +75,58 @@ export async function POST(request: NextRequest) {
       access.session?.user?.id ??
       null;
 
-    const user = await prisma.user.create({
-      data: {
-        firstName,
-        lastName,
-        email,
-        passwordHash: placeholderPasswordHash,
-        isActive: true,
-        accessState: "PENDING_INVITE",
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        isActive: true,
-        accessState: true,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          firstName,
+          lastName,
+          email,
+          passwordHash: placeholderPasswordHash,
+          isActive: true,
+          accessState: "PENDING_INVITE",
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          isActive: true,
+          accessState: true,
+        },
+      });
+
+      if (roleIds.length > 0) {
+        await tx.userRole.createMany({
+          data: roleIds.map((roleId) => ({
+            userId: user.id,
+            roleId,
+          })),
+        });
+      }
+
+      return user;
     });
 
     await logAction({
       actorUserId,
       moduleKey: "users",
       entityType: "User",
-      entityId: user.id,
+      entityId: result.id,
       action: "CREATE",
       afterJson: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        isActive: user.isActive,
-        accessState: user.accessState,
+        firstName: result.firstName,
+        lastName: result.lastName,
+        email: result.email,
+        isActive: result.isActive,
+        accessState: result.accessState,
+        roleIds,
       },
     });
 
     return NextResponse.json(
       {
-        id: user.id,
-        message: "Benutzer erfolgreich erstellt. Weise jetzt mindestens eine Rolle zu und sende danach die Einladung.",
+        id: result.id,
+        message: "Benutzer erfolgreich erstellt. Rollen sind bereits zugewiesen, Einladung kann jetzt gesendet werden.",
       },
       { status: 201 }
     );

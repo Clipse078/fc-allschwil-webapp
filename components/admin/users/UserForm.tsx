@@ -1,8 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
+
+type RoleItem = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+};
 
 type UserFormProps = {
   mode: "create" | "edit";
@@ -13,12 +20,14 @@ type UserFormProps = {
     email: string;
     isActive: boolean;
   };
+  initialRoles?: RoleItem[];
 };
 
 export default function UserForm({
   mode,
   userId,
   initialValues,
+  initialRoles = [],
 }: UserFormProps) {
   const router = useRouter();
 
@@ -26,8 +35,25 @@ export default function UserForm({
   const [lastName, setLastName] = useState(initialValues?.lastName ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? true);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const canSubmitCreate = useMemo(() => {
+    if (mode !== "create") {
+      return true;
+    }
+
+    return selectedRoleIds.length > 0;
+  }, [mode, selectedRoleIds]);
+
+  function toggleRole(roleId: string) {
+    setSelectedRoleIds((current) =>
+      current.includes(roleId)
+        ? current.filter((id) => id !== roleId)
+        : [...current, roleId]
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,7 +66,7 @@ export default function UserForm({
 
       const payload =
         mode === "create"
-          ? { firstName, lastName, email }
+          ? { firstName, lastName, email, roleIds: selectedRoleIds }
           : { firstName, lastName, email, isActive };
 
       const response = await fetch(url, {
@@ -108,8 +134,53 @@ export default function UserForm({
         </label>
 
         {mode === "create" ? (
-          <div className="fca-status-box fca-status-box-muted">
-            Der Benutzer wird zunächst ohne Login-Zugang erstellt. Danach Rollen zuweisen und anschliessend Einladung senden.
+          <div className="space-y-4">
+            <div>
+              <h3 className="fca-subheading">Rollen zuweisen</h3>
+              <p className="mt-3 text-sm text-slate-600">
+                Vor dem Erstellen muss mindestens eine Rolle zugewiesen werden. Danach kann die Einladung sofort versendet werden.
+              </p>
+            </div>
+
+            {initialRoles.length === 0 ? (
+              <div className="fca-status-box fca-status-box-error">
+                Keine Rollen gefunden. Bitte zuerst Rollen anlegen.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {initialRoles.map((role) => (
+                  <label
+                    key={role.id}
+                    className="fca-section-card flex items-start gap-3 px-4 py-4"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedRoleIds.includes(role.id)}
+                      onChange={() => toggleRole(role.id)}
+                      className="mt-1 fca-toggle-checkbox"
+                    />
+
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        {role.name}
+                      </div>
+                      <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                        {role.key}
+                      </div>
+                      {role.description ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          {role.description}
+                        </p>
+                      ) : null}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="fca-status-box fca-status-box-muted">
+              Benutzer wird ohne Passwort erstellt. Die eingeladene Person setzt ihr persönliches Passwort selbst über den Einladungslink.
+            </div>
           </div>
         ) : (
           <label className="fca-toggle-row">
@@ -130,7 +201,7 @@ export default function UserForm({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || (mode === "create" && !canSubmitCreate)}
             className="fca-button-primary"
           >
             {submitting
