@@ -40,12 +40,12 @@ function getNavIcon(label: string) {
       return LayoutDashboard;
     case "Vereinsleitung":
       return Briefcase;
+    case "Cockpit":
+      return BarChart3;
     case "Meetings":
       return ScrollText;
     case "Initiativen":
       return Flag;
-    case "KPIs":
-      return BarChart3;
     case "Saisons":
       return CalendarRange;
     case "Saisonplanner":
@@ -72,7 +72,7 @@ function getNavIcon(label: string) {
 }
 
 function isVereinsleitungChild(label: string) {
-  return label === "Meetings" || label === "Initiativen" || label === "KPIs";
+  return label === "Cockpit" || label === "Meetings" || label === "Initiativen";
 }
 
 function isPlannerChild(label: string) {

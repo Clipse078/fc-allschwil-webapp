@@ -1,4 +1,4 @@
-export const PERMISSIONS = {
+﻿export const PERMISSIONS = {
   USERS_MANAGE: "users.manage",
   USERS_IMPERSONATE: "users.impersonate",
 
@@ -29,6 +29,15 @@ export const PERMISSIONS = {
   WEBSITE_MANAGE: "website.manage",
   INFOBOARD_MANAGE: "infoboard.manage",
   FUNCTIONS_MANAGE: "functions.manage",
+
+  VEREINSLEITUNG_VIEW: "vereinsleitung.view",
+  VEREINSLEITUNG_KPI_VIEW: "vereinsleitung.kpi.view",
+  VEREINSLEITUNG_PENDENZEN_VIEW: "vereinsleitung.pendenzen.view",
+  VEREINSLEITUNG_PENDENZEN_MANAGE: "vereinsleitung.pendenzen.manage",
+  VEREINSLEITUNG_MEETINGS_VIEW: "vereinsleitung.meetings.view",
+  VEREINSLEITUNG_MEETINGS_MANAGE: "vereinsleitung.meetings.manage",
+  VEREINSLEITUNG_INITIATIVES_VIEW: "vereinsleitung.initiatives.view",
+  VEREINSLEITUNG_INITIATIVES_MANAGE: "vereinsleitung.initiatives.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

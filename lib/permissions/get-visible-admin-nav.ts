@@ -17,18 +17,33 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
     label: "Vereinsleitung",
     href: "/vereinsleitung",
+    permissionKeys: [PERMISSIONS.VEREINSLEITUNG_VIEW],
+  },
+  {
+    label: "Cockpit",
+    href: "/vereinsleitung/cockpit",
+    permissionKeys: [
+      PERMISSIONS.VEREINSLEITUNG_VIEW,
+      PERMISSIONS.VEREINSLEITUNG_KPI_VIEW,
+      PERMISSIONS.VEREINSLEITUNG_PENDENZEN_VIEW,
+      PERMISSIONS.VEREINSLEITUNG_PENDENZEN_MANAGE,
+    ],
   },
   {
     label: "Meetings",
     href: "/vereinsleitung/meetings",
+    permissionKeys: [
+      PERMISSIONS.VEREINSLEITUNG_MEETINGS_VIEW,
+      PERMISSIONS.VEREINSLEITUNG_MEETINGS_MANAGE,
+    ],
   },
   {
     label: "Initiativen",
     href: "/vereinsleitung/initiativen",
-  },
-  {
-    label: "KPIs",
-    href: "/vereinsleitung/kpis",
+    permissionKeys: [
+      PERMISSIONS.VEREINSLEITUNG_INITIATIVES_VIEW,
+      PERMISSIONS.VEREINSLEITUNG_INITIATIVES_MANAGE,
+    ],
   },
   {
     label: "Saisons",

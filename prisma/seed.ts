@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
@@ -70,6 +70,15 @@ async function main() {
     { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE },
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
+
+    { key: "vereinsleitung.view", name: "View Vereinsleitung", module: PermissionModule.FUNCTIONS },
+    { key: "vereinsleitung.kpi.view", name: "View Vereinsleitung KPI", module: PermissionModule.FUNCTIONS },
+    { key: "vereinsleitung.pendenzen.view", name: "View Vereinsleitung pendenzen", module: PermissionModule.FUNCTIONS },
+    { key: "vereinsleitung.pendenzen.manage", name: "Manage Vereinsleitung pendenzen", module: PermissionModule.FUNCTIONS },
+    { key: "vereinsleitung.meetings.view", name: "View Vereinsleitung meetings", module: PermissionModule.FUNCTIONS },
+    { key: "vereinsleitung.meetings.manage", name: "Manage Vereinsleitung meetings", module: PermissionModule.FUNCTIONS },
+    { key: "vereinsleitung.initiatives.view", name: "View Vereinsleitung initiatives", module: PermissionModule.FUNCTIONS },
+    { key: "vereinsleitung.initiatives.manage", name: "Manage Vereinsleitung initiatives", module: PermissionModule.FUNCTIONS },
   ] as const;
 
   for (const permission of permissions) {
@@ -368,7 +377,7 @@ async function main() {
         status: EventStatus.SCHEDULED,
         title: "FC Allschwil E4 vs FC Concordia Basel",
         description: "Demo Match für Spielplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im Brüel",
+        location: "Sportplatz im Brühl",
         startAt: new Date("2026-04-18T08:30:00.000Z"),
         endAt: new Date("2026-04-18T10:00:00.000Z"),
         opponentName: "FC Concordia Basel",
@@ -417,7 +426,7 @@ async function main() {
         status: EventStatus.SCHEDULED,
         title: "E4 Training Dienstag",
         description: "Demo Training für Trainingsplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im Brüel",
+        location: "Sportplatz im Brühl",
         startAt: new Date("2026-04-21T15:30:00.000Z"),
         endAt: new Date("2026-04-21T17:00:00.000Z"),
         meetingTime: new Date("2026-04-21T15:15:00.000Z"),
