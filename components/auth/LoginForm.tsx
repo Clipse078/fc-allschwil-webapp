@@ -162,30 +162,30 @@ export default function LoginForm() {
         <div className="mx-auto flex min-h-[calc(100vh-96px)] max-w-[1600px] items-center justify-center px-6 pb-14 pt-4 lg:px-10">
           <div className="w-full">
             <div className="mx-auto flex max-w-[980px] flex-col items-center text-center">
-              <div className="mb-10 w-[128px] lg:mb-12 lg:w-[156px]">
+              <div className="mb-8 w-[112px] lg:mb-10 lg:w-[132px]">
                 <Image
                   src="/images/logos/fc-allschwil.png"
                   alt="FC Allschwil"
-                  width={156}
-                  height={156}
+                  width={132}
+                  height={132}
                   priority
                   className="h-auto w-full object-contain drop-shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
                 />
               </div>
 
               <div className="space-y-1">
-                <h1 className="font-display text-[86px] font-black uppercase leading-[0.86] tracking-[-0.06em] text-[#0b122d] sm:text-[112px] lg:text-[132px]">
+                <h1 className="font-display text-[64px] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#0b122d] sm:text-[82px] lg:text-[96px]">
                   Willkommen
                 </h1>
-                <h2 className="font-display text-[62px] font-black uppercase leading-[0.86] tracking-[-0.06em] text-[#0d5db7] sm:text-[88px] lg:text-[108px]">
+                <h2 className="font-display text-[48px] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#0d5db7] sm:text-[66px] lg:text-[82px]">
                   beim FC Allschwil
                 </h2>
-                <h3 className="font-display text-[64px] font-black uppercase leading-[0.86] tracking-[-0.06em] text-[#c9181e] sm:text-[90px] lg:text-[112px]">
+                <h3 className="font-display text-[50px] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#c9181e] sm:text-[68px] lg:text-[84px]">
                   Clubmanager
                 </h3>
               </div>
 
-              <div className="mt-12 w-full max-w-[360px] rounded-[8px] border border-slate-300 bg-white/90 p-6 text-left shadow-[0_20px_40px_rgba(15,23,42,0.06)]">
+              <div className="mt-10 w-full max-w-[360px] rounded-[8px] border border-slate-300 bg-white/90 p-6 text-left shadow-[0_20px_40px_rgba(15,23,42,0.06)]">
                 <div className="mb-5 text-center">
                   <h4 className="text-[18px] font-semibold text-slate-900">Anmelden</h4>
                   <p className="mt-2 text-[12px] leading-5 text-slate-500">
