@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
 type HeaderContent = {
@@ -8,7 +9,21 @@ type HeaderContent = {
   description: string;
 };
 
-function getHeaderContent(pathname: string): HeaderContent {
+type MeetingHeaderResponseItem = {
+  slug: string;
+  title: string;
+  subtitle?: string | null;
+};
+
+function humanizeSlug(value: string) {
+  return value
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getStaticHeaderContent(pathname: string): HeaderContent {
   if (pathname === "/dashboard/planner") {
     return {
       eyebrow: "Saisonplanner",
@@ -44,19 +59,29 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/vereinsleitung/meetings/vorstandssitzung-april") {
+  if (pathname === "/vereinsleitung/meetings/new") {
     return {
       eyebrow: "Meetings",
-      title: "Vorstandssitzung April",
-      description: "Protokoll & Beschlüsse",
+      title: "Meeting planen",
+      description: "Neues Meeting erfassen und direkt mit Pendenzen verknüpfen.",
+    };
+  }
+
+  if (pathname.startsWith("/vereinsleitung/meetings/") && pathname.endsWith("/edit")) {
+    const slug = pathname.replace("/vereinsleitung/meetings/", "").replace("/edit", "");
+    return {
+      eyebrow: "Meetings",
+      title: humanizeSlug(slug),
+      description: "Meeting-Daten und Pendenzen-Verknüpfungen anpassen.",
     };
   }
 
   if (pathname.startsWith("/vereinsleitung/meetings/")) {
+    const slug = pathname.replace("/vereinsleitung/meetings/", "");
     return {
       eyebrow: "Meetings",
-      title: "Meeting Details",
-      description: "Protokoll, Teilnehmer, Beschlüsse und Massnahmen.",
+      title: humanizeSlug(slug),
+      description: "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
     };
   }
 
@@ -174,7 +199,91 @@ function getHeaderContent(pathname: string): HeaderContent {
 
 export default function AdminPageHeader() {
   const pathname = usePathname();
-  const headerContent = getHeaderContent(pathname);
+  const staticContent = useMemo(() => getStaticHeaderContent(pathname), [pathname]);
+  const [dynamicContent, setDynamicContent] = useState<HeaderContent | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadMeetingHeader() {
+      const isMeetingDetail =
+        pathname.startsWith("/vereinsleitung/meetings/") &&
+        pathname !== "/vereinsleitung/meetings" &&
+        pathname !== "/vereinsleitung/meetings/new";
+
+      if (!isMeetingDetail) {
+        setDynamicContent(null);
+        return;
+      }
+
+      const isEdit = pathname.endsWith("/edit");
+      const slug = pathname
+        .replace("/vereinsleitung/meetings/", "")
+        .replace("/edit", "");
+
+      try {
+        const response = await fetch("/api/vereinsleitung/meetings", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Meeting header fetch failed");
+        }
+
+        const data = (await response.json()) as MeetingHeaderResponseItem[];
+        const meeting = Array.isArray(data)
+          ? data.find((item) => item.slug === slug)
+          : null;
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (!meeting) {
+          setDynamicContent({
+            eyebrow: "Meetings",
+            title: humanizeSlug(slug),
+            description: isEdit
+              ? "Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
+              : "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
+          });
+          return;
+        }
+
+        setDynamicContent({
+          eyebrow: "Meetings",
+          title: meeting.title,
+          description:
+            meeting.subtitle && meeting.subtitle.trim().length > 0
+              ? meeting.subtitle
+              : isEdit
+                ? "Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
+                : "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
+        });
+      } catch {
+        if (isCancelled) {
+          return;
+        }
+
+        setDynamicContent({
+          eyebrow: "Meetings",
+          title: humanizeSlug(slug),
+          description: isEdit
+            ? "Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
+            : "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
+        });
+      }
+    }
+
+    void loadMeetingHeader();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [pathname]);
+
+  const headerContent = dynamicContent ?? staticContent;
 
   return (
     <div>

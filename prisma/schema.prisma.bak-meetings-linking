@@ -129,13 +129,6 @@ enum UserTokenType {
   PASSWORD_RESET
 }
 
-enum VereinsleitungMeetingParticipantStatus {
-  INVITED
-  CONFIRMED
-  EXCUSED
-  ABSENT
-}
-
 model User {
   id                  String          @id @default(cuid())
   email               String          @unique
@@ -310,10 +303,9 @@ model Person {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  playerSquadMembers         PlayerSquadMember[]
-  trainerTeamMembers         TrainerTeamMember[]
+  playerSquadMembers        PlayerSquadMember[]
+  trainerTeamMembers        TrainerTeamMember[]
   vereinsleitungOwnedMatters VereinsleitungMatter[]
-  meetingParticipants        VereinsleitungMeetingParticipant[]
 
   @@index([lastName, firstName])
   @@index([email])
@@ -554,77 +546,10 @@ model VereinsleitungMatter {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  owner       Person?                      @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  meetingLinks VereinsleitungMeetingMatter[]
+  owner Person? @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([status])
   @@index([priority])
   @@index([ownerPersonId])
   @@index([dueDate])
-}
-
-model VereinsleitungMeeting {
-  id                       String   @id @default(cuid())
-  title                    String
-  slug                     String   @unique
-  subtitle                 String?
-  description              String?
-  status                   String   @default("PLANNED")
-  location                 String?
-  onlineMeetingUrl         String?
-  startAt                  DateTime
-  endAt                    DateTime?
-  notes                    String?
-  carryOverSourceMeetingId String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-
-  carryOverSourceMeeting  VereinsleitungMeeting?             @relation("VereinsleitungMeetingCarryOver", fields: [carryOverSourceMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  carryOverTargetMeetings VereinsleitungMeeting[]            @relation("VereinsleitungMeetingCarryOver")
-  matterLinks             VereinsleitungMeetingMatter[]
-  carriedOverMatterLinks  VereinsleitungMeetingMatter[]      @relation("VereinsleitungMeetingMatterCarryOver")
-  participants            VereinsleitungMeetingParticipant[]
-
-  @@index([startAt])
-  @@index([status])
-  @@index([carryOverSourceMeetingId])
-}
-
-model VereinsleitungMeetingMatter {
-  id                       String   @id @default(cuid())
-  meetingId                String
-  matterId                 String
-  sortOrder                Int      @default(0)
-  carriedOverFromMeetingId String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-
-  meeting                VereinsleitungMeeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  matter                 VereinsleitungMatter   @relation(fields: [matterId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  carriedOverFromMeeting VereinsleitungMeeting? @relation("VereinsleitungMeetingMatterCarryOver", fields: [carriedOverFromMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-
-  @@unique([meetingId, matterId])
-  @@index([matterId])
-  @@index([sortOrder])
-  @@index([carriedOverFromMeetingId])
-}
-
-model VereinsleitungMeetingParticipant {
-  id            String                               @id @default(cuid())
-  meetingId      String
-  personId       String?
-  displayName    String
-  roleLabel      String?
-  status         VereinsleitungMeetingParticipantStatus @default(INVITED)
-  sortOrder      Int                                  @default(0)
-  remarks        String?
-  createdAt      DateTime                             @default(now())
-  updatedAt      DateTime                             @updatedAt
-
-  meeting VereinsleitungMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  person  Person?               @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-
-  @@index([meetingId, sortOrder])
-  @@index([personId])
-  @@index([status])
 }

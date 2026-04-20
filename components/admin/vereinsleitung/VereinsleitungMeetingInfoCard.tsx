@@ -1,18 +1,23 @@
 ﻿import { CalendarDays, Clock3, MapPin, Video } from "lucide-react";
 
 type VereinsleitungMeetingInfoCardProps = {
-  slug: string;
+  title: string;
+  dateLabel: string;
+  timeLabel: string;
+  location: string | null;
+  onlineMeetingUrl: string | null;
 };
 
 export default function VereinsleitungMeetingInfoCard({
-  slug,
+  title,
+  dateLabel,
+  timeLabel,
+  location,
+  onlineMeetingUrl,
 }: VereinsleitungMeetingInfoCardProps) {
-  const meetingTitle =
-    slug === "vorstandssitzung-april" ? "Sitzungsinformationen" : "Sitzungsinformationen";
-
   return (
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <h3 className="text-[1.08rem] font-semibold text-slate-900">{meetingTitle}</h3>
+      <h3 className="text-[1.08rem] font-semibold text-slate-900">{title}</h3>
 
       <div className="mt-5 space-y-4">
         <div className="flex items-start gap-3">
@@ -21,7 +26,7 @@ export default function VereinsleitungMeetingInfoCard({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Datum</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">Dienstag, 16. April 2024</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">{dateLabel}</p>
           </div>
         </div>
 
@@ -31,7 +36,7 @@ export default function VereinsleitungMeetingInfoCard({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Zeit</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">20:00 - 21:00 Uhr</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">{timeLabel}</p>
           </div>
         </div>
 
@@ -41,7 +46,9 @@ export default function VereinsleitungMeetingInfoCard({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Ort</p>
-            <p className="mt-1 text-sm font-medium text-slate-900">Clubhaus, Sitzungszimmer 1</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">
+              {location ?? "Noch kein Ort hinterlegt"}
+            </p>
           </div>
         </div>
 
@@ -51,12 +58,20 @@ export default function VereinsleitungMeetingInfoCard({
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Online Teilnahme</p>
-            <button
-              type="button"
-              className="mt-1 text-sm font-semibold text-[#0b4aa2] transition hover:text-[#08357a]"
-            >
-              Microsoft Teams Link öffnen
-            </button>
+            {onlineMeetingUrl ? (
+              <a
+                href={onlineMeetingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-block text-sm font-semibold text-[#0b4aa2] transition hover:text-[#08357a]"
+              >
+                Meeting-Link öffnen
+              </a>
+            ) : (
+              <p className="mt-1 text-sm font-medium text-slate-900">
+                Kein Online-Link hinterlegt
+              </p>
+            )}
           </div>
         </div>
       </div>

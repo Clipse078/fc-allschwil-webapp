@@ -6,19 +6,19 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import { getMeetingDetailItem } from "@/lib/vereinsleitung/meeting-detail";
 
-type VereinsleitungMeetingSlugPageProps = {
+type VereinsleitungMeetingDetailPageProps = {
   params: Promise<{
-    slug: string;
+    meetingId: string;
   }>;
 };
 
-export default async function VereinsleitungMeetingSlugPage({
+export default async function VereinsleitungMeetingDetailPage({
   params,
-}: VereinsleitungMeetingSlugPageProps) {
+}: VereinsleitungMeetingDetailPageProps) {
   await requireAnyPermission(ROUTE_PERMISSION_SETS.VEREINSLEITUNG_MEETINGS_READ);
 
   const resolvedParams = await params;
-  const meeting = await getMeetingDetailItem(resolvedParams.slug);
+  const meeting = await getMeetingDetailItem(resolvedParams.meetingId);
 
   if (!meeting) {
     notFound();

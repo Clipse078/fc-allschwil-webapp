@@ -19,23 +19,23 @@ export default function AdminPageActions() {
   const selectedSeason = searchParams.get("season");
 
   const seasonsHref = selectedSeason
-    ? `/dashboard/seasons?season=${encodeURIComponent(selectedSeason)}`
+    ? "/dashboard/seasons?season=" + encodeURIComponent(selectedSeason)
     : "/dashboard/seasons";
 
   const plannerHref = selectedSeason
-    ? `/dashboard/planner?season=${encodeURIComponent(selectedSeason)}`
+    ? "/dashboard/planner?season=" + encodeURIComponent(selectedSeason)
     : "/dashboard/planner";
 
   const weekHref = selectedSeason
-    ? `/dashboard/planner/week?season=${encodeURIComponent(selectedSeason)}`
+    ? "/dashboard/planner/week?season=" + encodeURIComponent(selectedSeason)
     : "/dashboard/planner/week";
 
   const dayHref = selectedSeason
-    ? `/dashboard/planner/day?season=${encodeURIComponent(selectedSeason)}`
+    ? "/dashboard/planner/day?season=" + encodeURIComponent(selectedSeason)
     : "/dashboard/planner/day";
 
   const plannerNewHref = selectedSeason
-    ? `/dashboard/planner/new?season=${encodeURIComponent(selectedSeason)}`
+    ? "/dashboard/planner/new?season=" + encodeURIComponent(selectedSeason)
     : "/dashboard/planner/new";
 
   if (pathname === "/dashboard") {
@@ -184,30 +184,60 @@ export default function AdminPageActions() {
     );
   }
 
+  if (pathname === "/vereinsleitung/meetings/new") {
+    return (
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link
+          href="/vereinsleitung/meetings"
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
+        >
+          <CalendarPlus className="h-4 w-4" />
+          Zurück zu Meetings
+        </Link>
+      </div>
+    );
+  }
+
+  if (pathname.startsWith("/vereinsleitung/meetings/") && pathname.endsWith("/edit")) {
+    const detailHref = pathname.replace(/\/edit$/, "");
+
+    return (
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link
+          href={detailHref}
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
+        >
+          <CalendarPlus className="h-4 w-4" />
+          Zurück zum Meeting
+        </Link>
+      </div>
+    );
+  }
+
   if (pathname === "/vereinsleitung/meetings" || pathname.startsWith("/vereinsleitung/meetings/")) {
     if (pathname === "/vereinsleitung/meetings") {
       return (
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
+          <Link
+            href="/vereinsleitung/meetings/new"
             className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
           >
             <CalendarPlus className="h-4 w-4" />
             Meeting planen
-          </button>
+          </Link>
         </div>
       );
     }
 
     return (
       <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
+        <Link
+          href={pathname + "/edit"}
           className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
         >
           <Pencil className="h-4 w-4" />
           Bearbeiten
-        </button>
+        </Link>
 
         <button
           type="button"
@@ -259,13 +289,13 @@ export default function AdminPageActions() {
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return (
       <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
+        <Link
+          href="/vereinsleitung/meetings/new"
           className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
         >
           <CalendarPlus className="h-4 w-4" />
           Meeting planen
-        </button>
+        </Link>
 
         <button
           type="button"
