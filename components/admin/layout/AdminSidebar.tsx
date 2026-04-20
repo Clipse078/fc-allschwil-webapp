@@ -40,8 +40,6 @@ function getNavIcon(label: string) {
       return LayoutDashboard;
     case "Vereinsleitung":
       return Briefcase;
-    case "Cockpit":
-      return BarChart3;
     case "Meetings":
       return ScrollText;
     case "Initiativen":
@@ -67,12 +65,12 @@ function getNavIcon(label: string) {
     case "Benutzer":
       return Shield;
     default:
-      return LayoutDashboard;
+      return BarChart3;
   }
 }
 
 function isVereinsleitungChild(label: string) {
-  return label === "Cockpit" || label === "Meetings" || label === "Initiativen";
+  return label === "Meetings" || label === "Initiativen";
 }
 
 function isPlannerChild(label: string) {

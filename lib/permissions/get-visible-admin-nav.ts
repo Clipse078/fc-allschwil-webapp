@@ -17,11 +17,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
     label: "Vereinsleitung",
     href: "/vereinsleitung",
-    permissionKeys: [PERMISSIONS.VEREINSLEITUNG_VIEW],
-  },
-  {
-    label: "Cockpit",
-    href: "/vereinsleitung/cockpit",
     permissionKeys: [
       PERMISSIONS.VEREINSLEITUNG_VIEW,
       PERMISSIONS.VEREINSLEITUNG_KPI_VIEW,
