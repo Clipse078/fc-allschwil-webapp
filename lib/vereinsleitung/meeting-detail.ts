@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
 import {
   formatMatterDueDateLabel,
   formatMeetingDateLabel,
@@ -14,12 +14,12 @@ import {
   getParticipantStatusLabel,
 } from "@/lib/vereinsleitung/meeting-participants";
 
-export async function getMeetingDetailItem(
-  meetingIdOrSlug: string,
+export async function getMeetingDetailItemBySlug(
+  slug: string,
 ): Promise<MeetingDetailItem | null> {
-  const meeting = await prisma.vereinsleitungMeeting.findFirst({
+  const meeting = await prisma.vereinsleitungMeeting.findUnique({
     where: {
-      OR: [{ id: meetingIdOrSlug }, { slug: meetingIdOrSlug }],
+      slug,
     },
     include: {
       matterLinks: {

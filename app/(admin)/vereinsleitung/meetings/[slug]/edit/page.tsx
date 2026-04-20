@@ -1,4 +1,4 @@
-﻿import { notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import VereinsleitungMeetingCreateForm from "@/components/admin/vereinsleitung/VereinsleitungMeetingCreateForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { prisma } from "@/lib/db/prisma";
@@ -40,6 +40,16 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           select: {
             matterId: true,
+          },
+        },
+        participants: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            personId: true,
+            displayName: true,
+            roleLabel: true,
+            status: true,
+            remarks: true,
           },
         },
       },
@@ -104,6 +114,13 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
               : "PLANNED",
         }}
         initialSelectedMatterIds={meeting.matterLinks.map((link) => link.matterId)}
+        initialParticipants={meeting.participants.map((participant) => ({
+          personId: participant.personId,
+          displayName: participant.displayName,
+          roleLabel: participant.roleLabel,
+          status: participant.status,
+          remarks: participant.remarks,
+        }))}
         matterOptions={matterOptions}
       />
     </div>

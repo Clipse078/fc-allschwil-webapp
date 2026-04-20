@@ -1,10 +1,10 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import VereinsleitungMeetingDetail from "@/components/admin/vereinsleitung/VereinsleitungMeetingDetail";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
-import { getMeetingDetailItem } from "@/lib/vereinsleitung/meeting-detail";
+import { getMeetingDetailItemBySlug } from "@/lib/vereinsleitung/meeting-detail";
 
 type VereinsleitungMeetingSlugPageProps = {
   params: Promise<{
@@ -18,7 +18,7 @@ export default async function VereinsleitungMeetingSlugPage({
   await requireAnyPermission(ROUTE_PERMISSION_SETS.VEREINSLEITUNG_MEETINGS_READ);
 
   const resolvedParams = await params;
-  const meeting = await getMeetingDetailItem(resolvedParams.slug);
+  const meeting = await getMeetingDetailItemBySlug(resolvedParams.slug);
 
   if (!meeting) {
     notFound();

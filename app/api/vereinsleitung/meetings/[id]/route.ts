@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+import { Prisma, type VereinsleitungMeetingParticipantStatus } from "@prisma/client";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
@@ -11,6 +12,15 @@ type RouteContext = {
   params: Promise<{
     id: string;
   }>;
+};
+
+type ParticipantInput = {
+  personId: string | null;
+  displayName: string;
+  roleLabel: string | null;
+  status: VereinsleitungMeetingParticipantStatus;
+  remarks: string | null;
+  sortOrder: number;
 };
 
 function getActorUserId(
@@ -44,7 +54,7 @@ function normalizeDateTime(value: unknown, fieldLabel: string) {
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungültig." } as const;
+    return { error: fieldLabel + " ist ungueltig." } as const;
   }
 
   return { value: parsed } as const;
@@ -60,7 +70,7 @@ function normalizeOptionalDateTime(value: unknown, fieldLabel: string) {
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungültig." } as const;
+    return { error: fieldLabel + " ist ungueltig." } as const;
   }
 
   return { value: parsed } as const;
@@ -82,6 +92,67 @@ function normalizeMatterIds(value: unknown) {
   return { value: Array.from(new Set(matterIds)) } as const;
 }
 
+function parseParticipantStatus(
+  value: unknown,
+): { value: VereinsleitungMeetingParticipantStatus } | { error: string } {
+  const status = String(value ?? "INVITED").trim().toUpperCase();
+
+  switch (status) {
+    case "INVITED":
+      return { value: "INVITED" };
+    case "CONFIRMED":
+      return { value: "CONFIRMED" };
+    case "EXCUSED":
+      return { value: "EXCUSED" };
+    case "ABSENT":
+      return { value: "ABSENT" };
+    default:
+      return { error: "Ungueltiger Teilnehmerstatus: " + status };
+  }
+}
+
+function normalizeParticipants(value: unknown) {
+  if (value === undefined) {
+    return { value: undefined } as const;
+  }
+
+  if (!Array.isArray(value)) {
+    return { error: "participants muss ein Array sein." } as const;
+  }
+
+  const participants: ParticipantInput[] = [];
+
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    const record =
+      item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const displayName = String(record.displayName ?? "").trim();
+    const personId = String(record.personId ?? "").trim();
+    const roleLabel = String(record.roleLabel ?? "").trim();
+    const remarks = String(record.remarks ?? "").trim();
+    const statusResult = parseParticipantStatus(record.status);
+
+    if (!displayName) {
+      return { error: "Jeder Teilnehmer braucht einen Namen." } as const;
+    }
+
+    if ("error" in statusResult) {
+      return { error: statusResult.error } as const;
+    }
+
+    participants.push({
+      personId: personId || null,
+      displayName,
+      roleLabel: roleLabel || null,
+      status: statusResult.value,
+      remarks: remarks || null,
+      sortOrder: index,
+    });
+  }
+
+  return { value: participants } as const;
+}
+
 async function validateMatterIds(matterIds: string[]) {
   if (matterIds.length === 0) {
     return { matters: [] } as const;
@@ -99,10 +170,46 @@ async function validateMatterIds(matterIds: string[]) {
   });
 
   if (matters.length !== matterIds.length) {
-    return { error: "Mindestens eine verknüpfte Pendenz wurde nicht gefunden." } as const;
+    return { error: "Mindestens eine verknuepfte Pendenz wurde nicht gefunden." } as const;
   }
 
   return { matters } as const;
+}
+
+async function validateParticipantPersonIds(
+  participants: {
+    personId: string | null;
+  }[],
+) {
+  const personIds = participants
+    .map((participant) => participant.personId)
+    .filter((personId): personId is string => Boolean(personId));
+
+  if (personIds.length === 0) {
+    return { ok: true } as const;
+  }
+
+  const uniquePersonIds = Array.from(new Set(personIds));
+
+  const people = await prisma.person.findMany({
+    where: {
+      id: {
+        in: uniquePersonIds,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (people.length !== uniquePersonIds.length) {
+    return {
+      ok: false,
+      error: "Mindestens ein Teilnehmer verweist auf eine unbekannte Person.",
+    } as const;
+  }
+
+  return { ok: true } as const;
 }
 
 async function buildUniqueMeetingSlug(title: string, excludeMeetingId?: string) {
@@ -171,6 +278,9 @@ async function getMeeting(id: string) {
           },
         },
       },
+      participants: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
     },
   });
 }
@@ -222,6 +332,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       location?: string | null;
       onlineMeetingUrl?: string | null;
       status?: string;
+      notes?: string | null;
       startAt?: Date;
       endAt?: Date | null;
       carryOverSourceMeetingId?: string | null;
@@ -235,7 +346,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
 
       data.title = title;
-      data.slug = await buildUniqueMeetingSlug(title, meetingId);
+      data.slug =
+        title === existingMeeting.title
+          ? existingMeeting.slug
+          : await buildUniqueMeetingSlug(title, meetingId);
     }
 
     if (body.subtitle !== undefined) {
@@ -256,6 +370,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (body.status !== undefined) {
       data.status = String(body.status ?? "").trim().toUpperCase() || "PLANNED";
+    }
+
+    if (body.notes !== undefined) {
+      data.notes = normalizeOptionalString(body.notes);
     }
 
     if (body.startAt !== undefined) {
@@ -306,6 +424,22 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
+    const participantsResult = normalizeParticipants(body.participants);
+
+    if ("error" in participantsResult) {
+      return NextResponse.json({ error: participantsResult.error }, { status: 400 });
+    }
+
+    if (participantsResult.value !== undefined) {
+      const participantValidation = await validateParticipantPersonIds(
+        participantsResult.value,
+      );
+
+      if (!participantValidation.ok) {
+        return NextResponse.json({ error: participantValidation.error }, { status: 400 });
+      }
+    }
+
     const updatedMeeting = await prisma.$transaction(async (tx) => {
       if (matterIdsResult.value !== undefined) {
         await tx.vereinsleitungMeetingMatter.deleteMany({
@@ -321,6 +455,29 @@ export async function PATCH(request: Request, context: RouteContext) {
               carriedOverFromMeetingId:
                 data.carryOverSourceMeetingId ?? existingMeeting.carryOverSourceMeetingId,
             })),
+          });
+        }
+      }
+
+      if (participantsResult.value !== undefined) {
+        await tx.vereinsleitungMeetingParticipant.deleteMany({
+          where: { meetingId },
+        });
+
+        if (participantsResult.value.length > 0) {
+          const participantCreateData: Prisma.VereinsleitungMeetingParticipantCreateManyInput[] =
+            participantsResult.value.map((participant) => ({
+              meetingId,
+              personId: participant.personId,
+              displayName: participant.displayName,
+              roleLabel: participant.roleLabel,
+              status: participant.status,
+              remarks: participant.remarks,
+              sortOrder: participant.sortOrder,
+            }));
+
+          await tx.vereinsleitungMeetingParticipant.createMany({
+            data: participantCreateData,
           });
         }
       }
@@ -355,6 +512,9 @@ export async function PATCH(request: Request, context: RouteContext) {
                 },
               },
             },
+          },
+          participants: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           },
         },
       });
