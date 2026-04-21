@@ -91,7 +91,7 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
       <AdminSectionHeader
         eyebrow="Meetings"
         title="Meeting bearbeiten"
-        description="Meeting-Daten und verknüpfte Pendenzen zentral anpassen."
+        description="Meeting-Daten, Online-Setup und verknüpfte Pendenzen zentral anpassen."
       />
 
       <VereinsleitungMeetingCreateForm
@@ -105,7 +105,9 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
           subtitle: meeting.subtitle ?? "",
           description: meeting.description ?? "",
           location: meeting.location ?? "",
-          onlineMeetingUrl: meeting.onlineMeetingUrl ?? "",
+          meetingMode: meeting.meetingMode,
+          meetingProvider: meeting.meetingProvider,
+          externalMeetingUrl: meeting.externalMeetingUrl ?? meeting.onlineMeetingUrl ?? "",
           startAt: toDateTimeLocalValue(meeting.startAt),
           endAt: toDateTimeLocalValue(meeting.endAt),
           status:

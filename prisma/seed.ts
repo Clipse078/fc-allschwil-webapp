@@ -1,4 +1,4 @@
-﻿import "dotenv/config";
+import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
@@ -9,6 +9,9 @@ import {
   PrismaClient,
   TeamCategory,
   TeamSeasonStatus,
+  VereinsleitungMeetingMode,
+  VereinsleitungMeetingProvider,
+  VereinsleitungTeamsSyncStatus,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
@@ -101,12 +104,16 @@ async function main() {
       key: "super_admin",
       name: "Super Admin",
       description: "Full platform access",
+      canAccessVereinsleitung: true,
+      canAttendVereinsleitungMeetings: true,
       permissionKeys: permissions.map((permission) => permission.key),
     },
     {
       key: "match_coordinator",
       name: "Match Coordinator",
       description: "Operational fixture owner",
+      canAccessVereinsleitung: false,
+      canAttendVereinsleitungMeetings: false,
       permissionKeys: [
         "seasons.view",
         "teams.view",
@@ -130,6 +137,8 @@ async function main() {
       key: "website_publisher",
       name: "Website Publisher",
       description: "Publishes public-facing content",
+      canAccessVereinsleitung: false,
+      canAttendVereinsleitungMeetings: false,
       permissionKeys: [
         "seasons.view",
         "events.view",
@@ -145,6 +154,8 @@ async function main() {
       key: "trainer",
       name: "Trainer",
       description: "Basic operational access",
+      canAccessVereinsleitung: false,
+      canAttendVereinsleitungMeetings: false,
       permissionKeys: [
         "seasons.view",
         "teams.view",
@@ -160,6 +171,8 @@ async function main() {
       key: "viewer",
       name: "Viewer",
       description: "Read-only access",
+      canAccessVereinsleitung: false,
+      canAttendVereinsleitungMeetings: false,
       permissionKeys: [
         "seasons.view",
         "teams.view",
@@ -176,11 +189,15 @@ async function main() {
       update: {
         name: roleDefinition.name,
         description: roleDefinition.description,
+        canAccessVereinsleitung: roleDefinition.canAccessVereinsleitung,
+        canAttendVereinsleitungMeetings: roleDefinition.canAttendVereinsleitungMeetings,
       },
       create: {
         key: roleDefinition.key,
         name: roleDefinition.name,
         description: roleDefinition.description,
+        canAccessVereinsleitung: roleDefinition.canAccessVereinsleitung,
+        canAttendVereinsleitungMeetings: roleDefinition.canAttendVereinsleitungMeetings,
       },
     });
 
@@ -353,9 +370,9 @@ async function main() {
 
   const demoTitles = [
     "FC Allschwil E4 vs FC Concordia Basel",
-    "E4 Frühlingsturnier Aesch",
+    "E4 FrÃ¼hlingsturnier Aesch",
     "E4 Training Dienstag",
-    "Sponsor Apéro Frühling 2026",
+    "Sponsor ApÃ©ro FrÃ¼hling 2026",
   ];
 
   await prisma.event.deleteMany({
@@ -376,8 +393,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "FC Allschwil E4 vs FC Concordia Basel",
-        description: "Demo Match für Spielplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im Brühl",
+        description: "Demo Match fÃ¼r Spielplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃ¼hl",
         startAt: new Date("2026-04-18T08:30:00.000Z"),
         endAt: new Date("2026-04-18T10:00:00.000Z"),
         opponentName: "FC Concordia Basel",
@@ -400,13 +417,13 @@ async function main() {
         type: EventType.TOURNAMENT,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
-        title: "E4 Frühlingsturnier Aesch",
-        description: "Demo Turnier für Website, Wochenplan, Teamseite und Infoboard.",
+        title: "E4 FrÃ¼hlingsturnier Aesch",
+        description: "Demo Turnier fÃ¼r Website, Wochenplan, Teamseite und Infoboard.",
         location: "Sportanlage Aesch",
         startAt: new Date("2026-05-02T07:30:00.000Z"),
         endAt: new Date("2026-05-02T15:30:00.000Z"),
         organizerName: "FC Aesch",
-        competitionLabel: "Frühlingsturnier",
+        competitionLabel: "FrÃ¼hlingsturnier",
         websiteVisible: true,
         infoboardVisible: true,
         homepageVisible: true,
@@ -425,8 +442,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "E4 Training Dienstag",
-        description: "Demo Training für Trainingsplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im Brühl",
+        description: "Demo Training fÃ¼r Trainingsplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃ¼hl",
         startAt: new Date("2026-04-21T15:30:00.000Z"),
         endAt: new Date("2026-04-21T17:00:00.000Z"),
         meetingTime: new Date("2026-04-21T15:15:00.000Z"),
@@ -447,8 +464,8 @@ async function main() {
       type: EventType.OTHER,
       source: EventSource.MANUAL,
       status: EventStatus.SCHEDULED,
-      title: "Sponsor Apéro Frühling 2026",
-      description: "Demo weiteres Event für die Website Events Seite.",
+      title: "Sponsor ApÃ©ro FrÃ¼hling 2026",
+      description: "Demo weiteres Event fÃ¼r die Website Events Seite.",
       location: "Clubhaus FC Allschwil",
       startAt: new Date("2026-05-14T16:30:00.000Z"),
       endAt: new Date("2026-05-14T20:00:00.000Z"),
@@ -473,6 +490,34 @@ async function main() {
 
   const passwordHash = await bcrypt.hash("ChangeMe123!", 12);
 
+  const existingAdminPerson = await prisma.person.findFirst({
+    where: { email: "admin@fcallschwil.ch" },
+    select: { id: true },
+  });
+
+  const adminPerson = existingAdminPerson
+    ? await prisma.person.update({
+        where: { id: existingAdminPerson.id },
+        data: {
+          firstName: "FC",
+          lastName: "Admin",
+          displayName: "FC Admin",
+          email: "admin@fcallschwil.ch",
+          isActive: true,
+          notes: "System-linked admin person for user/person relation and Vereinsleitung access foundation.",
+        },
+      })
+    : await prisma.person.create({
+        data: {
+          firstName: "FC",
+          lastName: "Admin",
+          displayName: "FC Admin",
+          email: "admin@fcallschwil.ch",
+          isActive: true,
+          notes: "System-linked admin person for user/person relation and Vereinsleitung access foundation.",
+        },
+      });
+
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@fcallschwil.ch" },
     update: {
@@ -480,6 +525,8 @@ async function main() {
       lastName: "Admin",
       passwordHash,
       isActive: true,
+      accessState: "ACTIVE",
+      personId: adminPerson.id,
     },
     create: {
       email: "admin@fcallschwil.ch",
@@ -487,6 +534,8 @@ async function main() {
       lastName: "Admin",
       passwordHash,
       isActive: true,
+      accessState: "ACTIVE",
+      personId: adminPerson.id,
     },
   });
 
@@ -501,6 +550,61 @@ async function main() {
     create: {
       userId: adminUser.id,
       roleId: superAdminRole.id,
+    },
+  });
+
+  await prisma.vereinsleitungMeeting.deleteMany({
+    where: {
+      title: {
+        in: ["Demo Vereinsleitung Hybrid Meeting", "Demo Vereinsleitung Online Meeting"],
+      },
+    },
+  });
+
+  await prisma.vereinsleitungMeeting.create({
+    data: {
+      title: "Demo Vereinsleitung Hybrid Meeting",
+      slug: "demo-vereinsleitung-hybrid-meeting",
+      subtitle: "Teams-ready Demo Meeting",
+      description: "Seeded demo meeting for Teams-ready structure and participant access foundation.",
+      status: "PLANNED",
+      location: "Clubhaus FC Allschwil",
+      meetingMode: VereinsleitungMeetingMode.HYBRID,
+      meetingProvider: VereinsleitungMeetingProvider.MICROSOFT_TEAMS,
+      teamsSyncStatus: VereinsleitungTeamsSyncStatus.NOT_CONFIGURED,
+      teamsOrganizerUserId: adminUser.id,
+      startAt: new Date("2026-05-06T17:30:00.000Z"),
+      endAt: new Date("2026-05-06T19:00:00.000Z"),
+      participants: {
+        create: [
+          {
+            personId: adminPerson.id,
+            displayName: "FC Admin",
+            roleLabel: "System Admin",
+            status: "INVITED",
+            sortOrder: 0,
+            remarks: "Linked seeded admin person",
+          },
+        ],
+      },
+    },
+  });
+
+  await prisma.vereinsleitungMeeting.create({
+    data: {
+      title: "Demo Vereinsleitung Online Meeting",
+      slug: "demo-vereinsleitung-online-meeting",
+      subtitle: "External fallback demo",
+      description: "Seeded demo meeting keeping backward compatibility with manual online links.",
+      status: "PLANNED",
+      meetingMode: VereinsleitungMeetingMode.ONLINE,
+      meetingProvider: VereinsleitungMeetingProvider.EXTERNAL,
+      onlineMeetingUrl: "https://teams.microsoft.com/",
+      externalMeetingUrl: "https://teams.microsoft.com/",
+      teamsSyncStatus: VereinsleitungTeamsSyncStatus.MANUAL,
+      teamsOrganizerUserId: adminUser.id,
+      startAt: new Date("2026-05-13T17:30:00.000Z"),
+      endAt: new Date("2026-05-13T18:30:00.000Z"),
     },
   });
 

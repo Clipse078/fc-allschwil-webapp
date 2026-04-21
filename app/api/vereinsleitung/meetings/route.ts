@@ -1,4 +1,9 @@
-import { type VereinsleitungMeetingParticipantStatus } from "@prisma/client";
+import {
+  VereinsleitungMeetingMode,
+  VereinsleitungMeetingProvider,
+  VereinsleitungTeamsSyncStatus,
+  type VereinsleitungMeetingParticipantStatus,
+} from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
@@ -147,6 +152,40 @@ function normalizeParticipants(value: unknown) {
   }
 
   return { value: participants } as const;
+}
+
+function parseMeetingMode(
+  value: unknown,
+): { value: VereinsleitungMeetingMode } | { error: string } {
+  const mode = String(value ?? "ON_SITE").trim().toUpperCase();
+
+  switch (mode) {
+    case "ON_SITE":
+      return { value: "ON_SITE" };
+    case "ONLINE":
+      return { value: "ONLINE" };
+    case "HYBRID":
+      return { value: "HYBRID" };
+    default:
+      return { error: "Ungültiger Meeting-Typ: " + mode };
+  }
+}
+
+function parseMeetingProvider(
+  value: unknown,
+): { value: VereinsleitungMeetingProvider } | { error: string } {
+  const provider = String(value ?? "NONE").trim().toUpperCase();
+
+  switch (provider) {
+    case "NONE":
+      return { value: "NONE" };
+    case "EXTERNAL":
+      return { value: "EXTERNAL" };
+    case "MICROSOFT_TEAMS":
+      return { value: "MICROSOFT_TEAMS" };
+    default:
+      return { error: "Ungültiger Meeting-Provider: " + provider };
+  }
 }
 
 async function validateMatterIds(matterIds: string[]) {
@@ -301,7 +340,9 @@ export async function POST(request: Request) {
     const subtitle = normalizeOptionalString(body.subtitle);
     const description = normalizeOptionalString(body.description);
     const location = normalizeOptionalString(body.location);
-    const onlineMeetingUrl = normalizeOptionalString(body.onlineMeetingUrl);
+    const meetingModeResult = parseMeetingMode(body.meetingMode);
+    const meetingProviderResult = parseMeetingProvider(body.meetingProvider);
+    const externalMeetingUrl = normalizeOptionalString(body.externalMeetingUrl);
     const status = String(body.status ?? "PLANNED").trim().toUpperCase() || "PLANNED";
     const carryOverSourceMeetingId = normalizeOptionalString(body.carryOverSourceMeetingId);
     const startAtResult = normalizeDateTime(body.startAt, "Startzeit");
@@ -311,6 +352,14 @@ export async function POST(request: Request) {
 
     if (!title) {
       return NextResponse.json({ error: "Titel ist erforderlich." }, { status: 400 });
+    }
+
+    if ("error" in meetingModeResult) {
+      return NextResponse.json({ error: meetingModeResult.error }, { status: 400 });
+    }
+
+    if ("error" in meetingProviderResult) {
+      return NextResponse.json({ error: meetingProviderResult.error }, { status: 400 });
     }
 
     if ("error" in startAtResult) {
@@ -336,6 +385,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const meetingMode = meetingModeResult.value;
+    const meetingProvider =
+      meetingMode === "ON_SITE" ? "NONE" : meetingProviderResult.value;
+
+    if (meetingProvider === "EXTERNAL" && !externalMeetingUrl) {
+      return NextResponse.json(
+        { error: "Ein externer Meeting-Link ist erforderlich." },
+        { status: 400 },
+      );
+    }
+
     const matterIds = matterIdsResult.value ?? [];
     const matterValidation = await validateMatterIds(matterIds);
 
@@ -352,6 +412,9 @@ export async function POST(request: Request) {
 
     const slug = await buildUniqueMeetingSlug(title);
 
+    const teamsSyncStatus: VereinsleitungTeamsSyncStatus =
+      meetingProvider === "MICROSOFT_TEAMS" ? "PENDING" : "NOT_CONFIGURED";
+
     const meeting = await prisma.vereinsleitungMeeting.create({
       data: {
         title,
@@ -359,7 +422,16 @@ export async function POST(request: Request) {
         subtitle,
         description,
         location,
-        onlineMeetingUrl,
+        meetingMode,
+        meetingProvider,
+        externalMeetingUrl: meetingProvider === "EXTERNAL" ? externalMeetingUrl : null,
+        onlineMeetingUrl: meetingProvider === "EXTERNAL" ? externalMeetingUrl : null,
+        teamsSyncStatus,
+        teamsJoinUrl: null,
+        teamsMeetingId: null,
+        teamsCalendarEventId: null,
+        teamsLastSyncedAt: null,
+        teamsErrorMessage: null,
         status,
         startAt: startAtResult.value,
         endAt: endAtResult.value,

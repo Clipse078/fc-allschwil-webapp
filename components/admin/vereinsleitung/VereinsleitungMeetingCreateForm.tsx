@@ -6,6 +6,14 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type MeetingStatus = "PLANNED" | "IN_PROGRESS" | "DONE";
 type ParticipantStatus = "INVITED" | "CONFIRMED" | "EXCUSED" | "ABSENT";
+type MeetingMode = "ON_SITE" | "ONLINE" | "HYBRID";
+type MeetingProvider = "NONE" | "EXTERNAL" | "MICROSOFT_TEAMS";
+type TeamsSyncStatus =
+  | "NOT_CONFIGURED"
+  | "MANUAL"
+  | "PENDING"
+  | "CREATED"
+  | "FAILED";
 
 type MatterOption = {
   id: string;
@@ -57,6 +65,11 @@ type FormState = {
   startAt: string;
   endAt: string;
   status: MeetingStatus;
+  meetingMode: MeetingMode;
+  meetingProvider: MeetingProvider;
+  externalMeetingUrl: string;
+  teamsJoinUrl: string;
+  teamsSyncStatus: TeamsSyncStatus;
 };
 
 type VereinsleitungMeetingCreateFormProps = {
@@ -80,6 +93,11 @@ const INITIAL_STATE: FormState = {
   startAt: "",
   endAt: "",
   status: "PLANNED",
+  meetingMode: "ON_SITE",
+  meetingProvider: "NONE",
+  externalMeetingUrl: "",
+  teamsJoinUrl: "",
+  teamsSyncStatus: "NOT_CONFIGURED",
 };
 
 const PARTICIPANT_STATUS_OPTIONS: { value: ParticipantStatus; label: string }[] = [
@@ -87,6 +105,26 @@ const PARTICIPANT_STATUS_OPTIONS: { value: ParticipantStatus; label: string }[] 
   { value: "CONFIRMED", label: "Anwesend" },
   { value: "EXCUSED", label: "Entschuldigt" },
   { value: "ABSENT", label: "Abwesend" },
+];
+
+const MEETING_MODE_OPTIONS: { value: MeetingMode; label: string }[] = [
+  { value: "ON_SITE", label: "Vor Ort" },
+  { value: "ONLINE", label: "Online" },
+  { value: "HYBRID", label: "Hybrid" },
+];
+
+const MEETING_PROVIDER_OPTIONS: { value: MeetingProvider; label: string }[] = [
+  { value: "NONE", label: "Kein Provider" },
+  { value: "EXTERNAL", label: "Externer Link" },
+  { value: "MICROSOFT_TEAMS", label: "Microsoft Teams" },
+];
+
+const TEAMS_SYNC_STATUS_OPTIONS: { value: TeamsSyncStatus; label: string }[] = [
+  { value: "NOT_CONFIGURED", label: "Nicht konfiguriert" },
+  { value: "MANUAL", label: "Manuell" },
+  { value: "PENDING", label: "Ausstehend" },
+  { value: "CREATED", label: "Erstellt" },
+  { value: "FAILED", label: "Fehlgeschlagen" },
 ];
 
 function getStatusClass(status: string) {
@@ -111,6 +149,21 @@ function getPriorityClass(priority: string) {
   }
 }
 
+function getTeamsSyncStatusClass(status: TeamsSyncStatus) {
+  switch (status) {
+    case "CREATED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "PENDING":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "FAILED":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    case "MANUAL":
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+}
+
 function getPersonName(person: {
   firstName: string;
   lastName: string;
@@ -127,6 +180,38 @@ function normalizeParticipantStatus(value?: string | null): ParticipantStatus {
       return value;
     default:
       return "INVITED";
+  }
+}
+
+function normalizeMeetingMode(value?: string | null): MeetingMode {
+  switch (value) {
+    case "ONLINE":
+    case "HYBRID":
+      return value;
+    default:
+      return "ON_SITE";
+  }
+}
+
+function normalizeMeetingProvider(value?: string | null): MeetingProvider {
+  switch (value) {
+    case "EXTERNAL":
+    case "MICROSOFT_TEAMS":
+      return value;
+    default:
+      return "NONE";
+  }
+}
+
+function normalizeTeamsSyncStatus(value?: string | null): TeamsSyncStatus {
+  switch (value) {
+    case "MANUAL":
+    case "PENDING":
+    case "CREATED":
+    case "FAILED":
+      return value;
+    default:
+      return "NOT_CONFIGURED";
   }
 }
 
@@ -162,6 +247,9 @@ export default function VereinsleitungMeetingCreateForm({
   const [form, setForm] = useState<FormState>({
     ...INITIAL_STATE,
     ...initialValues,
+    meetingMode: normalizeMeetingMode(initialValues?.meetingMode),
+    meetingProvider: normalizeMeetingProvider(initialValues?.meetingProvider),
+    teamsSyncStatus: normalizeTeamsSyncStatus(initialValues?.teamsSyncStatus),
   });
   const [selectedMatterIds, setSelectedMatterIds] = useState<string[]>(
     initialSelectedMatterIds ?? [],
@@ -177,6 +265,60 @@ export default function VereinsleitungMeetingCreateForm({
   const canSubmit = useMemo(() => {
     return Boolean(form.title.trim() && form.startAt.trim());
   }, [form.startAt, form.title]);
+
+  const showLocationField =
+    form.meetingMode === "ON_SITE" || form.meetingMode === "HYBRID";
+  const showProviderField =
+    form.meetingMode === "ONLINE" || form.meetingMode === "HYBRID";
+  const showExternalLinkField =
+    showProviderField && form.meetingProvider === "EXTERNAL";
+  const showTeamsFields =
+    showProviderField && form.meetingProvider === "MICROSOFT_TEAMS";
+  const showGenericOnlineLinkField =
+    showProviderField && form.meetingProvider !== "NONE";
+
+  useEffect(() => {
+    if (!showProviderField) {
+      setForm((current) => ({
+        ...current,
+        meetingProvider: "NONE",
+        externalMeetingUrl: "",
+        teamsJoinUrl: "",
+        teamsSyncStatus: "NOT_CONFIGURED",
+        onlineMeetingUrl: "",
+      }));
+      return;
+    }
+
+    if (form.meetingProvider === "NONE") {
+      setForm((current) => ({
+        ...current,
+        externalMeetingUrl: "",
+        teamsJoinUrl: "",
+        teamsSyncStatus: "NOT_CONFIGURED",
+        onlineMeetingUrl: "",
+      }));
+    }
+
+    if (form.meetingProvider === "EXTERNAL") {
+      setForm((current) => ({
+        ...current,
+        teamsJoinUrl: "",
+        teamsSyncStatus: "MANUAL",
+      }));
+    }
+
+    if (form.meetingProvider === "MICROSOFT_TEAMS" && form.teamsSyncStatus === "NOT_CONFIGURED") {
+      setForm((current) => ({
+        ...current,
+        teamsSyncStatus: "PENDING",
+      }));
+    }
+  }, [
+    showProviderField,
+    form.meetingProvider,
+    form.teamsSyncStatus,
+  ]);
 
   useEffect(() => {
     const controllers: AbortController[] = [];
@@ -368,23 +510,34 @@ export default function VereinsleitungMeetingCreateForm({
 
       const method = mode === "edit" ? "PATCH" : "POST";
 
+      const payload = {
+        title: form.title.trim(),
+        subtitle: form.subtitle.trim() || null,
+        description: form.description.trim() || null,
+        location: showLocationField ? form.location.trim() || null : null,
+        onlineMeetingUrl: showGenericOnlineLinkField
+          ? form.onlineMeetingUrl.trim() || null
+          : null,
+        startAt: form.startAt,
+        endAt: form.endAt.trim() || null,
+        status: form.status,
+        meetingMode: form.meetingMode,
+        meetingProvider: showProviderField ? form.meetingProvider : "NONE",
+        externalMeetingUrl: showExternalLinkField
+          ? form.externalMeetingUrl.trim() || null
+          : null,
+        teamsJoinUrl: showTeamsFields ? form.teamsJoinUrl.trim() || null : null,
+        teamsSyncStatus: showTeamsFields ? form.teamsSyncStatus : "NOT_CONFIGURED",
+        matterIds: selectedMatterIds,
+        participants: normalizedParticipants,
+      };
+
       const response = await fetch(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title: form.title.trim(),
-          subtitle: form.subtitle.trim() || null,
-          description: form.description.trim() || null,
-          location: form.location.trim() || null,
-          onlineMeetingUrl: form.onlineMeetingUrl.trim() || null,
-          startAt: form.startAt,
-          endAt: form.endAt.trim() || null,
-          status: form.status,
-          matterIds: selectedMatterIds,
-          participants: normalizedParticipants,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -465,14 +618,19 @@ export default function VereinsleitungMeetingCreateForm({
 
           <div>
             <label className="block text-sm font-semibold text-slate-900">
-              Ort
+              Meeting-Typ
             </label>
-            <input
-              value={form.location}
-              onChange={(event) => updateField("location", event.target.value)}
-              placeholder="z. B. Clubhaus Sitzungszimmer 1"
+            <select
+              value={form.meetingMode}
+              onChange={(event) => updateField("meetingMode", event.target.value as MeetingMode)}
               className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-            />
+            >
+              {MEETING_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -490,17 +648,125 @@ export default function VereinsleitungMeetingCreateForm({
             </select>
           </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-sm font-semibold text-slate-900">
-              Online-Meeting-Link
-            </label>
-            <input
-              value={form.onlineMeetingUrl}
-              onChange={(event) => updateField("onlineMeetingUrl", event.target.value)}
-              placeholder="https://teams.microsoft.com/..."
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-            />
-          </div>
+          {showLocationField ? (
+            <div>
+              <label className="block text-sm font-semibold text-slate-900">
+                Ort
+              </label>
+              <input
+                value={form.location}
+                onChange={(event) => updateField("location", event.target.value)}
+                placeholder="z. B. Clubhaus Sitzungszimmer 1"
+                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              />
+            </div>
+          ) : null}
+
+          {showProviderField ? (
+            <div>
+              <label className="block text-sm font-semibold text-slate-900">
+                Online-Provider
+              </label>
+              <select
+                value={form.meetingProvider}
+                onChange={(event) =>
+                  updateField("meetingProvider", event.target.value as MeetingProvider)
+                }
+                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              >
+                {MEETING_PROVIDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          {showGenericOnlineLinkField ? (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-slate-900">
+                Allgemeiner Online-Meeting-Link
+              </label>
+              <input
+                value={form.onlineMeetingUrl}
+                onChange={(event) => updateField("onlineMeetingUrl", event.target.value)}
+                placeholder="https://teams.microsoft.com/... oder anderer Meeting-Link"
+                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              />
+            </div>
+          ) : null}
+
+          {showExternalLinkField ? (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-slate-900">
+                Externer Meeting-Link
+              </label>
+              <input
+                value={form.externalMeetingUrl}
+                onChange={(event) => updateField("externalMeetingUrl", event.target.value)}
+                placeholder="https://..."
+                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              />
+            </div>
+          ) : null}
+
+          {showTeamsFields ? (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-slate-900">
+                  Teams Join-URL
+                </label>
+                <input
+                  value={form.teamsJoinUrl}
+                  onChange={(event) => updateField("teamsJoinUrl", event.target.value)}
+                  placeholder="https://teams.microsoft.com/l/meetup-join/..."
+                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-900">
+                  Teams Sync-Status
+                </label>
+                <select
+                  value={form.teamsSyncStatus}
+                  onChange={(event) =>
+                    updateField("teamsSyncStatus", event.target.value as TeamsSyncStatus)
+                  }
+                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                >
+                  {TEAMS_SYNC_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      Microsoft Teams Vorbereitung
+                    </div>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Diese Felder bleiben vorerst manuell. Eine echte Microsoft-Integration folgt später sicher und getrennt.
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${getTeamsSyncStatusClass(
+                      form.teamsSyncStatus,
+                    )}`}
+                  >
+                    {TEAMS_SYNC_STATUS_OPTIONS.find(
+                      (option) => option.value === form.teamsSyncStatus,
+                    )?.label ?? form.teamsSyncStatus}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : null}
 
           <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-slate-900">

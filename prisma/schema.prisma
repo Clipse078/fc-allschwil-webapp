@@ -129,11 +129,38 @@ enum UserTokenType {
   PASSWORD_RESET
 }
 
+enum VereinsleitungMeetingMode {
+  ON_SITE
+  ONLINE
+  HYBRID
+}
+
+enum VereinsleitungMeetingProvider {
+  NONE
+  EXTERNAL
+  MICROSOFT_TEAMS
+}
+
+enum VereinsleitungTeamsSyncStatus {
+  NOT_CONFIGURED
+  MANUAL
+  PENDING
+  CREATED
+  FAILED
+}
+
 enum VereinsleitungMeetingParticipantStatus {
   INVITED
   CONFIRMED
   EXCUSED
   ABSENT
+}
+
+enum VereinsleitungMeetingDecisionType {
+  DECISION
+  TASK
+  APPROVAL
+  INFO
 }
 
 model User {
@@ -142,6 +169,7 @@ model User {
   passwordHash        String
   firstName           String
   lastName            String
+  personId            String?         @unique
   isActive            Boolean         @default(true)
   accessState         UserAccessState @default(PENDING_INVITE)
   invitedAt           DateTime?
@@ -152,12 +180,14 @@ model User {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
+  person     Person?     @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   userRoles  UserRole[]
-  auditLogs  AuditLog[] @relation("AuditActor")
+  auditLogs  AuditLog[]  @relation("AuditActor")
   userTokens UserToken[]
 
   @@index([isActive])
   @@index([accessState])
+  @@index([personId])
 }
 
 model UserToken {
@@ -296,7 +326,7 @@ model Season {
 }
 
 model Person {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   firstName   String
   lastName    String
   displayName String?
@@ -304,16 +334,18 @@ model Person {
   phone       String?
   dateOfBirth DateTime?
   notes       String?
-  isActive    Boolean  @default(true)
-  isPlayer    Boolean  @default(false)
-  isTrainer   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean   @default(true)
+  isPlayer    Boolean   @default(false)
+  isTrainer   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  playerSquadMembers         PlayerSquadMember[]
-  trainerTeamMembers         TrainerTeamMember[]
-  vereinsleitungOwnedMatters VereinsleitungMatter[]
-  meetingParticipants        VereinsleitungMeetingParticipant[]
+  user                        User?
+  playerSquadMembers          PlayerSquadMember[]
+  trainerTeamMembers          TrainerTeamMember[]
+  vereinsleitungOwnedMatters  VereinsleitungMatter[]
+  meetingParticipants         VereinsleitungMeetingParticipant[]
+  responsibleMeetingDecisions VereinsleitungMeetingDecision[]
 
   @@index([lastName, firstName])
   @@index([email])
@@ -323,18 +355,18 @@ model Person {
 }
 
 model Team {
-  id               String   @id @default(cuid())
+  id               String       @id @default(cuid())
   name             String
-  slug             String   @unique
+  slug             String       @unique
   category         TeamCategory
   genderGroup      String?
   ageGroup         String?
-  sortOrder        Int      @default(0)
-  isActive         Boolean  @default(true)
-  websiteVisible   Boolean  @default(true)
-  infoboardVisible Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  sortOrder        Int          @default(0)
+  isActive         Boolean      @default(true)
+  websiteVisible   Boolean      @default(true)
+  infoboardVisible Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   teamSeasons     TeamSeason[]
   events          Event[]
@@ -544,17 +576,17 @@ model AuditLog {
 }
 
 model VereinsleitungMatter {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   title         String
   description   String?
-  status        String   @default("OPEN")
-  priority      String   @default("MEDIUM")
+  status        String    @default("OPEN")
+  priority      String    @default("MEDIUM")
   ownerPersonId String?
   dueDate       DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  owner       Person?                      @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  owner        Person?                       @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   meetingLinks VereinsleitungMeetingMatter[]
 
   @@index([status])
@@ -564,29 +596,46 @@ model VereinsleitungMatter {
 }
 
 model VereinsleitungMeeting {
-  id                       String   @id @default(cuid())
+  id                       String                        @id @default(cuid())
   title                    String
-  slug                     String   @unique
+  slug                     String                        @unique
   subtitle                 String?
   description              String?
-  status                   String   @default("PLANNED")
+  status                   String                        @default("PLANNED")
   location                 String?
   onlineMeetingUrl         String?
+  meetingMode              VereinsleitungMeetingMode     @default(ON_SITE)
+  meetingProvider          VereinsleitungMeetingProvider @default(NONE)
+  externalMeetingUrl       String?
+  teamsJoinUrl             String?
+  teamsMeetingId           String?
+  teamsCalendarEventId     String?
+  teamsSyncStatus          VereinsleitungTeamsSyncStatus @default(NOT_CONFIGURED)
+  teamsLastSyncedAt        DateTime?
+  teamsErrorMessage        String?
+  teamsOrganizerUserId     String?
   startAt                  DateTime
   endAt                    DateTime?
   notes                    String?
   carryOverSourceMeetingId String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
 
-  carryOverSourceMeeting  VereinsleitungMeeting?             @relation("VereinsleitungMeetingCarryOver", fields: [carryOverSourceMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  carryOverTargetMeetings VereinsleitungMeeting[]            @relation("VereinsleitungMeetingCarryOver")
+  carryOverSourceMeeting  VereinsleitungMeeting?               @relation("VereinsleitungMeetingCarryOver", fields: [carryOverSourceMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  carryOverTargetMeetings VereinsleitungMeeting[]              @relation("VereinsleitungMeetingCarryOver")
   matterLinks             VereinsleitungMeetingMatter[]
-  carriedOverMatterLinks  VereinsleitungMeetingMatter[]      @relation("VereinsleitungMeetingMatterCarryOver")
+  carriedOverMatterLinks  VereinsleitungMeetingMatter[]        @relation("VereinsleitungMeetingMatterCarryOver")
   participants            VereinsleitungMeetingParticipant[]
+  agendaItems             VereinsleitungMeetingAgendaItem[]
+  decisions               VereinsleitungMeetingDecision[]
+  protocolEntries         VereinsleitungMeetingProtocolEntry[]
 
   @@index([startAt])
   @@index([status])
+  @@index([meetingMode])
+  @@index([meetingProvider])
+  @@index([teamsSyncStatus])
+  @@index([teamsOrganizerUserId])
   @@index([carryOverSourceMeetingId])
 }
 
@@ -610,16 +659,16 @@ model VereinsleitungMeetingMatter {
 }
 
 model VereinsleitungMeetingParticipant {
-  id            String                               @id @default(cuid())
-  meetingId      String
-  personId       String?
-  displayName    String
-  roleLabel      String?
-  status         VereinsleitungMeetingParticipantStatus @default(INVITED)
-  sortOrder      Int                                  @default(0)
-  remarks        String?
-  createdAt      DateTime                             @default(now())
-  updatedAt      DateTime                             @updatedAt
+  id          String                                 @id @default(cuid())
+  meetingId   String
+  personId    String?
+  displayName String
+  roleLabel   String?
+  status      VereinsleitungMeetingParticipantStatus @default(INVITED)
+  sortOrder   Int                                    @default(0)
+  remarks     String?
+  createdAt   DateTime                               @default(now())
+  updatedAt   DateTime                               @updatedAt
 
   meeting VereinsleitungMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   person  Person?               @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -627,4 +676,61 @@ model VereinsleitungMeetingParticipant {
   @@index([meetingId, sortOrder])
   @@index([personId])
   @@index([status])
+}
+
+model VereinsleitungMeetingDecision {
+  id                     String                            @id @default(cuid())
+  meetingId              String
+  agendaItemId           String?
+  agendaItemTitle        String?
+  decisionText           String
+  decisionType           VereinsleitungMeetingDecisionType @default(DECISION)
+  responsiblePersonId    String?
+  responsibleDisplayName String?
+  dueDate                DateTime?
+  createMatter           Boolean                           @default(false)
+  sortOrder              Int                               @default(0)
+  remarks                String?
+  createdAt              DateTime                          @default(now())
+  updatedAt              DateTime                          @updatedAt
+
+  meeting           VereinsleitungMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  responsiblePerson Person?               @relation(fields: [responsiblePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([meetingId, sortOrder])
+  @@index([agendaItemId])
+  @@index([decisionType])
+  @@index([responsiblePersonId])
+  @@index([dueDate])
+  @@index([createMatter])
+}
+
+model VereinsleitungMeetingProtocolEntry {
+  id              String   @id @default(cuid())
+  meetingId       String
+  agendaItemId    String?
+  agendaItemTitle String?
+  notes           String
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  meeting VereinsleitungMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([meetingId, sortOrder])
+  @@index([agendaItemId])
+}
+
+model VereinsleitungMeetingAgendaItem {
+  id          String   @id @default(cuid())
+  meetingId   String
+  title       String
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  meeting VereinsleitungMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([meetingId, sortOrder])
 }

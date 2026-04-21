@@ -1,18 +1,15 @@
-import { Prisma, type VereinsleitungMeetingParticipantStatus } from "@prisma/client";
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import {
+  VereinsleitungMeetingMode,
+  VereinsleitungMeetingProvider,
+  VereinsleitungTeamsSyncStatus,
+  type VereinsleitungMeetingParticipantStatus,
+} from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
-import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import { slugifyMeetingTitle } from "@/lib/vereinsleitung/meeting-utils";
-
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
 
 type ParticipantInput = {
   personId: string | null;
@@ -54,7 +51,7 @@ function normalizeDateTime(value: unknown, fieldLabel: string) {
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungueltig." } as const;
+    return { error: fieldLabel + " ist ungültig." } as const;
   }
 
   return { value: parsed } as const;
@@ -70,7 +67,7 @@ function normalizeOptionalDateTime(value: unknown, fieldLabel: string) {
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungueltig." } as const;
+    return { error: fieldLabel + " ist ungültig." } as const;
   }
 
   return { value: parsed } as const;
@@ -89,7 +86,9 @@ function normalizeMatterIds(value: unknown) {
     .map((item) => String(item ?? "").trim())
     .filter(Boolean);
 
-  return { value: Array.from(new Set(matterIds)) } as const;
+  const uniqueMatterIds = Array.from(new Set(matterIds));
+
+  return { value: uniqueMatterIds } as const;
 }
 
 function parseParticipantStatus(
@@ -107,7 +106,7 @@ function parseParticipantStatus(
     case "ABSENT":
       return { value: "ABSENT" };
     default:
-      return { error: "Ungueltiger Teilnehmerstatus: " + status };
+      return { error: "Ungültiger Teilnehmerstatus: " + status };
   }
 }
 
@@ -153,6 +152,57 @@ function normalizeParticipants(value: unknown) {
   return { value: participants } as const;
 }
 
+function parseMeetingMode(
+  value: unknown,
+): { value: VereinsleitungMeetingMode } | { error: string } {
+  const mode = String(value ?? "ON_SITE").trim().toUpperCase();
+
+  switch (mode) {
+    case "ON_SITE":
+      return { value: "ON_SITE" };
+    case "ONLINE":
+      return { value: "ONLINE" };
+    case "HYBRID":
+      return { value: "HYBRID" };
+    default:
+      return { error: "Ungültiger Meeting-Typ: " + mode };
+  }
+}
+
+function parseMeetingProvider(
+  value: unknown,
+): { value: VereinsleitungMeetingProvider } | { error: string } {
+  const provider = String(value ?? "NONE").trim().toUpperCase();
+
+  switch (provider) {
+    case "NONE":
+      return { value: "NONE" };
+    case "EXTERNAL":
+      return { value: "EXTERNAL" };
+    case "MICROSOFT_TEAMS":
+      return { value: "MICROSOFT_TEAMS" };
+    default:
+      return { error: "Ungültiger Meeting-Provider: " + provider };
+  }
+}
+
+function parseMeetingStatus(
+  value: unknown,
+): { value: "PLANNED" | "IN_PROGRESS" | "DONE" } | { error: string } {
+  const status = String(value ?? "PLANNED").trim().toUpperCase();
+
+  switch (status) {
+    case "PLANNED":
+      return { value: "PLANNED" };
+    case "IN_PROGRESS":
+      return { value: "IN_PROGRESS" };
+    case "DONE":
+      return { value: "DONE" };
+    default:
+      return { error: "Ungültiger Meeting-Status: " + status };
+  }
+}
+
 async function validateMatterIds(matterIds: string[]) {
   if (matterIds.length === 0) {
     return { matters: [] } as const;
@@ -170,7 +220,7 @@ async function validateMatterIds(matterIds: string[]) {
   });
 
   if (matters.length !== matterIds.length) {
-    return { error: "Mindestens eine verknuepfte Pendenz wurde nicht gefunden." } as const;
+    return { error: "Mindestens eine verknüpfte Pendenz wurde nicht gefunden." } as const;
   }
 
   return { matters } as const;
@@ -251,60 +301,10 @@ async function buildUniqueMeetingSlug(title: string, excludeMeetingId?: string) 
   return baseSlug + "-" + counter;
 }
 
-async function getMeeting(id: string) {
-  return prisma.vereinsleitungMeeting.findUnique({
-    where: { id },
-    include: {
-      matterLinks: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        include: {
-          matter: {
-            include: {
-              owner: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  displayName: true,
-                },
-              },
-            },
-          },
-          carriedOverFromMeeting: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
-        },
-      },
-      participants: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
-    },
-  });
-}
-
-export async function GET(_request: Request, context: RouteContext) {
-  const access = await requireApiAnyPermission(
-    ROUTE_PERMISSION_SETS.VEREINSLEITUNG_MEETINGS_READ,
-  );
-
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
-  const params = await context.params;
-  const meeting = await getMeeting(params.id);
-
-  if (!meeting) {
-    return NextResponse.json({ error: "Meeting wurde nicht gefunden." }, { status: 404 });
-  }
-
-  return NextResponse.json(meeting);
-}
-
-export async function PATCH(request: Request, context: RouteContext) {
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
   const access = await requireApiPermission(
     PERMISSIONS.VEREINSLEITUNG_MEETINGS_MANAGE,
   );
@@ -313,182 +313,207 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const params = await context.params;
-  const meetingId = params.id;
+  const { id } = await context.params;
 
   try {
-    const existingMeeting = await getMeeting(meetingId);
+    const existingMeeting = await prisma.vereinsleitungMeeting.findUnique({
+      where: { id },
+      include: {
+        matterLinks: true,
+        participants: true,
+      },
+    });
 
     if (!existingMeeting) {
       return NextResponse.json({ error: "Meeting wurde nicht gefunden." }, { status: 404 });
     }
 
     const body = await request.json();
-    const data: {
-      title?: string;
-      slug?: string;
-      subtitle?: string | null;
-      description?: string | null;
-      location?: string | null;
-      onlineMeetingUrl?: string | null;
-      status?: string;
-      notes?: string | null;
-      startAt?: Date;
-      endAt?: Date | null;
-      carryOverSourceMeetingId?: string | null;
-    } = {};
 
-    if (body.title !== undefined) {
-      const title = String(body.title ?? "").trim();
+    if (body && typeof body === "object" && "status" in (body as Record<string, unknown>) && Object.keys(body as Record<string, unknown>).length === 1) {
+      const statusResult = parseMeetingStatus((body as Record<string, unknown>).status);
 
-      if (!title) {
-        return NextResponse.json({ error: "Titel ist erforderlich." }, { status: 400 });
+      if ("error" in statusResult) {
+        return NextResponse.json({ error: statusResult.error }, { status: 400 });
       }
 
-      data.title = title;
-      data.slug =
-        title === existingMeeting.title
-          ? existingMeeting.slug
-          : await buildUniqueMeetingSlug(title, meetingId);
+      const updated = await prisma.vereinsleitungMeeting.update({
+        where: { id },
+        data: {
+          status: statusResult.value,
+        },
+      });
+
+      await logAction({
+        actorUserId: getActorUserId(access),
+        moduleKey: "vereinsleitung",
+        entityType: "VereinsleitungMeeting",
+        entityId: id,
+        action: "STATUS_UPDATE",
+        beforeJson: { status: existingMeeting.status },
+        afterJson: { status: updated.status },
+      });
+
+      return NextResponse.json(updated);
     }
 
-    if (body.subtitle !== undefined) {
-      data.subtitle = normalizeOptionalString(body.subtitle);
+    const title = String(body.title ?? "").trim();
+    const subtitle = normalizeOptionalString(body.subtitle);
+    const description = normalizeOptionalString(body.description);
+    const location = normalizeOptionalString(body.location);
+    const meetingModeResult = parseMeetingMode(body.meetingMode);
+    const meetingProviderResult = parseMeetingProvider(body.meetingProvider);
+    const statusResult = parseMeetingStatus(body.status);
+    const externalMeetingUrl = normalizeOptionalString(body.externalMeetingUrl);
+    const carryOverSourceMeetingId = normalizeOptionalString(body.carryOverSourceMeetingId);
+    const startAtResult = normalizeDateTime(body.startAt, "Startzeit");
+    const endAtResult = normalizeOptionalDateTime(body.endAt, "Endzeit");
+    const matterIdsResult = normalizeMatterIds(body.matterIds);
+    const participantsResult = normalizeParticipants(body.participants);
+
+    if (existingMeeting.status === "DONE") {
+      return NextResponse.json(
+        { error: "Meeting ist abgeschlossen. Vorbereitungsdaten können nicht mehr bearbeitet werden." },
+        { status: 400 },
+      );
     }
 
-    if (body.description !== undefined) {
-      data.description = normalizeOptionalString(body.description);
+    if (!title) {
+      return NextResponse.json({ error: "Titel ist erforderlich." }, { status: 400 });
     }
 
-    if (body.location !== undefined) {
-      data.location = normalizeOptionalString(body.location);
+    if ("error" in meetingModeResult) {
+      return NextResponse.json({ error: meetingModeResult.error }, { status: 400 });
     }
 
-    if (body.onlineMeetingUrl !== undefined) {
-      data.onlineMeetingUrl = normalizeOptionalString(body.onlineMeetingUrl);
+    if ("error" in meetingProviderResult) {
+      return NextResponse.json({ error: meetingProviderResult.error }, { status: 400 });
     }
 
-    if (body.status !== undefined) {
-      data.status = String(body.status ?? "").trim().toUpperCase() || "PLANNED";
+    if ("error" in statusResult) {
+      return NextResponse.json({ error: statusResult.error }, { status: 400 });
     }
 
-    if (body.notes !== undefined) {
-      data.notes = normalizeOptionalString(body.notes);
+    if ("error" in startAtResult) {
+      return NextResponse.json({ error: startAtResult.error }, { status: 400 });
     }
 
-    if (body.startAt !== undefined) {
-      const startAtResult = normalizeDateTime(body.startAt, "Startzeit");
-
-      if ("error" in startAtResult) {
-        return NextResponse.json({ error: startAtResult.error }, { status: 400 });
-      }
-
-      data.startAt = startAtResult.value;
+    if ("error" in endAtResult) {
+      return NextResponse.json({ error: endAtResult.error }, { status: 400 });
     }
 
-    if (body.endAt !== undefined) {
-      const endAtResult = normalizeOptionalDateTime(body.endAt, "Endzeit");
-
-      if ("error" in endAtResult) {
-        return NextResponse.json({ error: endAtResult.error }, { status: 400 });
-      }
-
-      data.endAt = endAtResult.value;
+    if ("error" in matterIdsResult) {
+      return NextResponse.json({ error: matterIdsResult.error }, { status: 400 });
     }
 
-    if (body.carryOverSourceMeetingId !== undefined) {
-      data.carryOverSourceMeetingId = normalizeOptionalString(body.carryOverSourceMeetingId);
+    if ("error" in participantsResult) {
+      return NextResponse.json({ error: participantsResult.error }, { status: 400 });
     }
 
-    const nextStartAt = data.startAt ?? existingMeeting.startAt;
-    const nextEndAt = data.endAt === undefined ? existingMeeting.endAt : data.endAt;
-
-    if (nextEndAt && nextEndAt.getTime() < nextStartAt.getTime()) {
+    if (endAtResult.value && endAtResult.value.getTime() < startAtResult.value.getTime()) {
       return NextResponse.json(
         { error: "Endzeit darf nicht vor der Startzeit liegen." },
         { status: 400 },
       );
     }
 
-    const matterIdsResult = normalizeMatterIds(body.matterIds);
+    const meetingMode = meetingModeResult.value;
+    const meetingProvider =
+      meetingMode === "ON_SITE" ? "NONE" : meetingProviderResult.value;
 
-    if ("error" in matterIdsResult) {
-      return NextResponse.json({ error: matterIdsResult.error }, { status: 400 });
-    }
-
-    if (matterIdsResult.value !== undefined) {
-      const matterValidation = await validateMatterIds(matterIdsResult.value);
-
-      if ("error" in matterValidation) {
-        return NextResponse.json({ error: matterValidation.error }, { status: 400 });
-      }
-    }
-
-    const participantsResult = normalizeParticipants(body.participants);
-
-    if ("error" in participantsResult) {
-      return NextResponse.json({ error: participantsResult.error }, { status: 400 });
-    }
-
-    if (participantsResult.value !== undefined) {
-      const participantValidation = await validateParticipantPersonIds(
-        participantsResult.value,
+    if (meetingProvider === "EXTERNAL" && !externalMeetingUrl) {
+      return NextResponse.json(
+        { error: "Ein externer Meeting-Link ist erforderlich." },
+        { status: 400 },
       );
-
-      if (!participantValidation.ok) {
-        return NextResponse.json({ error: participantValidation.error }, { status: 400 });
-      }
     }
 
-    const updatedMeeting = await prisma.$transaction(async (tx) => {
-      if (matterIdsResult.value !== undefined) {
-        await tx.vereinsleitungMeetingMatter.deleteMany({
-          where: { meetingId },
-        });
+    const matterIds = matterIdsResult.value ?? [];
+    const matterValidation = await validateMatterIds(matterIds);
 
-        if (matterIdsResult.value.length > 0) {
-          await tx.vereinsleitungMeetingMatter.createMany({
-            data: matterIdsResult.value.map((matterId, index) => ({
-              meetingId,
-              matterId,
-              sortOrder: index,
-              carriedOverFromMeetingId:
-                data.carryOverSourceMeetingId ?? existingMeeting.carryOverSourceMeetingId,
-            })),
-          });
-        }
-      }
+    if ("error" in matterValidation) {
+      return NextResponse.json({ error: matterValidation.error }, { status: 400 });
+    }
 
-      if (participantsResult.value !== undefined) {
-        await tx.vereinsleitungMeetingParticipant.deleteMany({
-          where: { meetingId },
-        });
+    const participants = participantsResult.value ?? [];
+    const participantValidation = await validateParticipantPersonIds(participants);
 
-        if (participantsResult.value.length > 0) {
-          const participantCreateData: Prisma.VereinsleitungMeetingParticipantCreateManyInput[] =
-            participantsResult.value.map((participant) => ({
-              meetingId,
-              personId: participant.personId,
-              displayName: participant.displayName,
-              roleLabel: participant.roleLabel,
-              status: participant.status,
-              remarks: participant.remarks,
-              sortOrder: participant.sortOrder,
-            }));
+    if (!participantValidation.ok) {
+      return NextResponse.json({ error: participantValidation.error }, { status: 400 });
+    }
 
-          await tx.vereinsleitungMeetingParticipant.createMany({
-            data: participantCreateData,
-          });
-        }
-      }
+    const slug =
+      title === existingMeeting.title
+        ? existingMeeting.slug
+        : await buildUniqueMeetingSlug(title, existingMeeting.id);
 
-      await tx.vereinsleitungMeeting.update({
-        where: { id: meetingId },
-        data,
+    const teamsSyncStatus: VereinsleitungTeamsSyncStatus =
+      meetingProvider === "MICROSOFT_TEAMS"
+        ? existingMeeting.teamsSyncStatus === "CREATED"
+          ? "CREATED"
+          : "PENDING"
+        : meetingProvider === "EXTERNAL"
+          ? "MANUAL"
+          : "NOT_CONFIGURED";
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.vereinsleitungMeetingMatter.deleteMany({
+        where: { meetingId: id },
       });
 
-      return tx.vereinsleitungMeeting.findUnique({
-        where: { id: meetingId },
+      await tx.vereinsleitungMeetingParticipant.deleteMany({
+        where: { meetingId: id },
+      });
+
+      return tx.vereinsleitungMeeting.update({
+        where: { id },
+        data: {
+          title,
+          slug,
+          subtitle,
+          description,
+          location,
+          meetingMode,
+          meetingProvider,
+          externalMeetingUrl: meetingProvider === "EXTERNAL" ? externalMeetingUrl : null,
+          onlineMeetingUrl: meetingProvider === "EXTERNAL" ? externalMeetingUrl : null,
+          teamsSyncStatus,
+          teamsJoinUrl:
+            meetingProvider === "MICROSOFT_TEAMS" ? existingMeeting.teamsJoinUrl : null,
+          teamsMeetingId:
+            meetingProvider === "MICROSOFT_TEAMS" ? existingMeeting.teamsMeetingId : null,
+          teamsCalendarEventId:
+            meetingProvider === "MICROSOFT_TEAMS" ? existingMeeting.teamsCalendarEventId : null,
+          teamsLastSyncedAt:
+            meetingProvider === "MICROSOFT_TEAMS" ? existingMeeting.teamsLastSyncedAt : null,
+          teamsErrorMessage:
+            meetingProvider === "MICROSOFT_TEAMS" ? existingMeeting.teamsErrorMessage : null,
+          status: statusResult.value,
+          startAt: startAtResult.value,
+          endAt: endAtResult.value,
+          carryOverSourceMeetingId,
+          matterLinks: matterIds.length
+            ? {
+                create: matterIds.map((matterId, index) => ({
+                  matterId,
+                  sortOrder: index,
+                  carriedOverFromMeetingId: carryOverSourceMeetingId,
+                })),
+              }
+            : undefined,
+          participants: participants.length
+            ? {
+                create: participants.map((participant) => ({
+                  personId: participant.personId,
+                  displayName: participant.displayName,
+                  roleLabel: participant.roleLabel,
+                  status: participant.status,
+                  remarks: participant.remarks,
+                  sortOrder: participant.sortOrder,
+                })),
+              }
+            : undefined,
+        },
         include: {
           matterLinks: {
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -524,13 +549,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       actorUserId: getActorUserId(access),
       moduleKey: "vereinsleitung",
       entityType: "VereinsleitungMeeting",
-      entityId: meetingId,
+      entityId: updated.id,
       action: "UPDATE",
       beforeJson: existingMeeting,
-      afterJson: updatedMeeting,
+      afterJson: updated,
     });
 
-    return NextResponse.json(updatedMeeting);
+    return NextResponse.json(updated);
   } catch (error) {
     console.error("Update meeting failed:", error);
 
@@ -543,56 +568,6 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json(
       { error: "Meeting konnte nicht aktualisiert werden." },
-      { status: 500 },
-    );
-  }
-}
-
-export async function DELETE(_request: Request, context: RouteContext) {
-  const access = await requireApiPermission(
-    PERMISSIONS.VEREINSLEITUNG_MEETINGS_MANAGE,
-  );
-
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
-  const params = await context.params;
-  const meetingId = params.id;
-
-  try {
-    const existingMeeting = await getMeeting(meetingId);
-
-    if (!existingMeeting) {
-      return NextResponse.json({ error: "Meeting wurde nicht gefunden." }, { status: 404 });
-    }
-
-    await prisma.vereinsleitungMeeting.delete({
-      where: { id: meetingId },
-    });
-
-    await logAction({
-      actorUserId: getActorUserId(access),
-      moduleKey: "vereinsleitung",
-      entityType: "VereinsleitungMeeting",
-      entityId: meetingId,
-      action: "DELETE",
-      beforeJson: existingMeeting,
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Delete meeting failed:", error);
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: "Technischer Fehler: " + error.message },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Meeting konnte nicht gelöscht werden." },
       { status: 500 },
     );
   }

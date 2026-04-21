@@ -1,10 +1,11 @@
 ﻿import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
 import VereinsleitungMeetingAgendaCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingAgendaCard";
 import VereinsleitungMeetingDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingDecisionsCard";
+import VereinsleitungMeetingExecutionWorkspace from "@/components/admin/vereinsleitung/VereinsleitungMeetingExecutionWorkspace";
 import VereinsleitungMeetingInfoCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingInfoCard";
 import VereinsleitungMeetingParticipantsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingParticipantsCard";
 import VereinsleitungMeetingProtocolCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingProtocolCard";
-import type { MeetingDetailItem } from "@/lib/vereinsleitung/meeting-utils";
+import { getPreferredMeetingUrl, type MeetingDetailItem } from "@/lib/vereinsleitung/meeting-utils";
 
 type VereinsleitungMeetingDetailProps = {
   meeting: MeetingDetailItem;
@@ -13,8 +14,22 @@ type VereinsleitungMeetingDetailProps = {
 export default function VereinsleitungMeetingDetail({
   meeting,
 }: VereinsleitungMeetingDetailProps) {
+  const meetingUrl = getPreferredMeetingUrl({
+    teamsJoinUrl: meeting.teamsJoinUrl,
+    externalMeetingUrl: meeting.externalMeetingUrl,
+    onlineMeetingUrl: meeting.onlineMeetingUrl,
+  });
+
   return (
     <div className="space-y-5">
+      <VereinsleitungMeetingExecutionWorkspace
+        meetingId={meeting.id}
+        agendaItems={meeting.agendaItems}
+        protocolEntries={meeting.protocolEntries}
+        decisions={meeting.decisions ?? []}
+        isDone={meeting.isDone}
+      />
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.85fr)_360px]">
         <div className="space-y-5">
           <VereinsleitungMeetingAgendaCard
@@ -23,25 +38,45 @@ export default function VereinsleitungMeetingDetail({
             description={meeting.description}
           />
           <VereinsleitungMeetingActionsCard
-            title="Verknuepfte Pendenzen"
+            title="Meeting-Aktionen"
             linkedMatters={meeting.linkedMatters}
+            meetingUrl={meetingUrl}
+            teamsSyncStatusLabel={meeting.teamsSyncStatusLabel}
+            isLocked={meeting.isDone}
           />
-          <VereinsleitungMeetingProtocolCard notes={meeting.protocolNotes} />
-          <VereinsleitungMeetingDecisionsCard decisionsCount={meeting.decisionsCount} />
+          <VereinsleitungMeetingProtocolCard
+            meetingId={meeting.id}
+            notes={meeting.protocolNotes}
+            protocolEntries={meeting.protocolEntries}
+          />
+          <VereinsleitungMeetingDecisionsCard
+            meetingId={meeting.id}
+            decisions={meeting.decisions ?? []}
+          />
         </div>
 
         <div className="space-y-5">
           <VereinsleitungMeetingInfoCard
+            meetingId={meeting.id}
             title="Sitzungsinformationen"
             dateLabel={meeting.dateLabel}
             timeLabel={meeting.timeLabel}
             location={meeting.location}
             onlineMeetingUrl={meeting.onlineMeetingUrl}
+            meetingModeLabel={meeting.meetingModeLabel}
+            meetingProviderLabel={meeting.meetingProviderLabel}
+            teamsSyncStatusLabel={meeting.teamsSyncStatusLabel}
+            externalMeetingUrl={meeting.externalMeetingUrl}
+            teamsJoinUrl={meeting.teamsJoinUrl}
+            status={meeting.status}
+            statusLabel={meeting.statusLabel}
           />
-          <VereinsleitungMeetingParticipantsCard
-            participants={meeting.participants}
-            stats={meeting.participantStats}
-          />
+          <div id="participants">
+            <VereinsleitungMeetingParticipantsCard
+              participants={meeting.participants}
+              stats={meeting.participantStats}
+            />
+          </div>
         </div>
       </div>
     </div>

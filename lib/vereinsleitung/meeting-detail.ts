@@ -1,12 +1,19 @@
-import { prisma } from "@/lib/db/prisma";
+﻿import { prisma } from "@/lib/db/prisma";
 import {
   formatMatterDueDateLabel,
   formatMeetingDateLabel,
   formatMeetingTimeLabel,
+  getDecisionTypeLabel,
   getMatterPriorityLabel,
   getMatterStatusLabel,
+  getMeetingModeLabel,
+  getMeetingProviderLabel,
+  getMeetingStatusLabel,
+  getTeamsSyncStatusLabel,
+  type MeetingDecisionItem,
   type MeetingDetailItem,
   type MeetingParticipantItem,
+  type MeetingProtocolEntryItem,
 } from "@/lib/vereinsleitung/meeting-utils";
 import {
   getParticipantInitials,
@@ -14,12 +21,12 @@ import {
   getParticipantStatusLabel,
 } from "@/lib/vereinsleitung/meeting-participants";
 
-export async function getMeetingDetailItemBySlug(
-  slug: string,
+export async function getMeetingDetailItem(
+  meetingIdOrSlug: string,
 ): Promise<MeetingDetailItem | null> {
-  const meeting = await prisma.vereinsleitungMeeting.findUnique({
+  const meeting = await prisma.vereinsleitungMeeting.findFirst({
     where: {
-      slug,
+      OR: [{ id: meetingIdOrSlug }, { slug: meetingIdOrSlug }],
     },
     include: {
       matterLinks: {
@@ -48,6 +55,25 @@ export async function getMeetingDetailItemBySlug(
       participants: {
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       },
+      decisions: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        include: {
+          responsiblePerson: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              displayName: true,
+            },
+          },
+        },
+      },
+      protocolEntries: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+      agendaItems: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
     },
   });
 
@@ -65,6 +91,36 @@ export async function getMeetingDetailItemBySlug(
     remarks: participant.remarks,
   }));
 
+  const decisions: MeetingDecisionItem[] = meeting.decisions.map((decision) => {
+    const responsibleDisplayName =
+      decision.responsibleDisplayName ??
+      decision.responsiblePerson?.displayName ??
+      ([decision.responsiblePerson?.firstName, decision.responsiblePerson?.lastName]
+        .filter(Boolean)
+        .join(" ") || null);
+
+    return {
+      id: decision.id,
+      agendaItemId: decision.agendaItemId,
+      agendaItemTitle: decision.agendaItemTitle,
+      decisionText: decision.decisionText,
+      decisionType: decision.decisionType,
+      decisionTypeLabel: getDecisionTypeLabel(decision.decisionType),
+      responsiblePersonId: decision.responsiblePersonId,
+      responsibleDisplayName,
+      dueDateLabel: formatMatterDueDateLabel(decision.dueDate),
+      createMatter: decision.createMatter,
+      remarks: decision.remarks,
+    };
+  });
+
+  const protocolEntries: MeetingProtocolEntryItem[] = meeting.protocolEntries.map((entry) => ({
+    id: entry.id,
+    agendaItemId: entry.agendaItemId,
+    agendaItemTitle: entry.agendaItemTitle,
+    notes: entry.notes,
+  }));
+
   return {
     id: meeting.id,
     slug: meeting.slug,
@@ -72,10 +128,20 @@ export async function getMeetingDetailItemBySlug(
     subtitle: meeting.subtitle,
     description: meeting.description,
     status: meeting.status,
+    statusLabel: getMeetingStatusLabel(meeting.status),
+    isDone: meeting.status === "DONE",
     dateLabel: formatMeetingDateLabel(meeting.startAt),
     timeLabel: formatMeetingTimeLabel(meeting.startAt, meeting.endAt),
     location: meeting.location,
     onlineMeetingUrl: meeting.onlineMeetingUrl,
+    meetingMode: meeting.meetingMode,
+    meetingModeLabel: getMeetingModeLabel(meeting.meetingMode),
+    meetingProvider: meeting.meetingProvider,
+    meetingProviderLabel: getMeetingProviderLabel(meeting.meetingProvider),
+    teamsSyncStatus: meeting.teamsSyncStatus,
+    teamsSyncStatusLabel: getTeamsSyncStatusLabel(meeting.teamsSyncStatus),
+    externalMeetingUrl: meeting.externalMeetingUrl,
+    teamsJoinUrl: meeting.teamsJoinUrl,
     linkedMatters: meeting.matterLinks.map((link) => {
       const ownerName =
         link.matter.owner?.displayName ??
@@ -96,9 +162,17 @@ export async function getMeetingDetailItemBySlug(
         sourceMeetingTitle: link.carriedOverFromMeeting?.title ?? null,
       };
     }),
+    agendaItems: meeting.agendaItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      sortOrder: item.sortOrder,
+    })),
     participants,
     participantStats: getParticipantStats(participants),
     protocolNotes: meeting.notes,
-    decisionsCount: 0,
+    protocolEntries,
+    decisionsCount: decisions.length,
+    decisions,
   };
 }
