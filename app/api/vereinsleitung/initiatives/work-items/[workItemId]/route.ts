@@ -1,0 +1,70 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
+
+function parseStatus(value: unknown) {
+  const normalized = String(value ?? "").trim().toUpperCase();
+
+  switch (normalized) {
+    case "BACKLOG":
+    case "IN_PROGRESS":
+    case "RESOLVED":
+      return normalized;
+    default:
+      return null;
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ workItemId: string }> },
+) {
+  const access = await requireApiAnyPermission([PERMISSIONS.VEREINSLEITUNG_INITIATIVES_MANAGE]);
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const { workItemId } = await context.params;
+
+  try {
+    const body = await request.json();
+    const status = parseStatus(body.status);
+
+    if (!status) {
+      return NextResponse.json({ error: "UngÃƒÂ¼ltiger Status." }, { status: 400 });
+    }
+
+    const existing = await prisma.vereinsleitungInitiativeWorkItem.findUnique({
+      where: { id: workItemId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Work Item nicht gefunden." }, { status: 404 });
+    }
+
+    const updated = await prisma.vereinsleitungInitiativeWorkItem.update({
+      where: { id: workItemId },
+      data: { status },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("Update initiative work item failed:", error);
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: "Technischer Fehler: " + error.message },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Work Item konnte nicht aktualisiert werden." },
+      { status: 500 },
+    );
+  }
+}

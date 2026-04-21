@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import PeoplePicker, {
+  type PeoplePickerPerson,
+} from "@/components/admin/shared/people-picker/PeoplePicker";
 
 type MeetingStatus = "PLANNED" | "IN_PROGRESS" | "DONE";
 type ParticipantStatus = "INVITED" | "CONFIRMED" | "EXCUSED" | "ABSENT";
 type MeetingMode = "ON_SITE" | "ONLINE" | "HYBRID";
 type MeetingProvider = "NONE" | "EXTERNAL" | "MICROSOFT_TEAMS";
+type ProviderUiOption = "NONE" | "MICROSOFT_TEAMS" | "SKYPE" | "EXTERNAL";
 type TeamsSyncStatus =
   | "NOT_CONFIGURED"
   | "MANUAL"
@@ -26,15 +31,6 @@ type MatterOption = {
   ownerName: string | null;
 };
 
-type PersonSearchResult = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  displayName: string | null;
-  email: string | null;
-  phone: string | null;
-};
-
 type ParticipantRow = {
   key: string;
   personId: string;
@@ -42,10 +38,13 @@ type ParticipantRow = {
   roleLabel: string;
   status: ParticipantStatus;
   remarks: string;
-  searchQuery: string;
-  searchResults: PersonSearchResult[];
-  searchLoading: boolean;
-  searchError: string;
+  selectedPerson: PeoplePickerPerson | null;
+};
+
+type AgendaItemRow = {
+  key: string;
+  title: string;
+  description: string;
 };
 
 type InitialParticipant = {
@@ -54,6 +53,11 @@ type InitialParticipant = {
   roleLabel?: string | null;
   status?: string | null;
   remarks?: string | null;
+};
+
+type InitialAgendaItem = {
+  title?: string | null;
+  description?: string | null;
 };
 
 type FormState = {
@@ -67,6 +71,7 @@ type FormState = {
   status: MeetingStatus;
   meetingMode: MeetingMode;
   meetingProvider: MeetingProvider;
+  providerUi: ProviderUiOption;
   externalMeetingUrl: string;
   teamsJoinUrl: string;
   teamsSyncStatus: TeamsSyncStatus;
@@ -81,6 +86,7 @@ type VereinsleitungMeetingCreateFormProps = {
   initialValues?: Partial<FormState>;
   initialSelectedMatterIds?: string[];
   initialParticipants?: InitialParticipant[];
+  initialAgendaItems?: InitialAgendaItem[];
   meetingId?: string;
 };
 
@@ -95,6 +101,7 @@ const INITIAL_STATE: FormState = {
   status: "PLANNED",
   meetingMode: "ON_SITE",
   meetingProvider: "NONE",
+  providerUi: "NONE",
   externalMeetingUrl: "",
   teamsJoinUrl: "",
   teamsSyncStatus: "NOT_CONFIGURED",
@@ -111,12 +118,6 @@ const MEETING_MODE_OPTIONS: { value: MeetingMode; label: string }[] = [
   { value: "ON_SITE", label: "Vor Ort" },
   { value: "ONLINE", label: "Online" },
   { value: "HYBRID", label: "Hybrid" },
-];
-
-const MEETING_PROVIDER_OPTIONS: { value: MeetingProvider; label: string }[] = [
-  { value: "NONE", label: "Kein Provider" },
-  { value: "EXTERNAL", label: "Externer Link" },
-  { value: "MICROSOFT_TEAMS", label: "Microsoft Teams" },
 ];
 
 const TEAMS_SYNC_STATUS_OPTIONS: { value: TeamsSyncStatus; label: string }[] = [
@@ -164,14 +165,6 @@ function getTeamsSyncStatusClass(status: TeamsSyncStatus) {
   }
 }
 
-function getPersonName(person: {
-  firstName: string;
-  lastName: string;
-  displayName: string | null;
-}) {
-  return person.displayName || [person.firstName, person.lastName].filter(Boolean).join(" ");
-}
-
 function normalizeParticipantStatus(value?: string | null): ParticipantStatus {
   switch (value) {
     case "CONFIRMED":
@@ -215,6 +208,44 @@ function normalizeTeamsSyncStatus(value?: string | null): TeamsSyncStatus {
   }
 }
 
+function inferProviderUi(
+  meetingProvider?: string | null,
+  externalMeetingUrl?: string | null,
+  onlineMeetingUrl?: string | null,
+): ProviderUiOption {
+  if (meetingProvider === "MICROSOFT_TEAMS") {
+    return "MICROSOFT_TEAMS";
+  }
+
+  if (meetingProvider === "EXTERNAL") {
+    const url = (externalMeetingUrl ?? onlineMeetingUrl ?? "").toLowerCase();
+
+    if (url.includes("skype")) {
+      return "SKYPE";
+    }
+
+    return "EXTERNAL";
+  }
+
+  return "NONE";
+}
+
+function buildParticipantRoleLabel(person: PeoplePickerPerson) {
+  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" • ");
+}
+
+function createParticipantRowFromPerson(person: PeoplePickerPerson): ParticipantRow {
+  return {
+    key: Math.random().toString(36).slice(2, 11),
+    personId: person.id,
+    displayName: person.displayName,
+    roleLabel: buildParticipantRoleLabel(person),
+    status: "INVITED",
+    remarks: "",
+    selectedPerson: person,
+  };
+}
+
 function createParticipantRow(initial?: InitialParticipant): ParticipantRow {
   const personName = initial?.displayName?.trim() ?? "";
 
@@ -225,11 +256,65 @@ function createParticipantRow(initial?: InitialParticipant): ParticipantRow {
     roleLabel: initial?.roleLabel ?? "",
     status: normalizeParticipantStatus(initial?.status),
     remarks: initial?.remarks ?? "",
-    searchQuery: personName,
-    searchResults: [],
-    searchLoading: false,
-    searchError: "",
+    selectedPerson:
+      initial?.personId && personName
+        ? {
+            id: initial.personId,
+            displayName: personName,
+            functionLabel: initial.roleLabel ?? null,
+            teamLabel: null,
+            email: null,
+          }
+        : null,
   };
+}
+
+function createAgendaItem(initial?: InitialAgendaItem): AgendaItemRow {
+  return {
+    key: Math.random().toString(36).slice(2, 11),
+    title: initial?.title?.trim() ?? "",
+    description: initial?.description?.trim() ?? "",
+  };
+}
+
+function ProviderTile({
+  isActive,
+  title,
+  subtitle,
+  badge,
+  onClick,
+}: {
+  isActive: boolean;
+  title: string;
+  subtitle: string;
+  badge: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-[22px] border p-4 text-left transition ${
+        isActive
+          ? "border-[#0b4aa2]/30 bg-[#0b4aa2]/[0.05] shadow-sm"
+          : "border-slate-200 bg-white hover:bg-slate-50"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-[#0b4aa2]">
+          {badge}
+        </div>
+        {isActive ? (
+          <span className="rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2]">
+            Aktiv
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 text-sm font-semibold text-slate-900">{title}</div>
+      <div className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</div>
+    </button>
+  );
 }
 
 export default function VereinsleitungMeetingCreateForm({
@@ -241,24 +326,41 @@ export default function VereinsleitungMeetingCreateForm({
   initialValues,
   initialSelectedMatterIds,
   initialParticipants,
+  initialAgendaItems,
   meetingId,
 }: VereinsleitungMeetingCreateFormProps) {
   const router = useRouter();
+
   const [form, setForm] = useState<FormState>({
     ...INITIAL_STATE,
     ...initialValues,
     meetingMode: normalizeMeetingMode(initialValues?.meetingMode),
     meetingProvider: normalizeMeetingProvider(initialValues?.meetingProvider),
+    providerUi: inferProviderUi(
+      initialValues?.meetingProvider,
+      initialValues?.externalMeetingUrl,
+      initialValues?.onlineMeetingUrl,
+    ),
     teamsSyncStatus: normalizeTeamsSyncStatus(initialValues?.teamsSyncStatus),
   });
+
   const [selectedMatterIds, setSelectedMatterIds] = useState<string[]>(
     initialSelectedMatterIds ?? [],
   );
+
   const [participants, setParticipants] = useState<ParticipantRow[]>(
     initialParticipants && initialParticipants.length > 0
       ? initialParticipants.map((participant) => createParticipantRow(participant))
-      : [createParticipantRow()],
+      : [],
   );
+
+  const [agendaItems, setAgendaItems] = useState<AgendaItemRow[]>(
+    initialAgendaItems && initialAgendaItems.length > 0
+      ? initialAgendaItems.map((item) => createAgendaItem(item))
+      : [],
+  );
+
+  const [pickerItems, setPickerItems] = useState<PeoplePickerPerson[]>([]);
   const [error, setError] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -268,20 +370,25 @@ export default function VereinsleitungMeetingCreateForm({
 
   const showLocationField =
     form.meetingMode === "ON_SITE" || form.meetingMode === "HYBRID";
+
   const showProviderField =
     form.meetingMode === "ONLINE" || form.meetingMode === "HYBRID";
+
   const showExternalLinkField =
-    showProviderField && form.meetingProvider === "EXTERNAL";
+    showProviderField && (form.providerUi === "EXTERNAL" || form.providerUi === "SKYPE");
+
   const showTeamsFields =
-    showProviderField && form.meetingProvider === "MICROSOFT_TEAMS";
+    showProviderField && form.providerUi === "MICROSOFT_TEAMS";
+
   const showGenericOnlineLinkField =
-    showProviderField && form.meetingProvider !== "NONE";
+    showProviderField && form.providerUi !== "NONE";
 
   useEffect(() => {
     if (!showProviderField) {
       setForm((current) => ({
         ...current,
         meetingProvider: "NONE",
+        providerUi: "NONE",
         externalMeetingUrl: "",
         teamsJoinUrl: "",
         teamsSyncStatus: "NOT_CONFIGURED",
@@ -290,9 +397,10 @@ export default function VereinsleitungMeetingCreateForm({
       return;
     }
 
-    if (form.meetingProvider === "NONE") {
+    if (form.providerUi === "NONE") {
       setForm((current) => ({
         ...current,
+        meetingProvider: "NONE",
         externalMeetingUrl: "",
         teamsJoinUrl: "",
         teamsSyncStatus: "NOT_CONFIGURED",
@@ -300,123 +408,46 @@ export default function VereinsleitungMeetingCreateForm({
       }));
     }
 
-    if (form.meetingProvider === "EXTERNAL") {
+    if (form.providerUi === "MICROSOFT_TEAMS") {
       setForm((current) => ({
         ...current,
+        meetingProvider: "MICROSOFT_TEAMS",
+        teamsSyncStatus:
+          current.teamsSyncStatus === "NOT_CONFIGURED" ? "PENDING" : current.teamsSyncStatus,
+      }));
+    }
+
+    if (form.providerUi === "EXTERNAL" || form.providerUi === "SKYPE") {
+      setForm((current) => ({
+        ...current,
+        meetingProvider: "EXTERNAL",
         teamsJoinUrl: "",
         teamsSyncStatus: "MANUAL",
       }));
     }
-
-    if (form.meetingProvider === "MICROSOFT_TEAMS" && form.teamsSyncStatus === "NOT_CONFIGURED") {
-      setForm((current) => ({
-        ...current,
-        teamsSyncStatus: "PENDING",
-      }));
-    }
-  }, [
-    showProviderField,
-    form.meetingProvider,
-    form.teamsSyncStatus,
-  ]);
+  }, [showProviderField, form.providerUi]);
 
   useEffect(() => {
-    const controllers: AbortController[] = [];
+    if (pickerItems.length === 0) {
+      return;
+    }
 
-    participants.forEach((participant) => {
-      const query = participant.searchQuery.trim();
+    setParticipants((current) => {
+      const existingIds = new Set(current.map((item) => item.personId).filter(Boolean));
 
-      if (!query || query.length < 2) {
-        if (
-          participant.searchResults.length > 0 ||
-          participant.searchLoading ||
-          participant.searchError
-        ) {
-          setParticipants((current) =>
-            current.map((entry) =>
-              entry.key === participant.key
-                ? {
-                    ...entry,
-                    searchResults: [],
-                    searchLoading: false,
-                    searchError: "",
-                  }
-                : entry,
-            ),
-          );
-        }
-        return;
+      const additions = pickerItems
+        .filter((person) => !existingIds.has(person.id))
+        .map((person) => createParticipantRowFromPerson(person));
+
+      if (additions.length === 0) {
+        return current;
       }
 
-      const controller = new AbortController();
-      controllers.push(controller);
-
-      setParticipants((current) =>
-        current.map((entry) =>
-          entry.key === participant.key
-            ? {
-                ...entry,
-                searchLoading: true,
-                searchError: "",
-              }
-            : entry,
-        ),
-      );
-
-      fetch("/api/people/search?q=" + encodeURIComponent(query) + "&mode=any", {
-        method: "GET",
-        cache: "no-store",
-        signal: controller.signal,
-      })
-        .then(async (response) => {
-          const data = await response.json().catch(() => null);
-
-          if (!response.ok) {
-            throw new Error(data?.error ?? "Personensuche konnte nicht geladen werden.");
-          }
-
-          const results = Array.isArray(data) ? (data as PersonSearchResult[]) : [];
-
-          setParticipants((current) =>
-            current.map((entry) =>
-              entry.key === participant.key
-                ? {
-                    ...entry,
-                    searchResults: results,
-                    searchLoading: false,
-                    searchError: "",
-                  }
-                : entry,
-            ),
-          );
-        })
-        .catch((searchError) => {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          setParticipants((current) =>
-            current.map((entry) =>
-              entry.key === participant.key
-                ? {
-                    ...entry,
-                    searchResults: [],
-                    searchLoading: false,
-                    searchError:
-                      searchError instanceof Error
-                        ? searchError.message
-                        : "Personensuche konnte nicht geladen werden.",
-                  }
-                : entry,
-            ),
-          );
-        });
+      return [...current, ...additions];
     });
 
-    return () => {
-      controllers.forEach((controller) => controller.abort());
-    };
-  }, [participants]);
+    setPickerItems([]);
+  }, [pickerItems]);
 
   function updateField<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
     setForm((current) => ({
@@ -444,42 +475,25 @@ export default function VereinsleitungMeetingCreateForm({
     );
   }
 
-  function addParticipantRow() {
-    setParticipants((current) => [...current, createParticipantRow()]);
+  function removeParticipant(key: string) {
+    setParticipants((current) => current.filter((participant) => participant.key !== key));
   }
 
-  function removeParticipantRow(key: string) {
-    setParticipants((current) => {
-      if (current.length === 1) {
-        return [createParticipantRow()];
-      }
-
-      return current.filter((participant) => participant.key !== key);
-    });
+  function addAgendaItem() {
+    setAgendaItems((current) => [...current, createAgendaItem()]);
   }
 
-  function selectPerson(key: string, person: PersonSearchResult) {
-    const personName = getPersonName(person);
-
-    updateParticipant(key, (participant) => ({
-      ...participant,
-      personId: person.id,
-      displayName: personName,
-      searchQuery: personName,
-      searchResults: [],
-      searchError: "",
-      searchLoading: false,
-    }));
+  function updateAgendaItem(
+    key: string,
+    updater: (item: AgendaItemRow) => AgendaItemRow,
+  ) {
+    setAgendaItems((current) =>
+      current.map((item) => (item.key === key ? updater(item) : item)),
+    );
   }
 
-  function clearLinkedPerson(key: string) {
-    updateParticipant(key, (participant) => ({
-      ...participant,
-      personId: "",
-      searchResults: [],
-      searchError: "",
-      searchLoading: false,
-    }));
+  function removeAgendaItem(key: string) {
+    setAgendaItems((current) => current.filter((item) => item.key !== key));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -498,6 +512,13 @@ export default function VereinsleitungMeetingCreateForm({
         remarks: participant.remarks.trim() || null,
       }))
       .filter((participant) => participant.displayName);
+
+    const normalizedAgendaItems = agendaItems
+      .map((item) => ({
+        title: item.title.trim(),
+        description: item.description.trim() || null,
+      }))
+      .filter((item) => item.title);
 
     setIsSubmitting(true);
     setError("");
@@ -522,7 +543,7 @@ export default function VereinsleitungMeetingCreateForm({
         endAt: form.endAt.trim() || null,
         status: form.status,
         meetingMode: form.meetingMode,
-        meetingProvider: showProviderField ? form.meetingProvider : "NONE",
+        meetingProvider: form.meetingProvider,
         externalMeetingUrl: showExternalLinkField
           ? form.externalMeetingUrl.trim() || null
           : null,
@@ -530,6 +551,7 @@ export default function VereinsleitungMeetingCreateForm({
         teamsSyncStatus: showTeamsFields ? form.teamsSyncStatus : "NOT_CONFIGURED",
         matterIds: selectedMatterIds,
         participants: normalizedParticipants,
+        agendaItems: normalizedAgendaItems,
       };
 
       const response = await fetch(endpoint, {
@@ -663,23 +685,38 @@ export default function VereinsleitungMeetingCreateForm({
           ) : null}
 
           {showProviderField ? (
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-slate-900">
                 Online-Provider
               </label>
-              <select
-                value={form.meetingProvider}
-                onChange={(event) =>
-                  updateField("meetingProvider", event.target.value as MeetingProvider)
-                }
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-              >
-                {MEETING_PROVIDER_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+
+              <div className="mt-2 grid gap-3 md:grid-cols-3">
+                <ProviderTile
+                  isActive={form.providerUi === "MICROSOFT_TEAMS"}
+                  title="Microsoft Teams"
+                  subtitle="Für interne FCA Meetings"
+                  badge="T"
+                  onClick={() => updateField("providerUi", "MICROSOFT_TEAMS")}
+                />
+                <ProviderTile
+                  isActive={form.providerUi === "SKYPE"}
+                  title="Skype"
+                  subtitle="Schneller externer Link"
+                  badge="S"
+                  onClick={() => updateField("providerUi", "SKYPE")}
+                />
+                <ProviderTile
+                  isActive={form.providerUi === "EXTERNAL"}
+                  title="Anderer Link"
+                  subtitle="Für Zoom, Google Meet oder andere Anbieter"
+                  badge="↗"
+                  onClick={() => updateField("providerUi", "EXTERNAL")}
+                />
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                Weitere sinnvolle Anbieter später: Zoom und Google Meet.
+              </p>
             </div>
           ) : null}
 
@@ -691,7 +728,7 @@ export default function VereinsleitungMeetingCreateForm({
               <input
                 value={form.onlineMeetingUrl}
                 onChange={(event) => updateField("onlineMeetingUrl", event.target.value)}
-                placeholder="https://teams.microsoft.com/... oder anderer Meeting-Link"
+                placeholder="https://..."
                 className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
               />
             </div>
@@ -700,7 +737,7 @@ export default function VereinsleitungMeetingCreateForm({
           {showExternalLinkField ? (
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-slate-900">
-                Externer Meeting-Link
+                {form.providerUi === "SKYPE" ? "Skype-Link" : "Externer Meeting-Link"}
               </label>
               <input
                 value={form.externalMeetingUrl}
@@ -751,7 +788,7 @@ export default function VereinsleitungMeetingCreateForm({
                       Microsoft Teams Vorbereitung
                     </div>
                     <p className="mt-1 text-sm text-slate-500">
-                      Diese Felder bleiben vorerst manuell. Eine echte Microsoft-Integration folgt später sicher und getrennt.
+                      Diese Felder bleiben vorerst manuell. Eine echte Microsoft-Integration folgt später separat.
                     </p>
                   </div>
                   <span
@@ -775,8 +812,8 @@ export default function VereinsleitungMeetingCreateForm({
             <textarea
               value={form.description}
               onChange={(event) => updateField("description", event.target.value)}
-              rows={6}
-              placeholder="Kontext, Traktanden, Vorbereitungen, Pendenzen-Hinweise ..."
+              rows={5}
+              placeholder="Kontext, Vorbereitungen und Hinweise ..."
               className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
             />
           </div>
@@ -787,221 +824,169 @@ export default function VereinsleitungMeetingCreateForm({
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <h3 className="text-[1.08rem] font-semibold text-slate-900">
-              Teilnehmer
+              Eingeladene Personen
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Erfasse freie Teilnehmer oder verknüpfe bestehende Personen aus dem People-Modul.
+              Einfach Personen suchen und direkt zur Einladungsliste hinzufügen.
             </p>
           </div>
 
           <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-            {participants.filter((participant) => participant.displayName.trim()).length} erfasst
+            {participants.length} eingeladen
           </div>
         </div>
 
-        <div className="mt-5 space-y-4">
-          {participants.map((participant, index) => {
-            const selectedPerson = participant.searchResults.find(
-              (item) => item.id === participant.personId,
-            );
+        <div className="mt-5">
+          <PeoplePicker
+            mode="multiple"
+            searchMode="vereinsleitung"
+            selectedItems={pickerItems}
+            onChange={setPickerItems}
+            placeholder="Personen suchen und hinzufügen"
+            emptyText="Keine passende Person gefunden."
+          />
+        </div>
 
-            return (
+        {participants.length === 0 ? (
+          <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-500">
+            Noch keine Personen eingeladen.
+          </div>
+        ) : (
+          <div className="mt-5 space-y-3">
+            {participants.map((participant) => (
               <div
                 key={participant.key}
-                className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                className="grid gap-3 rounded-[22px] border border-slate-200 bg-white px-4 py-4 md:grid-cols-[minmax(0,1.2fr)_180px_minmax(0,1fr)_auto]"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
                   <div className="text-sm font-semibold text-slate-900">
-                    Teilnehmer {index + 1}
+                    {participant.displayName}
+                  </div>
+                  <div className="mt-1 truncate text-xs text-slate-500">
+                    {participant.roleLabel || "Ohne Rollenbezeichnung"}
+                  </div>
+                </div>
+
+                <select
+                  value={participant.status}
+                  onChange={(event) =>
+                    updateParticipant(participant.key, (current) => ({
+                      ...current,
+                      status: event.target.value as ParticipantStatus,
+                    }))
+                  }
+                  className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                >
+                  {PARTICIPANT_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  value={participant.remarks}
+                  onChange={(event) =>
+                    updateParticipant(participant.key, (current) => ({
+                      ...current,
+                      remarks: event.target.value,
+                    }))
+                  }
+                  placeholder="Bemerkung optional"
+                  className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => removeParticipant(participant.key)}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Entfernen
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h3 className="text-[1.08rem] font-semibold text-slate-900">
+              Traktanden
+            </h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Traktanden wie Work Items einfach als Liste hinzufügen.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={addAgendaItem}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            <Plus className="h-4 w-4" />
+            Traktand hinzufügen
+          </button>
+        </div>
+
+        {agendaItems.length === 0 ? (
+          <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-500">
+            Noch keine Traktanden erfasst.
+          </div>
+        ) : (
+          <div className="mt-5 space-y-3">
+            {agendaItems.map((item, index) => (
+              <div
+                key={item.key}
+                className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-900">
+                    Traktand {index + 1}
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => removeParticipantRow(participant.key)}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                    onClick={() => removeAgendaItem(item.key)}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
                   >
+                    <Trash2 className="h-3.5 w-3.5" />
                     Entfernen
                   </button>
                 </div>
 
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-slate-900">
-                      Person suchen
-                    </span>
-                    <input
-                      value={participant.searchQuery}
-                      onChange={(event) =>
-                        updateParticipant(participant.key, (current) => ({
-                          ...current,
-                          searchQuery: event.target.value,
-                        }))
-                      }
-                      placeholder="Name, E-Mail oder Telefon"
-                      className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                    />
+                <div className="mt-4 grid gap-4">
+                  <input
+                    value={item.title}
+                    onChange={(event) =>
+                      updateAgendaItem(item.key, (current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    placeholder="Titel des Traktands"
+                    className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  />
 
-                    {participant.searchLoading ? (
-                      <p className="mt-2 text-xs text-slate-500">Suche läuft...</p>
-                    ) : null}
-
-                    {participant.searchError ? (
-                      <p className="mt-2 text-xs font-medium text-rose-700">
-                        {participant.searchError}
-                      </p>
-                    ) : null}
-
-                    {!participant.searchLoading &&
-                    participant.searchQuery.trim().length >= 2 &&
-                    participant.searchResults.length > 0 ? (
-                      <div className="mt-3 max-h-56 overflow-auto rounded-[18px] border border-slate-200 bg-slate-50 p-2">
-                        <div className="space-y-2">
-                          {participant.searchResults.map((person) => {
-                            const personName = getPersonName(person);
-                            const isSelected = participant.personId === person.id;
-
-                            return (
-                              <button
-                                key={person.id}
-                                type="button"
-                                onClick={() => selectPerson(participant.key, person)}
-                                className={`flex w-full items-start justify-between gap-3 rounded-[16px] border px-3 py-3 text-left transition ${
-                                  isSelected
-                                    ? "border-[#0b4aa2]/30 bg-[#0b4aa2]/[0.05]"
-                                    : "border-slate-200 bg-white hover:bg-slate-50"
-                                }`}
-                              >
-                                <div className="min-w-0">
-                                  <div className="text-sm font-semibold text-slate-900">
-                                    {personName}
-                                  </div>
-                                  <div className="mt-1 text-xs text-slate-500">
-                                    {[person.email, person.phone].filter(Boolean).join(" • ")}
-                                  </div>
-                                </div>
-                                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                                  {isSelected ? "Verknüpft" : "Auswählen"}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {participant.personId ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] px-3 py-1 text-xs font-semibold text-[#0b4aa2]">
-                          Verknüpft mit bestehender Person
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => clearLinkedPerson(participant.key)}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                        >
-                          Verknüpfung lösen
-                        </button>
-                      </div>
-                    ) : null}
-                  </label>
-
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-slate-900">
-                      Anzeigename *
-                    </span>
-                    <input
-                      value={participant.displayName}
-                      onChange={(event) =>
-                        updateParticipant(participant.key, (current) => ({
-                          ...current,
-                          displayName: event.target.value,
-                          ...(current.personId
-                            ? {}
-                            : {
-                                searchQuery: event.target.value,
-                              }),
-                        }))
-                      }
-                      placeholder="z. B. Michael Duijster"
-                      className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                    />
-                    {selectedPerson ? (
-                      <p className="mt-2 text-xs text-slate-500">
-                        Gewählt aus Suche: {getPersonName(selectedPerson)}
-                      </p>
-                    ) : null}
-                  </label>
-
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-slate-900">
-                      Rolle
-                    </span>
-                    <input
-                      value={participant.roleLabel}
-                      onChange={(event) =>
-                        updateParticipant(participant.key, (current) => ({
-                          ...current,
-                          roleLabel: event.target.value,
-                        }))
-                      }
-                      placeholder="z. B. Präsident, Protokoll, Gast"
-                      className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="block text-sm font-semibold text-slate-900">
-                      Status
-                    </span>
-                    <select
-                      value={participant.status}
-                      onChange={(event) =>
-                        updateParticipant(participant.key, (current) => ({
-                          ...current,
-                          status: event.target.value as ParticipantStatus,
-                        }))
-                      }
-                      className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                    >
-                      {PARTICIPANT_STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block md:col-span-2">
-                    <span className="block text-sm font-semibold text-slate-900">
-                      Bemerkungen
-                    </span>
-                    <input
-                      value={participant.remarks}
-                      onChange={(event) =>
-                        updateParticipant(participant.key, (current) => ({
-                          ...current,
-                          remarks: event.target.value,
-                        }))
-                      }
-                      placeholder="Optionaler Hinweis zum Teilnehmer"
-                      className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                    />
-                  </label>
+                  <textarea
+                    value={item.description}
+                    onChange={(event) =>
+                      updateAgendaItem(item.key, (current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    rows={3}
+                    placeholder="Beschreibung optional"
+                    className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  />
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-5">
-          <button
-            type="button"
-            onClick={addParticipantRow}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            Teilnehmer hinzufügen
-          </button>
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">

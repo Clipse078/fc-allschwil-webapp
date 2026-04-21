@@ -7,6 +7,9 @@ import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import {
   formatMeetingListDateLabel,
   formatMeetingTimeLabel,
+  getMeetingApprovalStatusLabel,
+  getMeetingStatusLabel,
+  isMeetingApprovalLocked,
   type MeetingListItem,
 } from "@/lib/vereinsleitung/meeting-utils";
 
@@ -39,6 +42,10 @@ export default async function VereinsleitungMeetingsPage() {
       title: meeting.title,
       subtitle: meeting.subtitle,
       status: meeting.status,
+      statusLabel: getMeetingStatusLabel(meeting.status),
+      approvalStatus: meeting.approvalStatus,
+      approvalStatusLabel: getMeetingApprovalStatusLabel(meeting.approvalStatus),
+      isApprovalLocked: isMeetingApprovalLocked(meeting.approvalStatus),
       dateLabel: formatMeetingListDateLabel(meeting.startAt),
       timeLabel: formatMeetingTimeLabel(meeting.startAt, meeting.endAt),
       location: meeting.location,

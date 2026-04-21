@@ -1,0 +1,118 @@
+import { NextResponse } from "next/server";
+import {
+  VereinsleitungInitiativeWorkItemAssigneeMode,
+  VereinsleitungInitiativeWorkItemStatus,
+} from "@prisma/client";
+import { prisma } from "@/lib/db/prisma";
+import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
+
+function normalizePriority(value: unknown) {
+  const normalized = String(value ?? "MAJOR").trim().toUpperCase();
+  if (["CRITICAL", "MAJOR", "MINOR"].includes(normalized)) {
+    return normalized;
+  }
+  return "MAJOR";
+}
+
+function normalizeStoryPoints(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function parseAssigneeMode(value: unknown): VereinsleitungInitiativeWorkItemAssigneeMode {
+  const normalized = String(value ?? "NONE").trim().toUpperCase();
+
+  switch (normalized) {
+    case "PERSON":
+      return "PERSON";
+    case "EXTERNAL":
+      return "EXTERNAL";
+    default:
+      return "NONE";
+  }
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ initiativeId: string }> },
+) {
+  const access = await requireApiAnyPermission(ROUTE_PERMISSION_SETS.VEREINSLEITUNG_INITIATIVES_MANAGE);
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const { initiativeId } = await context.params;
+
+  try {
+    const body = await request.json();
+    const title = String(body.title ?? "").trim();
+    const priority = normalizePriority(body.priority);
+    const storyPoints = normalizeStoryPoints(body.storyPoints);
+    const assigneeMode = parseAssigneeMode(body.assigneeMode);
+    const assigneePersonId = String(body.assigneePersonId ?? "").trim() || null;
+
+    if (!title) {
+      return NextResponse.json({ error: "Titel ist erforderlich." }, { status: 400 });
+    }
+
+    if (assigneeMode === "PERSON" && !assigneePersonId) {
+      return NextResponse.json({ error: "Bitte eine Person auswählen." }, { status: 400 });
+    }
+
+    const initiative = await prisma.vereinsleitungInitiative.findUnique({
+      where: { id: initiativeId },
+      select: { id: true },
+    });
+
+    if (!initiative) {
+      return NextResponse.json({ error: "Initiative nicht gefunden." }, { status: 404 });
+    }
+
+    const lastItem = await prisma.vereinsleitungInitiativeWorkItem.findFirst({
+      where: { initiativeId },
+      orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
+      select: { sortOrder: true },
+    });
+
+    const created = await prisma.vereinsleitungInitiativeWorkItem.create({
+      data: {
+        initiativeId,
+        title,
+        priority,
+        storyPoints,
+        assigneeMode,
+        assigneePersonId: assigneeMode === "PERSON" ? assigneePersonId : null,
+        externalAssigneeLabel: assigneeMode === "EXTERNAL" ? "External" : null,
+        status: VereinsleitungInitiativeWorkItemStatus.BACKLOG,
+        sortOrder: (lastItem?.sortOrder ?? -1) + 1,
+      },
+    });
+
+    return NextResponse.json(created, { status: 201 });
+  } catch (error) {
+    console.error("Create initiative work item failed:", error);
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: "Technischer Fehler: " + error.message },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Work Item konnte nicht erstellt werden." },
+      { status: 500 },
+    );
+  }
+}

@@ -1,4 +1,4 @@
-﻿export const PERMISSIONS = {
+export const PERMISSIONS = {
   USERS_MANAGE: "users.manage",
   USERS_IMPERSONATE: "users.impersonate",
 
@@ -36,6 +36,8 @@
   VEREINSLEITUNG_PENDENZEN_MANAGE: "vereinsleitung.pendenzen.manage",
   VEREINSLEITUNG_MEETINGS_VIEW: "vereinsleitung.meetings.view",
   VEREINSLEITUNG_MEETINGS_MANAGE: "vereinsleitung.meetings.manage",
+  VEREINSLEITUNG_MEETINGS_REVIEW: "vereinsleitung.meetings.review",
+  VEREINSLEITUNG_MEETINGS_APPROVE: "vereinsleitung.meetings.approve",
   VEREINSLEITUNG_INITIATIVES_VIEW: "vereinsleitung.initiatives.view",
   VEREINSLEITUNG_INITIATIVES_MANAGE: "vereinsleitung.initiatives.manage",
 } as const;

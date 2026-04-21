@@ -9,10 +9,13 @@ import {
   Edit3,
   FileCheck2,
   Info,
+  Link2,
   ListTodo,
   Loader2,
+  Lock,
   Plus,
   Search,
+  ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
@@ -225,6 +228,12 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   const [decisionStates, setDecisionStates] = useState<Record<string, DecisionComposerState>>({});
   const [decisionEditStates, setDecisionEditStates] = useState<Record<string, DecisionEditState>>({});
 
+  const isExecutionLocked = isDone;
+  const canEditProtocol = !isExecutionLocked;
+  const canEditDecisions = !isExecutionLocked;
+  const approvalWorkflowHint =
+    "Nächster Schritt: Review- und Freigabelogik kann auf diesem Lock-Zustand aufbauen.";
+
   const protocolByAgenda = useMemo(() => {
     const map = new Map<string, MeetingProtocolEntryItem[]>();
 
@@ -397,6 +406,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   async function submitProtocol(agenda: MeetingAgendaItem) {
+    if (!canEditProtocol) {
+      alert("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+      return;
+    }
+
     const state = getProtocolState(agenda.id);
 
     if (!state.notes.trim()) {
@@ -410,20 +424,17 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         error: null,
       });
 
-      const response = await fetch(
-        "/api/vereinsleitung/meetings/" + meetingId + "/protocol",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agendaItemId: agenda.id,
-            agendaItemTitle: agenda.title,
-            notes: state.notes.trim(),
-          }),
+      const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/protocol", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          agendaItemId: agenda.id,
+          agendaItemTitle: agenda.title,
+          notes: state.notes.trim(),
+        }),
+      });
 
       const payload = await response.json();
 
@@ -445,6 +456,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   function startProtocolEdit(agendaId: string, entry: MeetingProtocolEntryItem) {
+    if (!canEditProtocol) {
+      alert("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+      return;
+    }
+
     updateProtocolEditState(agendaId, {
       entryId: entry.id,
       notes: entry.notes,
@@ -454,6 +470,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   async function saveProtocolEdit(agenda: MeetingAgendaItem) {
+    if (!canEditProtocol) {
+      alert("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+      return;
+    }
+
     const state = getProtocolEditState(agenda.id);
 
     if (!state.entryId) {
@@ -473,21 +494,18 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         error: null,
       });
 
-      const response = await fetch(
-        "/api/vereinsleitung/meetings/" + meetingId + "/protocol",
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            entryId: state.entryId,
-            agendaItemId: agenda.id,
-            agendaItemTitle: agenda.title,
-            notes: state.notes.trim(),
-          }),
+      const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/protocol", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          entryId: state.entryId,
+          agendaItemId: agenda.id,
+          agendaItemTitle: agenda.title,
+          notes: state.notes.trim(),
+        }),
+      });
 
       const payload = await response.json();
 
@@ -509,8 +527,15 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   async function deleteProtocolEntry(entryId: string) {
+    if (!canEditProtocol) {
+      throw new Error("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+    }
+
     const response = await fetch(
-      "/api/vereinsleitung/meetings/" + meetingId + "/protocol?entryId=" + encodeURIComponent(entryId),
+      "/api/vereinsleitung/meetings/" +
+        meetingId +
+        "/protocol?entryId=" +
+        encodeURIComponent(entryId),
       {
         method: "DELETE",
       },
@@ -526,6 +551,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   async function submitDecision(agenda: MeetingAgendaItem) {
+    if (!canEditDecisions) {
+      alert("Dieses Meeting ist abgeschlossen. Entscheide sind gesperrt.");
+      return;
+    }
+
     const state = getDecisionState(agenda.id);
 
     if (!state.decisionText.trim()) {
@@ -541,26 +571,23 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         error: null,
       });
 
-      const response = await fetch(
-        "/api/vereinsleitung/meetings/" + meetingId + "/decisions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            decisionText: state.decisionText.trim(),
-            decisionType: state.decisionType,
-            agendaItemId: agenda.id,
-            agendaItemTitle: agenda.title,
-            responsiblePersonId: state.responsiblePersonId || null,
-            responsibleDisplayName: state.responsibleDisplayName.trim() || null,
-            dueDate: state.dueDate || null,
-            createMatter: state.createMatter,
-            remarks: state.remarks.trim() || null,
-          }),
+      const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/decisions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          decisionText: state.decisionText.trim(),
+          decisionType: state.decisionType,
+          agendaItemId: agenda.id,
+          agendaItemTitle: agenda.title,
+          responsiblePersonId: state.responsiblePersonId || null,
+          responsibleDisplayName: state.responsibleDisplayName.trim() || null,
+          dueDate: state.dueDate || null,
+          createMatter: state.createMatter,
+          remarks: state.remarks.trim() || null,
+        }),
+      });
 
       const payload = await response.json();
 
@@ -582,6 +609,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   function startDecisionEdit(agendaId: string, decision: MeetingDecisionItem) {
+    if (!canEditDecisions) {
+      alert("Dieses Meeting ist abgeschlossen. Entscheide sind gesperrt.");
+      return;
+    }
+
     updateDecisionEditState(agendaId, {
       decisionId: decision.id,
       decisionText: decision.decisionText,
@@ -600,6 +632,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   async function saveDecisionEdit(agenda: MeetingAgendaItem) {
+    if (!canEditDecisions) {
+      alert("Dieses Meeting ist abgeschlossen. Entscheide sind gesperrt.");
+      return;
+    }
+
     const state = getDecisionEditState(agenda.id);
 
     if (!state.decisionId) {
@@ -619,27 +656,24 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         error: null,
       });
 
-      const response = await fetch(
-        "/api/vereinsleitung/meetings/" + meetingId + "/decisions",
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            decisionId: state.decisionId,
-            decisionText: state.decisionText.trim(),
-            decisionType: state.decisionType,
-            agendaItemId: agenda.id,
-            agendaItemTitle: agenda.title,
-            responsiblePersonId: state.responsiblePersonId || null,
-            responsibleDisplayName: state.responsibleDisplayName.trim() || null,
-            dueDate: state.dueDate || null,
-            createMatter: state.createMatter,
-            remarks: state.remarks.trim() || null,
-          }),
+      const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/decisions", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          decisionId: state.decisionId,
+          decisionText: state.decisionText.trim(),
+          decisionType: state.decisionType,
+          agendaItemId: agenda.id,
+          agendaItemTitle: agenda.title,
+          responsiblePersonId: state.responsiblePersonId || null,
+          responsibleDisplayName: state.responsibleDisplayName.trim() || null,
+          dueDate: state.dueDate || null,
+          createMatter: state.createMatter,
+          remarks: state.remarks.trim() || null,
+        }),
+      });
 
       const payload = await response.json();
 
@@ -661,8 +695,15 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   }
 
   async function deleteDecision(decisionId: string) {
+    if (!canEditDecisions) {
+      throw new Error("Dieses Meeting ist abgeschlossen. Entscheide sind gesperrt.");
+    }
+
     const response = await fetch(
-      "/api/vereinsleitung/meetings/" + meetingId + "/decisions?decisionId=" + encodeURIComponent(decisionId),
+      "/api/vereinsleitung/meetings/" +
+        meetingId +
+        "/decisions?decisionId=" +
+        encodeURIComponent(decisionId),
       {
         method: "DELETE",
       },
@@ -691,15 +732,35 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         </p>
       </div>
 
-      {isDone ? (
-        <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4">
-          <p className="text-sm font-medium text-amber-800">
-            Meeting ist abgeschlossen.
-          </p>
-          <p className="mt-2 text-sm leading-6 text-amber-700">
-            Planungsbereiche bleiben gesperrt. Protokoll und Entscheide dürfen vorerst weiter gepflegt
-            werden.
-          </p>
+      {isExecutionLocked ? (
+        <div className="mt-6 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+          <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl border border-amber-200 bg-white p-2 text-amber-700">
+                <Lock className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Meeting ist abgeschlossen</p>
+                <p className="mt-2 text-sm leading-6 text-amber-700">
+                  Protokoll und Entscheide sind jetzt gesperrt. Damit ist die Ausführung sauber
+                  eingefroren und die Nachbearbeitung läuft künftig kontrolliert über einen
+                  Freigabe- oder Reopen-Workflow.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-[#0b4aa2]/15 bg-[#0b4aa2]/5 px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl border border-[#0b4aa2]/15 bg-white p-2 text-[#0b4aa2]">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Workflow-Fundament bereit</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{approvalWorkflowHint}</p>
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -712,6 +773,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
           const protocolEditState = getProtocolEditState(agenda.id);
           const decisionState = getDecisionState(agenda.id);
           const decisionEditState = getDecisionEditState(agenda.id);
+          const agendaCreatesMatterCount = agendaDecisions.filter((decision) => decision.createMatter).length;
 
           return (
             <article
@@ -734,16 +796,21 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                     <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
                       {agendaDecisions.length} Entscheide
                     </span>
+                    <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                      {agendaCreatesMatterCount} mit Pendenz-Link
+                    </span>
+                    {isExecutionLocked ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                        <Lock className="h-3.5 w-3.5" />
+                        Gesperrt
+                      </span>
+                    ) : null}
                   </div>
 
-                  <h3 className="mt-3 text-base font-semibold text-slate-900">
-                    {agenda.title}
-                  </h3>
+                  <h3 className="mt-3 text-base font-semibold text-slate-900">{agenda.title}</h3>
 
                   {agenda.description ? (
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {agenda.description}
-                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{agenda.description}</p>
                   ) : null}
                 </div>
 
@@ -758,10 +825,16 @@ export default function VereinsleitungMeetingExecutionWorkspace({
               {isOpen ? (
                 <div className="grid gap-5 border-t border-slate-200 bg-white px-5 py-5 xl:grid-cols-2">
                   <div className="space-y-4">
-                    <div>
+                    <div className="flex items-center justify-between gap-3">
                       <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Protokoll
                       </h4>
+                      {isExecutionLocked ? (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                          <Lock className="h-3.5 w-3.5" />
+                          Gesperrt nach Abschluss
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="space-y-3">
@@ -785,7 +858,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                       })
                                     }
                                     rows={4}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                                    disabled={!canEditProtocol}
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                                   />
 
                                   {protocolEditState.error ? (
@@ -808,7 +882,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                     <button
                                       type="button"
                                       onClick={() => saveProtocolEdit(agenda)}
-                                      disabled={protocolEditState.isSubmitting}
+                                      disabled={protocolEditState.isSubmitting || !canEditProtocol}
                                       className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                       {protocolEditState.isSubmitting ? (
@@ -827,7 +901,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                     <button
                                       type="button"
                                       onClick={() => startProtocolEdit(agenda.id, entry)}
-                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                                      disabled={!canEditProtocol}
+                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       <Edit3 className="h-3.5 w-3.5" />
                                       Bearbeiten
@@ -845,7 +920,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                           alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
                                         }
                                       }}
-                                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                                      disabled={!canEditProtocol}
+                                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                       Löschen
@@ -876,8 +952,13 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                           })
                         }
                         rows={4}
-                        placeholder="Was wurde bei diesem Traktandum besprochen?"
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                        disabled={!canEditProtocol}
+                        placeholder={
+                          canEditProtocol
+                            ? "Was wurde bei diesem Traktandum besprochen?"
+                            : "Meeting abgeschlossen: Protokolleinträge sind gesperrt."
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                       />
 
                       {protocolState.error ? (
@@ -890,25 +971,33 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         <button
                           type="button"
                           onClick={() => submitProtocol(agenda)}
-                          disabled={protocolState.isSubmitting}
+                          disabled={protocolState.isSubmitting || !canEditProtocol}
                           className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
                         >
                           {protocolState.isSubmitting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
+                          ) : canEditProtocol ? (
                             <Plus className="h-4 w-4" />
+                          ) : (
+                            <Lock className="h-4 w-4" />
                           )}
-                          Protokoll erfassen
+                          {canEditProtocol ? "Protokoll erfassen" : "Gesperrt"}
                         </button>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <div>
+                    <div className="flex items-center justify-between gap-3">
                       <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Entscheide
                       </h4>
+                      {isExecutionLocked ? (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                          <Lock className="h-3.5 w-3.5" />
+                          Gesperrt nach Abschluss
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="space-y-3">
@@ -933,7 +1022,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                       })
                                     }
                                     rows={4}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                                    disabled={!canEditDecisions}
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                                   />
 
                                   <div className="grid gap-4 md:grid-cols-2">
@@ -944,7 +1034,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                           decisionType: event.target.value,
                                         })
                                       }
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                                      disabled={!canEditDecisions}
+                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                                     >
                                       {decisionTypeOptions.map((option) => (
                                         <option key={option.value} value={option.value}>
@@ -961,7 +1052,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                           dueDate: event.target.value,
                                         })
                                       }
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                                      disabled={!canEditDecisions}
+                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                                     />
                                   </div>
 
@@ -974,15 +1066,16 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                           onChange={(event) =>
                                             handleResponsibleSearch(agenda.id, event.target.value, "edit")
                                           }
+                                          disabled={!canEditDecisions}
                                           placeholder="Person suchen oder frei eintragen"
-                                          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                                          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                                         />
                                         {decisionEditState.isSearching ? (
                                           <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
                                         ) : null}
                                       </div>
 
-                                      {decisionEditState.responsibleOptions.length > 0 ? (
+                                      {decisionEditState.responsibleOptions.length > 0 && canEditDecisions ? (
                                         <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                                           {decisionEditState.responsibleOptions.map((person) => (
                                             <button
@@ -1017,8 +1110,9 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                           remarks: event.target.value,
                                         })
                                       }
+                                      disabled={!canEditDecisions}
                                       placeholder="Optionaler Kontext"
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                                     />
                                   </div>
 
@@ -1031,10 +1125,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                           createMatter: event.target.checked,
                                         })
                                       }
-                                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2]"
+                                      disabled={!canEditDecisions}
+                                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2] disabled:cursor-not-allowed"
                                     />
                                     <span className="text-sm text-slate-700">
-                                      Für spätere Pendenz-Autogenerierung vormerken
+                                      Für Pendenz-Autogenerierung bestätigen
                                     </span>
                                   </label>
 
@@ -1058,7 +1153,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                     <button
                                       type="button"
                                       onClick={() => saveDecisionEdit(agenda)}
-                                      disabled={decisionEditState.isSubmitting}
+                                      disabled={decisionEditState.isSubmitting || !canEditDecisions}
                                       className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                       {decisionEditState.isSubmitting ? (
@@ -1079,14 +1174,28 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                       </div>
 
                                       <div className="space-y-2">
-                                        <span
-                                          className={[
-                                            "inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold",
-                                            getDecisionBadgeClass(decision.decisionType),
-                                          ].join(" ")}
-                                        >
-                                          {getDecisionTypeLabel(decision.decisionType)}
-                                        </span>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span
+                                            className={[
+                                              "inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold",
+                                              getDecisionBadgeClass(decision.decisionType),
+                                            ].join(" ")}
+                                          >
+                                            {getDecisionTypeLabel(decision.decisionType)}
+                                          </span>
+
+                                          {decision.createMatter ? (
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                              <Link2 className="h-3.5 w-3.5" />
+                                              Mit Pendenz-Link bestätigt
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
+                                              <Link2 className="h-3.5 w-3.5" />
+                                              Ohne Pendenz-Link
+                                            </span>
+                                          )}
+                                        </div>
 
                                         <p className="text-sm font-medium leading-6 text-slate-900">
                                           {decision.decisionText}
@@ -1122,11 +1231,23 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                     </div>
                                   </div>
 
+                                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                      Matter-Link Status
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-700">
+                                      {decision.createMatter
+                                        ? "Ja – dieser Entscheid ist explizit für die automatische Pendenz-Erstellung markiert."
+                                        : "Nein – dieser Entscheid bleibt ohne automatische Pendenz-Erstellung."}
+                                    </p>
+                                  </div>
+
                                   <div className="mt-4 flex flex-wrap justify-end gap-2">
                                     <button
                                       type="button"
                                       onClick={() => startDecisionEdit(agenda.id, decision)}
-                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                                      disabled={!canEditDecisions}
+                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       <Edit3 className="h-3.5 w-3.5" />
                                       Bearbeiten
@@ -1144,7 +1265,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                           alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
                                         }
                                       }}
-                                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                                      disabled={!canEditDecisions}
+                                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                       Löschen
@@ -1177,8 +1299,13 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                               })
                             }
                             rows={4}
-                            placeholder="Was wurde bei diesem Traktandum beschlossen?"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                            disabled={!canEditDecisions}
+                            placeholder={
+                              canEditDecisions
+                                ? "Was wurde bei diesem Traktandum beschlossen?"
+                                : "Meeting abgeschlossen: Entscheide sind gesperrt."
+                            }
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                           />
                         </div>
 
@@ -1193,7 +1320,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                 decisionType: event.target.value,
                               })
                             }
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                            disabled={!canEditDecisions}
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                           >
                             {decisionTypeOptions.map((option) => (
                               <option key={option.value} value={option.value}>
@@ -1215,7 +1343,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                 dueDate: event.target.value,
                               })
                             }
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                            disabled={!canEditDecisions}
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                           />
                         </div>
 
@@ -1230,15 +1359,16 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                               onChange={(event) =>
                                 handleResponsibleSearch(agenda.id, event.target.value, "create")
                               }
+                              disabled={!canEditDecisions}
                               placeholder="Person suchen oder frei eintragen"
-                              className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                              className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                             />
                             {decisionState.isSearching ? (
                               <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
                             ) : null}
                           </div>
 
-                          {decisionState.responsibleOptions.length > 0 ? (
+                          {decisionState.responsibleOptions.length > 0 && canEditDecisions ? (
                             <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                               {decisionState.responsibleOptions.map((person) => (
                                 <button
@@ -1277,27 +1407,42 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                 remarks: event.target.value,
                               })
                             }
+                            disabled={!canEditDecisions}
                             placeholder="Optionaler Kontext"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                           />
                         </div>
                       </div>
 
-                      <label className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={decisionState.createMatter}
-                          onChange={(event) =>
-                            updateDecisionState(agenda.id, {
-                              createMatter: event.target.checked,
-                            })
-                          }
-                          className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2]"
-                        />
-                        <span className="text-sm text-slate-700">
-                          Für spätere Pendenz-Autogenerierung vormerken
-                        </span>
-                      </label>
+                      <div className="mt-4 rounded-[22px] border border-slate-200 bg-white px-4 py-4">
+                        <label className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={decisionState.createMatter}
+                            onChange={(event) =>
+                              updateDecisionState(agenda.id, {
+                                createMatter: event.target.checked,
+                              })
+                            }
+                            disabled={!canEditDecisions}
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2] disabled:cursor-not-allowed"
+                          />
+                          <span className="text-sm text-slate-700">
+                            Diesen Entscheid explizit für die automatische Pendenz-Erstellung markieren
+                          </span>
+                        </label>
+
+                        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                            Matter-Link Bestätigung
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {decisionState.createMatter
+                              ? "Bestätigt: Beim Speichern wird dieser Entscheid als Basis für eine Pendenz markiert."
+                              : "Nicht bestätigt: Dieser Entscheid bleibt ohne automatische Pendenz-Erstellung."}
+                          </p>
+                        </div>
+                      </div>
 
                       {decisionState.error ? (
                         <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -1309,15 +1454,17 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         <button
                           type="button"
                           onClick={() => submitDecision(agenda)}
-                          disabled={decisionState.isSubmitting}
+                          disabled={decisionState.isSubmitting || !canEditDecisions}
                           className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
                         >
                           {decisionState.isSubmitting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
+                          ) : canEditDecisions ? (
                             <Plus className="h-4 w-4" />
+                          ) : (
+                            <Lock className="h-4 w-4" />
                           )}
-                          Entscheid erfassen
+                          {canEditDecisions ? "Entscheid erfassen" : "Gesperrt"}
                         </button>
                       </div>
                     </div>

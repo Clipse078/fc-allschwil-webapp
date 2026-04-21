@@ -1,0 +1,349 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import AdminAvatar from "@/components/admin/shared/AdminAvatar";
+import PeoplePicker, {
+  type PeoplePickerPerson,
+} from "@/components/admin/shared/people-picker/PeoplePicker";
+
+type WorkItemStatus = "BACKLOG" | "IN_PROGRESS" | "RESOLVED";
+
+type WorkItemRow = {
+  id: string;
+  title: string;
+  priority: string;
+  storyPoints: number | null;
+  assigneeMode: string;
+  assigneePersonId: string | null;
+  assigneeName: string;
+  status: WorkItemStatus;
+};
+
+type Props = {
+  initiativeId: string;
+  totalCount: number;
+  resolvedCount: number;
+  progressPercent: number;
+  workItems: WorkItemRow[];
+};
+
+function getPriorityLabel(priority: string) {
+  switch (priority) {
+    case "CRITICAL":
+      return "Critical";
+    case "MINOR":
+      return "Minor";
+    default:
+      return "Major";
+  }
+}
+
+function getPriorityClass(priority: string) {
+  switch (priority) {
+    case "CRITICAL":
+      return "text-rose-700";
+    case "MINOR":
+      return "text-slate-500";
+    default:
+      return "text-rose-600";
+  }
+}
+
+function getStatusOptions() {
+  return [
+    { value: "BACKLOG", label: "BACKLOG" },
+    { value: "IN_PROGRESS", label: "IN PROGRESS" },
+    { value: "RESOLVED", label: "RESOLVED" },
+  ] as const;
+}
+
+export default function VereinsleitungInitiativeWorkItemsClient({
+  initiativeId,
+  totalCount,
+  resolvedCount,
+  progressPercent,
+  workItems,
+}: Props) {
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState("MAJOR");
+  const [storyPoints, setStoryPoints] = useState("");
+  const [assigneeType, setAssigneeType] = useState<"NONE" | "PERSON" | "EXTERNAL">("NONE");
+  const [selectedPerson, setSelectedPerson] = useState<PeoplePickerPerson | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const progressLabel = useMemo(() => {
+    return progressPercent + "% erledigt";
+  }, [progressPercent]);
+
+  async function createWorkItem() {
+    if (!title.trim() || isSubmitting) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError("");
+
+      const response = await fetch(
+        "/api/vereinsleitung/initiatives/" + initiativeId + "/work-items",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: title.trim(),
+            priority,
+            storyPoints: storyPoints.trim() ? Number(storyPoints) : null,
+            assigneeMode: assigneeType,
+            assigneePersonId:
+              assigneeType === "PERSON" ? selectedPerson?.id ?? null : null,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Work Item konnte nicht erstellt werden.");
+      }
+
+      setTitle("");
+      setPriority("MAJOR");
+      setStoryPoints("");
+      setAssigneeType("NONE");
+      setSelectedPerson(null);
+      router.refresh();
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Work Item konnte nicht erstellt werden.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function updateStatus(workItemId: string, nextStatus: WorkItemStatus) {
+    try {
+      const response = await fetch(
+        "/api/vereinsleitung/initiatives/work-items/" + workItemId,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: nextStatus,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Status konnte nicht aktualisiert werden.");
+      }
+
+      router.refresh();
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Status konnte nicht aktualisiert werden.",
+      );
+    }
+  }
+
+  return (
+    <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[1.08rem] font-semibold text-slate-900">
+            Work Items
+          </div>
+          <div className="mt-2 text-sm text-slate-500">
+            {resolvedCount} von {totalCount} erledigt
+          </div>
+        </div>
+
+        <div className="text-sm font-semibold text-slate-600">
+          {progressLabel}
+        </div>
+      </div>
+
+      <div className="mt-4 h-3 rounded-full bg-slate-200">
+        <div
+          className="h-3 rounded-full bg-[#7eb241]"
+          style={{ width: progressPercent + "%" }}
+        />
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-[22px] border border-slate-200">
+        <div className="grid grid-cols-[minmax(0,1.9fr)_96px_96px_180px_140px] gap-0 border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+          <div className="px-4 py-3">Work</div>
+          <div className="px-4 py-3">Priority</div>
+          <div className="px-4 py-3">Story Points</div>
+          <div className="px-4 py-3">Assignee</div>
+          <div className="px-4 py-3">Status</div>
+        </div>
+
+        <div className="divide-y divide-slate-200">
+          {workItems.map((item) => (
+            <div
+              key={item.id}
+              className="grid grid-cols-[minmax(0,1.9fr)_96px_96px_180px_140px] items-center gap-0 bg-white text-sm"
+            >
+              <div className="px-4 py-4 text-slate-900">{item.title}</div>
+
+              <div className={"px-4 py-4 font-semibold " + getPriorityClass(item.priority)}>
+                {getPriorityLabel(item.priority)}
+              </div>
+
+              <div className="px-4 py-4 text-slate-500">
+                {item.storyPoints ?? "None"}
+              </div>
+
+              <div className="px-4 py-4">
+                <div className="flex items-center gap-2">
+                  <AdminAvatar name={item.assigneeName} size="sm" />
+                  <span className="truncate text-slate-700">{item.assigneeName}</span>
+                </div>
+              </div>
+
+              <div className="px-4 py-4">
+                <select
+                  value={item.status}
+                  onChange={(event) =>
+                    updateStatus(item.id, event.target.value as WorkItemStatus)
+                  }
+                  className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#0b4aa2]"
+                >
+                  {getStatusOptions().map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-[22px] border border-slate-200 bg-slate-50 p-5">
+        <div className="text-sm font-semibold text-slate-900">Neues Work Item</div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_140px_140px_minmax(0,1fr)_auto]">
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Titel des Work Items"
+            className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+          />
+
+          <select
+            value={priority}
+            onChange={(event) => setPriority(event.target.value)}
+            className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+          >
+            <option value="MAJOR">Major</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="MINOR">Minor</option>
+          </select>
+
+          <input
+            value={storyPoints}
+            onChange={(event) => setStoryPoints(event.target.value)}
+            placeholder="Story Points"
+            className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+          />
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAssigneeType("NONE");
+                  setSelectedPerson(null);
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  assigneeType === "NONE"
+                    ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] text-[#0b4aa2]"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                Nicht zugewiesen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAssigneeType("PERSON");
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  assigneeType === "PERSON"
+                    ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] text-[#0b4aa2]"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                Person
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAssigneeType("EXTERNAL");
+                  setSelectedPerson(null);
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  assigneeType === "EXTERNAL"
+                    ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] text-[#0b4aa2]"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                Extern
+              </button>
+            </div>
+
+            {assigneeType === "PERSON" ? (
+              <PeoplePicker
+                mode="single"
+                searchMode="any"
+                selected={selectedPerson}
+                onSelect={(person) => setSelectedPerson(person && person.id ? person : null)}
+                placeholder="Person suchen"
+                emptyText="Keine passende Person gefunden."
+              />
+            ) : assigneeType === "EXTERNAL" ? (
+              <div className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                Zuweisung an Profil: Extern
+              </div>
+            ) : (
+              <div className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
+                Keine Zuweisung
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={createWorkItem}
+            disabled={!title.trim() || isSubmitting || (assigneeType === "PERSON" && !selectedPerson)}
+            className="h-[50px] rounded-full bg-[#0b4aa2] px-5 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? "Speichert..." : "HinzufÃ¼gen"}
+          </button>
+        </div>
+
+        {error ? (
+          <div className="mt-4 rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}

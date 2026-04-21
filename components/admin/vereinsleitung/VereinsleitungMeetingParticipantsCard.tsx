@@ -1,4 +1,4 @@
-﻿import { Users } from "lucide-react";
+import { Users } from "lucide-react";
 import type {
   MeetingParticipantItem,
   MeetingParticipantStats,
@@ -57,7 +57,7 @@ export default function VereinsleitungMeetingParticipantsCard({
       {participants.length === 0 ? (
         <div className="mt-5 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6">
           <p className="text-sm font-medium text-slate-700">
-            Fuer dieses Meeting sind noch keine Teilnehmer hinterlegt.
+            Für dieses Meeting sind noch keine Teilnehmer hinterlegt.
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             Die Datenstruktur ist vorbereitet. Als naechstes kann die Teilnehmerverwaltung angebunden
@@ -92,7 +92,7 @@ export default function VereinsleitungMeetingParticipantsCard({
       )}
 
       <div className="mt-6 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm font-medium text-slate-600">
-        Teilnehmerverwaltung folgt im naechsten Schritt
+        Teilnehmerübersicht
       </div>
     </section>
   );

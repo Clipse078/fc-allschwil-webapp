@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import {
   VereinsleitungMeetingMode,
   VereinsleitungMeetingProvider,
@@ -19,6 +19,14 @@ type ParticipantInput = {
   remarks: string | null;
   sortOrder: number;
 };
+
+type AgendaItemInput = {
+  title: string;
+  description: string | null;
+  sortOrder: number;
+};
+
+type ApprovalStatusValue = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
 function getActorUserId(
   access:
@@ -152,6 +160,38 @@ function normalizeParticipants(value: unknown) {
   return { value: participants } as const;
 }
 
+function normalizeAgendaItems(value: unknown) {
+  if (value === undefined) {
+    return { value: undefined } as const;
+  }
+
+  if (!Array.isArray(value)) {
+    return { error: "agendaItems muss ein Array sein." } as const;
+  }
+
+  const agendaItems: AgendaItemInput[] = [];
+
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    const record =
+      item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const title = String(record.title ?? "").trim();
+    const description = String(record.description ?? "").trim();
+
+    if (!title) {
+      continue;
+    }
+
+    agendaItems.push({
+      title,
+      description: description || null,
+      sortOrder: index,
+    });
+  }
+
+  return { value: agendaItems } as const;
+}
+
 function parseMeetingMode(
   value: unknown,
 ): { value: VereinsleitungMeetingMode } | { error: string } {
@@ -200,6 +240,25 @@ function parseMeetingStatus(
       return { value: "DONE" };
     default:
       return { error: "Ungültiger Meeting-Status: " + status };
+  }
+}
+
+function parseApprovalStatus(
+  value: unknown,
+): { value: ApprovalStatusValue } | { error: string } {
+  const status = String(value ?? "DRAFT").trim().toUpperCase();
+
+  switch (status) {
+    case "DRAFT":
+      return { value: "DRAFT" };
+    case "SUBMITTED":
+      return { value: "SUBMITTED" };
+    case "APPROVED":
+      return { value: "APPROVED" };
+    case "REJECTED":
+      return { value: "REJECTED" };
+    default:
+      return { error: "Ungültiger Freigabestatus: " + status };
   }
 }
 
@@ -321,6 +380,7 @@ export async function PATCH(
       include: {
         matterLinks: true,
         participants: true,
+        agendaItems: true,
       },
     });
 
@@ -329,9 +389,15 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    const payload =
+      body && typeof body === "object" ? (body as Record<string, unknown>) : null;
 
-    if (body && typeof body === "object" && "status" in (body as Record<string, unknown>) && Object.keys(body as Record<string, unknown>).length === 1) {
-      const statusResult = parseMeetingStatus((body as Record<string, unknown>).status);
+    if (!payload) {
+      return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+    }
+
+    if ("status" in payload && Object.keys(payload).length === 1) {
+      const statusResult = parseMeetingStatus(payload.status);
 
       if ("error" in statusResult) {
         return NextResponse.json({ error: statusResult.error }, { status: 400 });
@@ -357,19 +423,162 @@ export async function PATCH(
       return NextResponse.json(updated);
     }
 
-    const title = String(body.title ?? "").trim();
-    const subtitle = normalizeOptionalString(body.subtitle);
-    const description = normalizeOptionalString(body.description);
-    const location = normalizeOptionalString(body.location);
-    const meetingModeResult = parseMeetingMode(body.meetingMode);
-    const meetingProviderResult = parseMeetingProvider(body.meetingProvider);
-    const statusResult = parseMeetingStatus(body.status);
-    const externalMeetingUrl = normalizeOptionalString(body.externalMeetingUrl);
-    const carryOverSourceMeetingId = normalizeOptionalString(body.carryOverSourceMeetingId);
-    const startAtResult = normalizeDateTime(body.startAt, "Startzeit");
-    const endAtResult = normalizeOptionalDateTime(body.endAt, "Endzeit");
-    const matterIdsResult = normalizeMatterIds(body.matterIds);
-    const participantsResult = normalizeParticipants(body.participants);
+    if ("approvalStatus" in payload) {
+      const allowedApprovalKeys = ["approvalStatus", "approvalNotes"];
+      const hasOnlyApprovalFields = Object.keys(payload).every((key) =>
+        allowedApprovalKeys.includes(key),
+      );
+
+      if (!hasOnlyApprovalFields) {
+        return NextResponse.json(
+          { error: "Freigabestatus darf nur separat aktualisiert werden." },
+          { status: 400 },
+        );
+      }
+
+      const approvalStatusResult = parseApprovalStatus(payload.approvalStatus);
+
+      if ("error" in approvalStatusResult) {
+        return NextResponse.json({ error: approvalStatusResult.error }, { status: 400 });
+      }
+
+      const permissionKeys = access.session?.user?.permissionKeys ?? [];
+      const requiresReviewPermission =
+        approvalStatusResult.value === "SUBMITTED" ||
+        approvalStatusResult.value === "REJECTED";
+      const requiresApprovePermission =
+        approvalStatusResult.value === "APPROVED" ||
+        approvalStatusResult.value === "DRAFT";
+
+      if (
+        requiresReviewPermission &&
+        !permissionKeys.includes(PERMISSIONS.VEREINSLEITUNG_MEETINGS_REVIEW)
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Für diesen Freigabeschritt fehlt die Berechtigung vereinsleitung.meetings.review.",
+          },
+          { status: 403 },
+        );
+      }
+
+      if (
+        requiresApprovePermission &&
+        !permissionKeys.includes(PERMISSIONS.VEREINSLEITUNG_MEETINGS_APPROVE)
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Für diesen Freigabeschritt fehlt die Berechtigung vereinsleitung.meetings.approve.",
+          },
+          { status: 403 },
+        );
+      }
+
+      const approvalNotes = normalizeOptionalString(payload.approvalNotes);
+
+      if (approvalStatusResult.value === "REJECTED" && !approvalNotes) {
+        return NextResponse.json(
+          { error: "Für eine Ablehnung ist ein Ablehnungsgrund erforderlich." },
+          { status: 400 },
+        );
+      }
+
+      const actorUserId = getActorUserId(access);
+      const now = new Date();
+
+      const approvalUpdateData =
+        approvalStatusResult.value === "SUBMITTED"
+          ? {
+              approvalStatus: approvalStatusResult.value,
+              approvalNotes: approvalNotes ?? null,
+              approvalSubmittedAt: now,
+              approvedAt: null,
+              rejectedAt: null,
+              approvalRequestedByUserId: actorUserId,
+              approvedByUserId: null,
+              rejectedByUserId: null,
+            }
+          : approvalStatusResult.value === "APPROVED"
+            ? {
+                approvalStatus: approvalStatusResult.value,
+                approvalNotes: approvalNotes ?? null,
+                approvedAt: now,
+                rejectedAt: null,
+                approvedByUserId: actorUserId,
+                rejectedByUserId: null,
+              }
+            : approvalStatusResult.value === "REJECTED"
+              ? {
+                  approvalStatus: approvalStatusResult.value,
+                  approvalNotes,
+                  rejectedAt: now,
+                  approvedAt: null,
+                  rejectedByUserId: actorUserId,
+                  approvedByUserId: null,
+                }
+              : {
+                  approvalStatus: approvalStatusResult.value,
+                  approvalNotes: null,
+                  approvalSubmittedAt: null,
+                  approvedAt: null,
+                  rejectedAt: null,
+                  approvalRequestedByUserId: null,
+                  approvedByUserId: null,
+                  rejectedByUserId: null,
+                };
+
+      const updated = await prisma.vereinsleitungMeeting.update({
+        where: { id },
+        data: approvalUpdateData,
+      });
+
+      await logAction({
+        actorUserId,
+        moduleKey: "vereinsleitung",
+        entityType: "VereinsleitungMeeting",
+        entityId: id,
+        action: "APPROVAL_STATUS_UPDATE",
+        beforeJson: {
+          approvalStatus: existingMeeting.approvalStatus,
+          approvalNotes: existingMeeting.approvalNotes,
+          approvalSubmittedAt: existingMeeting.approvalSubmittedAt,
+          approvedAt: existingMeeting.approvedAt,
+          rejectedAt: existingMeeting.rejectedAt,
+          approvalRequestedByUserId: existingMeeting.approvalRequestedByUserId,
+          approvedByUserId: existingMeeting.approvedByUserId,
+          rejectedByUserId: existingMeeting.rejectedByUserId,
+        },
+        afterJson: {
+          approvalStatus: updated.approvalStatus,
+          approvalNotes: updated.approvalNotes,
+          approvalSubmittedAt: updated.approvalSubmittedAt,
+          approvedAt: updated.approvedAt,
+          rejectedAt: updated.rejectedAt,
+          approvalRequestedByUserId: updated.approvalRequestedByUserId,
+          approvedByUserId: updated.approvedByUserId,
+          rejectedByUserId: updated.rejectedByUserId,
+        },
+      });
+
+      return NextResponse.json(updated);
+    }
+
+    const title = String(payload.title ?? "").trim();
+    const subtitle = normalizeOptionalString(payload.subtitle);
+    const description = normalizeOptionalString(payload.description);
+    const location = normalizeOptionalString(payload.location);
+    const meetingModeResult = parseMeetingMode(payload.meetingMode);
+    const meetingProviderResult = parseMeetingProvider(payload.meetingProvider);
+    const statusResult = parseMeetingStatus(payload.status);
+    const externalMeetingUrl = normalizeOptionalString(payload.externalMeetingUrl);
+    const carryOverSourceMeetingId = normalizeOptionalString(payload.carryOverSourceMeetingId);
+    const startAtResult = normalizeDateTime(payload.startAt, "Startzeit");
+    const endAtResult = normalizeOptionalDateTime(payload.endAt, "Endzeit");
+    const matterIdsResult = normalizeMatterIds(payload.matterIds);
+    const participantsResult = normalizeParticipants(payload.participants);
+    const agendaItemsResult = normalizeAgendaItems(payload.agendaItems);
 
     if (existingMeeting.status === "DONE") {
       return NextResponse.json(
@@ -410,6 +619,10 @@ export async function PATCH(
       return NextResponse.json({ error: participantsResult.error }, { status: 400 });
     }
 
+    if ("error" in agendaItemsResult) {
+      return NextResponse.json({ error: agendaItemsResult.error }, { status: 400 });
+    }
+
     if (endAtResult.value && endAtResult.value.getTime() < startAtResult.value.getTime()) {
       return NextResponse.json(
         { error: "Endzeit darf nicht vor der Startzeit liegen." },
@@ -442,6 +655,7 @@ export async function PATCH(
       return NextResponse.json({ error: participantValidation.error }, { status: 400 });
     }
 
+    const agendaItems = agendaItemsResult.value ?? [];
     const slug =
       title === existingMeeting.title
         ? existingMeeting.slug
@@ -462,6 +676,10 @@ export async function PATCH(
       });
 
       await tx.vereinsleitungMeetingParticipant.deleteMany({
+        where: { meetingId: id },
+      });
+
+      await tx.vereinsleitungMeetingAgendaItem.deleteMany({
         where: { meetingId: id },
       });
 
@@ -513,6 +731,15 @@ export async function PATCH(
                 })),
               }
             : undefined,
+          agendaItems: agendaItems.length
+            ? {
+                create: agendaItems.map((item) => ({
+                  title: item.title,
+                  description: item.description,
+                  sortOrder: item.sortOrder,
+                })),
+              }
+            : undefined,
         },
         include: {
           matterLinks: {
@@ -539,6 +766,9 @@ export async function PATCH(
             },
           },
           participants: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          },
+          agendaItems: {
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           },
         },

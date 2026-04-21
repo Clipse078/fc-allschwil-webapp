@@ -52,6 +52,13 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
             remarks: true,
           },
         },
+        agendaItems: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            title: true,
+            description: true,
+          },
+        },
       },
     }),
     prisma.vereinsleitungMatter.findMany({
@@ -122,6 +129,10 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
           roleLabel: participant.roleLabel,
           status: participant.status,
           remarks: participant.remarks,
+        }))}
+        initialAgendaItems={meeting.agendaItems.map((item) => ({
+          title: item.title,
+          description: item.description,
         }))}
         matterOptions={matterOptions}
       />

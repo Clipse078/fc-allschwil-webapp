@@ -1,0 +1,103 @@
+"use client";
+
+import { useState } from "react";
+
+export default function InitiativeInlineEditor({ initiative }) {
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState({
+    title: initiative.title,
+    subtitle: initiative.subtitle || "",
+    description: initiative.description || "",
+    status: initiative.status,
+    startDate: initiative.startDate ? initiative.startDate.slice(0,10) : "",
+    targetDate: initiative.targetDate ? initiative.targetDate.slice(0,10) : "",
+  });
+
+  async function save() {
+    const res = await fetch(
+      "/api/vereinsleitung/initiatives/" + initiative.id,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      }
+    );
+
+    if (res.ok) {
+      location.reload();
+    } else {
+      alert("Speichern fehlgeschlagen");
+    }
+  }
+
+  if (!edit) {
+    return (
+      <div className="flex gap-3">
+        <button
+          onClick={() => setEdit(true)}
+          className="fca-button-secondary"
+        >
+          Bearbeiten
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <input
+        value={form.title}
+        onChange={(e) => setForm({ ...form, title: e.target.value })}
+        className="fca-input"
+      />
+
+      <input
+        value={form.subtitle}
+        onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+        className="fca-input"
+      />
+
+      <textarea
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        className="fca-input"
+      />
+
+      <select
+        value={form.status}
+        onChange={(e) => setForm({ ...form, status: e.target.value })}
+        className="fca-input"
+      >
+        <option value="PLANNED">Geplant</option>
+        <option value="IN_PROGRESS">In Arbeit</option>
+        <option value="DONE">Abgeschlossen</option>
+      </select>
+
+      <div className="flex gap-3">
+        <input
+          type="date"
+          value={form.startDate}
+          onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+          className="fca-input"
+        />
+
+        <input
+          type="date"
+          value={form.targetDate}
+          onChange={(e) => setForm({ ...form, targetDate: e.target.value })}
+          className="fca-input"
+        />
+      </div>
+
+      <div className="flex gap-3">
+        <button onClick={save} className="fca-button-primary">
+          Speichern
+        </button>
+
+        <button onClick={() => setEdit(false)} className="fca-button-secondary">
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  );
+}

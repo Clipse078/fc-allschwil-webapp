@@ -1,0 +1,55 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+
+function normalizeOptionalString(value: unknown) {
+  const v = String(value ?? "").trim();
+  return v ? v : null;
+}
+
+function normalizeOptionalDate(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ initiativeId: string }> }
+) {
+  const access = await requireApiPermission(
+    PERMISSIONS.VEREINSLEITUNG_INITIATIVES_MANAGE
+  );
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const { initiativeId } = await context.params;
+
+  try {
+    const body = await request.json();
+
+    const updated = await prisma.vereinsleitungInitiative.update({
+      where: { id: initiativeId },
+      data: {
+        title: String(body.title ?? "").trim(),
+        subtitle: normalizeOptionalString(body.subtitle),
+        description: normalizeOptionalString(body.description),
+        status: String(body.status ?? "IN_PROGRESS"),
+        startDate: normalizeOptionalDate(body.startDate),
+        targetDate: normalizeOptionalDate(body.targetDate),
+      },
+    });
+
+    return NextResponse.json(updated);
+  } catch (e) {
+    return NextResponse.json(
+      { error: "Update fehlgeschlagen." },
+      { status: 500 }
+    );
+  }
+}

@@ -1,4 +1,4 @@
-﻿import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
+import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
 import VereinsleitungMeetingAgendaCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingAgendaCard";
 import VereinsleitungMeetingDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingDecisionsCard";
 import VereinsleitungMeetingExecutionWorkspace from "@/components/admin/vereinsleitung/VereinsleitungMeetingExecutionWorkspace";
@@ -27,7 +27,7 @@ export default function VereinsleitungMeetingDetail({
         agendaItems={meeting.agendaItems}
         protocolEntries={meeting.protocolEntries}
         decisions={meeting.decisions ?? []}
-        isDone={meeting.isDone}
+        isDone={meeting.isDone || meeting.isApprovalLocked}
       />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.85fr)_360px]">
@@ -42,7 +42,9 @@ export default function VereinsleitungMeetingDetail({
             linkedMatters={meeting.linkedMatters}
             meetingUrl={meetingUrl}
             teamsSyncStatusLabel={meeting.teamsSyncStatusLabel}
-            isLocked={meeting.isDone}
+            isLocked={meeting.isDone || meeting.isApprovalLocked}
+            approvalStatusLabel={meeting.approvalStatusLabel}
+            isApprovalLocked={meeting.isApprovalLocked}
           />
           <VereinsleitungMeetingProtocolCard
             meetingId={meeting.id}
@@ -70,6 +72,18 @@ export default function VereinsleitungMeetingDetail({
             teamsJoinUrl={meeting.teamsJoinUrl}
             status={meeting.status}
             statusLabel={meeting.statusLabel}
+            approvalStatus={meeting.approvalStatus}
+            approvalStatusLabel={meeting.approvalStatusLabel}
+            approvalNotes={meeting.approvalNotes}
+            approvalSubmittedAtLabel={meeting.approvalSubmittedAtLabel}
+            approvedAtLabel={meeting.approvedAtLabel}
+            rejectedAtLabel={meeting.rejectedAtLabel}
+            approvalRequestedByUserId={meeting.approvalRequestedByUserId}
+            approvedByUserId={meeting.approvedByUserId}
+            rejectedByUserId={meeting.rejectedByUserId}
+            approvalLockReasonLabel={meeting.approvalLockReasonLabel}
+            isApprovalLocked={meeting.isApprovalLocked}
+            isDone={meeting.isDone}
           />
           <div id="participants">
             <VereinsleitungMeetingParticipantsCard

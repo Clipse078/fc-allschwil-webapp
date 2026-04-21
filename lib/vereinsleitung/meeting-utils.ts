@@ -1,9 +1,13 @@
-﻿export type MeetingListItem = {
+export type MeetingListItem = {
   id: string;
   slug: string;
   title: string;
   subtitle: string | null;
   status: string;
+  statusLabel?: string;
+  approvalStatus: string;
+  approvalStatusLabel: string;
+  isApprovalLocked: boolean;
   dateLabel: string;
   timeLabel: string;
   location: string | null;
@@ -82,6 +86,11 @@ export type MeetingStatusOption = {
   label: string;
 };
 
+export type MeetingApprovalStatusOption = {
+  value: string;
+  label: string;
+};
+
 export type MeetingDetailItem = {
   id: string;
   slug: string;
@@ -90,7 +99,18 @@ export type MeetingDetailItem = {
   description: string | null;
   status: string;
   statusLabel: string;
+  approvalStatus: string;
+  approvalStatusLabel: string;
+  approvalNotes: string | null;
+  approvalSubmittedAtLabel: string | null;
+  approvedAtLabel: string | null;
+  rejectedAtLabel: string | null;
+  approvalRequestedByUserId: string | null;
+  approvedByUserId: string | null;
+  rejectedByUserId: string | null;
+  approvalLockReasonLabel: string | null;
   isDone: boolean;
+  isApprovalLocked: boolean;
   dateLabel: string;
   timeLabel: string;
   location: string | null;
@@ -131,6 +151,14 @@ const TIME_FORMATTER = new Intl.DateTimeFormat("de-CH", {
   minute: "2-digit",
 });
 
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat("de-CH", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 export function slugifyMeetingTitle(title: string) {
   return title
     .toLowerCase()
@@ -149,6 +177,15 @@ export function formatMeetingDateLabel(value: Date | string) {
 export function formatMeetingListDateLabel(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
   return SHORT_DATE_FORMATTER.format(date);
+}
+
+export function formatMeetingDateTimeLabel(value?: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return DATE_TIME_FORMATTER.format(date) + " Uhr";
 }
 
 export function formatMeetingTimeLabel(
@@ -287,6 +324,49 @@ export function getMeetingStatusOptions(): MeetingStatusOption[] {
     { value: "IN_PROGRESS", label: "In Durchführung" },
     { value: "DONE", label: "Abgeschlossen" },
   ];
+}
+
+export function getMeetingApprovalStatusLabel(value: string) {
+  switch (value) {
+    case "DRAFT":
+      return "Entwurf";
+    case "SUBMITTED":
+      return "Zur Prüfung";
+    case "APPROVED":
+      return "Freigegeben";
+    case "REJECTED":
+      return "Abgelehnt";
+    default:
+      return value;
+  }
+}
+
+export function getMeetingApprovalStatusOptions(): MeetingApprovalStatusOption[] {
+  return [
+    { value: "DRAFT", label: "Entwurf" },
+    { value: "SUBMITTED", label: "Zur Prüfung" },
+    { value: "APPROVED", label: "Freigegeben" },
+    { value: "REJECTED", label: "Abgelehnt" },
+  ];
+}
+
+export function isMeetingApprovalLocked(status: string) {
+  return status === "APPROVED";
+}
+
+export function getMeetingApprovalLockReasonLabel(input: {
+  status: string;
+  approvalStatus: string;
+}) {
+  if (input.status === "DONE") {
+    return "Gesperrt, weil das Meeting abgeschlossen ist.";
+  }
+
+  if (input.approvalStatus === "APPROVED") {
+    return "Gesperrt, weil das Meeting freigegeben wurde.";
+  }
+
+  return null;
 }
 
 export function getPreferredMeetingUrl(input: {

@@ -1,5 +1,5 @@
 ﻿import Link from "next/link";
-import { ArrowUpRight, CircleCheckBig, ClipboardList, ListChecks } from "lucide-react";
+import { ArrowUpRight, CircleCheckBig, ClipboardList, ListChecks, Lock, ShieldCheck } from "lucide-react";
 import { type MeetingMatterItem } from "@/lib/vereinsleitung/meeting-utils";
 
 type VereinsleitungMeetingActionsCardProps = {
@@ -8,6 +8,8 @@ type VereinsleitungMeetingActionsCardProps = {
   meetingUrl: string | null;
   teamsSyncStatusLabel: string;
   isLocked?: boolean;
+  approvalStatusLabel?: string;
+  isApprovalLocked?: boolean;
 };
 
 export default function VereinsleitungMeetingActionsCard({
@@ -16,6 +18,8 @@ export default function VereinsleitungMeetingActionsCard({
   meetingUrl,
   teamsSyncStatusLabel,
   isLocked = false,
+  approvalStatusLabel = "Entwurf",
+  isApprovalLocked = false,
 }: VereinsleitungMeetingActionsCardProps) {
   return (
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
@@ -27,11 +31,11 @@ export default function VereinsleitungMeetingActionsCard({
       {isLocked ? (
         <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4">
           <p className="text-sm font-medium text-amber-800">
-            Meeting ist abgeschlossen.
+            Meeting-Arbeitsbereich ist gesperrt.
           </p>
           <p className="mt-2 text-sm leading-6 text-amber-700">
-            Vorbereitungs- und Planungsbereiche sind jetzt gesperrt. Protokoll und Entscheide bleiben
-            vorerst weiter bearbeitbar.
+            Entweder ist das Meeting abgeschlossen oder bereits freigegeben. Änderungen an Vorbereitung,
+            Ausführung und Nachbearbeitung sollen künftig kontrolliert über Review- oder Reopen-Workflows laufen.
           </p>
         </div>
       ) : null}
@@ -59,6 +63,21 @@ export default function VereinsleitungMeetingActionsCard({
           </p>
         </article>
 
+        <article className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.03)]">
+          <div className="flex items-center gap-2 text-slate-900">
+            <ShieldCheck className="h-4 w-4 text-[#0b4aa2]" />
+            <h4 className="text-sm font-semibold">Freigabe</h4>
+          </div>
+          <p className="mt-4 text-lg font-semibold text-slate-900">{approvalStatusLabel}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            {isApprovalLocked
+              ? "Freigegeben – Approval-Lock aktiv."
+              : "Approval-Workflow-Grundlage vorbereitet."}
+          </p>
+        </article>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <article className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.03)]">
           <div className="flex items-center gap-2 text-slate-900">
             <ArrowUpRight className="h-4 w-4 text-[#0b4aa2]" />
@@ -89,6 +108,16 @@ export default function VereinsleitungMeetingActionsCard({
               Zu Teilnehmern springen
             </Link>
           </div>
+        </article>
+
+        <article className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.03)]">
+          <div className="flex items-center gap-2 text-slate-900">
+            <Lock className="h-4 w-4 text-[#0b4aa2]" />
+            <h4 className="text-sm font-semibold">Workflow-Hinweis</h4>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-slate-500">
+            Nächster Schritt: echte Submit-, Review- und Approve-Aktionen auf Basis dieses Freigabestatus und des Approval-Locks.
+          </p>
         </article>
       </div>
     </section>

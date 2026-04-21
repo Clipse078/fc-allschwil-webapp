@@ -1,11 +1,5 @@
 ﻿import Link from "next/link";
-import {
-  CalendarDays,
-  ChevronRight,
-  CircleCheckBig,
-  ListChecks,
-  MapPin,
-} from "lucide-react";
+import { CalendarDays, ChevronRight, CircleCheckBig, ListChecks, Lock, MapPin, ShieldCheck } from "lucide-react";
 import type { MeetingListItem } from "@/lib/vereinsleitung/meeting-utils";
 
 type VereinsleitungMeetingsListProps = {
@@ -23,16 +17,16 @@ function getStatusClass(status: string) {
   }
 }
 
-function getStatusLabel(status: string) {
+function getApprovalStatusClass(status: string) {
   switch (status) {
-    case "DONE":
-      return "Erledigt";
-    case "IN_PROGRESS":
-      return "In Arbeit";
-    case "PLANNED":
-      return "Geplant";
+    case "APPROVED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "SUBMITTED":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "REJECTED":
+      return "border-rose-200 bg-rose-50 text-rose-700";
     default:
-      return status;
+      return "border-slate-200 bg-slate-50 text-slate-600";
   }
 }
 
@@ -73,8 +67,23 @@ export default function VereinsleitungMeetingsList({
                     meeting.status,
                   )}`}
                 >
-                  {getStatusLabel(meeting.status)}
+                  {meeting.statusLabel ?? meeting.status}
                 </span>
+
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getApprovalStatusClass(
+                    meeting.approvalStatus,
+                  )}`}
+                >
+                  Freigabe: {meeting.approvalStatusLabel}
+                </span>
+
+                {meeting.isApprovalLocked ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    <Lock className="h-3.5 w-3.5" />
+                    Approval-Lock aktiv
+                  </span>
+                ) : null}
               </div>
 
               {meeting.subtitle ? (
@@ -102,6 +111,11 @@ export default function VereinsleitungMeetingsList({
                 <span className="inline-flex items-center gap-2">
                   <CircleCheckBig className="h-4 w-4" />
                   {meeting.openMatterCount} offen / in Arbeit
+                </span>
+
+                <span className="inline-flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  {meeting.approvalStatusLabel}
                 </span>
               </div>
             </div>
