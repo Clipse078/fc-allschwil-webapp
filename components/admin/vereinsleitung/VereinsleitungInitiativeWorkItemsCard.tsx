@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Edit3, Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { CheckCircle2, Clock3, Edit3, Loader2, Plus, Save, Trash2, X } from "lucide-react";
 import PeoplePicker, {
   type PeoplePickerPerson,
 } from "@/components/admin/shared/people-picker/PeoplePicker";
@@ -77,6 +77,46 @@ function toDateInputValue(value: string | null) {
   }
 
   return value.slice(0, 10);
+}
+
+function isOverdue(value: string | null, status: string) {
+  if (!value || status === "RESOLVED") {
+    return false;
+  }
+
+  const dueDate = new Date(value);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+
+  return dueDate.getTime() < today.getTime();
+}
+
+function getDueDateBadgeClass(value: string | null, status: string) {
+  if (!value) {
+    return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+
+  if (isOverdue(value, status)) {
+    return "border-rose-200 bg-rose-50 text-rose-700";
+  }
+
+  if (status === "RESOLVED") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  return "border-blue-200 bg-blue-50 text-blue-700";
+}
+
+function getAssigneeCardClass(status: string) {
+  switch (status) {
+    case "RESOLVED":
+      return "border-emerald-100 bg-emerald-50/60";
+    case "IN_PROGRESS":
+      return "border-blue-100 bg-blue-50/60";
+    default:
+      return "border-slate-200 bg-slate-50";
+  }
 }
 
 function buildDraft(item: InitiativeDetailWorkItem): DraftState {
@@ -229,6 +269,47 @@ export default function VereinsleitungInitiativeWorkItemsCard({
     }
   }
 
+  async function quickSetStatus(item: InitiativeDetailWorkItem, nextStatus: string) {
+    try {
+      setBusyId(item.id);
+      setError("");
+
+      const response = await fetch(
+        "/api/vereinsleitung/initiatives/work-items/" + item.id,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: item.title,
+            priority: item.priority,
+            dueDate: item.dueDateIso ? item.dueDateIso.slice(0, 10) : null,
+            assigneeMode: item.assigneeMode,
+            assigneePersonId: item.assigneeMode === "PERSON" ? item.assigneePersonId : null,
+            externalAssigneeLabel:
+              item.assigneeMode === "EXTERNAL" ? item.externalAssigneeLabel : null,
+            status: nextStatus,
+          }),
+        },
+      );
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Status konnte nicht aktualisiert werden.");
+      }
+
+      router.refresh();
+    } catch (errorValue) {
+      setError(
+        errorValue instanceof Error ? errorValue.message : "Statuswechsel fehlgeschlagen.",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function deleteWorkItem(workItemId: string, workItemTitle: string) {
     const confirmed = confirm('Work Item "' + workItemTitle + '" wirklich löschen?');
     if (!confirmed) {
@@ -270,7 +351,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
         <div>
           <h3 className="text-[1.1rem] font-semibold text-slate-900">Work Items</h3>
           <p className="mt-2 text-sm text-slate-500">
-            Aufgaben mit Due Date und sauberer Personenzuweisung via PeoplePicker.
+            Aufgaben mit Due Date, PeoplePicker und schnellen Status-Aktionen.
           </p>
         </div>
 
@@ -379,11 +460,16 @@ export default function VereinsleitungInitiativeWorkItemsCard({
           {sortedItems.map((item) => {
             const isEditing = editId === item.id && draft !== null;
             const isBusy = busyId === item.id;
+            const overdue = isOverdue(item.dueDateIso, item.status);
 
             return (
               <article
                 key={item.id}
-                className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                className={`rounded-[24px] border bg-white p-4 shadow-sm transition ${
+                  overdue
+                    ? "border-rose-200 shadow-[0_10px_26px_rgba(244,63,94,0.08)]"
+                    : "border-slate-200"
+                }`}
               >
                 {isEditing ? (
                   <div className="space-y-4">
@@ -520,60 +606,111 @@ export default function VereinsleitungInitiativeWorkItemsCard({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={
-                            "rounded-full border px-2.5 py-1 text-[11px] font-semibold " +
-                            getPriorityClass(item.priority)
-                          }
-                        >
-                          {item.priority}
-                        </span>
-
-                        <span
-                          className={
-                            "rounded-full border px-2.5 py-1 text-[11px] font-semibold " +
-                            getStatusClass(item.status)
-                          }
-                        >
-                          {getStatusLabel(item.status)}
-                        </span>
-
-                        {item.dueDateIso ? (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                            Fällig: {formatDateLabel(item.dueDateIso)}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={
+                              "rounded-full border px-2.5 py-1 text-[11px] font-semibold " +
+                              getPriorityClass(item.priority)
+                            }
+                          >
+                            {item.priority}
                           </span>
+
+                          <span
+                            className={
+                              "rounded-full border px-2.5 py-1 text-[11px] font-semibold " +
+                              getStatusClass(item.status)
+                            }
+                          >
+                            {getStatusLabel(item.status)}
+                          </span>
+
+                          {item.dueDateIso ? (
+                            <span
+                              className={
+                                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold " +
+                                getDueDateBadgeClass(item.dueDateIso, item.status)
+                              }
+                            >
+                              <Clock3 className="h-3 w-3" />
+                              {overdue ? "Überfällig: " : "Fällig: "}
+                              {formatDateLabel(item.dueDateIso)}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <h4 className="mt-3 text-base font-semibold text-slate-900">{item.title}</h4>
+
+                        <div
+                          className={
+                            "mt-3 inline-flex items-center gap-2 rounded-[16px] border px-3 py-2 text-sm " +
+                            getAssigneeCardClass(item.status)
+                          }
+                        >
+                          <span className="font-semibold text-slate-900">Verantwortlich:</span>
+                          <span className="text-slate-600">{item.assigneeName}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {item.status !== "BACKLOG" ? (
+                          <button
+                            type="button"
+                            onClick={() => quickSetStatus(item, "BACKLOG")}
+                            disabled={isBusy}
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                            Zu Backlog
+                          </button>
                         ) : null}
+
+                        {item.status !== "IN_PROGRESS" ? (
+                          <button
+                            type="button"
+                            onClick={() => quickSetStatus(item, "IN_PROGRESS")}
+                            disabled={isBusy}
+                            className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock3 className="h-3.5 w-3.5" />}
+                            In Arbeit
+                          </button>
+                        ) : null}
+
+                        {item.status !== "RESOLVED" ? (
+                          <button
+                            type="button"
+                            onClick={() => quickSetStatus(item, "RESOLVED")}
+                            disabled={isBusy}
+                            className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                            Erledigen
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => startEdit(item)}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                          Bearbeiten
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteWorkItem(item.id, item.title)}
+                          disabled={isBusy}
+                          className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          Löschen
+                        </button>
                       </div>
-
-                      <h4 className="mt-3 text-base font-semibold text-slate-900">{item.title}</h4>
-
-                      <div className="mt-3 text-sm text-slate-500">
-                        Verantwortlich: {item.assigneeName}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(item)}
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                        Bearbeiten
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => deleteWorkItem(item.id, item.title)}
-                        disabled={isBusy}
-                        className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        Löschen
-                      </button>
                     </div>
                   </div>
                 )}
