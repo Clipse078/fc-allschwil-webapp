@@ -44,8 +44,13 @@ export default async function InitiativeSlugPage({
               firstName: true,
               lastName: true,
               displayName: true,
-              email: true,
-              phone: true,
+            },
+          },
+          sourceMeeting: {
+            select: {
+              id: true,
+              slug: true,
+              title: true,
             },
           },
         },
@@ -76,8 +81,6 @@ export default async function InitiativeSlugPage({
       dueDateIso: item.dueDate ? item.dueDate.toISOString() : null,
       assigneeMode: item.assigneeMode,
       assigneePersonId: item.assigneePersonId,
-      externalAssigneeLabel: item.externalAssigneeLabel,
-      assigneeName,
       assigneePerson: item.assigneePerson
         ? {
             id: item.assigneePerson.id,
@@ -88,15 +91,22 @@ export default async function InitiativeSlugPage({
               [item.assigneePerson.firstName, item.assigneePerson.lastName]
                 .filter(Boolean)
                 .join(" "),
-            email: item.assigneePerson.email,
-            phone: item.assigneePerson.phone,
+            email: null,
+            phone: null,
             imageSrc: null,
             functionLabel: null,
             teamLabel: null,
           }
         : null,
+      externalAssigneeLabel: item.externalAssigneeLabel,
+      assigneeName,
       status: item.status,
       sortOrder: item.sortOrder,
+      sourceMeetingId: item.sourceMeetingId,
+      sourceMeetingSlug: item.sourceMeeting?.slug ?? null,
+      sourceMeetingTitle: item.sourceMeeting?.title ?? null,
+      sourceDecisionId: item.sourceDecisionId,
+      sourceAgendaItemTitle: item.sourceAgendaItemTitle,
     };
   });
 

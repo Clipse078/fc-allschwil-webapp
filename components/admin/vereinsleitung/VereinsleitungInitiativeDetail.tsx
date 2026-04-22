@@ -15,11 +15,16 @@ export type InitiativeDetailWorkItem = {
   dueDateIso: string | null;
   assigneeMode: string;
   assigneePersonId: string | null;
+  assigneePerson: PeoplePickerPerson | null;
   externalAssigneeLabel: string | null;
   assigneeName: string;
-  assigneePerson: PeoplePickerPerson | null;
   status: string;
   sortOrder: number;
+  sourceMeetingId: string | null;
+  sourceMeetingSlug: string | null;
+  sourceMeetingTitle: string | null;
+  sourceDecisionId: string | null;
+  sourceAgendaItemTitle: string | null;
 };
 
 type InitiativeDetailData = {
@@ -43,7 +48,7 @@ type VereinsleitungInitiativeDetailProps = {
 
 function formatDateLabel(value: string | null) {
   if (!value) {
-    return "—";
+    return "--";
   }
 
   return new Intl.DateTimeFormat("de-CH", {
@@ -85,9 +90,10 @@ export default function VereinsleitungInitiativeDetail({
   const resolvedWorkItems = workItems.filter((item) => item.status === "RESOLVED").length;
   const progressPercent =
     totalWorkItems > 0 ? Math.round((resolvedWorkItems / totalWorkItems) * 100) : 0;
+  const meetingOriginCount = workItems.filter((item) => Boolean(item.sourceMeetingId)).length;
 
   async function handleDelete() {
-    const confirmed = confirm('Initiative "' + initiative.title + '" wirklich löschen?');
+    const confirmed = confirm('Initiative "' + initiative.title + '" wirklich loeschen?');
     if (!confirmed) {
       return;
     }
@@ -100,13 +106,13 @@ export default function VereinsleitungInitiativeDetail({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Initiative konnte nicht gelöscht werden.");
+        throw new Error(payload?.error || "Initiative konnte nicht geloescht werden.");
       }
 
       router.push("/vereinsleitung/initiativen");
       router.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
+      alert(error instanceof Error ? error.message : "Loeschen fehlgeschlagen.");
     }
   }
 
@@ -118,7 +124,7 @@ export default function VereinsleitungInitiativeDetail({
             href="/vereinsleitung/initiativen"
             className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
-            Zur Übersicht
+            Zur Uebersicht
           </Link>
 
           <Link
@@ -135,7 +141,7 @@ export default function VereinsleitungInitiativeDetail({
             className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
           >
             <Trash2 className="h-4 w-4" />
-            Löschen
+            Loeschen
           </button>
         </div>
 
@@ -217,6 +223,13 @@ export default function VereinsleitungInitiativeDetail({
                 <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Ziel</div>
                 <div className="mt-1 font-medium text-slate-800">
                   {formatDateLabel(initiative.targetDateIso)}
+                </div>
+              </div>
+
+              <div className="rounded-[18px] border border-blue-100 bg-blue-50/70 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-blue-500">Aus Meetings</div>
+                <div className="mt-1 font-medium text-blue-900">
+                  {meetingOriginCount} Work Items mit Meeting-Herkunft
                 </div>
               </div>
             </div>

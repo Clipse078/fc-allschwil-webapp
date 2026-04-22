@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import {
   Prisma,
   VereinsleitungInitiativeStatus,
@@ -634,6 +634,9 @@ export async function POST(
               assigneePersonId: decision.responsiblePersonId,
               externalAssigneeLabel: null,
               status: VereinsleitungInitiativeWorkItemStatus.BACKLOG,
+              sourceMeetingId: meetingId,
+              sourceDecisionId: createdDecision.id,
+              sourceAgendaItemTitle: decision.agendaItemTitle,
               sortOrder: (lastWorkItem?.sortOrder ?? -1) + 1,
             },
           });
