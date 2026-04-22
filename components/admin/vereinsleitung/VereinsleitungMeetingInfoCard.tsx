@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -291,199 +291,142 @@ export default function VereinsleitungMeetingInfoCard({
   const hasAnyApprovalPermission = canReviewMeetings || canApproveMeetings;
 
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-            Meeting
-          </p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">{title}</h3>
-        </div>
-
-        <span
-          className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${getTeamsStatusClass(
-            teamsSyncStatusLabel,
-          )}`}
-        >
-          Teams: {teamsSyncStatusLabel}
-        </span>
-      </div>
-
-      <div className="mt-5 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2">
-          <StatusIcon className="h-4.5 w-4.5 text-[#0b4aa2]" />
-          <h4 className="text-sm font-semibold text-slate-900">Meeting-Status</h4>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(status)}`}>
-            {statusLabel}
-          </span>
-
-          {canManageMeetings ? (
-            <>
-              <select
-                value={selectedStatus}
-                onChange={(event) => setSelectedStatus(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={saveStatus}
-                disabled={isSubmittingStatus || selectedStatus === status}
-                className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSubmittingStatus ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Status speichern
-              </button>
-            </>
-          ) : (
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500">
-              Keine Status-Bearbeitung
-            </span>
-          )}
-        </div>
-
-        {statusError ? (
-          <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {statusError}
+    <section className="overflow-hidden rounded-[30px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+      <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+              Meeting
+            </p>
+            <h3 className="mt-2 text-[1.2rem] font-semibold text-slate-900">{title}</h3>
           </div>
-        ) : null}
-      </div>
 
-      <div className="mt-5 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2">
-          <ApprovalIcon className="h-4.5 w-4.5 text-[#0b4aa2]" />
-          <h4 className="text-sm font-semibold text-slate-900">Freigabestatus</h4>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getApprovalBadgeClass(approvalStatus)}`}>
-            {approvalStatusLabel}
+          <span
+            className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${getTeamsStatusClass(
+              teamsSyncStatusLabel,
+            )}`}
+          >
+            Teams: {teamsSyncStatusLabel}
           </span>
-
-          {isApprovalLocked ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <Lock className="h-3.5 w-3.5" />
-              Approval-Lock aktiv
-            </span>
-          ) : null}
-
-          {isDone ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Meeting abgeschlossen
-            </span>
-          ) : null}
-
-          {canManuallyEditApproval ? (
-            <>
-              <select
-                value={selectedApprovalStatus}
-                onChange={(event) => setSelectedApprovalStatus(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-              >
-                {approvalStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={saveApprovalStatus}
-                disabled={isSubmittingApproval || selectedApprovalStatus === approvalStatus}
-                className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSubmittingApproval ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="h-4 w-4" />
-                )}
-                Freigabe speichern
-              </button>
-            </>
-          ) : null}
         </div>
 
-        {approvalLockReasonLabel ? (
-          <div className="mt-4 rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-            {approvalLockReasonLabel}
-          </div>
-        ) : null}
-
-        <div className="mt-4 grid gap-3">
-          <div className="rounded-[20px] border border-slate-200 bg-white p-4">
+        <div className="mt-5 grid gap-4">
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
             <div className="flex items-center gap-2">
-              <CalendarClock className="h-4 w-4 text-[#0b4aa2]" />
-              <h5 className="text-sm font-semibold text-slate-900">Freigabe-Metadaten</h5>
+              <StatusIcon className="h-4.5 w-4.5 text-[#0b4aa2]" />
+              <h4 className="text-sm font-semibold text-slate-900">Meeting-Status</h4>
             </div>
 
-            <div className="mt-3 grid gap-3 text-sm text-slate-700">
-              <div className="grid gap-1">
-                <span className="font-medium text-slate-900">Zur Prüfung gesendet am</span>
-                <span>{approvalSubmittedAtLabel ?? "—"}</span>
-              </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${getStatusBadgeClass(status)}`}>
+                {statusLabel}
+              </span>
 
-              <div className="grid gap-1">
-                <span className="font-medium text-slate-900">Freigegeben am</span>
-                <span>{approvedAtLabel ?? "—"}</span>
-              </div>
+              {canManageMeetings ? (
+                <>
+                  <select
+                    value={selectedStatus}
+                    onChange={(event) => setSelectedStatus(event.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  >
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
 
-              <div className="grid gap-1">
-                <span className="font-medium text-slate-900">Abgelehnt am</span>
-                <span>{rejectedAtLabel ?? "—"}</span>
-              </div>
-
-              <div className="grid gap-1">
-                <span className="font-medium text-slate-900">Angefordert von</span>
-                <span className="inline-flex items-center gap-2">
-                  <UserRound className="h-4 w-4 text-slate-400" />
-                  {getUserIdLabel(approvalRequestedByUserId)}
+                  <button
+                    type="button"
+                    onClick={saveStatus}
+                    disabled={isSubmittingStatus || selectedStatus === status}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isSubmittingStatus ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    Status speichern
+                  </button>
+                </>
+              ) : (
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500">
+                  Keine Status-Bearbeitung
                 </span>
-              </div>
-
-              <div className="grid gap-1">
-                <span className="font-medium text-slate-900">Freigegeben von</span>
-                <span className="inline-flex items-center gap-2">
-                  <UserRound className="h-4 w-4 text-slate-400" />
-                  {getUserIdLabel(approvedByUserId)}
-                </span>
-              </div>
-
-              <div className="grid gap-1">
-                <span className="font-medium text-slate-900">Abgelehnt von</span>
-                <span className="inline-flex items-center gap-2">
-                  <UserRound className="h-4 w-4 text-slate-400" />
-                  {getUserIdLabel(rejectedByUserId)}
-                </span>
-              </div>
-
-              <div className="grid gap-1">
-                <span className="font-medium text-slate-900">{getApprovalNoteLabel(approvalStatus)}</span>
-                <span className="inline-flex items-start gap-2">
-                  <FileText className="mt-0.5 h-4 w-4 text-slate-400" />
-                  <span>{approvalNotes ?? "—"}</span>
-                </span>
-              </div>
+              )}
             </div>
+
+            {statusError ? (
+              <div className="mt-4 rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {statusError}
+              </div>
+            ) : null}
           </div>
-        </div>
 
-        {hasAnyApprovalPermission ? (
-          <>
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex items-center gap-2">
+              <ApprovalIcon className="h-4.5 w-4.5 text-[#0b4aa2]" />
+              <h4 className="text-sm font-semibold text-slate-900">Freigabestatus</h4>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${getApprovalBadgeClass(approvalStatus)}`}>
+                {approvalStatusLabel}
+              </span>
+
+              {isApprovalLocked ? (
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                  <Lock className="h-3.5 w-3.5" />
+                  Approval-Lock aktiv
+                </span>
+              ) : null}
+
+              {isDone ? (
+                <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Meeting abgeschlossen
+                </span>
+              ) : null}
+
+              {canManuallyEditApproval ? (
+                <>
+                  <select
+                    value={selectedApprovalStatus}
+                    onChange={(event) => setSelectedApprovalStatus(event.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  >
+                    {approvalStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={saveApprovalStatus}
+                    disabled={isSubmittingApproval || selectedApprovalStatus === approvalStatus}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isSubmittingApproval ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4" />
+                    )}
+                    Freigabe speichern
+                  </button>
+                </>
+              ) : null}
+            </div>
+
+            {approvalLockReasonLabel ? (
+              <div className="mt-4 rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                {approvalLockReasonLabel}
+              </div>
+            ) : null}
+
             <div className="mt-4 rounded-[20px] border border-slate-200 bg-white p-4">
               <label className="block text-sm font-semibold text-slate-900">
                 Freigabehinweis / Ablehnungsgrund
@@ -500,140 +443,195 @@ export default function VereinsleitungMeetingInfoCard({
               </p>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {canReviewMeetings ? (
-                <button
-                  type="button"
-                  onClick={() => runQuickApprovalAction("SUBMITTED")}
-                  disabled={isSubmittingApproval || !canSubmit}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {isSubmittingApproval && selectedApprovalStatus === "SUBMITTED" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  Zur Prüfung
-                </button>
+            {hasAnyApprovalPermission ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {canReviewMeetings ? (
+                  <button
+                    type="button"
+                    onClick={() => runQuickApprovalAction("SUBMITTED")}
+                    disabled={isSubmittingApproval || !canSubmit}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {isSubmittingApproval && selectedApprovalStatus === "SUBMITTED" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    Zur Prüfung
+                  </button>
+                ) : null}
+
+                {canApproveMeetings ? (
+                  <button
+                    type="button"
+                    onClick={() => runQuickApprovalAction("APPROVED")}
+                    disabled={isSubmittingApproval || !canApprove}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {isSubmittingApproval && selectedApprovalStatus === "APPROVED" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4" />
+                    )}
+                    Freigeben
+                  </button>
+                ) : null}
+
+                {canReviewMeetings ? (
+                  <button
+                    type="button"
+                    onClick={() => runQuickApprovalAction("REJECTED")}
+                    disabled={isSubmittingApproval || !canReject}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {isSubmittingApproval && selectedApprovalStatus === "REJECTED" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    Ablehnen
+                  </button>
+                ) : null}
+
+                {canApproveMeetings ? (
+                  <button
+                    type="button"
+                    onClick={() => runQuickApprovalAction("DRAFT")}
+                    disabled={isSubmittingApproval || !canReopen}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {isSubmittingApproval && selectedApprovalStatus === "DRAFT" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Undo2 className="h-4 w-4" />
+                    )}
+                    Zu Entwurf
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+                Keine Freigabeaktionen verfügbar.
+              </div>
+            )}
+
+            <p className="mt-4 text-sm leading-6 text-slate-600">
+              Freigabeaktionen werden strikt nach Berechtigung angezeigt. Ablehnungen verlangen einen Grund, Freigaben können optional dokumentiert werden.
+            </p>
+
+            {approvalError ? (
+              <div className="mt-4 rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {approvalError}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-4.5 w-4.5 text-[#0b4aa2]" />
+              <h4 className="text-sm font-semibold text-slate-900">Meeting-Kontext</h4>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Datum</div>
+                <div className="mt-1 font-medium text-slate-800">{dateLabel}</div>
+              </div>
+
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Zeit</div>
+                <div className="mt-1 font-medium text-slate-800">{timeLabel}</div>
+              </div>
+
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Meeting-Typ</div>
+                <div className="mt-1 font-medium text-slate-800">{meetingModeLabel}</div>
+              </div>
+
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Provider</div>
+                <div className="mt-1 font-medium text-slate-800">{meetingProviderLabel}</div>
+              </div>
+
+              {location ? (
+                <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Ort</div>
+                  <div className="mt-1 font-medium text-slate-800">{location}</div>
+                </div>
               ) : null}
 
-              {canApproveMeetings ? (
-                <button
-                  type="button"
-                  onClick={() => runQuickApprovalAction("APPROVED")}
-                  disabled={isSubmittingApproval || !canApprove}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {isSubmittingApproval && selectedApprovalStatus === "APPROVED" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="h-4 w-4" />
-                  )}
-                  Freigeben
-                </button>
-              ) : null}
-
-              {canReviewMeetings ? (
-                <button
-                  type="button"
-                  onClick={() => runQuickApprovalAction("REJECTED")}
-                  disabled={isSubmittingApproval || !canReject}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {isSubmittingApproval && selectedApprovalStatus === "REJECTED" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <XCircle className="h-4 w-4" />
-                  )}
-                  Ablehnen
-                </button>
-              ) : null}
-
-              {canApproveMeetings ? (
-                <button
-                  type="button"
-                  onClick={() => runQuickApprovalAction("DRAFT")}
-                  disabled={isSubmittingApproval || !canReopen}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {isSubmittingApproval && selectedApprovalStatus === "DRAFT" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Undo2 className="h-4 w-4" />
-                  )}
-                  Zu Entwurf
-                </button>
+              {meetingUrl ? (
+                <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Meeting-Link</div>
+                  <a
+                    href={meetingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block break-all font-medium text-[#0b4aa2] hover:underline"
+                  >
+                    {meetingUrl}
+                  </a>
+                </div>
               ) : null}
             </div>
-          </>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-            Keine Freigabeaktionen verfügbar.
           </div>
-        )}
 
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Freigabeaktionen werden strikt nach Berechtigung angezeigt. Ablehnungen verlangen einen Grund, Freigaben können optional dokumentiert werden.
-        </p>
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4.5 w-4.5 text-[#0b4aa2]" />
+              <h4 className="text-sm font-semibold text-slate-900">Freigabe-Metadaten</h4>
+            </div>
 
-        {approvalError ? (
-          <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {approvalError}
-          </div>
-        ) : null}
-      </div>
+            <div className="mt-4 grid gap-3 text-sm text-slate-700">
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="font-medium text-slate-900">Zur Prüfung gesendet am</div>
+                <div className="mt-1">{approvalSubmittedAtLabel ?? "—"}</div>
+              </div>
 
-      <div className="mt-5 space-y-3 text-sm text-slate-600">
-        <div className="flex items-start gap-3">
-          <CalendarClock className="mt-0.5 h-4 w-4 text-slate-400" />
-          <div>
-            <div className="font-medium text-slate-900">{dateLabel}</div>
-            <div>{timeLabel}</div>
-          </div>
-        </div>
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="font-medium text-slate-900">Freigegeben am</div>
+                <div className="mt-1">{approvedAtLabel ?? "—"}</div>
+              </div>
 
-        <div className="flex items-start gap-3">
-          <PlayCircle className="mt-0.5 h-4 w-4 text-slate-400" />
-          <div>
-            <div className="font-medium text-slate-900">Meeting-Typ</div>
-            <div>{meetingModeLabel}</div>
-          </div>
-        </div>
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="font-medium text-slate-900">Abgelehnt am</div>
+                <div className="mt-1">{rejectedAtLabel ?? "—"}</div>
+              </div>
 
-        <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 text-slate-400" />
-          <div>
-            <div className="font-medium text-slate-900">Provider</div>
-            <div>{meetingProviderLabel}</div>
-          </div>
-        </div>
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="font-medium text-slate-900">Angefordert von</div>
+                <div className="mt-1 inline-flex items-center gap-2">
+                  <UserRound className="h-4 w-4 text-slate-400" />
+                  {getUserIdLabel(approvalRequestedByUserId)}
+                </div>
+              </div>
 
-        {location ? (
-          <div className="flex items-start gap-3">
-            <CalendarClock className="mt-0.5 h-4 w-4 text-slate-400" />
-            <div>
-              <div className="font-medium text-slate-900">Ort</div>
-              <div>{location}</div>
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="font-medium text-slate-900">Freigegeben von</div>
+                <div className="mt-1 inline-flex items-center gap-2">
+                  <UserRound className="h-4 w-4 text-slate-400" />
+                  {getUserIdLabel(approvedByUserId)}
+                </div>
+              </div>
+
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="font-medium text-slate-900">Abgelehnt von</div>
+                <div className="mt-1 inline-flex items-center gap-2">
+                  <UserRound className="h-4 w-4 text-slate-400" />
+                  {getUserIdLabel(rejectedByUserId)}
+                </div>
+              </div>
+
+              <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
+                <div className="font-medium text-slate-900">{getApprovalNoteLabel(approvalStatus)}</div>
+                <div className="mt-1 inline-flex items-start gap-2">
+                  <FileText className="mt-0.5 h-4 w-4 text-slate-400" />
+                  <span>{approvalNotes ?? "—"}</span>
+                </div>
+              </div>
             </div>
           </div>
-        ) : null}
-
-        {meetingUrl ? (
-          <div className="flex items-start gap-3">
-            <CalendarClock className="mt-0.5 h-4 w-4 text-slate-400" />
-            <div className="min-w-0">
-              <div className="font-medium text-slate-900">Meeting-Link</div>
-              <a
-                href={meetingUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="break-all text-[#0b4aa2] hover:underline"
-              >
-                {meetingUrl}
-              </a>
-            </div>
-          </div>
-        ) : null}
+        </div>
       </div>
     </section>
   );
