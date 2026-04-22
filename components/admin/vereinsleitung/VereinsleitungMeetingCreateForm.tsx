@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import PeoplePicker, {
   type PeoplePickerPerson,
 } from "@/components/admin/shared/people-picker/PeoplePicker";
@@ -360,6 +360,9 @@ export default function VereinsleitungMeetingCreateForm({
       : [],
   );
 
+  const [quickAgendaTitle, setQuickAgendaTitle] = useState("");
+  const [quickAgendaDescription, setQuickAgendaDescription] = useState("");
+
   const [pickerItems, setPickerItems] = useState<PeoplePickerPerson[]>([]);
   const [error, setError] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -479,8 +482,32 @@ export default function VereinsleitungMeetingCreateForm({
     setParticipants((current) => current.filter((participant) => participant.key !== key));
   }
 
-  function addAgendaItem() {
-    setAgendaItems((current) => [...current, createAgendaItem()]);
+  function addAgendaItem(initial?: InitialAgendaItem) {
+    setAgendaItems((current) => [...current, createAgendaItem(initial)]);
+  }
+
+  function addQuickAgendaItem() {
+    const title = quickAgendaTitle.trim();
+    const description = quickAgendaDescription.trim();
+
+    if (!title) {
+      return;
+    }
+
+    addAgendaItem({
+      title,
+      description,
+    });
+
+    setQuickAgendaTitle("");
+    setQuickAgendaDescription("");
+  }
+
+  function handleQuickAgendaTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addQuickAgendaItem();
+    }
   }
 
   function updateAgendaItem(
@@ -494,6 +521,27 @@ export default function VereinsleitungMeetingCreateForm({
 
   function removeAgendaItem(key: string) {
     setAgendaItems((current) => current.filter((item) => item.key !== key));
+  }
+
+  function moveAgendaItem(key: string, direction: "up" | "down") {
+    setAgendaItems((current) => {
+      const index = current.findIndex((item) => item.key === key);
+
+      if (index === -1) {
+        return current;
+      }
+
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return current;
+      }
+
+      const next = [...current];
+      const [moved] = next.splice(index, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -917,71 +965,140 @@ export default function VereinsleitungMeetingCreateForm({
               Traktanden
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Traktanden wie Work Items einfach als Liste hinzufügen.
+              Erfasse die Traktanden direkt für dieses Meeting und bringe sie in die richtige Reihenfolge.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={addAgendaItem}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <Plus className="h-4 w-4" />
-            Traktand hinzufügen
-          </button>
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+            {agendaItems.length} erfasst
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)_auto]">
+            <input
+              value={quickAgendaTitle}
+              onChange={(event) => setQuickAgendaTitle(event.target.value)}
+              onKeyDown={handleQuickAgendaTitleKeyDown}
+              placeholder="Neues Traktand, z. B. Budget Saisonstart"
+              className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+            />
+
+            <input
+              value={quickAgendaDescription}
+              onChange={(event) => setQuickAgendaDescription(event.target.value)}
+              placeholder="Kurzbeschreibung optional"
+              className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+            />
+
+            <button
+              type="button"
+              onClick={addQuickAgendaItem}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            >
+              <Plus className="h-4 w-4" />
+              Hinzufügen
+            </button>
+          </div>
+
+          <p className="mt-3 text-xs text-slate-500">
+            Tipp: Im Titelfeld einfach Enter drücken, um das Traktand sofort hinzuzufügen.
+          </p>
         </div>
 
         {agendaItems.length === 0 ? (
           <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-500">
-            Noch keine Traktanden erfasst.
+            Noch keine Traktanden erfasst. Starte oben mit einem ersten Punkt wie z. B. Begrüssung, Rückblick oder Beschlüsse.
           </div>
         ) : (
           <div className="mt-5 space-y-3">
             {agendaItems.map((item, index) => (
               <div
                 key={item.key}
-                className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-slate-900">
-                    Traktand {index + 1}
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500">
+                      <GripVertical className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        Traktand {index + 1}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Reihenfolge kann direkt angepasst werden.
+                      </div>
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => removeAgendaItem(item.key)}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Entfernen
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => moveAgendaItem(item.key, "up")}
+                      disabled={index === 0}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                      Hoch
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => moveAgendaItem(item.key, "down")}
+                      disabled={index === agendaItems.length - 1}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                      Runter
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => removeAgendaItem(item.key)}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Entfernen
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-4">
-                  <input
-                    value={item.title}
-                    onChange={(event) =>
-                      updateAgendaItem(item.key, (current) => ({
-                        ...current,
-                        title: event.target.value,
-                      }))
-                    }
-                    placeholder="Titel des Traktands"
-                    className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                  />
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Titel
+                    </label>
+                    <input
+                      value={item.title}
+                      onChange={(event) =>
+                        updateAgendaItem(item.key, (current) => ({
+                          ...current,
+                          title: event.target.value,
+                        }))
+                      }
+                      placeholder="Titel des Traktands"
+                      className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                    />
+                  </div>
 
-                  <textarea
-                    value={item.description}
-                    onChange={(event) =>
-                      updateAgendaItem(item.key, (current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                    rows={3}
-                    placeholder="Beschreibung optional"
-                    className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                  />
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Beschreibung
+                    </label>
+                    <textarea
+                      value={item.description}
+                      onChange={(event) =>
+                        updateAgendaItem(item.key, (current) => ({
+                          ...current,
+                          description: event.target.value,
+                        }))
+                      }
+                      rows={3}
+                      placeholder="Beschreibung optional"
+                      className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                    />
+                  </div>
                 </div>
               </div>
             ))}
