@@ -1,4 +1,4 @@
-import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
+﻿import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
 import VereinsleitungMeetingAgendaCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingAgendaCard";
 import VereinsleitungMeetingDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingDecisionsCard";
 import VereinsleitungMeetingExecutionWorkspace from "@/components/admin/vereinsleitung/VereinsleitungMeetingExecutionWorkspace";
@@ -9,10 +9,16 @@ import { getPreferredMeetingUrl, type MeetingDetailItem } from "@/lib/vereinslei
 
 type VereinsleitungMeetingDetailProps = {
   meeting: MeetingDetailItem;
+  canManageMeetings: boolean;
+  canReviewMeetings: boolean;
+  canApproveMeetings: boolean;
 };
 
 export default function VereinsleitungMeetingDetail({
   meeting,
+  canManageMeetings,
+  canReviewMeetings,
+  canApproveMeetings,
 }: VereinsleitungMeetingDetailProps) {
   const meetingUrl = getPreferredMeetingUrl({
     teamsJoinUrl: meeting.teamsJoinUrl,
@@ -84,6 +90,9 @@ export default function VereinsleitungMeetingDetail({
             approvalLockReasonLabel={meeting.approvalLockReasonLabel}
             isApprovalLocked={meeting.isApprovalLocked}
             isDone={meeting.isDone}
+            canManageMeetings={canManageMeetings}
+            canReviewMeetings={canReviewMeetings}
+            canApproveMeetings={canApproveMeetings}
           />
           <div id="participants">
             <VereinsleitungMeetingParticipantsCard

@@ -1,8 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import {
   CalendarClock,
   CheckCircle2,
@@ -16,7 +15,6 @@ import {
   UserRound,
   XCircle,
 } from "lucide-react";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   getMeetingApprovalStatusOptions,
   getMeetingStatusOptions,
@@ -48,6 +46,9 @@ type VereinsleitungMeetingInfoCardProps = {
   approvalLockReasonLabel: string | null;
   isApprovalLocked: boolean;
   isDone: boolean;
+  canManageMeetings: boolean;
+  canReviewMeetings: boolean;
+  canApproveMeetings: boolean;
 };
 
 function getTeamsStatusClass(label: string) {
@@ -159,18 +160,16 @@ export default function VereinsleitungMeetingInfoCard({
   approvalLockReasonLabel,
   isApprovalLocked,
   isDone,
+  canManageMeetings,
+  canReviewMeetings,
+  canApproveMeetings,
 }: VereinsleitungMeetingInfoCardProps) {
   const router = useRouter();
-  const { data: session } = useSession();
   const meetingUrl = getMeetingUrl(externalMeetingUrl, teamsJoinUrl, onlineMeetingUrl);
   const statusOptions = getMeetingStatusOptions();
   const approvalStatusOptions = getMeetingApprovalStatusOptions();
   const StatusIcon = getStatusIcon(status);
   const ApprovalIcon = getApprovalIcon(approvalStatus);
-
-  const permissionKeys = session?.user?.permissionKeys ?? [];
-  const canReviewMeetings = permissionKeys.includes(PERMISSIONS.VEREINSLEITUNG_MEETINGS_REVIEW);
-  const canApproveMeetings = permissionKeys.includes(PERMISSIONS.VEREINSLEITUNG_MEETINGS_APPROVE);
 
   const [selectedStatus, setSelectedStatus] = useState(status);
   const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(approvalStatus);
@@ -199,6 +198,11 @@ export default function VereinsleitungMeetingInfoCard({
   }
 
   async function saveStatus() {
+    if (!canManageMeetings) {
+      setStatusError("Du hast keine Berechtigung, den Meeting-Status zu ändern.");
+      return;
+    }
+
     try {
       setIsSubmittingStatus(true);
       setStatusError(null);
@@ -316,31 +320,39 @@ export default function VereinsleitungMeetingInfoCard({
             {statusLabel}
           </span>
 
-          <select
-            value={selectedStatus}
-            onChange={(event) => setSelectedStatus(event.target.value)}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          {canManageMeetings ? (
+            <>
+              <select
+                value={selectedStatus}
+                onChange={(event) => setSelectedStatus(event.target.value)}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
 
-          <button
-            type="button"
-            onClick={saveStatus}
-            disabled={isSubmittingStatus || selectedStatus === status}
-            className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSubmittingStatus ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4" />
-            )}
-            Status speichern
-          </button>
+              <button
+                type="button"
+                onClick={saveStatus}
+                disabled={isSubmittingStatus || selectedStatus === status}
+                className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmittingStatus ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Status speichern
+              </button>
+            </>
+          ) : (
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500">
+              Keine Status-Bearbeitung
+            </span>
+          )}
         </div>
 
         {statusError ? (
@@ -561,7 +573,7 @@ export default function VereinsleitungMeetingInfoCard({
         )}
 
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Freigabeaktionen werden jetzt strikt nach Berechtigung getrennt angezeigt. Ablehnungen verlangen einen Grund, Freigaben können optional dokumentiert werden.
+          Freigabeaktionen werden strikt nach Berechtigung angezeigt. Ablehnungen verlangen einen Grund, Freigaben können optional dokumentiert werden.
         </p>
 
         {approvalError ? (
