@@ -10,6 +10,23 @@ type CockpitKpiItem = {
   note: string;
 };
 
+function PremiumKpiCard({ item }: { item: CockpitKpiItem }) {
+  return (
+    <article className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+      <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+      <div className="p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          {item.label}
+        </p>
+        <p className="mt-4 text-[2.4rem] font-semibold leading-none tracking-tight text-slate-900">
+          {item.value}
+        </p>
+        <p className="mt-4 text-sm leading-6 text-slate-500">{item.note}</p>
+      </div>
+    </article>
+  );
+}
+
 export default async function VereinsleitungCockpitPage() {
   await requireAnyPermission(ROUTE_PERMISSION_SETS.VEREINSLEITUNG_COCKPIT_READ);
 
@@ -44,22 +61,22 @@ export default async function VereinsleitungCockpitPage() {
     {
       label: "Aktive Personen",
       value: String(activePeopleCount),
-      note: "aktive Personen im System",
+      note: "Alle aktiven Personenprofile im System.",
     },
     {
       label: "Aktive Teams",
       value: String(activeTeamsCount),
-      note: "aktive Teams im System",
+      note: "Aktuell geführte Teams im Vereinsbetrieb.",
     },
     {
       label: "Trainer & Betreuer",
       value: String(activeTrainerCount),
-      note: "aktive Trainerprofile",
+      note: "Aktive Trainer- und Betreuerprofile.",
     },
     {
       label: "Offene Pendenzen",
       value: String(openMattersCount),
-      note: "nicht erledigte Pendenzen",
+      note: "Noch nicht erledigte oder abgeschlossene Pendenzen.",
     },
   ];
 
@@ -68,27 +85,44 @@ export default async function VereinsleitungCockpitPage() {
       <AdminSectionHeader
         eyebrow="Vereinsleitung"
         title="Cockpit"
-        description="Übersicht über Kennzahlen und offene Themen im Verein"
+        description="Zentrale Übersicht über Kennzahlen, Vereinsaktivität und offene Themen."
       />
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         {kpiItems.map((item) => (
-          <article
-            key={item.label}
-            className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm"
-          >
-            <p className="text-sm text-slate-500">{item.label}</p>
-            <p className="mt-3 text-[2rem] font-bold leading-none text-slate-900">
-              {item.value}
-            </p>
-            <p className="mt-3 text-xs text-slate-400">{item.note}</p>
-          </article>
+          <PremiumKpiCard key={item.label} item={item} />
         ))}
       </section>
 
-      <section className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">Offene Themen</h3>
-        <OpenMattersList />
+      <section
+        id="offene-themen"
+        className="overflow-hidden scroll-mt-24 rounded-[32px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)]"
+      >
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+
+        <div className="p-6 md:p-7">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+                Pendenzen
+              </p>
+              <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-slate-900">
+                Offene Themen
+              </h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                Hier siehst du die aktuell offenen Pendenzen der Vereinsleitung in einer zentralen Übersicht.
+              </p>
+            </div>
+
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+              Live-Übersicht
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <OpenMattersList />
+          </div>
+        </div>
       </section>
     </div>
   );
