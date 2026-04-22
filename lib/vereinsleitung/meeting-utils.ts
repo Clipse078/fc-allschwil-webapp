@@ -1,4 +1,4 @@
-﻿export type MeetingListItem = {
+export type MeetingListItem = {
   id: string;
   slug: string;
   title: string;
@@ -76,6 +76,8 @@ export type MeetingDecisionItem = {
   initiativeId: string | null;
   initiativeTitle: string | null;
   initiativeSlug: string | null;
+  hasSourcedWorkItem: boolean;
+  sourcedWorkItemCount: number;
 };
 
 export type MeetingDecisionResponsibleOption = {

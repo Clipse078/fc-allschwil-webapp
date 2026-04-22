@@ -219,7 +219,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     if (inlineState.initiativeMode === "LINK" && !inlineState.selectedInitiativeId) {
       setInlineState((current) => ({
         ...current,
-        error: "Bitte zuerst eine bestehende Initiative auswählen.",
+        error: "Bitte zuerst eine bestehende Initiative auswÃ¤hlen.",
       }));
       return;
     }
@@ -282,10 +282,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
             Execution Workspace
           </p>
           <h2 className="mt-2 text-[1.2rem] font-semibold text-slate-900">
-            Meeting-Ausführung nach Traktanden
+            Meeting-AusfÃ¼hrung nach Traktanden
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Protokoll, Beschlüsse und Initiative-Verknüpfungen werden entlang der Agenda sichtbar gemacht.
+            Protokoll, BeschlÃ¼sse und Initiative-VerknÃ¼pfungen werden entlang der Agenda sichtbar gemacht.
           </p>
         </div>
 
@@ -294,10 +294,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
             {groupedAgenda.length} Traktanden
           </span>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-            {protocolEntries.length} Protokolleinträge
+            {protocolEntries.length} ProtokolleintrÃ¤ge
           </span>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-            {decisions.length} Beschlüsse
+            {decisions.length} BeschlÃ¼sse
           </span>
           {isDone ? (
             <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -309,7 +309,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
       {groupedAgenda.length === 0 ? (
         <div className="mt-6 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-500">
-          Für dieses Meeting wurden noch keine Traktanden hinterlegt. Ergänze zuerst die Agenda, damit Protokoll und Beschlüsse sauber strukturiert geführt werden können.
+          FÃ¼r dieses Meeting wurden noch keine Traktanden hinterlegt. ErgÃ¤nze zuerst die Agenda, damit Protokoll und BeschlÃ¼sse sauber strukturiert gefÃ¼hrt werden kÃ¶nnen.
         </div>
       ) : (
         <div className="mt-6 space-y-4">
@@ -327,7 +327,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                     {item.title}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {item.description ?? "Keine zusätzliche Beschreibung hinterlegt."}
+                    {item.description ?? "Keine zusÃ¤tzliche Beschreibung hinterlegt."}
                   </p>
                 </div>
 
@@ -336,7 +336,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                     {item.protocolEntries.length} Notizen
                   </span>
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {item.decisions.length} Beschlüsse
+                    {item.decisions.length} BeschlÃ¼sse
                   </span>
                 </div>
               </div>
@@ -344,7 +344,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
               {!isDone ? (
                 <div className="mt-5 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-xs text-slate-500">Aktionen für dieses Traktand</div>
+                    <div className="text-xs text-slate-500">Aktionen fÃ¼r dieses Traktand</div>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -352,7 +352,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <Plus className="h-3.5 w-3.5" />
-                        Notiz hinzufügen
+                        Notiz hinzufÃ¼gen
                       </button>
                       <button
                         type="button"
@@ -360,7 +360,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <Plus className="h-3.5 w-3.5" />
-                        Beschluss hinzufügen
+                        Beschluss hinzufÃ¼gen
                       </button>
                     </div>
                   </div>
@@ -470,10 +470,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         />
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
-                            Als Pendenz übernehmen
+                            Als Pendenz Ã¼bernehmen
                           </div>
                           <div className="mt-1 text-sm leading-6 text-slate-500">
-                            Beim Speichern wird zusätzlich automatisch eine neue Pendenz erzeugt und mit diesem Meeting verknüpft.
+                            Beim Speichern wird zusÃ¤tzlich automatisch eine neue Pendenz erzeugt und mit diesem Meeting verknÃ¼pft.
                           </div>
                         </div>
                       </label>
@@ -482,7 +482,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         <div className="flex items-center gap-2">
                           <FolderGit2 className="h-4 w-4 text-[#0b4aa2]" />
                           <div className="text-sm font-semibold text-slate-900">
-                            Initiative-Verknüpfung
+                            Initiative-VerknÃ¼pfung
                           </div>
                         </div>
 
@@ -578,10 +578,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                               }
                               className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
                             >
-                              <option value="">Initiative auswählen</option>
+                              <option value="">Initiative auswÃ¤hlen</option>
                               {initiativeOptions.map((initiative) => (
                                 <option key={initiative.id} value={initiative.id}>
-                                  {initiative.title} · {initiative.statusLabel}
+                                  {initiative.title} Â· {initiative.statusLabel}
                                 </option>
                               ))}
                             </select>
@@ -623,7 +623,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
                   {item.protocolEntries.length === 0 ? (
                     <div className="mt-4 rounded-[16px] border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">
-                      Noch keine Protokolleinträge zu diesem Traktand.
+                      Noch keine ProtokolleintrÃ¤ge zu diesem Traktand.
                     </div>
                   ) : (
                     <div className="mt-4 space-y-3">
@@ -642,12 +642,12 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                 <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-[#0b4aa2]" />
-                    <h4 className="text-sm font-semibold text-slate-900">Beschlüsse</h4>
+                    <h4 className="text-sm font-semibold text-slate-900">BeschlÃ¼sse</h4>
                   </div>
 
                   {item.decisions.length === 0 ? (
                     <div className="mt-4 rounded-[16px] border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">
-                      Noch keine Beschlüsse zu diesem Traktand.
+                      Noch keine BeschlÃ¼sse zu diesem Traktand.
                     </div>
                   ) : (
                     <div className="mt-4 space-y-3">
@@ -677,6 +677,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                 Initiative: {decision.initiativeTitle}
                               </span>
                             ) : null}
+                            {decision.hasSourcedWorkItem ? (
+                              <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                                Work item created{decision.sourcedWorkItemCount > 1 ? ": " + decision.sourcedWorkItemCount : ""}
+                              </span>
+                            ) : null}
                           </div>
                           <div className="mt-2 text-sm leading-6 text-slate-600">
                             {decision.decisionText}
@@ -687,7 +692,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                 <span>Verantwortlich: {decision.responsibleDisplayName}</span>
                               ) : null}
                               {decision.dueDateLabel ? (
-                                <span>Fällig: {decision.dueDateLabel}</span>
+                                <span>FÃ¤llig: {decision.dueDateLabel}</span>
                               ) : null}
                             </div>
                           ) : null}
@@ -711,16 +716,16 @@ export default function VereinsleitungMeetingExecutionWorkspace({
             </h3>
           </div>
           <p className="mt-2 text-sm leading-6 text-amber-800">
-            Einige Protokolleinträge oder Beschlüsse sind noch keinem Traktand zugeordnet.
+            Einige ProtokolleintrÃ¤ge oder BeschlÃ¼sse sind noch keinem Traktand zugeordnet.
           </p>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <div className="rounded-[18px] bg-white/80 p-4">
               <div className="text-sm font-semibold text-slate-900">
-                Offene Protokolleinträge
+                Offene ProtokolleintrÃ¤ge
               </div>
               {unassignedProtocolEntries.length === 0 ? (
-                <div className="mt-3 text-sm text-slate-500">Keine offenen Einträge.</div>
+                <div className="mt-3 text-sm text-slate-500">Keine offenen EintrÃ¤ge.</div>
               ) : (
                 <div className="mt-3 space-y-2">
                   {unassignedProtocolEntries.map((entry) => (
@@ -737,10 +742,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
             <div className="rounded-[18px] bg-white/80 p-4">
               <div className="text-sm font-semibold text-slate-900">
-                Offene Beschlüsse
+                Offene BeschlÃ¼sse
               </div>
               {unassignedDecisions.length === 0 ? (
-                <div className="mt-3 text-sm text-slate-500">Keine offenen Beschlüsse.</div>
+                <div className="mt-3 text-sm text-slate-500">Keine offenen BeschlÃ¼sse.</div>
               ) : (
                 <div className="mt-3 space-y-2">
                   {unassignedDecisions.map((decision) => (

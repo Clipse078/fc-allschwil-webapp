@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
 import {
   formatMatterDueDateLabel,
   formatMeetingDateLabel,
@@ -79,6 +79,11 @@ export async function getMeetingDetailItem(
                 title: true,
               },
             },
+            sourcedWorkItems: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
         protocolEntries: {
@@ -137,6 +142,8 @@ export async function getMeetingDetailItem(
       initiativeId: decision.initiativeId,
       initiativeTitle: decision.initiative?.title ?? decision.initiativeTitle ?? null,
       initiativeSlug: decision.initiative?.slug ?? null,
+      hasSourcedWorkItem: decision.sourcedWorkItems.length > 0,
+      sourcedWorkItemCount: decision.sourcedWorkItems.length,
     };
   });
 
