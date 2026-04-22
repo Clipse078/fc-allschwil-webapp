@@ -2,6 +2,8 @@
 import {
   Prisma,
   VereinsleitungInitiativeStatus,
+  VereinsleitungInitiativeWorkItemAssigneeMode,
+  VereinsleitungInitiativeWorkItemStatus,
   type VereinsleitungMeetingDecisionType,
 } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
@@ -61,6 +63,7 @@ type CreatedDecisionResult = {
   }>;
   createdMatter: Prisma.VereinsleitungMatterGetPayload<Record<string, never>> | null;
   createdInitiative: Prisma.VereinsleitungInitiativeGetPayload<Record<string, never>> | null;
+  createdWorkItem: Prisma.VereinsleitungInitiativeWorkItemGetPayload<Record<string, never>> | null;
 };
 
 type OptionalDateTimeResult =
@@ -330,6 +333,35 @@ function buildInitiativeDescription(decision: DecisionInput, meetingTitle: strin
   return lines.join("\n");
 }
 
+function buildWorkItemTitle(decision: DecisionInput) {
+  if (decision.agendaItemTitle) {
+    return decision.agendaItemTitle + " – " + decision.decisionText;
+  }
+
+  return decision.decisionText;
+}
+
+function buildWorkItemPriority(decisionType: VereinsleitungMeetingDecisionType) {
+  switch (decisionType) {
+    case "TASK":
+      return "CRITICAL";
+    case "APPROVAL":
+      return "MAJOR";
+    case "DECISION":
+      return "MAJOR";
+    case "INFO":
+      return "MINOR";
+    default:
+      return "MAJOR";
+  }
+}
+
+function buildAssigneeMode(decision: DecisionInput) {
+  return decision.responsiblePersonId
+    ? VereinsleitungInitiativeWorkItemAssigneeMode.PERSON
+    : VereinsleitungInitiativeWorkItemAssigneeMode.NONE;
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -582,10 +614,36 @@ export async function POST(
           });
         }
 
+        let createdWorkItem: Prisma.VereinsleitungInitiativeWorkItemGetPayload<Record<string, never>> | null =
+          null;
+
+        if (linkedInitiativeId) {
+          const lastWorkItem = await tx.vereinsleitungInitiativeWorkItem.findFirst({
+            where: { initiativeId: linkedInitiativeId },
+            orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
+            select: { sortOrder: true },
+          });
+
+          createdWorkItem = await tx.vereinsleitungInitiativeWorkItem.create({
+            data: {
+              initiativeId: linkedInitiativeId,
+              title: buildWorkItemTitle(decision),
+              priority: buildWorkItemPriority(decision.decisionType),
+              dueDate: decision.dueDate,
+              assigneeMode: buildAssigneeMode(decision),
+              assigneePersonId: decision.responsiblePersonId,
+              externalAssigneeLabel: null,
+              status: VereinsleitungInitiativeWorkItemStatus.BACKLOG,
+              sortOrder: (lastWorkItem?.sortOrder ?? -1) + 1,
+            },
+          });
+        }
+
         results.push({
           decision: createdDecision,
           createdMatter,
           createdInitiative,
+          createdWorkItem,
         });
       }
 
