@@ -1,4 +1,4 @@
-﻿import VereinsleitungMeetingCreateForm from "@/components/admin/vereinsleitung/VereinsleitungMeetingCreateForm";
+import VereinsleitungMeetingCreateForm from "@/components/admin/vereinsleitung/VereinsleitungMeetingCreateForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -44,7 +44,7 @@ export default async function VereinsleitungMeetingNewPage() {
       <AdminSectionHeader
         eyebrow="Meetings"
         title="Meeting planen"
-        description="Erfasse ein neues Meeting und verknüpfe bestehende Pendenzen direkt beim Erstellen."
+        description="Erfasse Termin, Teilnehmende, Traktanden und verknüpfte Pendenzen in einem sauberen Flow."
       />
 
       <VereinsleitungMeetingCreateForm matterOptions={matterOptions} />

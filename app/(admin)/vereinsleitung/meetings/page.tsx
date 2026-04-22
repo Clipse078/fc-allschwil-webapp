@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import VereinsleitungMeetingsList from "@/components/admin/vereinsleitung/VereinsleitungMeetingsList";
 import { prisma } from "@/lib/db/prisma";
@@ -59,7 +59,7 @@ export default async function VereinsleitungMeetingsPage() {
       <AdminSectionHeader
         eyebrow="Meetings"
         title="Meetings"
-        description="Übersicht aller Sitzungen mit verknüpften Pendenzen – absteigend vom neuesten zum ältesten Eintrag."
+        description="Übersicht aller Sitzungen mit verknüpften Pendenzen, Status und Freigabe."
         actions={
           <Link href="/vereinsleitung/meetings/new" className="fca-button-primary">
             Meeting planen

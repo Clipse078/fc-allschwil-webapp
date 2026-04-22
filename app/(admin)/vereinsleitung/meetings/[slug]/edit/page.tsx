@@ -1,4 +1,4 @@
-﻿import { notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import VereinsleitungMeetingCreateForm from "@/components/admin/vereinsleitung/VereinsleitungMeetingCreateForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { prisma } from "@/lib/db/prisma";
@@ -98,14 +98,14 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
       <AdminSectionHeader
         eyebrow="Meetings"
         title="Meeting bearbeiten"
-        description="Meeting-Daten, Online-Setup und verknüpfte Pendenzen zentral anpassen."
+        description="Passe Stammdaten, Teilnehmende, Traktanden und verknüpfte Pendenzen in einem klaren Editor an."
       />
 
       <VereinsleitungMeetingCreateForm
         mode="edit"
         meetingId={meeting.id}
-        submitLabel="Meeting speichern"
-        submittingLabel="Meeting wird gespeichert..."
+        submitLabel="Änderungen speichern"
+        submittingLabel="Änderungen werden gespeichert..."
         cancelHref={"/vereinsleitung/meetings/" + meeting.slug}
         initialValues={{
           title: meeting.title,

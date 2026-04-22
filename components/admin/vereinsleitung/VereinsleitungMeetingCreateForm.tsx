@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -646,7 +646,7 @@ export default function VereinsleitungMeetingCreateForm({
               value={form.title}
               onChange={(event) => updateField("title", event.target.value)}
               placeholder="z. B. Vereinsleitungssitzung Mai 2026"
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             />
           </div>
 
@@ -658,7 +658,7 @@ export default function VereinsleitungMeetingCreateForm({
               value={form.subtitle}
               onChange={(event) => updateField("subtitle", event.target.value)}
               placeholder="z. B. Planung, Beschlüsse und offene Themen"
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             />
           </div>
 
@@ -670,7 +670,7 @@ export default function VereinsleitungMeetingCreateForm({
               type="datetime-local"
               value={form.startAt}
               onChange={(event) => updateField("startAt", event.target.value)}
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             />
           </div>
 
@@ -682,7 +682,7 @@ export default function VereinsleitungMeetingCreateForm({
               type="datetime-local"
               value={form.endAt}
               onChange={(event) => updateField("endAt", event.target.value)}
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             />
           </div>
 
@@ -693,7 +693,7 @@ export default function VereinsleitungMeetingCreateForm({
             <select
               value={form.meetingMode}
               onChange={(event) => updateField("meetingMode", event.target.value as MeetingMode)}
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             >
               {MEETING_MODE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -710,11 +710,11 @@ export default function VereinsleitungMeetingCreateForm({
             <select
               value={form.status}
               onChange={(event) => updateField("status", event.target.value as MeetingStatus)}
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             >
-              <option value="PLANNED">PLANNED</option>
-              <option value="IN_PROGRESS">IN_PROGRESS</option>
-              <option value="DONE">DONE</option>
+              <option value="PLANNED">Geplant</option>
+              <option value="IN_PROGRESS">In Durchführung</option>
+              <option value="DONE">Abgeschlossen</option>
             </select>
           </div>
 
@@ -727,7 +727,7 @@ export default function VereinsleitungMeetingCreateForm({
                 value={form.location}
                 onChange={(event) => updateField("location", event.target.value)}
                 placeholder="z. B. Clubhaus Sitzungszimmer 1"
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
               />
             </div>
           ) : null}
@@ -763,7 +763,7 @@ export default function VereinsleitungMeetingCreateForm({
               </div>
 
               <p className="mt-3 text-xs text-slate-500">
-                Weitere sinnvolle Anbieter später: Zoom und Google Meet.
+                Weitere Anbieter wie Zoom oder Google Meet können später ergänzt werden.
               </p>
             </div>
           ) : null}
@@ -777,7 +777,7 @@ export default function VereinsleitungMeetingCreateForm({
                 value={form.onlineMeetingUrl}
                 onChange={(event) => updateField("onlineMeetingUrl", event.target.value)}
                 placeholder="https://..."
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
               />
             </div>
           ) : null}
@@ -791,7 +791,7 @@ export default function VereinsleitungMeetingCreateForm({
                 value={form.externalMeetingUrl}
                 onChange={(event) => updateField("externalMeetingUrl", event.target.value)}
                 placeholder="https://..."
-                className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
               />
             </div>
           ) : null}
@@ -806,7 +806,7 @@ export default function VereinsleitungMeetingCreateForm({
                   value={form.teamsJoinUrl}
                   onChange={(event) => updateField("teamsJoinUrl", event.target.value)}
                   placeholder="https://teams.microsoft.com/l/meetup-join/..."
-                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
                 />
               </div>
 
@@ -819,7 +819,7 @@ export default function VereinsleitungMeetingCreateForm({
                   onChange={(event) =>
                     updateField("teamsSyncStatus", event.target.value as TeamsSyncStatus)
                   }
-                  className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
                 >
                   {TEAMS_SYNC_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -862,7 +862,7 @@ export default function VereinsleitungMeetingCreateForm({
               onChange={(event) => updateField("description", event.target.value)}
               rows={5}
               placeholder="Kontext, Vorbereitungen und Hinweise ..."
-              className="mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             />
           </div>
         </div>
@@ -875,7 +875,7 @@ export default function VereinsleitungMeetingCreateForm({
               Eingeladene Personen
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Einfach Personen suchen und direkt zur Einladungsliste hinzufügen.
+              Personen suchen, hinzufügen und direkt sauber für das Meeting vorbereiten.
             </p>
           </div>
 
@@ -923,7 +923,7 @@ export default function VereinsleitungMeetingCreateForm({
                       status: event.target.value as ParticipantStatus,
                     }))
                   }
-                  className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  className="rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
                 >
                   {PARTICIPANT_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -940,8 +940,8 @@ export default function VereinsleitungMeetingCreateForm({
                       remarks: event.target.value,
                     }))
                   }
-                  placeholder="Bemerkung optional"
-                  className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                  placeholder="Bemerkung"
+                  className="rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
                 />
 
                 <button
@@ -965,7 +965,7 @@ export default function VereinsleitungMeetingCreateForm({
               Traktanden
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Erfasse die Traktanden direkt für dieses Meeting und bringe sie in die richtige Reihenfolge.
+              Traktanden schnell erfassen, sortieren und für die Durchführung sauber vorbereiten.
             </p>
           </div>
 
@@ -981,14 +981,14 @@ export default function VereinsleitungMeetingCreateForm({
               onChange={(event) => setQuickAgendaTitle(event.target.value)}
               onKeyDown={handleQuickAgendaTitleKeyDown}
               placeholder="Neues Traktand, z. B. Budget Saisonstart"
-              className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             />
 
             <input
               value={quickAgendaDescription}
               onChange={(event) => setQuickAgendaDescription(event.target.value)}
               placeholder="Kurzbeschreibung optional"
-              className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+              className="rounded-[18px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
             />
 
             <button
@@ -1015,7 +1015,7 @@ export default function VereinsleitungMeetingCreateForm({
             {agendaItems.map((item, index) => (
               <div
                 key={item.key}
-                className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)]"
               >
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="flex items-center gap-3">
@@ -1113,7 +1113,7 @@ export default function VereinsleitungMeetingCreateForm({
               Pendenzen verknüpfen
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Bestehende Pendenzen können direkt mit diesem Meeting verknüpft oder entfernt werden.
+              Bestehende Pendenzen direkt auswählen und diesem Meeting zuordnen.
             </p>
           </div>
 
@@ -1134,7 +1134,7 @@ export default function VereinsleitungMeetingCreateForm({
               return (
                 <label
                   key={matter.id}
-                  className={`flex cursor-pointer items-start gap-4 rounded-[22px] border px-4 py-4 shadow-sm transition ${
+                  className={`flex cursor-pointer items-start gap-4 rounded-[24px] border px-5 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition ${
                     isChecked
                       ? "border-[#0b4aa2]/30 bg-[#0b4aa2]/[0.04]"
                       : "border-slate-200 bg-white hover:bg-slate-50/70"

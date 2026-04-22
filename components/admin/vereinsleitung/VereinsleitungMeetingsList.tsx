@@ -135,7 +135,7 @@ export default function VereinsleitungMeetingsList({
                 <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-500">
                   <span className="inline-flex items-center gap-2">
                     <CalendarDays className="h-4 w-4 text-slate-400" />
-                    {meeting.dateLabel} • {meeting.timeLabel}
+                    {meeting.dateLabel} · {meeting.timeLabel}
                   </span>
 
                   {meeting.location ? (
