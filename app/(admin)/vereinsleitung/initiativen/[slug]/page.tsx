@@ -1,4 +1,4 @@
-﻿import { notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import VereinsleitungInitiativeDetail, {
   type InitiativeDetailWorkItem,
@@ -115,7 +115,7 @@ export default async function InitiativeSlugPage({
       <AdminSectionHeader
         eyebrow="Vereinsleitung"
         title={initiative.title}
-        description={initiative.subtitle ?? "Initiativen Details"}
+        description={initiative.subtitle ?? "Initiativen-Details"}
       />
 
       <VereinsleitungInitiativeDetail

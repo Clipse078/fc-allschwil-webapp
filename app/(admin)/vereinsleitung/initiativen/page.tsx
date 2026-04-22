@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -56,6 +56,7 @@ export default async function VereinsleitungInitiativenPage() {
         select: {
           id: true,
           status: true,
+          sourceMeetingId: true,
         },
       },
     },
@@ -63,29 +64,36 @@ export default async function VereinsleitungInitiativenPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <AdminSectionHeader
-          eyebrow="Vereinsleitung"
-          title="Initiativen"
-          description="Alle Initiativen im Überblick und direkt per Detailseite aufrufbar."
-        />
-
-        <form action="/api/vereinsleitung/initiativen" method="POST" className="lg:pb-1">
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700"
-          >
-            Neue Initiative
-          </button>
-        </form>
-      </div>
+      <AdminSectionHeader
+        eyebrow="Vereinsleitung"
+        title="Initiativen"
+        description="Alle Initiativen im Überblick – mit Status, Fortschritt, Verantwortlichkeit und direktem Einstieg in die Detailansicht."
+        actions={
+          <form action="/api/vereinsleitung/initiativen" method="POST">
+            <button
+              type="submit"
+              className="fca-button-primary"
+            >
+              Neue Initiative
+            </button>
+          </form>
+        }
+      />
 
       {initiatives.length === 0 ? (
-        <section className="rounded-[30px] border border-dashed border-slate-300 bg-white p-8 text-sm text-slate-500 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-          Es wurde noch keine Initiative erfasst.
+        <section className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+          <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+          <div className="p-10 text-center">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Noch keine Initiativen vorhanden
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              Sobald Initiativen erfasst werden, erscheinen sie hier automatisch mit Fortschritt, Verantwortlichkeit und Work-Item-Status.
+            </p>
+          </div>
         </section>
       ) : (
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section className="grid gap-5 xl:grid-cols-2">
           {initiatives.map((initiative) => {
             const ownerName =
               initiative.owner?.displayName ??
@@ -97,6 +105,9 @@ export default async function VereinsleitungInitiativenPage() {
             const resolvedWorkItems = initiative.workItems.filter(
               (item) => item.status === "RESOLVED",
             ).length;
+            const sourcedWorkItems = initiative.workItems.filter(
+              (item) => Boolean(item.sourceMeetingId),
+            ).length;
             const progressPercent =
               totalWorkItems > 0 ? Math.round((resolvedWorkItems / totalWorkItems) * 100) : 0;
 
@@ -104,51 +115,86 @@ export default async function VereinsleitungInitiativenPage() {
               <Link
                 key={initiative.id}
                 href={"/vereinsleitung/initiativen/" + initiative.slug}
-                className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)]"
+                className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-[2px] hover:shadow-[0_24px_52px_rgba(15,23,42,0.09)]"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-[1.1rem] font-semibold text-slate-900">
-                      {initiative.title}
-                    </div>
-                    <div className="mt-2 text-sm text-slate-500">
-                      {initiative.subtitle ?? "Keine Kurzbeschreibung hinterlegt."}
-                    </div>
-                  </div>
+                <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
 
-                  <span
-                    className={"rounded-full border px-3 py-1 text-[11px] font-semibold " + getStatusClass(initiative.status)}
-                  >
-                    {getInitiativeStatusLabel(initiative.status)}
-                  </span>
-                </div>
-
-                <div className="mt-5 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.16em] text-slate-400">Verantwortlich</div>
-                    <div className="mt-1 font-medium text-slate-800">{ownerName}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.16em] text-slate-400">Zeitraum</div>
-                    <div className="mt-1 font-medium text-slate-800">
-                      {formatDateLabel(initiative.startDate)} – {formatDateLabel(initiative.targetDate)}
+                <div className="p-6 md:p-7">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="text-[1.35rem] font-semibold tracking-tight text-slate-900">
+                        {initiative.title}
+                      </h3>
+                      <p className="mt-3 text-[15px] leading-7 text-slate-600">
+                        {initiative.subtitle ?? "Keine Kurzbeschreibung hinterlegt."}
+                      </p>
                     </div>
-                  </div>
-                </div>
 
-                <div className="mt-5">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-semibold text-slate-900">Fortschritt</span>
-                    <span className="text-slate-500">
-                      {resolvedWorkItems}/{totalWorkItems} erledigt
+                    <span
+                      className={
+                        "rounded-full border px-3 py-1.5 text-[11px] font-semibold " +
+                        getStatusClass(initiative.status)
+                      }
+                    >
+                      {getInitiativeStatusLabel(initiative.status)}
                     </span>
                   </div>
 
-                  <div className="mt-2 h-3 rounded-full bg-slate-100">
-                    <div
-                      className="h-3 rounded-full bg-[#7eb241]"
-                      style={{ width: progressPercent + "%" }}
-                    />
+                  <div className="mt-6 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                        Verantwortlich
+                      </div>
+                      <div className="mt-1 font-medium text-slate-800">{ownerName}</div>
+                    </div>
+
+                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                        Zeitraum
+                      </div>
+                      <div className="mt-1 font-medium text-slate-800">
+                        {formatDateLabel(initiative.startDate)} – {formatDateLabel(initiative.targetDate)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-4">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                        Work Items
+                      </div>
+                      <div className="mt-1 font-semibold text-slate-900">{totalWorkItems}</div>
+                    </div>
+
+                    <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-4">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                        Erledigt
+                      </div>
+                      <div className="mt-1 font-semibold text-slate-900">{resolvedWorkItems}</div>
+                    </div>
+
+                    <div className="rounded-[22px] border border-blue-100 bg-blue-50/70 px-4 py-4">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-blue-500">
+                        Aus Meetings
+                      </div>
+                      <div className="mt-1 font-semibold text-blue-900">{sourcedWorkItems}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-semibold text-slate-900">Fortschritt</span>
+                      <span className="text-slate-500">
+                        {resolvedWorkItems}/{totalWorkItems} erledigt
+                      </span>
+                    </div>
+
+                    <div className="mt-2 h-3 rounded-full bg-slate-100">
+                      <div
+                        className="h-3 rounded-full bg-[#7eb241]"
+                        style={{ width: progressPercent + "%" }}
+                      />
+                    </div>
                   </div>
                 </div>
               </Link>
