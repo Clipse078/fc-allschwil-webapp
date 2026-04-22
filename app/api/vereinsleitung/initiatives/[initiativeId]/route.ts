@@ -114,3 +114,42 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ initiativeId: string }> },
+) {
+  const access = await requireApiPermission(
+    PERMISSIONS.VEREINSLEITUNG_INITIATIVES_MANAGE,
+  );
+
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const { initiativeId } = await context.params;
+
+  try {
+    const existing = await prisma.vereinsleitungInitiative.findUnique({
+      where: { id: initiativeId },
+      select: { id: true, title: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Initiative nicht gefunden." }, { status: 404 });
+    }
+
+    await prisma.vereinsleitungInitiative.delete({
+      where: { id: initiativeId },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Delete initiative failed:", error);
+
+    return NextResponse.json(
+      { error: "Initiative konnte nicht geloescht werden." },
+      { status: 500 },
+    );
+  }
+}

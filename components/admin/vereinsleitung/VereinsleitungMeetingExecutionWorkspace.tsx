@@ -1,15 +1,15 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
-  ChevronDown,
   Clock3,
   Edit3,
   FileCheck2,
   Info,
   Link2,
+  ListChecks,
   ListTodo,
   Loader2,
   Lock,
@@ -81,7 +81,7 @@ type DecisionEditState = {
   error: string | null;
 };
 
-type VereinsleitungMeetingExecutionWorkspaceProps = {
+type Props = {
   meetingId: string;
   agendaItems: MeetingAgendaItem[];
   protocolEntries: MeetingProtocolEntryItem[];
@@ -116,11 +116,8 @@ function getDecisionBadgeClass(type: string) {
 }
 
 function getPersonDisplayName(person: SearchResultPerson) {
-  return (
-    person.displayName ??
-    [person.firstName, person.lastName].filter(Boolean).join(" ").trim() ??
-    ""
-  );
+  const fullName = [person.firstName, person.lastName].filter(Boolean).join(" ").trim();
+  return person.displayName ?? fullName ?? "";
 }
 
 function createInitialProtocolState(): ProtocolComposerState {
@@ -213,13 +210,25 @@ function parseSwissDateLabelToInput(value: string | null) {
   return year + "-" + month + "-" + day;
 }
 
+function getAgendaProgress(protocolCount: number, decisionCount: number) {
+  if (protocolCount === 0 && decisionCount === 0) {
+    return 0;
+  }
+
+  if (protocolCount > 0 && decisionCount > 0) {
+    return 100;
+  }
+
+  return 50;
+}
+
 export default function VereinsleitungMeetingExecutionWorkspace({
   meetingId,
   agendaItems,
   protocolEntries,
   decisions,
   isDone = false,
-}: VereinsleitungMeetingExecutionWorkspaceProps) {
+}: Props) {
   const router = useRouter();
   const decisionTypeOptions = useMemo(() => getDecisionTypeOptions(), []);
   const [openAgendaId, setOpenAgendaId] = useState<string | null>(agendaItems[0]?.id ?? null);
@@ -231,8 +240,6 @@ export default function VereinsleitungMeetingExecutionWorkspace({
   const isExecutionLocked = isDone;
   const canEditProtocol = !isExecutionLocked;
   const canEditDecisions = !isExecutionLocked;
-  const approvalWorkflowHint =
-    "Nächster Schritt: Review- und Freigabelogik kann auf diesem Lock-Zustand aufbauen.";
 
   const protocolByAgenda = useMemo(() => {
     const map = new Map<string, MeetingProtocolEntryItem[]>();
@@ -259,6 +266,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
     return map;
   }, [decisions]);
+
+  const activeAgenda = useMemo(
+    () => agendaItems.find((item) => item.id === openAgendaId) ?? agendaItems[0] ?? null,
+    [agendaItems, openAgendaId],
+  );
 
   function getProtocolState(agendaId: string) {
     return protocolStates[agendaId] ?? createInitialProtocolState();
@@ -337,15 +349,9 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
     if (value.trim().length < 2) {
       if (mode === "create") {
-        updateDecisionState(agendaId, {
-          responsibleOptions: [],
-          isSearching: false,
-        });
+        updateDecisionState(agendaId, { responsibleOptions: [], isSearching: false });
       } else {
-        updateDecisionEditState(agendaId, {
-          responsibleOptions: [],
-          isSearching: false,
-        });
+        updateDecisionEditState(agendaId, { responsibleOptions: [], isSearching: false });
       }
       return;
     }
@@ -359,10 +365,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
       const response = await fetch(
         "/api/people/search?mode=vereinsleitung&q=" + encodeURIComponent(value.trim()),
-        {
-          method: "GET",
-          cache: "no-store",
-        },
+        { method: "GET", cache: "no-store" },
       );
 
       const payload = await response.json();
@@ -391,23 +394,18 @@ export default function VereinsleitungMeetingExecutionWorkspace({
       }
     } catch (error) {
       console.error(error);
+
       if (mode === "create") {
-        updateDecisionState(agendaId, {
-          responsibleOptions: [],
-          isSearching: false,
-        });
+        updateDecisionState(agendaId, { responsibleOptions: [], isSearching: false });
       } else {
-        updateDecisionEditState(agendaId, {
-          responsibleOptions: [],
-          isSearching: false,
-        });
+        updateDecisionEditState(agendaId, { responsibleOptions: [], isSearching: false });
       }
     }
   }
 
   async function submitProtocol(agenda: MeetingAgendaItem) {
     if (!canEditProtocol) {
-      alert("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+      alert("Dieses Meeting ist abgeschlossen. Protokolleintraege sind gesperrt.");
       return;
     }
 
@@ -419,10 +417,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     }
 
     try {
-      updateProtocolState(agenda.id, {
-        isSubmitting: true,
-        error: null,
-      });
+      updateProtocolState(agenda.id, { isSubmitting: true, error: null });
 
       const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/protocol", {
         method: "POST",
@@ -457,7 +452,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
   function startProtocolEdit(agendaId: string, entry: MeetingProtocolEntryItem) {
     if (!canEditProtocol) {
-      alert("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+      alert("Dieses Meeting ist abgeschlossen. Protokolleintraege sind gesperrt.");
       return;
     }
 
@@ -471,7 +466,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
   async function saveProtocolEdit(agenda: MeetingAgendaItem) {
     if (!canEditProtocol) {
-      alert("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+      alert("Dieses Meeting ist abgeschlossen. Protokolleintraege sind gesperrt.");
       return;
     }
 
@@ -482,17 +477,12 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     }
 
     if (!state.notes.trim()) {
-      updateProtocolEditState(agenda.id, {
-        error: "Bitte erfasse einen Protokolleintrag.",
-      });
+      updateProtocolEditState(agenda.id, { error: "Bitte erfasse einen Protokolleintrag." });
       return;
     }
 
     try {
-      updateProtocolEditState(agenda.id, {
-        isSubmitting: true,
-        error: null,
-      });
+      updateProtocolEditState(agenda.id, { isSubmitting: true, error: null });
 
       const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/protocol", {
         method: "PATCH",
@@ -528,7 +518,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
   async function deleteProtocolEntry(entryId: string) {
     if (!canEditProtocol) {
-      throw new Error("Dieses Meeting ist abgeschlossen. Protokolleinträge sind gesperrt.");
+      throw new Error("Dieses Meeting ist abgeschlossen. Protokolleintraege sind gesperrt.");
     }
 
     const response = await fetch(
@@ -544,7 +534,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload?.error || "Protokolleintrag konnte nicht gelöscht werden.");
+      throw new Error(payload?.error || "Protokolleintrag konnte nicht geloescht werden.");
     }
 
     router.refresh();
@@ -566,10 +556,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     }
 
     try {
-      updateDecisionState(agenda.id, {
-        isSubmitting: true,
-        error: null,
-      });
+      updateDecisionState(agenda.id, { isSubmitting: true, error: null });
 
       const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/decisions", {
         method: "POST",
@@ -651,10 +638,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     }
 
     try {
-      updateDecisionEditState(agenda.id, {
-        isSubmitting: true,
-        error: null,
-      });
+      updateDecisionEditState(agenda.id, { isSubmitting: true, error: null });
 
       const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/decisions", {
         method: "PATCH",
@@ -712,768 +696,810 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload?.error || "Entscheidung konnte nicht gelöscht werden.");
+      throw new Error(payload?.error || "Entscheidung konnte nicht geloescht werden.");
     }
 
     router.refresh();
   }
 
+  if (!activeAgenda) {
+    return (
+      <section className="rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+          Noch keine Traktanden vorhanden.
+        </div>
+      </section>
+    );
+  }
+
+  const activeProtocolEntries = protocolByAgenda.get(activeAgenda.id) ?? [];
+  const activeDecisions = decisionsByAgenda.get(activeAgenda.id) ?? [];
+  const protocolState = getProtocolState(activeAgenda.id);
+  const protocolEditState = getProtocolEditState(activeAgenda.id);
+  const decisionState = getDecisionState(activeAgenda.id);
+  const decisionEditState = getDecisionEditState(activeAgenda.id);
+
   return (
     <section className="rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-          Meeting-Ausführung
-        </p>
-        <h2 className="text-xl font-semibold text-slate-900">
-          Traktandenbasierter Arbeitsbereich
-        </h2>
-        <p className="text-sm text-slate-600">
-          Jedes Traktandum bündelt jetzt direkt seine Protokolleinträge und Entscheide.
-        </p>
+      <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+            Meeting-Ausfuehrung
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900">
+            Traktandenbasierter Arbeitsbereich
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Links Auswahl, in der Mitte Protokoll und Entscheide, rechts Status und Workflow.
+          </p>
+        </div>
+
+        {isExecutionLocked ? (
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">
+            <Lock className="h-3.5 w-3.5" />
+            Gesperrt
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Aktiv
+          </div>
+        )}
       </div>
 
-      {isExecutionLocked ? (
-        <div className="mt-6 grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-          <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl border border-amber-200 bg-white p-2 text-amber-700">
-                <Lock className="h-4 w-4" />
+      <div className="mt-6 grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+        <aside className="space-y-3">
+          {agendaItems.map((agenda, index) => {
+            const agendaProtocolEntries = protocolByAgenda.get(agenda.id) ?? [];
+            const agendaDecisions = decisionsByAgenda.get(agenda.id) ?? [];
+            const progress = getAgendaProgress(
+              agendaProtocolEntries.length,
+              agendaDecisions.length,
+            );
+            const isActive = agenda.id === activeAgenda.id;
+
+            return (
+              <button
+                key={agenda.id}
+                type="button"
+                onClick={() => setOpenAgendaId(agenda.id)}
+                className={[
+                  "block w-full rounded-[24px] border p-4 text-left transition",
+                  isActive
+                    ? "border-[#0b4aa2]/30 bg-[#0b4aa2]/5"
+                    : "border-slate-200 bg-slate-50 hover:bg-white",
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    Traktandum {index + 1}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-500">{progress}%</span>
+                </div>
+
+                <div className="mt-2 text-sm font-semibold text-slate-900">{agenda.title}</div>
+
+                <div className="mt-3 h-2 rounded-full bg-slate-200">
+                  <div
+                    className="h-2 rounded-full bg-[#0b4aa2]"
+                    style={{ width: progress + "%" }}
+                  />
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                  <div>{agendaProtocolEntries.length} Protokoll</div>
+                  <div>{agendaDecisions.length} Entscheide</div>
+                </div>
+              </button>
+            );
+          })}
+        </aside>
+
+        <div className="space-y-6">
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Aktives Traktandum
+            </p>
+            <h3 className="mt-2 text-lg font-semibold text-slate-900">{activeAgenda.title}</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              {activeAgenda.description ?? "Keine Beschreibung hinterlegt."}
+            </p>
+          </div>
+
+          <div className="grid gap-6 2xl:grid-cols-2">
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Protokoll
+                </h4>
+                {isExecutionLocked ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                    <Lock className="h-3.5 w-3.5" />
+                    Gesperrt
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {activeProtocolEntries.length > 0 ? (
+                  activeProtocolEntries.map((entry) => {
+                    const isEditing = protocolEditState.entryId === entry.id;
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className="rounded-[20px] border border-slate-200 bg-slate-50 p-4"
+                      >
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <textarea
+                              value={protocolEditState.notes}
+                              onChange={(event) =>
+                                updateProtocolEditState(activeAgenda.id, {
+                                  notes: event.target.value,
+                                  error: null,
+                                })
+                              }
+                              rows={4}
+                              disabled={!canEditProtocol}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                            />
+
+                            {protocolEditState.error ? (
+                              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                {protocolEditState.error}
+                              </div>
+                            ) : null}
+
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateProtocolEditState(
+                                    activeAgenda.id,
+                                    createInitialProtocolEditState(),
+                                  )
+                                }
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+                              >
+                                <X className="h-4 w-4" />
+                                Abbrechen
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => saveProtocolEdit(activeAgenda)}
+                                disabled={protocolEditState.isSubmitting || !canEditProtocol}
+                                className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
+                              >
+                                {protocolEditState.isSubmitting ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Edit3 className="h-4 w-4" />
+                                )}
+                                Speichern
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-sm leading-6 text-slate-700">{entry.notes}</p>
+                            <div className="mt-4 flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startProtocolEdit(activeAgenda.id, entry)}
+                                disabled={!canEditProtocol}
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                Bearbeiten
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const confirmed = confirm("Protokolleintrag wirklich loeschen?");
+                                  if (!confirmed) {
+                                    return;
+                                  }
+                                  try {
+                                    await deleteProtocolEntry(entry.id);
+                                  } catch (error) {
+                                    alert(
+                                      error instanceof Error
+                                        ? error.message
+                                        : "Loeschen fehlgeschlagen.",
+                                    );
+                                  }
+                                }}
+                                disabled={!canEditProtocol}
+                                className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Loeschen
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                    Noch keine Protokolleintraege zu diesem Traktandum.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <label className="mb-2 block text-sm font-medium text-slate-800">
+                  Neuer Protokolleintrag
+                </label>
+                <textarea
+                  value={protocolState.notes}
+                  onChange={(event) =>
+                    updateProtocolState(activeAgenda.id, {
+                      notes: event.target.value,
+                      error: null,
+                    })
+                  }
+                  rows={4}
+                  disabled={!canEditProtocol}
+                  placeholder={
+                    canEditProtocol
+                      ? "Was wurde bei diesem Traktandum besprochen?"
+                      : "Meeting abgeschlossen: Protokolleintraege sind gesperrt."
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                />
+
+                {protocolState.error ? (
+                  <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {protocolState.error}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => submitProtocol(activeAgenda)}
+                    disabled={protocolState.isSubmitting || !canEditProtocol}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
+                  >
+                    {protocolState.isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : canEditProtocol ? (
+                      <Plus className="h-4 w-4" />
+                    ) : (
+                      <Lock className="h-4 w-4" />
+                    )}
+                    {canEditProtocol ? "Protokoll erfassen" : "Gesperrt"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Entscheide
+                </h4>
+                {isExecutionLocked ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+                    <Lock className="h-3.5 w-3.5" />
+                    Gesperrt
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {activeDecisions.length > 0 ? (
+                  activeDecisions.map((decision) => {
+                    const Icon = getDecisionIcon(decision.decisionType);
+                    const isEditing = decisionEditState.decisionId === decision.id;
+
+                    return (
+                      <div
+                        key={decision.id}
+                        className="rounded-[20px] border border-slate-200 bg-slate-50 p-4"
+                      >
+                        {isEditing ? (
+                          <div className="space-y-4">
+                            <textarea
+                              value={decisionEditState.decisionText}
+                              onChange={(event) =>
+                                updateDecisionEditState(activeAgenda.id, {
+                                  decisionText: event.target.value,
+                                  error: null,
+                                })
+                              }
+                              rows={4}
+                              disabled={!canEditDecisions}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                            />
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <select
+                                value={decisionEditState.decisionType}
+                                onChange={(event) =>
+                                  updateDecisionEditState(activeAgenda.id, {
+                                    decisionType: event.target.value,
+                                  })
+                                }
+                                disabled={!canEditDecisions}
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                              >
+                                {decisionTypeOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <input
+                                type="date"
+                                value={decisionEditState.dueDate}
+                                onChange={(event) =>
+                                  updateDecisionEditState(activeAgenda.id, {
+                                    dueDate: event.target.value,
+                                  })
+                                }
+                                disabled={!canEditDecisions}
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                              />
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="relative">
+                                <div className="relative">
+                                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                  <input
+                                    value={decisionEditState.responsibleSearch}
+                                    onChange={(event) =>
+                                      handleResponsibleSearch(activeAgenda.id, event.target.value, "edit")
+                                    }
+                                    disabled={!canEditDecisions}
+                                    placeholder="Person suchen oder frei eintragen"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:border-[#0b4aa2]"
+                                  />
+                                  {decisionEditState.isSearching ? (
+                                    <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
+                                  ) : null}
+                                </div>
+
+                                {decisionEditState.responsibleOptions.length > 0 && canEditDecisions ? (
+                                  <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                                    {decisionEditState.responsibleOptions.map((person) => (
+                                      <button
+                                        key={person.id}
+                                        type="button"
+                                        onClick={() =>
+                                          updateDecisionEditState(activeAgenda.id, {
+                                            responsiblePersonId: person.id,
+                                            responsibleDisplayName: person.displayName,
+                                            responsibleSearch: person.displayName,
+                                            responsibleOptions: [],
+                                          })
+                                        }
+                                        className="block w-full rounded-xl px-3 py-2 text-left hover:bg-slate-50"
+                                      >
+                                        <div className="text-sm font-medium text-slate-900">
+                                          {person.displayName}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                          {person.email ?? "Vereinsleitung / Meetingzugang"}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              <input
+                                value={decisionEditState.remarks}
+                                onChange={(event) =>
+                                  updateDecisionEditState(activeAgenda.id, {
+                                    remarks: event.target.value,
+                                  })
+                                }
+                                disabled={!canEditDecisions}
+                                placeholder="Optionaler Kontext"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                              />
+                            </div>
+
+                            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={decisionEditState.createMatter}
+                                onChange={(event) =>
+                                  updateDecisionEditState(activeAgenda.id, {
+                                    createMatter: event.target.checked,
+                                  })
+                                }
+                                disabled={!canEditDecisions}
+                                className="mt-1 h-4 w-4 rounded border-slate-300"
+                              />
+                              <span className="text-sm text-slate-700">
+                                Fuer Pendenz-Autogenerierung bestaetigen
+                              </span>
+                            </label>
+
+                            {decisionEditState.error ? (
+                              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                {decisionEditState.error}
+                              </div>
+                            ) : null}
+
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateDecisionEditState(
+                                    activeAgenda.id,
+                                    createInitialDecisionEditState(),
+                                  )
+                                }
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+                              >
+                                <X className="h-4 w-4" />
+                                Abbrechen
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => saveDecisionEdit(activeAgenda)}
+                                disabled={decisionEditState.isSubmitting || !canEditDecisions}
+                                className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
+                              >
+                                {decisionEditState.isSubmitting ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Edit3 className="h-4 w-4" />
+                                )}
+                                Speichern
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="flex items-start gap-3">
+                                <div className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-700">
+                                  <Icon className="h-4 w-4" />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span
+                                      className={[
+                                        "inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold",
+                                        getDecisionBadgeClass(decision.decisionType),
+                                      ].join(" ")}
+                                    >
+                                      {getDecisionTypeLabel(decision.decisionType)}
+                                    </span>
+
+                                    {decision.createMatter ? (
+                                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                        <Link2 className="h-3.5 w-3.5" />
+                                        Mit Pendenz-Link
+                                      </span>
+                                    ) : null}
+                                  </div>
+
+                                  <p className="text-sm font-medium leading-6 text-slate-900">
+                                    {decision.decisionText}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {decision.dueDateLabel ? (
+                                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                                  <Clock3 className="h-3.5 w-3.5" />
+                                  Faellig bis {decision.dueDateLabel}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              <div className="rounded-2xl border border-white bg-white p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                  Verantwortlich
+                                </p>
+                                <p className="mt-1 text-sm font-medium text-slate-800">
+                                  {decision.responsibleDisplayName ?? "Noch offen"}
+                                </p>
+                              </div>
+
+                              <div className="rounded-2xl border border-white bg-white p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                  Bemerkung
+                                </p>
+                                <p className="mt-1 text-sm text-slate-700">
+                                  {decision.remarks ?? "—"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startDecisionEdit(activeAgenda.id, decision)}
+                                disabled={!canEditDecisions}
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                Bearbeiten
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const confirmed = confirm("Entscheidung wirklich loeschen?");
+                                  if (!confirmed) {
+                                    return;
+                                  }
+                                  try {
+                                    await deleteDecision(decision.id);
+                                  } catch (error) {
+                                    alert(
+                                      error instanceof Error
+                                        ? error.message
+                                        : "Loeschen fehlgeschlagen.",
+                                    );
+                                  }
+                                }}
+                                disabled={!canEditDecisions}
+                                className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Loeschen
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                    Noch keine Entscheide zu diesem Traktandum.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-800">
+                      Neuer Entscheid / Auftrag
+                    </label>
+                    <textarea
+                      value={decisionState.decisionText}
+                      onChange={(event) =>
+                        updateDecisionState(activeAgenda.id, {
+                          decisionText: event.target.value,
+                          error: null,
+                        })
+                      }
+                      rows={4}
+                      disabled={!canEditDecisions}
+                      placeholder={
+                        canEditDecisions
+                          ? "Was wurde bei diesem Traktandum beschlossen?"
+                          : "Meeting abgeschlossen: Entscheide sind gesperrt."
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-800">Typ</label>
+                    <select
+                      value={decisionState.decisionType}
+                      onChange={(event) =>
+                        updateDecisionState(activeAgenda.id, {
+                          decisionType: event.target.value,
+                        })
+                      }
+                      disabled={!canEditDecisions}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                    >
+                      {decisionTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-800">
+                      Faellig bis
+                    </label>
+                    <input
+                      type="date"
+                      value={decisionState.dueDate}
+                      onChange={(event) =>
+                        updateDecisionState(activeAgenda.id, {
+                          dueDate: event.target.value,
+                        })
+                      }
+                      disabled={!canEditDecisions}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <label className="mb-2 block text-sm font-medium text-slate-800">
+                      Verantwortlich
+                    </label>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={decisionState.responsibleSearch}
+                        onChange={(event) =>
+                          handleResponsibleSearch(activeAgenda.id, event.target.value, "create")
+                        }
+                        disabled={!canEditDecisions}
+                        placeholder="Person suchen oder frei eintragen"
+                        className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:border-[#0b4aa2]"
+                      />
+                      {decisionState.isSearching ? (
+                        <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
+                      ) : null}
+                    </div>
+
+                    {decisionState.responsibleOptions.length > 0 && canEditDecisions ? (
+                      <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                        {decisionState.responsibleOptions.map((person) => (
+                          <button
+                            key={person.id}
+                            type="button"
+                            onClick={() =>
+                              updateDecisionState(activeAgenda.id, {
+                                responsiblePersonId: person.id,
+                                responsibleDisplayName: person.displayName,
+                                responsibleSearch: person.displayName,
+                                responsibleOptions: [],
+                              })
+                            }
+                            className="block w-full rounded-xl px-3 py-2 text-left hover:bg-slate-50"
+                          >
+                            <div className="text-sm font-medium text-slate-900">
+                              {person.displayName}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {person.email ?? "Vereinsleitung / Meetingzugang"}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-800">
+                      Bemerkung
+                    </label>
+                    <input
+                      value={decisionState.remarks}
+                      onChange={(event) =>
+                        updateDecisionState(activeAgenda.id, {
+                          remarks: event.target.value,
+                        })
+                      }
+                      disabled={!canEditDecisions}
+                      placeholder="Optionaler Kontext"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#0b4aa2]"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-[20px] border border-slate-200 bg-white px-4 py-4">
+                  <label className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={decisionState.createMatter}
+                      onChange={(event) =>
+                        updateDecisionState(activeAgenda.id, {
+                          createMatter: event.target.checked,
+                        })
+                      }
+                      disabled={!canEditDecisions}
+                      className="mt-1 h-4 w-4 rounded border-slate-300"
+                    />
+                    <span className="text-sm text-slate-700">
+                      Diesen Entscheid fuer die automatische Pendenz-Erstellung markieren
+                    </span>
+                  </label>
+                </div>
+
+                {decisionState.error ? (
+                  <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {decisionState.error}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => submitDecision(activeAgenda)}
+                    disabled={decisionState.isSubmitting || !canEditDecisions}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
+                  >
+                    {decisionState.isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : canEditDecisions ? (
+                      <Plus className="h-4 w-4" />
+                    ) : (
+                      <Lock className="h-4 w-4" />
+                    )}
+                    {canEditDecisions ? "Entscheid erfassen" : "Gesperrt"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside className="space-y-4">
+          <div className="rounded-[24px] border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-700">
+                <ListChecks className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-amber-800">Meeting ist abgeschlossen</p>
-                <p className="mt-2 text-sm leading-6 text-amber-700">
-                  Protokoll und Entscheide sind jetzt gesperrt. Damit ist die Ausführung sauber
-                  eingefroren und die Nachbearbeitung läuft künftig kontrolliert über einen
-                  Freigabe- oder Reopen-Workflow.
+                <p className="text-sm font-semibold text-slate-900">Aktives Traktandum</p>
+                <p className="text-xs text-slate-500">Kontext und Fortschritt</p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Protokolleintraege
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {activeProtocolEntries.length}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Entscheide
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {activeDecisions.length}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Fortschritt
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {getAgendaProgress(activeProtocolEntries.length, activeDecisions.length)}%
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-[#0b4aa2]/15 bg-[#0b4aa2]/5 px-5 py-4">
-            <div className="flex items-start gap-3">
+          <div className="rounded-[24px] border border-[#0b4aa2]/15 bg-[#0b4aa2]/5 p-5">
+            <div className="flex items-center gap-3">
               <div className="rounded-2xl border border-[#0b4aa2]/15 bg-white p-2 text-[#0b4aa2]">
                 <ShieldCheck className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-900">Workflow-Fundament bereit</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{approvalWorkflowHint}</p>
+                <p className="text-sm font-semibold text-slate-900">Naechster Ausbau</p>
+                <p className="text-xs text-slate-500">CRUD fuer Meetings / Traktanden / Subtasks</p>
               </div>
             </div>
+
+            <p className="mt-4 text-sm leading-6 text-slate-600">
+              Sobald dieser Build wieder sauber ist, erweitern wir als naechsten Schritt
+              systematisch Edit- und Delete-Funktionen fuer Meetings, Traktanden,
+              Initiativen und Work Items.
+            </p>
           </div>
-        </div>
-      ) : null}
-
-      <div className="mt-6 space-y-4">
-        {agendaItems.map((agenda) => {
-          const isOpen = openAgendaId === agenda.id;
-          const agendaProtocolEntries = protocolByAgenda.get(agenda.id) ?? [];
-          const agendaDecisions = decisionsByAgenda.get(agenda.id) ?? [];
-          const protocolState = getProtocolState(agenda.id);
-          const protocolEditState = getProtocolEditState(agenda.id);
-          const decisionState = getDecisionState(agenda.id);
-          const decisionEditState = getDecisionEditState(agenda.id);
-          const agendaCreatesMatterCount = agendaDecisions.filter((decision) => decision.createMatter).length;
-
-          return (
-            <article
-              key={agenda.id}
-              className="overflow-hidden rounded-[26px] border border-slate-200 bg-slate-50/70"
-            >
-              <button
-                type="button"
-                onClick={() => setOpenAgendaId((current) => (current === agenda.id ? null : agenda.id))}
-                className="flex w-full items-start justify-between gap-4 px-5 py-5 text-left transition hover:bg-white/70"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                      Traktandum
-                    </span>
-                    <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                      {agendaProtocolEntries.length} Protokolleinträge
-                    </span>
-                    <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                      {agendaDecisions.length} Entscheide
-                    </span>
-                    <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                      {agendaCreatesMatterCount} mit Pendenz-Link
-                    </span>
-                    {isExecutionLocked ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                        <Lock className="h-3.5 w-3.5" />
-                        Gesperrt
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <h3 className="mt-3 text-base font-semibold text-slate-900">{agenda.title}</h3>
-
-                  {agenda.description ? (
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{agenda.description}</p>
-                  ) : null}
-                </div>
-
-                <ChevronDown
-                  className={[
-                    "mt-1 h-5 w-5 shrink-0 text-slate-400 transition",
-                    isOpen ? "rotate-180" : "",
-                  ].join(" ")}
-                />
-              </button>
-
-              {isOpen ? (
-                <div className="grid gap-5 border-t border-slate-200 bg-white px-5 py-5 xl:grid-cols-2">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Protokoll
-                      </h4>
-                      {isExecutionLocked ? (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
-                          <Lock className="h-3.5 w-3.5" />
-                          Gesperrt nach Abschluss
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-3">
-                      {agendaProtocolEntries.length > 0 ? (
-                        agendaProtocolEntries.map((entry) => {
-                          const isEditing = protocolEditState.entryId === entry.id;
-
-                          return (
-                            <div
-                              key={entry.id}
-                              className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4"
-                            >
-                              {isEditing ? (
-                                <div className="space-y-3">
-                                  <textarea
-                                    value={protocolEditState.notes}
-                                    onChange={(event) =>
-                                      updateProtocolEditState(agenda.id, {
-                                        notes: event.target.value,
-                                        error: null,
-                                      })
-                                    }
-                                    rows={4}
-                                    disabled={!canEditProtocol}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                                  />
-
-                                  {protocolEditState.error ? (
-                                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                                      {protocolEditState.error}
-                                    </div>
-                                  ) : null}
-
-                                  <div className="flex flex-wrap justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        updateProtocolEditState(agenda.id, createInitialProtocolEditState())
-                                      }
-                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                                    >
-                                      <X className="h-4 w-4" />
-                                      Abbrechen
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => saveProtocolEdit(agenda)}
-                                      disabled={protocolEditState.isSubmitting || !canEditProtocol}
-                                      className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                      {protocolEditState.isSubmitting ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Edit3 className="h-4 w-4" />
-                                      )}
-                                      Speichern
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <p className="text-sm leading-6 text-slate-700">{entry.notes}</p>
-                                  <div className="mt-4 flex flex-wrap justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => startProtocolEdit(agenda.id, entry)}
-                                      disabled={!canEditProtocol}
-                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      <Edit3 className="h-3.5 w-3.5" />
-                                      Bearbeiten
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        const confirmed = confirm("Protokolleintrag wirklich löschen?");
-                                        if (!confirmed) {
-                                          return;
-                                        }
-                                        try {
-                                          await deleteProtocolEntry(entry.id);
-                                        } catch (error) {
-                                          alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
-                                        }
-                                      }}
-                                      disabled={!canEditProtocol}
-                                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                      Löschen
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                          Noch keine Protokolleinträge zu diesem Traktandum.
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-                      <label className="mb-2 block text-sm font-medium text-slate-800">
-                        Neuer Protokolleintrag
-                      </label>
-                      <textarea
-                        value={protocolState.notes}
-                        onChange={(event) =>
-                          updateProtocolState(agenda.id, {
-                            notes: event.target.value,
-                            error: null,
-                          })
-                        }
-                        rows={4}
-                        disabled={!canEditProtocol}
-                        placeholder={
-                          canEditProtocol
-                            ? "Was wurde bei diesem Traktandum besprochen?"
-                            : "Meeting abgeschlossen: Protokolleinträge sind gesperrt."
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                      />
-
-                      {protocolState.error ? (
-                        <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                          {protocolState.error}
-                        </div>
-                      ) : null}
-
-                      <div className="mt-4 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => submitProtocol(agenda)}
-                          disabled={protocolState.isSubmitting || !canEditProtocol}
-                          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                          {protocolState.isSubmitting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : canEditProtocol ? (
-                            <Plus className="h-4 w-4" />
-                          ) : (
-                            <Lock className="h-4 w-4" />
-                          )}
-                          {canEditProtocol ? "Protokoll erfassen" : "Gesperrt"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Entscheide
-                      </h4>
-                      {isExecutionLocked ? (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
-                          <Lock className="h-3.5 w-3.5" />
-                          Gesperrt nach Abschluss
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-3">
-                      {agendaDecisions.length > 0 ? (
-                        agendaDecisions.map((decision) => {
-                          const Icon = getDecisionIcon(decision.decisionType);
-                          const isEditing = decisionEditState.decisionId === decision.id;
-
-                          return (
-                            <div
-                              key={decision.id}
-                              className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4"
-                            >
-                              {isEditing ? (
-                                <div className="space-y-4">
-                                  <textarea
-                                    value={decisionEditState.decisionText}
-                                    onChange={(event) =>
-                                      updateDecisionEditState(agenda.id, {
-                                        decisionText: event.target.value,
-                                        error: null,
-                                      })
-                                    }
-                                    rows={4}
-                                    disabled={!canEditDecisions}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                                  />
-
-                                  <div className="grid gap-4 md:grid-cols-2">
-                                    <select
-                                      value={decisionEditState.decisionType}
-                                      onChange={(event) =>
-                                        updateDecisionEditState(agenda.id, {
-                                          decisionType: event.target.value,
-                                        })
-                                      }
-                                      disabled={!canEditDecisions}
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                                    >
-                                      {decisionTypeOptions.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </select>
-
-                                    <input
-                                      type="date"
-                                      value={decisionEditState.dueDate}
-                                      onChange={(event) =>
-                                        updateDecisionEditState(agenda.id, {
-                                          dueDate: event.target.value,
-                                        })
-                                      }
-                                      disabled={!canEditDecisions}
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                                    />
-                                  </div>
-
-                                  <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="relative">
-                                      <div className="relative">
-                                        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                          value={decisionEditState.responsibleSearch}
-                                          onChange={(event) =>
-                                            handleResponsibleSearch(agenda.id, event.target.value, "edit")
-                                          }
-                                          disabled={!canEditDecisions}
-                                          placeholder="Person suchen oder frei eintragen"
-                                          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                                        />
-                                        {decisionEditState.isSearching ? (
-                                          <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
-                                        ) : null}
-                                      </div>
-
-                                      {decisionEditState.responsibleOptions.length > 0 && canEditDecisions ? (
-                                        <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                                          {decisionEditState.responsibleOptions.map((person) => (
-                                            <button
-                                              key={person.id}
-                                              type="button"
-                                              onClick={() =>
-                                                updateDecisionEditState(agenda.id, {
-                                                  responsiblePersonId: person.id,
-                                                  responsibleDisplayName: person.displayName,
-                                                  responsibleSearch: person.displayName,
-                                                  responsibleOptions: [],
-                                                })
-                                              }
-                                              className="block w-full rounded-xl px-3 py-2 text-left transition hover:bg-slate-50"
-                                            >
-                                              <div className="text-sm font-medium text-slate-900">
-                                                {person.displayName}
-                                              </div>
-                                              <div className="text-xs text-slate-500">
-                                                {person.email ?? "Vereinsleitung / Meetingzugang"}
-                                              </div>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-
-                                    <input
-                                      value={decisionEditState.remarks}
-                                      onChange={(event) =>
-                                        updateDecisionEditState(agenda.id, {
-                                          remarks: event.target.value,
-                                        })
-                                      }
-                                      disabled={!canEditDecisions}
-                                      placeholder="Optionaler Kontext"
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                                    />
-                                  </div>
-
-                                  <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={decisionEditState.createMatter}
-                                      onChange={(event) =>
-                                        updateDecisionEditState(agenda.id, {
-                                          createMatter: event.target.checked,
-                                        })
-                                      }
-                                      disabled={!canEditDecisions}
-                                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2] disabled:cursor-not-allowed"
-                                    />
-                                    <span className="text-sm text-slate-700">
-                                      Für Pendenz-Autogenerierung bestätigen
-                                    </span>
-                                  </label>
-
-                                  {decisionEditState.error ? (
-                                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                                      {decisionEditState.error}
-                                    </div>
-                                  ) : null}
-
-                                  <div className="flex flex-wrap justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        updateDecisionEditState(agenda.id, createInitialDecisionEditState())
-                                      }
-                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                                    >
-                                      <X className="h-4 w-4" />
-                                      Abbrechen
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => saveDecisionEdit(agenda)}
-                                      disabled={decisionEditState.isSubmitting || !canEditDecisions}
-                                      className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                      {decisionEditState.isSubmitting ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Edit3 className="h-4 w-4" />
-                                      )}
-                                      Speichern
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div className="flex items-start gap-3">
-                                      <div className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-700">
-                                        <Icon className="h-4 w-4" />
-                                      </div>
-
-                                      <div className="space-y-2">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span
-                                            className={[
-                                              "inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold",
-                                              getDecisionBadgeClass(decision.decisionType),
-                                            ].join(" ")}
-                                          >
-                                            {getDecisionTypeLabel(decision.decisionType)}
-                                          </span>
-
-                                          {decision.createMatter ? (
-                                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                              <Link2 className="h-3.5 w-3.5" />
-                                              Mit Pendenz-Link bestätigt
-                                            </span>
-                                          ) : (
-                                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
-                                              <Link2 className="h-3.5 w-3.5" />
-                                              Ohne Pendenz-Link
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        <p className="text-sm font-medium leading-6 text-slate-900">
-                                          {decision.decisionText}
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    {decision.dueDateLabel ? (
-                                      <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                                        <Clock3 className="h-3.5 w-3.5" />
-                                        Fällig bis {decision.dueDateLabel}
-                                      </div>
-                                    ) : null}
-                                  </div>
-
-                                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                    <div className="rounded-2xl border border-white bg-white p-3">
-                                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                                        Verantwortlich
-                                      </p>
-                                      <p className="mt-1 text-sm font-medium text-slate-800">
-                                        {decision.responsibleDisplayName ?? "Noch offen"}
-                                      </p>
-                                    </div>
-
-                                    <div className="rounded-2xl border border-white bg-white p-3">
-                                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                                        Bemerkung
-                                      </p>
-                                      <p className="mt-1 text-sm text-slate-700">
-                                        {decision.remarks ?? "—"}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                                      Matter-Link Status
-                                    </p>
-                                    <p className="mt-1 text-sm text-slate-700">
-                                      {decision.createMatter
-                                        ? "Ja – dieser Entscheid ist explizit für die automatische Pendenz-Erstellung markiert."
-                                        : "Nein – dieser Entscheid bleibt ohne automatische Pendenz-Erstellung."}
-                                    </p>
-                                  </div>
-
-                                  <div className="mt-4 flex flex-wrap justify-end gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => startDecisionEdit(agenda.id, decision)}
-                                      disabled={!canEditDecisions}
-                                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      <Edit3 className="h-3.5 w-3.5" />
-                                      Bearbeiten
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        const confirmed = confirm("Entscheidung wirklich löschen?");
-                                        if (!confirmed) {
-                                          return;
-                                        }
-                                        try {
-                                          await deleteDecision(decision.id);
-                                        } catch (error) {
-                                          alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
-                                        }
-                                      }}
-                                      disabled={!canEditDecisions}
-                                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                      Löschen
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                          Noch keine Entscheide zu diesem Traktandum.
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="md:col-span-2">
-                          <label className="mb-2 block text-sm font-medium text-slate-800">
-                            Neuer Entscheid / Auftrag
-                          </label>
-                          <textarea
-                            value={decisionState.decisionText}
-                            onChange={(event) =>
-                              updateDecisionState(agenda.id, {
-                                decisionText: event.target.value,
-                                error: null,
-                              })
-                            }
-                            rows={4}
-                            disabled={!canEditDecisions}
-                            placeholder={
-                              canEditDecisions
-                                ? "Was wurde bei diesem Traktandum beschlossen?"
-                                : "Meeting abgeschlossen: Entscheide sind gesperrt."
-                            }
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-800">
-                            Typ
-                          </label>
-                          <select
-                            value={decisionState.decisionType}
-                            onChange={(event) =>
-                              updateDecisionState(agenda.id, {
-                                decisionType: event.target.value,
-                              })
-                            }
-                            disabled={!canEditDecisions}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                          >
-                            {decisionTypeOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-800">
-                            Fällig bis
-                          </label>
-                          <input
-                            type="date"
-                            value={decisionState.dueDate}
-                            onChange={(event) =>
-                              updateDecisionState(agenda.id, {
-                                dueDate: event.target.value,
-                              })
-                            }
-                            disabled={!canEditDecisions}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                          />
-                        </div>
-
-                        <div className="relative">
-                          <label className="mb-2 block text-sm font-medium text-slate-800">
-                            Verantwortlich
-                          </label>
-                          <div className="relative">
-                            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                              value={decisionState.responsibleSearch}
-                              onChange={(event) =>
-                                handleResponsibleSearch(agenda.id, event.target.value, "create")
-                              }
-                              disabled={!canEditDecisions}
-                              placeholder="Person suchen oder frei eintragen"
-                              className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                            />
-                            {decisionState.isSearching ? (
-                              <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />
-                            ) : null}
-                          </div>
-
-                          {decisionState.responsibleOptions.length > 0 && canEditDecisions ? (
-                            <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                              {decisionState.responsibleOptions.map((person) => (
-                                <button
-                                  key={person.id}
-                                  type="button"
-                                  onClick={() =>
-                                    updateDecisionState(agenda.id, {
-                                      responsiblePersonId: person.id,
-                                      responsibleDisplayName: person.displayName,
-                                      responsibleSearch: person.displayName,
-                                      responsibleOptions: [],
-                                    })
-                                  }
-                                  className="block w-full rounded-xl px-3 py-2 text-left transition hover:bg-slate-50"
-                                >
-                                  <div className="text-sm font-medium text-slate-900">
-                                    {person.displayName}
-                                  </div>
-                                  <div className="text-xs text-slate-500">
-                                    {person.email ?? "Vereinsleitung / Meetingzugang"}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-800">
-                            Bemerkung
-                          </label>
-                          <input
-                            value={decisionState.remarks}
-                            onChange={(event) =>
-                              updateDecisionState(agenda.id, {
-                                remarks: event.target.value,
-                              })
-                            }
-                            disabled={!canEditDecisions}
-                            placeholder="Optionaler Kontext"
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 rounded-[22px] border border-slate-200 bg-white px-4 py-4">
-                        <label className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={decisionState.createMatter}
-                            onChange={(event) =>
-                              updateDecisionState(agenda.id, {
-                                createMatter: event.target.checked,
-                              })
-                            }
-                            disabled={!canEditDecisions}
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2] disabled:cursor-not-allowed"
-                          />
-                          <span className="text-sm text-slate-700">
-                            Diesen Entscheid explizit für die automatische Pendenz-Erstellung markieren
-                          </span>
-                        </label>
-
-                        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                            Matter-Link Bestätigung
-                          </p>
-                          <p className="mt-1 text-sm text-slate-700">
-                            {decisionState.createMatter
-                              ? "Bestätigt: Beim Speichern wird dieser Entscheid als Basis für eine Pendenz markiert."
-                              : "Nicht bestätigt: Dieser Entscheid bleibt ohne automatische Pendenz-Erstellung."}
-                          </p>
-                        </div>
-                      </div>
-
-                      {decisionState.error ? (
-                        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                          {decisionState.error}
-                        </div>
-                      ) : null}
-
-                      <div className="mt-4 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => submitDecision(agenda)}
-                          disabled={decisionState.isSubmitting || !canEditDecisions}
-                          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                          {decisionState.isSubmitting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : canEditDecisions ? (
-                            <Plus className="h-4 w-4" />
-                          ) : (
-                            <Lock className="h-4 w-4" />
-                          )}
-                          {canEditDecisions ? "Entscheid erfassen" : "Gesperrt"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
+        </aside>
       </div>
     </section>
   );

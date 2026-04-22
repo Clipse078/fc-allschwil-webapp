@@ -6,7 +6,6 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 
 function normalizePriority(value: unknown) {
   const normalized = String(value ?? "MAJOR").trim().toUpperCase();
@@ -43,6 +42,11 @@ function parseAssigneeMode(value: unknown): VereinsleitungInitiativeWorkItemAssi
   }
 }
 
+function normalizeOptionalString(value: unknown) {
+  const normalized = String(value ?? "").trim();
+  return normalized ? normalized : null;
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ initiativeId: string }> },
@@ -61,14 +65,19 @@ export async function POST(
     const priority = normalizePriority(body.priority);
     const storyPoints = normalizeStoryPoints(body.storyPoints);
     const assigneeMode = parseAssigneeMode(body.assigneeMode);
-    const assigneePersonId = String(body.assigneePersonId ?? "").trim() || null;
+    const assigneePersonId = normalizeOptionalString(body.assigneePersonId);
+    const externalAssigneeLabel = normalizeOptionalString(body.externalAssigneeLabel);
 
     if (!title) {
       return NextResponse.json({ error: "Titel ist erforderlich." }, { status: 400 });
     }
 
     if (assigneeMode === "PERSON" && !assigneePersonId) {
-      return NextResponse.json({ error: "Bitte eine Person auswÃƒÂ¤hlen." }, { status: 400 });
+      return NextResponse.json({ error: "Bitte eine Person auswaehlen." }, { status: 400 });
+    }
+
+    if (assigneeMode === "EXTERNAL" && !externalAssigneeLabel) {
+      return NextResponse.json({ error: "Bitte einen externen Assignee erfassen." }, { status: 400 });
     }
 
     const initiative = await prisma.vereinsleitungInitiative.findUnique({
@@ -78,6 +87,17 @@ export async function POST(
 
     if (!initiative) {
       return NextResponse.json({ error: "Initiative nicht gefunden." }, { status: 404 });
+    }
+
+    if (assigneePersonId) {
+      const person = await prisma.person.findUnique({
+        where: { id: assigneePersonId },
+        select: { id: true },
+      });
+
+      if (!person) {
+        return NextResponse.json({ error: "Person nicht gefunden." }, { status: 400 });
+      }
     }
 
     const lastItem = await prisma.vereinsleitungInitiativeWorkItem.findFirst({
@@ -94,7 +114,7 @@ export async function POST(
         storyPoints,
         assigneeMode,
         assigneePersonId: assigneeMode === "PERSON" ? assigneePersonId : null,
-        externalAssigneeLabel: assigneeMode === "EXTERNAL" ? "External" : null,
+        externalAssigneeLabel: assigneeMode === "EXTERNAL" ? externalAssigneeLabel : null,
         status: VereinsleitungInitiativeWorkItemStatus.BACKLOG,
         sortOrder: (lastItem?.sortOrder ?? -1) + 1,
       },
