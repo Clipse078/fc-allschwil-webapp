@@ -728,13 +728,17 @@ model VereinsleitungMeetingDecision {
   responsibleDisplayName String?
   dueDate                DateTime?
   createMatter           Boolean                           @default(false)
+  initiativeId           String?
+  createInitiative       Boolean                           @default(false)
+  initiativeTitle        String?
   sortOrder              Int                               @default(0)
   remarks                String?
   createdAt              DateTime                          @default(now())
   updatedAt              DateTime                          @updatedAt
 
-  meeting           VereinsleitungMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  responsiblePerson Person?               @relation(fields: [responsiblePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  meeting           VereinsleitungMeeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  responsiblePerson Person?                 @relation(fields: [responsiblePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  initiative        VereinsleitungInitiative? @relation(fields: [initiativeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([meetingId, sortOrder])
   @@index([agendaItemId])
@@ -742,6 +746,8 @@ model VereinsleitungMeetingDecision {
   @@index([responsiblePersonId])
   @@index([dueDate])
   @@index([createMatter])
+  @@index([initiativeId])
+  @@index([createInitiative])
 }
 
 model VereinsleitungMeetingProtocolEntry {
@@ -774,21 +780,22 @@ model VereinsleitungMeetingAgendaItem {
   @@index([meetingId, sortOrder])
 }
 model VereinsleitungInitiative {
-  id            String                       @id @default(cuid())
-  title         String
-  slug          String                       @unique
-  subtitle      String?
-  description   String?
-  status        VereinsleitungInitiativeStatus @default(IN_PROGRESS)
-  ownerPersonId String?
+  id             String                        @id @default(cuid())
+  title          String
+  slug           String                        @unique
+  subtitle       String?
+  description    String?
+  status         VereinsleitungInitiativeStatus @default(IN_PROGRESS)
+  ownerPersonId  String?
   ownerRoleLabel String?
-  startDate     DateTime?
-  targetDate    DateTime?
-  createdAt     DateTime                     @default(now())
-  updatedAt     DateTime                     @updatedAt
+  startDate      DateTime?
+  targetDate     DateTime?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
 
-  owner     Person?                             @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  workItems VereinsleitungInitiativeWorkItem[]
+  owner           Person?                        @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  workItems       VereinsleitungInitiativeWorkItem[]
+  meetingDecisions VereinsleitungMeetingDecision[]
 
   @@index([status])
   @@index([ownerPersonId])
@@ -797,18 +804,18 @@ model VereinsleitungInitiative {
 }
 
 model VereinsleitungInitiativeWorkItem {
-  id                   String                                   @id @default(cuid())
-  initiativeId         String
-  title                String
-  priority             String                                   @default("MAJOR")
-  storyPoints          Int?
-  assigneeMode         VereinsleitungInitiativeWorkItemAssigneeMode @default(NONE)
-  assigneePersonId     String?
+  id                    String                                      @id @default(cuid())
+  initiativeId          String
+  title                 String
+  priority              String                                      @default("MAJOR")
+  dueDate               DateTime?
+  assigneeMode          VereinsleitungInitiativeWorkItemAssigneeMode @default(NONE)
+  assigneePersonId      String?
   externalAssigneeLabel String?
-  status               VereinsleitungInitiativeWorkItemStatus   @default(BACKLOG)
-  sortOrder            Int                                      @default(0)
-  createdAt            DateTime                                 @default(now())
-  updatedAt            DateTime                                 @updatedAt
+  status                VereinsleitungInitiativeWorkItemStatus      @default(BACKLOG)
+  sortOrder             Int                                         @default(0)
+  createdAt             DateTime                                    @default(now())
+  updatedAt             DateTime                                    @updatedAt
 
   initiative     VereinsleitungInitiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   assigneePerson Person?                  @relation(fields: [assigneePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -817,4 +824,6 @@ model VereinsleitungInitiativeWorkItem {
   @@index([assigneePersonId])
   @@index([status])
   @@index([assigneeMode])
+  @@index([dueDate])
 }
+

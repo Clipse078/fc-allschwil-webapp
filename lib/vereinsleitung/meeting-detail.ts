@@ -1,10 +1,11 @@
-import { prisma } from "@/lib/db/prisma";
+﻿import { prisma } from "@/lib/db/prisma";
 import {
   formatMatterDueDateLabel,
   formatMeetingDateLabel,
   formatMeetingDateTimeLabel,
   formatMeetingTimeLabel,
   getDecisionTypeLabel,
+  getInitiativeStatusLabel,
   getMatterPriorityLabel,
   getMatterStatusLabel,
   getMeetingApprovalLockReasonLabel,
@@ -28,58 +29,76 @@ import {
 export async function getMeetingDetailItem(
   meetingIdOrSlug: string,
 ): Promise<MeetingDetailItem | null> {
-  const meeting = await prisma.vereinsleitungMeeting.findFirst({
-    where: {
-      OR: [{ id: meetingIdOrSlug }, { slug: meetingIdOrSlug }],
-    },
-    include: {
-      matterLinks: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        include: {
-          matter: {
-            include: {
-              owner: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  displayName: true,
+  const [meeting, initiatives] = await Promise.all([
+    prisma.vereinsleitungMeeting.findFirst({
+      where: {
+        OR: [{ id: meetingIdOrSlug }, { slug: meetingIdOrSlug }],
+      },
+      include: {
+        matterLinks: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          include: {
+            matter: {
+              include: {
+                owner: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    displayName: true,
+                  },
                 },
               },
             },
-          },
-          carriedOverFromMeeting: {
-            select: {
-              id: true,
-              title: true,
+            carriedOverFromMeeting: {
+              select: {
+                id: true,
+                title: true,
+              },
             },
           },
         },
-      },
-      participants: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
-      decisions: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        include: {
-          responsiblePerson: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              displayName: true,
+        participants: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+        decisions: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          include: {
+            responsiblePerson: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                displayName: true,
+              },
+            },
+            initiative: {
+              select: {
+                id: true,
+                slug: true,
+                title: true,
+              },
             },
           },
         },
+        protocolEntries: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+        agendaItems: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
       },
-      protocolEntries: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.vereinsleitungInitiative.findMany({
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        status: true,
       },
-      agendaItems: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
-    },
-  });
+    }),
+  ]);
 
   if (!meeting) {
     return null;
@@ -115,6 +134,9 @@ export async function getMeetingDetailItem(
       dueDateLabel: formatMatterDueDateLabel(decision.dueDate),
       createMatter: decision.createMatter,
       remarks: decision.remarks,
+      initiativeId: decision.initiativeId,
+      initiativeTitle: decision.initiative?.title ?? decision.initiativeTitle ?? null,
+      initiativeSlug: decision.initiative?.slug ?? null,
     };
   });
 
@@ -192,5 +214,12 @@ export async function getMeetingDetailItem(
     protocolEntries,
     decisionsCount: decisions.length,
     decisions,
+    initiativeOptions: initiatives.map((initiative) => ({
+      id: initiative.id,
+      slug: initiative.slug,
+      title: initiative.title,
+      status: initiative.status,
+      statusLabel: getInitiativeStatusLabel(initiative.status),
+    })),
   };
 }

@@ -1,4 +1,4 @@
-export type MeetingListItem = {
+﻿export type MeetingListItem = {
   id: string;
   slug: string;
   title: string;
@@ -53,6 +53,14 @@ export type MeetingAgendaItem = {
   sortOrder: number;
 };
 
+export type MeetingInitiativeOption = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  statusLabel: string;
+};
+
 export type MeetingDecisionItem = {
   id: string;
   agendaItemId: string | null;
@@ -65,6 +73,9 @@ export type MeetingDecisionItem = {
   dueDateLabel: string | null;
   createMatter: boolean;
   remarks: string | null;
+  initiativeId: string | null;
+  initiativeTitle: string | null;
+  initiativeSlug: string | null;
 };
 
 export type MeetingDecisionResponsibleOption = {
@@ -131,6 +142,7 @@ export type MeetingDetailItem = {
   protocolEntries: MeetingProtocolEntryItem[];
   decisionsCount: number;
   decisions?: MeetingDecisionItem[];
+  initiativeOptions: MeetingInitiativeOption[];
 };
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("de-CH", {
@@ -348,6 +360,17 @@ export function getMeetingApprovalStatusOptions(): MeetingApprovalStatusOption[]
     { value: "APPROVED", label: "Freigegeben" },
     { value: "REJECTED", label: "Abgelehnt" },
   ];
+}
+
+export function getInitiativeStatusLabel(value: string) {
+  switch (value) {
+    case "PLANNED":
+      return "Geplant";
+    case "DONE":
+      return "Abgeschlossen";
+    default:
+      return "In Arbeit";
+  }
 }
 
 export function isMeetingApprovalLocked(status: string) {

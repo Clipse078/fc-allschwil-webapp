@@ -1,10 +1,20 @@
 ﻿"use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CheckCircle2, FileText, ListChecks, Loader2, Plus } from "lucide-react";
+import {
+  CheckCircle2,
+  FileText,
+  FolderGit2,
+  ListChecks,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import type {
   MeetingAgendaItem,
   MeetingDecisionItem,
+  MeetingInitiativeOption,
   MeetingProtocolEntryItem,
 } from "@/lib/vereinsleitung/meeting-utils";
 import { groupByAgendaItems } from "@/lib/vereinsleitung/meeting-grouping";
@@ -14,8 +24,11 @@ type VereinsleitungMeetingExecutionWorkspaceProps = {
   agendaItems: MeetingAgendaItem[];
   protocolEntries: MeetingProtocolEntryItem[];
   decisions: MeetingDecisionItem[];
+  initiativeOptions: MeetingInitiativeOption[];
   isDone: boolean;
 };
+
+type InitiativeMode = "NONE" | "CREATE" | "LINK";
 
 type InlineState = {
   openNoteForAgendaId: string | null;
@@ -23,6 +36,10 @@ type InlineState = {
   noteText: string;
   decisionText: string;
   decisionType: "DECISION" | "TASK" | "APPROVAL" | "INFO";
+  createMatter: boolean;
+  initiativeMode: InitiativeMode;
+  selectedInitiativeId: string;
+  initiativeTitle: string;
   isSavingNote: boolean;
   isSavingDecision: boolean;
   error: string | null;
@@ -34,18 +51,38 @@ const INITIAL_INLINE_STATE: InlineState = {
   noteText: "",
   decisionText: "",
   decisionType: "DECISION",
+  createMatter: false,
+  initiativeMode: "NONE",
+  selectedInitiativeId: "",
+  initiativeTitle: "",
   isSavingNote: false,
   isSavingDecision: false,
   error: null,
 };
+
+function getDecisionBadgeClass(decisionType: string) {
+  switch (decisionType) {
+    case "TASK":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "APPROVAL":
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    case "INFO":
+      return "border-slate-200 bg-slate-50 text-slate-700";
+    default:
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+}
 
 export default function VereinsleitungMeetingExecutionWorkspace({
   meetingId,
   agendaItems,
   protocolEntries,
   decisions,
+  initiativeOptions,
   isDone,
 }: VereinsleitungMeetingExecutionWorkspaceProps) {
+  const router = useRouter();
+
   const groupedAgenda = useMemo(
     () => groupByAgendaItems(agendaItems, protocolEntries, decisions),
     [agendaItems, protocolEntries, decisions],
@@ -67,19 +104,27 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     setInlineState((current) => ({
       ...current,
       openNoteForAgendaId: agendaItemId,
-      openDecisionForAgendaId: current.openDecisionForAgendaId === agendaItemId ? null : current.openDecisionForAgendaId,
+      openDecisionForAgendaId:
+        current.openDecisionForAgendaId === agendaItemId
+          ? null
+          : current.openDecisionForAgendaId,
       noteText: "",
       error: null,
     }));
   }
 
-  function openDecision(agendaItemId: string) {
+  function openDecision(agendaItemId: string, agendaItemTitle: string) {
     setInlineState((current) => ({
       ...current,
       openDecisionForAgendaId: agendaItemId,
-      openNoteForAgendaId: current.openNoteForAgendaId === agendaItemId ? null : current.openNoteForAgendaId,
+      openNoteForAgendaId:
+        current.openNoteForAgendaId === agendaItemId ? null : current.openNoteForAgendaId,
       decisionText: "",
       decisionType: "DECISION",
+      createMatter: false,
+      initiativeMode: "NONE",
+      selectedInitiativeId: "",
+      initiativeTitle: agendaItemTitle,
       error: null,
     }));
   }
@@ -92,6 +137,12 @@ export default function VereinsleitungMeetingExecutionWorkspace({
       noteText: "",
       decisionText: "",
       decisionType: "DECISION",
+      createMatter: false,
+      initiativeMode: "NONE",
+      selectedInitiativeId: "",
+      initiativeTitle: "",
+      isSavingNote: false,
+      isSavingDecision: false,
       error: null,
     }));
   }
@@ -114,20 +165,17 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         error: null,
       }));
 
-      const response = await fetch(
-        "/api/vereinsleitung/meetings/" + meetingId + "/protocol",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agendaItemId,
-            agendaItemTitle,
-            notes,
-          }),
+      const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/protocol", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          agendaItemId,
+          agendaItemTitle,
+          notes,
+        }),
+      });
 
       const data = await response.json();
 
@@ -135,7 +183,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         throw new Error(data?.error || "Protokolleintrag konnte nicht erstellt werden.");
       }
 
-      window.location.reload();
+      closeInlineEditors();
+      router.refresh();
     } catch (error) {
       setInlineState((current) => ({
         ...current,
@@ -159,6 +208,22 @@ export default function VereinsleitungMeetingExecutionWorkspace({
       return;
     }
 
+    if (inlineState.initiativeMode === "CREATE" && !inlineState.initiativeTitle.trim()) {
+      setInlineState((current) => ({
+        ...current,
+        error: "Bitte zuerst einen Initiative-Titel erfassen.",
+      }));
+      return;
+    }
+
+    if (inlineState.initiativeMode === "LINK" && !inlineState.selectedInitiativeId) {
+      setInlineState((current) => ({
+        ...current,
+        error: "Bitte zuerst eine bestehende Initiative auswählen.",
+      }));
+      return;
+    }
+
     try {
       setInlineState((current) => ({
         ...current,
@@ -166,22 +231,28 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         error: null,
       }));
 
-      const response = await fetch(
-        "/api/vereinsleitung/meetings/" + meetingId + "/decisions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agendaItemId,
-            agendaItemTitle,
-            decisionText,
-            decisionType: inlineState.decisionType,
-            createMatter: false,
-          }),
+      const response = await fetch("/api/vereinsleitung/meetings/" + meetingId + "/decisions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          agendaItemId,
+          agendaItemTitle,
+          decisionText,
+          decisionType: inlineState.decisionType,
+          createMatter: inlineState.createMatter,
+          createInitiative: inlineState.initiativeMode === "CREATE",
+          initiativeTitle:
+            inlineState.initiativeMode === "CREATE"
+              ? inlineState.initiativeTitle.trim()
+              : null,
+          initiativeId:
+            inlineState.initiativeMode === "LINK"
+              ? inlineState.selectedInitiativeId
+              : null,
+        }),
+      });
 
       const data = await response.json();
 
@@ -189,7 +260,8 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         throw new Error(data?.error || "Beschluss konnte nicht erstellt werden.");
       }
 
-      window.location.reload();
+      closeInlineEditors();
+      router.refresh();
     } catch (error) {
       setInlineState((current) => ({
         ...current,
@@ -213,7 +285,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
             Meeting-Ausführung nach Traktanden
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Protokoll und Beschlüsse werden entlang der Agenda sichtbar gemacht.
+            Protokoll, Beschlüsse und Initiative-Verknüpfungen werden entlang der Agenda sichtbar gemacht.
           </p>
         </div>
 
@@ -284,7 +356,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                       </button>
                       <button
                         type="button"
-                        onClick={() => openDecision(item.id)}
+                        onClick={() => openDecision(item.id, item.title)}
                         className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -384,6 +456,135 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         </div>
                       </div>
 
+                      <label className="mt-4 flex items-start gap-3 rounded-[16px] border border-slate-200 bg-slate-50 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={inlineState.createMatter}
+                          onChange={(event) =>
+                            setInlineState((current) => ({
+                              ...current,
+                              createMatter: event.target.checked,
+                            }))
+                          }
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2]"
+                        />
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            Als Pendenz übernehmen
+                          </div>
+                          <div className="mt-1 text-sm leading-6 text-slate-500">
+                            Beim Speichern wird zusätzlich automatisch eine neue Pendenz erzeugt und mit diesem Meeting verknüpft.
+                          </div>
+                        </div>
+                      </label>
+
+                      <div className="mt-4 rounded-[16px] border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-center gap-2">
+                          <FolderGit2 className="h-4 w-4 text-[#0b4aa2]" />
+                          <div className="text-sm font-semibold text-slate-900">
+                            Initiative-Verknüpfung
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setInlineState((current) => ({
+                                ...current,
+                                initiativeMode: "NONE",
+                                selectedInitiativeId: "",
+                              }))
+                            }
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                              inlineState.initiativeMode === "NONE"
+                                ? "border-slate-300 bg-slate-900 text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            Keine
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setInlineState((current) => ({
+                                ...current,
+                                initiativeMode: "CREATE",
+                                selectedInitiativeId: "",
+                                initiativeTitle: current.initiativeTitle || item.title,
+                              }))
+                            }
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                              inlineState.initiativeMode === "CREATE"
+                                ? "border-[#0b4aa2] bg-[#0b4aa2] text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            Neue Initiative
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setInlineState((current) => ({
+                                ...current,
+                                initiativeMode: "LINK",
+                              }))
+                            }
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                              inlineState.initiativeMode === "LINK"
+                                ? "border-[#0b4aa2] bg-[#0b4aa2] text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            Bestehende Initiative
+                          </button>
+                        </div>
+
+                        {inlineState.initiativeMode === "CREATE" ? (
+                          <div className="mt-4">
+                            <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Initiative-Titel
+                            </label>
+                            <input
+                              value={inlineState.initiativeTitle}
+                              onChange={(event) =>
+                                setInlineState((current) => ({
+                                  ...current,
+                                  initiativeTitle: event.target.value,
+                                }))
+                              }
+                              placeholder="Titel der neuen Initiative"
+                              className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                            />
+                          </div>
+                        ) : null}
+
+                        {inlineState.initiativeMode === "LINK" ? (
+                          <div className="mt-4">
+                            <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Bestehende Initiative
+                            </label>
+                            <select
+                              value={inlineState.selectedInitiativeId}
+                              onChange={(event) =>
+                                setInlineState((current) => ({
+                                  ...current,
+                                  selectedInitiativeId: event.target.value,
+                                }))
+                              }
+                              className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                            >
+                              <option value="">Initiative auswählen</option>
+                              {initiativeOptions.map((initiative) => (
+                                <option key={initiative.id} value={initiative.id}>
+                                  {initiative.title} · {initiative.statusLabel}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : null}
+                      </div>
+
                       <div className="mt-4 flex flex-wrap gap-2">
                         <button
                           type="button"
@@ -451,8 +652,27 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                           key={decision.id}
                           className="rounded-[16px] bg-white px-4 py-4"
                         >
-                          <div className="text-sm font-semibold text-slate-900">
-                            {decision.decisionTypeLabel}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getDecisionBadgeClass(decision.decisionType)}`}>
+                              {decision.decisionTypeLabel}
+                            </div>
+                            {decision.createMatter ? (
+                              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                                Mit Pendenz
+                              </span>
+                            ) : null}
+                            {decision.initiativeSlug && decision.initiativeTitle ? (
+                              <Link
+                                href={"/vereinsleitung/initiativen/" + decision.initiativeSlug}
+                                className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100"
+                              >
+                                Initiative: {decision.initiativeTitle}
+                              </Link>
+                            ) : decision.initiativeTitle ? (
+                              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                                Initiative: {decision.initiativeTitle}
+                              </span>
+                            ) : null}
                           </div>
                           <div className="mt-2 text-sm leading-6 text-slate-600">
                             {decision.decisionText}

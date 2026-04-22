@@ -33,6 +33,7 @@ export default function VereinsleitungMeetingDetail({
         agendaItems={meeting.agendaItems}
         protocolEntries={meeting.protocolEntries}
         decisions={meeting.decisions ?? []}
+        initiativeOptions={meeting.initiativeOptions}
         isDone={meeting.isDone || meeting.isApprovalLocked}
       />
 
