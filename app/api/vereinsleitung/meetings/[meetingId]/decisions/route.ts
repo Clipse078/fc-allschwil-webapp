@@ -111,7 +111,7 @@ function normalizeOptionalDateTime(
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungültig." };
+    return { error: fieldLabel + " ist ungueltig." };
   }
 
   return { value: parsed };
@@ -132,7 +132,7 @@ function parseDecisionType(
     case "INFO":
       return { value: "INFO" };
     default:
-      return { error: "Ungültiger Entscheidungstyp: " + decisionType };
+      return { error: "Ungueltiger Entscheidungstyp: " + decisionType };
   }
 }
 
@@ -157,7 +157,7 @@ function normalizeDecision(
 
   const dueDateResult = normalizeOptionalDateTime(
     record.dueDate,
-    "Fälligkeitsdatum",
+    "Faelligkeitsdatum",
   );
 
   if ("error" in dueDateResult) {
@@ -169,7 +169,7 @@ function normalizeDecision(
   const initiativeTitle = normalizeOptionalString(record.initiativeTitle);
 
   if (createInitiative && !initiativeTitle) {
-    return { error: "Für eine neue Initiative ist ein Initiative-Titel erforderlich." };
+    return { error: "Fuer eine neue Initiative ist ein Initiative-Titel erforderlich." };
   }
 
   return {
@@ -283,7 +283,7 @@ async function validateInitiatives(decisions: DecisionInput[]) {
   if (initiatives.length !== initiativeIds.length) {
     return {
       ok: false,
-      error: "Mindestens eine verknüpfte Initiative wurde nicht gefunden.",
+      error: "Mindestens eine verknuepfte Initiative wurde nicht gefunden.",
     } as const;
   }
 
@@ -292,7 +292,7 @@ async function validateInitiatives(decisions: DecisionInput[]) {
 
 function buildMatterTitle(decision: DecisionInput) {
   if (decision.agendaItemTitle) {
-    return decision.agendaItemTitle + " – " + decision.decisionText;
+    return decision.agendaItemTitle + " - " + decision.decisionText;
   }
 
   return decision.decisionText;
@@ -335,7 +335,7 @@ function buildInitiativeDescription(decision: DecisionInput, meetingTitle: strin
 
 function buildWorkItemTitle(decision: DecisionInput) {
   if (decision.agendaItemTitle) {
-    return decision.agendaItemTitle + " – " + decision.decisionText;
+    return decision.agendaItemTitle + " - " + decision.decisionText;
   }
 
   return decision.decisionText;
@@ -422,6 +422,75 @@ function mapDecisionTypeToMatterPriority(
     default:
       return "MEDIUM";
   }
+}
+
+async function syncSourcedWorkItemForDecision(
+  tx: Prisma.TransactionClient,
+  options: {
+    meetingId: string;
+    decisionId: string;
+    linkedInitiativeId: string | null;
+    decision: DecisionInput;
+  },
+) {
+  const { meetingId, decisionId, linkedInitiativeId, decision } = options;
+
+  const existingWorkItem = await tx.vereinsleitungInitiativeWorkItem.findFirst({
+    where: {
+      sourceDecisionId: decisionId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!linkedInitiativeId) {
+    if (existingWorkItem) {
+      await tx.vereinsleitungInitiativeWorkItem.delete({
+        where: {
+          id: existingWorkItem.id,
+        },
+      });
+    }
+
+    return null;
+  }
+
+  const data = {
+    initiativeId: linkedInitiativeId,
+    title: buildWorkItemTitle(decision),
+    priority: buildWorkItemPriority(decision.decisionType),
+    dueDate: decision.dueDate,
+    assigneeMode: buildAssigneeMode(decision),
+    assigneePersonId: decision.responsiblePersonId,
+    externalAssigneeLabel: null,
+    sourceMeetingId: meetingId,
+    sourceDecisionId: decisionId,
+    sourceAgendaItemTitle: decision.agendaItemTitle,
+  };
+
+  if (existingWorkItem) {
+    return tx.vereinsleitungInitiativeWorkItem.update({
+      where: {
+        id: existingWorkItem.id,
+      },
+      data,
+    });
+  }
+
+  const lastWorkItem = await tx.vereinsleitungInitiativeWorkItem.findFirst({
+    where: { initiativeId: linkedInitiativeId },
+    orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
+    select: { sortOrder: true },
+  });
+
+  return tx.vereinsleitungInitiativeWorkItem.create({
+    data: {
+      ...data,
+      status: VereinsleitungInitiativeWorkItemStatus.BACKLOG,
+      sortOrder: (lastWorkItem?.sortOrder ?? -1) + 1,
+    },
+  });
 }
 
 export async function GET(
@@ -521,7 +590,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Für Initiative-Verknüpfungen fehlt die Berechtigung vereinsleitung.initiatives.manage.",
+            "Fuer Initiative-Verknuepfungen fehlt die Berechtigung vereinsleitung.initiatives.manage.",
         },
         { status: 403 },
       );
@@ -614,33 +683,14 @@ export async function POST(
           });
         }
 
-        let createdWorkItem: Prisma.VereinsleitungInitiativeWorkItemGetPayload<Record<string, never>> | null =
-          null;
-
-        if (linkedInitiativeId) {
-          const lastWorkItem = await tx.vereinsleitungInitiativeWorkItem.findFirst({
-            where: { initiativeId: linkedInitiativeId },
-            orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
-            select: { sortOrder: true },
-          });
-
-          createdWorkItem = await tx.vereinsleitungInitiativeWorkItem.create({
-            data: {
-              initiativeId: linkedInitiativeId,
-              title: buildWorkItemTitle(decision),
-              priority: buildWorkItemPriority(decision.decisionType),
-              dueDate: decision.dueDate,
-              assigneeMode: buildAssigneeMode(decision),
-              assigneePersonId: decision.responsiblePersonId,
-              externalAssigneeLabel: null,
-              status: VereinsleitungInitiativeWorkItemStatus.BACKLOG,
-              sourceMeetingId: meetingId,
-              sourceDecisionId: createdDecision.id,
-              sourceAgendaItemTitle: decision.agendaItemTitle,
-              sortOrder: (lastWorkItem?.sortOrder ?? -1) + 1,
-            },
-          });
-        }
+        const createdWorkItem = linkedInitiativeId
+          ? await syncSourcedWorkItemForDecision(tx, {
+              meetingId,
+              decisionId: createdDecision.id,
+              linkedInitiativeId,
+              decision,
+            })
+          : null;
 
         results.push({
           decision: createdDecision,
@@ -739,7 +789,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error:
-            "Für Initiative-Verknüpfungen fehlt die Berechtigung vereinsleitung.initiatives.manage.",
+            "Fuer Initiative-Verknuepfungen fehlt die Berechtigung vereinsleitung.initiatives.manage.",
         },
         { status: 403 },
       );
@@ -791,7 +841,7 @@ export async function PATCH(
         linkedInitiativeTitle = null;
       }
 
-      return tx.vereinsleitungMeetingDecision.update({
+      const updatedDecision = await tx.vereinsleitungMeetingDecision.update({
         where: { id: decisionId },
         data: {
           agendaItemId: decision.agendaItemId,
@@ -809,6 +859,15 @@ export async function PATCH(
         },
         include: DECISION_INCLUDE,
       });
+
+      await syncSourcedWorkItemForDecision(tx, {
+        meetingId,
+        decisionId,
+        linkedInitiativeId,
+        decision,
+      });
+
+      return updatedDecision;
     });
 
     await logAction({
@@ -879,8 +938,18 @@ export async function DELETE(
       );
     }
 
-    await prisma.vereinsleitungMeetingDecision.delete({
-      where: { id: decisionId },
+    await prisma.$transaction(async (tx) => {
+      await tx.vereinsleitungInitiativeWorkItem.deleteMany({
+        where: {
+          sourceDecisionId: decisionId,
+        },
+      });
+
+      await tx.vereinsleitungMeetingDecision.delete({
+        where: {
+          id: decisionId,
+        },
+      });
     });
 
     await logAction({
@@ -904,7 +973,7 @@ export async function DELETE(
     }
 
     return NextResponse.json(
-      { error: "Entscheidung konnte nicht gelöscht werden." },
+      { error: "Entscheidung konnte nicht geloescht werden." },
       { status: 500 },
     );
   }
