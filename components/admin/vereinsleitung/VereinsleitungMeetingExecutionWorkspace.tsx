@@ -1,7 +1,7 @@
 ﻿"use client";
 
-import { useMemo } from "react";
-import { CheckCircle2, FileText, ListChecks } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle2, FileText, ListChecks, Loader2, Plus } from "lucide-react";
 import type {
   MeetingAgendaItem,
   MeetingDecisionItem,
@@ -17,7 +17,30 @@ type VereinsleitungMeetingExecutionWorkspaceProps = {
   isDone: boolean;
 };
 
+type InlineState = {
+  openNoteForAgendaId: string | null;
+  openDecisionForAgendaId: string | null;
+  noteText: string;
+  decisionText: string;
+  decisionType: "DECISION" | "TASK" | "APPROVAL" | "INFO";
+  isSavingNote: boolean;
+  isSavingDecision: boolean;
+  error: string | null;
+};
+
+const INITIAL_INLINE_STATE: InlineState = {
+  openNoteForAgendaId: null,
+  openDecisionForAgendaId: null,
+  noteText: "",
+  decisionText: "",
+  decisionType: "DECISION",
+  isSavingNote: false,
+  isSavingDecision: false,
+  error: null,
+};
+
 export default function VereinsleitungMeetingExecutionWorkspace({
+  meetingId,
   agendaItems,
   protocolEntries,
   decisions,
@@ -37,6 +60,147 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     () => decisions.filter((decision) => !decision.agendaItemId),
     [decisions],
   );
+
+  const [inlineState, setInlineState] = useState<InlineState>(INITIAL_INLINE_STATE);
+
+  function openNote(agendaItemId: string) {
+    setInlineState((current) => ({
+      ...current,
+      openNoteForAgendaId: agendaItemId,
+      openDecisionForAgendaId: current.openDecisionForAgendaId === agendaItemId ? null : current.openDecisionForAgendaId,
+      noteText: "",
+      error: null,
+    }));
+  }
+
+  function openDecision(agendaItemId: string) {
+    setInlineState((current) => ({
+      ...current,
+      openDecisionForAgendaId: agendaItemId,
+      openNoteForAgendaId: current.openNoteForAgendaId === agendaItemId ? null : current.openNoteForAgendaId,
+      decisionText: "",
+      decisionType: "DECISION",
+      error: null,
+    }));
+  }
+
+  function closeInlineEditors() {
+    setInlineState((current) => ({
+      ...current,
+      openNoteForAgendaId: null,
+      openDecisionForAgendaId: null,
+      noteText: "",
+      decisionText: "",
+      decisionType: "DECISION",
+      error: null,
+    }));
+  }
+
+  async function createProtocolEntry(agendaItemId: string, agendaItemTitle: string) {
+    const notes = inlineState.noteText.trim();
+
+    if (!notes) {
+      setInlineState((current) => ({
+        ...current,
+        error: "Bitte zuerst eine Notiz erfassen.",
+      }));
+      return;
+    }
+
+    try {
+      setInlineState((current) => ({
+        ...current,
+        isSavingNote: true,
+        error: null,
+      }));
+
+      const response = await fetch(
+        "/api/vereinsleitung/meetings/" + meetingId + "/protocol",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agendaItemId,
+            agendaItemTitle,
+            notes,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Protokolleintrag konnte nicht erstellt werden.");
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setInlineState((current) => ({
+        ...current,
+        isSavingNote: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Technischer Fehler beim Erstellen der Notiz.",
+      }));
+    }
+  }
+
+  async function createDecision(agendaItemId: string, agendaItemTitle: string) {
+    const decisionText = inlineState.decisionText.trim();
+
+    if (!decisionText) {
+      setInlineState((current) => ({
+        ...current,
+        error: "Bitte zuerst einen Beschlusstext erfassen.",
+      }));
+      return;
+    }
+
+    try {
+      setInlineState((current) => ({
+        ...current,
+        isSavingDecision: true,
+        error: null,
+      }));
+
+      const response = await fetch(
+        "/api/vereinsleitung/meetings/" + meetingId + "/decisions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agendaItemId,
+            agendaItemTitle,
+            decisionText,
+            decisionType: inlineState.decisionType,
+            createMatter: false,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Beschluss konnte nicht erstellt werden.");
+      }
+
+      window.location.reload();
+    } catch (error) {
+      setInlineState((current) => ({
+        ...current,
+        isSavingDecision: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Technischer Fehler beim Erstellen des Beschlusses.",
+      }));
+    }
+  }
 
   return (
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
@@ -104,6 +268,146 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                   </span>
                 </div>
               </div>
+
+              {!isDone ? (
+                <div className="mt-5 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs text-slate-500">Aktionen für dieses Traktand</div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openNote(item.id)}
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Notiz hinzufügen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openDecision(item.id)}
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Beschluss hinzufügen
+                      </button>
+                    </div>
+                  </div>
+
+                  {inlineState.error &&
+                  (inlineState.openNoteForAgendaId === item.id ||
+                    inlineState.openDecisionForAgendaId === item.id) ? (
+                    <div className="mt-4 rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {inlineState.error}
+                    </div>
+                  ) : null}
+
+                  {inlineState.openNoteForAgendaId === item.id ? (
+                    <div className="mt-4 rounded-[16px] bg-white p-4">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Neue Notiz
+                      </label>
+                      <textarea
+                        value={inlineState.noteText}
+                        onChange={(event) =>
+                          setInlineState((current) => ({
+                            ...current,
+                            noteText: event.target.value,
+                          }))
+                        }
+                        rows={4}
+                        placeholder="Protokollnotiz zu diesem Traktand ..."
+                        className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                      />
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => createProtocolEntry(item.id, item.title)}
+                          disabled={inlineState.isSavingNote}
+                          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {inlineState.isSavingNote ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          Notiz speichern
+                        </button>
+                        <button
+                          type="button"
+                          onClick={closeInlineEditors}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {inlineState.openDecisionForAgendaId === item.id ? (
+                    <div className="mt-4 rounded-[16px] bg-white p-4">
+                      <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Typ
+                          </label>
+                          <select
+                            value={inlineState.decisionType}
+                            onChange={(event) =>
+                              setInlineState((current) => ({
+                                ...current,
+                                decisionType: event.target.value as InlineState["decisionType"],
+                              }))
+                            }
+                            className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                          >
+                            <option value="DECISION">Beschluss</option>
+                            <option value="TASK">Auftrag</option>
+                            <option value="APPROVAL">Freigabe</option>
+                            <option value="INFO">Info</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Beschlusstext
+                          </label>
+                          <textarea
+                            value={inlineState.decisionText}
+                            onChange={(event) =>
+                              setInlineState((current) => ({
+                                ...current,
+                                decisionText: event.target.value,
+                              }))
+                            }
+                            rows={4}
+                            placeholder="Beschluss, Auftrag oder Entscheidung zu diesem Traktand ..."
+                            className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => createDecision(item.id, item.title)}
+                          disabled={inlineState.isSavingDecision}
+                          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {inlineState.isSavingDecision ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : null}
+                          Beschluss speichern
+                        </button>
+                        <button
+                          type="button"
+                          onClick={closeInlineEditors}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="mt-5 grid gap-4 xl:grid-cols-2">
                 <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
