@@ -116,7 +116,7 @@ async function main() {
     },
     {
       key: "president",
-      name: "PrÃ¤sident",
+      name: "PrÃƒÂ¤sident",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -136,7 +136,7 @@ async function main() {
     },
     {
       key: "vice_president",
-      name: "Vize-PrÃ¤sident",
+      name: "Vize-PrÃƒÂ¤sident",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -155,7 +155,7 @@ async function main() {
     },
     {
       key: "sekretaer",
-      name: "SekretÃ¤r",
+      name: "SekretÃƒÂ¤r",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -293,7 +293,7 @@ async function main() {
     },
     {
       key: "aktivitaetenkommission_leiter",
-      name: "AktivitÃ¤tenkommision Leiter",
+      name: "AktivitÃƒÂ¤tenkommision Leiter",
       description: "Organisatorische Leitung / Operations",
       canAccessVereinsleitung: false,
       canAttendVereinsleitungMeetings: true,
@@ -303,7 +303,7 @@ async function main() {
     },
     {
       key: "aktivitaetenkommission_mitglied",
-      name: "AktivitÃ¤tenkommision Mitgelied",
+      name: "AktivitÃƒÂ¤tenkommision Mitgelied",
       description: "Organisatorische Leitung / Operations",
       canAccessVereinsleitung: false,
       canAttendVereinsleitungMeetings: true,
@@ -740,9 +740,9 @@ async function main() {
 
   const demoTitles = [
     "FC Allschwil E4 vs FC Concordia Basel",
-    "E4 FrÃƒÂ¼hlingsturnier Aesch",
+    "E4 FrÃƒÆ’Ã‚Â¼hlingsturnier Aesch",
     "E4 Training Dienstag",
-    "Sponsor ApÃƒÂ©ro FrÃƒÂ¼hling 2026",
+    "Sponsor ApÃƒÆ’Ã‚Â©ro FrÃƒÆ’Ã‚Â¼hling 2026",
   ];
 
   await prisma.event.deleteMany({
@@ -763,8 +763,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "FC Allschwil E4 vs FC Concordia Basel",
-        description: "Demo Match fÃƒÂ¼r Spielplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im BrÃƒÂ¼hl",
+        description: "Demo Match fÃƒÆ’Ã‚Â¼r Spielplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃƒÆ’Ã‚Â¼hl",
         startAt: new Date("2026-04-18T08:30:00.000Z"),
         endAt: new Date("2026-04-18T10:00:00.000Z"),
         opponentName: "FC Concordia Basel",
@@ -787,13 +787,13 @@ async function main() {
         type: EventType.TOURNAMENT,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
-        title: "E4 FrÃƒÂ¼hlingsturnier Aesch",
-        description: "Demo Turnier fÃƒÂ¼r Website, Wochenplan, Teamseite und Infoboard.",
+        title: "E4 FrÃƒÆ’Ã‚Â¼hlingsturnier Aesch",
+        description: "Demo Turnier fÃƒÆ’Ã‚Â¼r Website, Wochenplan, Teamseite und Infoboard.",
         location: "Sportanlage Aesch",
         startAt: new Date("2026-05-02T07:30:00.000Z"),
         endAt: new Date("2026-05-02T15:30:00.000Z"),
         organizerName: "FC Aesch",
-        competitionLabel: "FrÃƒÂ¼hlingsturnier",
+        competitionLabel: "FrÃƒÆ’Ã‚Â¼hlingsturnier",
         websiteVisible: true,
         infoboardVisible: true,
         homepageVisible: true,
@@ -812,8 +812,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "E4 Training Dienstag",
-        description: "Demo Training fÃƒÂ¼r Trainingsplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im BrÃƒÂ¼hl",
+        description: "Demo Training fÃƒÆ’Ã‚Â¼r Trainingsplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃƒÆ’Ã‚Â¼hl",
         startAt: new Date("2026-04-21T15:30:00.000Z"),
         endAt: new Date("2026-04-21T17:00:00.000Z"),
         meetingTime: new Date("2026-04-21T15:15:00.000Z"),
@@ -834,8 +834,8 @@ async function main() {
       type: EventType.OTHER,
       source: EventSource.MANUAL,
       status: EventStatus.SCHEDULED,
-      title: "Sponsor ApÃƒÂ©ro FrÃƒÂ¼hling 2026",
-      description: "Demo weiteres Event fÃƒÂ¼r die Website Events Seite.",
+      title: "Sponsor ApÃƒÆ’Ã‚Â©ro FrÃƒÆ’Ã‚Â¼hling 2026",
+      description: "Demo weiteres Event fÃƒÆ’Ã‚Â¼r die Website Events Seite.",
       location: "Clubhaus FC Allschwil",
       startAt: new Date("2026-05-14T16:30:00.000Z"),
       endAt: new Date("2026-05-14T20:00:00.000Z"),
@@ -936,7 +936,7 @@ async function main() {
       slug: "website-relaunch-initiative",
       subtitle: "Initiativen Details",
       description:
-        "Der aktuelle Webauftritt des FC Allschwil ist technisch veraltet, nicht mobil-optimiert und repräsentiert den Verein nicht mehr zeitgemäss. Ziel dieser Initiative ist die Konzeption, Gestaltung und Entwicklung einer neuen, modernen Website, die als zentraler Kommunikationskanal für Mitglieder, Fans und Sponsoren dient.",
+        "Der aktuelle Webauftritt des FC Allschwil ist technisch veraltet, nicht mobil-optimiert und reprÃ¤sentiert den Verein nicht mehr zeitgemÃ¤ss. Ziel dieser Initiative ist die Konzeption, Gestaltung und Entwicklung einer neuen, modernen Website, die als zentraler Kommunikationskanal fÃ¼r Mitglieder, Fans und Sponsoren dient.",
       status: VereinsleitungInitiativeStatus.IN_PROGRESS,
       ownerPersonId: adminPerson.id,
       ownerRoleLabel: "Ressortleiter Organisation & Vereinsentwicklung",
@@ -947,7 +947,6 @@ async function main() {
           {
             title: "Phase 6 | Retainer for Additional Requests",
             priority: "MAJOR",
-            storyPoints: null,
             assigneeMode: VereinsleitungInitiativeWorkItemAssigneeMode.PERSON,
             assigneePersonId: adminPerson.id,
             status: VereinsleitungInitiativeWorkItemStatus.BACKLOG,
@@ -956,7 +955,6 @@ async function main() {
           {
             title: "v3.7 Customer feedback - part 3",
             priority: "MAJOR",
-            storyPoints: null,
             assigneeMode: VereinsleitungInitiativeWorkItemAssigneeMode.NONE,
             status: VereinsleitungInitiativeWorkItemStatus.RESOLVED,
             sortOrder: 1,
@@ -964,7 +962,6 @@ async function main() {
           {
             title: "Show additional Qualification status on RFRFQ",
             priority: "MAJOR",
-            storyPoints: null,
             assigneeMode: VereinsleitungInitiativeWorkItemAssigneeMode.EXTERNAL,
             externalAssigneeLabel: "External",
             status: VereinsleitungInitiativeWorkItemStatus.RESOLVED,
@@ -973,7 +970,6 @@ async function main() {
           {
             title: "Supplier | Spend Data | Adjust Lead Buyers",
             priority: "MAJOR",
-            storyPoints: null,
             assigneeMode: VereinsleitungInitiativeWorkItemAssigneeMode.NONE,
             status: VereinsleitungInitiativeWorkItemStatus.RESOLVED,
             sortOrder: 3,
