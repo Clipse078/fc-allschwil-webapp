@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -484,6 +484,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                           <div className="text-sm font-semibold text-slate-900">
                             Initiative-Verknüpfung
                           </div>
+                        </div>
+
+                        <div className="mt-3 rounded-[14px] border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-blue-900">
+                          If you link or create an initiative here, the system will automatically create a sourced work item with a back-reference to this meeting decision.
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
