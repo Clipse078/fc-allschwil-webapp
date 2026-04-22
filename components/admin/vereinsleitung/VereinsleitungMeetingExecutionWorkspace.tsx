@@ -281,10 +281,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-              Execution Workspace
+              Meeting-Ausführung
             </p>
             <h2 className="mt-2 text-[1.2rem] font-semibold text-slate-900">
-              Meeting-Ausführung nach Traktanden
+              Ausführung nach Traktanden
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               Protokoll, Beschlüsse und Initiative-Verknüpfungen werden entlang der Agenda sichtbar gemacht.
@@ -489,7 +489,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                           </div>
 
                           <div className="mt-3 rounded-[14px] border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-blue-900">
-                            If you link or create an initiative here, the system will automatically create a sourced work item with a back-reference to this meeting decision.
+                            Wenn du hier eine Initiative erstellst oder verknüpfst, erzeugt das System automatisch ein verknüpftes Work Item mit Rückbezug auf diesen Meeting-Entscheid.
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -684,11 +684,11 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                   href={"/vereinsleitung/initiativen/" + decision.initiativeSlug + "#work-item-source-" + decision.id}
                                   className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
                                 >
-                                  Work item created{decision.sourcedWorkItemCount > 1 ? ": " + decision.sourcedWorkItemCount : ""}
+                                  Quelle-Aufgabe erstellt{decision.sourcedWorkItemCount > 1 ? ": " + decision.sourcedWorkItemCount : ""}
                                 </Link>
                               ) : decision.hasSourcedWorkItem ? (
                                 <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                                  Work item created{decision.sourcedWorkItemCount > 1 ? ": " + decision.sourcedWorkItemCount : ""}
+                                  Quelle-Aufgabe erstellt{decision.sourcedWorkItemCount > 1 ? ": " + decision.sourcedWorkItemCount : ""}
                                 </span>
                               ) : null}
                             </div>

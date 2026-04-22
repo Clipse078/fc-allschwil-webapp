@@ -66,7 +66,7 @@ export default function VereinsleitungMeetingActionsCard({
             </div>
             <p className="mt-4 text-lg font-semibold text-slate-900">{teamsSyncStatusLabel}</p>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Status der Teams-/Online-Meeting-Vorbereitung.
+              Status der Teams- und Online-Meeting-Vorbereitung.
             </p>
           </article>
 
