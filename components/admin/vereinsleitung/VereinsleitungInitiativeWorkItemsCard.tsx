@@ -62,7 +62,7 @@ function getPriorityClass(priority: string) {
 
 function formatDateLabel(value: string | null) {
   if (!value) {
-    return "—";
+    return "â€”";
   }
 
   return new Intl.DateTimeFormat("de-CH", {
@@ -385,7 +385,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
               <article
                 id={item.sourceDecisionId ? "work-item-source-" + item.sourceDecisionId : "work-item-" + item.id}
                 key={item.id}
-                className="scroll-mt-28 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                className="scroll-mt-28 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition-colors duration-700 target:border-violet-300 target:bg-violet-50/60"
               >
                 {isEditing ? (
                   <div className="space-y-4">
@@ -545,7 +545,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
 
                         {item.dueDateIso ? (
                           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                            Fällig: {formatDateLabel(item.dueDateIso)}
+                            FÃ¤llig: {formatDateLabel(item.dueDateIso)}
                           </span>
                         ) : null}
 
