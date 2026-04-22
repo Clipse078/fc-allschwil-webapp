@@ -181,7 +181,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Work Item konnte nicht erstellt werden.");
+        throw new Error(payload?.error || "Arbeitspaket konnte nicht erstellt werden.");
       }
 
       resetCreateFields();
@@ -229,7 +229,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Work Item konnte nicht gespeichert werden.");
+        throw new Error(payload?.error || "Arbeitspaket konnte nicht gespeichert werden.");
       }
 
       stopEdit();
@@ -242,7 +242,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
   }
 
   async function deleteWorkItem(workItemId: string, workItemTitle: string) {
-    const confirmed = confirm('Work Item "' + workItemTitle + '" wirklich löschen?');
+    const confirmed = confirm('Arbeitspaket "' + workItemTitle + '" wirklich löschen?');
     if (!confirmed) {
       return;
     }
@@ -261,7 +261,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Work Item konnte nicht gelöscht werden.");
+        throw new Error(payload?.error || "Arbeitspaket konnte nicht gelöscht werden.");
       }
 
       if (editId === workItemId) {
@@ -282,14 +282,19 @@ export default function VereinsleitungInitiativeWorkItemsCard({
       <div className="p-6 md:p-7">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h3 className="text-[1.2rem] font-semibold tracking-tight text-slate-900">Work Items</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+              Umsetzung
+            </p>
+            <h3 className="mt-2 text-[1.2rem] font-semibold tracking-tight text-slate-900">
+              Arbeitspakete
+            </h3>
             <p className="mt-2 text-sm text-slate-500">
               Aufgaben mit Priorität, Fälligkeit, sauberer Zuweisung und optionaler Meeting-Herkunft.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-            <span>{totalCount} total</span>
+            <span>{totalCount} gesamt</span>
             <span>{resolvedCount} erledigt</span>
             <span>{progressPercent}% Fortschritt</span>
           </div>
@@ -300,7 +305,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
             <input
               value={newTitle}
               onChange={(event) => setNewTitle(event.target.value)}
-              placeholder="Neues Work Item"
+              placeholder="Neues Arbeitspaket"
               className="rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
             />
 
@@ -384,7 +389,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
 
         {sortedItems.length === 0 ? (
           <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-500">
-            Noch keine Work Items vorhanden.
+            Noch keine Arbeitspakete vorhanden.
           </div>
         ) : (
           <div className="mt-5 space-y-3">
@@ -394,7 +399,11 @@ export default function VereinsleitungInitiativeWorkItemsCard({
 
               return (
                 <article
-                  id={item.sourceDecisionId ? "work-item-source-" + item.sourceDecisionId : "work-item-" + item.id}
+                  id={
+                    item.sourceDecisionId
+                      ? "work-item-source-" + item.sourceDecisionId
+                      : "work-item-" + item.id
+                  }
                   key={item.id}
                   className="scroll-mt-28 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition-colors duration-700 target:border-violet-300 target:bg-violet-50/60"
                 >

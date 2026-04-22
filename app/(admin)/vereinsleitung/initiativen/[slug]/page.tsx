@@ -115,7 +115,10 @@ export default async function InitiativeSlugPage({
       <AdminSectionHeader
         eyebrow="Vereinsleitung"
         title={initiative.title}
-        description={initiative.subtitle ?? "Initiativen-Details"}
+        description={
+          initiative.subtitle ??
+          "Status, Verantwortlichkeit, Roadmap und Arbeitspakete dieser Initiative."
+        }
       />
 
       <VereinsleitungInitiativeDetail

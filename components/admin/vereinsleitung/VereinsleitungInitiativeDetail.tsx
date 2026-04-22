@@ -119,19 +119,16 @@ export default function VereinsleitungInitiativeDetail({
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/vereinsleitung/initiativen"
-          className="fca-button-secondary"
-        >
+        <Link href="/vereinsleitung/initiativen" className="fca-button-secondary">
           Zur Übersicht
         </Link>
 
         <Link
-          href={"/vereinsleitung/initiativen/" + initiative.slug + "/edit"}
+          href={"/vereinsleitung/initiativen/" + initiative.slug + "#initiative-editor"}
           className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/5 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2] transition hover:bg-[#0b4aa2]/10"
         >
           <FilePenLine className="h-4 w-4" />
-          Bearbeiten
+          Initiative bearbeiten
         </Link>
 
         <button
@@ -144,28 +141,56 @@ export default function VereinsleitungInitiativeDetail({
         </button>
       </div>
 
-      <InitiativeInlineEditor
-        initiative={{
-          id: initiative.id,
-          title: initiative.title,
-          subtitle: initiative.subtitle,
-          description: initiative.description,
-          status: initiative.status as never,
-          startDate: initiative.startDateIso,
-          targetDate: initiative.targetDateIso,
-          ownerRoleLabel: initiative.ownerRoleLabel,
-          ownerPerson: initiative.ownerPerson,
-        }}
-      />
+      <section
+        id="initiative-editor"
+        className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)]"
+      >
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+        <div className="p-6 md:p-7">
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+              Initiative bearbeiten
+            </p>
+            <h3 className="mt-2 text-[1.3rem] font-semibold tracking-tight text-slate-900">
+              Stammdaten und Verantwortlichkeit
+            </h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              Passe Titel, Beschreibung, Zeitraum, Status und verantwortliche Person direkt hier an.
+            </p>
+          </div>
+
+          <InitiativeInlineEditor
+            initiative={{
+              id: initiative.id,
+              title: initiative.title,
+              subtitle: initiative.subtitle,
+              description: initiative.description,
+              status: initiative.status as never,
+              startDate: initiative.startDateIso,
+              targetDate: initiative.targetDateIso,
+              ownerRoleLabel: initiative.ownerRoleLabel,
+              ownerPerson: initiative.ownerPerson,
+            }}
+          />
+        </div>
+      </section>
 
       <section className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
         <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
         <div className="p-6 md:p-7">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.75fr)]">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
             <div>
-              <h3 className="text-[1.35rem] font-semibold tracking-tight text-slate-900">
-                Projektbeschreibung
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+                Überblick
+              </p>
+              <h3 className="mt-2 text-[1.35rem] font-semibold tracking-tight text-slate-900">
+                Beschreibung der Initiative
               </h3>
+
+              {initiative.subtitle ? (
+                <p className="mt-3 text-sm font-medium text-slate-600">{initiative.subtitle}</p>
+              ) : null}
+
               <p className="mt-4 max-w-4xl text-[15px] leading-7 text-slate-700">
                 {initiative.description ?? "Keine Beschreibung hinterlegt."}
               </p>
@@ -204,23 +229,29 @@ export default function VereinsleitungInitiativeDetail({
 
               <div className="mt-5 grid gap-3 text-sm text-slate-600">
                 <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Start</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                    Start
+                  </div>
                   <div className="mt-1 font-medium text-slate-800">
                     {formatDateLabel(initiative.startDateIso)}
                   </div>
                 </div>
 
                 <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Ziel</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                    Ziel
+                  </div>
                   <div className="mt-1 font-medium text-slate-800">
                     {formatDateLabel(initiative.targetDateIso)}
                   </div>
                 </div>
 
                 <div className="rounded-[18px] border border-blue-100 bg-blue-50/70 px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-blue-500">Aus Meetings</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-blue-500">
+                    Aus Meetings
+                  </div>
                   <div className="mt-1 font-medium text-blue-900">
-                    {meetingOriginCount} Work Items mit Meeting-Herkunft
+                    {meetingOriginCount} Arbeitspakete mit Meeting-Herkunft
                   </div>
                 </div>
               </div>

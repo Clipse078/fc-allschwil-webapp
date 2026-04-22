@@ -21,5 +21,5 @@ export default async function InitiativeEditPage({
     notFound();
   }
 
-  redirect("/vereinsleitung/initiativen/" + initiative.slug);
+  redirect("/vereinsleitung/initiativen/" + initiative.slug + "#initiative-editor");
 }
