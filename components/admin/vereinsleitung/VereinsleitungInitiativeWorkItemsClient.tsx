@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -334,7 +334,7 @@ export default function VereinsleitungInitiativeWorkItemsClient({
             disabled={!title.trim() || isSubmitting || (assigneeType === "PERSON" && !selectedPerson)}
             className="h-[50px] rounded-full bg-[#0b4aa2] px-5 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Speichert..." : "HinzufÃ¼gen"}
+            {isSubmitting ? "Speichert..." : "HinzufÃƒÂ¼gen"}
           </button>
         </div>
 

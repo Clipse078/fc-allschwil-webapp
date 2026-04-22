@@ -49,7 +49,7 @@ export default async function VereinsleitungMeetingSlugPage({
         description="DB-basierte Meeting-Ansicht mit Pendenzen, Teilnehmern, Protokoll und vorbereitetem Beschlussbereich."
         actions={
           <Link href="/vereinsleitung/meetings" className="fca-button-secondary">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         }
       />
@@ -63,3 +63,4 @@ export default async function VereinsleitungMeetingSlugPage({
     </div>
   );
 }
+

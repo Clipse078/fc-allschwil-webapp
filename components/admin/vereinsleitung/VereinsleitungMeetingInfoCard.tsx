@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -128,7 +128,7 @@ function getApprovalNoteLabel(status: string) {
 
 function getUserIdLabel(userId: string | null) {
   if (!userId) {
-    return "—";
+    return "â€”";
   }
 
   return userId;
@@ -199,7 +199,7 @@ export default function VereinsleitungMeetingInfoCard({
 
   async function saveStatus() {
     if (!canManageMeetings) {
-      setStatusError("Du hast keine Berechtigung, den Meeting-Status zu ändern.");
+      setStatusError("Du hast keine Berechtigung, den Meeting-Status zu Ã¤ndern.");
       return;
     }
 
@@ -218,12 +218,12 @@ export default function VereinsleitungMeetingInfoCard({
 
   async function saveApprovalStatus() {
     if (!canApproveMeetings) {
-      setApprovalError("Du hast keine Berechtigung, den Freigabestatus manuell zu ändern.");
+      setApprovalError("Du hast keine Berechtigung, den Freigabestatus manuell zu Ã¤ndern.");
       return;
     }
 
     if (selectedApprovalStatus === "REJECTED" && !approvalNotesInput.trim()) {
-      setApprovalError("Für eine Ablehnung ist ein Ablehnungsgrund erforderlich.");
+      setApprovalError("FÃ¼r eine Ablehnung ist ein Ablehnungsgrund erforderlich.");
       return;
     }
 
@@ -254,12 +254,12 @@ export default function VereinsleitungMeetingInfoCard({
       : canReviewMeetings;
 
     if (!hasRequiredPermission) {
-      setApprovalError("Du hast keine Berechtigung für diese Freigabeaktion.");
+      setApprovalError("Du hast keine Berechtigung fÃ¼r diese Freigabeaktion.");
       return;
     }
 
     if (nextApprovalStatus === "REJECTED" && !approvalNotesInput.trim()) {
-      setApprovalError("Für eine Ablehnung ist ein Ablehnungsgrund erforderlich.");
+      setApprovalError("FÃ¼r eine Ablehnung ist ein Ablehnungsgrund erforderlich.");
       return;
     }
 
@@ -379,7 +379,7 @@ export default function VereinsleitungMeetingInfoCard({
               {isApprovalLocked ? (
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
                   <Lock className="h-3.5 w-3.5" />
-                  Approval-Lock aktiv
+                  Freigabe-Sperre aktiv
                 </span>
               ) : null}
 
@@ -457,7 +457,7 @@ export default function VereinsleitungMeetingInfoCard({
                     ) : (
                       <Send className="h-4 w-4" />
                     )}
-                    Zur Prüfung
+                    Zur PrÃ¼fung
                   </button>
                 ) : null}
 
@@ -511,12 +511,12 @@ export default function VereinsleitungMeetingInfoCard({
               </div>
             ) : (
               <div className="mt-4 rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-                Keine Freigabeaktionen verfügbar.
+                Keine Freigabeaktionen verfÃ¼gbar.
               </div>
             )}
 
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Freigabeaktionen werden strikt nach Berechtigung angezeigt. Ablehnungen verlangen einen Grund, Freigaben können optional dokumentiert werden.
+              Freigabeaktionen werden strikt nach Berechtigung angezeigt. Ablehnungen verlangen einen Grund, Freigaben kÃ¶nnen optional dokumentiert werden.
             </p>
 
             {approvalError ? (
@@ -584,18 +584,18 @@ export default function VereinsleitungMeetingInfoCard({
 
             <div className="mt-4 grid gap-3 text-sm text-slate-700">
               <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
-                <div className="font-medium text-slate-900">Zur Prüfung gesendet am</div>
-                <div className="mt-1">{approvalSubmittedAtLabel ?? "—"}</div>
+                <div className="font-medium text-slate-900">Zur PrÃ¼fung gesendet am</div>
+                <div className="mt-1">{approvalSubmittedAtLabel ?? "â€”"}</div>
               </div>
 
               <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
                 <div className="font-medium text-slate-900">Freigegeben am</div>
-                <div className="mt-1">{approvedAtLabel ?? "—"}</div>
+                <div className="mt-1">{approvedAtLabel ?? "â€”"}</div>
               </div>
 
               <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
                 <div className="font-medium text-slate-900">Abgelehnt am</div>
-                <div className="mt-1">{rejectedAtLabel ?? "—"}</div>
+                <div className="mt-1">{rejectedAtLabel ?? "â€”"}</div>
               </div>
 
               <div className="rounded-[18px] border border-slate-200 bg-white px-4 py-3">
@@ -626,7 +626,7 @@ export default function VereinsleitungMeetingInfoCard({
                 <div className="font-medium text-slate-900">{getApprovalNoteLabel(approvalStatus)}</div>
                 <div className="mt-1 inline-flex items-start gap-2">
                   <FileText className="mt-0.5 h-4 w-4 text-slate-400" />
-                  <span>{approvalNotes ?? "—"}</span>
+                  <span>{approvalNotes ?? "â€”"}</span>
                 </div>
               </div>
             </div>

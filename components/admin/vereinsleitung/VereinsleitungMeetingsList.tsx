@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,7 +49,7 @@ export default function VereinsleitungMeetingsList({
   const router = useRouter();
 
   async function handleDelete(meetingId: string, meetingTitle: string) {
-    const confirmed = confirm('Meeting "' + meetingTitle + '" wirklich löschen?');
+    const confirmed = confirm('Meeting "' + meetingTitle + '" wirklich lÃ¶schen?');
     if (!confirmed) {
       return;
     }
@@ -62,12 +62,12 @@ export default function VereinsleitungMeetingsList({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Meeting konnte nicht gelöscht werden.");
+        throw new Error(payload?.error || "Meeting konnte nicht gelÃ¶scht werden.");
       }
 
       router.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
+      alert(error instanceof Error ? error.message : "LÃ¶schen fehlgeschlagen.");
     }
   }
 
@@ -78,7 +78,7 @@ export default function VereinsleitungMeetingsList({
         <div className="p-10 text-center">
           <h3 className="text-lg font-semibold text-slate-900">Noch keine Meetings vorhanden</h3>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            Sobald Meetings erfasst werden, erscheinen sie hier automatisch inklusive verknüpfter Pendenzen.
+            Sobald Meetings erfasst werden, erscheinen sie hier automatisch inklusive verknÃ¼pfter Pendenzen.
           </p>
         </div>
       </section>
@@ -121,7 +121,7 @@ export default function VereinsleitungMeetingsList({
                   {meeting.isApprovalLocked ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
                       <Lock className="h-3.5 w-3.5" />
-                      Approval-Lock aktiv
+                      Freigabe-Sperre aktiv
                     </span>
                   ) : null}
                 </div>
@@ -135,7 +135,7 @@ export default function VereinsleitungMeetingsList({
                 <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-500">
                   <span className="inline-flex items-center gap-2">
                     <CalendarDays className="h-4 w-4 text-slate-400" />
-                    {meeting.dateLabel} · {meeting.timeLabel}
+                    {meeting.dateLabel} Â· {meeting.timeLabel}
                   </span>
 
                   {meeting.location ? (
@@ -147,7 +147,7 @@ export default function VereinsleitungMeetingsList({
 
                   <span className="inline-flex items-center gap-2">
                     <ListChecks className="h-4 w-4 text-slate-400" />
-                    {meeting.linkedMatterCount} verknüpfte Pendenzen
+                    {meeting.linkedMatterCount} verknÃ¼pfte Pendenzen
                   </span>
 
                   <span className="inline-flex items-center gap-2">
@@ -168,7 +168,7 @@ export default function VereinsleitungMeetingsList({
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <ExternalLink className="h-4 w-4" />
-                  Öffnen
+                  Ã–ffnen
                 </Link>
 
                 <Link
@@ -185,7 +185,7 @@ export default function VereinsleitungMeetingsList({
                   className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Löschen
+                  LÃ¶schen
                 </button>
               </div>
             </div>
