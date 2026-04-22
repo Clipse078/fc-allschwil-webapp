@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import VereinsleitungInitiativeDetail, {
   type InitiativeDetailWorkItem,
@@ -44,6 +44,8 @@ export default async function InitiativeSlugPage({
               firstName: true,
               lastName: true,
               displayName: true,
+              email: true,
+              phone: true,
             },
           },
         },
@@ -71,11 +73,28 @@ export default async function InitiativeSlugPage({
       id: item.id,
       title: item.title,
       priority: item.priority,
-      storyPoints: item.storyPoints,
+      dueDateIso: item.dueDate ? item.dueDate.toISOString() : null,
       assigneeMode: item.assigneeMode,
       assigneePersonId: item.assigneePersonId,
       externalAssigneeLabel: item.externalAssigneeLabel,
       assigneeName,
+      assigneePerson: item.assigneePerson
+        ? {
+            id: item.assigneePerson.id,
+            firstName: item.assigneePerson.firstName,
+            lastName: item.assigneePerson.lastName,
+            displayName:
+              item.assigneePerson.displayName ??
+              [item.assigneePerson.firstName, item.assigneePerson.lastName]
+                .filter(Boolean)
+                .join(" "),
+            email: item.assigneePerson.email,
+            phone: item.assigneePerson.phone,
+            imageSrc: null,
+            functionLabel: null,
+            teamLabel: null,
+          }
+        : null,
       status: item.status,
       sortOrder: item.sortOrder,
     };

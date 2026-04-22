@@ -1,4 +1,4 @@
-type VereinsleitungInitiativeRoadmapProps = {
+﻿type VereinsleitungInitiativeRoadmapProps = {
   status: string;
   startDateIso: string | null;
   targetDateIso: string | null;
@@ -9,7 +9,7 @@ type VereinsleitungInitiativeRoadmapProps = {
 
 function formatDateLabel(value: string | null) {
   if (!value) {
-    return "--";
+    return "—";
   }
 
   return new Intl.DateTimeFormat("de-CH", {
@@ -69,7 +69,7 @@ export default function VereinsleitungInitiativeRoadmap({
         </div>
 
         <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4">
-          <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Work Items</div>
+          <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Subtasks</div>
           <div className="mt-2 text-sm font-semibold text-slate-900">{totalWorkItems}</div>
         </div>
 

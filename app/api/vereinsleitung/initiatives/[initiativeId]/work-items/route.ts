@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import {
   VereinsleitungInitiativeWorkItemAssigneeMode,
   VereinsleitungInitiativeWorkItemStatus,
@@ -13,20 +13,6 @@ function normalizePriority(value: unknown) {
     return normalized;
   }
   return "MAJOR";
-}
-
-function normalizeStoryPoints(value: unknown) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return null;
-  }
-
-  return parsed;
 }
 
 function parseAssigneeMode(value: unknown): VereinsleitungInitiativeWorkItemAssigneeMode {
@@ -47,6 +33,22 @@ function normalizeOptionalString(value: unknown) {
   return normalized ? normalized : null;
 }
 
+function normalizeOptionalDate(value: unknown) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = new Date(raw + "T00:00:00.000Z");
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "INVALID_DATE";
+  }
+
+  return parsed;
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ initiativeId: string }> },
@@ -63,7 +65,7 @@ export async function POST(
     const body = await request.json();
     const title = String(body.title ?? "").trim();
     const priority = normalizePriority(body.priority);
-    const storyPoints = normalizeStoryPoints(body.storyPoints);
+    const dueDate = normalizeOptionalDate(body.dueDate);
     const assigneeMode = parseAssigneeMode(body.assigneeMode);
     const assigneePersonId = normalizeOptionalString(body.assigneePersonId);
     const externalAssigneeLabel = normalizeOptionalString(body.externalAssigneeLabel);
@@ -72,8 +74,12 @@ export async function POST(
       return NextResponse.json({ error: "Titel ist erforderlich." }, { status: 400 });
     }
 
+    if (dueDate === "INVALID_DATE") {
+      return NextResponse.json({ error: "Ungültiges Fälligkeitsdatum." }, { status: 400 });
+    }
+
     if (assigneeMode === "PERSON" && !assigneePersonId) {
-      return NextResponse.json({ error: "Bitte eine Person auswaehlen." }, { status: 400 });
+      return NextResponse.json({ error: "Bitte eine Person auswählen." }, { status: 400 });
     }
 
     if (assigneeMode === "EXTERNAL" && !externalAssigneeLabel) {
@@ -111,7 +117,7 @@ export async function POST(
         initiativeId,
         title,
         priority,
-        storyPoints,
+        dueDate,
         assigneeMode,
         assigneePersonId: assigneeMode === "PERSON" ? assigneePersonId : null,
         externalAssigneeLabel: assigneeMode === "EXTERNAL" ? externalAssigneeLabel : null,

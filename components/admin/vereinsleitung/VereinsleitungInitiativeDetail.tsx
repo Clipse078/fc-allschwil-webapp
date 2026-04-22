@@ -12,11 +12,12 @@ export type InitiativeDetailWorkItem = {
   id: string;
   title: string;
   priority: string;
-  storyPoints: number | null;
+  dueDateIso: string | null;
   assigneeMode: string;
   assigneePersonId: string | null;
   externalAssigneeLabel: string | null;
   assigneeName: string;
+  assigneePerson: PeoplePickerPerson | null;
   status: string;
   sortOrder: number;
 };
@@ -42,7 +43,7 @@ type VereinsleitungInitiativeDetailProps = {
 
 function formatDateLabel(value: string | null) {
   if (!value) {
-    return "--";
+    return "—";
   }
 
   return new Intl.DateTimeFormat("de-CH", {
@@ -86,7 +87,7 @@ export default function VereinsleitungInitiativeDetail({
     totalWorkItems > 0 ? Math.round((resolvedWorkItems / totalWorkItems) * 100) : 0;
 
   async function handleDelete() {
-    const confirmed = confirm('Initiative "' + initiative.title + '" wirklich loeschen?');
+    const confirmed = confirm('Initiative "' + initiative.title + '" wirklich löschen?');
     if (!confirmed) {
       return;
     }
@@ -99,13 +100,13 @@ export default function VereinsleitungInitiativeDetail({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Initiative konnte nicht geloescht werden.");
+        throw new Error(payload?.error || "Initiative konnte nicht gelöscht werden.");
       }
 
       router.push("/vereinsleitung/initiativen");
       router.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Loeschen fehlgeschlagen.");
+      alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
     }
   }
 
@@ -117,7 +118,7 @@ export default function VereinsleitungInitiativeDetail({
             href="/vereinsleitung/initiativen"
             className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
-            Zur Uebersicht
+            Zur Übersicht
           </Link>
 
           <Link
@@ -134,7 +135,7 @@ export default function VereinsleitungInitiativeDetail({
             className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
           >
             <Trash2 className="h-4 w-4" />
-            Loeschen
+            Löschen
           </button>
         </div>
 
@@ -242,4 +243,3 @@ export default function VereinsleitungInitiativeDetail({
     </div>
   );
 }
-

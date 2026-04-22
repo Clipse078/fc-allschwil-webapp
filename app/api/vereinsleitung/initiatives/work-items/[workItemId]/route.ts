@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { type VereinsleitungInitiativeWorkItemAssigneeMode } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
@@ -17,15 +17,17 @@ function normalizePriority(value: unknown) {
   return "MAJOR";
 }
 
-function normalizeStoryPoints(value: unknown) {
-  if (value === null || value === undefined || value === "") {
+function normalizeOptionalDate(value: unknown) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
     return null;
   }
 
-  const parsed = Number(value);
+  const parsed = new Date(raw + "T00:00:00.000Z");
 
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return null;
+  if (Number.isNaN(parsed.getTime())) {
+    return "INVALID_DATE";
   }
 
   return parsed;
@@ -74,7 +76,7 @@ export async function PATCH(
 
     const title = String(body.title ?? "").trim();
     const priority = normalizePriority(body.priority);
-    const storyPoints = normalizeStoryPoints(body.storyPoints);
+    const dueDate = normalizeOptionalDate(body.dueDate);
     const status = parseStatus(body.status);
     const assigneeMode = parseAssigneeMode(body.assigneeMode);
     const assigneePersonId = normalizeOptionalString(body.assigneePersonId);
@@ -85,11 +87,15 @@ export async function PATCH(
     }
 
     if (!status) {
-      return NextResponse.json({ error: "Ungueltiger Status." }, { status: 400 });
+      return NextResponse.json({ error: "Ungültiger Status." }, { status: 400 });
+    }
+
+    if (dueDate === "INVALID_DATE") {
+      return NextResponse.json({ error: "Ungültiges Fälligkeitsdatum." }, { status: 400 });
     }
 
     if (assigneeMode === "PERSON" && !assigneePersonId) {
-      return NextResponse.json({ error: "Bitte eine Person auswaehlen." }, { status: 400 });
+      return NextResponse.json({ error: "Bitte eine Person auswählen." }, { status: 400 });
     }
 
     if (assigneeMode === "EXTERNAL" && !externalAssigneeLabel) {
@@ -121,7 +127,7 @@ export async function PATCH(
       data: {
         title,
         priority,
-        storyPoints,
+        dueDate,
         assigneeMode,
         assigneePersonId: assigneeMode === "PERSON" ? assigneePersonId : null,
         externalAssigneeLabel: assigneeMode === "EXTERNAL" ? externalAssigneeLabel : null,
@@ -178,7 +184,7 @@ export async function DELETE(
     console.error("Delete initiative work item failed:", error);
 
     return NextResponse.json(
-      { error: "Work Item konnte nicht geloescht werden." },
+      { error: "Work Item konnte nicht gelöscht werden." },
       { status: 500 },
     );
   }

@@ -1,8 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Edit3, Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import PeoplePicker, {
+  type PeoplePickerPerson,
+} from "@/components/admin/shared/people-picker/PeoplePicker";
 import type { InitiativeDetailWorkItem } from "@/components/admin/vereinsleitung/VereinsleitungInitiativeDetail";
 
 type VereinsleitungInitiativeWorkItemsCardProps = {
@@ -16,9 +19,9 @@ type VereinsleitungInitiativeWorkItemsCardProps = {
 type DraftState = {
   title: string;
   priority: string;
-  storyPoints: string;
+  dueDate: string;
   assigneeMode: string;
-  assigneePersonId: string;
+  assigneePerson: PeoplePickerPerson | null;
   externalAssigneeLabel: string;
   status: string;
 };
@@ -56,13 +59,33 @@ function getPriorityClass(priority: string) {
   }
 }
 
+function formatDateLabel(value: string | null) {
+  if (!value) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("de-CH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function toDateInputValue(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return value.slice(0, 10);
+}
+
 function buildDraft(item: InitiativeDetailWorkItem): DraftState {
   return {
     title: item.title,
     priority: item.priority,
-    storyPoints: item.storyPoints === null ? "" : String(item.storyPoints),
+    dueDate: toDateInputValue(item.dueDateIso),
     assigneeMode: item.assigneeMode,
-    assigneePersonId: item.assigneePersonId ?? "",
+    assigneePerson: item.assigneePerson,
     externalAssigneeLabel: item.externalAssigneeLabel ?? "",
     status: item.status,
   };
@@ -79,7 +102,10 @@ export default function VereinsleitungInitiativeWorkItemsCard({
 
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState("MAJOR");
-  const [newStoryPoints, setNewStoryPoints] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newAssigneeMode, setNewAssigneeMode] = useState("NONE");
+  const [newAssigneePerson, setNewAssigneePerson] = useState<PeoplePickerPerson | null>(null);
+  const [newExternalAssigneeLabel, setNewExternalAssigneeLabel] = useState("");
   const [createBusy, setCreateBusy] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState | null>(null);
@@ -103,6 +129,15 @@ export default function VereinsleitungInitiativeWorkItemsCard({
     setError("");
   }
 
+  function resetCreateFields() {
+    setNewTitle("");
+    setNewPriority("MAJOR");
+    setNewDueDate("");
+    setNewAssigneeMode("NONE");
+    setNewAssigneePerson(null);
+    setNewExternalAssigneeLabel("");
+  }
+
   async function createWorkItem() {
     if (!newTitle.trim() || createBusy) {
       return;
@@ -122,10 +157,11 @@ export default function VereinsleitungInitiativeWorkItemsCard({
           body: JSON.stringify({
             title: newTitle.trim(),
             priority: newPriority,
-            storyPoints: newStoryPoints.trim() || null,
-            assigneeMode: "NONE",
-            assigneePersonId: null,
-            externalAssigneeLabel: null,
+            dueDate: newDueDate || null,
+            assigneeMode: newAssigneeMode,
+            assigneePersonId: newAssigneeMode === "PERSON" ? newAssigneePerson?.id ?? null : null,
+            externalAssigneeLabel:
+              newAssigneeMode === "EXTERNAL" ? newExternalAssigneeLabel.trim() || null : null,
           }),
         },
       );
@@ -136,9 +172,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
         throw new Error(payload?.error || "Work Item konnte nicht erstellt werden.");
       }
 
-      setNewTitle("");
-      setNewPriority("MAJOR");
-      setNewStoryPoints("");
+      resetCreateFields();
       router.refresh();
     } catch (errorValue) {
       setError(errorValue instanceof Error ? errorValue.message : "Erstellen fehlgeschlagen.");
@@ -167,10 +201,14 @@ export default function VereinsleitungInitiativeWorkItemsCard({
           body: JSON.stringify({
             title: draft.title.trim(),
             priority: draft.priority,
-            storyPoints: draft.storyPoints.trim() || null,
+            dueDate: draft.dueDate || null,
             assigneeMode: draft.assigneeMode,
-            assigneePersonId: draft.assigneePersonId.trim() || null,
-            externalAssigneeLabel: draft.externalAssigneeLabel.trim() || null,
+            assigneePersonId:
+              draft.assigneeMode === "PERSON" ? draft.assigneePerson?.id ?? null : null,
+            externalAssigneeLabel:
+              draft.assigneeMode === "EXTERNAL"
+                ? draft.externalAssigneeLabel.trim() || null
+                : null,
             status: draft.status,
           }),
         },
@@ -192,7 +230,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
   }
 
   async function deleteWorkItem(workItemId: string, workItemTitle: string) {
-    const confirmed = confirm('Work Item "' + workItemTitle + '" wirklich loeschen?');
+    const confirmed = confirm('Work Item "' + workItemTitle + '" wirklich löschen?');
     if (!confirmed) {
       return;
     }
@@ -211,7 +249,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Work Item konnte nicht geloescht werden.");
+        throw new Error(payload?.error || "Work Item konnte nicht gelöscht werden.");
       }
 
       if (editId === workItemId) {
@@ -220,7 +258,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
 
       router.refresh();
     } catch (errorValue) {
-      setError(errorValue instanceof Error ? errorValue.message : "Loeschen fehlgeschlagen.");
+      setError(errorValue instanceof Error ? errorValue.message : "Löschen fehlgeschlagen.");
     } finally {
       setBusyId(null);
     }
@@ -232,7 +270,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
         <div>
           <h3 className="text-[1.1rem] font-semibold text-slate-900">Work Items</h3>
           <p className="mt-2 text-sm text-slate-500">
-            JIRA-artige Aufgabenliste mit Editieren und Loeschen.
+            Aufgaben mit Due Date und sauberer Personenzuweisung via PeoplePicker.
           </p>
         </div>
 
@@ -244,7 +282,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
       </div>
 
       <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px_140px_auto]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_160px_180px]">
           <input
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
@@ -263,12 +301,57 @@ export default function VereinsleitungInitiativeWorkItemsCard({
           </select>
 
           <input
-            value={newStoryPoints}
-            onChange={(event) => setNewStoryPoints(event.target.value)}
-            placeholder="Story Points"
+            type="date"
+            value={newDueDate}
+            onChange={(event) => setNewDueDate(event.target.value)}
             className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
           />
+        </div>
 
+        <div className="mt-3 grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+          <select
+            value={newAssigneeMode}
+            onChange={(event) => {
+              const mode = event.target.value;
+              setNewAssigneeMode(mode);
+              if (mode !== "PERSON") {
+                setNewAssigneePerson(null);
+              }
+              if (mode !== "EXTERNAL") {
+                setNewExternalAssigneeLabel("");
+              }
+            }}
+            className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+          >
+            <option value="NONE">Keine Zuweisung</option>
+            <option value="PERSON">Person</option>
+            <option value="EXTERNAL">Extern</option>
+          </select>
+
+          {newAssigneeMode === "PERSON" ? (
+            <PeoplePicker
+              mode="single"
+              searchMode="vereinsleitung"
+              selected={newAssigneePerson}
+              onSelect={setNewAssigneePerson}
+              placeholder="Person suchen und zuweisen"
+              emptyText="Keine passende Person gefunden."
+            />
+          ) : newAssigneeMode === "EXTERNAL" ? (
+            <input
+              value={newExternalAssigneeLabel}
+              onChange={(event) => setNewExternalAssigneeLabel(event.target.value)}
+              placeholder="Externer Assignee"
+              className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+            />
+          ) : (
+            <div className="rounded-[16px] border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
+              Keine Person zugewiesen.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3">
           <button
             type="button"
             onClick={createWorkItem}
@@ -276,7 +359,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
             className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#083a80] disabled:cursor-not-allowed disabled:opacity-70"
           >
             {createBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Hinzufuegen
+            Hinzufügen
           </button>
         </div>
       </div>
@@ -345,53 +428,74 @@ export default function VereinsleitungInitiativeWorkItemsCard({
                       </select>
 
                       <input
-                        value={draft.storyPoints}
+                        type="date"
+                        value={draft.dueDate}
                         onChange={(event) =>
                           setDraft((current) =>
-                            current ? { ...current, storyPoints: event.target.value } : current,
+                            current ? { ...current, dueDate: event.target.value } : current,
                           )
                         }
-                        placeholder="Story Points"
                         className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
                       />
+                    </div>
 
+                    <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
                       <select
                         value={draft.assigneeMode}
                         onChange={(event) =>
                           setDraft((current) =>
-                            current ? { ...current, assigneeMode: event.target.value } : current,
+                            current
+                              ? {
+                                  ...current,
+                                  assigneeMode: event.target.value,
+                                  assigneePerson:
+                                    event.target.value === "PERSON" ? current.assigneePerson : null,
+                                  externalAssigneeLabel:
+                                    event.target.value === "EXTERNAL"
+                                      ? current.externalAssigneeLabel
+                                      : "",
+                                }
+                              : current,
                           )
                         }
                         className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
                       >
-                        <option value="NONE">None</option>
+                        <option value="NONE">Keine Zuweisung</option>
                         <option value="PERSON">Person</option>
-                        <option value="EXTERNAL">External</option>
+                        <option value="EXTERNAL">Extern</option>
                       </select>
 
-                      <input
-                        value={draft.assigneePersonId}
-                        onChange={(event) =>
-                          setDraft((current) =>
-                            current ? { ...current, assigneePersonId: event.target.value } : current,
-                          )
-                        }
-                        placeholder="Person ID (optional)"
-                        className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                      />
-
-                      <input
-                        value={draft.externalAssigneeLabel}
-                        onChange={(event) =>
-                          setDraft((current) =>
-                            current
-                              ? { ...current, externalAssigneeLabel: event.target.value }
-                              : current,
-                          )
-                        }
-                        placeholder="Externer Assignee"
-                        className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                      />
+                      {draft.assigneeMode === "PERSON" ? (
+                        <PeoplePicker
+                          mode="single"
+                          searchMode="vereinsleitung"
+                          selected={draft.assigneePerson}
+                          onSelect={(person) =>
+                            setDraft((current) =>
+                              current ? { ...current, assigneePerson: person } : current,
+                            )
+                          }
+                          placeholder="Person suchen und zuweisen"
+                          emptyText="Keine passende Person gefunden."
+                        />
+                      ) : draft.assigneeMode === "EXTERNAL" ? (
+                        <input
+                          value={draft.externalAssigneeLabel}
+                          onChange={(event) =>
+                            setDraft((current) =>
+                              current
+                                ? { ...current, externalAssigneeLabel: event.target.value }
+                                : current,
+                            )
+                          }
+                          placeholder="Externer Assignee"
+                          className="rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
+                        />
+                      ) : (
+                        <div className="rounded-[16px] border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
+                          Keine Person zugewiesen.
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap justify-end gap-2">
@@ -437,9 +541,9 @@ export default function VereinsleitungInitiativeWorkItemsCard({
                           {getStatusLabel(item.status)}
                         </span>
 
-                        {item.storyPoints !== null ? (
+                        {item.dueDateIso ? (
                           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                            {item.storyPoints} SP
+                            Fällig: {formatDateLabel(item.dueDateIso)}
                           </span>
                         ) : null}
                       </div>
@@ -468,7 +572,7 @@ export default function VereinsleitungInitiativeWorkItemsCard({
                         className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
                       >
                         {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        Loeschen
+                        Löschen
                       </button>
                     </div>
                   </div>
