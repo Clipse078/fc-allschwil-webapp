@@ -42,6 +42,7 @@ export default function VereinsleitungMeetingDetail({
             title="Meeting-Kontext"
             subtitle={meeting.subtitle}
             description={meeting.description}
+            agendaItems={meeting.agendaItems}
           />
           <VereinsleitungMeetingActionsCard
             title="Meeting-Aktionen"
