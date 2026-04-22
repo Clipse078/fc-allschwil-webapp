@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -383,8 +383,9 @@ export default function VereinsleitungInitiativeWorkItemsCard({
 
             return (
               <article
+                id={item.sourceDecisionId ? "work-item-source-" + item.sourceDecisionId : "work-item-" + item.id}
                 key={item.id}
-                className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
+                className="scroll-mt-28 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm"
               >
                 {isEditing ? (
                   <div className="space-y-4">

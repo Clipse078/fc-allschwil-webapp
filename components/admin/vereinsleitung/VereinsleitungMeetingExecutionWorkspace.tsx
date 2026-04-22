@@ -219,7 +219,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     if (inlineState.initiativeMode === "LINK" && !inlineState.selectedInitiativeId) {
       setInlineState((current) => ({
         ...current,
-        error: "Bitte zuerst eine bestehende Initiative auswÃƒÂ¤hlen.",
+        error: "Bitte zuerst eine bestehende Initiative auswÃƒÆ’Ã‚Â¤hlen.",
       }));
       return;
     }
@@ -282,10 +282,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
             Execution Workspace
           </p>
           <h2 className="mt-2 text-[1.2rem] font-semibold text-slate-900">
-            Meeting-AusfÃƒÂ¼hrung nach Traktanden
+            Meeting-AusfÃƒÆ’Ã‚Â¼hrung nach Traktanden
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Protokoll, BeschlÃƒÂ¼sse und Initiative-VerknÃƒÂ¼pfungen werden entlang der Agenda sichtbar gemacht.
+            Protokoll, BeschlÃƒÆ’Ã‚Â¼sse und Initiative-VerknÃƒÆ’Ã‚Â¼pfungen werden entlang der Agenda sichtbar gemacht.
           </p>
         </div>
 
@@ -294,10 +294,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
             {groupedAgenda.length} Traktanden
           </span>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-            {protocolEntries.length} ProtokolleintrÃƒÂ¤ge
+            {protocolEntries.length} ProtokolleintrÃƒÆ’Ã‚Â¤ge
           </span>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-            {decisions.length} BeschlÃƒÂ¼sse
+            {decisions.length} BeschlÃƒÆ’Ã‚Â¼sse
           </span>
           {isDone ? (
             <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -309,7 +309,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
       {groupedAgenda.length === 0 ? (
         <div className="mt-6 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-500">
-          FÃƒÂ¼r dieses Meeting wurden noch keine Traktanden hinterlegt. ErgÃƒÂ¤nze zuerst die Agenda, damit Protokoll und BeschlÃƒÂ¼sse sauber strukturiert gefÃƒÂ¼hrt werden kÃƒÂ¶nnen.
+          FÃƒÆ’Ã‚Â¼r dieses Meeting wurden noch keine Traktanden hinterlegt. ErgÃƒÆ’Ã‚Â¤nze zuerst die Agenda, damit Protokoll und BeschlÃƒÆ’Ã‚Â¼sse sauber strukturiert gefÃƒÆ’Ã‚Â¼hrt werden kÃƒÆ’Ã‚Â¶nnen.
         </div>
       ) : (
         <div className="mt-6 space-y-4">
@@ -327,7 +327,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                     {item.title}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {item.description ?? "Keine zusÃƒÂ¤tzliche Beschreibung hinterlegt."}
+                    {item.description ?? "Keine zusÃƒÆ’Ã‚Â¤tzliche Beschreibung hinterlegt."}
                   </p>
                 </div>
 
@@ -336,7 +336,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                     {item.protocolEntries.length} Notizen
                   </span>
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {item.decisions.length} BeschlÃƒÂ¼sse
+                    {item.decisions.length} BeschlÃƒÆ’Ã‚Â¼sse
                   </span>
                 </div>
               </div>
@@ -344,7 +344,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
               {!isDone ? (
                 <div className="mt-5 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-xs text-slate-500">Aktionen fÃƒÂ¼r dieses Traktand</div>
+                    <div className="text-xs text-slate-500">Aktionen fÃƒÆ’Ã‚Â¼r dieses Traktand</div>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -352,7 +352,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <Plus className="h-3.5 w-3.5" />
-                        Notiz hinzufÃƒÂ¼gen
+                        Notiz hinzufÃƒÆ’Ã‚Â¼gen
                       </button>
                       <button
                         type="button"
@@ -360,7 +360,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <Plus className="h-3.5 w-3.5" />
-                        Beschluss hinzufÃƒÂ¼gen
+                        Beschluss hinzufÃƒÆ’Ã‚Â¼gen
                       </button>
                     </div>
                   </div>
@@ -470,10 +470,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         />
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
-                            Als Pendenz ÃƒÂ¼bernehmen
+                            Als Pendenz ÃƒÆ’Ã‚Â¼bernehmen
                           </div>
                           <div className="mt-1 text-sm leading-6 text-slate-500">
-                            Beim Speichern wird zusÃƒÂ¤tzlich automatisch eine neue Pendenz erzeugt und mit diesem Meeting verknÃƒÂ¼pft.
+                            Beim Speichern wird zusÃƒÆ’Ã‚Â¤tzlich automatisch eine neue Pendenz erzeugt und mit diesem Meeting verknÃƒÆ’Ã‚Â¼pft.
                           </div>
                         </div>
                       </label>
@@ -482,7 +482,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         <div className="flex items-center gap-2">
                           <FolderGit2 className="h-4 w-4 text-[#0b4aa2]" />
                           <div className="text-sm font-semibold text-slate-900">
-                            Initiative-VerknÃƒÂ¼pfung
+                            Initiative-VerknÃƒÆ’Ã‚Â¼pfung
                           </div>
                         </div>
 
@@ -578,10 +578,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                               }
                               className="mt-2 w-full rounded-[16px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
                             >
-                              <option value="">Initiative auswÃƒÂ¤hlen</option>
+                              <option value="">Initiative auswÃƒÆ’Ã‚Â¤hlen</option>
                               {initiativeOptions.map((initiative) => (
                                 <option key={initiative.id} value={initiative.id}>
-                                  {initiative.title} Ã‚Â· {initiative.statusLabel}
+                                  {initiative.title} Ãƒâ€šÃ‚Â· {initiative.statusLabel}
                                 </option>
                               ))}
                             </select>
@@ -623,7 +623,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
                   {item.protocolEntries.length === 0 ? (
                     <div className="mt-4 rounded-[16px] border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">
-                      Noch keine ProtokolleintrÃƒÂ¤ge zu diesem Traktand.
+                      Noch keine ProtokolleintrÃƒÆ’Ã‚Â¤ge zu diesem Traktand.
                     </div>
                   ) : (
                     <div className="mt-4 space-y-3">
@@ -642,12 +642,12 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                 <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-[#0b4aa2]" />
-                    <h4 className="text-sm font-semibold text-slate-900">BeschlÃƒÂ¼sse</h4>
+                    <h4 className="text-sm font-semibold text-slate-900">BeschlÃƒÆ’Ã‚Â¼sse</h4>
                   </div>
 
                   {item.decisions.length === 0 ? (
                     <div className="mt-4 rounded-[16px] border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">
-                      Noch keine BeschlÃƒÂ¼sse zu diesem Traktand.
+                      Noch keine BeschlÃƒÆ’Ã‚Â¼sse zu diesem Traktand.
                     </div>
                   ) : (
                     <div className="mt-4 space-y-3">
@@ -679,7 +679,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                             ) : null}
                             {decision.hasSourcedWorkItem && decision.initiativeSlug ? (
                               <Link
-                                href={"/vereinsleitung/initiativen/" + decision.initiativeSlug}
+                                href={"/vereinsleitung/initiativen/" + decision.initiativeSlug + "#work-item-source-" + decision.id}
                                 className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
                               >
                                 Work item created{decision.sourcedWorkItemCount > 1 ? ": " + decision.sourcedWorkItemCount : ""}
@@ -699,7 +699,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                 <span>Verantwortlich: {decision.responsibleDisplayName}</span>
                               ) : null}
                               {decision.dueDateLabel ? (
-                                <span>FÃƒÂ¤llig: {decision.dueDateLabel}</span>
+                                <span>FÃƒÆ’Ã‚Â¤llig: {decision.dueDateLabel}</span>
                               ) : null}
                             </div>
                           ) : null}
@@ -723,16 +723,16 @@ export default function VereinsleitungMeetingExecutionWorkspace({
             </h3>
           </div>
           <p className="mt-2 text-sm leading-6 text-amber-800">
-            Einige ProtokolleintrÃƒÂ¤ge oder BeschlÃƒÂ¼sse sind noch keinem Traktand zugeordnet.
+            Einige ProtokolleintrÃƒÆ’Ã‚Â¤ge oder BeschlÃƒÆ’Ã‚Â¼sse sind noch keinem Traktand zugeordnet.
           </p>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             <div className="rounded-[18px] bg-white/80 p-4">
               <div className="text-sm font-semibold text-slate-900">
-                Offene ProtokolleintrÃƒÂ¤ge
+                Offene ProtokolleintrÃƒÆ’Ã‚Â¤ge
               </div>
               {unassignedProtocolEntries.length === 0 ? (
-                <div className="mt-3 text-sm text-slate-500">Keine offenen EintrÃƒÂ¤ge.</div>
+                <div className="mt-3 text-sm text-slate-500">Keine offenen EintrÃƒÆ’Ã‚Â¤ge.</div>
               ) : (
                 <div className="mt-3 space-y-2">
                   {unassignedProtocolEntries.map((entry) => (
@@ -749,10 +749,10 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
             <div className="rounded-[18px] bg-white/80 p-4">
               <div className="text-sm font-semibold text-slate-900">
-                Offene BeschlÃƒÂ¼sse
+                Offene BeschlÃƒÆ’Ã‚Â¼sse
               </div>
               {unassignedDecisions.length === 0 ? (
-                <div className="mt-3 text-sm text-slate-500">Keine offenen BeschlÃƒÂ¼sse.</div>
+                <div className="mt-3 text-sm text-slate-500">Keine offenen BeschlÃƒÆ’Ã‚Â¼sse.</div>
               ) : (
                 <div className="mt-3 space-y-2">
                   {unassignedDecisions.map((decision) => (
