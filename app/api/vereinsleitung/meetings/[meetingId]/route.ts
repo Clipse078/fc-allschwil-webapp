@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+﻿import { auth } from "@/auth";
+import { NextResponse } from "next/server";
 import {
   VereinsleitungMeetingMode,
   VereinsleitungMeetingProvider,
@@ -7,7 +8,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { slugifyMeetingTitle } from "@/lib/vereinsleitung/meeting-utils";
 
@@ -28,20 +29,18 @@ type AgendaItemInput = {
 
 type ApprovalStatusValue = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
-function getActorUserId(
-  access:
-    | {
-        session?: {
-          user?: {
-            id?: string | null;
-            effectiveUserId?: string | null;
-          } | null;
-        } | null;
-      }
-    | null
-    | undefined,
-) {
-  return access?.session?.user?.effectiveUserId ?? access?.session?.user?.id ?? null;
+type SessionLike =
+  | {
+      user?: {
+        id?: string | null;
+        effectiveUserId?: string | null;
+      } | null;
+    }
+  | null
+  | undefined;
+
+function getActorUserId(session: SessionLike) {
+  return session?.user?.effectiveUserId ?? session?.user?.id ?? null;
 }
 
 function normalizeOptionalString(value: unknown) {
@@ -59,7 +58,7 @@ function normalizeDateTime(value: unknown, fieldLabel: string) {
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltig." } as const;
+    return { error: fieldLabel + " ist ungültig." } as const;
   }
 
   return { value: parsed } as const;
@@ -75,7 +74,7 @@ function normalizeOptionalDateTime(value: unknown, fieldLabel: string) {
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltig." } as const;
+    return { error: fieldLabel + " ist ungültig." } as const;
   }
 
   return { value: parsed } as const;
@@ -114,7 +113,7 @@ function parseParticipantStatus(
     case "ABSENT":
       return { value: "ABSENT" };
     default:
-      return { error: "UngÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltiger Teilnehmerstatus: " + status };
+      return { error: "Ungültiger Teilnehmerstatus: " + status };
   }
 }
 
@@ -205,7 +204,7 @@ function parseMeetingMode(
     case "HYBRID":
       return { value: "HYBRID" };
     default:
-      return { error: "UngÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltiger Meeting-Typ: " + mode };
+      return { error: "Ungültiger Meeting-Typ: " + mode };
   }
 }
 
@@ -222,7 +221,7 @@ function parseMeetingProvider(
     case "MICROSOFT_TEAMS":
       return { value: "MICROSOFT_TEAMS" };
     default:
-      return { error: "UngÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltiger Meeting-Provider: " + provider };
+      return { error: "Ungültiger Meeting-Provider: " + provider };
   }
 }
 
@@ -239,7 +238,7 @@ function parseMeetingStatus(
     case "DONE":
       return { value: "DONE" };
     default:
-      return { error: "UngÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltiger Meeting-Status: " + status };
+      return { error: "Ungültiger Meeting-Status: " + status };
   }
 }
 
@@ -258,7 +257,7 @@ function parseApprovalStatus(
     case "REJECTED":
       return { value: "REJECTED" };
     default:
-      return { error: "UngÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltiger Freigabestatus: " + status };
+      return { error: "Ungültiger Freigabestatus: " + status };
   }
 }
 
@@ -279,7 +278,7 @@ async function validateMatterIds(matterIds: string[]) {
   });
 
   if (matters.length !== matterIds.length) {
-    return { error: "Mindestens eine verknÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼pfte Pendenz wurde nicht gefunden." } as const;
+    return { error: "Mindestens eine verknüpfte Pendenz wurde nicht gefunden." } as const;
   }
 
   return { matters } as const;
@@ -364,12 +363,27 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ meetingId: string }> },
 ) {
-  const access = await requireApiPermission(
+  const session = await auth();
+
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canManageMeetings = hasPermission(
+    session,
     PERMISSIONS.VEREINSLEITUNG_MEETINGS_MANAGE,
   );
+  const canReviewMeetings = hasPermission(
+    session,
+    PERMISSIONS.VEREINSLEITUNG_MEETINGS_REVIEW,
+  );
+  const canApproveMeetings = hasPermission(
+    session,
+    PERMISSIONS.VEREINSLEITUNG_MEETINGS_APPROVE,
+  );
 
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+  if (!canManageMeetings && !canReviewMeetings && !canApproveMeetings) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { meetingId } = await context.params;
@@ -393,10 +407,17 @@ export async function PATCH(
       body && typeof body === "object" ? (body as Record<string, unknown>) : null;
 
     if (!payload) {
-      return NextResponse.json({ error: "UngÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼ltige Anfrage." }, { status: 400 });
+      return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
     }
 
     if ("status" in payload && Object.keys(payload).length === 1) {
+      if (!canManageMeetings) {
+        return NextResponse.json(
+          { error: "Für diese Änderung fehlt die Berechtigung vereinsleitung.meetings.manage." },
+          { status: 403 },
+        );
+      }
+
       const statusResult = parseMeetingStatus(payload.status);
 
       if ("error" in statusResult) {
@@ -411,7 +432,7 @@ export async function PATCH(
       });
 
       await logAction({
-        actorUserId: getActorUserId(access),
+        actorUserId: getActorUserId(session),
         moduleKey: "vereinsleitung",
         entityType: "VereinsleitungMeeting",
         entityId: meetingId,
@@ -442,7 +463,6 @@ export async function PATCH(
         return NextResponse.json({ error: approvalStatusResult.error }, { status: 400 });
       }
 
-      const permissionKeys = access.session?.user?.permissionKeys ?? [];
       const requiresReviewPermission =
         approvalStatusResult.value === "SUBMITTED" ||
         approvalStatusResult.value === "REJECTED";
@@ -450,27 +470,21 @@ export async function PATCH(
         approvalStatusResult.value === "APPROVED" ||
         approvalStatusResult.value === "DRAFT";
 
-      if (
-        requiresReviewPermission &&
-        !permissionKeys.includes(PERMISSIONS.VEREINSLEITUNG_MEETINGS_REVIEW)
-      ) {
+      if (requiresReviewPermission && !canReviewMeetings) {
         return NextResponse.json(
           {
             error:
-              "FÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r diesen Freigabeschritt fehlt die Berechtigung vereinsleitung.meetings.review.",
+              "Für diesen Freigabeschritt fehlt die Berechtigung vereinsleitung.meetings.review.",
           },
           { status: 403 },
         );
       }
 
-      if (
-        requiresApprovePermission &&
-        !permissionKeys.includes(PERMISSIONS.VEREINSLEITUNG_MEETINGS_APPROVE)
-      ) {
+      if (requiresApprovePermission && !canApproveMeetings) {
         return NextResponse.json(
           {
             error:
-              "FÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r diesen Freigabeschritt fehlt die Berechtigung vereinsleitung.meetings.approve.",
+              "Für diesen Freigabeschritt fehlt die Berechtigung vereinsleitung.meetings.approve.",
           },
           { status: 403 },
         );
@@ -480,12 +494,12 @@ export async function PATCH(
 
       if (approvalStatusResult.value === "REJECTED" && !approvalNotes) {
         return NextResponse.json(
-          { error: "FÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r eine Ablehnung ist ein Ablehnungsgrund erforderlich." },
+          { error: "Für eine Ablehnung ist ein Ablehnungsgrund erforderlich." },
           { status: 400 },
         );
       }
 
-      const actorUserId = getActorUserId(access);
+      const actorUserId = getActorUserId(session);
       const now = new Date();
 
       const approvalUpdateData =
@@ -565,6 +579,13 @@ export async function PATCH(
       return NextResponse.json(updated);
     }
 
+    if (!canManageMeetings) {
+      return NextResponse.json(
+        { error: "Für diese Änderung fehlt die Berechtigung vereinsleitung.meetings.manage." },
+        { status: 403 },
+      );
+    }
+
     const title = String(payload.title ?? "").trim();
     const subtitle = normalizeOptionalString(payload.subtitle);
     const description = normalizeOptionalString(payload.description);
@@ -582,7 +603,7 @@ export async function PATCH(
 
     if (existingMeeting.status === "DONE") {
       return NextResponse.json(
-        { error: "Meeting ist abgeschlossen. Vorbereitungsdaten kÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¶nnen nicht mehr bearbeitet werden." },
+        { error: "Meeting ist abgeschlossen. Vorbereitungsdaten können nicht mehr bearbeitet werden." },
         { status: 400 },
       );
     }
@@ -776,7 +797,7 @@ export async function PATCH(
     });
 
     await logAction({
-      actorUserId: getActorUserId(access),
+      actorUserId: getActorUserId(session),
       moduleKey: "vereinsleitung",
       entityType: "VereinsleitungMeeting",
       entityId: updated.id,
