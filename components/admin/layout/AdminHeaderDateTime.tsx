@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -32,11 +32,11 @@ export default function AdminHeaderDateTime() {
   }, [now]);
 
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white/90 px-5 py-3 shadow-sm backdrop-blur-sm">
-      <p className="text-[0.9rem] font-medium tracking-tight text-slate-500">
+    <div className="flex flex-col items-start justify-center">
+      <p className="text-[0.95rem] font-medium tracking-tight text-slate-500">
         {formattedDate}
       </p>
-      <p className="mt-1 font-[var(--font-display)] text-[2.1rem] font-bold uppercase leading-none tracking-[-0.04em] text-slate-900">
+      <p className="mt-1 font-[var(--font-display)] text-[2.75rem] font-bold leading-none tracking-[-0.05em] text-slate-950">
         {formattedTime}
       </p>
     </div>

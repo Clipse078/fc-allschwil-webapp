@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
 import {
   formatMatterDueDateLabel,
   formatMeetingDateLabel,
@@ -152,3 +152,4 @@ export async function getMeetingDetailItem(
     decisions,
   };
 }
+

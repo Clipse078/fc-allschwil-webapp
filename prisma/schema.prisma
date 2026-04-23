@@ -188,6 +188,26 @@ enum VereinsleitungInitiativeWorkItemAssigneeMode {
   EXTERNAL
 }
 
+model OrganigrammDepartment {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  accentFrom  String   @default("#0b4aa2")
+  accentVia   String   @default("#6a5acd")
+  accentTo    String   @default("#d62839")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles Role[]
+
+  @@index([sortOrder])
+  @@index([isActive])
+  @@index([name])
+}
+
 model User {
   id                  String          @id @default(cuid())
   email               String          @unique
@@ -243,15 +263,24 @@ model Role {
   canAttendVereinsleitungMeetings Boolean  @default(false)
   createdAt                       DateTime @default(now())
   updatedAt                       DateTime @updatedAt
+  organigrammDepartmentId         String?
+  organigrammDisplayName          String?
+  organigrammDescription          String?
+  organigrammSortOrder            Int      @default(0)
+  organigrammIsGroupRole          Boolean  @default(false)
 
   userRoles                 UserRole[]
   rolePermissions           RolePermission[]
   workflowRules             RoleWorkflowRule[]
   workflowReviewAssignments RoleWorkflowReviewAssignment[] @relation("WorkflowReviewerRole")
+  organigrammDepartment     OrganigrammDepartment?         @relation(fields: [organigrammDepartmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([name])
   @@index([canAccessVereinsleitung])
   @@index([canAttendVereinsleitungMeetings])
+  @@index([organigrammDepartmentId])
+  @@index([organigrammSortOrder])
+  @@index([organigrammIsGroupRole])
 }
 
 model Permission {
@@ -365,12 +394,12 @@ model Person {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user                        User?
-  playerSquadMembers          PlayerSquadMember[]
-  trainerTeamMembers          TrainerTeamMember[]
-  vereinsleitungOwnedMatters  VereinsleitungMatter[]
-  meetingParticipants         VereinsleitungMeetingParticipant[]
-  responsibleMeetingDecisions VereinsleitungMeetingDecision[]
+  user                         User?
+  playerSquadMembers           PlayerSquadMember[]
+  trainerTeamMembers           TrainerTeamMember[]
+  vereinsleitungOwnedMatters   VereinsleitungMatter[]
+  meetingParticipants          VereinsleitungMeetingParticipant[]
+  responsibleMeetingDecisions  VereinsleitungMeetingDecision[]
   ownedInitiatives             VereinsleitungInitiative[]
   assignedInitiativeWorkItems  VereinsleitungInitiativeWorkItem[]
 
@@ -613,7 +642,7 @@ model VereinsleitungMatter {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  owner        Person?                       @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  owner        Person?                      @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   meetingLinks VereinsleitungMeetingMatter[]
 
   @@index([status])
@@ -623,43 +652,43 @@ model VereinsleitungMatter {
 }
 
 model VereinsleitungMeeting {
-  id                       String                             @id @default(cuid())
-  title                    String
-  slug                     String                             @unique
-  subtitle                 String?
-  description              String?
-  status                   String                             @default("PLANNED")
-  approvalStatus           VereinsleitungMeetingApprovalStatus @default(DRAFT)
-  approvalSubmittedAt      DateTime?
-  approvedAt               DateTime?
-  rejectedAt               DateTime?
-  approvalNotes            String?
+  id                        String                              @id @default(cuid())
+  title                     String
+  slug                      String                              @unique
+  subtitle                  String?
+  description               String?
+  status                    String                              @default("PLANNED")
+  approvalStatus            VereinsleitungMeetingApprovalStatus @default(DRAFT)
+  approvalSubmittedAt       DateTime?
+  approvedAt                DateTime?
+  rejectedAt                DateTime?
+  approvalNotes             String?
   approvalRequestedByUserId String?
-  approvedByUserId         String?
-  rejectedByUserId         String?
-  location                 String?
-  onlineMeetingUrl         String?
-  meetingMode              VereinsleitungMeetingMode          @default(ON_SITE)
-  meetingProvider          VereinsleitungMeetingProvider      @default(NONE)
-  externalMeetingUrl       String?
-  teamsJoinUrl             String?
-  teamsMeetingId           String?
-  teamsCalendarEventId     String?
-  teamsSyncStatus          VereinsleitungTeamsSyncStatus      @default(NOT_CONFIGURED)
-  teamsLastSyncedAt        DateTime?
-  teamsErrorMessage        String?
-  teamsOrganizerUserId     String?
-  startAt                  DateTime
-  endAt                    DateTime?
-  notes                    String?
-  carryOverSourceMeetingId String?
-  createdAt                DateTime                           @default(now())
-  updatedAt                DateTime                           @updatedAt
+  approvedByUserId          String?
+  rejectedByUserId          String?
+  location                  String?
+  onlineMeetingUrl          String?
+  meetingMode               VereinsleitungMeetingMode           @default(ON_SITE)
+  meetingProvider           VereinsleitungMeetingProvider       @default(NONE)
+  externalMeetingUrl        String?
+  teamsJoinUrl              String?
+  teamsMeetingId            String?
+  teamsCalendarEventId      String?
+  teamsSyncStatus           VereinsleitungTeamsSyncStatus       @default(NOT_CONFIGURED)
+  teamsLastSyncedAt         DateTime?
+  teamsErrorMessage         String?
+  teamsOrganizerUserId      String?
+  startAt                   DateTime
+  endAt                     DateTime?
+  notes                     String?
+  carryOverSourceMeetingId  String?
+  createdAt                 DateTime                            @default(now())
+  updatedAt                 DateTime                            @updatedAt
 
-  carryOverSourceMeeting  VereinsleitungMeeting?        @relation("VereinsleitungMeetingCarryOver", fields: [carryOverSourceMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  carryOverTargetMeetings VereinsleitungMeeting[]       @relation("VereinsleitungMeetingCarryOver")
+  carryOverSourceMeeting  VereinsleitungMeeting?         @relation("VereinsleitungMeetingCarryOver", fields: [carryOverSourceMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  carryOverTargetMeetings VereinsleitungMeeting[]        @relation("VereinsleitungMeetingCarryOver")
   matterLinks             VereinsleitungMeetingMatter[]
-  carriedOverMatterLinks  VereinsleitungMeetingMatter[] @relation("VereinsleitungMeetingMatterCarryOver")
+  carriedOverMatterLinks  VereinsleitungMeetingMatter[]  @relation("VereinsleitungMeetingMatterCarryOver")
   participants            VereinsleitungMeetingParticipant[]
   agendaItems             VereinsleitungMeetingAgendaItem[]
   decisions               VereinsleitungMeetingDecision[]
@@ -719,26 +748,26 @@ model VereinsleitungMeetingParticipant {
 }
 
 model VereinsleitungMeetingDecision {
-  id                     String                            @id @default(cuid())
+  id                     String                             @id @default(cuid())
   meetingId              String
   agendaItemId           String?
   agendaItemTitle        String?
   decisionText           String
-  decisionType           VereinsleitungMeetingDecisionType @default(DECISION)
+  decisionType           VereinsleitungMeetingDecisionType  @default(DECISION)
   responsiblePersonId    String?
   responsibleDisplayName String?
   dueDate                DateTime?
-  createMatter           Boolean                           @default(false)
+  createMatter           Boolean                            @default(false)
   initiativeId           String?
-  createInitiative       Boolean                           @default(false)
+  createInitiative       Boolean                            @default(false)
   initiativeTitle        String?
-  sortOrder              Int                               @default(0)
+  sortOrder              Int                                @default(0)
   remarks                String?
-  createdAt              DateTime                          @default(now())
-  updatedAt              DateTime                          @updatedAt
+  createdAt              DateTime                           @default(now())
+  updatedAt              DateTime                           @updatedAt
 
-  meeting           VereinsleitungMeeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  responsiblePerson Person?                 @relation(fields: [responsiblePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  meeting           VereinsleitungMeeting      @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  responsiblePerson Person?                    @relation(fields: [responsiblePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   initiative        VereinsleitungInitiative? @relation(fields: [initiativeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   sourcedWorkItems  VereinsleitungInitiativeWorkItem[] @relation("InitiativeWorkItemSourceDecision")
 
@@ -781,22 +810,23 @@ model VereinsleitungMeetingAgendaItem {
 
   @@index([meetingId, sortOrder])
 }
-model VereinsleitungInitiative {
-  id             String                        @id @default(cuid())
-  title          String
-  slug           String                        @unique
-  subtitle       String?
-  description    String?
-  status         VereinsleitungInitiativeStatus @default(IN_PROGRESS)
-  ownerPersonId  String?
-  ownerRoleLabel String?
-  startDate      DateTime?
-  targetDate     DateTime?
-  createdAt      DateTime                      @default(now())
-  updatedAt      DateTime                      @updatedAt
 
-  owner           Person?                        @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  workItems       VereinsleitungInitiativeWorkItem[]
+model VereinsleitungInitiative {
+  id              String                         @id @default(cuid())
+  title           String
+  slug            String                         @unique
+  subtitle        String?
+  description     String?
+  status          VereinsleitungInitiativeStatus @default(IN_PROGRESS)
+  ownerPersonId   String?
+  ownerRoleLabel  String?
+  startDate       DateTime?
+  targetDate      DateTime?
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
+
+  owner            Person?                         @relation(fields: [ownerPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  workItems        VereinsleitungInitiativeWorkItem[]
   meetingDecisions VereinsleitungMeetingDecision[]
 
   @@index([status])
@@ -822,9 +852,9 @@ model VereinsleitungInitiativeWorkItem {
   createdAt             DateTime                                     @default(now())
   updatedAt             DateTime                                     @updatedAt
 
-  initiative     VereinsleitungInitiative      @relation(fields: [initiativeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  assigneePerson Person?                       @relation(fields: [assigneePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  sourceMeeting  VereinsleitungMeeting?        @relation("InitiativeWorkItemSourceMeeting", fields: [sourceMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  initiative     VereinsleitungInitiative       @relation(fields: [initiativeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assigneePerson Person?                        @relation(fields: [assigneePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourceMeeting  VereinsleitungMeeting?         @relation("InitiativeWorkItemSourceMeeting", fields: [sourceMeetingId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   sourceDecision VereinsleitungMeetingDecision? @relation("InitiativeWorkItemSourceDecision", fields: [sourceDecisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([initiativeId, sortOrder])
@@ -835,5 +865,3 @@ model VereinsleitungInitiativeWorkItem {
   @@index([sourceMeetingId])
   @@index([sourceDecisionId])
 }
-
-

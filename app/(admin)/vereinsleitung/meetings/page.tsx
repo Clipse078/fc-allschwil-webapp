@@ -1,5 +1,3 @@
-import Link from "next/link";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import VereinsleitungMeetingsList from "@/components/admin/vereinsleitung/VereinsleitungMeetingsList";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -55,17 +53,12 @@ export default async function VereinsleitungMeetingsPage() {
   });
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Meetings"
-        title="Meetings"
-        description="Übersicht aller Sitzungen mit verknüpften Pendenzen, Status und Freigabe."
-        actions={
-          <Link href="/vereinsleitung/meetings/new" className="fca-button-primary">
-            Meeting planen
-          </Link>
-        }
-      />
+    <div className="space-y-6">
+      <section className="rounded-[28px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] backdrop-blur-xl">
+        <p className="text-sm font-medium text-slate-500">
+          Alle Sitzungen zentral verwalten, öffnen und weiterbearbeiten.
+        </p>
+      </section>
 
       <VereinsleitungMeetingsList meetings={meetingItems} />
     </div>

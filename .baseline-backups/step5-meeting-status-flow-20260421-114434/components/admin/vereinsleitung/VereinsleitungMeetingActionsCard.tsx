@@ -52,7 +52,7 @@ export default function VereinsleitungMeetingActionsCard({
           </p>
           <h3 className="mt-2 text-lg font-semibold text-slate-900">{title}</h3>
           <p className="mt-2 text-sm text-slate-500">
-            Direkte Meeting-Aktionen und Überblick über verknüpfte Pendenzen.
+            Direkte Meeting-Aktionen und Ãœberblick Ã¼ber verknÃ¼pfte Pendenzen.
           </p>
         </div>
 
@@ -74,7 +74,7 @@ export default function VereinsleitungMeetingActionsCard({
             className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
           >
             <ArrowUpRight className="h-4 w-4" />
-            Meeting öffnen
+            Meeting Ã¶ffnen
           </a>
         ) : (
           <button
@@ -99,7 +99,7 @@ export default function VereinsleitungMeetingActionsCard({
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Verknüpft
+            VerknÃ¼pft
           </div>
           <div className="mt-2 text-2xl font-semibold text-slate-900">
             {linkedMatters.length}
@@ -144,9 +144,9 @@ export default function VereinsleitungMeetingActionsCard({
 
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   {matter.ownerName ? <span>Verantwortlich: {matter.ownerName}</span> : null}
-                  {matter.dueDateLabel ? <span>Fällig: {matter.dueDateLabel}</span> : null}
+                  {matter.dueDateLabel ? <span>FÃ¤llig: {matter.dueDateLabel}</span> : null}
                   {matter.sourceMeetingTitle ? (
-                    <span>Übernommen aus: {matter.sourceMeetingTitle}</span>
+                    <span>Ãœbernommen aus: {matter.sourceMeetingTitle}</span>
                   ) : null}
                 </div>
               </div>
@@ -163,7 +163,7 @@ export default function VereinsleitungMeetingActionsCard({
         </div>
       ) : (
         <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-500">
-          Aktuell sind keine Pendenzen mit diesem Meeting verknüpft.
+          Aktuell sind keine Pendenzen mit diesem Meeting verknÃ¼pft.
         </div>
       )}
     </section>

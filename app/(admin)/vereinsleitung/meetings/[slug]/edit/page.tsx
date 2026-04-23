@@ -6,6 +6,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   formatMatterDueDateLabel,
+  getInitiativeStatusLabel,
   getMatterPriorityLabel,
   getMatterStatusLabel,
 } from "@/lib/vereinsleitung/meeting-utils";
@@ -27,12 +28,33 @@ function toDateTimeLocalValue(value: Date | string | null | undefined) {
   return localDate.toISOString().slice(0, 16);
 }
 
+function getDatePart(value: Date | string | null | undefined) {
+  const localValue = toDateTimeLocalValue(value);
+  return localValue ? localValue.slice(0, 10) : "";
+}
+
+function getTimePart(value: Date | string | null | undefined) {
+  const localValue = toDateTimeLocalValue(value);
+  return localValue ? localValue.slice(11, 16) : "";
+}
+
+function getInitiativeProgressPercent(
+  workItems: Array<{ status: string }>,
+) {
+  if (workItems.length === 0) {
+    return 0;
+  }
+
+  const resolvedCount = workItems.filter((item) => item.status === "RESOLVED").length;
+  return Math.round((resolvedCount / workItems.length) * 100);
+}
+
 export default async function EditMeetingPage({ params }: EditMeetingPageProps) {
   await requireAnyPermission([PERMISSIONS.VEREINSLEITUNG_MEETINGS_MANAGE]);
 
   const resolvedParams = await params;
 
-  const [meeting, matters] = await Promise.all([
+  const [meeting, matters, initiatives] = await Promise.all([
     prisma.vereinsleitungMeeting.findUnique({
       where: { slug: resolvedParams.slug },
       include: {
@@ -74,6 +96,20 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
         },
       },
     }),
+    prisma.vereinsleitungInitiative.findMany({
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        status: true,
+        workItems: {
+          select: {
+            status: true,
+          },
+        },
+      },
+    }),
   ]);
 
   if (!meeting) {
@@ -93,12 +129,21 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
       ([matter.owner?.firstName, matter.owner?.lastName].filter(Boolean).join(" ") || null),
   }));
 
+  const initiativeOptions = initiatives.map((initiative) => ({
+    id: initiative.id,
+    slug: initiative.slug,
+    title: initiative.title,
+    status: initiative.status,
+    statusLabel: getInitiativeStatusLabel(initiative.status),
+    progressPercent: getInitiativeProgressPercent(initiative.workItems),
+  }));
+
   return (
     <div className="space-y-8">
       <AdminSectionHeader
         eyebrow="Meetings"
         title="Meeting bearbeiten"
-        description="Passe Stammdaten, Teilnehmende, Traktanden und verknüpfte Pendenzen in einem klaren Editor an."
+        description="Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
       />
 
       <VereinsleitungMeetingCreateForm
@@ -107,20 +152,21 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
         submitLabel="Änderungen speichern"
         submittingLabel="Änderungen werden gespeichert..."
         cancelHref={"/vereinsleitung/meetings/" + meeting.slug}
+        initiativeOptions={initiativeOptions}
         initialValues={{
           title: meeting.title,
-          subtitle: meeting.subtitle ?? "",
           description: meeting.description ?? "",
           location: meeting.location ?? "",
-          meetingMode: meeting.meetingMode,
+          meetingDate: getDatePart(meeting.startAt),
+          startTime: getTimePart(meeting.startAt),
+          endTime: getTimePart(meeting.endAt),
           meetingProvider: meeting.meetingProvider,
-          externalMeetingUrl: meeting.externalMeetingUrl ?? meeting.onlineMeetingUrl ?? "",
-          startAt: toDateTimeLocalValue(meeting.startAt),
-          endAt: toDateTimeLocalValue(meeting.endAt),
-          status:
-            meeting.status === "IN_PROGRESS" || meeting.status === "DONE"
-              ? meeting.status
-              : "PLANNED",
+          meetingLink:
+            meeting.teamsJoinUrl ??
+            meeting.externalMeetingUrl ??
+            meeting.onlineMeetingUrl ??
+            "",
+          teamsSyncStatus: meeting.teamsSyncStatus,
         }}
         initialSelectedMatterIds={meeting.matterLinks.map((link) => link.matterId)}
         initialParticipants={meeting.participants.map((participant) => ({

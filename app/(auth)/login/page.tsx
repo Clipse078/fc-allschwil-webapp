@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+﻿import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import LoginForm from "@/components/auth/LoginForm";
 
@@ -11,3 +11,4 @@ export default async function LoginPage() {
 
   return <LoginForm />;
 }
+

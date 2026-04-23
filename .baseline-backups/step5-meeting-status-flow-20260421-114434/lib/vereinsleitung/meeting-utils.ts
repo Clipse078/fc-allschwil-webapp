@@ -1,4 +1,4 @@
-﻿export type MeetingListItem = {
+export type MeetingListItem = {
   id: string;
   slug: string;
   title: string;
@@ -268,3 +268,4 @@ export function getPreferredMeetingUrl(input: {
 }) {
   return input.teamsJoinUrl ?? input.externalMeetingUrl ?? input.onlineMeetingUrl ?? null;
 }
+

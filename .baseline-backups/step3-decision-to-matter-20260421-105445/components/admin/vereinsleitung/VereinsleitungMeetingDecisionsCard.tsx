@@ -1,4 +1,4 @@
-﻿import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { type MeetingDecisionItem } from "@/lib/vereinsleitung/meeting-utils";
 
 type VereinsleitungMeetingDecisionsCardProps = {
@@ -48,3 +48,4 @@ export default function VereinsleitungMeetingDecisionsCard({
     </section>
   );
 }
+

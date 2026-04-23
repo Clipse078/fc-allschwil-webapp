@@ -6,10 +6,11 @@ import { signIn } from "next-auth/react";
 import { CalendarDays, KeyRound, Lock, Mail } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import FcaBrandCrest from "@/components/shared/FcaBrandCrest";
+import { BRANDING, getFullSystemName } from "@/lib/config/branding";
 
 const REMEMBER_EMAIL_KEY = "fca-login-remember-email";
 const REMEMBER_ENABLED_KEY = "fca-login-remember-enabled";
-const DEFAULT_EMAIL = "admin@fcallschwil.ch";
+const DEFAULT_EMAIL = BRANDING.supportEmail;
 const DEFAULT_PASSWORD = "ChangeMe123!";
 
 function getInitialRememberMe(): boolean {
@@ -165,7 +166,7 @@ export default function LoginForm() {
               <div className="mb-8 w-[112px] lg:mb-10 lg:w-[132px]">
                 <Image
                   src="/images/logos/fc-allschwil.png"
-                  alt="FC Allschwil"
+                  alt={BRANDING.clubName}
                   width={132}
                   height={132}
                   priority
@@ -178,10 +179,10 @@ export default function LoginForm() {
                   Willkommen
                 </h1>
                 <h2 className="font-display text-[48px] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#0d5db7] sm:text-[66px] lg:text-[82px]">
-                  beim FC Allschwil
+                  beim {BRANDING.clubName}
                 </h2>
-                <h3 className="font-display text-[50px] font-black uppercase leading-[0.88] tracking-[-0.055em] text-[#c9181e] sm:text-[68px] lg:text-[84px]">
-                  Clubmanager
+                <h3 className="font-display text-[42px] font-black leading-[0.92] tracking-[-0.04em] text-[#c9181e] sm:text-[58px] lg:text-[68px]">
+                  {BRANDING.systemName}
                 </h3>
               </div>
 
@@ -189,7 +190,7 @@ export default function LoginForm() {
                 <div className="mb-5 text-center">
                   <h4 className="text-[18px] font-semibold text-slate-900">Anmelden</h4>
                   <p className="mt-2 text-[12px] leading-5 text-slate-500">
-                    Bitte geben Sie Ihre Zugangsdaten ein, um auf das System zuzugreifen.
+                    Bitte geben Sie Ihre Zugangsdaten ein, um auf {getFullSystemName()} zuzugreifen.
                   </p>
                 </div>
 
@@ -250,7 +251,7 @@ export default function LoginForm() {
                     </label>
 
                     <Link
-                      href="mailto:admin@fcallschwil.ch?subject=Passwort%20vergessen"
+                      href={`mailto:${BRANDING.supportEmail}?subject=Passwort%20vergessen`}
                       className="text-xs font-medium text-[#0b5db3] transition hover:text-[#094c91]"
                     >
                       Passwort vergessen?

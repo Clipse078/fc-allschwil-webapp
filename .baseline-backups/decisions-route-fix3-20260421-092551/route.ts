@@ -49,7 +49,7 @@ function normalizeOptionalDateTime(value: unknown, fieldLabel: string) {
   const parsed = new Date(raw);
 
   if (Number.isNaN(parsed.getTime())) {
-    return { error: fieldLabel + " ist ungültig." } as const;
+    return { error: fieldLabel + " ist ungÃ¼ltig." } as const;
   }
 
   return { value: parsed } as const;
@@ -70,7 +70,7 @@ function parseDecisionType(
     case "INFO":
       return { value: "INFO" };
     default:
-      return { error: "Ungültiger Entscheidungstyp: " + decisionType };
+      return { error: "UngÃ¼ltiger Entscheidungstyp: " + decisionType };
   }
 }
 
@@ -93,10 +93,10 @@ function normalizeDecision(
     return { error: decisionTypeResult.error };
   }
 
-  const dueDateResult = normalizeOptionalDateTime(record.dueDate, "Fälligkeitsdatum");
+  const dueDateResult = normalizeOptionalDateTime(record.dueDate, "FÃ¤lligkeitsdatum");
 
   if ("error" in dueDateResult) {
-    return { error: dueDateResult.error ?? "Fälligkeitsdatum ist ungültig." };
+    return { error: dueDateResult.error ?? "FÃ¤lligkeitsdatum ist ungÃ¼ltig." };
   }
 
   return {
@@ -323,3 +323,4 @@ export async function POST(
     );
   }
 }
+

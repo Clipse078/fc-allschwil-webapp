@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   ArrowUpRight,
   CircleCheckBig,
@@ -39,10 +39,12 @@ export default function VereinsleitungMeetingActionsCard({
 
         {isLocked ? (
           <div className="mt-6 rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4">
-            <p className="text-sm font-medium text-amber-800">Meeting-Arbeitsbereich ist gesperrt.</p>
+            <p className="text-sm font-medium text-amber-800">
+              Meeting-Arbeitsbereich ist gesperrt.
+            </p>
             <p className="mt-2 text-sm leading-6 text-amber-700">
-              Entweder ist das Meeting abgeschlossen oder bereits freigegeben. Ã„nderungen an Vorbereitung,
-              AusfÃ¼hrung und Nachbearbeitung sollen kÃ¼nftig kontrolliert Ã¼ber Review- oder Reopen-Workflows laufen.
+              Entweder ist das Meeting abgeschlossen oder bereits freigegeben. Änderungen an Vorbereitung,
+              Ausführung und Nachbearbeitung sollen künftig kontrolliert über Review- oder Reopen-Workflows laufen.
             </p>
           </div>
         ) : null}
@@ -51,7 +53,7 @@ export default function VereinsleitungMeetingActionsCard({
           <article className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.03)]">
             <div className="flex items-center gap-2 text-slate-900">
               <ClipboardList className="h-4 w-4 text-[#0b4aa2]" />
-              <h4 className="text-sm font-semibold">VerknÃ¼pfte Pendenzen</h4>
+              <h4 className="text-sm font-semibold">Verknüpfte Pendenzen</h4>
             </div>
             <p className="mt-4 text-3xl font-semibold text-slate-900">{linkedMatters.length}</p>
             <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -78,7 +80,7 @@ export default function VereinsleitungMeetingActionsCard({
             <p className="mt-4 text-lg font-semibold text-slate-900">{approvalStatusLabel}</p>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               {isApprovalLocked
-                ? "Freigegeben â€“ Freigabe-Sperre aktiv."
+                ? "Freigegeben – Freigabe-Sperre aktiv."
                 : "Approval-Workflow-Grundlage vorbereitet."}
             </p>
           </article>
@@ -98,7 +100,7 @@ export default function VereinsleitungMeetingActionsCard({
                 rel="noreferrer"
                 className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#083a80]"
               >
-                Meeting Ã¶ffnen
+                Meeting öffnen
                 <ArrowUpRight className="h-4 w-4" />
               </a>
             ) : (
@@ -108,7 +110,10 @@ export default function VereinsleitungMeetingActionsCard({
             )}
 
             <div className="mt-4">
-              <Link href="#participants" className="text-sm font-medium text-[#0b4aa2] hover:underline">
+              <Link
+                href="#participants"
+                className="text-sm font-medium text-[#0b4aa2] hover:underline"
+              >
                 Zu Teilnehmern springen
               </Link>
             </div>
@@ -120,7 +125,7 @@ export default function VereinsleitungMeetingActionsCard({
               <h4 className="text-sm font-semibold">Workflow-Hinweis</h4>
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-500">
-              NÃ¤chster Schritt: echte Submit-, Review- und Approve-Aktionen auf Basis dieses Freigabestatus und der Freigabe-Sperre.
+              Nächster Schritt: echte Submit-, Review- und Approve-Aktionen auf Basis dieses Freigabestatus und der Freigabe-Sperre.
             </p>
           </article>
         </div>

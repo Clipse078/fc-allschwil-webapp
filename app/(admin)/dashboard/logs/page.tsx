@@ -17,7 +17,7 @@ export default async function LogsPage() {
         </h2>
 
         <p className="mt-3 max-w-2xl text-sm text-slate-600">
-          Uebersicht der letzten protokollierten Aenderungen im System.
+          Übersicht der letzten protokollierten Aenderungen im System.
         </p>
       </div>
 

@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { type VereinsleitungMeetingDecisionType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
@@ -323,3 +323,4 @@ export async function POST(
     );
   }
 }
+

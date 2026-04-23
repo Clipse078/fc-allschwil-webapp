@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, Clock3, FileCheck2, Info, ListTodo } from "lucide-react";
+import { CheckCircle2, Clock3, FileCheck2, Info, ListTodo } from "lucide-react";
 import { getDecisionTypeLabel, type MeetingDecisionItem } from "@/lib/vereinsleitung/meeting-utils";
 
 type VereinsleitungMeetingDecisionsCardProps = {
@@ -141,3 +141,4 @@ export default function VereinsleitungMeetingDecisionsCard({
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -46,7 +46,7 @@ export default function AdminPageActions() {
           className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
         >
           <CalendarPlus className="h-4 w-4" />
-          Planner öffnen
+          Jahresplan öffnen
         </Link>
 
         <Link
@@ -99,7 +99,7 @@ export default function AdminPageActions() {
             className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
           >
             <CalendarPlus className="h-4 w-4" />
-            Saisonplanner
+            Jahresplan
           </Link>
         ) : null}
 
@@ -109,7 +109,7 @@ export default function AdminPageActions() {
             className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
           >
             <CalendarPlus className="h-4 w-4" />
-            Wochenplanner
+            Wochenplan
           </Link>
         ) : null}
 
@@ -119,7 +119,7 @@ export default function AdminPageActions() {
             className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
           >
             <CalendarPlus className="h-4 w-4" />
-            Tagesplanner
+            Tagesplan
           </Link>
         ) : null}
       </div>
@@ -134,7 +134,7 @@ export default function AdminPageActions() {
           className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
         >
           <CalendarPlus className="h-4 w-4" />
-          Zurück zum Planner
+          Zurück zum Jahresplan
         </Link>
       </div>
     );
@@ -192,7 +192,7 @@ export default function AdminPageActions() {
           className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
         >
           <CalendarPlus className="h-4 w-4" />
-          Zurück zu Meetings
+          Zurück zu den Meetings
         </Link>
       </div>
     );
@@ -244,7 +244,7 @@ export default function AdminPageActions() {
           className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <CheckCircle2 className="h-4 w-4" />
-          Beschluss fassen
+          Beschluss erfassen
         </button>
       </div>
     );

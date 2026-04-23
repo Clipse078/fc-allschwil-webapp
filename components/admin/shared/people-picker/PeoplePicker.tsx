@@ -70,7 +70,7 @@ export default function PeoplePicker({
   onChange,
   placeholder = "Name, Gruppe oder E-Mail suchen",
   searchMode = "any",
-  emptyText = "Keine passenden Personen gefunden.",
+  emptyText = "Keine passende Person gefunden.",
 }: PeoplePickerProps) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -102,6 +102,7 @@ export default function PeoplePicker({
     if (debouncedQuery.length < 2) {
       setResults([]);
       setIsLoading(false);
+      setHighlightedIndex(0);
       return;
     }
 
@@ -133,7 +134,7 @@ export default function PeoplePicker({
         const data = await response.json().catch(() => null);
 
         if (!response.ok) {
-          throw new Error(data?.error ?? "Personensuche konnte nicht geladen werden.");
+          throw new Error(data?.error ?? "Die Personensuche konnte nicht geladen werden.");
         }
 
         const nextResults = Array.isArray(data) ? (data as PeoplePickerPerson[]) : [];
@@ -216,29 +217,10 @@ export default function PeoplePicker({
     applySingleSelect(person);
   }
 
-  return (
-    <div ref={rootRef} className="relative">
-      {mode === "multiple" && selectedItems.length > 0 ? (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {selectedItems.map((item) => (
-            <div
-              key={item.id}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
-            >
-              <span>{item.displayName}</span>
-              <button
-                type="button"
-                onClick={() => removeChip(item.id)}
-                className="rounded-full text-slate-400 transition hover:text-slate-700"
-                aria-label={item.displayName + " entfernen"}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
+  const shouldShowDropdown = isOpen && debouncedQuery.length >= 2;
 
+  return (
+    <div ref={rootRef} className="relative z-20">
       {mode === "single" && selected ? (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.04] px-3 py-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -267,60 +249,96 @@ export default function PeoplePicker({
         </div>
       ) : null}
 
-      <div className="relative">
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          onKeyDown={(event) => {
-            if (!isOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-              setIsOpen(true);
-              return;
-            }
-
-            if (event.key === "ArrowDown") {
-              event.preventDefault();
-              setHighlightedIndex((current) =>
-                Math.min(current + 1, Math.max(results.length - 1, 0)),
-              );
-            }
-
-            if (event.key === "ArrowUp") {
-              event.preventDefault();
-              setHighlightedIndex((current) => Math.max(current - 1, 0));
-            }
-
-            if (event.key === "Enter" && isOpen && results.length > 0) {
-              event.preventDefault();
-              selectHighlighted();
-            }
-
-            if (event.key === "Escape") {
-              setIsOpen(false);
-            }
-          }}
-          placeholder={placeholder}
-          className="w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-        />
-
-        {isLoading ? (
-          <div className="pointer-events-none absolute right-4 top-3.5 text-xs text-slate-400">
-            Suche...
+      <div
+        className={`rounded-[20px] border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition ${
+          isOpen
+            ? "border-[#0b4aa2] ring-4 ring-[#0b4aa2]/10"
+            : "border-slate-200"
+        }`}
+      >
+        {mode === "multiple" && selectedItems.length > 0 ? (
+          <div className="flex flex-wrap gap-2 border-b border-slate-100 px-3 pb-2 pt-3">
+            {selectedItems.map((item) => (
+              <div
+                key={item.id}
+                className="inline-flex items-center gap-2 rounded-full border border-[#0b4aa2]/15 bg-[#0b4aa2]/[0.05] px-2.5 py-1.5 text-xs font-semibold text-[#0b4aa2]"
+              >
+                <span className="max-w-[180px] truncate">{item.displayName}</span>
+                <button
+                  type="button"
+                  onClick={() => removeChip(item.id)}
+                  className="rounded-full text-[#0b4aa2]/70 transition hover:text-rose-600"
+                  aria-label={item.displayName + " entfernen"}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         ) : null}
+
+        <div className="relative">
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setIsOpen(true);
+            }}
+            onFocus={() => setIsOpen(true)}
+            onKeyDown={(event) => {
+              if (
+                mode === "multiple" &&
+                event.key === "Backspace" &&
+                !query.trim() &&
+                selectedItems.length > 0
+              ) {
+                removeChip(selectedItems[selectedItems.length - 1].id);
+                return;
+              }
+
+              if (!shouldShowDropdown && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+                return;
+              }
+
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setHighlightedIndex((current) =>
+                  Math.min(current + 1, Math.max(results.length - 1, 0)),
+                );
+              }
+
+              if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setHighlightedIndex((current) => Math.max(current - 1, 0));
+              }
+
+              if (event.key === "Enter" && shouldShowDropdown && results.length > 0) {
+                event.preventDefault();
+                selectHighlighted();
+              }
+
+              if (event.key === "Escape") {
+                setIsOpen(false);
+              }
+            }}
+            placeholder={placeholder}
+            className={`w-full rounded-[20px] bg-white px-4 py-3 text-sm text-slate-900 outline-none ${
+              mode === "multiple" && selectedItems.length > 0 ? "rounded-t-none" : ""
+            }`}
+          />
+
+          {isLoading ? (
+            <div className="pointer-events-none absolute right-4 top-3.5 text-xs text-slate-400">
+              Suche...
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      {isOpen ? (
+      {shouldShowDropdown ? (
         <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.14)]">
-          {debouncedQuery.length < 2 ? (
-            <div className="px-4 py-3 text-sm text-slate-500">
-              Mindestens 2 Zeichen eingeben.
-            </div>
-          ) : results.length === 0 ? (
+          {results.length === 0 ? (
             <div className="px-4 py-3 text-sm text-slate-500">
               {emptyText}
             </div>

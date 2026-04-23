@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
@@ -36,6 +36,8 @@ export default function AdminShell({
           lastName={lastName}
           email={email}
           permissionKeys={permissionKeys}
+          currentSeasonLabel="2025/2026"
+          nextSeasonLabel="2026/2027"
           collapsed={collapsed}
           onToggle={() => setCollapsed((current) => !current)}
         />

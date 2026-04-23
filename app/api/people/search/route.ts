@@ -16,6 +16,7 @@ type PersonRecord = {
   dateOfBirth: Date | null;
   isPlayer: boolean;
   isTrainer: boolean;
+  notes: string | null;
   user: {
     userRoles: {
       role: {
@@ -84,8 +85,19 @@ const FCA_ROLE_PRIORITY = [
   "contact_person_supplier",
   "contact_person_gemeinde",
   "viewer",
-  "super_admin"
+  "super_admin",
 ] as const;
+
+const DEMO_PERSON_IMAGE_MAP: Record<string, string> = {
+  "demo-vl-reh": "/images/people/demo/rene-hagen.svg",
+  "demo-vl-roh": "/images/people/demo/roger-harrisberger.svg",
+  "demo-vl-pas": "/images/people/demo/patrick-scotton.svg",
+  "demo-vl-far": "/images/people/demo/fabian-roth.svg",
+  "demo-vl-jos": "/images/people/demo/joel-schuler.svg",
+  "demo-vl-nin": "/images/people/demo/nicole-nuessli.svg",
+  "demo-vl-abb": "/images/people/demo/abdi-birrer.svg",
+  "demo-vl-ang": "/images/people/demo/andreas-gaedt.svg",
+};
 
 function matchesQuery(
   person: {
@@ -94,6 +106,7 @@ function matchesQuery(
     displayName: string | null;
     email: string | null;
     phone: string | null;
+    notes?: string | null;
   },
   query: string,
 ) {
@@ -109,6 +122,7 @@ function matchesQuery(
     person.displayName ?? "",
     person.email ?? "",
     person.phone ?? "",
+    person.notes ?? "",
   ].some((value) => value.toLowerCase().includes(normalizedQuery));
 }
 
@@ -175,7 +189,17 @@ function getTeamLabelFromPlayer(person: PersonRecord) {
   );
 }
 
-function getPrimaryRoleLabel(person: PersonRecord) {
+function isDemoVereinsleitungPerson(person: PersonRecord) {
+  const email = person.email?.toLowerCase() ?? "";
+  const notes = person.notes?.toLowerCase() ?? "";
+  return email.endsWith("@fcallschwil.demo") || notes.includes("vereinsleitung demo person");
+}
+
+function getPrimaryRoleLabel(person: PersonRecord, mode: SearchMode) {
+  if (mode === "vereinsleitung" && isDemoVereinsleitungPerson(person)) {
+    return "Vereinsleitung";
+  }
+
   const sortedRoles = getSortedRoles(person);
 
   if (sortedRoles.length > 0) {
@@ -195,7 +219,11 @@ function getPrimaryRoleLabel(person: PersonRecord) {
   return "Person";
 }
 
-function getSecondaryTeamLabel(person: PersonRecord) {
+function getSecondaryTeamLabel(person: PersonRecord, mode: SearchMode) {
+  if (mode === "vereinsleitung" && isDemoVereinsleitungPerson(person)) {
+    return "Meeting Demo";
+  }
+
   const sortedRoles = getSortedRoles(person);
   const primaryRoleKey = sortedRoles[0]?.role.key ?? null;
 
@@ -221,6 +249,10 @@ function getSecondaryTeamLabel(person: PersonRecord) {
 }
 
 function isEligibleForVereinsleitung(person: PersonRecord) {
+  if (isDemoVereinsleitungPerson(person)) {
+    return true;
+  }
+
   const sortedRoles = getSortedRoles(person);
 
   if (
@@ -235,7 +267,11 @@ function isEligibleForVereinsleitung(person: PersonRecord) {
   return person.isTrainer || person.isPlayer;
 }
 
-function toSearchItem(person: PersonRecord) {
+function getPersonImageSrc(person: PersonRecord) {
+  return DEMO_PERSON_IMAGE_MAP[person.id] ?? null;
+}
+
+function toSearchItem(person: PersonRecord, mode: SearchMode) {
   return {
     id: person.id,
     firstName: person.firstName,
@@ -243,9 +279,9 @@ function toSearchItem(person: PersonRecord) {
     displayName: getDisplayName(person),
     email: person.email,
     phone: person.phone,
-    imageSrc: null,
-    functionLabel: getPrimaryRoleLabel(person),
-    teamLabel: getSecondaryTeamLabel(person),
+    imageSrc: getPersonImageSrc(person),
+    functionLabel: getPrimaryRoleLabel(person, mode),
+    teamLabel: getSecondaryTeamLabel(person, mode),
     isPlayer: person.isPlayer,
     isTrainer: person.isTrainer,
   };
@@ -338,6 +374,7 @@ export async function GET(request: NextRequest) {
           { displayName: { contains: query, mode: "insensitive" } },
           { email: { contains: query, mode: "insensitive" } },
           { phone: { contains: query, mode: "insensitive" } },
+          { notes: { contains: query, mode: "insensitive" } },
         ],
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -352,6 +389,7 @@ export async function GET(request: NextRequest) {
         dateOfBirth: true,
         isPlayer: true,
         isTrainer: true,
+        notes: true,
         user: {
           select: {
             userRoles: {
@@ -435,7 +473,7 @@ export async function GET(request: NextRequest) {
       return true;
     });
 
-    return NextResponse.json(filtered.slice(0, 20).map(toSearchItem));
+    return NextResponse.json(filtered.slice(0, 20).map((person) => toSearchItem(person, mode)));
   } catch (error) {
     console.error("Search people failed:", error);
 

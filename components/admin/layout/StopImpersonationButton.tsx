@@ -16,7 +16,7 @@ export default function StopImpersonationButton() {
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Impersonation konnte nicht beendet werden.");
+        throw new Error(data?.error ?? "Die Impersonation konnte nicht beendet werden.");
       }
 
       window.location.href = "/dashboard/users";
@@ -35,7 +35,7 @@ export default function StopImpersonationButton() {
       disabled={submitting}
       className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {submitting ? "Beende..." : "Zurueck zum Admin"}
+      {submitting ? "Wird beendet..." : "Zurück zum Admin"}
     </button>
   );
 }

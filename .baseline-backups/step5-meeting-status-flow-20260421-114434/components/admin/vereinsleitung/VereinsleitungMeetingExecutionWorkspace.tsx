@@ -188,7 +188,7 @@ function parseSwissDateLabelToInput(value: string | null) {
   const monthMap: Record<string, string> = {
     Jan: "01",
     Feb: "02",
-    Mär: "03",
+    MÃ¤r: "03",
     Apr: "04",
     Mai: "05",
     Jun: "06",
@@ -517,7 +517,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload?.error || "Protokolleintrag konnte nicht gelöscht werden.");
+      throw new Error(payload?.error || "Protokolleintrag konnte nicht gelÃ¶scht werden.");
     }
 
     router.refresh();
@@ -669,7 +669,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     const payload = await response.json();
 
     if (!response.ok) {
-      throw new Error(payload?.error || "Entscheidung konnte nicht gelöscht werden.");
+      throw new Error(payload?.error || "Entscheidung konnte nicht gelÃ¶scht werden.");
     }
 
     router.refresh();
@@ -679,13 +679,13 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     <section className="rounded-[30px] border border-slate-200 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-          Meeting-Ausführung
+          Meeting-AusfÃ¼hrung
         </p>
         <h2 className="text-xl font-semibold text-slate-900">
           Traktandenbasierter Arbeitsbereich
         </h2>
         <p className="text-sm text-slate-600">
-          Jedes Traktandum bündelt jetzt direkt seine Protokolleinträge und Entscheide.
+          Jedes Traktandum bÃ¼ndelt jetzt direkt seine ProtokolleintrÃ¤ge und Entscheide.
         </p>
       </div>
 
@@ -715,7 +715,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                       Traktandum
                     </span>
                     <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                      {agendaProtocolEntries.length} Protokolleinträge
+                      {agendaProtocolEntries.length} ProtokolleintrÃ¤ge
                     </span>
                     <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
                       {agendaDecisions.length} Entscheide
@@ -821,20 +821,20 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 <button
                                       type="button"
                                       onClick={async () => {
-                                        const confirmed = confirm("Protokolleintrag wirklich löschen?");
+                                        const confirmed = confirm("Protokolleintrag wirklich lÃ¶schen?");
                                         if (!confirmed) {
                                           return;
                                         }
                                         try {
                                           await deleteProtocolEntry(entry.id);
                                         } catch (error) {
-                                          alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
+                                          alert(error instanceof Error ? error.message : "LÃ¶schen fehlgeschlagen.");
                                         }
                                       }}
                                       className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
-                                      Löschen
+                                      LÃ¶schen
                                     </button>
                                   </div>
                                 </div>
@@ -844,7 +844,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                         })
                       ) : (
                         <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                          Noch keine Protokolleinträge zu diesem Traktandum.
+                          Noch keine ProtokolleintrÃ¤ge zu diesem Traktandum.
                         </div>
                       )}
                     </div>
@@ -1020,7 +1020,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                       className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2]"
                                     />
                                     <span className="text-sm text-slate-700">
-                                      Für spätere Pendenz-Autogenerierung vormerken
+                                      FÃ¼r spÃ¤tere Pendenz-Autogenerierung vormerken
                                     </span>
                                   </label>
 
@@ -1083,7 +1083,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                     {decision.dueDateLabel ? (
                                       <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
                                         <Clock3 className="h-3.5 w-3.5" />
-                                        Fällig bis {decision.dueDateLabel}
+                                        FÃ¤llig bis {decision.dueDateLabel}
                                       </div>
                                     ) : null}
                                   </div>
@@ -1103,7 +1103,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                         Bemerkung
                                       </p>
                                       <p className="mt-1 text-sm text-slate-700">
-                                        {decision.remarks ?? "—"}
+                                        {decision.remarks ?? "â€”"}
                                       </p>
                                     </div>
                                   </div>
@@ -1120,20 +1120,20 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                                     <button
                                       type="button"
                                       onClick={async () => {
-                                        const confirmed = confirm("Entscheidung wirklich löschen?");
+                                        const confirmed = confirm("Entscheidung wirklich lÃ¶schen?");
                                         if (!confirmed) {
                                           return;
                                         }
                                         try {
                                           await deleteDecision(decision.id);
                                         } catch (error) {
-                                          alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
+                                          alert(error instanceof Error ? error.message : "LÃ¶schen fehlgeschlagen.");
                                         }
                                       }}
                                       className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
-                                      Löschen
+                                      LÃ¶schen
                                     </button>
                                   </div>
                                 </div>
@@ -1191,7 +1191,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
 
                         <div>
                           <label className="mb-2 block text-sm font-medium text-slate-800">
-                            Fällig bis
+                            FÃ¤llig bis
                           </label>
                           <input
                             type="date"
@@ -1281,7 +1281,7 @@ export default function VereinsleitungMeetingExecutionWorkspace({
                           className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0b4aa2] focus:ring-[#0b4aa2]"
                         />
                         <span className="text-sm text-slate-700">
-                          Für spätere Pendenz-Autogenerierung vormerken
+                          FÃ¼r spÃ¤tere Pendenz-Autogenerierung vormerken
                         </span>
                       </label>
 
@@ -1317,3 +1317,4 @@ export default function VereinsleitungMeetingExecutionWorkspace({
     </section>
   );
 }
+

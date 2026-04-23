@@ -1,4 +1,4 @@
-﻿import { ClipboardList } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 
 type VereinsleitungMeetingProtocolCardProps = {
   notes: string | null;
@@ -32,3 +32,4 @@ export default function VereinsleitungMeetingProtocolCard({
     </section>
   );
 }
+

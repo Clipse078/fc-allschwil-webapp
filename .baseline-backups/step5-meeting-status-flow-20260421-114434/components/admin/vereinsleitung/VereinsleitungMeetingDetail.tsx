@@ -1,4 +1,4 @@
-﻿import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
+import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
 import VereinsleitungMeetingAgendaCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingAgendaCard";
 import VereinsleitungMeetingDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingDecisionsCard";
 import VereinsleitungMeetingExecutionWorkspace from "@/components/admin/vereinsleitung/VereinsleitungMeetingExecutionWorkspace";
@@ -77,3 +77,4 @@ export default function VereinsleitungMeetingDetail({
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,36 +49,43 @@ export default function VereinsleitungMeetingsList({
   const router = useRouter();
 
   async function handleDelete(meetingId: string, meetingTitle: string) {
-    const confirmed = confirm('Meeting "' + meetingTitle + '" wirklich lÃ¶schen?');
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/vereinsleitung/meetings/" + meetingId, {
-        method: "DELETE",
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.error || "Meeting konnte nicht gelÃ¶scht werden.");
-      }
-
-      router.refresh();
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "LÃ¶schen fehlgeschlagen.");
-    }
+  const confirmed = confirm(`Meeting "${meetingTitle}" wirklich löschen?`);
+  if (!confirmed) {
+    return;
   }
+
+  try {
+    const response = await fetch("/api/vereinsleitung/meetings/" + meetingId, {
+      method: "DELETE",
+    });
+
+    const raw = await response.text();
+    const payload = raw ? JSON.parse(raw) : null;
+
+    if (!response.ok) {
+      throw new Error(
+        payload && typeof payload.error === "string"
+          ? payload.error
+          : "Meeting konnte nicht gelöscht werden.",
+      );
+    }
+
+    router.refresh();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
+  }
+}
 
   if (meetings.length === 0) {
     return (
       <section className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
         <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
         <div className="p-10 text-center">
-          <h3 className="text-lg font-semibold text-slate-900">Noch keine Meetings vorhanden</h3>
+          <h3 className="text-lg font-semibold text-slate-900">
+            Noch keine Meetings vorhanden
+          </h3>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            Sobald Meetings erfasst werden, erscheinen sie hier automatisch inklusive verknÃ¼pfter Pendenzen.
+            Sobald Meetings erfasst werden, erscheinen sie hier automatisch inklusive verknüpfter Pendenzen.
           </p>
         </div>
       </section>
@@ -135,7 +142,7 @@ export default function VereinsleitungMeetingsList({
                 <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-500">
                   <span className="inline-flex items-center gap-2">
                     <CalendarDays className="h-4 w-4 text-slate-400" />
-                    {meeting.dateLabel} Â· {meeting.timeLabel}
+                    {meeting.dateLabel} · {meeting.timeLabel}
                   </span>
 
                   {meeting.location ? (
@@ -147,7 +154,7 @@ export default function VereinsleitungMeetingsList({
 
                   <span className="inline-flex items-center gap-2">
                     <ListChecks className="h-4 w-4 text-slate-400" />
-                    {meeting.linkedMatterCount} verknÃ¼pfte Pendenzen
+                    {meeting.linkedMatterCount} verknüpfte Pendenzen
                   </span>
 
                   <span className="inline-flex items-center gap-2">
@@ -168,7 +175,7 @@ export default function VereinsleitungMeetingsList({
                   className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   <ExternalLink className="h-4 w-4" />
-                  Ã–ffnen
+                  Öffnen
                 </Link>
 
                 <Link
@@ -185,7 +192,7 @@ export default function VereinsleitungMeetingsList({
                   className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
                 >
                   <Trash2 className="h-4 w-4" />
-                  LÃ¶schen
+                  Löschen
                 </button>
               </div>
             </div>
