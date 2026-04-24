@@ -67,11 +67,15 @@ export default function WochenplanEventCard({
     <button
       type="button"
       draggable
-      onDragStart={() => onDragStart(event.id)}
+      onDragStart={(dragEvent) => {
+        dragEvent.dataTransfer.effectAllowed = "move";
+        dragEvent.dataTransfer.setData("text/plain", event.id);
+        onDragStart(event.id);
+      }}
       onDragEnd={onDragEnd}
       onClick={() => onOpenRooms(event.id)}
       className={[
-        "group relative block w-full max-w-full overflow-hidden rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:shadow-md",
+        "group relative block w-full max-w-full cursor-grab overflow-hidden rounded-2xl border p-3 text-left shadow-sm transition duration-200 hover:-translate-y-[1px] hover:shadow-md active:cursor-grabbing active:scale-[0.98] active:opacity-70",
         categoryClasses,
         hasConflict
           ? "ring-2 ring-red-300/60 shadow-[0_10px_24px_rgba(239,68,68,0.10)]"
@@ -162,5 +166,6 @@ export default function WochenplanEventCard({
     </button>
   );
 }
+
 
 

@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useState } from "react";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -112,6 +113,7 @@ export default function WochenplanDayGrid({
   isToday = false,
 }: WochenplanDayGridProps) {
   const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
+  const [hoverCellKey, setHoverCellKey] = useState<string | null>(null);
 
   return (
     <div className={["overflow-hidden rounded-[28px] border bg-white shadow-sm transition", isToday ? "border-blue-300 shadow-[0_0_0_4px_rgba(59,130,246,0.10),0_18px_45px_rgba(15,23,42,0.08)]" : "border-slate-200"].join(" ")}>
@@ -176,19 +178,27 @@ export default function WochenplanDayGrid({
               return (
                 <div
                   key={pitchRow.key + "-" + slot}
+                  onDragEnter={() => setHoverCellKey(pitchRow.key + "-" + pitchRow.fieldLabel + "-" + slot)}
+                  onDragLeave={() => setHoverCellKey(null)}
                   onDragOver={(dragEvent) => dragEvent.preventDefault()}
                   onDrop={() => {
+                    setHoverCellKey(null);
                     if (!draggingEventId) {
                       return;
                     }
 
                     onDropEvent(draggingEventId, dayKey, pitchRow.key, slot, pitchRow.fieldLabel);
                   }}
-                  className="min-h-[110px] border-r border-t border-slate-200 bg-white p-2 last:border-r-0"
+                  className={[
+                    "min-h-[110px] border-r border-t border-slate-200 bg-white p-2 transition last:border-r-0",
+                    hoverCellKey === pitchRow.key + "-" + pitchRow.fieldLabel + "-" + slot
+                      ? "bg-blue-50/70 ring-2 ring-inset ring-blue-300"
+                      : "",
+                  ].join(" ")}
                 >
                   <div
                     className={[
-                      "relative h-full overflow-hidden rounded-2xl border border-dashed p-1.5 transition",
+                      "relative h-full overflow-hidden rounded-2xl border border-dashed p-1.5 transition duration-200",
                       hasCellConflict
                         ? "border-red-200 bg-red-50/20"
                         : "border-slate-200 bg-slate-50/50",
@@ -222,6 +232,7 @@ export default function WochenplanDayGrid({
     </div>
   );
 }
+
 
 
 
