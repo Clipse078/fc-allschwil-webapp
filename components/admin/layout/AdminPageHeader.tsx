@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { ChevronRight, Command, Search, Users, Shield, CalendarDays, Flag, X } from "lucide-react";
@@ -54,7 +54,7 @@ const DUMMY_RESULTS: SpotlightResult[] = [
   },
   {
     id: "p2",
-    title: "Nicole Nüssli",
+    title: "Nicole NÃ¼ssli",
     subtitle: "Vereinsleitung",
     href: "/dashboard/persons",
     type: "person",
@@ -69,14 +69,14 @@ const DUMMY_RESULTS: SpotlightResult[] = [
   {
     id: "m1",
     title: "Vereinsleitungssitzung Mai 2026",
-    subtitle: "02.05.2026 · Vereinsleitung",
+    subtitle: "02.05.2026 Â· Vereinsleitung",
     href: "/vereinsleitung/meetings",
     type: "meeting",
   },
   {
     id: "i1",
     title: "Website Go-Live",
-    subtitle: "Initiative · In Umsetzung",
+    subtitle: "Initiative Â· In Umsetzung",
     href: "/vereinsleitung/initiativen",
     type: "initiative",
   },
@@ -118,7 +118,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "2. Betrieb & Organisation",
       title: "Betrieb & Organisation",
       description:
-        "Demo-Modulübersicht für Finanzen, Material, Medien, Aktivitäten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
+        "Demo-ModulÃ¼bersicht fÃ¼r Finanzen, Material, Medien, AktivitÃ¤ten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
     };
   }
 
@@ -127,7 +127,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "2. Betrieb & Organisation",
       title: humanizeSlug(pathname.replace("/dashboard/operations/", "")),
       description:
-        "Demo-Platzhalter für das kommende Modul. Diese Seite dient für die Freitag-Demo als zukünftiger Modulanker.",
+        "Demo-Platzhalter fÃ¼r das kommende Modul. Diese Seite dient fÃ¼r die Freitag-Demo als zukÃ¼nftiger Modulanker.",
     };
   }
 
@@ -136,7 +136,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "3. Technische Kommission",
       title: "Technische Kommission",
       description:
-        "Demo-Modulübersicht für Leistungsplan Aktive, Jugend-Ausbildungsplan, Meetings und Kommunikation HUB.",
+        "Demo-ModulÃ¼bersicht fÃ¼r Leistungsplan Aktive, Jugend-Ausbildungsplan, Meetings und Kommunikation HUB.",
     };
   }
 
@@ -145,7 +145,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "3. Technische Kommission",
       title: humanizeSlug(pathname.replace("/dashboard/technische-kommission/", "")),
       description:
-        "Demo-Platzhalter für das kommende Modul der Technischen Kommission.",
+        "Demo-Platzhalter fÃ¼r das kommende Modul der Technischen Kommission.",
     };
   }
 
@@ -154,25 +154,25 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Aktuelle Saison",
       description:
-        "Modulübersicht für aktuelle Saisonprozesse mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "ModulÃ¼bersicht fÃ¼r aktuelle Saisonprozesse mit Teams, Jahresplan, Wochenplan und Tagesplan.",
     };
   }
 
   if (pathname === "/dashboard/next-season") {
     return {
-      eyebrow: "5. Nächste Saison",
-      title: "Nächste Saison",
+      eyebrow: "5. NÃ¤chste Saison",
+      title: "NÃ¤chste Saison",
       description:
-        "Demo-Modulübersicht für die kommende Saison mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "Demo-ModulÃ¼bersicht fÃ¼r die kommende Saison mit Teams, Jahresplan, Wochenplan und Tagesplan.",
     };
   }
 
   if (pathname.startsWith("/dashboard/next-season/")) {
     return {
-      eyebrow: "5. Nächste Saison",
+      eyebrow: "5. NÃ¤chste Saison",
       title: humanizeSlug(pathname.replace("/dashboard/next-season/", "")),
       description:
-        "Demo-Platzhalter für die kommende Saisonplanung.",
+        "Demo-Platzhalter fÃ¼r die kommende Saisonplanung.",
     };
   }
 
@@ -181,16 +181,16 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Personen",
       description:
-        "Personenmodul für Trainer, Spieler, Vereinsfunktionäre und externe Kontakte.",
+        "Personenmodul fÃ¼r Trainer, Spieler, VereinsfunktionÃ¤re und externe Kontakte.",
     };
   }
 
   if (pathname === "/dashboard/vereinsfunktionaere") {
     return {
       eyebrow: "6. Personen",
-      title: "Vereinsfunktionäre",
+      title: "VereinsfunktionÃ¤re",
       description:
-        "Demo-Platzhalter für Vereinsfunktionäre als eigenes Personen-Teilmodul.",
+        "Demo-Platzhalter fÃ¼r VereinsfunktionÃ¤re als eigenes Personen-Teilmodul.",
     };
   }
 
@@ -199,7 +199,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Externe Kontakte",
       description:
-        "Demo-Platzhalter für externe Kontakte als eigenes Personen-Teilmodul.",
+        "Demo-Platzhalter fÃ¼r externe Kontakte als eigenes Personen-Teilmodul.",
     };
   }
 
@@ -208,7 +208,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Trainer",
       description:
-        "Trainerdaten strukturiert verwalten und für Organisation und Website bereitstellen.",
+        "Trainerdaten strukturiert verwalten und fÃ¼r Organisation und Website bereitstellen.",
     };
   }
 
@@ -217,7 +217,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Spieler",
       description:
-        "Spielerdaten zentral verwalten und für spätere Prozesse und Teams nutzbar machen.",
+        "Spielerdaten zentral verwalten und fÃ¼r spÃ¤tere Prozesse und Teams nutzbar machen.",
     };
   }
 
@@ -226,7 +226,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "7. Neue Anmeldungen",
       title: "Neue Anmeldungen",
       description:
-        "Demo-Modulübersicht für neue Trainer, neue Spieler und neue Vereinsfunktionäre.",
+        "Demo-ModulÃ¼bersicht fÃ¼r neue Trainer, neue Spieler und neue VereinsfunktionÃ¤re.",
     };
   }
 
@@ -235,7 +235,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "7. Neue Anmeldungen",
       title: humanizeSlug(pathname.replace("/dashboard/neu-anmeldungen/", "")),
       description:
-        "Demo-Platzhalter für eingehende Neuanmeldungen.",
+        "Demo-Platzhalter fÃ¼r eingehende Neuanmeldungen.",
     };
   }
 
@@ -253,7 +253,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Jahresplan",
       description:
-        "Führende Saisonplanung mit Trainings, Matches, Turnieren, weiteren Events und Ferienperioden über die ganze Saison.",
+        "FÃ¼hrende Saisonplanung mit Trainings, Matches, Turnieren, weiteren Events und Ferienperioden Ã¼ber die ganze Saison.",
     };
   }
 
@@ -262,7 +262,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Wochenplan",
       description:
-        "Operative Wochenplanung pro Kalenderwoche. Diese Sicht ist für Website und später Mobile App vorgesehen.",
+        "Operative Wochenplanung pro Kalenderwoche. Diese Sicht ist fÃ¼r Website und spÃ¤ter Mobile App vorgesehen.",
     };
   }
 
@@ -271,7 +271,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Tagesplan",
       description:
-        "Operative Tagesplanung für den Live-Betrieb und die direkte Ausspielung auf das Infoboard.",
+        "Operative Tagesplanung fÃ¼r den Live-Betrieb und die direkte Ausspielung auf das Infoboard.",
     };
   }
 
@@ -279,7 +279,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Meetings",
-      description: "Übersicht aller Sitzungen – absteigend vom neuesten zum ältesten Eintrag.",
+      description: "Ãœbersicht aller Sitzungen â€“ absteigend vom neuesten zum Ã¤ltesten Eintrag.",
     };
   }
 
@@ -287,7 +287,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Meeting planen",
-      description: "Neues Meeting erfassen und direkt mit Pendenzen verknüpfen.",
+      description: "Neues Meeting erfassen und direkt mit Pendenzen verknÃ¼pfen.",
     };
   }
 
@@ -296,7 +296,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: humanizeSlug(slug),
-      description: "Meeting-Daten und Pendenzen-Verknüpfungen anpassen.",
+      description: "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen.",
     };
   }
 
@@ -305,7 +305,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: humanizeSlug(slug),
-      description: "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
+      description: "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
     };
   }
 
@@ -313,14 +313,14 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Initiativen",
-      description: "Übersicht aller Initiativen – absteigend vom neuesten zum ältesten Eintrag.",
+      description: "Ãœbersicht aller Initiativen â€“ absteigend vom neuesten zum Ã¤ltesten Eintrag.",
     };
   }
 
   if (pathname.startsWith("/vereinsleitung/initiativen/")) {
     return {
       eyebrow: "1. Vereinsleitung",
-      title: "Initiative – Details",
+      title: "Initiative â€“ Details",
       description: "Fortschritt, Aufgaben, Meetings und Entscheidungen.",
     };
   }
@@ -330,7 +330,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "1. Vereinsleitung",
       title: "Kommunikation HUB",
       description:
-        "Demo-Platzhalter für den künftigen Kommunikations-Hub der Vereinsleitung.",
+        "Demo-Platzhalter fÃ¼r den kÃ¼nftigen Kommunikations-Hub der Vereinsleitung.",
     };
   }
 
@@ -338,14 +338,14 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "KPIs",
-      description: "Kennzahlen und Trends für die strategische Steuerung des Vereins.",
+      description: "Kennzahlen und Trends fÃ¼r die strategische Steuerung des Vereins.",
     };
   }
 
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return {
       eyebrow: "1. Vereinsleitung",
-      title: "Vereinsleitung – Übersicht",
+      title: "Vereinsleitung â€“ Ãœbersicht",
       description:
         "Strategische Steuerung des Vereins mit Zielen, Initiativen, Meetings, Aufgaben und Entscheidungen an einem Ort.",
     };
@@ -356,7 +356,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "Saisons",
       title: "Saisonplanung",
       description:
-        "Neue zukünftige Saisons sind in Planung. Die aktuelle Saison ist laufend. Vergangene Saisons werden nach Saisonende automatisch abgeschlossen.",
+        "Neue zukÃ¼nftige Saisons sind in Planung. Die aktuelle Saison ist laufend. Vergangene Saisons werden nach Saisonende automatisch abgeschlossen.",
     };
   }
 
@@ -365,7 +365,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Events",
       description:
-        "Events sind saisongeführt und umfassen Matches, Turniere, Trainings sowie weitere Vereinsereignisse pro gewählter Saison.",
+        "Events sind saisongefÃ¼hrt und umfassen Matches, Turniere, Trainings sowie weitere Vereinsereignisse pro gewÃ¤hlter Saison.",
     };
   }
 
@@ -374,7 +374,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Teams",
       description:
-        "Teams sind saisongeführt und werden dynamisch pro Saison und Teamkategorie verwaltet.",
+        "Teams sind saisongefÃ¼hrt und werden dynamisch pro Saison und Teamkategorie verwaltet.",
     };
   }
 
@@ -532,36 +532,36 @@ function SpotlightSearch() {
       ? createPortal(
           <div
             id="admin-spotlight-portal"
-            className="fixed inset-x-0 top-24 z-[180] flex justify-center px-4"
+            className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 fixed inset-x-0 top-24 z-[180] flex justify-center px-4"
           >
-            <div className="w-full max-w-[820px]">
-            <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
-              <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 w-full max-w-[820px]">
+            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
+              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
 
-              <div className="border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                  <Search className="h-4 w-4 text-[#0b4aa2]" />
+              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 border-b border-slate-100 px-5 py-4">
+                <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
+                  <Search className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4 text-[#0b4aa2]" />
                   <input
                     autoFocus
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Nach Personen, Teams, Meetings oder Initiativen suchen …"
-                    className="w-full bg-transparent text-sm text-slate-900 outline-none"
+                    placeholder="Nach Personen, Teams, Meetings oder Initiativen suchen â€¦"
+                    className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 w-full bg-transparent text-sm text-slate-900 outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setIsOpen(false)}
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50"
+                    className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50"
                   >
-                    <X className="mr-1 h-3.5 w-3.5" />
+                    <X className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 mr-1 h-3.5 w-3.5" />
                     ESC
                   </button>
                 </div>
               </div>
 
-              <div className="max-h-[520px] overflow-y-auto">
+              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 max-h-[520px] overflow-y-auto">
                 {groupedResults.length === 0 ? (
-                  <div className="px-5 py-8 text-sm text-slate-500">
+                  <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 px-5 py-8 text-sm text-slate-500">
                     Keine Treffer gefunden.
                   </div>
                 ) : (
@@ -570,14 +570,14 @@ function SpotlightSearch() {
                       let flatIndex = -1;
 
                       return groupedResults.map((group) => (
-                        <div key={group.key} className="border-b border-slate-100 last:border-b-0">
-                          <div className="px-5 py-4">
-                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        <div key={group.key} className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 border-b border-slate-100 last:border-b-0">
+                          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 px-5 py-4">
+                            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                               {group.label}
                             </div>
                           </div>
 
-                          <div className="px-3 pb-3">
+                          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 px-3 pb-3">
                             {group.items.map((item) => {
                               flatIndex += 1;
                               const isHighlighted = flatIndex === highlightedIndex;
@@ -595,26 +595,26 @@ function SpotlightSearch() {
                                       : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"
                                   }`}
                                 >
-                                  <div className="flex min-w-0 items-center gap-3">
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2]">
-                                      <Icon className="h-4 w-4" />
+                                  <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex min-w-0 items-center gap-3">
+                                    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2]">
+                                      <Icon className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4" />
                                     </div>
 
-                                    <div className="min-w-0">
-                                      <div className="truncate text-sm font-semibold text-slate-900">
+                                    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 min-w-0">
+                                      <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-sm font-semibold text-slate-900">
                                         {item.title}
                                       </div>
-                                      <div className="truncate text-xs text-slate-500">
+                                      <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-xs text-slate-500">
                                         {item.subtitle}
                                       </div>
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-3">
-                                    <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2] sm:inline-flex">
+                                  <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex items-center gap-3">
+                                    <span className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2] sm:inline-flex">
                                       {group.label.slice(0, -1)}
                                     </span>
-                                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                                    <ChevronRight className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4 shrink-0 text-slate-400" />
                                   </div>
                                 </Link>
                               );
@@ -624,17 +624,17 @@ function SpotlightSearch() {
                       ));
                     })()}
 
-                    <div className="border-t border-slate-100 px-4 py-3">
+                    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 border-t border-slate-100 px-4 py-3">
                       <Link
                         href="/dashboard"
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center justify-between rounded-[18px] px-4 py-3 text-sm font-semibold text-[#0b4aa2] transition hover:bg-slate-50"
+                        className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex items-center justify-between rounded-[18px] px-4 py-3 text-sm font-semibold text-[#0b4aa2] transition hover:bg-slate-50"
                       >
-                        <span className="inline-flex items-center gap-2">
-                          <Search className="h-4 w-4" />
+                        <span className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 inline-flex items-center gap-2">
+                          <Search className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4" />
                           Alle Ergebnisse anzeigen
                         </span>
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4" />
                       </Link>
                     </div>
                   </div>
@@ -649,29 +649,29 @@ function SpotlightSearch() {
 
   return (
     <>
-      <div ref={containerRef} className="relative w-full max-w-[820px]">
+      <div ref={containerRef} className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 relative w-full max-w-[820px]">
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="group flex w-full items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+          className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 group flex w-full items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
         >
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[#0b4aa2] transition group-hover:bg-[#0b4aa2]/[0.06]">
-              <Search className="h-5 w-5" />
+          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex min-w-0 items-center gap-4">
+            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[#0b4aa2] transition group-hover:bg-[#0b4aa2]/[0.06]">
+              <Search className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-5 w-5" />
             </div>
 
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900">
+            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 min-w-0">
+              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-sm font-semibold text-slate-900">
                 Global suchen
               </div>
-              <div className="truncate text-sm text-slate-500">
-                Spieler, Teams, Meetings, Initiativen …
+              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-sm text-slate-500">
+                Spieler, Teams, Meetings, Initiativen â€¦
               </div>
             </div>
           </div>
 
-          <div className="hidden items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500 sm:inline-flex">
-            <Command className="h-3.5 w-3.5" />
+          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 hidden items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500 sm:inline-flex">
+            <Command className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-3.5 w-3.5" />
             K
           </div>
         </button>
@@ -737,8 +737,8 @@ export default function AdminPageHeader({
             eyebrow: "1. Vereinsleitung",
             title: humanizeSlug(slug),
             description: isEdit
-              ? "Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
-              : "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
+              ? "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen."
+              : "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
           });
           return;
         }
@@ -750,8 +750,8 @@ export default function AdminPageHeader({
             meeting.subtitle && meeting.subtitle.trim().length > 0
               ? meeting.subtitle
               : isEdit
-                ? "Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
-                : "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
+                ? "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen."
+                : "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
         });
       } catch {
         if (isCancelled) {
@@ -762,8 +762,8 @@ export default function AdminPageHeader({
           eyebrow: "1. Vereinsleitung",
           title: humanizeSlug(slug),
           description: isEdit
-            ? "Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
-            : "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
+            ? "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen."
+            : "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
         });
       }
     }
@@ -782,17 +782,17 @@ export default function AdminPageHeader({
     Boolean(canManageSeasons);
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
+    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex flex-col gap-5">
+      <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 min-w-0">
           {headerContent.eyebrow ? (
-            <p className="fca-eyebrow">{headerContent.eyebrow}</p>
+            <p className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 fca-eyebrow">{headerContent.eyebrow}</p>
           ) : null}
 
-          <h1 className="fca-heading mt-2">{headerContent.title}</h1>
+          <h1 className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 fca-heading mt-2">{headerContent.title}</h1>
 
           {headerContent.description ? (
-            <p className="mt-3 max-w-2xl text-sm text-slate-500">
+            <p className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 mt-3 max-w-2xl text-sm text-slate-500">
               {headerContent.description}
             </p>
           ) : null}
@@ -801,11 +801,11 @@ export default function AdminPageHeader({
         {showDashboardSeasonPill ? (
           <Link
             href="/dashboard/seasons"
-            className="group inline-flex w-fit items-center gap-3 rounded-full border border-[#d7e3f8] bg-[#f3f7fd] px-4 py-2.5 text-sm font-semibold text-[#0b4aa2] shadow-sm transition hover:border-[#bdd1f3] hover:bg-white hover:shadow-[0_10px_24px_rgba(11,74,162,0.10)]"
+            className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 group inline-flex w-fit items-center gap-3 rounded-full border border-[#d7e3f8] bg-[#f3f7fd] px-4 py-2.5 text-sm font-semibold text-[#0b4aa2] shadow-sm transition hover:border-[#bdd1f3] hover:bg-white hover:shadow-[0_10px_24px_rgba(11,74,162,0.10)]"
           >
-            <span className="text-slate-500">Saison</span>
+            <span className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 text-slate-500">Saison</span>
             <span>{currentSeasonLabel}</span>
-            <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+            <ChevronRight className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4 transition group-hover:translate-x-0.5" />
           </Link>
         ) : null}
       </div>
