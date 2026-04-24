@@ -41,6 +41,18 @@ export async function POST(request: Request) {
       ) as PublishEventPayload[])
     : [];
 
+  if (
+    action === "publish" &&
+    !(session.user.roleKeys ?? []).some((roleKey) =>
+      ["SUPERADMIN", "ADMIN", "MATCHDAY_COORDINATOR"].includes(roleKey),
+    )
+  ) {
+    return NextResponse.json(
+      { error: "Keine Berechtigung zum Freigeben und Publizieren des Wochenplans." },
+      { status: 403 },
+    );
+  }
+
   if (events.length === 0) {
     return NextResponse.json(
       { error: "Keine Wochenplan-Einträge zum Publizieren erhalten." },
@@ -136,4 +148,5 @@ export async function POST(request: Request) {
     publishedCount: events.length,
   });
 }
+
 
