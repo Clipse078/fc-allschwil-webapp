@@ -127,6 +127,7 @@ export default async function PublicInfoboardPage() {
     const main = groups[0][0];
     const participants = participantLabels(groups[0]);
     const rooms = roomCodes(groups[0]);
+    const matchSponsor = sponsors[0] ?? null;
 
     return (
       <main className="flex h-screen w-screen items-center justify-center overflow-hidden bg-[#06152f] px-12 py-10 text-white">
@@ -142,6 +143,27 @@ export default async function PublicInfoboardPage() {
             </p>
             <LiveClock />
           </div>
+
+          {matchSponsor ? (
+            <div className="absolute bottom-10 right-10 max-w-[420px] rounded-[28px] bg-white px-7 py-5 text-right text-slate-950 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-red-600">
+                Präsentiert von
+              </p>
+              {matchSponsor.logoUrl ? (
+                <div className="mt-3 flex justify-end">
+                  <img
+                    src={matchSponsor.logoUrl}
+                    alt={matchSponsor.displayName}
+                    className="max-h-20 max-w-[260px] object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="mt-2 text-3xl font-black uppercase text-[#0b4aa2]">
+                  {matchSponsor.displayName}
+                </p>
+              )}
+            </div>
+          ) : null}
 
           <div className="absolute right-10 top-10 rounded-[28px] bg-white px-7 py-5 text-right text-slate-950 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">
@@ -349,6 +371,7 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
 
 
 
