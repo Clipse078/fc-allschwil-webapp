@@ -127,7 +127,11 @@ export default async function PublicInfoboardPage() {
     const main = groups[0][0];
     const participants = participantLabels(groups[0]);
     const rooms = roomCodes(groups[0]);
-    const matchSponsor = sponsors[0] ?? null;
+    const matchSponsor =
+      sponsors.find((sponsor) => sponsor.tier === "MAIN") ??
+      sponsors.find((sponsor) => sponsor.tier === "GOLD") ??
+      sponsors[0] ??
+      null;
 
     return (
       <main className="flex h-screen w-screen items-center justify-center overflow-hidden bg-[#06152f] px-12 py-10 text-white">
@@ -371,6 +375,7 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
 
 
 

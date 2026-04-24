@@ -22,7 +22,17 @@ export async function getInfoboardSponsors() {
   });
 
   return sponsors.flatMap((sponsor) => {
-    const weight = Math.max(1, sponsor.infoboardWeight);
+    const tierBoost =
+      sponsor.tier === "MAIN"
+        ? 5
+        : sponsor.tier === "GOLD"
+          ? 3
+          : sponsor.tier === "SILVER"
+            ? 2
+            : 1;
+
+    const weight = Math.max(1, sponsor.infoboardWeight) * tierBoost;
+
     return Array.from({ length: weight }, () => ({
       id: sponsor.id,
       displayName: sponsor.displayName,
@@ -32,3 +42,4 @@ export async function getInfoboardSponsors() {
     }));
   });
 }
+
