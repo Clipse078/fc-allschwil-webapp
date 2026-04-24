@@ -180,14 +180,38 @@ export default async function InfoboardPage() {
                     </p>
 
                     <div className="mt-3 flex flex-wrap gap-3">
-                      {participants.slice(0, 8).map((participant) => (
-                        <span
-                          key={participant}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xl font-black text-slate-800"
-                        >
-                          {participant}
-                        </span>
-                      ))}
+                      {participants.length === 2 ? (
+  <div className="flex items-center gap-4 text-3xl font-black text-slate-900">
+    <span>{participants[0]}</span>
+    <span className="text-red-600">vs</span>
+    <span>{participants[1]}</span>
+  </div>
+) : participants.length <= 4 ? (
+  <div className="flex flex-wrap gap-3">
+    {participants.map((p) => (
+      <span
+        key={p}
+        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xl font-black text-slate-800"
+      >
+        {p}
+      </span>
+    ))}
+  </div>
+) : (
+  <div className="grid grid-cols-2 gap-3">
+    {participants.slice(0, 6).map((p) => (
+      <span
+        key={p}
+        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-lg font-bold text-slate-800"
+      >
+        {p}
+      </span>
+    ))}
+    <span className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-lg font-bold text-slate-500">
+      +{participants.length - 6} weitere
+    </span>
+  </div>
+)}
 
                       {participants.length > 8 ? (
                         <span className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-xl font-black text-slate-500">
@@ -223,3 +247,4 @@ export default async function InfoboardPage() {
     </main>
   );
 }
+
