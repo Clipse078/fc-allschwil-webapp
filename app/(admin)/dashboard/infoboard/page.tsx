@@ -103,11 +103,11 @@ export default async function InfoboardPage() {
   const groups = groupEvents(todayEvents);
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#06152f] p-6 text-white">
+    <main className="min-h-screen overflow-hidden bg-[#06152f] p-2 text-white">
       <meta httpEquiv="refresh" content="30" />
 
-      <div className="mx-auto flex min-h-[calc(100vh-48px)] max-w-[1900px] flex-col gap-6">
-        <header className="flex items-center justify-between gap-6 rounded-[32px] border border-white/10 bg-white/10 px-8 py-6 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur">
+      <div className=" flex min-h-[calc(100vh-48px)] max-w-none flex-col gap-2">
+        <header className="flex items-center justify-between gap-2 rounded-[32px] border border-white/10 bg-white/10 px-8 py-6 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.22em] text-red-200">
               FC Allschwil Infoboard
@@ -126,7 +126,7 @@ export default async function InfoboardPage() {
         </header>
 
         {groups.length > 0 ? (
-          <section className="grid flex-1 gap-5 xl:grid-cols-2">
+          <section className="grid flex-1 gap-5 xl:grid-cols-2 2xl:grid-cols-3">
             {groups.map((group) => {
               const main = group[0];
               const participants = participantLabels(group);
@@ -247,4 +247,5 @@ export default async function InfoboardPage() {
     </main>
   );
 }
+
 
