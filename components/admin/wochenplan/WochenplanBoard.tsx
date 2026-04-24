@@ -597,6 +597,54 @@ function getNextTrainingField(
   return "A";
 }
 
+
+function hasEventOnPitchRow(
+  event: WochenplanBoardEvent,
+  pitchRow: { key: WochenplanBoardPitchRowKey; fieldLabel: "A" | "B" },
+) {
+  if (event.pitchRowKey !== pitchRow.key) {
+    return false;
+  }
+
+  if (event.fieldLabel === null) {
+    return pitchRow.fieldLabel === "A";
+  }
+
+  return event.fieldLabel === pitchRow.fieldLabel;
+}
+
+function getCompactPitchRows(
+  dayKey: WochenplanBoardDayKey,
+  events: WochenplanBoardEvent[],
+) {
+  const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
+  const rows = PITCH_ROWS.filter((pitchRow) =>
+    dayEvents.some((event) => hasEventOnPitchRow(event, pitchRow)),
+  );
+
+  return rows.length > 0 ? rows : PITCH_ROWS.slice(0, 1);
+}
+
+function getCompactTimeSlots(
+  dayKey: WochenplanBoardDayKey,
+  events: WochenplanBoardEvent[],
+) {
+  const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
+  const baseSlots =
+    dayKey === "SATURDAY" || dayKey === "SUNDAY"
+      ? WEEKEND_TIME_SLOTS
+      : WEEKDAY_TIME_SLOTS;
+
+  const slots = baseSlots.filter((slot) =>
+    dayEvents.some((event) => event.slotKey === slot),
+  );
+
+  return slots.length > 0 ? slots : baseSlots.slice(0, 1);
+}
+
+function hasEventsOnDay(dayKey: WochenplanBoardDayKey, events: WochenplanBoardEvent[]) {
+  return events.some((event) => event.boardDayKey === dayKey);
+}
 function buildSnapshot(events: WochenplanBoardEvent[]) {
   return JSON.stringify(
     events.map((event) => ({
@@ -737,6 +785,10 @@ export default function WochenplanBoard({
   }
 
   const visibleDays = visibleDayKeys && visibleDayKeys.length > 0 ? DAYS.filter((day) => visibleDayKeys.includes(day.key)) : DAYS;
+  const displayedDays =
+    viewMode === "PLANNING"
+      ? visibleDays.filter((day) => hasEventsOnDay(day.key, events))
+      : visibleDays;
 
   return (
     <div className="space-y-6">
@@ -812,6 +864,7 @@ export default function WochenplanBoard({
     </div>
   );
 }
+
 
 
 
