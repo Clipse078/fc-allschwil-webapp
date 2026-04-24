@@ -35,6 +35,13 @@ function getVisibleDayKeys(start: Date, end: Date): WochenplanBoardDayKey[] {
   return keys;
 }
 
+function getIsoWeekStartDate(value: Date) {
+  const date = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() - (day - 1));
+  return date.toISOString().slice(0, 10);
+}
+
 function getCurrentDayKey(weekOffset: number): WochenplanBoardDayKey | null {
   if (weekOffset !== 0) return null;
 
@@ -184,9 +191,10 @@ export default async function WeekPlannerPage({
         initialEvents={boardData.events}
         visibleDayKeys={visibleDayKeys}
         currentDayKey={currentDayKey}
-        weekStartDate={boardData.weekWindow.start.toISOString().slice(0, 10)}
+        weekStartDate={getIsoWeekStartDate(boardData.weekWindow.start)}
       />
     </div>
   );
 }
+
 
