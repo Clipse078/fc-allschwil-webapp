@@ -6,6 +6,7 @@ import {
   EventStatus,
   EventType,
   PermissionModule,
+  PlanningResourceType,
   PrismaClient,
   TeamCategory,
   TeamSeasonStatus,
@@ -116,7 +117,7 @@ async function main() {
     },
     {
       key: "president",
-      name: "PrÃƒÂ¤sident",
+      name: "PrÃƒÆ’Ã‚Â¤sident",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -136,7 +137,7 @@ async function main() {
     },
     {
       key: "vice_president",
-      name: "Vize-PrÃƒÂ¤sident",
+      name: "Vize-PrÃƒÆ’Ã‚Â¤sident",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -155,7 +156,7 @@ async function main() {
     },
     {
       key: "sekretaer",
-      name: "SekretÃƒÂ¤r",
+      name: "SekretÃƒÆ’Ã‚Â¤r",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -293,7 +294,7 @@ async function main() {
     },
     {
       key: "aktivitaetenkommission_leiter",
-      name: "AktivitÃƒÂ¤tenkommision Leiter",
+      name: "AktivitÃƒÆ’Ã‚Â¤tenkommision Leiter",
       description: "Organisatorische Leitung / Operations",
       canAccessVereinsleitung: false,
       canAttendVereinsleitungMeetings: true,
@@ -303,7 +304,7 @@ async function main() {
     },
     {
       key: "aktivitaetenkommission_mitglied",
-      name: "AktivitÃƒÂ¤tenkommision Mitgelied",
+      name: "AktivitÃƒÆ’Ã‚Â¤tenkommision Mitgelied",
       description: "Organisatorische Leitung / Operations",
       canAccessVereinsleitung: false,
       canAttendVereinsleitungMeetings: true,
@@ -740,9 +741,9 @@ async function main() {
 
   const demoTitles = [
     "FC Allschwil E4 vs FC Concordia Basel",
-    "E4 FrÃƒÆ’Ã‚Â¼hlingsturnier Aesch",
+    "E4 FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hlingsturnier Aesch",
     "E4 Training Dienstag",
-    "Sponsor ApÃƒÆ’Ã‚Â©ro FrÃƒÆ’Ã‚Â¼hling 2026",
+    "Sponsor ApÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ro FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hling 2026",
   ];
 
   await prisma.event.deleteMany({
@@ -763,8 +764,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "FC Allschwil E4 vs FC Concordia Basel",
-        description: "Demo Match fÃƒÆ’Ã‚Â¼r Spielplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im BrÃƒÆ’Ã‚Â¼hl",
+        description: "Demo Match fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r Spielplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hl",
         startAt: new Date("2026-04-18T08:30:00.000Z"),
         endAt: new Date("2026-04-18T10:00:00.000Z"),
         opponentName: "FC Concordia Basel",
@@ -787,13 +788,13 @@ async function main() {
         type: EventType.TOURNAMENT,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
-        title: "E4 FrÃƒÆ’Ã‚Â¼hlingsturnier Aesch",
-        description: "Demo Turnier fÃƒÆ’Ã‚Â¼r Website, Wochenplan, Teamseite und Infoboard.",
+        title: "E4 FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hlingsturnier Aesch",
+        description: "Demo Turnier fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r Website, Wochenplan, Teamseite und Infoboard.",
         location: "Sportanlage Aesch",
         startAt: new Date("2026-05-02T07:30:00.000Z"),
         endAt: new Date("2026-05-02T15:30:00.000Z"),
         organizerName: "FC Aesch",
-        competitionLabel: "FrÃƒÆ’Ã‚Â¼hlingsturnier",
+        competitionLabel: "FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hlingsturnier",
         websiteVisible: true,
         infoboardVisible: true,
         homepageVisible: true,
@@ -812,8 +813,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "E4 Training Dienstag",
-        description: "Demo Training fÃƒÆ’Ã‚Â¼r Trainingsplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im BrÃƒÆ’Ã‚Â¼hl",
+        description: "Demo Training fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r Trainingsplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hl",
         startAt: new Date("2026-04-21T15:30:00.000Z"),
         endAt: new Date("2026-04-21T17:00:00.000Z"),
         meetingTime: new Date("2026-04-21T15:15:00.000Z"),
@@ -834,8 +835,8 @@ async function main() {
       type: EventType.OTHER,
       source: EventSource.MANUAL,
       status: EventStatus.SCHEDULED,
-      title: "Sponsor ApÃƒÆ’Ã‚Â©ro FrÃƒÆ’Ã‚Â¼hling 2026",
-      description: "Demo weiteres Event fÃƒÆ’Ã‚Â¼r die Website Events Seite.",
+      title: "Sponsor ApÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ro FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hling 2026",
+      description: "Demo weiteres Event fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r die Website Events Seite.",
       location: "Clubhaus FC Allschwil",
       startAt: new Date("2026-05-14T16:30:00.000Z"),
       endAt: new Date("2026-05-14T20:00:00.000Z"),
@@ -849,6 +850,42 @@ async function main() {
       sortOrder: 40,
     },
   });
+
+  const planningResources = [
+    { key: "stadion-feld-a", name: "Stadion Feld A", type: PlanningResourceType.PITCH, sortOrder: 10 },
+    { key: "stadion-feld-b", name: "Stadion Feld B", type: PlanningResourceType.PITCH, sortOrder: 20 },
+    { key: "kunstrasen-2-feld-a", name: "Kunstrasen 2 Feld A", type: PlanningResourceType.PITCH, sortOrder: 30 },
+    { key: "kunstrasen-2-feld-b", name: "Kunstrasen 2 Feld B", type: PlanningResourceType.PITCH, sortOrder: 40 },
+    { key: "kunstrasen-3-feld-a", name: "Kunstrasen 3 Feld A", type: PlanningResourceType.PITCH, sortOrder: 50 },
+    { key: "kunstrasen-3-feld-b", name: "Kunstrasen 3 Feld B", type: PlanningResourceType.PITCH, sortOrder: 60 },
+    { key: "garderobe-e1", name: "Garderobe E1", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 110 },
+    { key: "garderobe-e2", name: "Garderobe E2", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 120 },
+    { key: "garderobe-e3", name: "Garderobe E3", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 130 },
+    { key: "garderobe-e4", name: "Garderobe E4", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 140 },
+    { key: "garderobe-o1", name: "Garderobe O1", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 210 },
+    { key: "garderobe-o2", name: "Garderobe O2", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 220 },
+    { key: "garderobe-o3", name: "Garderobe O3", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 230 },
+    { key: "garderobe-o4", name: "Garderobe O4", type: PlanningResourceType.DRESSING_ROOM, sortOrder: 240 },
+  ] as const;
+
+  for (const resource of planningResources) {
+    await prisma.planningResource.upsert({
+      where: { key: resource.key },
+      update: {
+        name: resource.name,
+        type: resource.type,
+        sortOrder: resource.sortOrder,
+        isActive: true,
+      },
+      create: {
+        key: resource.key,
+        name: resource.name,
+        type: resource.type,
+        sortOrder: resource.sortOrder,
+        isActive: true,
+      },
+    });
+  }
 
   const superAdminRole = await prisma.role.findUnique({
     where: { key: "super_admin" },
@@ -936,7 +973,7 @@ async function main() {
       slug: "website-relaunch-initiative",
       subtitle: "Initiativen Details",
       description:
-        "Der aktuelle Webauftritt des FC Allschwil ist technisch veraltet, nicht mobil-optimiert und reprÃ¤sentiert den Verein nicht mehr zeitgemÃ¤ss. Ziel dieser Initiative ist die Konzeption, Gestaltung und Entwicklung einer neuen, modernen Website, die als zentraler Kommunikationskanal fÃ¼r Mitglieder, Fans und Sponsoren dient.",
+        "Der aktuelle Webauftritt des FC Allschwil ist technisch veraltet, nicht mobil-optimiert und reprÃƒÂ¤sentiert den Verein nicht mehr zeitgemÃƒÂ¤ss. Ziel dieser Initiative ist die Konzeption, Gestaltung und Entwicklung einer neuen, modernen Website, die als zentraler Kommunikationskanal fÃƒÂ¼r Mitglieder, Fans und Sponsoren dient.",
       status: VereinsleitungInitiativeStatus.IN_PROGRESS,
       ownerPersonId: adminPerson.id,
       ownerRoleLabel: "Ressortleiter Organisation & Vereinsentwicklung",

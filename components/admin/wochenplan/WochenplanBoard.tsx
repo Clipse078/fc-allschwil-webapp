@@ -25,7 +25,10 @@ const PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; label: string }> = [
 ];
 
 const TIME_SLOTS: WochenplanBoardSlotKey[] = [
-  "15:45-17:15",
+  "08:00-10:00",
+  "10:00-12:00",
+  "12:00-14:00",
+  "14:00-17:15",
   "17:15-18:45",
   "18:45-20:15",
   "20:15-21:45",
@@ -37,6 +40,8 @@ const DAYS: Array<{ key: WochenplanBoardDayKey; label: string }> = [
   { key: "WEDNESDAY", label: "Mittwoch" },
   { key: "THURSDAY", label: "Donnerstag" },
   { key: "FRIDAY", label: "Freitag" },
+  { key: "SATURDAY", label: "Samstag" },
+  { key: "SUNDAY", label: "Sonntag" },
 ];
 
 function getSlotStartHour(slotKey: WochenplanBoardSlotKey) {
@@ -580,8 +585,8 @@ function buildSnapshot(events: WochenplanBoardEvent[]) {
   );
 }
 
-export default function WochenplanBoard() {
-  const [events, setEvents] = useState<WochenplanBoardEvent[]>(buildDemoEvents());
+export default function WochenplanBoard({ initialEvents = [] }: { initialEvents?: WochenplanBoardEvent[] }) {
+  const [events, setEvents] = useState<WochenplanBoardEvent[]>(initialEvents.length > 0 ? initialEvents : buildDemoEvents());
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
   const [dayPlannerState, setDayPlannerState] = useState<{
@@ -592,7 +597,7 @@ export default function WochenplanBoard() {
     dayLabel: null,
   });
 
-  const initialSnapshot = useMemo(() => buildSnapshot(buildDemoEvents()), []);
+  const initialSnapshot = useMemo(() => buildSnapshot(initialEvents.length > 0 ? initialEvents : buildDemoEvents()), [initialEvents]);
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
 
@@ -763,3 +768,7 @@ export default function WochenplanBoard() {
     </div>
   );
 }
+
+
+
+

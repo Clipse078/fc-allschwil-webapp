@@ -1,4 +1,4 @@
-﻿import { EventSource, EventType } from "@prisma/client";
+﻿import { EventSource, EventType, PlanningResourceType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getDayWindow, getWeekWindow } from "@/lib/planner/date-utils";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
@@ -161,6 +161,17 @@ export async function getPlannerCreateFormData(args?: {
     },
   });
 
+  const planningResources = await prisma.planningResource.findMany({
+    where: { isActive: true },
+    orderBy: [{ type: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      type: true,
+    },
+  });
+
   const normalizedType =
     args?.selectedType &&
     Object.values(EventType).includes(args.selectedType as EventType)
@@ -183,6 +194,12 @@ export async function getPlannerCreateFormData(args?: {
       id: team.id,
       name: team.name,
       category: team.category,
+    })),
+    planningResources: planningResources.map((resource) => ({
+      id: resource.id,
+      key: resource.key,
+      name: resource.name,
+      type: resource.type,
     })),
     selectedSeasonKey,
     selectedSeasonId: selectedSeason?.id ?? "",
@@ -220,6 +237,17 @@ export async function getPlannerEditFormData(
       trainingsplanVisible: true,
       teamPageVisible: true,
       teamId: true,
+      planningAllocations: {
+        select: {
+          resourceId: true,
+          label: true,
+          resource: {
+            select: {
+              type: true,
+            },
+          },
+        },
+      },
       season: {
         select: {
           key: true,
@@ -261,6 +289,22 @@ export async function getPlannerEditFormData(
       competitionLabel: event.competitionLabel ?? "",
       description: event.description ?? "",
       remarks: event.remarks ?? "",
+      pitchResourceId:
+        event.planningAllocations.find(
+          (allocation) => allocation.resource.type === PlanningResourceType.PITCH,
+        )?.resourceId ?? "",
+      homeDressingRoomResourceId:
+        event.planningAllocations.find(
+          (allocation) =>
+            allocation.resource.type === PlanningResourceType.DRESSING_ROOM &&
+            allocation.label !== "Gegner",
+        )?.resourceId ?? "",
+      awayDressingRoomResourceId:
+        event.planningAllocations.find(
+          (allocation) =>
+            allocation.resource.type === PlanningResourceType.DRESSING_ROOM &&
+            allocation.label === "Gegner",
+        )?.resourceId ?? "",
       websiteVisible: event.websiteVisible,
       infoboardVisible: event.infoboardVisible,
       homepageVisible: event.homepageVisible,

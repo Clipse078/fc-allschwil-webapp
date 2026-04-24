@@ -30,6 +30,8 @@ function getCategoryClasses(categoryKey: WochenplanBoardEvent["categoryKey"]) {
       return "border-pink-300 bg-pink-50 text-pink-800";
     case "SENIOREN":
       return "border-slate-300 bg-slate-50 text-slate-800";
+    case "TRAININGSGRUPPE":
+      return "border-emerald-300 bg-emerald-50 text-emerald-800";
     case "TRAINER":
       return "border-neutral-300 bg-neutral-50 text-neutral-800";
     default:
@@ -160,3 +162,5 @@ export default function WochenplanEventCard({
     </button>
   );
 }
+
+

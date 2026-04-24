@@ -1,4 +1,4 @@
-export type WochenplanEventAllocation = {
+﻿export type WochenplanEventAllocation = {
   pitchCode: string | null;
   homeDressingRoomCode: string | null;
   awayDressingRoomCode: string | null;
@@ -54,7 +54,9 @@ export type WochenplanBoardDayKey =
   | "TUESDAY"
   | "WEDNESDAY"
   | "THURSDAY"
-  | "FRIDAY";
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
 
 export type WochenplanBoardPitchRowKey =
   | "STADION"
@@ -62,6 +64,10 @@ export type WochenplanBoardPitchRowKey =
   | "KUNSTRASEN_3";
 
 export type WochenplanBoardSlotKey =
+  | "08:00-10:00"
+  | "10:00-12:00"
+  | "12:00-14:00"
+  | "14:00-17:15"
   | "15:45-17:15"
   | "17:15-18:45"
   | "18:45-20:15"
@@ -73,6 +79,7 @@ export type WochenplanBoardCategoryKey =
   | "AKTIVE"
   | "FRAUEN"
   | "SENIOREN"
+  | "TRAININGSGRUPPE"
   | "TRAINER";
 
 export type WochenplanBoardEvent = WochenplanEventItem & {
@@ -84,3 +91,5 @@ export type WochenplanBoardEvent = WochenplanEventItem & {
   coachLabel: string | null;
   categoryKey: WochenplanBoardCategoryKey;
 };
+
+

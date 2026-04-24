@@ -18,6 +18,12 @@ type PlannerCreateFormData = {
     name: string;
     category: string;
   }>;
+  planningResources: Array<{
+    id: string;
+    key: string;
+    name: string;
+    type: "PITCH" | "DRESSING_ROOM" | "HALL" | "OTHER";
+  }>;
   selectedSeasonKey: string;
   selectedSeasonId: string;
   selectedType: EventType;
@@ -35,6 +41,9 @@ type PlannerCreateFormData = {
     competitionLabel: string;
     description: string;
     remarks: string;
+    pitchResourceId: string;
+    homeDressingRoomResourceId: string;
+    awayDressingRoomResourceId: string;
     websiteVisible: boolean;
     infoboardVisible: boolean;
     homepageVisible: boolean;
@@ -92,6 +101,12 @@ export default function PlannerEntryCreateForm({
   const defaults = data.defaults;
   const formAction =
     mode === "edit" ? updatePlannerEntryAction : createPlannerEntryAction;
+  const pitchResources = data.planningResources.filter(
+    (resource) => resource.type === "PITCH",
+  );
+  const dressingRoomResources = data.planningResources.filter(
+    (resource) => resource.type === "DRESSING_ROOM",
+  );
 
   return (
     <div className="space-y-8">
@@ -317,6 +332,71 @@ export default function PlannerEntryCreateForm({
           </div>
 
           <div className="space-y-5">
+            <article className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+              <h2 className="text-[1.05rem] font-semibold text-slate-900">
+                Planung & Ressourcen
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Weise Spielfeld und Garderoben zu. Diese Daten bilden die Grundlage für Wochenplan, Tagesplan und Infoboard.
+              </p>
+
+              <div className="mt-5 space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-700">
+                    Spielfeld
+                  </label>
+                  <select
+                    name="pitchResourceId"
+                    defaultValue={defaults?.pitchResourceId ?? ""}
+                    className="mt-2 h-11 w-full rounded-[16px] border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-blue-300"
+                  >
+                    <option value="">Noch kein Spielfeld zugewiesen</option>
+                    {pitchResources.map((resource) => (
+                      <option key={resource.id} value={resource.id}>
+                        {resource.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700">
+                    Garderobe Team / Heim
+                  </label>
+                  <select
+                    name="homeDressingRoomResourceId"
+                    defaultValue={defaults?.homeDressingRoomResourceId ?? ""}
+                    className="mt-2 h-11 w-full rounded-[16px] border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-blue-300"
+                  >
+                    <option value="">Noch keine Garderobe</option>
+                    {dressingRoomResources.map((resource) => (
+                      <option key={resource.id} value={resource.id}>
+                        {resource.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700">
+                    Garderobe Gegner
+                  </label>
+                  <select
+                    name="awayDressingRoomResourceId"
+                    defaultValue={defaults?.awayDressingRoomResourceId ?? ""}
+                    className="mt-2 h-11 w-full rounded-[16px] border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-blue-300"
+                  >
+                    <option value="">Nur bei Match / Turnier</option>
+                    {dressingRoomResources.map((resource) => (
+                      <option key={resource.id} value={resource.id}>
+                        {resource.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </article>
+
             <article className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
               <h2 className="text-[1.05rem] font-semibold text-slate-900">
                 Publikation

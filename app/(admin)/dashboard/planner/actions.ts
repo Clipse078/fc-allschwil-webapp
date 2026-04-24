@@ -1,6 +1,12 @@
 ﻿"use server";
 
-import { EventSource, EventStatus, EventType } from "@prisma/client";
+import {
+  EventSource,
+  EventStatus,
+  EventType,
+  PlanningAllocationMode,
+  PlanningResourceType,
+} from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -68,6 +74,133 @@ async function requirePlannerManagePermission() {
   return session;
 }
 
+async function validatePlanningResources(args: {
+  seasonKey: string | null;
+  prefix: string;
+  pitchResourceId: string | null;
+  homeDressingRoomResourceId: string | null;
+  awayDressingRoomResourceId: string | null;
+}) {
+  const resourceIds = [
+    args.pitchResourceId,
+    args.homeDressingRoomResourceId,
+    args.awayDressingRoomResourceId,
+  ].filter(Boolean) as string[];
+
+  if (resourceIds.length === 0) {
+    return;
+  }
+
+  const resources = await prisma.planningResource.findMany({
+    where: {
+      id: { in: resourceIds },
+      isActive: true,
+    },
+    select: {
+      id: true,
+      type: true,
+    },
+  });
+
+  const resourceMap = new Map(
+    resources.map((resource) => [resource.id, resource.type]),
+  );
+
+  if (
+    args.pitchResourceId &&
+    resourceMap.get(args.pitchResourceId) !== PlanningResourceType.PITCH
+  ) {
+    redirect(
+      buildPlannerRedirect({
+        seasonKey: args.seasonKey,
+        status: `${args.prefix}-invalid-pitch`,
+      }),
+    );
+  }
+
+  if (
+    args.homeDressingRoomResourceId &&
+    resourceMap.get(args.homeDressingRoomResourceId) !==
+      PlanningResourceType.DRESSING_ROOM
+  ) {
+    redirect(
+      buildPlannerRedirect({
+        seasonKey: args.seasonKey,
+        status: `${args.prefix}-invalid-home-room`,
+      }),
+    );
+  }
+
+  if (
+    args.awayDressingRoomResourceId &&
+    resourceMap.get(args.awayDressingRoomResourceId) !==
+      PlanningResourceType.DRESSING_ROOM
+  ) {
+    redirect(
+      buildPlannerRedirect({
+        seasonKey: args.seasonKey,
+        status: `${args.prefix}-invalid-away-room`,
+      }),
+    );
+  }
+}
+
+async function replaceEventPlanningAllocations(args: {
+  eventId: string;
+  type: EventType;
+  startAt: Date;
+  endAt: Date | null;
+  pitchResourceId: string | null;
+  homeDressingRoomResourceId: string | null;
+  awayDressingRoomResourceId: string | null;
+}) {
+  await prisma.eventPlanningAllocation.deleteMany({
+    where: { eventId: args.eventId },
+  });
+
+  const allocations = [
+    args.pitchResourceId
+      ? {
+          eventId: args.eventId,
+          resourceId: args.pitchResourceId,
+          mode:
+            args.type === EventType.TRAINING
+              ? PlanningAllocationMode.HALF_PITCH
+              : PlanningAllocationMode.FULL_PITCH,
+          startsAt: args.startAt,
+          endsAt: args.endAt,
+          label: "Spielfeld",
+        }
+      : null,
+    args.homeDressingRoomResourceId
+      ? {
+          eventId: args.eventId,
+          resourceId: args.homeDressingRoomResourceId,
+          mode: PlanningAllocationMode.SINGLE_ROOM,
+          startsAt: args.startAt,
+          endsAt: args.endAt,
+          label: args.type === EventType.MATCH ? "Heimteam" : "Team",
+        }
+      : null,
+    args.awayDressingRoomResourceId
+      ? {
+          eventId: args.eventId,
+          resourceId: args.awayDressingRoomResourceId,
+          mode: PlanningAllocationMode.SINGLE_ROOM,
+          startsAt: args.startAt,
+          endsAt: args.endAt,
+          label: "Gegner",
+        }
+      : null,
+  ].filter((allocation): allocation is NonNullable<typeof allocation> => allocation !== null);
+
+  if (allocations.length > 0) {
+    await prisma.eventPlanningAllocation.createMany({
+      data: allocations,
+    });
+  }
+}
+
 async function validatePlannerForm(
   formData: FormData,
   mode: "create" | "update",
@@ -86,6 +219,13 @@ async function validatePlannerForm(
   const remarks = toNullableString(formData.get("remarks"));
   const startAt = toDate(formData.get("startAt"));
   const endAt = toDate(formData.get("endAt"));
+  const pitchResourceId = toNullableString(formData.get("pitchResourceId"));
+  const homeDressingRoomResourceId = toNullableString(
+    formData.get("homeDressingRoomResourceId"),
+  );
+  const awayDressingRoomResourceId = toNullableString(
+    formData.get("awayDressingRoomResourceId"),
+  );
 
   const prefix = mode === "update" ? "update" : "create";
 
@@ -127,6 +267,14 @@ async function validatePlannerForm(
     redirect(buildPlannerRedirect({ seasonKey, status: `${prefix}-invalid-team` }));
   }
 
+  await validatePlanningResources({
+    seasonKey,
+    prefix,
+    pitchResourceId,
+    homeDressingRoomResourceId,
+    awayDressingRoomResourceId,
+  });
+
   return {
     season,
     seasonKey,
@@ -142,6 +290,9 @@ async function validatePlannerForm(
     remarks,
     startAt,
     endAt,
+    pitchResourceId,
+    homeDressingRoomResourceId,
+    awayDressingRoomResourceId,
     websiteVisible: toBool(formData.get("websiteVisible")),
     infoboardVisible: toBool(formData.get("infoboardVisible")),
     homepageVisible: toBool(formData.get("homepageVisible")),
@@ -162,7 +313,7 @@ export async function createPlannerEntryAction(formData: FormData) {
   await requirePlannerManagePermission();
   const data = await validatePlannerForm(formData, "create");
 
-  await prisma.event.create({
+  const createdEvent = await prisma.event.create({
     data: {
       seasonId: data.season.id,
       teamId: data.teamId,
@@ -185,6 +336,19 @@ export async function createPlannerEntryAction(formData: FormData) {
       trainingsplanVisible: data.trainingsplanVisible,
       teamPageVisible: data.teamPageVisible,
     },
+    select: {
+      id: true,
+    },
+  });
+
+  await replaceEventPlanningAllocations({
+    eventId: createdEvent.id,
+    type: data.type,
+    startAt: data.startAt,
+    endAt: data.endAt,
+    pitchResourceId: data.pitchResourceId,
+    homeDressingRoomResourceId: data.homeDressingRoomResourceId,
+    awayDressingRoomResourceId: data.awayDressingRoomResourceId,
   });
 
   revalidatePlannerPaths();
@@ -240,6 +404,16 @@ export async function updatePlannerEntryAction(formData: FormData) {
     },
   });
 
+  await replaceEventPlanningAllocations({
+    eventId,
+    type: data.type,
+    startAt: data.startAt,
+    endAt: data.endAt,
+    pitchResourceId: data.pitchResourceId,
+    homeDressingRoomResourceId: data.homeDressingRoomResourceId,
+    awayDressingRoomResourceId: data.awayDressingRoomResourceId,
+  });
+
   revalidatePlannerPaths();
 
   redirect(
@@ -274,3 +448,4 @@ export async function deletePlannerEntryAction(formData: FormData) {
 
   redirect(buildPlannerRedirect({ seasonKey, status: "delete-success" }));
 }
+
