@@ -1,14 +1,27 @@
-﻿import { prisma } from "@/lib/db/prisma";
+﻿import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
+import type { WochenplanBoardDayKey, WochenplanBoardEvent } from "@/lib/wochenplan/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
 
-function formatTime(value: Date) {
+function getTodayKey(): WochenplanBoardDayKey {
+  const day = new Date().getDay();
+  if (day === 1) return "MONDAY";
+  if (day === 2) return "TUESDAY";
+  if (day === 3) return "WEDNESDAY";
+  if (day === 4) return "THURSDAY";
+  if (day === 5) return "FRIDAY";
+  if (day === 6) return "SATURDAY";
+  return "SUNDAY";
+}
+
+function formatTime(value: Date | string | null) {
+  if (!value) return "offen";
   return new Intl.DateTimeFormat("de-CH", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Europe/Zurich",
-  }).format(value);
+  }).format(new Date(value));
 }
 
 function formatToday() {
@@ -21,69 +34,82 @@ function formatToday() {
   }).format(new Date());
 }
 
-function getTypeLabel(type: string) {
-  if (type === "TRAINING") return "Training";
-  if (type === "TOURNAMENT") return "Turnier";
+function getEventTypeLabel(type: string) {
   if (type === "MATCH") return "Match";
+  if (type === "TOURNAMENT") return "Turnier";
+  if (type === "TRAINING") return "Training";
   return "Event";
 }
 
-export default async function PublicInfoboardPage() {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+function getGroupKey(event: WochenplanBoardEvent) {
+  return [
+    event.slotKey,
+    event.eventType,
+    event.pitchRowKey,
+    event.fieldLabel ?? "FULL",
+    event.competitionLabel ?? event.title,
+  ].join("|");
+}
 
-  const todayEnd = new Date(todayStart);
-  todayEnd.setDate(todayEnd.getDate() + 1);
-
-  const events = await prisma.event.findMany({
-    where: {
-      infoboardVisible: true,
-      startAt: {
-        gte: todayStart,
-        lt: todayEnd,
-      },
-    },
-    orderBy: [{ startAt: "asc" }, { title: "asc" }],
-    select: {
-      id: true,
-      title: true,
-      type: true,
-      startAt: true,
-      endAt: true,
-      location: true,
-      competitionLabel: true,
-      opponentName: true,
-      organizerName: true,
-      team: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  });
-
-  const groups = new Map<string, typeof events>();
+function groupEvents(events: WochenplanBoardEvent[]) {
+  const groups = new Map<string, WochenplanBoardEvent[]>();
 
   for (const event of events) {
-    const key = [
-      event.type,
-      event.competitionLabel ?? event.title,
-      event.startAt.toISOString(),
-      event.endAt?.toISOString() ?? "",
-      event.location ?? "",
-    ].join("|");
-
+    const key = getGroupKey(event);
     groups.set(key, [...(groups.get(key) ?? []), event]);
   }
 
-  const groupedEvents = Array.from(groups.values());
+  return Array.from(groups.values()).sort((a, b) => {
+    return new Date(a[0].startAt).getTime() - new Date(b[0].startAt).getTime();
+  });
+}
+
+function pitchLabel(event: WochenplanBoardEvent) {
+  const base =
+    event.pitchRowKey === "KUNSTRASEN_2"
+      ? "Kunstrasen 2"
+      : event.pitchRowKey === "KUNSTRASEN_3"
+        ? "Kunstrasen 3"
+        : "Stadion";
+
+  return event.fieldLabel ? `${base} · Feld ${event.fieldLabel}` : base;
+}
+
+function roomCodes(events: WochenplanBoardEvent[]) {
+  return Array.from(
+    new Set(
+      events.flatMap((event) =>
+        [
+          event.allocation.homeDressingRoomCode,
+          event.allocation.awayDressingRoomCode,
+        ].filter(Boolean),
+      ),
+    ),
+  ) as string[];
+}
+
+function participantLabels(events: WochenplanBoardEvent[]) {
+  return Array.from(
+    new Set(
+      events.map((event) => event.teamName ?? event.opponentName ?? event.title).filter(Boolean),
+    ),
+  ) as string[];
+}
+
+export default async function PublicInfoboardPage() {
+  const { events } = await getWochenplanBoardData({ weekOffset: 0 });
+  const todayKey = getTodayKey();
+  const todayEvents = events.filter(
+    (event) => event.boardDayKey === todayKey && event.allocation.publishedToInfoboard,
+  );
+  const groups = groupEvents(todayEvents);
 
   return (
-    <main className="h-screen w-screen overflow-hidden bg-[#06152f] p-6 text-white">
+    <main className="h-screen w-screen overflow-hidden bg-[#06152f] px-8 py-6 text-white">
       <meta httpEquiv="refresh" content="30" />
 
-      <div className="flex h-full w-full flex-col gap-6">
-        <header className="flex items-center justify-between rounded-[32px] border border-white/10 bg-white/10 px-10 py-7 shadow-[0_24px_80px_rgba(0,0,0,0.22)]">
+      <div className="flex h-full w-full flex-col gapx-8 py-6">
+        <header className="flex items-center justify-between rounded-[32px] border border-white/10 bg-white/10 px-10 py-7 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.24em] text-red-200">
               FC Allschwil Infoboard
@@ -101,26 +127,24 @@ export default async function PublicInfoboardPage() {
           </div>
         </header>
 
-        {groupedEvents.length > 0 ? (
-          <section className="grid flex-1 grid-cols-2 gap-6 2xl:grid-cols-3">
-            {groupedEvents.map((group) => {
+        {groups.length > 0 ? (
+          <section className="grid flex-1 grid-cols-2 gapx-8 py-6 2xl:grid-cols-3">
+            {groups.map((group) => {
               const main = group[0];
-              const participants = Array.from(
-                new Set(
-                  group.map((event) => event.team?.name ?? event.opponentName ?? event.title),
-                ),
-              ).filter(Boolean);
+              const participants = participantLabels(group);
+              const rooms = roomCodes(group);
+              const isShared = participants.length > 1;
 
               return (
                 <article
-                  key={main.id}
-                  className="rounded-[32px] bg-white p-8 text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)]"
+                  key={getGroupKey(main)}
+                  className="rounded-[32px] border border-white/10 bg-white p-8 text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)]"
                 >
-                  <div className="flex items-start justify-between gap-6">
+                  <div className="flex items-start justify-between gapx-8 py-6">
                     <div>
                       <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">
-                        {getTypeLabel(main.type)}
-                        {participants.length > 1 ? " · mehrere Teams" : ""}
+                        {getEventTypeLabel(main.eventType)}
+                        {isShared ? " · mehrere Teams" : ""}
                       </p>
                       <h2 className="mt-3 text-4xl font-black uppercase tracking-tight text-[#0b4aa2]">
                         {main.competitionLabel ?? main.title}
@@ -130,23 +154,24 @@ export default async function PublicInfoboardPage() {
                     <div className="rounded-3xl bg-slate-100 px-5 py-4 text-right">
                       <p className="text-4xl font-black">{formatTime(main.startAt)}</p>
                       <p className="text-xl font-bold text-slate-500">
-                        bis {main.endAt ? formatTime(main.endAt) : "offen"}
+                        bis {formatTime(main.endAt)}
                       </p>
                     </div>
                   </div>
 
                   <div className="mt-6 flex flex-wrap gap-3">
-                    {main.location ? (
-                      <span className="rounded-full bg-blue-50 px-5 py-3 text-xl font-black text-[#0b4aa2]">
-                        {main.location}
-                      </span>
-                    ) : null}
+                    <span className="rounded-full bg-blue-50 px-5 py-3 text-xl font-black text-[#0b4aa2]">
+                      {pitchLabel(main)}
+                    </span>
 
-                    {main.organizerName ? (
-                      <span className="rounded-full bg-emerald-50 px-5 py-3 text-xl font-black text-emerald-700">
-                        {main.organizerName}
+                    {rooms.map((room) => (
+                      <span
+                        key={room}
+                        className="rounded-full bg-emerald-50 px-5 py-3 text-xl font-black text-emerald-700"
+                      >
+                        Garderobe {room}
                       </span>
-                    ) : null}
+                    ))}
                   </div>
 
                   <div className="mt-8">
@@ -154,29 +179,57 @@ export default async function PublicInfoboardPage() {
                       Teilnehmer
                     </p>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      {participants.slice(0, 8).map((participant) => (
-                        <span
-                          key={participant}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xl font-black text-slate-800"
-                        >
-                          {participant}
-                        </span>
-                      ))}
-
-                      {participants.length > 8 ? (
-                        <span className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-xl font-black text-slate-500">
-                          +{participants.length - 8} weitere
-                        </span>
-                      ) : null}
+                    <div className="mt-4">
+                      {participants.length === 2 ? (
+                        <div className="flex items-center gap-4 text-3xl font-black text-slate-900">
+                          <span>{participants[0]}</span>
+                          <span className="text-red-600">vs</span>
+                          <span>{participants[1]}</span>
+                        </div>
+                      ) : participants.length <= 4 ? (
+                        <div className="flex flex-wrap gap-3">
+                          {participants.map((participant) => (
+                            <span
+                              key={participant}
+                              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xl font-black text-slate-800"
+                            >
+                              {participant}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          {participants.slice(0, 8).map((participant) => (
+                            <span
+                              key={participant}
+                              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-lg font-bold text-slate-800"
+                            >
+                              {participant}
+                            </span>
+                          ))}
+                          {participants.length > 8 ? (
+                            <span className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-lg font-bold text-slate-500">
+                              +{participants.length - 8} weitere
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {main.opponentName || main.organizerName ? (
+                    <p className="mt-6 text-xl font-semibold text-slate-600">
+                      {main.opponentName ? `Gegner: ${main.opponentName}` : null}
+                      {main.opponentName && main.organizerName ? " · " : null}
+                      {main.organizerName ? `Organisator: ${main.organizerName}` : null}
+                    </p>
+                  ) : null}
                 </article>
               );
             })}
           </section>
         ) : (
-          <section className="flex flex-1 items-center justify-center rounded-[32px] bg-white text-center text-slate-900">
+          <section className="flex flex-1 items-center justify-center rounded-[32px] bg-white text-center text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)]">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">
                 Heute
@@ -191,3 +244,5 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
+
