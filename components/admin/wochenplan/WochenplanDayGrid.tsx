@@ -135,15 +135,16 @@ export default function WochenplanDayGrid({
         </button>
       </div>
 
-      <div className="grid grid-cols-[170px_repeat(7,minmax(0,1fr))] border-t border-slate-200">
-        <div className="border-r border-slate-200 bg-slate-50 px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
-          Ort
-        </div>
+      <div className="overflow-x-auto border-t border-slate-200">
+        <div className="grid min-w-[1280px] grid-cols-[190px_repeat(7,156px)]">
+        <div className="sticky left-0 z-20 border-r border-slate-200 bg-slate-50 px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400 shadow-[8px_0_16px_rgba(15,23,42,0.04)]">
+            Ort
+          </div>
 
         {timeSlots.map((slot) => (
           <div
             key={slot}
-            className="border-r border-slate-200 bg-slate-50 px-4 py-3 text-center text-[0.72rem] font-semibold text-slate-600 last:border-r-0"
+            className="sticky top-0 z-10 border-r border-slate-200 bg-slate-50 px-4 py-3 text-center text-[0.72rem] font-semibold text-slate-600 last:border-r-0"
           >
             {slot}
           </div>
@@ -151,9 +152,9 @@ export default function WochenplanDayGrid({
 
         {pitchRows.map((pitchRow) => (
           <div key={pitchRow.key} className="contents">
-            <div className="border-r border-t border-slate-200 px-4 py-4 text-sm font-semibold text-slate-700">
-              {pitchRow.label}
-            </div>
+            <div className="sticky left-0 z-10 border-r border-t border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-700 shadow-[8px_0_16px_rgba(15,23,42,0.04)]">
+                {pitchRow.label}
+              </div>
 
             {timeSlots.map((slot) => {
               const cellEvents = dayEvents.filter((event) => {
@@ -217,8 +218,10 @@ export default function WochenplanDayGrid({
           </div>
         ))}
       </div>
+      </div>
     </div>
   );
 }
+
 
 
