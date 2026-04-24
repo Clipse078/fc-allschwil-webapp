@@ -68,8 +68,8 @@ export async function POST(req: Request) {
 
   // attach pitch allocation
   if (pitchResourceKey) {
-    const pitch = await prisma.planningResource.findUnique({
-      where: { key: pitchResourceKey },
+    const pitch = await prisma.planningResource.findFirst({
+      where: { key: pitchResourceKey, isActive: true, type: "PITCH" },
     });
 
     if (pitch) {
@@ -84,8 +84,8 @@ export async function POST(req: Request) {
 
   // home dressing room
   if (dressingRoomHomeKey) {
-    const room = await prisma.planningResource.findUnique({
-      where: { key: dressingRoomHomeKey },
+    const room = await prisma.planningResource.findFirst({
+      where: { key: dressingRoomHomeKey, isActive: true, type: "DRESSING_ROOM" },
     });
 
     if (room) {
@@ -101,8 +101,8 @@ export async function POST(req: Request) {
 
   // away dressing room
   if (dressingRoomAwayKey) {
-    const room = await prisma.planningResource.findUnique({
-      where: { key: dressingRoomAwayKey },
+    const room = await prisma.planningResource.findFirst({
+      where: { key: dressingRoomAwayKey, isActive: true, type: "DRESSING_ROOM" },
     });
 
     if (room) {
@@ -121,5 +121,6 @@ export async function POST(req: Request) {
     eventId: event.id,
   });
 }
+
 
 
