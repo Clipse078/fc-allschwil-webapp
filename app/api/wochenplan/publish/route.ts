@@ -41,14 +41,29 @@ export async function POST(request: Request) {
       ) as PublishEventPayload[])
     : [];
 
-  if (
-    action === "publish" &&
-    !(session.user.roleKeys ?? []).some((roleKey) =>
-      ["SUPERADMIN", "ADMIN", "MATCHDAY_COORDINATOR"].includes(roleKey),
-    )
-  ) {
+  const workflowPolicy = await prisma.workflowPolicy.findFirst({
+    where: {
+      domain: "WOCHENPLAN",
+      active: true,
+    },
+  });
+
+  const userRoleKeys = session.user.roleKeys ?? [];
+  const allowedRoleKeys =
+    action === "publish"
+      ? workflowPolicy?.reviewerRoleKeys ?? ["SUPERADMIN", "ADMIN", "MATCHDAY_COORDINATOR"]
+      : workflowPolicy?.editorRoleKeys ?? ["SUPERADMIN", "ADMIN", "MATCHDAY_COORDINATOR"];
+
+  const hasPermission = userRoleKeys.some((roleKey) => allowedRoleKeys.includes(roleKey));
+
+  if (!hasPermission) {
     return NextResponse.json(
-      { error: "Keine Berechtigung zum Freigeben und Publizieren des Wochenplans." },
+      {
+        error:
+          action === "publish"
+            ? "Keine Berechtigung zum Freigeben und Publizieren des Wochenplans."
+            : "Keine Berechtigung zum Einreichen von Wochenplan-Änderungen.",
+      },
       { status: 403 },
     );
   }
@@ -148,5 +163,6 @@ export async function POST(request: Request) {
     publishedCount: events.length,
   });
 }
+
 
 
