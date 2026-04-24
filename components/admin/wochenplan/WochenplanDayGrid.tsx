@@ -12,7 +12,7 @@ import WochenplanRoomConflictBadge from "@/components/admin/wochenplan/Wochenpla
 type WochenplanDayGridProps = {
   dayLabel: string;
   dayKey: WochenplanBoardDayKey;
-  pitchRows: Array<{ key: WochenplanBoardPitchRowKey; label: string }>;
+  pitchRows: Array<{ key: WochenplanBoardPitchRowKey; fieldLabel: "A" | "B"; label: string }>;
   timeSlots: WochenplanBoardSlotKey[];
   events: WochenplanBoardEvent[];
   roomConflictCount: number;
@@ -22,6 +22,7 @@ type WochenplanDayGridProps = {
     nextDayKey: WochenplanBoardDayKey,
     nextPitchRowKey: WochenplanBoardPitchRowKey,
     nextSlotKey: WochenplanBoardSlotKey,
+    nextFieldLabel: "A" | "B",
   ) => void;
   onOpenRooms: (eventId: string) => void;
   onDragStart: (eventId: string) => void;
@@ -134,7 +135,7 @@ export default function WochenplanDayGrid({
         </button>
       </div>
 
-      <div className="grid grid-cols-[150px_repeat(4,minmax(0,1fr))] border-t border-slate-200">
+      <div className="grid grid-cols-[170px_repeat(7,minmax(0,1fr))] border-t border-slate-200">
         <div className="border-r border-slate-200 bg-slate-50 px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Ort
         </div>
@@ -155,11 +156,17 @@ export default function WochenplanDayGrid({
             </div>
 
             {timeSlots.map((slot) => {
-              const cellEvents = dayEvents.filter(
-                (event) =>
-                  event.pitchRowKey === pitchRow.key &&
-                  event.slotKey === slot,
-              );
+              const cellEvents = dayEvents.filter((event) => {
+                if (event.pitchRowKey !== pitchRow.key || event.slotKey !== slot) {
+                  return false;
+                }
+
+                if (event.fieldLabel === null) {
+                  return pitchRow.fieldLabel === "A";
+                }
+
+                return event.fieldLabel === pitchRow.fieldLabel;
+              });
 
               const hasCellPitchIssue = hasCellPitchConflict(cellEvents);
               const roomConflictCountInCell = getCellRoomConflictCount(cellEvents, dayEvents);
@@ -174,7 +181,7 @@ export default function WochenplanDayGrid({
                       return;
                     }
 
-                    onDropEvent(draggingEventId, dayKey, pitchRow.key, slot);
+                    onDropEvent(draggingEventId, dayKey, pitchRow.key, slot, pitchRow.fieldLabel);
                   }}
                   className="min-h-[110px] border-r border-t border-slate-200 bg-white p-2 last:border-r-0"
                 >
@@ -213,4 +220,5 @@ export default function WochenplanDayGrid({
     </div>
   );
 }
+
 

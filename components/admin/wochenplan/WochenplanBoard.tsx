@@ -18,10 +18,13 @@ import type {
   WochenplanEventItem,
 } from "@/lib/wochenplan/types";
 
-const PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; label: string }> = [
-  { key: "STADION", label: "Stadion" },
-  { key: "KUNSTRASEN_2", label: "KR 2" },
-  { key: "KUNSTRASEN_3", label: "KR 3" },
+const PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; fieldLabel: "A" | "B"; label: string }> = [
+  { key: "STADION", fieldLabel: "A", label: "Stadion · Feld A" },
+  { key: "STADION", fieldLabel: "B", label: "Stadion · Feld B" },
+  { key: "KUNSTRASEN_2", fieldLabel: "A", label: "KR 2 · Feld A" },
+  { key: "KUNSTRASEN_2", fieldLabel: "B", label: "KR 2 · Feld B" },
+  { key: "KUNSTRASEN_3", fieldLabel: "A", label: "KR 3 · Feld A" },
+  { key: "KUNSTRASEN_3", fieldLabel: "B", label: "KR 3 · Feld B" },
 ];
 
 const TIME_SLOTS: WochenplanBoardSlotKey[] = [
@@ -649,6 +652,7 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
     nextDayKey: WochenplanBoardDayKey,
     nextPitchRowKey: WochenplanBoardPitchRowKey,
     nextSlotKey: WochenplanBoardSlotKey,
+    nextFieldLabel: "A" | "B",
   ) {
     setEvents((current) =>
       current.map((event) => {
@@ -656,17 +660,14 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
           return event;
         }
 
-        const nextFieldLabel =
-          event.eventType === "TRAINING"
-            ? getNextTrainingField(current, event.id, nextDayKey, nextPitchRowKey, nextSlotKey)
-            : null;
+        const assignedFieldLabel = event.eventType === "TRAINING" ? nextFieldLabel : null;
 
         return {
           ...event,
           boardDayKey: nextDayKey,
           pitchRowKey: nextPitchRowKey,
           slotKey: nextSlotKey,
-          fieldLabel: nextFieldLabel,
+          fieldLabel: assignedFieldLabel,
           startAt: createIsoDateTime(nextDayKey, nextSlotKey, false),
           endAt: createIsoDateTime(nextDayKey, nextSlotKey, true),
           location:
@@ -771,6 +772,7 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
     </div>
   );
 }
+
 
 
 
