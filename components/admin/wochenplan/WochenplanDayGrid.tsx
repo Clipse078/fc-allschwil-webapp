@@ -138,7 +138,7 @@ export default function WochenplanDayGrid({
       </div>
 
       <div className="overflow-x-auto border-t border-slate-200">
-        <div className="grid min-w-[1280px] grid-cols-[190px_repeat(7,156px)]">
+        <div className="grid min-w-[1180px] grid-cols-[190px_repeat(4,minmax(190px,1fr))]">
         <div className="sticky left-0 z-20 border-r border-slate-200 bg-slate-50 px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400 shadow-[8px_0_16px_rgba(15,23,42,0.04)]">
             Ort
           </div>
@@ -190,7 +190,7 @@ export default function WochenplanDayGrid({
                     onDropEvent(draggingEventId, dayKey, pitchRow.key, slot, pitchRow.fieldLabel);
                   }}
                   className={[
-                    "min-h-[110px] border-r border-t border-slate-200 bg-white p-2 transition last:border-r-0",
+                    "min-h-[138px] border-r border-t border-slate-200 bg-white p-2.5 transition last:border-r-0",
                     hoverCellKey === pitchRow.key + "-" + pitchRow.fieldLabel + "-" + slot
                       ? "bg-blue-50/70 ring-2 ring-inset ring-blue-300"
                       : "",
@@ -232,6 +232,7 @@ export default function WochenplanDayGrid({
     </div>
   );
 }
+
 
 
 

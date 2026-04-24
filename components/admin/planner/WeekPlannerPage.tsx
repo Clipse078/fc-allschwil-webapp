@@ -184,7 +184,9 @@ export default async function WeekPlannerPage({
         initialEvents={boardData.events}
         visibleDayKeys={visibleDayKeys}
         currentDayKey={currentDayKey}
+        weekStartDate={boardData.weekWindow.start.toISOString().slice(0, 10)}
       />
     </div>
   );
 }
+

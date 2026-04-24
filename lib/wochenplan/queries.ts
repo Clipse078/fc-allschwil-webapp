@@ -25,7 +25,7 @@ function toSlotKey(date: Date): WochenplanBoardSlotKey {
   if (minutes < 10 * 60) return "08:00-10:00";
   if (minutes < 12 * 60) return "10:00-12:00";
   if (minutes < 14 * 60) return "12:00-14:00";
-  if (minutes < 17 * 60 + 15) return "14:00-17:15";
+  if (minutes < 17 * 60 + 15) return "15:45-17:15";
   if (minutes < 18 * 60 + 45) return "17:15-18:45";
   if (minutes < 20 * 60 + 15) return "18:45-20:15";
   return "20:15-21:45";
@@ -130,6 +130,7 @@ export async function getWochenplanBoardData(args?: { weekOffset?: number | null
     weekWindow,
   };
 }
+
 
 
 
