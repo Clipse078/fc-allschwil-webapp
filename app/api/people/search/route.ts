@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
@@ -454,12 +454,7 @@ export async function GET(request: NextRequest) {
       }
 
       if (mode === "player") {
-        if (!person.dateOfBirth || allowedBirthYears.length === 0) {
-          return false;
-        }
-
-        const birthYear = new Date(person.dateOfBirth).getUTCFullYear();
-        return allowedBirthYears.includes(birthYear);
+        return true;
       }
 
       if (mode === "trainer") {

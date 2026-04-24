@@ -155,6 +155,10 @@ export default function TeamSquadManagementCard({
     return searchResults.find((item) => item.id === selectedPersonId) ?? null;
   }, [searchResults, selectedPersonId]);
 
+  const selectedBirthYear = getBirthYear(selectedPerson?.dateOfBirth);
+  const selectedFitsJahrgang =
+    selectedBirthYear !== null && allowedBirthYears.includes(selectedBirthYear);
+
   async function handleSearch() {
     if (searchQuery.trim().length < 2) {
       setSearchError("Bitte mindestens 2 Zeichen eingeben.");
@@ -436,8 +440,21 @@ export default function TeamSquadManagementCard({
                         Geburtsdatum: {formatBirthDate(selectedPerson.dateOfBirth) ?? "nicht gesetzt"}
                       </div>
                       <div className="mt-1 text-sm text-slate-500">
-                        Geburtsjahr: {getBirthYear(selectedPerson.dateOfBirth) ?? "-"}
+                        Geburtsjahr: {selectedBirthYear ?? "-"}
                       </div>
+
+                      {selectedBirthYear !== null && !selectedFitsJahrgang ? (
+                        <div className="fca-status-box fca-status-box-warn mt-4">
+                          ⚠ Dieser Spieler passt nicht zur Jahrgangslogik dieser Team-Saison.
+                          Erlaubt: {allowedBirthYears.join(", ")} · Spieler: {selectedBirthYear}
+                        </div>
+                      ) : null}
+
+                      {selectedBirthYear !== null && selectedFitsJahrgang ? (
+                        <div className="fca-status-box fca-status-box-success mt-4">
+                          Jahrgang passt zu dieser Team-Saison.
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -522,7 +539,7 @@ export default function TeamSquadManagementCard({
                 <button
                   type="button"
                   onClick={handleAssign}
-                  disabled={assignLoading || !selectedPersonId}
+                  disabled={assignLoading || !selectedPersonId || !selectedFitsJahrgang}
                   className="fca-button-primary"
                 >
                   {assignLoading ? "Hinzufügen..." : "Spieler hinzufügen"}
@@ -621,3 +638,4 @@ function Toggle({
     </div>
   );
 }
+
