@@ -28,6 +28,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
+  const action = body?.action === "submit" ? "submit" : "publish";
+
   const events = Array.isArray(body?.events)
     ? (body.events.filter(
         (event: unknown): event is PublishEventPayload =>
@@ -87,11 +89,14 @@ export async function POST(request: Request) {
           startAt: new Date(event.startAt),
           endAt: event.endAt ? new Date(event.endAt) : null,
           wochenplanVisible: true,
-          websiteVisible: true,
-          infoboardVisible: true,
-          reviewStage: "PUBLISHED",
-          publishedAt: new Date(),
-          publishedByUserId: session.user.id,
+          websiteVisible: action === "publish",
+          infoboardVisible: action === "publish",
+          reviewStage: action === "publish" ? "PUBLISHED" : "SUBMITTED",
+          reviewRequestedAt: action === "submit" ? new Date() : undefined,
+          reviewedAt: action === "publish" ? new Date() : undefined,
+          approvedByUserId: action === "publish" ? session.user.id : undefined,
+          publishedAt: action === "publish" ? new Date() : null,
+          publishedByUserId: action === "publish" ? session.user.id : null,
           planningAllocations: {
             upsert: {
               where: {
@@ -127,6 +132,8 @@ export async function POST(request: Request) {
   );
 
   return NextResponse.json({
+    action,
     publishedCount: events.length,
   });
 }
+

@@ -45,7 +45,7 @@ export default function WochenplanPublishBar({
   const [isPublishing, setIsPublishing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function publishChanges() {
+  async function publishChanges(action: "submit" | "publish") {
     if (!hasUnsavedChanges || events.length === 0 || isPublishing) {
       return;
     }
@@ -59,6 +59,7 @@ export default function WochenplanPublishBar({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        action,
         events: events.map((event) => ({
           id: event.id,
           startAt: event.startAt,
@@ -79,7 +80,11 @@ export default function WochenplanPublishBar({
     }
 
     const payload = await response.json().catch(() => null);
-    setMessage(`${payload?.publishedCount ?? events.length} Einträge publiziert.`);
+    setMessage(
+      action === "submit"
+        ? `${payload?.publishedCount ?? events.length} Einträge zur Freigabe eingereicht.`
+        : `${payload?.publishedCount ?? events.length} Einträge publiziert.`,
+    );
     onPublished();
   }
   return (
@@ -110,7 +115,7 @@ export default function WochenplanPublishBar({
 
           <button
             type="button"
-            onClick={publishChanges}
+            onClick={() => publishChanges("submit")}
             disabled={!hasUnsavedChanges || isPublishing}
             className={[
               "rounded-full border px-6 py-3 text-sm font-semibold transition",
@@ -119,12 +124,27 @@ export default function WochenplanPublishBar({
                 : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed",
             ].join(" ")}
           >
-            {isPublishing ? "Publizieren..." : "Änderungen publizieren"}
+            {isPublishing ? "Senden..." : "Änderungen einreichen"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => publishChanges("publish")}
+            disabled={!hasUnsavedChanges || isPublishing}
+            className={[
+              "rounded-full border px-6 py-3 text-sm font-semibold transition",
+              hasUnsavedChanges && !isPublishing
+                ? "border-blue-200 bg-[#0b4aa2] text-white hover:bg-[#083a7d]"
+                : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed",
+            ].join(" ")}
+          >
+            {isPublishing ? "Publizieren..." : "Freigeben & publizieren"}
           </button>
         </div>
       </div>
     </AdminSurfaceCard>
   );
 }
+
 
 
