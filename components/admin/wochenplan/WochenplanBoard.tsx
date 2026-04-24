@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import WochenplanConflictPanel from "@/components/admin/wochenplan/WochenplanConflictPanel";
 import WochenplanDayGrid from "@/components/admin/wochenplan/WochenplanDayGrid";
 import WochenplanLegend from "@/components/admin/wochenplan/WochenplanLegend";
+import WochenplanLiveOverview from "@/components/admin/wochenplan/WochenplanLiveOverview";
 import WochenplanPublishBar from "@/components/admin/wochenplan/WochenplanPublishBar";
 import WochenplanRoomDayPlannerDialog, {
   type WochenplanRoomConflictPair,
@@ -43,6 +44,8 @@ const WEEKEND_TIME_SLOTS: WochenplanBoardSlotKey[] = [
   "18:45-20:15",
   "20:15-21:45",
 ];
+
+type WochenplanViewMode = "LIVE" | "PLANNING" | "BOOKING";
 
 const DAYS: Array<{ key: WochenplanBoardDayKey; label: string }> = [
   { key: "MONDAY", label: "Montag" },
@@ -620,6 +623,7 @@ export default function WochenplanBoard({
   weekStartDate?: string;
 }) {
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(initialEvents.length > 0 ? initialEvents : buildDemoEvents());
+  const [viewMode, setViewMode] = useState<WochenplanViewMode>("LIVE");
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
   const [dayPlannerState, setDayPlannerState] = useState<{
@@ -808,6 +812,7 @@ export default function WochenplanBoard({
     </div>
   );
 }
+
 
 
 
