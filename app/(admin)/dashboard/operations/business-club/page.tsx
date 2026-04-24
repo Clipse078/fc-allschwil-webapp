@@ -22,6 +22,7 @@ export default async function Page() {
       infoboardWeight: true,
       infoboardSortOrder: true,
       remarks: true,
+      logoUrl: true,
     },
   });
 
@@ -43,3 +44,4 @@ export default async function Page() {
     </main>
   );
 }
+

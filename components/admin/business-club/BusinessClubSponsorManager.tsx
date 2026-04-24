@@ -15,6 +15,7 @@ type Sponsor = {
   infoboardWeight: number;
   infoboardSortOrder: number;
   remarks: string | null;
+  logoUrl: string | null;
 };
 
 type BusinessClubSponsorManagerProps = {
@@ -56,6 +57,31 @@ export default function BusinessClubSponsorManager({ sponsors }: BusinessClubSpo
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
       setError(payload?.error ?? "Sponsor konnte nicht gespeichert werden.");
+      return;
+    }
+
+    router.refresh();
+  }
+
+  async function uploadLogo(id: string, file: File | null) {
+    if (!file) return;
+
+    setPendingId(id);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append("logo", file);
+
+    const response = await fetch(`/api/business-club/sponsors/${id}/logo`, {
+      method: "POST",
+      body: formData,
+    });
+
+    setPendingId(null);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setError(payload?.error ?? "Logo konnte nicht hochgeladen werden.");
       return;
     }
 
@@ -175,12 +201,17 @@ export default function BusinessClubSponsorManager({ sponsors }: BusinessClubSpo
         {sponsors.length > 0 ? (
           <div className="divide-y divide-slate-100">
             {sponsors.map((sponsor) => (
-              <div key={sponsor.id} className="grid gap-4 px-6 py-5 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.7fr_0.7fr] lg:items-center">
+              <div key={sponsor.id} className="grid gap-4 px-6 py-5 lg:grid-cols-[1.4fr_0.75fr_0.65fr_0.75fr_1fr_0.65fr] lg:items-center">
                 <div>
                   <p className="text-lg font-black text-slate-950">{sponsor.displayName}</p>
                   <p className="text-sm font-semibold text-slate-500">
                     {sponsor.companyName ?? "Kein Firmenzusatz"} · {tierLabel(sponsor.tier)}
                   </p>
+                  {sponsor.logoUrl ? (
+                    <p className="mt-1 text-xs font-bold text-emerald-600">Logo hinterlegt</p>
+                  ) : (
+                    <p className="mt-1 text-xs font-bold text-slate-400">Noch kein Logo</p>
+                  )}
                 </div>
 
                 <select
@@ -222,6 +253,19 @@ export default function BusinessClubSponsorManager({ sponsors }: BusinessClubSpo
 
                 <div>
                   <label className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                    Logo
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    disabled={pendingId === sponsor.id}
+                    onChange={(event) => uploadLogo(sponsor.id, event.target.files?.[0] ?? null)}
+                    className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-xs font-bold text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
                     Gewichtung
                   </label>
                   <select
@@ -254,3 +298,4 @@ export default function BusinessClubSponsorManager({ sponsors }: BusinessClubSpo
     </div>
   );
 }
+
