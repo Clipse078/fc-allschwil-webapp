@@ -1,4 +1,4 @@
-import {
+﻿import {
   PERMISSIONS,
   type PermissionKey,
 } from "@/lib/permissions/permissions";
@@ -81,7 +81,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
   },
   {
-    label: "2.4 Aktivitäten / Events",
+    label: "2.4 AktivitÃ¤ten / Events",
     href: "/dashboard/operations/aktivitaeten-events",
     parentLabel: "Operations & Organisation",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
@@ -105,7 +105,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
   },
   {
-    label: "2.8 Kommunikation HUB",
+    label: "2.8 Ressourcen",
+    href: "/dashboard/operations/resources",
+    parentLabel: "Operations & Organisation",
+    permissionKeys: [PERMISSIONS.USERS_MANAGE],
+  },
+  {
+    label: "2.9 Kommunikation HUB",
     href: "/dashboard/operations/kommunikation-hub",
     parentLabel: "Operations & Organisation",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
@@ -219,7 +225,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
   {
-    label: "6.3 Vereinsfunktionäre",
+    label: "6.3 VereinsfunktionÃ¤re",
     href: "/dashboard/vereinsfunktionaere",
     parentLabel: "Persons",
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
@@ -249,7 +255,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
   },
   {
-    label: "7.3 Neue Vereinsfunktionäre",
+    label: "7.3 Neue VereinsfunktionÃ¤re",
     href: "/dashboard/neu-anmeldungen/neue-vereinsfunktionaere",
     parentLabel: "Neue Anmeldungen",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],

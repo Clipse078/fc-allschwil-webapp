@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -78,12 +78,14 @@ function getNavIcon(label: string) {
       return Wrench;
     case "Medien":
       return ImageIcon;
-    case "Aktivitäten / Events":
+    case "AktivitÃ¤ten / Events":
       return CalendarDays;
     case "Business Club":
       return ShieldCheck;
     case "Archiv":
       return Archive;
+    case "Ressourcen":
+      return Wrench;
     case "Technische Kommission":
       return GraduationCap;
     case "Leistungsplan Aktive":
@@ -93,7 +95,7 @@ function getNavIcon(label: string) {
     case "Aktuelle Saison":
     case "Current Season":
       return CalendarRange;
-    case "Nächste Saison":
+    case "NÃ¤chste Saison":
     case "Next Season":
       return CalendarRange;
     case "Jahresplan":
@@ -113,7 +115,7 @@ function getNavIcon(label: string) {
     case "Spieler":
     case "Players":
       return UserRound;
-    case "Vereinsfunktionäre":
+    case "VereinsfunktionÃ¤re":
       return Users;
     case "Externe Kontakte":
     case "External Contacts":
@@ -152,7 +154,7 @@ function getDisplayLabel(label: string) {
     case "Current Season":
       return "Aktuelle Saison";
     case "Next Season":
-      return "Nächste Saison";
+      return "NÃ¤chste Saison";
     case "Persons":
       return "Personen";
     case "Trainers":
@@ -249,7 +251,7 @@ export default function VereinsOSSidebar({
                 <button
                   type="button"
                   onClick={handleToggle}
-                  aria-label="Menü einklappen"
+                  aria-label="MenÃ¼ einklappen"
                   className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -262,7 +264,7 @@ export default function VereinsOSSidebar({
                 <button
                   type="button"
                   onClick={handleToggle}
-                  aria-label="Menü erweitern"
+                  aria-label="MenÃ¼ erweitern"
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
                 >
                   <ChevronRight className="h-4 w-4" />
