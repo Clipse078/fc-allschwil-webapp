@@ -106,6 +106,12 @@ function isNow(event: WochenplanBoardEvent) {
   return now >= start && now <= end;
 }
 
+function isBigMatchMode(groups: WochenplanBoardEvent[][]) {
+  if (groups.length !== 1) return false;
+  const event = groups[0]?.[0];
+  return event?.eventType === "MATCH" || event?.eventType === "TOURNAMENT";
+}
+
 export default async function PublicInfoboardPage() {
   const [{ events }, sponsors] = await Promise.all([
     getWochenplanBoardData({ weekOffset: 0 }),
@@ -116,6 +122,90 @@ export default async function PublicInfoboardPage() {
     (event) => event.boardDayKey === todayKey && event.allocation.publishedToInfoboard,
   );
   const groups = groupEvents(todayEvents);
+
+  if (isBigMatchMode(groups)) {
+    const main = groups[0][0];
+    const participants = participantLabels(groups[0]);
+    const rooms = roomCodes(groups[0]);
+
+    return (
+      <main className="flex h-screen w-screen items-center justify-center overflow-hidden bg-[#06152f] px-12 py-10 text-white">
+        <meta httpEquiv="refresh" content="30" />
+
+        <section className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[44px] border border-white/10 bg-white/10 p-12 text-center shadow-[0_30px_110px_rgba(0,0,0,0.34)] backdrop-blur">
+          <div className="absolute left-10 top-10 text-left">
+            <p className="text-sm font-black uppercase tracking-[0.3em] text-red-200">
+              FC Allschwil Matchday
+            </p>
+            <p className="mt-3 text-3xl font-black capitalize text-white">
+              {formatToday()}
+            </p>
+            <LiveClock />
+          </div>
+
+          <div className="absolute right-10 top-10 rounded-[28px] bg-white px-7 py-5 text-right text-slate-950 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">
+              Anpfiff
+            </p>
+            <p className="mt-1 text-6xl font-black">{formatTime(main.startAt)}</p>
+          </div>
+
+          <div className="max-w-[1500px]">
+            <p className="text-base font-black uppercase tracking-[0.3em] text-red-200">
+              {main.competitionLabel ?? getEventTypeLabel(main.eventType)}
+            </p>
+
+            {participants.length === 2 ? (
+              <div className="mt-10 grid items-center gap-10 lg:grid-cols-[1fr_auto_1fr]">
+                <h1 className="text-7xl font-black uppercase tracking-tight text-white 2xl:text-8xl">
+                  {participants[0]}
+                </h1>
+                <span className="rounded-full bg-red-600 px-8 py-5 text-5xl font-black uppercase text-white shadow-[0_20px_60px_rgba(220,38,38,0.35)]">
+                  vs
+                </span>
+                <h1 className="text-7xl font-black uppercase tracking-tight text-white 2xl:text-8xl">
+                  {participants[1]}
+                </h1>
+              </div>
+            ) : (
+              <h1 className="mt-10 text-8xl font-black uppercase tracking-tight text-white">
+                {main.competitionLabel ?? main.title}
+              </h1>
+            )}
+
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
+              <span className="rounded-full bg-white px-7 py-4 text-3xl font-black text-[#0b4aa2]">
+                {pitchLabel(main)}
+              </span>
+
+              {rooms.map((room) => (
+                <span
+                  key={room}
+                  className="rounded-full bg-emerald-100 px-7 py-4 text-3xl font-black text-emerald-700"
+                >
+                  Garderobe {room}
+                </span>
+              ))}
+
+              {main.location ? (
+                <span className="rounded-full bg-slate-900/40 px-7 py-4 text-3xl font-black text-white">
+                  {main.location}
+                </span>
+              ) : null}
+            </div>
+
+            {main.opponentName || main.organizerName ? (
+              <p className="mt-10 text-3xl font-bold text-white/65">
+                {main.opponentName ? `Gegner: ${main.opponentName}` : null}
+                {main.opponentName && main.organizerName ? " · " : null}
+                {main.organizerName ? `Organisator: ${main.organizerName}` : null}
+              </p>
+            ) : null}
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="h-screen w-screen overflow-hidden bg-[#06152f] px-8 py-6 text-white">
@@ -259,6 +349,8 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
+
 
 
 
