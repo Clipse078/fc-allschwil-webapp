@@ -30,6 +30,7 @@ type WochenplanDayGridProps = {
   onDragEnd: () => void;
   draggingEventId: string | null;
   isToday?: boolean;
+  mode?: "PLANNING" | "BOOKING";
 };
 
 function hasRoomConflictForEvent(
@@ -111,6 +112,7 @@ export default function WochenplanDayGrid({
   onDragEnd,
   draggingEventId,
   isToday = false,
+  mode = "PLANNING",
 }: WochenplanDayGridProps) {
   const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
   const [hoverCellKey, setHoverCellKey] = useState<string | null>(null);
@@ -180,6 +182,8 @@ export default function WochenplanDayGrid({
               const hasCellPitchIssue = hasCellPitchConflict(cellEvents);
               const roomConflictCountInCell = getCellRoomConflictCount(cellEvents, dayEvents);
               const hasCellConflict = hasCellPitchIssue || roomConflictCountInCell > 0;
+              const isBookingMode = mode === "BOOKING";
+              const isFreeCell = cellEvents.length === 0 && isBookingMode;
 
               return (
                 <div
@@ -196,7 +200,8 @@ export default function WochenplanDayGrid({
                     onDropEvent(draggingEventId, dayKey, pitchRow.key, slot, pitchRow.fieldLabel);
                   }}
                   className={[
-                    "min-h-[138px] border-r border-t border-slate-200 bg-white p-2.5 transition last:border-r-0",
+                    "min-h-[138px] border-r border-t border-slate-200 p-2.5 transition last:border-r-0",
+                    isFreeCell ? "bg-emerald-50/70" : "bg-white",
                     hoverCellKey === pitchRow.key + "-" + pitchRow.fieldLabel + "-" + slot
                       ? "bg-blue-50/70 ring-2 ring-inset ring-blue-300"
                       : "",
@@ -207,11 +212,30 @@ export default function WochenplanDayGrid({
                       "relative h-full overflow-hidden rounded-2xl border border-dashed p-1.5 transition duration-200",
                       hasCellConflict
                         ? "border-red-200 bg-red-50/20"
-                        : "border-slate-200 bg-slate-50/50",
+                        : isFreeCell
+                          ? "border-emerald-300 bg-emerald-50/80"
+                          : "border-slate-200 bg-slate-50/50",
                     ].join(" ")}
                   >
                     {hasCellConflict ? (
                       <div className="absolute right-2 top-2 z-10 h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]" />
+                    ) : null}
+
+                    {isFreeCell ? (
+                      <div className="flex h-full min-h-[104px] flex-col items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-white/55 px-3 py-4 text-center">
+                        <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-emerald-700">
+                          Frei
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-emerald-800">
+                          Slot buchbar
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {isBookingMode && cellEvents.length > 0 ? (
+                      <div className="mb-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">
+                        Belegt
+                      </div>
                     ) : null}
 
                     <div className="grid gap-2">
@@ -238,6 +262,8 @@ export default function WochenplanDayGrid({
     </div>
   );
 }
+
+
 
 
 
