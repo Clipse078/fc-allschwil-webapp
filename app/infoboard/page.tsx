@@ -1,6 +1,7 @@
 ﻿import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import type { WochenplanBoardDayKey, WochenplanBoardEvent } from "@/lib/wochenplan/types";
 import LiveClock from "@/components/infoboard/LiveClock";
+import InfoboardRotator from "@/components/infoboard/InfoboardRotator";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
@@ -254,3 +255,6 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
+
+
