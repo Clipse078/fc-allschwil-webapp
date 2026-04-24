@@ -708,7 +708,7 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
     <div className="space-y-6">
       <WochenplanPublishBar
         hasUnsavedChanges={hasUnsavedChanges}
-        eventIds={events.map((event) => event.id)}
+        events={events}
         onPublished={() => setPublishedSnapshot(buildSnapshot(events))}
       />
 
@@ -778,6 +778,7 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
     </div>
   );
 }
+
 
 
 

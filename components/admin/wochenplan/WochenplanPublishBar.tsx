@@ -5,7 +5,14 @@ import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 
 type WochenplanPublishBarProps = {
   hasUnsavedChanges: boolean;
-  eventIds: string[];
+  events: Array<{
+    id: string;
+    startAt: Date | string;
+    endAt: Date | string | null;
+    eventType: string;
+    pitchRowKey: string;
+    fieldLabel: "A" | "B" | null;
+  }>;
   onPublished: () => void;
 };
 
@@ -32,14 +39,14 @@ function ChannelBadge({
 
 export default function WochenplanPublishBar({
   hasUnsavedChanges,
-  eventIds,
+  events,
   onPublished,
 }: WochenplanPublishBarProps) {
   const [isPublishing, setIsPublishing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function publishChanges() {
-    if (!hasUnsavedChanges || eventIds.length === 0 || isPublishing) {
+    if (!hasUnsavedChanges || events.length === 0 || isPublishing) {
       return;
     }
 
@@ -51,7 +58,16 @@ export default function WochenplanPublishBar({
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ eventIds }),
+      body: JSON.stringify({
+        events: events.map((event) => ({
+          id: event.id,
+          startAt: event.startAt,
+          endAt: event.endAt,
+          eventType: event.eventType,
+          pitchRowKey: event.pitchRowKey,
+          fieldLabel: event.fieldLabel,
+        })),
+      }),
     });
 
     setIsPublishing(false);
@@ -63,7 +79,7 @@ export default function WochenplanPublishBar({
     }
 
     const payload = await response.json().catch(() => null);
-    setMessage(`${payload?.publishedCount ?? eventIds.length} Einträge publiziert.`);
+    setMessage(`${payload?.publishedCount ?? events.length} Einträge publiziert.`);
     onPublished();
   }
   return (
@@ -110,4 +126,5 @@ export default function WochenplanPublishBar({
     </AdminSurfaceCard>
   );
 }
+
 
