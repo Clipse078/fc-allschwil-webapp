@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
@@ -117,7 +117,7 @@ async function main() {
     },
     {
       key: "president",
-      name: "PrÃƒÆ’Ã‚Â¤sident",
+      name: "PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¤sident",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -137,7 +137,7 @@ async function main() {
     },
     {
       key: "vice_president",
-      name: "Vize-PrÃƒÆ’Ã‚Â¤sident",
+      name: "Vize-PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¤sident",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -156,7 +156,7 @@ async function main() {
     },
     {
       key: "sekretaer",
-      name: "SekretÃƒÆ’Ã‚Â¤r",
+      name: "SekretÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¤r",
       description: "Vereinsleitung",
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
@@ -294,7 +294,7 @@ async function main() {
     },
     {
       key: "aktivitaetenkommission_leiter",
-      name: "AktivitÃƒÆ’Ã‚Â¤tenkommision Leiter",
+      name: "AktivitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¤tenkommision Leiter",
       description: "Organisatorische Leitung / Operations",
       canAccessVereinsleitung: false,
       canAttendVereinsleitungMeetings: true,
@@ -304,7 +304,7 @@ async function main() {
     },
     {
       key: "aktivitaetenkommission_mitglied",
-      name: "AktivitÃƒÆ’Ã‚Â¤tenkommision Mitgelied",
+      name: "AktivitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¤tenkommision Mitgelied",
       description: "Organisatorische Leitung / Operations",
       canAccessVereinsleitung: false,
       canAttendVereinsleitungMeetings: true,
@@ -741,9 +741,9 @@ async function main() {
 
   const demoTitles = [
     "FC Allschwil E4 vs FC Concordia Basel",
-    "E4 FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hlingsturnier Aesch",
+    "E4 FrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼hlingsturnier Aesch",
     "E4 Training Dienstag",
-    "Sponsor ApÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ro FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hling 2026",
+    "Sponsor ApÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ro FrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼hling 2026",
   ];
 
   await prisma.event.deleteMany({
@@ -764,8 +764,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "FC Allschwil E4 vs FC Concordia Basel",
-        description: "Demo Match fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r Spielplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im BrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hl",
+        description: "Demo Match fÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼r Spielplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼hl",
         startAt: new Date("2026-04-18T08:30:00.000Z"),
         endAt: new Date("2026-04-18T10:00:00.000Z"),
         opponentName: "FC Concordia Basel",
@@ -788,13 +788,13 @@ async function main() {
         type: EventType.TOURNAMENT,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
-        title: "E4 FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hlingsturnier Aesch",
-        description: "Demo Turnier fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r Website, Wochenplan, Teamseite und Infoboard.",
+        title: "E4 FrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼hlingsturnier Aesch",
+        description: "Demo Turnier fÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼r Website, Wochenplan, Teamseite und Infoboard.",
         location: "Sportanlage Aesch",
         startAt: new Date("2026-05-02T07:30:00.000Z"),
         endAt: new Date("2026-05-02T15:30:00.000Z"),
         organizerName: "FC Aesch",
-        competitionLabel: "FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hlingsturnier",
+        competitionLabel: "FrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼hlingsturnier",
         websiteVisible: true,
         infoboardVisible: true,
         homepageVisible: true,
@@ -813,8 +813,8 @@ async function main() {
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
         title: "E4 Training Dienstag",
-        description: "Demo Training fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r Trainingsplan, Wochenplan, Teamseite und Infoboard.",
-        location: "Sportplatz im BrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hl",
+        description: "Demo Training fÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼r Trainingsplan, Wochenplan, Teamseite und Infoboard.",
+        location: "Sportplatz im BrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼hl",
         startAt: new Date("2026-04-21T15:30:00.000Z"),
         endAt: new Date("2026-04-21T17:00:00.000Z"),
         meetingTime: new Date("2026-04-21T15:15:00.000Z"),
@@ -835,8 +835,8 @@ async function main() {
       type: EventType.OTHER,
       source: EventSource.MANUAL,
       status: EventStatus.SCHEDULED,
-      title: "Sponsor ApÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©ro FrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼hling 2026",
-      description: "Demo weiteres Event fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r die Website Events Seite.",
+      title: "Sponsor ApÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ro FrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼hling 2026",
+      description: "Demo weiteres Event fÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¼r die Website Events Seite.",
       location: "Clubhaus FC Allschwil",
       startAt: new Date("2026-05-14T16:30:00.000Z"),
       endAt: new Date("2026-05-14T20:00:00.000Z"),
@@ -973,7 +973,7 @@ async function main() {
       slug: "website-relaunch-initiative",
       subtitle: "Initiativen Details",
       description:
-        "Der aktuelle Webauftritt des FC Allschwil ist technisch veraltet, nicht mobil-optimiert und reprÃƒÂ¤sentiert den Verein nicht mehr zeitgemÃƒÂ¤ss. Ziel dieser Initiative ist die Konzeption, Gestaltung und Entwicklung einer neuen, modernen Website, die als zentraler Kommunikationskanal fÃƒÂ¼r Mitglieder, Fans und Sponsoren dient.",
+        "Der aktuelle Webauftritt des FC Allschwil ist technisch veraltet, nicht mobil-optimiert und reprÃƒÆ’Ã‚Â¤sentiert den Verein nicht mehr zeitgemÃƒÆ’Ã‚Â¤ss. Ziel dieser Initiative ist die Konzeption, Gestaltung und Entwicklung einer neuen, modernen Website, die als zentraler Kommunikationskanal fÃƒÆ’Ã‚Â¼r Mitglieder, Fans und Sponsoren dient.",
       status: VereinsleitungInitiativeStatus.IN_PROGRESS,
       ownerPersonId: adminPerson.id,
       ownerRoleLabel: "Ressortleiter Organisation & Vereinsentwicklung",
@@ -1088,3 +1088,4 @@ main()
     await prisma.$disconnect();
     await pool.end();
   });
+
