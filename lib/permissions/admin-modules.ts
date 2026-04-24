@@ -33,7 +33,7 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     key: "wochenplan",
     title: "Wochenplan",
     description: "Operative Wochenplanung mit Platz- und Garderobenzuteilung für Sandra.",
-    href: "/dashboard/wochenplan",
+    href: "/dashboard/planner/week",
     requiredPermissions: [PERMISSIONS.WOCHENPLAN_MANAGE],
   },
   {
@@ -79,3 +79,4 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.USERS_MANAGE],
   },
 ];
+
