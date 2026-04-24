@@ -117,6 +117,32 @@ export default function WochenplanDayGrid({
   const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
   const [hoverCellKey, setHoverCellKey] = useState<string | null>(null);
 
+  const effectivePitchRows =
+    mode === "PLANNING"
+      ? pitchRows.filter((pitchRow) =>
+          dayEvents.some((event) => {
+            if (event.pitchRowKey !== pitchRow.key) {
+              return false;
+            }
+
+            if (event.fieldLabel === null) {
+              return pitchRow.fieldLabel === "A";
+            }
+
+            return event.fieldLabel === pitchRow.fieldLabel;
+          }),
+        )
+      : pitchRows;
+
+  const effectiveTimeSlots =
+    mode === "PLANNING"
+      ? timeSlots.filter((slot) => dayEvents.some((event) => event.slotKey === slot))
+      : timeSlots;
+
+  if (mode === "PLANNING" && (effectivePitchRows.length === 0 || effectiveTimeSlots.length === 0)) {
+    return null;
+  }
+
   return (
     <div className={["overflow-hidden rounded-[28px] border bg-white shadow-sm transition", isToday ? "border-blue-300 shadow-[0_0_0_4px_rgba(59,130,246,0.10),0_18px_45px_rgba(15,23,42,0.08)]" : "border-slate-200"].join(" ")}>
       <div className={["flex items-center justify-between gap-4 px-5 py-4 text-white", isToday ? "bg-[#0b4aa2]" : "bg-[#0f1b3d]"].join(" ")}>
@@ -143,15 +169,15 @@ export default function WochenplanDayGrid({
         <div
           className="grid"
           style={{
-            minWidth: 190 + timeSlots.length * 210,
-            gridTemplateColumns: `190px repeat(${timeSlots.length}, minmax(210px, 1fr))`,
+            minWidth: 190 + effectiveTimeSlots.length * 210,
+            gridTemplateColumns: `190px repeat(${effectiveTimeSlots.length}, minmax(210px, 1fr))`,
           }}
         >
         <div className="sticky left-0 z-20 border-r border-slate-200 bg-slate-50 px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400 shadow-[8px_0_16px_rgba(15,23,42,0.04)]">
             Ort
           </div>
 
-        {timeSlots.map((slot) => (
+        {effectiveTimeSlots.map((slot) => (
           <div
             key={slot}
             className="sticky top-0 z-10 border-r border-slate-200 bg-slate-50 px-4 py-3 text-center text-[0.72rem] font-semibold text-slate-600 last:border-r-0"
@@ -160,13 +186,13 @@ export default function WochenplanDayGrid({
           </div>
         ))}
 
-        {pitchRows.map((pitchRow) => (
+        {effectivePitchRows.map((pitchRow) => (
           <div key={pitchRow.key} className="contents">
             <div className="sticky left-0 z-10 border-r border-t border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-700 shadow-[8px_0_16px_rgba(15,23,42,0.04)]">
                 {pitchRow.label}
               </div>
 
-            {timeSlots.map((slot) => {
+            {effectiveTimeSlots.map((slot) => {
               const cellEvents = dayEvents.filter((event) => {
                 if (event.pitchRowKey !== pitchRow.key || event.slotKey !== slot) {
                   return false;
@@ -262,6 +288,7 @@ export default function WochenplanDayGrid({
     </div>
   );
 }
+
 
 
 
