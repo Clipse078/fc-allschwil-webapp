@@ -53,7 +53,7 @@ export function getSeasonStartYearFromInput(
   seasonInput: string | Date
 ): number | null {
   if (typeof seasonInput === "string") {
-    const match = seasonInput.match(/(\d{4})\s*\/\s*\d{4}/);
+    const match = seasonInput.match(/(\d{4})\D+\d{4}/);
     if (match?.[1]) {
       return Number(match[1]);
     }
@@ -72,9 +72,9 @@ export function getCanonicalSeasonLabel(
   seasonInput: string | Date
 ): string | null {
   if (typeof seasonInput === "string") {
-    const match = seasonInput.match(/(\d{4})\s*\/\s*\d{4}/);
+    const match = seasonInput.match(/(\d{4})\D+\d{4}/);
     if (match?.[0]) {
-      return match[0].replace(/\s+/g, "");
+      return match[0].replace(/\D+/, "/").replace(/\s+/g, "");
     }
   }
 
@@ -145,3 +145,4 @@ export function isBirthYearAllowedForTeamSeason(args: {
     birthYear,
   };
 }
+
