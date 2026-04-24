@@ -1,5 +1,6 @@
 ﻿import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import type { WochenplanBoardDayKey, WochenplanBoardEvent } from "@/lib/wochenplan/types";
+import LiveClock from "@/components/infoboard/LiveClock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
@@ -120,7 +121,7 @@ export default async function PublicInfoboardPage() {
           </div>
 
           <div className="text-right">
-            <p className="text-3xl font-black capitalize">{formatToday()}</p>
+            <p className="text-3xl font-black capitalize">{formatToday()}\n            <LiveClock /></p>
             <p className="mt-1 text-sm font-semibold text-white/65">
               Aktualisierung alle 30 Sekunden
             </p>
@@ -244,5 +245,9 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
+
+
+
 
 
