@@ -138,7 +138,13 @@ export default function WochenplanDayGrid({
       </div>
 
       <div className="overflow-x-auto border-t border-slate-200">
-        <div className="grid min-w-[1180px] grid-cols-[190px_repeat(4,minmax(190px,1fr))]">
+        <div
+          className={
+            timeSlots.length > 4
+              ? "grid min-w-[1540px] grid-cols-[190px_repeat(7,minmax(190px,1fr))]"
+              : "grid min-w-[1180px] grid-cols-[190px_repeat(4,minmax(190px,1fr))]"
+          }
+        >
         <div className="sticky left-0 z-20 border-r border-slate-200 bg-slate-50 px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400 shadow-[8px_0_16px_rgba(15,23,42,0.04)]">
             Ort
           </div>
@@ -232,6 +238,7 @@ export default function WochenplanDayGrid({
     </div>
   );
 }
+
 
 
 
