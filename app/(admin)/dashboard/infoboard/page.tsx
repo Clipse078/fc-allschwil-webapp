@@ -1,21 +1,27 @@
-﻿import WochenplanBoard from "@/components/admin/wochenplan/WochenplanBoard";
-import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
-import type { WochenplanBoardDayKey } from "@/lib/wochenplan/types";
+﻿import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
+import type { WochenplanBoardDayKey, WochenplanBoardEvent } from "@/lib/wochenplan/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
 
 function getTodayKey(): WochenplanBoardDayKey {
   const day = new Date().getDay();
-
   if (day === 1) return "MONDAY";
   if (day === 2) return "TUESDAY";
   if (day === 3) return "WEDNESDAY";
   if (day === 4) return "THURSDAY";
   if (day === 5) return "FRIDAY";
   if (day === 6) return "SATURDAY";
-
   return "SUNDAY";
+}
+
+function formatTime(value: Date | string | null) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("de-CH", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Zurich",
+  }).format(new Date(value));
 }
 
 function formatToday() {
@@ -28,10 +34,73 @@ function formatToday() {
   }).format(new Date());
 }
 
+function getEventTypeLabel(type: string) {
+  if (type === "MATCH") return "Match";
+  if (type === "TOURNAMENT") return "Turnier";
+  if (type === "TRAINING") return "Training";
+  return "Event";
+}
+
+function getGroupKey(event: WochenplanBoardEvent) {
+  return [
+    event.slotKey,
+    event.eventType,
+    event.pitchRowKey,
+    event.fieldLabel ?? "FULL",
+    event.competitionLabel ?? event.title,
+  ].join("|");
+}
+
+function groupEvents(events: WochenplanBoardEvent[]) {
+  const groups = new Map<string, WochenplanBoardEvent[]>();
+
+  for (const event of events) {
+    const key = getGroupKey(event);
+    groups.set(key, [...(groups.get(key) ?? []), event]);
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    return new Date(a[0].startAt).getTime() - new Date(b[0].startAt).getTime();
+  });
+}
+
+function pitchLabel(event: WochenplanBoardEvent) {
+  const base =
+    event.pitchRowKey === "KUNSTRASEN_2"
+      ? "Kunstrasen 2"
+      : event.pitchRowKey === "KUNSTRASEN_3"
+        ? "Kunstrasen 3"
+        : "Stadion";
+
+  return event.fieldLabel ? `${base} · Feld ${event.fieldLabel}` : base;
+}
+
+function roomCodes(events: WochenplanBoardEvent[]) {
+  return Array.from(
+    new Set(
+      events.flatMap((event) =>
+        [
+          event.allocation.homeDressingRoomCode,
+          event.allocation.awayDressingRoomCode,
+        ].filter(Boolean),
+      ),
+    ),
+  ) as string[];
+}
+
+function participantLabels(events: WochenplanBoardEvent[]) {
+  return Array.from(
+    new Set(
+      events.map((event) => event.teamName ?? event.title).filter(Boolean),
+    ),
+  ) as string[];
+}
+
 export default async function InfoboardPage() {
   const { events } = await getWochenplanBoardData({ weekOffset: 0 });
   const todayKey = getTodayKey();
   const todayEvents = events.filter((event) => event.boardDayKey === todayKey);
+  const groups = groupEvents(todayEvents);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#06152f] p-6 text-white">
@@ -56,29 +125,100 @@ export default async function InfoboardPage() {
           </div>
         </header>
 
-        <section className="flex-1 overflow-hidden rounded-[32px] border border-white/10 bg-white p-5 text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)]">
-          {todayEvents.length > 0 ? (
-            <WochenplanBoard
-              initialEvents={todayEvents}
-              visibleDayKeys={[todayKey]}
-              currentDayKey={todayKey}
-            />
-          ) : (
-            <div className="flex min-h-[60vh] items-center justify-center rounded-[28px] border border-dashed border-slate-200 bg-slate-50 p-10 text-center">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">
-                  Heute
-                </p>
-                <h2 className="mt-3 text-4xl font-black uppercase text-[#0b4aa2]">
-                  Keine Einträge geplant
-                </h2>
-                <p className="mt-3 text-lg text-slate-500">
-                  Sobald Trainings, Matches oder Turniere im Wochenplan publiziert sind, erscheinen sie hier automatisch.
-                </p>
-              </div>
+        {groups.length > 0 ? (
+          <section className="grid flex-1 gap-5 xl:grid-cols-2">
+            {groups.map((group) => {
+              const main = group[0];
+              const participants = participantLabels(group);
+              const rooms = roomCodes(group);
+              const isShared = participants.length > 1;
+
+              return (
+                <article
+                  key={getGroupKey(main)}
+                  className="rounded-[32px] border border-white/10 bg-white p-7 text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)]"
+                >
+                  <div className="flex items-start justify-between gap-5">
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">
+                        {getEventTypeLabel(main.eventType)}
+                        {isShared ? " · Mehrere Teams" : ""}
+                      </p>
+                      <h2 className="mt-2 text-4xl font-black uppercase tracking-tight text-[#0b4aa2]">
+                        {main.competitionLabel ?? main.title}
+                      </h2>
+                    </div>
+
+                    <div className="rounded-3xl bg-slate-100 px-5 py-4 text-right">
+                      <p className="text-3xl font-black text-slate-950">
+                        {formatTime(main.startAt)}
+                      </p>
+                      <p className="text-lg font-bold text-slate-500">
+                        bis {formatTime(main.endAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <span className="rounded-full bg-blue-50 px-5 py-3 text-lg font-bold text-[#0b4aa2]">
+                      {pitchLabel(main)}
+                    </span>
+
+                    {rooms.map((room) => (
+                      <span
+                        key={room}
+                        className="rounded-full bg-emerald-50 px-5 py-3 text-lg font-bold text-emerald-700"
+                      >
+                        Garderobe {room}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-7">
+                    <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">
+                      Teilnehmer
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {participants.slice(0, 8).map((participant) => (
+                        <span
+                          key={participant}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xl font-black text-slate-800"
+                        >
+                          {participant}
+                        </span>
+                      ))}
+
+                      {participants.length > 8 ? (
+                        <span className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-xl font-black text-slate-500">
+                          +{participants.length - 8} weitere
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {main.opponentName || main.organizerName ? (
+                    <p className="mt-6 text-xl font-semibold text-slate-600">
+                      {main.opponentName ? `Gegner: ${main.opponentName}` : null}
+                      {main.organizerName ? `Organisator: ${main.organizerName}` : null}
+                    </p>
+                  ) : null}
+                </article>
+              );
+            })}
+          </section>
+        ) : (
+          <section className="flex flex-1 items-center justify-center rounded-[32px] border border-white/10 bg-white p-10 text-center text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)]">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">
+                Heute
+              </p>
+              <h2 className="mt-3 text-5xl font-black uppercase text-[#0b4aa2]">
+                Keine Einträge geplant
+              </h2>
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </div>
     </main>
   );
