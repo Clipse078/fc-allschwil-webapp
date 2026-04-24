@@ -92,7 +92,7 @@ export default function TeamSettingsCard({
     }
 
     return (
-      getCanonicalSeasonLabel(activeSeason.season.startDate) ??
+      getCanonicalSeasonLabel(activeSeason.season.key) ??
       activeSeason.season.name
     );
   }, [activeSeason]);
@@ -104,7 +104,7 @@ export default function TeamSettingsCard({
 
     return getAllowedBirthYearsForSeason(
       form.ageGroup,
-      activeSeason.season.startDate
+      activeSeason.season.key
     );
   }, [form.ageGroup, activeSeason]);
 
@@ -360,3 +360,4 @@ function Toggle({
     </div>
   );
 }
+

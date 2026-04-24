@@ -137,7 +137,7 @@ export async function POST(request: NextRequest, context: Context) {
 
     const jahrgangCheck = isBirthYearAllowedForTeamSeason({
       categoryCode: teamSeason.team.ageGroup,
-      seasonStartDate: teamSeason.season.startDate,
+      seasonStartDate: teamSeason.season.key,
       birthDate: person.dateOfBirth,
     });
 
@@ -293,4 +293,7 @@ export async function POST(request: NextRequest, context: Context) {
     );
   }
 }
+
+
+
 

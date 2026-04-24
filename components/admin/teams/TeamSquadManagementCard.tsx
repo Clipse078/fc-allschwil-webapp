@@ -116,17 +116,17 @@ export default function TeamSquadManagementCard({
 
   const saisonLabel = useMemo(() => {
     return (
-      getCanonicalSeasonLabel(teamSeason.season.startDate) ??
+      getCanonicalSeasonLabel(teamSeason.season.key) ??
       teamSeason.season.name
     );
-  }, [teamSeason.season.startDate, teamSeason.season.name]);
+  }, [teamSeason.season.key, teamSeason.season.name]);
 
   const allowedBirthYears = useMemo(() => {
     return getAllowedBirthYearsForSeason(
       teamSeason.teamAgeGroup,
-      teamSeason.season.startDate
+      teamSeason.season.key
     );
-  }, [teamSeason.teamAgeGroup, teamSeason.season.startDate]);
+  }, [teamSeason.teamAgeGroup, teamSeason.season.key]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
@@ -638,4 +638,5 @@ function Toggle({
     </div>
   );
 }
+
 

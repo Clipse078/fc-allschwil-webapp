@@ -47,10 +47,23 @@ export function normalizeJuniorCategoryCode(
   return null;
 }
 
+export function getSeasonStartYearFromInput(
+  seasonInput: string | Date
+): number | null {
+  if (typeof seasonInput === "string") {
+    const match = seasonInput.match(/(\d{4})\s*\/\s*\d{4}/);
+    if (match?.[1]) {
+      return Number(match[1]);
+    }
+  }
+
+  return getSwissFootballSeasonStartYearFromDate(seasonInput);
+}
+
 export function getSeasonStartYearFromDate(
   dateInput: string | Date
 ): number | null {
-  return getSwissFootballSeasonStartYearFromDate(dateInput);
+  return getSeasonStartYearFromInput(dateInput);
 }
 
 export function getCanonicalSeasonLabel(
@@ -61,10 +74,10 @@ export function getCanonicalSeasonLabel(
 
 export function getAllowedBirthYearsForSeason(
   categoryCode: string | null | undefined,
-  seasonStartDate: string | Date
+  seasonInput: string | Date
 ): number[] {
   const normalizedCode = normalizeJuniorCategoryCode(categoryCode);
-  const seasonStartYear = getSeasonStartYearFromDate(seasonStartDate);
+  const seasonStartYear = getSeasonStartYearFromInput(seasonInput);
 
   if (!normalizedCode || seasonStartYear === null) {
     return [];
@@ -72,7 +85,7 @@ export function getAllowedBirthYearsForSeason(
 
   const shift = seasonStartYear - BASE_SEASON_START_YEAR;
 
-  return BASE_JAHRGANG_BY_CODE[normalizedCode].map((year) => year - shift);
+  return BASE_JAHRGANG_BY_CODE[normalizedCode].map((year) => year + shift);
 }
 
 export function isBirthYearAllowedForTeamSeason(args: {
@@ -123,4 +136,3 @@ export function isBirthYearAllowedForTeamSeason(args: {
     birthYear,
   };
 }
-

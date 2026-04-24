@@ -316,6 +316,7 @@ export async function GET(request: NextRequest) {
         select: {
           season: {
             select: {
+              key: true,
               startDate: true,
             },
           },
@@ -338,7 +339,7 @@ export async function GET(request: NextRequest) {
 
       allowedBirthYears = getAllowedBirthYearsForSeason(
         teamSeason.team.ageGroup,
-        teamSeason.season.startDate,
+        teamSeason.season.key,
       );
 
       excludedPersonIds = new Set(teamSeason.playerSquadMembers.map((entry) => entry.personId));
@@ -485,3 +486,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+
