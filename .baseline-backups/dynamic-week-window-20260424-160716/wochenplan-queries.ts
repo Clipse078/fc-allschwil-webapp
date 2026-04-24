@@ -1,6 +1,5 @@
 ﻿import { PlanningResourceType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { getPlanningWeekWindow } from "@/lib/planning/week-window";
 import type {
   WochenplanBoardCategoryKey,
   WochenplanBoardDayKey,
@@ -69,13 +68,21 @@ function toCategoryKey(category: string | null | undefined): WochenplanBoardCate
   return "TRAINER";
 }
 
-function getWeekWindow(weekOffset?: number | null) {
-  return getPlanningWeekWindow({ weekOffset });
+function getWeekWindow() {
+  const today = new Date();
+  const day = today.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const start = new Date(today);
+  start.setDate(today.getDate() + diffToMonday);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
 }
 
-export async function getWochenplanBoardData(args?: { weekOffset?: number | null }): Promise<{ events: WochenplanBoardEvent[]; weekWindow: ReturnType<typeof getPlanningWeekWindow> }> {
-  const weekWindow = getWeekWindow(args?.weekOffset);
-  const { start, end } = weekWindow;
+export async function getWochenplanBoardData(): Promise<WochenplanBoardEvent[]> {
+  const { start, end } = getWeekWindow();
 
   const events = await prisma.event.findMany({
     where: { wochenplanVisible: true, startAt: { gte: start, lte: end } },
@@ -89,7 +96,7 @@ export async function getWochenplanBoardData(args?: { weekOffset?: number | null
     },
   });
 
-  const mappedEvents = events.map((event) => {
+  return events.map((event) => {
     const pitchAllocation = event.planningAllocations.find((allocation) => allocation.resource.type === PlanningResourceType.PITCH);
     const homeRoomAllocation = event.planningAllocations.find((allocation) => allocation.resource.type === PlanningResourceType.DRESSING_ROOM && allocation.label !== "Gegner");
     const awayRoomAllocation = event.planningAllocations.find((allocation) => allocation.resource.type === PlanningResourceType.DRESSING_ROOM && allocation.label === "Gegner");
@@ -124,12 +131,5 @@ export async function getWochenplanBoardData(args?: { weekOffset?: number | null
       },
     } satisfies WochenplanBoardEvent;
   });
-
-  return {
-    events: mappedEvents,
-    weekWindow,
-  };
 }
-
-
 
