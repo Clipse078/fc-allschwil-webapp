@@ -775,7 +775,7 @@ export default function AdminPageHeader({
     };
   }, [pathname]);
 
-  const headerContent = dynamicContent ?? staticContent;
+  const headerContent: HeaderContent = { eyebrow: "", title: getDayGreeting(firstName), description: undefined };
   const showDashboardSeasonPill =
     pathname === "/dashboard" &&
     Boolean(currentSeasonLabel) &&
@@ -814,4 +814,6 @@ export default function AdminPageHeader({
     </div>
   );
 }
+
+
 
