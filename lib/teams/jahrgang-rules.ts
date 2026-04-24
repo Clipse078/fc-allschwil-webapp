@@ -72,7 +72,7 @@ export function getAllowedBirthYearsForSeason(
 
   const shift = seasonStartYear - BASE_SEASON_START_YEAR;
 
-  return BASE_JAHRGANG_BY_CODE[normalizedCode].map((year) => year + shift);
+  return BASE_JAHRGANG_BY_CODE[normalizedCode].map((year) => year - shift);
 }
 
 export function isBirthYearAllowedForTeamSeason(args: {
@@ -123,3 +123,4 @@ export function isBirthYearAllowedForTeamSeason(args: {
     birthYear,
   };
 }
+
