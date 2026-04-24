@@ -600,9 +600,11 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
     dayLabel: null,
   });
 
-  const initialSnapshot = useMemo(() => buildSnapshot(initialEvents.length > 0 ? initialEvents : buildDemoEvents()), [initialEvents]);
+  const [publishedSnapshot, setPublishedSnapshot] = useState(() =>
+    buildSnapshot(initialEvents.length > 0 ? initialEvents : buildDemoEvents()),
+  );
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
-  const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
+  const hasUnsavedChanges = currentSnapshot !== publishedSnapshot;
 
   const conflicts = useMemo(() => {
     return getWochenplanConflicts(events.map(toConflictEvent));
@@ -704,7 +706,11 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
 
   return (
     <div className="space-y-6">
-      <WochenplanPublishBar hasUnsavedChanges={hasUnsavedChanges} />
+      <WochenplanPublishBar
+        hasUnsavedChanges={hasUnsavedChanges}
+        eventIds={events.map((event) => event.id)}
+        onPublished={() => setPublishedSnapshot(buildSnapshot(events))}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
         <div className="space-y-6">
@@ -772,6 +778,7 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, cu
     </div>
   );
 }
+
 
 
 

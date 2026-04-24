@@ -1,7 +1,12 @@
-﻿import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
+﻿"use client";
+
+import { useState } from "react";
+import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 
 type WochenplanPublishBarProps = {
   hasUnsavedChanges: boolean;
+  eventIds: string[];
+  onPublished: () => void;
 };
 
 function ChannelBadge({
@@ -27,7 +32,40 @@ function ChannelBadge({
 
 export default function WochenplanPublishBar({
   hasUnsavedChanges,
+  eventIds,
+  onPublished,
 }: WochenplanPublishBarProps) {
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function publishChanges() {
+    if (!hasUnsavedChanges || eventIds.length === 0 || isPublishing) {
+      return;
+    }
+
+    setIsPublishing(true);
+    setMessage(null);
+
+    const response = await fetch("/api/wochenplan/publish", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ eventIds }),
+    });
+
+    setIsPublishing(false);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      setMessage(payload?.error ?? "Publizieren fehlgeschlagen.");
+      return;
+    }
+
+    const payload = await response.json().catch(() => null);
+    setMessage(`${payload?.publishedCount ?? eventIds.length} Einträge publiziert.`);
+    onPublished();
+  }
   return (
     <AdminSurfaceCard className="p-5">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
@@ -49,25 +87,27 @@ export default function WochenplanPublishBar({
         {/* RIGHT: Actions */}
         <div className="flex flex-col items-start gap-3 xl:items-end">
           <div className="text-xs text-slate-500">
-            {hasUnsavedChanges
+            {message ?? (hasUnsavedChanges
               ? "Änderungen bereit zur Veröffentlichung"
-              : "Keine neuen Änderungen"}
+              : "Keine neuen Änderungen")}
           </div>
 
           <button
             type="button"
-            disabled={!hasUnsavedChanges}
+            onClick={publishChanges}
+            disabled={!hasUnsavedChanges || isPublishing}
             className={[
               "rounded-full border px-6 py-3 text-sm font-semibold transition",
-              hasUnsavedChanges
+              hasUnsavedChanges && !isPublishing
                 ? "border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700 btn-glow btn-glow-red"
                 : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed",
             ].join(" ")}
           >
-            Änderungen publizieren
+            {isPublishing ? "Publizieren..." : "Änderungen publizieren"}
           </button>
         </div>
       </div>
     </AdminSurfaceCard>
   );
 }
+
