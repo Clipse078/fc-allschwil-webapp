@@ -922,3 +922,32 @@ model VereinsleitungInitiativeWorkItem {
   @@index([sourceMeetingId])
   @@index([sourceDecisionId])
 }
+
+enum BusinessClubSponsorTier {
+  MAIN
+  GOLD
+  SILVER
+  BRONZE
+  PARTNER
+}
+
+model BusinessClubSponsor {
+  id                  String                  @id @default(cuid())
+  displayName         String
+  companyName         String?
+  tier                BusinessClubSponsorTier @default(PARTNER)
+  logoUrl             String?
+  websiteUrl          String?
+  active              Boolean                 @default(true)
+  infoboardVisible    Boolean                 @default(false)
+  infoboardWeight     Int                     @default(1)
+  infoboardSortOrder  Int                     @default(0)
+  remarks             String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([active])
+  @@index([infoboardVisible])
+  @@index([tier])
+  @@index([infoboardSortOrder])
+}

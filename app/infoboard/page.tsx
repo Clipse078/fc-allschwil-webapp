@@ -2,6 +2,7 @@
 import type { WochenplanBoardDayKey, WochenplanBoardEvent } from "@/lib/wochenplan/types";
 import LiveClock from "@/components/infoboard/LiveClock";
 import InfoboardRotator from "@/components/infoboard/InfoboardRotator";
+import { getInfoboardSponsors } from "@/lib/business-club/queries";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
@@ -106,7 +107,10 @@ function isNow(event: WochenplanBoardEvent) {
 }
 
 export default async function PublicInfoboardPage() {
-  const { events } = await getWochenplanBoardData({ weekOffset: 0 });
+  const [{ events }, sponsors] = await Promise.all([
+    getWochenplanBoardData({ weekOffset: 0 }),
+    getInfoboardSponsors(),
+  ]);
   const todayKey = getTodayKey();
   const todayEvents = events.filter(
     (event) => event.boardDayKey === todayKey && event.allocation.publishedToInfoboard,
@@ -255,6 +259,7 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
 
 
 
