@@ -77,6 +77,15 @@ export default async function WochenplanPage({ searchParams }: WochenplanPagePro
             </Link>
           ) : null}
 
+          {weekWindow.weekOffset > 0 ? (
+            <Link
+              href="/dashboard/wochenplan?week=0"
+              className="inline-flex h-11 items-center rounded-full border border-blue-200 bg-blue-50 px-5 text-sm font-semibold text-[#0b4aa2] shadow-sm transition hover:bg-blue-100"
+            >
+              Zur aktuellen Woche
+            </Link>
+          ) : null}
+
           <Link
             href={nextHref}
             className="inline-flex h-11 items-center rounded-full bg-[#0b4aa2] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#08357a]"
@@ -90,3 +99,4 @@ export default async function WochenplanPage({ searchParams }: WochenplanPagePro
     </div>
   );
 }
+
