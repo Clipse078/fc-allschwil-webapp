@@ -97,6 +97,13 @@ function participantLabels(events: WochenplanBoardEvent[]) {
   ) as string[];
 }
 
+function isNow(event: WochenplanBoardEvent) {
+  const now = new Date().getTime();
+  const start = new Date(event.startAt).getTime();
+  const end = event.endAt ? new Date(event.endAt).getTime() : start + 60 * 60 * 1000;
+  return now >= start && now <= end;
+}
+
 export default async function PublicInfoboardPage() {
   const { events } = await getWochenplanBoardData({ weekOffset: 0 });
   const todayKey = getTodayKey();
@@ -109,7 +116,7 @@ export default async function PublicInfoboardPage() {
     <main className="h-screen w-screen overflow-hidden bg-[#06152f] px-8 py-6 text-white">
       <meta httpEquiv="refresh" content="30" />
 
-      <div className="flex h-full w-full flex-col gapx-8 py-6">
+      <div className="flex h-full w-full flex-col gap-4">
         <header className="flex items-center justify-between rounded-[32px] border border-white/10 bg-white/10 px-10 py-7 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.24em] text-red-200">
@@ -121,7 +128,8 @@ export default async function PublicInfoboardPage() {
           </div>
 
           <div className="text-right">
-            <p className="text-3xl font-black capitalize">{formatToday()}\n            <LiveClock /></p>
+            <p className="text-3xl font-black capitalize">{formatToday()}</p>
+            <LiveClock />
             <p className="mt-1 text-sm font-semibold text-white/65">
               Aktualisierung alle 30 Sekunden
             </p>
@@ -129,9 +137,10 @@ export default async function PublicInfoboardPage() {
         </header>
 
         {groups.length > 0 ? (
-          <section className="grid flex-1 grid-cols-2 gapx-8 py-6 2xl:grid-cols-3">
+          <section className="grid flex-1 grid-cols-2 gap-4 2xl:grid-cols-3">
             {groups.map((group) => {
               const main = group[0];
+              const nowActive = isNow(main);
               const participants = participantLabels(group);
               const rooms = roomCodes(group);
               const isShared = participants.length > 1;
@@ -139,12 +148,12 @@ export default async function PublicInfoboardPage() {
               return (
                 <article
                   key={getGroupKey(main)}
-                  className="rounded-[32px] border border-white/10 bg-white p-8 text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)]"
+                  className={`rounded-[32px] border ${nowActive ? "border-red-400 ring-4 ring-red-300/40 scale-[1.02]" : "border-white/10 opacity-90"} bg-white p-8 text-slate-900 shadow-[0_30px_90px_rgba(0,0,0,0.28)] transition-all`}
                 >
-                  <div className="flex items-start justify-between gapx-8 py-6">
+                  <div className="flex items-start justify-between gap-6">
                     <div>
                       <p className="text-sm font-black uppercase tracking-[0.18em] text-red-600">
-                        {getEventTypeLabel(main.eventType)}
+                        {nowActive ? "LIVE" : getEventTypeLabel(main.eventType)}
                         {isShared ? " · mehrere Teams" : ""}
                       </p>
                       <h2 className="mt-3 text-4xl font-black uppercase tracking-tight text-[#0b4aa2]">
@@ -245,9 +254,3 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
-
-
-
-
-
-
