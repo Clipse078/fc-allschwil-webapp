@@ -20,6 +20,12 @@ type InfoboardRotatorProps = {
   sponsors: InfoboardSponsor[];
 };
 
+function getSponsorLogoClass(tier: string) {
+  if (tier === "MAIN") return "max-h-56 max-w-[760px]";
+  if (tier === "GOLD") return "max-h-48 max-w-[680px]";
+  return "max-h-40 max-w-[600px]";
+}
+
 function getTierLabel(tier: string) {
   if (tier === "MAIN") return "Hauptsponsor";
   if (tier === "GOLD") return "Gold Sponsor";
@@ -80,11 +86,27 @@ export default function InfoboardRotator({ children, sponsors }: InfoboardRotato
           <p className="mt-8 text-3xl font-black uppercase tracking-[0.22em] text-slate-400">
             {getTierLabel(sponsor.tier)}
           </p>
-          <h2 className="mt-5 text-8xl font-black uppercase tracking-tight text-[#0b4aa2]">
-            {sponsor.displayName}
-          </h2>
+          {sponsor.logoUrl ? (
+            <div className="mt-8 flex justify-center">
+              <img
+                src={sponsor.logoUrl}
+                alt={sponsor.displayName}
+                className={`${getSponsorLogoClass(sponsor.tier)} object-contain`}
+              />
+            </div>
+          ) : (
+            <h2 className="mt-5 text-8xl font-black uppercase tracking-tight text-[#0b4aa2]">
+              {sponsor.displayName}
+            </h2>
+          )}
+          {sponsor.logoUrl ? (
+            <h2 className="mt-8 text-5xl font-black uppercase tracking-tight text-[#0b4aa2]">
+              {sponsor.displayName}
+            </h2>
+          ) : null}
+
           {sponsor.companyName ? (
-            <p className="mt-6 text-4xl font-bold text-slate-500">{sponsor.companyName}</p>
+            <p className="mt-5 text-4xl font-bold text-slate-500">{sponsor.companyName}</p>
           ) : null}
           <p className="mt-8 text-3xl font-bold text-slate-500">
             Gemeinsam für unseren Verein
@@ -96,3 +118,4 @@ export default function InfoboardRotator({ children, sponsors }: InfoboardRotato
 
   return <>{visible}</>;
 }
+
