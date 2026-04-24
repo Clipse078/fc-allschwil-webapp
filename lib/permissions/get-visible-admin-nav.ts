@@ -171,7 +171,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
   },
   {
-    label: "4.4 Tagesplan",
+    label: "4.4 Platz reservieren",
+    href: "/dashboard/planner/reserve",
+    parentLabel: "Current Season",
+    permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+  },
+  {
+    label: "4.5 Tagesplan",
     href: "/dashboard/planner/day",
     parentLabel: "Current Season",
     permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
@@ -279,3 +285,4 @@ export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavIte
     );
   });
 }
+

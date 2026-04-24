@@ -102,6 +102,8 @@ function getNavIcon(label: string) {
       return ClipboardList;
     case "Wochenplan":
       return CalendarDays;
+    case "Platz reservieren":
+      return CalendarDays;
     case "Tagesplan":
       return CalendarDays;
     case "Teams":
@@ -402,3 +404,4 @@ export default function VereinsOSSidebar({
     </aside>
   );
 }
+
