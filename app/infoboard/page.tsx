@@ -132,7 +132,7 @@ export default async function PublicInfoboardPage() {
       <main className="flex h-screen w-screen items-center justify-center overflow-hidden bg-[#06152f] px-12 py-10 text-white">
         <meta httpEquiv="refresh" content="30" />
 
-        <section className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[44px] border border-white/10 bg-white/10 p-12 text-center shadow-[0_30px_110px_rgba(0,0,0,0.34)] backdrop-blur">
+        <section className="relative flex h-full w-full animate-[fadeIn_700ms_ease-out] items-center justify-center overflow-hidden rounded-[44px] border border-white/10 bg-white/10 p-12 text-center shadow-[0_30px_110px_rgba(0,0,0,0.34)] backdrop-blur">
           <div className="absolute left-10 top-10 text-left">
             <p className="text-sm font-black uppercase tracking-[0.3em] text-red-200">
               FC Allschwil Matchday
@@ -349,6 +349,7 @@ export default async function PublicInfoboardPage() {
     </main>
   );
 }
+
 
 
 

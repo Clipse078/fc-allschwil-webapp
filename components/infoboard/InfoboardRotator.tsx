@@ -78,7 +78,7 @@ export default function InfoboardRotator({ children, sponsors }: InfoboardRotato
 
   if (showSponsor && sponsor) {
     return (
-      <div className="col-span-full flex h-full min-h-[620px] items-center justify-center rounded-[36px] border border-white/10 bg-white text-center text-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.28)]">
+      <div className="col-span-full flex h-full min-h-[620px] animate-[fadeIn_700ms_ease-out] items-center justify-center rounded-[36px] border border-white/10 bg-white text-center text-slate-950 shadow-[0_30px_90px_rgba(0,0,0,0.28)]">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.3em] text-red-600">
             FC Allschwil bedankt sich bei
@@ -95,7 +95,7 @@ export default function InfoboardRotator({ children, sponsors }: InfoboardRotato
               />
             </div>
           ) : (
-            <h2 className="mt-5 text-8xl font-black uppercase tracking-tight text-[#0b4aa2]">
+            <h2 className="mt-5 animate-[softZoom_900ms_ease-out] text-8xl font-black uppercase tracking-tight text-[#0b4aa2]">
               {sponsor.displayName}
             </h2>
           )}
@@ -116,6 +116,34 @@ export default function InfoboardRotator({ children, sponsors }: InfoboardRotato
     );
   }
 
-  return <>{visible}</>;
+  return (
+    <>
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes softZoom {
+          from {
+            opacity: 0;
+            transform: scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      `}</style>
+      <div className="contents animate-[fadeIn_500ms_ease-out]">{visible}</div>
+    </>
+  );
 }
+
 
