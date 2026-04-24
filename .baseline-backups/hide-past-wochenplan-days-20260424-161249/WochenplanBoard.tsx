@@ -585,7 +585,7 @@ function buildSnapshot(events: WochenplanBoardEvent[]) {
   );
 }
 
-export default function WochenplanBoard({ initialEvents = [], visibleDayKeys }: { initialEvents?: WochenplanBoardEvent[]; visibleDayKeys?: WochenplanBoardDayKey[] }) {
+export default function WochenplanBoard({ initialEvents = [] }: { initialEvents?: WochenplanBoardEvent[] }) {
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(initialEvents.length > 0 ? initialEvents : buildDemoEvents());
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
@@ -699,15 +699,13 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys }: 
     );
   }
 
-  const visibleDays = visibleDayKeys && visibleDayKeys.length > 0 ? DAYS.filter((day) => visibleDayKeys.includes(day.key)) : DAYS;
-
   return (
     <div className="space-y-6">
       <WochenplanPublishBar hasUnsavedChanges={hasUnsavedChanges} />
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
         <div className="space-y-6">
-          {visibleDays.map((day) => (
+          {DAYS.map((day) => (
             <WochenplanDayGrid
               key={day.key}
               dayLabel={formatBoardDayLabel(day.key, day.label)}
@@ -770,7 +768,6 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys }: 
     </div>
   );
 }
-
 
 
 

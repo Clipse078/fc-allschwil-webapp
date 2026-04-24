@@ -3,7 +3,6 @@ import WochenplanBoard from "@/components/admin/wochenplan/WochenplanBoard";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
-import type { WochenplanBoardDayKey } from "@/lib/wochenplan/types";
 
 type WochenplanPageProps = {
   searchParams?: Promise<{
@@ -11,36 +10,12 @@ type WochenplanPageProps = {
   }>;
 };
 
-function getVisibleDayKeys(start: Date, end: Date): WochenplanBoardDayKey[] {
-  const keys: WochenplanBoardDayKey[] = [];
-  const cursor = new Date(start);
-
-  cursor.setHours(12, 0, 0, 0);
-
-  while (cursor.getTime() <= end.getTime()) {
-    const day = cursor.getDay();
-
-    if (day === 1) keys.push("MONDAY");
-    if (day === 2) keys.push("TUESDAY");
-    if (day === 3) keys.push("WEDNESDAY");
-    if (day === 4) keys.push("THURSDAY");
-    if (day === 5) keys.push("FRIDAY");
-    if (day === 6) keys.push("SATURDAY");
-    if (day === 0) keys.push("SUNDAY");
-
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return keys;
-}
-
 export default async function WochenplanPage({ searchParams }: WochenplanPageProps) {
   await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
 
   const params = (await searchParams) ?? {};
   const weekOffset = Math.max(0, Number(params.week ?? 0) || 0);
   const { events, weekWindow } = await getWochenplanBoardData({ weekOffset });
-  const visibleDayKeys = getVisibleDayKeys(weekWindow.start, weekWindow.end);
 
   const previousHref =
     weekWindow.previousWeekOffset === null
@@ -86,7 +61,7 @@ export default async function WochenplanPage({ searchParams }: WochenplanPagePro
         </div>
       </section>
 
-      <WochenplanBoard initialEvents={events} visibleDayKeys={visibleDayKeys} />
+      <WochenplanBoard initialEvents={events} />
     </div>
   );
 }
