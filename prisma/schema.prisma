@@ -951,3 +951,20 @@ model BusinessClubSponsor {
   @@index([tier])
   @@index([infoboardSortOrder])
 }
+
+model WorkflowPolicy {
+  id                 String   @id @default(cuid())
+  domain             String   // JAHRESPLAN | WOCHENPLAN | TAGESPLAN
+  editorRoleKeys     String[] // roles allowed to edit
+  reviewerRoleKeys   String[] // roles allowed to review/publish
+  targetGroups       String[] // G,F,E,D,C,B,A,AKTIVE,FRAUEN etc
+  requireReview      Boolean  @default(true)
+  allowSelfApproval  Boolean  @default(false)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([domain])
+  @@index([active])
+}
+
