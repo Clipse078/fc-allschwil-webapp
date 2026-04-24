@@ -35,14 +35,14 @@ export function normalizeJuniorCategoryCode(
     .replace(/\s+/g, "")
     .replace("-", "");
 
-  if (normalized === "G") return "G";
-  if (normalized === "F") return "F";
-  if (normalized === "E") return "E";
-  if (normalized === "D7") return "D7";
-  if (normalized === "D9") return "D9";
-  if (normalized === "C") return "C";
-  if (normalized === "B") return "B";
-  if (normalized === "A") return "A";
+  if (normalized === "D7" || normalized.startsWith("D7")) return "D7";
+  if (normalized === "D9" || normalized.startsWith("D9")) return "D9";
+  if (normalized === "G" || normalized.startsWith("G")) return "G";
+  if (normalized === "F" || normalized.startsWith("F")) return "F";
+  if (normalized === "E" || normalized.startsWith("E")) return "E";
+  if (normalized === "C" || normalized.startsWith("C")) return "C";
+  if (normalized === "B" || normalized.startsWith("B")) return "B";
+  if (normalized === "A" || normalized.startsWith("A")) return "A";
 
   return null;
 }
@@ -136,3 +136,4 @@ export function isBirthYearAllowedForTeamSeason(args: {
     birthYear,
   };
 }
+
