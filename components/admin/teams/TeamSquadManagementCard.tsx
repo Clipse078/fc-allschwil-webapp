@@ -123,10 +123,10 @@ export default function TeamSquadManagementCard({
 
   const allowedBirthYears = useMemo(() => {
     return getAllowedBirthYearsForSeason(
-      teamSeason.teamAgeGroup,
+      teamSeason.teamAgeGroup ?? teamSeason.displayName ?? teamSeason.shortName,
       teamSeason.season.key
     );
-  }, [teamSeason.teamAgeGroup, teamSeason.season.key]);
+  }, [teamSeason.teamAgeGroup, teamSeason.displayName, teamSeason.shortName, teamSeason.season.key]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
@@ -638,5 +638,6 @@ function Toggle({
     </div>
   );
 }
+
 
 

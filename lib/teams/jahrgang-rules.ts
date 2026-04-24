@@ -29,20 +29,22 @@ const BASE_SEASON_START_YEAR = 2025;
 export function normalizeJuniorCategoryCode(
   value: string | null | undefined
 ): JuniorCategoryCode | null {
-  const normalized = String(value ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .replace("-", "");
+  const raw = String(value ?? "").trim().toUpperCase();
 
-  if (normalized === "D7" || normalized.startsWith("D7")) return "D7";
-  if (normalized === "D9" || normalized.startsWith("D9")) return "D9";
-  if (normalized === "G" || normalized.startsWith("G")) return "G";
-  if (normalized === "F" || normalized.startsWith("F")) return "F";
-  if (normalized === "E" || normalized.startsWith("E")) return "E";
-  if (normalized === "C" || normalized.startsWith("C")) return "C";
-  if (normalized === "B" || normalized.startsWith("B")) return "B";
-  if (normalized === "A" || normalized.startsWith("A")) return "A";
+  const normalized = raw
+    .replace(/Ä/g, "AE")
+    .replace(/Ö/g, "OE")
+    .replace(/Ü/g, "UE")
+    .replace(/[^A-Z0-9]/g, "");
+
+  if (normalized.startsWith("D7")) return "D7";
+  if (normalized.startsWith("D9")) return "D9";
+  if (normalized.startsWith("G")) return "G";
+  if (normalized.startsWith("F")) return "F";
+  if (normalized.startsWith("E")) return "E";
+  if (normalized.startsWith("C")) return "C";
+  if (normalized.startsWith("B")) return "B";
+  if (normalized.startsWith("A")) return "A";
 
   return null;
 }
@@ -67,9 +69,16 @@ export function getSeasonStartYearFromDate(
 }
 
 export function getCanonicalSeasonLabel(
-  seasonStartDate: string | Date
+  seasonInput: string | Date
 ): string | null {
-  return getCanonicalSwissFootballSeasonLabelFromSeasonStartDate(seasonStartDate);
+  if (typeof seasonInput === "string") {
+    const match = seasonInput.match(/(\d{4})\s*\/\s*\d{4}/);
+    if (match?.[0]) {
+      return match[0].replace(/\s+/g, "");
+    }
+  }
+
+  return getCanonicalSwissFootballSeasonLabelFromSeasonStartDate(seasonInput);
 }
 
 export function getAllowedBirthYearsForSeason(
@@ -136,4 +145,3 @@ export function isBirthYearAllowedForTeamSeason(args: {
     birthYear,
   };
 }
-

@@ -103,10 +103,10 @@ export default function TeamSettingsCard({
     }
 
     return getAllowedBirthYearsForSeason(
-      form.ageGroup,
+      form.ageGroup ?? form.name,
       activeSeason.season.key
     );
-  }, [form.ageGroup, activeSeason]);
+  }, [form.ageGroup, form.name, activeSeason]);
 
   function updateField<K extends keyof Team>(field: K, value: Team[K]) {
     if (!canManage) {
@@ -360,4 +360,5 @@ function Toggle({
     </div>
   );
 }
+
 
