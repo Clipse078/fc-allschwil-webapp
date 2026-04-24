@@ -34,6 +34,12 @@ function tierLabel(value: SponsorTier) {
   return tiers.find((tier) => tier.value === value)?.label ?? "Partner";
 }
 
+function sponsorLogoClass(tier: SponsorTier) {
+  if (tier === "MAIN") return "max-h-28 max-w-[360px]";
+  if (tier === "GOLD") return "max-h-24 max-w-[320px]";
+  return "max-h-20 max-w-[280px]";
+}
+
 export default function BusinessClubSponsorManager({ sponsors }: BusinessClubSponsorManagerProps) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -185,6 +191,68 @@ export default function BusinessClubSponsorManager({ sponsors }: BusinessClubSpo
         ) : null}
       </section>
 
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600">
+          Vorschau
+        </p>
+        <h2 className="mt-1 text-2xl font-black uppercase tracking-tight text-[#0b4aa2]">
+          Infoboard Sponsor-Screens
+        </h2>
+        <p className="mt-1 text-sm font-medium text-slate-500">
+          Vorschau der aktiven Sponsoren, die im Infoboard-Screensaver erscheinen.
+        </p>
+
+        {sponsors.filter((sponsor) => sponsor.active && sponsor.infoboardVisible).length > 0 ? (
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
+            {sponsors
+              .filter((sponsor) => sponsor.active && sponsor.infoboardVisible)
+              .slice(0, 4)
+              .map((sponsor) => (
+                <div
+                  key={sponsor.id}
+                  className="flex min-h-[260px] items-center justify-center rounded-[28px] border border-slate-200 bg-[#06152f] p-6 text-center text-white shadow-sm"
+                >
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.24em] text-red-200">
+                      FC Allschwil bedankt sich bei
+                    </p>
+                    <p className="mt-5 text-sm font-black uppercase tracking-[0.2em] text-white/45">
+                      {tierLabel(sponsor.tier)}
+                    </p>
+                    {sponsor.logoUrl ? (
+                      <div className="mt-5 flex justify-center">
+                        <img
+                          src={sponsor.logoUrl}
+                          alt={sponsor.displayName}
+                          className={`${sponsorLogoClass(sponsor.tier)} object-contain`}
+                        />
+                      </div>
+                    ) : (
+                      <h3 className="mt-5 text-4xl font-black uppercase tracking-tight text-white">
+                        {sponsor.displayName}
+                      </h3>
+                    )}
+                    {sponsor.logoUrl ? (
+                      <h3 className="mt-5 text-2xl font-black uppercase tracking-tight text-white">
+                        {sponsor.displayName}
+                      </h3>
+                    ) : null}
+                    {sponsor.companyName ? (
+                      <p className="mt-3 text-lg font-bold text-white/60">{sponsor.companyName}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+            <p className="text-sm font-black text-slate-700">
+              Noch keine aktiven Infoboard-Sponsoren für die Vorschau.
+            </p>
+          </div>
+        )}
+      </section>
+
       <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-5">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600">
@@ -298,4 +366,5 @@ export default function BusinessClubSponsorManager({ sponsors }: BusinessClubSpo
     </div>
   );
 }
+
 
