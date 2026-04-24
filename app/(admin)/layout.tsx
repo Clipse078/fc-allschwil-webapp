@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+﻿import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import StageEnvironmentBanner from "@/components/admin/deployment/StageEnvironmentBanner";
@@ -118,7 +118,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           ) : null}
 
-          <header className="border-b border-slate-200 bg-white/78 backdrop-blur-xl">
+          <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/92 shadow-[0_12px_34px_rgba(15,23,42,0.06)] backdrop-blur-xl">
             <div className="px-6 py-6 lg:px-8 2xl:px-10">
               <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 flex-1">

@@ -1,4 +1,4 @@
-import AdminHeaderDateTime from "@/components/admin/layout/AdminHeaderDateTime";
+﻿import AdminHeaderDateTime from "@/components/admin/layout/AdminHeaderDateTime";
 import AdminHeaderSeasonContext from "@/components/admin/layout/AdminHeaderSeasonContext";
 import AdminHeaderUserPanel from "@/components/admin/layout/AdminHeaderUserPanel";
 
@@ -16,16 +16,19 @@ export default function AdminHeaderMetaRow({
   roleLabel,
 }: AdminHeaderMetaRowProps) {
   return (
-    <div className="flex flex-col items-start gap-4 lg:flex-row lg:items-center lg:gap-8 xl:justify-end">
-      <AdminHeaderSeasonContext currentSeasonLabel={currentSeasonLabel} />
-      <div className="hidden h-14 w-px bg-slate-200 lg:block" />
+    <div className="flex flex-col items-start gap-4 lg:flex-row lg:items-start lg:gap-8 xl:justify-end">
       <AdminHeaderUserPanel
         firstName={firstName}
         lastName={lastName}
         roleLabel={roleLabel}
       />
-      <div className="hidden h-14 w-px bg-slate-200 lg:block" />
-      <AdminHeaderDateTime />
+
+      <div className="hidden h-16 w-px bg-slate-200 lg:block" />
+
+      <div className="flex flex-col items-start gap-3">
+        <AdminHeaderDateTime />
+        <AdminHeaderSeasonContext currentSeasonLabel={currentSeasonLabel} />
+      </div>
     </div>
   );
 }

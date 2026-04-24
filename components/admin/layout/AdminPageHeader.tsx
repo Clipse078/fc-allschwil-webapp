@@ -532,36 +532,36 @@ function SpotlightSearch() {
       ? createPortal(
           <div
             id="admin-spotlight-portal"
-            className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 fixed inset-x-0 top-24 z-[180] flex justify-center px-4"
+            className="fixed inset-x-0 top-24 z-[180] flex justify-center px-4"
           >
-            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 w-full max-w-[820px]">
-            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
-              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+            <div className="w-full max-w-[820px]">
+            <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
+              <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
 
-              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 border-b border-slate-100 px-5 py-4">
-                <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                  <Search className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4 text-[#0b4aa2]" />
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
+                  <Search className="h-4 w-4 text-[#0b4aa2]" />
                   <input
                     autoFocus
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Nach Personen, Teams, Meetings oder Initiativen suchen â€¦"
-                    className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 w-full bg-transparent text-sm text-slate-900 outline-none"
+                    className="w-full bg-transparent text-sm text-slate-900 outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setIsOpen(false)}
-                    className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50"
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50"
                   >
-                    <X className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 mr-1 h-3.5 w-3.5" />
+                    <X className="mr-1 h-3.5 w-3.5" />
                     ESC
                   </button>
                 </div>
               </div>
 
-              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 max-h-[520px] overflow-y-auto">
+              <div className="max-h-[520px] overflow-y-auto">
                 {groupedResults.length === 0 ? (
-                  <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 px-5 py-8 text-sm text-slate-500">
+                  <div className="px-5 py-8 text-sm text-slate-500">
                     Keine Treffer gefunden.
                   </div>
                 ) : (
@@ -570,14 +570,14 @@ function SpotlightSearch() {
                       let flatIndex = -1;
 
                       return groupedResults.map((group) => (
-                        <div key={group.key} className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 border-b border-slate-100 last:border-b-0">
-                          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 px-5 py-4">
-                            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        <div key={group.key} className="border-b border-slate-100 last:border-b-0">
+                          <div className="px-5 py-4">
+                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                               {group.label}
                             </div>
                           </div>
 
-                          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 px-3 pb-3">
+                          <div className="px-3 pb-3">
                             {group.items.map((item) => {
                               flatIndex += 1;
                               const isHighlighted = flatIndex === highlightedIndex;
@@ -595,26 +595,26 @@ function SpotlightSearch() {
                                       : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"
                                   }`}
                                 >
-                                  <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex min-w-0 items-center gap-3">
-                                    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2]">
-                                      <Icon className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4" />
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2]">
+                                      <Icon className="h-4 w-4" />
                                     </div>
 
-                                    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 min-w-0">
-                                      <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-sm font-semibold text-slate-900">
+                                    <div className="min-w-0">
+                                      <div className="truncate text-sm font-semibold text-slate-900">
                                         {item.title}
                                       </div>
-                                      <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-xs text-slate-500">
+                                      <div className="truncate text-xs text-slate-500">
                                         {item.subtitle}
                                       </div>
                                     </div>
                                   </div>
 
-                                  <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex items-center gap-3">
-                                    <span className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2] sm:inline-flex">
+                                  <div className="flex items-center gap-3">
+                                    <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2] sm:inline-flex">
                                       {group.label.slice(0, -1)}
                                     </span>
-                                    <ChevronRight className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4 shrink-0 text-slate-400" />
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
                                   </div>
                                 </Link>
                               );
@@ -624,17 +624,17 @@ function SpotlightSearch() {
                       ));
                     })()}
 
-                    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 border-t border-slate-100 px-4 py-3">
+                    <div className="border-t border-slate-100 px-4 py-3">
                       <Link
                         href="/dashboard"
                         onClick={() => setIsOpen(false)}
-                        className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex items-center justify-between rounded-[18px] px-4 py-3 text-sm font-semibold text-[#0b4aa2] transition hover:bg-slate-50"
+                        className="flex items-center justify-between rounded-[18px] px-4 py-3 text-sm font-semibold text-[#0b4aa2] transition hover:bg-slate-50"
                       >
-                        <span className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 inline-flex items-center gap-2">
-                          <Search className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4" />
+                        <span className="inline-flex items-center gap-2">
+                          <Search className="h-4 w-4" />
                           Alle Ergebnisse anzeigen
                         </span>
-                        <ChevronRight className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4" />
+                        <ChevronRight className="h-4 w-4" />
                       </Link>
                     </div>
                   </div>
@@ -649,29 +649,29 @@ function SpotlightSearch() {
 
   return (
     <>
-      <div ref={containerRef} className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 relative w-full max-w-[820px]">
+      <div ref={containerRef} className="relative w-full max-w-[820px]">
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 group flex w-full items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+          className="group flex w-full items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
         >
-          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex min-w-0 items-center gap-4">
-            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[#0b4aa2] transition group-hover:bg-[#0b4aa2]/[0.06]">
-              <Search className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-5 w-5" />
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[#0b4aa2] transition group-hover:bg-[#0b4aa2]/[0.06]">
+              <Search className="h-5 w-5" />
             </div>
 
-            <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 min-w-0">
-              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-sm font-semibold text-slate-900">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-900">
                 Global suchen
               </div>
-              <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 truncate text-sm text-slate-500">
+              <div className="truncate text-sm text-slate-500">
                 Spieler, Teams, Meetings, Initiativen â€¦
               </div>
             </div>
           </div>
 
-          <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 hidden items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500 sm:inline-flex">
-            <Command className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-3.5 w-3.5" />
+          <div className="hidden items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-500 sm:inline-flex">
+            <Command className="h-3.5 w-3.5" />
             K
           </div>
         </button>
@@ -782,17 +782,17 @@ export default function AdminPageHeader({
     Boolean(canManageSeasons);
 
   return (
-    <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex flex-col gap-5">
-      <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 min-w-0">
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
           {headerContent.eyebrow ? (
-            <p className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 fca-eyebrow">{headerContent.eyebrow}</p>
+            <p className="fca-eyebrow">{headerContent.eyebrow}</p>
           ) : null}
 
-          <h1 className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 fca-heading mt-2">{headerContent.title}</h1>
+          <h1 className="fca-heading mt-2">{headerContent.title}</h1>
 
           {headerContent.description ? (
-            <p className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 mt-3 max-w-2xl text-sm text-slate-500">
+            <p className="mt-3 max-w-2xl text-sm text-slate-500">
               {headerContent.description}
             </p>
           ) : null}
@@ -801,11 +801,11 @@ export default function AdminPageHeader({
         {showDashboardSeasonPill ? (
           <Link
             href="/dashboard/seasons"
-            className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 group inline-flex w-fit items-center gap-3 rounded-full border border-[#d7e3f8] bg-[#f3f7fd] px-4 py-2.5 text-sm font-semibold text-[#0b4aa2] shadow-sm transition hover:border-[#bdd1f3] hover:bg-white hover:shadow-[0_10px_24px_rgba(11,74,162,0.10)]"
+            className="group inline-flex w-fit items-center gap-3 rounded-full border border-[#d7e3f8] bg-[#f3f7fd] px-4 py-2.5 text-sm font-semibold text-[#0b4aa2] shadow-sm transition hover:border-[#bdd1f3] hover:bg-white hover:shadow-[0_10px_24px_rgba(11,74,162,0.10)]"
           >
-            <span className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 text-slate-500">Saison</span>
+            <span className="text-slate-500">Saison</span>
             <span>{currentSeasonLabel}</span>
-            <ChevronRight className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/90 border-b border-slate-200 h-4 w-4 transition group-hover:translate-x-0.5" />
+            <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </Link>
         ) : null}
       </div>
@@ -814,3 +814,4 @@ export default function AdminPageHeader({
     </div>
   );
 }
+
