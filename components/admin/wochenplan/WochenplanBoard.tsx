@@ -585,7 +585,7 @@ function buildSnapshot(events: WochenplanBoardEvent[]) {
   );
 }
 
-export default function WochenplanBoard({ initialEvents = [], visibleDayKeys }: { initialEvents?: WochenplanBoardEvent[]; visibleDayKeys?: WochenplanBoardDayKey[] }) {
+export default function WochenplanBoard({ initialEvents = [], visibleDayKeys, currentDayKey }: { initialEvents?: WochenplanBoardEvent[]; visibleDayKeys?: WochenplanBoardDayKey[]; currentDayKey?: WochenplanBoardDayKey | null }) {
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(initialEvents.length > 0 ? initialEvents : buildDemoEvents());
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
@@ -727,6 +727,7 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys }: 
               onDragStart={setDraggingEventId}
               onDragEnd={() => setDraggingEventId(null)}
               draggingEventId={draggingEventId}
+              isToday={currentDayKey === day.key}
             />
           ))}
 
@@ -770,6 +771,7 @@ export default function WochenplanBoard({ initialEvents = [], visibleDayKeys }: 
     </div>
   );
 }
+
 
 
 

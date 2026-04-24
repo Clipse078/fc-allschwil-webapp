@@ -34,6 +34,22 @@ function getVisibleDayKeys(start: Date, end: Date): WochenplanBoardDayKey[] {
   return keys;
 }
 
+function getCurrentDayKey(weekOffset: number): WochenplanBoardDayKey | null {
+  if (weekOffset !== 0) return null;
+
+  const day = new Date().getDay();
+
+  if (day === 1) return "MONDAY";
+  if (day === 2) return "TUESDAY";
+  if (day === 3) return "WEDNESDAY";
+  if (day === 4) return "THURSDAY";
+  if (day === 5) return "FRIDAY";
+  if (day === 6) return "SATURDAY";
+  if (day === 0) return "SUNDAY";
+
+  return null;
+}
+
 export default async function WochenplanPage({ searchParams }: WochenplanPageProps) {
   await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
 
@@ -41,6 +57,7 @@ export default async function WochenplanPage({ searchParams }: WochenplanPagePro
   const weekOffset = Math.max(0, Number(params.week ?? 0) || 0);
   const { events, weekWindow } = await getWochenplanBoardData({ weekOffset });
   const visibleDayKeys = getVisibleDayKeys(weekWindow.start, weekWindow.end);
+  const currentDayKey = getCurrentDayKey(weekOffset);
 
   const previousHref =
     weekWindow.previousWeekOffset === null
@@ -95,8 +112,11 @@ export default async function WochenplanPage({ searchParams }: WochenplanPagePro
         </div>
       </section>
 
-      <WochenplanBoard initialEvents={events} visibleDayKeys={visibleDayKeys} />
+      <WochenplanBoard
+        initialEvents={events}
+        visibleDayKeys={visibleDayKeys}
+        currentDayKey={currentDayKey}
+      />
     </div>
   );
 }
-

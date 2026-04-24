@@ -27,6 +27,7 @@ type WochenplanDayGridProps = {
   onDragStart: (eventId: string) => void;
   onDragEnd: () => void;
   draggingEventId: string | null;
+  isToday?: boolean;
 };
 
 function hasRoomConflictForEvent(
@@ -107,13 +108,21 @@ export default function WochenplanDayGrid({
   onDragStart,
   onDragEnd,
   draggingEventId,
+  isToday = false,
 }: WochenplanDayGridProps) {
   const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-4 bg-[#0f1b3d] px-5 py-4 text-white">
-        <p className="text-sm font-semibold">{dayLabel}</p>
+    <div className={["overflow-hidden rounded-[28px] border bg-white shadow-sm transition", isToday ? "border-blue-300 shadow-[0_0_0_4px_rgba(59,130,246,0.10),0_18px_45px_rgba(15,23,42,0.08)]" : "border-slate-200"].join(" ")}>
+      <div className={["flex items-center justify-between gap-4 px-5 py-4 text-white", isToday ? "bg-[#0b4aa2]" : "bg-[#0f1b3d]"].join(" ")}>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm font-semibold">{dayLabel}</p>
+          {isToday ? (
+            <span className="rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-white">
+              Heute
+            </span>
+          ) : null}
+        </div>
 
         <button
           type="button"
@@ -204,3 +213,4 @@ export default function WochenplanDayGrid({
     </div>
   );
 }
+
