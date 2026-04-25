@@ -30,6 +30,25 @@ export async function DELETE(_: Request, context: Context) {
         isWebsiteVisible: true,
         sortOrder: true,
         remarks: true,
+        teamSeason: {
+          select: {
+            teamId: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+            season: {
+              select: {
+                id: true,
+                key: true,
+                name: true,
+              },
+            },
+          },
+        },
         person: {
           select: {
             firstName: true,
@@ -40,7 +59,11 @@ export async function DELETE(_: Request, context: Context) {
       },
     });
 
-    if (!existing || existing.teamSeasonId !== teamSeasonId) {
+    if (
+      !existing ||
+      existing.teamSeasonId !== teamSeasonId ||
+      existing.teamSeason.teamId !== teamId
+    ) {
       return NextResponse.json(
         { error: "Trainerteam-Eintrag nicht gefunden." },
         { status: 404 }
@@ -60,10 +83,23 @@ export async function DELETE(_: Request, context: Context) {
       entityType: "TrainerTeamMember",
       entityId: trainerMemberId,
       action: "DELETE",
-      beforeJson: existing,
+      beforeJson: {
+        id: existing.id,
+        teamSeasonId: existing.teamSeasonId,
+        personId: existing.personId,
+        status: existing.status,
+        roleLabel: existing.roleLabel,
+        isWebsiteVisible: existing.isWebsiteVisible,
+        sortOrder: existing.sortOrder,
+        remarks: existing.remarks,
+      },
       metadataJson: {
-        teamId,
-        teamSeasonId,
+        teamId: existing.teamSeason.team.id,
+        teamName: existing.teamSeason.team.name,
+        teamSlug: existing.teamSeason.team.slug,
+        seasonId: existing.teamSeason.season.id,
+        seasonKey: existing.teamSeason.season.key,
+        seasonName: existing.teamSeason.season.name,
         personName:
           existing.person.displayName ||
           (existing.person.firstName + " " + existing.person.lastName),
@@ -71,7 +107,9 @@ export async function DELETE(_: Request, context: Context) {
     });
 
     revalidatePath("/dashboard/teams");
-    revalidatePath("/dashboard/teams/" + teamId);
+    revalidatePath(
+      `/dashboard/seasons/${existing.teamSeason.season.key}/teams/${existing.teamSeason.team.slug}`,
+    );
 
     return NextResponse.json({
       message: "Trainer erfolgreich aus dem Trainerteam entfernt.",

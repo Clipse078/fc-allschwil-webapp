@@ -137,7 +137,11 @@ export default function TeamCreateForm() {
         );
       }
 
-      router.push("/dashboard/teams/" + data.teamId);
+      if (data?.seasonKey && data?.teamSlug) {
+        router.push(`/dashboard/seasons/${data.seasonKey}/teams/${data.teamSlug}`);
+      } else {
+        router.push("/dashboard/teams/" + data.teamId);
+      }
       router.refresh();
     } catch (err) {
       setError(
@@ -234,7 +238,7 @@ export default function TeamCreateForm() {
               value={genderGroup}
               onChange={(event) => setGenderGroup(event.target.value)}
               className="fca-input"
-              placeholder="z. B. Boys, Girls, Mixed"
+              placeholder="z. B. Männer, Frauen, Mixed"
             />
           </label>
 
@@ -285,3 +289,4 @@ export default function TeamCreateForm() {
     </AdminSurfaceCard>
   );
 }
+

@@ -109,7 +109,9 @@ export async function DELETE(_: NextRequest, context: Context) {
     });
 
     revalidatePath("/dashboard/teams");
-    revalidatePath("/dashboard/teams/" + teamId);
+    revalidatePath(
+      `/dashboard/seasons/${existing.teamSeason.season.key}/teams/${existing.teamSeason.team.slug}`,
+    );
 
     return NextResponse.json({
       message: "Spieler erfolgreich aus dem Team-Saison-Kader entfernt.",
@@ -151,3 +153,4 @@ export async function DELETE(_: NextRequest, context: Context) {
     );
   }
 }
+

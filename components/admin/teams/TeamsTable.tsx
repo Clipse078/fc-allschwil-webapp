@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -41,6 +41,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 function getCategoryLabel(category: string) {
   return CATEGORY_LABELS[category] ?? category;
+}
+
+function getTeamHref(team: TeamItem) {
+  if (team.activeSeason?.seasonKey && team.slug) {
+    return `/dashboard/seasons/${team.activeSeason.seasonKey}/teams/${team.slug}`;
+  }
+
+  return `/dashboard/teams/${team.id}`;
 }
 
 export default function TeamsTable({ initialTeams }: TeamsTableProps) {
@@ -87,10 +95,7 @@ export default function TeamsTable({ initialTeams }: TeamsTableProps) {
               </select>
             </label>
 
-            <Link
-              href="/dashboard/teams/new"
-              className="fca-button-primary"
-            >
+            <Link href="/dashboard/teams/new" className="fca-button-primary">
               Neues Team
             </Link>
           </div>
@@ -142,10 +147,7 @@ export default function TeamsTable({ initialTeams }: TeamsTableProps) {
                 </>
               }
               actions={
-                <Link
-                  href={"/dashboard/teams/" + team.id}
-                  className="fca-button-primary"
-                >
+                <Link href={getTeamHref(team)} className="fca-button-primary">
                   Öffnen
                 </Link>
               }
