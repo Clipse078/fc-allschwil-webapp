@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ChevronRight, Command, Search, Users, Shield, CalendarDays, Flag, X } from "lucide-react";
@@ -402,7 +402,6 @@ function getSpotlightIcon(type: SpotlightResult["type"]) {
 function SpotlightSearch() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [query, setQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [portalStyle, setPortalStyle] = useState<{
@@ -449,10 +448,6 @@ function SpotlightSearch() {
       width,
     });
   }
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -528,7 +523,7 @@ function SpotlightSearch() {
   }, []);
 
   const portal =
-    isMounted && isOpen && portalStyle
+    isOpen && portalStyle
       ? createPortal(
           <div
             id="admin-spotlight-portal"
