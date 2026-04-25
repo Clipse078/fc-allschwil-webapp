@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -72,7 +72,8 @@ export default function InfoboardRotator({ children, sponsors }: InfoboardRotato
     return () => clearInterval(interval);
   }, [hasSponsors, sponsors.length]);
 
-  const start = page * PAGE_SIZE;
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * PAGE_SIZE;
   const visible = items.slice(start, start + PAGE_SIZE);
   const sponsor = sponsors[sponsorIndex];
 
