@@ -49,6 +49,22 @@ enum TrainerTeamStatus {
   ARCHIVED
 }
 
+enum TrainerQualificationType {
+  DIPLOMA
+  CERTIFICATE
+  COURSE
+  WORKSHOP
+  FIRST_AID
+  OTHER
+}
+
+enum TrainerQualificationStatus {
+  VALID
+  IN_PROGRESS
+  EXPIRED
+  PLANNED
+  UNKNOWN
+}
 enum EventType {
   MATCH
   TOURNAMENT
@@ -413,6 +429,7 @@ model Person {
   user                        User?
   playerSquadMembers          PlayerSquadMember[]
   trainerTeamMembers          TrainerTeamMember[]
+  trainerQualifications       TrainerQualification[]
   vereinsleitungOwnedMatters  VereinsleitungMatter[]
   meetingParticipants         VereinsleitungMeetingParticipant[]
   responsibleMeetingDecisions VereinsleitungMeetingDecision[]
@@ -426,6 +443,32 @@ model Person {
   @@index([isTrainer])
 }
 
+
+model TrainerQualification {
+  id               String                     @id @default(cuid())
+  personId         String
+  type             TrainerQualificationType   @default(DIPLOMA)
+  status           TrainerQualificationStatus @default(UNKNOWN)
+  title            String
+  issuer           String?
+  licenseNumber    String?
+  issuedAt         DateTime?
+  expiresAt        DateTime?
+  documentUrl      String?
+  remarks          String?
+  isClubVerified   Boolean                    @default(false)
+  isWebsiteVisible Boolean                    @default(false)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([personId])
+  @@index([type])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([isClubVerified])
+}
 model Team {
   id               String       @id @default(cuid())
   name             String
@@ -967,4 +1010,5 @@ model WorkflowPolicy {
   @@index([domain])
   @@index([active])
 }
+
 
