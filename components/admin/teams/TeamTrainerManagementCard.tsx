@@ -143,6 +143,7 @@ export default function TeamTrainerManagementCard({
   const [removeMessage, setRemoveMessage] = useState<string | null>(null);
 
   const [qualificationPersonId, setQualificationPersonId] = useState<string | null>(null);
+  const [expandedQualificationPersonId, setExpandedQualificationPersonId] = useState<string | null>(null);
   const [qualificationTitle, setQualificationTitle] = useState("");
   const [qualificationType, setQualificationType] = useState("DIPLOMA");
   const [qualificationStatus, setQualificationStatus] = useState("UNKNOWN");
@@ -458,7 +459,7 @@ export default function TeamTrainerManagementCard({
                 <>
                   <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
                   <span className="fca-pill">Website: {member.isWebsiteVisible ? "Ja" : "Nein"}</span>
-                  <span className="fca-pill">Diplome: {member.person.trainerQualifications?.length ?? 0}</span>
+                  <button type="button" onClick={() => setExpandedQualificationPersonId(expandedQualificationPersonId === member.person.id ? null : member.person.id)} className="fca-pill">Diplome: {member.person.trainerQualifications?.length ?? 0}</button>
                 </>
               }
               actions={
@@ -479,6 +480,29 @@ export default function TeamTrainerManagementCard({
                     >
                       {removingMemberId === member.id ? "Entfernen..." : "Entfernen"}
                     </button>
+
+                    {expandedQualificationPersonId === member.person.id ? (
+                      <div className="mt-2 w-full min-w-[280px] rounded-[22px] border border-blue-100 bg-blue-50/60 p-4 text-left shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="fca-label">Interne Diplome / Zertifikate</div>
+                          <span className="fca-pill">Intern</span>
+                        </div>
+                        {member.person.trainerQualifications && member.person.trainerQualifications.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {member.person.trainerQualifications.map((qualification) => (
+                              <div key={qualification.id} className="rounded-[18px] border border-blue-100 bg-white px-3 py-2">
+                                <div className="font-semibold text-slate-900">{qualification.title}</div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {[qualification.issuer, qualification.status, qualification.isClubVerified ? "geprüft" : null].filter(Boolean).join(" · ") || "Keine Zusatzdaten"}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="fca-status-box fca-status-box-muted mt-3">Noch keine Diplome hinterlegt.</div>
+                        )}
+                      </div>
+                    ) : null}
 
                     {qualificationPersonId === member.person.id ? (
                       <div className="mt-2 w-full min-w-[280px] rounded-[22px] border border-slate-200 bg-white p-4 text-left shadow-sm">
