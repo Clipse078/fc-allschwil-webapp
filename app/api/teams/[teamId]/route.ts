@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { Prisma, TeamCategory } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
@@ -9,6 +9,14 @@ import { logAction } from "@/lib/audit/log-action";
 type Context = {
   params: Promise<{ teamId: string }>;
 };
+
+function normalizeTeamSlug(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
 const ALLOWED_CATEGORIES = [
   "KINDERFUSSBALL",
@@ -74,6 +82,7 @@ export async function PATCH(request: NextRequest, context: Context) {
     }
 
     const name = String(body.name ?? "").trim();
+    const slug = normalizeTeamSlug(name);
     const category = String(body.category ?? "").trim();
     const genderGroup =
       body.genderGroup === null || body.genderGroup === undefined
@@ -106,10 +115,26 @@ export async function PATCH(request: NextRequest, context: Context) {
       );
     }
 
+    const slugConflict = await prisma.team.findFirst({
+      where: {
+        slug,
+        id: { not: teamId },
+      },
+      select: { id: true, name: true },
+    });
+
+    if (slugConflict) {
+      return NextResponse.json(
+        { error: `Teamkürzel "${slug}" ist bereits für "${slugConflict.name}" vergeben.` },
+        { status: 409 }
+      );
+    }
+
     const updated = await prisma.team.update({
       where: { id: teamId },
       data: {
         name,
+        slug,
         category: category as TeamCategory,
         genderGroup,
         ageGroup,

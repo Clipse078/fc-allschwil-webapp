@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 import {
@@ -42,7 +43,9 @@ const CATEGORY_OPTIONS = [
   { value: "KINDERFUSSBALL", label: "Kinderfussball" },
   { value: "JUNIOREN", label: "Junioren" },
   { value: "AKTIVE", label: "Aktive" },
-  { value: "FRAUEN", label: "Frauen" },
+  { value: "MEN", label: "Männer" },
+  { value: "WOMEN", label: "Frauen" },
+  { value: "MIXED", label: "Mixed" },
   { value: "SENIOREN", label: "Senioren" },
   { value: "TRAININGSGRUPPE", label: "Trainingsgruppe" },
 ];
@@ -68,7 +71,21 @@ export default function TeamSettingsCard({
   canManage,
   onSaved,
 }: Props) {
-  const [form, setForm] = useState<Team>(team);
+  const router = useRouter();
+  const normalizeGenderGroup = (value: string | null) => {
+    const normalized = String(value ?? "").toUpperCase();
+
+    if (normalized === "MÄNNER" || normalized === "MANNER" || normalized === "MEN" || normalized === "MALE") return "MEN";
+    if (normalized === "FRAUEN" || normalized === "WOMEN" || normalized === "FEMALE") return "WOMEN";
+    if (normalized === "MIXED" || normalized === "GEMISCHT") return "MIXED";
+
+    return "MIXED";
+  };
+
+  const [form, setForm] = useState<Team>({
+    ...team,
+    genderGroup: normalizeGenderGroup(team.genderGroup),
+  });
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,14 +126,22 @@ export default function TeamSettingsCard({
   }, [form.ageGroup, form.name, activeSeason]);
 
   function updateField<K extends keyof Team>(field: K, value: Team[K]) {
-    if (!canManage) {
-      return;
-    }
+    setForm((current) => {
+      const next = {
+        ...current,
+        [field]: value,
+      };
 
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+      if (field === "name") {
+        next.slug = String(value)
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "");
+      }
+
+      return next;
+    });
   }
 
   async function handleSave() {
@@ -136,6 +161,7 @@ export default function TeamSettingsCard({
         },
         body: JSON.stringify({
           name: form.name,
+
           category: form.category,
           genderGroup: form.genderGroup,
           ageGroup: form.ageGroup,
@@ -160,6 +186,9 @@ export default function TeamSettingsCard({
       }));
 
       onSaved?.(updatedTeam);
+      if (saisonLabel && updatedTeam.slug !== team.slug) {
+        router.replace(`/dashboard/seasons/${saisonLabel.replace("/", "-")}/teams/${updatedTeam.slug}`);
+      }
       setMessage(data?.message ?? "Team erfolgreich gespeichert.");
     } catch (err) {
       setError(
@@ -176,7 +205,7 @@ export default function TeamSettingsCard({
         <div>
           <p className="fca-eyebrow">Team Details</p>
           <h3 className="fca-heading mt-2">{form.name}</h3>
-          <p className="mt-3 text-sm text-slate-500">Slug: {form.slug}</p>
+          <p className="mt-3 text-sm text-slate-500">Teamkürzel: {form.slug}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -235,16 +264,18 @@ export default function TeamSettingsCard({
 
         <label className="block space-y-2">
           <span className="fca-label">Geschlechtergruppe</span>
-          <input
-            type="text"
-            value={form.genderGroup ?? ""}
+          <select
+            value={normalizeGenderGroup(form.genderGroup)}
             disabled={!canManage}
             onChange={(event) =>
               updateField("genderGroup", event.target.value || null)
             }
-            className="fca-input"
-            placeholder="z. B. Boys, Girls, Mixed"
-          />
+            className="fca-select"
+          >
+            <option value="MEN">Männer</option>
+            <option value="WOMEN">Frauen</option>
+            <option value="MIXED">Mixed</option>
+          </select>
         </label>
 
         <label className="block space-y-2">
