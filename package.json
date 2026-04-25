@@ -6,7 +6,7 @@
                     "dev":  "next dev --turbopack",
                     "build":  "next build --turbopack",
                     "start":  "next start",
-                    "lint":  "eslint . --ignore-pattern baseline-backups/**",
+                    "lint":  "eslint . --ignore-pattern baseline-backups/** --ignore-pattern .baseline-backups/**",
                     "postinstall":  "prisma generate",
                     "db:generate":  "prisma generate",
                     "db:migrate":  "prisma migrate dev",

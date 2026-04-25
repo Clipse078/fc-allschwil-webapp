@@ -59,7 +59,7 @@ function highlightText(text: string, query: string) {
 }
 
 function buildMetaLabel(person: PeoplePickerPerson) {
-  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" • ");
+  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" â€¢ ");
 }
 
 export default function PeoplePicker({
@@ -92,7 +92,7 @@ export default function PeoplePicker({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      setDebouncedQuery(query.trim());
+      const nextQuery = query.trim(); if (nextQuery.length < 2) { setResults([]); setIsLoading(false); setHighlightedIndex(0); } setDebouncedQuery(nextQuery);
     }, 250);
 
     return () => window.clearTimeout(timeout);
@@ -234,7 +234,7 @@ export default function PeoplePicker({
                 {selected.displayName}
               </div>
               <div className="truncate text-xs text-slate-500">
-                {buildMetaLabel(selected) || selected.email || "Person verknüpft"}
+                {buildMetaLabel(selected) || selected.email || "Person verknÃ¼pft"}
               </div>
             </div>
           </div>
@@ -244,7 +244,7 @@ export default function PeoplePicker({
             onClick={() => onSelect?.(null)}
             className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
           >
-            Lösen
+            LÃ¶sen
           </button>
         </div>
       ) : null}
@@ -270,7 +270,7 @@ export default function PeoplePicker({
                   className="rounded-full text-[#0b4aa2]/70 transition hover:text-rose-600"
                   aria-label={item.displayName + " entfernen"}
                 >
-                  ×
+                  Ã—
                 </button>
               </div>
             ))}
@@ -397,10 +397,10 @@ export default function PeoplePicker({
                       {mode === "multiple"
                         ? isSelected
                           ? "Entfernen"
-                          : "Hinzufügen"
+                          : "HinzufÃ¼gen"
                         : isSelected
-                          ? "Verknüpft"
-                          : "Auswählen"}
+                          ? "VerknÃ¼pft"
+                          : "AuswÃ¤hlen"}
                     </span>
                   </button>
                 );
