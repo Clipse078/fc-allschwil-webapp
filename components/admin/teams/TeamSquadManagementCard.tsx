@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -486,13 +486,13 @@ export default function TeamSquadManagementCard({
 
           {hasSearched && !searchLoading && !searchError && searchResults.length === 0 ? (
             <div className="fca-status-box fca-status-box-muted mt-4">
-              Keine aktiven Spieler zu "{lastSearchQuery}" gefunden. Bitte prüfe die Schreibweise oder lege neue Personen im People-Modul an.
+              Keine aktiven Spieler zu «{lastSearchQuery}» gefunden. Bitte prüfe die Schreibweise oder lege neue Personen im People-Modul an.
             </div>
           ) : null}
 
           {hasSearched && !searchLoading && !searchError && searchResults.length > 0 && validSearchResults.length === 0 ? (
             <div className="fca-status-box fca-status-box-warn mt-4">
-              Es wurden Spieler zu "{lastSearchQuery}" gefunden, aber keiner passt zur Jahrgangslogik dieser Team-Saison. Die Zuweisungsfelder bleiben deshalb ausgeblendet. {getJahrgangExplanation(allowedBirthYears)}
+              Es wurden Spieler zu «{lastSearchQuery}» gefunden, aber keiner passt zur Jahrgangslogik dieser Team-Saison. Die Zuweisungsfelder bleiben deshalb ausgeblendet. {getJahrgangExplanation(allowedBirthYears)}
             </div>
           ) : null}
 
