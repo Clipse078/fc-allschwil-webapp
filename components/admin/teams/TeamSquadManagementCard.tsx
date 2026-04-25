@@ -690,49 +690,59 @@ export default function TeamSquadManagementCard({
         </div>
       ) : (
         <div className="mt-5 space-y-3">
-          {teamSeason.playerSquadMembers.map((member) => (
-            <AdminListItem
-              key={member.id}
-              avatar={
-                <AdminAvatar
-                  name={getPersonName(member.person)}
-                  size="md"
-                />
-              }
-              title={getPersonName(member.person)}
-              subtitle={[
-                getBirthYear(member.person.dateOfBirth)?.toString() ?? null,
-                member.positionLabel ?? null,
-                member.shirtNumber ? "Nr. " + member.shirtNumber : null,
-              ]
-                .filter(Boolean)
-                .join(" • ") || "Keine Zusatzdaten"}
-              meta={
-                <>
-                  <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
-                  <span className="fca-pill">
-                    Website: {member.isWebsiteVisible ? "Ja" : "Nein"}
-                  </span>
-                  {member.isCaptain ? <span className="fca-pill">Captain</span> : null}
-                  {member.isViceCaptain ? <span className="fca-pill">Vice-Captain</span> : null}
-                </>
-              }
-              actions={
-                canManage ? (
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(member)}
-                    disabled={removingMemberId === member.id}
-                    className="fca-button-primary"
-                  >
-                    {removingMemberId === member.id ? "Entfernen..." : "Entfernen"}
-                  </button>
-                ) : (
-                  <span className="text-xs text-slate-400">Nur lesen</span>
-                )
-              }
-            />
-          ))}
+          {teamSeason.playerSquadMembers.map((member) => {
+            const memberBirthYear = getBirthYear(member.person.dateOfBirth);
+            const memberFitsJahrgang =
+              allowedBirthYears.length === 0 ||
+              (memberBirthYear !== null && allowedBirthYears.includes(memberBirthYear));
+
+            return (
+              <AdminListItem
+                key={member.id}
+                avatar={
+                  <AdminAvatar
+                    name={getPersonName(member.person)}
+                    size="md"
+                  />
+                }
+                title={getPersonName(member.person)}
+                subtitle={[
+                  memberBirthYear ? "Jahrgang " + memberBirthYear : "Jahrgang fehlt",
+                  member.positionLabel ?? null,
+                  member.shirtNumber ? "Nr. " + member.shirtNumber : null,
+                ]
+                  .filter(Boolean)
+                  .join(" • ") || "Keine Zusatzdaten"}
+                meta={
+                  <>
+                    <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
+                    <span className={memberFitsJahrgang ? "fca-pill" : "rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800"}>
+                      {memberFitsJahrgang ? "Jahrgang OK" : "⚠ Jahrgang prüfen"}
+                    </span>
+                    <span className="fca-pill">
+                      Website: {member.isWebsiteVisible ? "Ja" : "Nein"}
+                    </span>
+                    {member.isCaptain ? <span className="fca-pill">Captain</span> : null}
+                    {member.isViceCaptain ? <span className="fca-pill">Vice-Captain</span> : null}
+                  </>
+                }
+                actions={
+                  canManage ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(member)}
+                      disabled={removingMemberId === member.id}
+                      className={memberFitsJahrgang ? "fca-button-primary" : "rounded-full border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-800 shadow-sm transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"}
+                    >
+                      {removingMemberId === member.id ? "Entfernen..." : "Entfernen"}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-400">Nur lesen</span>
+                  )
+                }
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -760,3 +770,4 @@ function Toggle({
     </div>
   );
 }
+
