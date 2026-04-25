@@ -492,7 +492,7 @@ export default function TeamSquadManagementCard({
 
           {hasSearched && !searchLoading && !searchError && searchResults.length > 0 && validSearchResults.length === 0 ? (
             <div className="fca-status-box fca-status-box-warn mt-4">
-              Es wurden Spieler zu "{lastSearchQuery}" gefunden, aber keiner passt zur Jahrgangslogik dieser Team-Saison. {getJahrgangExplanation(allowedBirthYears)}
+              Es wurden Spieler zu "{lastSearchQuery}" gefunden, aber keiner passt zur Jahrgangslogik dieser Team-Saison. Die Zuweisungsfelder bleiben deshalb ausgeblendet. {getJahrgangExplanation(allowedBirthYears)}
             </div>
           ) : null}
 
@@ -811,5 +811,6 @@ function Toggle({
     </div>
   );
 }
+
 
 
