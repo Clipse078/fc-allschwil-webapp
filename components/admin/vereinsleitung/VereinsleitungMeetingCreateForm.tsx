@@ -319,7 +319,7 @@ function inferProviderUi(
 }
 
 function buildParticipantRoleLabel(person: PeoplePickerPerson) {
-  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" • ");
+  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" â€¢ ");
 }
 
 function formatBytes(bytes: number) {
@@ -508,7 +508,7 @@ function getAgendaBudgetTone(plannedMinutes: number, availableMinutes: number) {
     return {
       pill: "border-slate-200 bg-slate-50 text-slate-600",
       bar: "bg-slate-400",
-      hint: "Zeitbudget noch unvollständig.",
+      hint: "Zeitbudget noch unvollstÃ¤ndig.",
     };
   }
 
@@ -516,7 +516,7 @@ function getAgendaBudgetTone(plannedMinutes: number, availableMinutes: number) {
     return {
       pill: "border-rose-200 bg-rose-50 text-rose-700",
       bar: "bg-rose-500",
-      hint: "Traktanden dauern länger als das Meeting.",
+      hint: "Traktanden dauern lÃ¤nger als das Meeting.",
     };
   }
 
@@ -524,14 +524,14 @@ function getAgendaBudgetTone(plannedMinutes: number, availableMinutes: number) {
     return {
       pill: "border-amber-200 bg-amber-50 text-amber-700",
       bar: "bg-amber-500",
-      hint: "Zeitbudget fast ausgeschöpft.",
+      hint: "Zeitbudget fast ausgeschÃ¶pft.",
     };
   }
 
   return {
     pill: "border-emerald-200 bg-emerald-50 text-emerald-700",
     bar: "bg-emerald-500",
-    hint: "Zeitbudget im grünen Bereich.",
+    hint: "Zeitbudget im grÃ¼nen Bereich.",
   };
 }
 
@@ -547,7 +547,7 @@ function renderInitiativePreview(
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-[#0b4aa2]/20 hover:text-[#0b4aa2] hover:shadow-[0_6px_16px_rgba(11,74,162,0.08)]"
-          title="Initiative in neuem Tab öffnen"
+          title="Initiative in neuem Tab Ã¶ffnen"
         >
           <span className="truncate max-w-[180px]">{selectedInitiative.title}</span>
           <ExternalLink className="h-3 w-3 shrink-0" />
@@ -584,7 +584,7 @@ function renderInitiativePreview(
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2]">
-          Verknüpft
+          VerknÃ¼pft
         </span>
 
         <span
@@ -621,8 +621,8 @@ function renderInitiativePreview(
           type="button"
           onClick={onUnlink}
           className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
-          title="Initiative lösen"
-          aria-label="Initiative lösen"
+          title="Initiative lÃ¶sen"
+          aria-label="Initiative lÃ¶sen"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -707,8 +707,8 @@ function ToggleNoteButton({
           ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/10 text-[#0b4aa2]"
           : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
       }`}
-      title={isActive ? "Notiz ausblenden" : "Notiz hinzufügen"}
-      aria-label={isActive ? "Notiz ausblenden" : "Notiz hinzufügen"}
+      title={isActive ? "Notiz ausblenden" : "Notiz hinzufÃ¼gen"}
+      aria-label={isActive ? "Notiz ausblenden" : "Notiz hinzufÃ¼gen"}
     >
       <Plus className="h-4 w-4" />
     </button>
@@ -956,7 +956,7 @@ function InitiativePicker({
                           </div>
                           {selectedInitiativeId === initiative.id ? (
                             <span className="inline-flex items-center rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/10 px-2 py-0.5 text-[10px] font-semibold text-[#0b4aa2]">
-                              Verknüpft
+                              VerknÃ¼pft
                             </span>
                           ) : null}
                         </div>
@@ -989,7 +989,7 @@ function InitiativePicker({
                           rel="noreferrer"
                           onClick={(event) => event.stopPropagation()}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-[#0b4aa2]/20 hover:text-[#0b4aa2]"
-                          title="Initiative öffnen"
+                          title="Initiative Ã¶ffnen"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </Link>
@@ -1407,9 +1407,9 @@ export default function VereinsleitungMeetingCreateForm({
         const attachments = matterAttachments[matter.id] ?? [];
 
         return [
-          `Verknüpfte Pendenz ${index + 1}: ${matter.title}`,
+          `VerknÃ¼pfte Pendenz ${index + 1}: ${matter.title}`,
           matter.ownerName ? `Assignee: ${matter.ownerName}` : null,
-          matter.dueDateLabel ? `Fällig: ${matter.dueDateLabel}` : null,
+          matter.dueDateLabel ? `FÃ¤llig: ${matter.dueDateLabel}` : null,
           attachments.length > 0
             ? `Beilagen: ${attachments.map((attachment) => attachment.name).join(", ")}`
             : null,
@@ -1426,8 +1426,8 @@ export default function VereinsleitungMeetingCreateForm({
         return [
           `Manuelle Pendenz ${index + 1}: ${item.title.trim()}`,
           item.assigneeName ? `Assignee: ${item.assigneeName}` : null,
-          item.dueDate ? `Fällig: ${item.dueDate}` : null,
-          item.priority ? `Priorität: ${item.priority}` : null,
+          item.dueDate ? `FÃ¤llig: ${item.dueDate}` : null,
+          item.priority ? `PrioritÃ¤t: ${item.priority}` : null,
           item.notes.trim() ? `Notiz: ${item.notes.trim()}` : null,
           item.initiativeId
             ? `Initiative: ${
@@ -1635,7 +1635,7 @@ export default function VereinsleitungMeetingCreateForm({
                       }`}
                     >
                       <ExternalLink className="h-4 w-4" />
-                      App öffnen
+                      App Ã¶ffnen
                     </a>
                   ) : null}
 
@@ -1672,7 +1672,7 @@ export default function VereinsleitungMeetingCreateForm({
                       Microsoft Teams Vorbereitung
                     </div>
                     <p className="mt-1 text-sm text-slate-500">
-                      Diese Felder bleiben vorerst manuell. Eine echte Microsoft-Integration folgt später separat.
+                      Diese Felder bleiben vorerst manuell. Eine echte Microsoft-Integration folgt spÃ¤ter separat.
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1730,7 +1730,7 @@ export default function VereinsleitungMeetingCreateForm({
               {participants.length} Teilnehmer
             </div>
             <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              {participants.filter((participant) => participant.status === "CONFIRMED").length} bestätigt
+              {participants.filter((participant) => participant.status === "CONFIRMED").length} bestÃ¤tigt
             </div>
           </div>
 
@@ -1740,7 +1740,7 @@ export default function VereinsleitungMeetingCreateForm({
               searchMode="vereinsleitung"
               selectedItems={pickerItems}
               onChange={setPickerItems}
-              placeholder="Personen suchen und hinzufügen"
+              placeholder="Personen suchen und hinzufÃ¼gen"
               emptyText="Keine passende Person gefunden."
             />
           </div>
@@ -1756,7 +1756,7 @@ export default function VereinsleitungMeetingCreateForm({
                     Noch keine Teilnehmer
                   </div>
                   <div className="mt-1 text-sm text-slate-500">
-                    Suche oben nach Namen und füge Mitglieder direkt dem Meeting hinzu.
+                    Suche oben nach Namen und fÃ¼ge Mitglieder direkt dem Meeting hinzu.
                   </div>
                 </div>
               </div>
@@ -1861,10 +1861,10 @@ export default function VereinsleitungMeetingCreateForm({
               Geplante Dauer {agendaTotalMinutes} Min.
             </span>
             <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${agendaBudgetTone.pill}`}>
-              Meeting {meetingDurationMinutes > 0 ? meetingDurationMinutes : "—"} Min.
+              Meeting {meetingDurationMinutes > 0 ? meetingDurationMinutes : "â€”"} Min.
             </span>
             <span className="text-xs text-slate-500">
-              Ziehe Einträge am Griff, um die Reihenfolge zu ändern.
+              Ziehe EintrÃ¤ge am Griff, um die Reihenfolge zu Ã¤ndern.
             </span>
           </div>
 
@@ -2050,14 +2050,14 @@ export default function VereinsleitungMeetingCreateForm({
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <Plus className="h-4 w-4" />
-            Traktand hinzufügen
+            Traktand hinzufÃ¼gen
           </button>
         </div>
       </SectionCard>
 
       <SectionCard
         title="Pendenzen"
-        description="Bestehende Pendenzen plus manuelle JIRA-artige Liste mit Drag & Drop, Assignee, Priorität, Fälligkeit, Notiz, Initiative und Beilagen."
+        description="Bestehende Pendenzen plus manuelle JIRA-artige Liste mit Drag & Drop, Assignee, PrioritÃ¤t, FÃ¤lligkeit, Notiz, Initiative und Beilagen."
         accent="blue"
       >
         <div className="space-y-3">
@@ -2139,7 +2139,7 @@ export default function VereinsleitungMeetingCreateForm({
               {manualMatters.length} manuelle Pendenzen
             </span>
             <span className="text-xs text-slate-500">
-              Ziehe manuelle Pendenzen am Griff, um die Reihenfolge zu ändern.
+              Ziehe manuelle Pendenzen am Griff, um die Reihenfolge zu Ã¤ndern.
             </span>
           </div>
 
@@ -2321,7 +2321,7 @@ export default function VereinsleitungMeetingCreateForm({
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <Plus className="h-4 w-4" />
-            Manuelle Pendenz hinzufügen
+            Manuelle Pendenz hinzufÃ¼gen
           </button>
         </div>
 
@@ -2341,7 +2341,7 @@ export default function VereinsleitungMeetingCreateForm({
           </button>
 
           <Link href={cancelHref} className="fca-button-secondary">
-            Zurück
+            ZurÃ¼ck
           </Link>
         </div>
       </SectionCard>
