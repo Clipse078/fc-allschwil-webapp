@@ -2,7 +2,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
-import { getAllowedBirthYearsForSeason } from "@/lib/teams/jahrgang-rules";
 
 type SearchMode = "any" | "player" | "trainer" | "vereinsleitung";
 
@@ -279,6 +278,7 @@ function toSearchItem(person: PersonRecord, mode: SearchMode) {
     displayName: getDisplayName(person),
     email: person.email,
     phone: person.phone,
+    dateOfBirth: person.dateOfBirth ? person.dateOfBirth.toISOString() : null,
     imageSrc: getPersonImageSrc(person),
     functionLabel: getPrimaryRoleLabel(person, mode),
     teamLabel: getSecondaryTeamLabel(person, mode),
@@ -307,24 +307,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    let allowedBirthYears: number[] = [];
     let excludedPersonIds = new Set<string>();
 
     if (teamSeasonId && mode === "player") {
       const teamSeason = await prisma.teamSeason.findUnique({
         where: { id: teamSeasonId },
         select: {
-          season: {
-            select: {
-              key: true,
-              startDate: true,
-            },
-          },
-          team: {
-            select: {
-              ageGroup: true,
-            },
-          },
           playerSquadMembers: {
             select: {
               personId: true,
@@ -336,11 +324,6 @@ export async function GET(request: NextRequest) {
       if (!teamSeason) {
         return NextResponse.json({ error: "Team-Saison nicht gefunden." }, { status: 404 });
       }
-
-      allowedBirthYears = getAllowedBirthYearsForSeason(
-        teamSeason.team.ageGroup,
-        teamSeason.season.key,
-      );
 
       excludedPersonIds = new Set(teamSeason.playerSquadMembers.map((entry) => entry.personId));
     }
@@ -486,6 +469,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-
-

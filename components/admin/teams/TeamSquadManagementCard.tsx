@@ -107,6 +107,14 @@ function formatBirthDate(dateOfBirth?: string | null) {
   return date.toLocaleDateString("de-CH");
 }
 
+function getJahrgangExplanation(allowedBirthYears: number[]) {
+  if (allowedBirthYears.length === 0) {
+    return "Für diese Team-Saison ist keine automatische Jahrgangslogik verfügbar.";
+  }
+
+  return "Erlaubt für diese Team-Saison: " + allowedBirthYears.join(", ");
+}
+
 export default function TeamSquadManagementCard({
   teamId,
   canManage,
@@ -129,6 +137,9 @@ export default function TeamSquadManagementCard({
   }, [teamSeason.teamAgeGroup, teamSeason.displayName, teamSeason.shortName, teamSeason.season.key]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [lastSearchQuery, setLastSearchQuery] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
+  const [showInvalidPlayers, setShowInvalidPlayers] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<PersonSearchResult[]>([]);
@@ -151,29 +162,60 @@ export default function TeamSquadManagementCard({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [removeMessage, setRemoveMessage] = useState<string | null>(null);
 
+  const validSearchResults = useMemo(() => {
+    if (allowedBirthYears.length === 0) {
+      return searchResults;
+    }
+
+    return searchResults.filter((person) => {
+      const birthYear = getBirthYear(person.dateOfBirth);
+      return birthYear !== null && allowedBirthYears.includes(birthYear);
+    });
+  }, [allowedBirthYears, searchResults]);
+
+  const invalidSearchResults = useMemo(() => {
+    if (allowedBirthYears.length === 0) {
+      return [];
+    }
+
+    return searchResults.filter((person) => {
+      const birthYear = getBirthYear(person.dateOfBirth);
+      return birthYear === null || !allowedBirthYears.includes(birthYear);
+    });
+  }, [allowedBirthYears, searchResults]);
+
   const selectedPerson = useMemo(() => {
-    return searchResults.find((item) => item.id === selectedPersonId) ?? null;
-  }, [searchResults, selectedPersonId]);
+    return validSearchResults.find((item) => item.id === selectedPersonId) ?? null;
+  }, [validSearchResults, selectedPersonId]);
 
   const selectedBirthYear = getBirthYear(selectedPerson?.dateOfBirth);
   const selectedFitsJahrgang =
     selectedBirthYear !== null && allowedBirthYears.includes(selectedBirthYear);
 
   async function handleSearch() {
-    if (searchQuery.trim().length < 2) {
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery.length < 2) {
       setSearchError("Bitte mindestens 2 Zeichen eingeben.");
       setSearchResults([]);
       setSelectedPersonId("");
+      setHasSearched(false);
+      setLastSearchQuery("");
+      setShowInvalidPlayers(false);
       return;
     }
 
     setSearchLoading(true);
     setSearchError(null);
+    setAssignError(null);
+    setAssignMessage(null);
+    setShowInvalidPlayers(false);
+    setLastSearchQuery(trimmedQuery);
 
     try {
       const response = await fetch(
         "/api/people/search?q=" +
-          encodeURIComponent(searchQuery.trim()) +
+          encodeURIComponent(trimmedQuery) +
           "&mode=player&teamSeasonId=" +
           encodeURIComponent(teamSeason.id),
         {
@@ -189,14 +231,24 @@ export default function TeamSquadManagementCard({
       }
 
       const results = Array.isArray(data) ? (data as PersonSearchResult[]) : [];
+      const validResults =
+        allowedBirthYears.length === 0
+          ? results
+          : results.filter((person) => {
+              const birthYear = getBirthYear(person.dateOfBirth);
+              return birthYear !== null && allowedBirthYears.includes(birthYear);
+            });
+
       setSearchResults(results);
-      setSelectedPersonId(results[0]?.id ?? "");
+      setSelectedPersonId(validResults[0]?.id ?? "");
+      setHasSearched(true);
     } catch (err) {
       setSearchError(
         err instanceof Error ? err.message : "Ein Fehler ist aufgetreten."
       );
       setSearchResults([]);
       setSelectedPersonId("");
+      setHasSearched(true);
     } finally {
       setSearchLoading(false);
     }
@@ -208,7 +260,15 @@ export default function TeamSquadManagementCard({
     }
 
     if (!selectedPersonId) {
-      setAssignError("Bitte zuerst eine Person auswählen.");
+      setAssignError("Bitte zuerst einen gültigen Spieler aus dem erlaubten Jahrgang auswählen.");
+      setAssignMessage(null);
+      return;
+    }
+
+    if (!selectedFitsJahrgang) {
+      setAssignError(
+        "Zuweisung blockiert: Der ausgewählte Spieler passt nicht zur Jahrgangslogik dieser Team-Saison."
+      );
       setAssignMessage(null);
       return;
     }
@@ -254,7 +314,10 @@ export default function TeamSquadManagementCard({
       );
       setSelectedPersonId("");
       setSearchQuery("");
+      setLastSearchQuery("");
+      setHasSearched(false);
       setSearchResults([]);
+      setShowInvalidPlayers(false);
       setShirtNumber("");
       setPositionLabel("");
       setIsCaptain(false);
@@ -369,7 +432,7 @@ export default function TeamSquadManagementCard({
           <div>
             <h5 className="fca-eyebrow">Spieler zuweisen</h5>
             <p className="fca-body-muted mt-2">
-              Neue Personen werden nur im People-Modul angelegt.
+              Neue Personen werden nur im People-Modul angelegt. Die Suche zeigt zuerst nur Spieler, die zur Jahrgangslogik passen.
             </p>
           </div>
 
@@ -378,6 +441,12 @@ export default function TeamSquadManagementCard({
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleSearch();
+                }
+              }}
               placeholder="Aktiven Spieler suchen nach Name, E-Mail oder Telefon"
               className="fca-input"
             />
@@ -397,22 +466,28 @@ export default function TeamSquadManagementCard({
             </div>
           ) : null}
 
-          {searchResults.length === 0 ? (
+          {hasSearched && !searchLoading && !searchError && searchResults.length === 0 ? (
             <div className="fca-status-box fca-status-box-muted mt-4">
-              Keine passenden aktiven Spieler gefunden. Neue Personen bitte im People-Modul anlegen.
+              Keine aktiven Spieler zu "{lastSearchQuery}" gefunden. Bitte prüfe die Schreibweise oder lege neue Personen im People-Modul an.
             </div>
           ) : null}
 
-          {searchResults.length > 0 ? (
+          {hasSearched && !searchLoading && !searchError && searchResults.length > 0 && validSearchResults.length === 0 ? (
+            <div className="fca-status-box fca-status-box-warn mt-4">
+              Es wurden Spieler zu "{lastSearchQuery}" gefunden, aber keiner passt zur Jahrgangslogik dieser Team-Saison. {getJahrgangExplanation(allowedBirthYears)}
+            </div>
+          ) : null}
+
+          {validSearchResults.length > 0 ? (
             <div className="mt-4 grid gap-4">
               <label className="block space-y-2">
-                <span className="fca-label">Spieler</span>
+                <span className="fca-label">Gültige Spieler für diese Team-Saison</span>
                 <select
                   value={selectedPersonId}
                   onChange={(event) => setSelectedPersonId(event.target.value)}
                   className="fca-select"
                 >
-                  {searchResults.map((person) => (
+                  {validSearchResults.map((person) => (
                     <option key={person.id} value={person.id}>
                       {getPersonName(person)}
                     </option>
@@ -442,13 +517,6 @@ export default function TeamSquadManagementCard({
                       <div className="mt-1 text-sm text-slate-500">
                         Geburtsjahr: {selectedBirthYear ?? "-"}
                       </div>
-
-                      {selectedBirthYear !== null && !selectedFitsJahrgang ? (
-                        <div className="fca-status-box fca-status-box-warn mt-4">
-                          ⚠ Dieser Spieler passt nicht zur Jahrgangslogik dieser Team-Saison.
-                          Erlaubt: {allowedBirthYears.join(", ")} · Spieler: {selectedBirthYear}
-                        </div>
-                      ) : null}
 
                       {selectedBirthYear !== null && selectedFitsJahrgang ? (
                         <div className="fca-status-box fca-status-box-success mt-4">
@@ -547,6 +615,60 @@ export default function TeamSquadManagementCard({
               </div>
             </div>
           ) : null}
+
+          {invalidSearchResults.length > 0 ? (
+            <div className="mt-5 rounded-[24px] border border-amber-200 bg-amber-50/60 p-4">
+              <button
+                type="button"
+                onClick={() => setShowInvalidPlayers((current) => !current)}
+                className="flex w-full items-center justify-between gap-4 text-left"
+              >
+                <span className="text-sm font-semibold text-amber-900">
+                  ⚠ Spieler ausserhalb Jahrgang anzeigen ({invalidSearchResults.length})
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                  {showInvalidPlayers ? "Ausblenden" : "Anzeigen"}
+                </span>
+              </button>
+
+              {showInvalidPlayers ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-amber-900">
+                    Diese Spieler wurden gefunden, passen aber nicht zur Jahrgangslogik und können hier nicht zugewiesen werden. {getJahrgangExplanation(allowedBirthYears)}
+                  </p>
+
+                  {invalidSearchResults.map((person) => {
+                    const birthYear = getBirthYear(person.dateOfBirth);
+
+                    return (
+                      <div
+                        key={person.id}
+                        className="rounded-[20px] border border-amber-200 bg-white/80 p-4"
+                      >
+                        <div className="flex items-center gap-4">
+                          <AdminAvatar name={getPersonName(person)} size="md" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-slate-900">
+                              {getPersonName(person)}
+                            </div>
+                            <div className="mt-1 text-sm text-slate-500">
+                              {[person.email, person.phone].filter(Boolean).join(" • ") || "Keine Kontaktdaten"}
+                            </div>
+                            <div className="mt-1 text-sm text-slate-500">
+                              Geburtsdatum: {formatBirthDate(person.dateOfBirth) ?? "nicht gesetzt"} · Geburtsjahr: {birthYear ?? "-"}
+                            </div>
+                          </div>
+                          <span className="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                            Nicht zuweisbar
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -638,6 +760,3 @@ function Toggle({
     </div>
   );
 }
-
-
-
