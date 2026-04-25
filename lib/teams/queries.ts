@@ -1,4 +1,4 @@
-﻿import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 
 export async function getAvailableTeamSeasons() {
@@ -135,6 +135,67 @@ export async function getTeamDetailData(teamId: string) {
               isActive: true,
             },
           },
+          playerSquadMembers: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+            select: {
+              id: true,
+              status: true,
+              shirtNumber: true,
+              positionLabel: true,
+              isCaptain: true,
+              isViceCaptain: true,
+              isWebsiteVisible: true,
+              sortOrder: true,
+              remarks: true,
+              person: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  displayName: true,
+                  email: true,
+                  phone: true,
+                  dateOfBirth: true,
+                },
+              },
+            },
+          },
+          trainerTeamMembers: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+            select: {
+              id: true,
+              status: true,
+              roleLabel: true,
+              isWebsiteVisible: true,
+              sortOrder: true,
+              remarks: true,
+              person: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  displayName: true,
+                  email: true,
+                  phone: true,
+                  trainerQualifications: {
+                    orderBy: [{ expiresAt: "asc" }, { title: "asc" }],
+                    select: {
+                      id: true,
+                      type: true,
+                      status: true,
+                      title: true,
+                      issuer: true,
+                      issuedAt: true,
+                      expiresAt: true,
+                      licenseNumber: true,
+                      remarks: true,
+                      isClubVerified: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -153,6 +214,24 @@ export async function getTeamDetailData(teamId: string) {
         startDate: entry.season.startDate.toISOString(),
         endDate: entry.season.endDate.toISOString(),
       },
+      playerSquadMembers: entry.playerSquadMembers.map((member) => ({
+        ...member,
+        person: {
+          ...member.person,
+          dateOfBirth: member.person.dateOfBirth?.toISOString() ?? null,
+        },
+      })),
+      trainerTeamMembers: entry.trainerTeamMembers.map((member) => ({
+        ...member,
+        person: {
+          ...member.person,
+          trainerQualifications: member.person.trainerQualifications.map((qualification) => ({
+            ...qualification,
+            issuedAt: qualification.issuedAt?.toISOString() ?? null,
+            expiresAt: qualification.expiresAt?.toISOString() ?? null,
+          })),
+        },
+      })),
     })),
   };
 }
