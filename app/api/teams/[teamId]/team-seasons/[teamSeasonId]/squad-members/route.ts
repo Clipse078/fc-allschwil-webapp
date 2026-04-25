@@ -49,3 +49,4 @@ export async function POST(req: Request, { params }: any) {
     return NextResponse.json({ error: "Failed to assign player" }, { status: 500 });
   }
 }
+
