@@ -83,7 +83,7 @@ const QUALIFICATION_TYPE_OPTIONS = [
 
 const QUALIFICATION_STATUS_OPTIONS = [
   { value: "UNKNOWN", label: "Unbekannt" },
-  { value: "VALID", label: "Gültig" },
+  { value: "VALID", label: "GÃ¼ltig" },
   { value: "IN_PROGRESS", label: "In Ausbildung" },
   { value: "EXPIRED", label: "Abgelaufen" },
   { value: "PLANNED", label: "Geplant" },
@@ -101,11 +101,11 @@ function getTrainerQualificationLabel(qualification: TrainerQualification) {
   const parts = [
     qualification.title,
     qualification.issuer,
-    qualification.status === "VALID" ? "gültig" : null,
-    qualification.isClubVerified ? "geprüft" : null,
+    qualification.status === "VALID" ? "gÃ¼ltig" : null,
+    qualification.isClubVerified ? "geprÃ¼ft" : null,
   ].filter(Boolean);
 
-  return parts.join(" · ");
+  return parts.join(" Â· ");
 }
 
 export default function TeamTrainerManagementCard({
@@ -149,6 +149,7 @@ export default function TeamTrainerManagementCard({
   const [qualificationStatus, setQualificationStatus] = useState("UNKNOWN");
   const [qualificationIssuer, setQualificationIssuer] = useState("");
   const [qualificationLoading, setQualificationLoading] = useState(false);
+  const [deletingQualificationId, setDeletingQualificationId] = useState<string | null>(null);
   const [qualificationMessage, setQualificationMessage] = useState<string | null>(null);
   const [qualificationError, setQualificationError] = useState<string | null>(null);
 
@@ -194,7 +195,7 @@ export default function TeamTrainerManagementCard({
     if (!canManage) return;
 
     if (!selectedPersonId) {
-      setAssignError("Bitte zuerst eine Person auswählen.");
+      setAssignError("Bitte zuerst eine Person auswÃ¤hlen.");
       setAssignMessage(null);
       return;
     }
@@ -225,10 +226,10 @@ export default function TeamTrainerManagementCard({
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Trainer konnte nicht dem Trainerteam hinzugefügt werden.");
+        throw new Error(data?.error ?? "Trainer konnte nicht dem Trainerteam hinzugefÃ¼gt werden.");
       }
 
-      setAssignMessage(data?.message ?? "Trainer erfolgreich dem Trainerteam hinzugefügt.");
+      setAssignMessage(data?.message ?? "Trainer erfolgreich dem Trainerteam hinzugefÃ¼gt.");
       setSelectedPersonId("");
       setSearchQuery("");
       setSearchResults([]);
@@ -290,6 +291,40 @@ export default function TeamTrainerManagementCard({
     }
   }
 
+  async function handleDeleteQualification(personId: string, qualification: TrainerQualification) {
+    if (!canManage) return;
+
+    const confirmed = window.confirm(
+      'Diplom "' + qualification.title + '" wirklich löschen?'
+    );
+
+    if (!confirmed) return;
+
+    setDeletingQualificationId(qualification.id);
+    setQualificationError(null);
+    setQualificationMessage(null);
+
+    try {
+      const response = await fetch(
+        "/api/people/" + personId + "/trainer-qualifications/" + qualification.id,
+        { method: "DELETE" }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Trainer-Diplom konnte nicht gelöscht werden.");
+      }
+
+      setQualificationMessage(data?.message ?? "Trainer-Diplom erfolgreich gelöscht.");
+      router.refresh();
+    } catch (err) {
+      setQualificationError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+    } finally {
+      setDeletingQualificationId(null);
+    }
+  }
+
   async function handleRemove(member: TrainerMember) {
     if (!canManage) return;
 
@@ -347,7 +382,7 @@ export default function TeamTrainerManagementCard({
 
       {!canManage ? (
         <div className="fca-status-box fca-status-box-warn mt-5">
-          Diese Trainerübersicht ist aktuell nur lesbar.
+          Diese TrainerÃ¼bersicht ist aktuell nur lesbar.
         </div>
       ) : (
         <div className="fca-section-card mt-5 p-5">
@@ -425,7 +460,7 @@ export default function TeamTrainerManagementCard({
 
               <div className="flex justify-end">
                 <button type="button" onClick={handleAssign} disabled={assignLoading || !selectedPersonId} className="fca-button-primary">
-                  {assignLoading ? "Hinzufügen..." : "Trainer hinzufügen"}
+                  {assignLoading ? "HinzufÃ¼gen..." : "Trainer hinzufÃ¼gen"}
                 </button>
               </div>
             </div>
@@ -454,7 +489,7 @@ export default function TeamTrainerManagementCard({
                 member.person.trainerQualifications && member.person.trainerQualifications.length > 0
                   ? "Diplome: " + member.person.trainerQualifications.map(getTrainerQualificationLabel).join(" | ")
                   : "Keine Diplome hinterlegt",
-              ].join(" • ")}
+              ].join(" â€¢ ")}
               meta={
                 <>
                   <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
@@ -493,7 +528,7 @@ export default function TeamTrainerManagementCard({
                               <div key={qualification.id} className="rounded-[18px] border border-blue-100 bg-white px-3 py-2">
                                 <div className="font-semibold text-slate-900">{qualification.title}</div>
                                 <div className="mt-1 text-xs text-slate-500">
-                                  {[qualification.issuer, qualification.status, qualification.isClubVerified ? "geprüft" : null].filter(Boolean).join(" · ") || "Keine Zusatzdaten"}
+                                  {[qualification.issuer, qualification.status, qualification.isClubVerified ? "geprÃ¼ft" : null].filter(Boolean).join(" Â· ") || "Keine Zusatzdaten"}
                                 </div>
                               </div>
                             ))}
