@@ -191,6 +191,24 @@ export default function TeamSquadManagementCard({
   const selectedBirthYear = getBirthYear(selectedPerson?.dateOfBirth);
   const selectedFitsJahrgang =
     selectedBirthYear !== null && allowedBirthYears.includes(selectedBirthYear);
+  const squadJahrgangSummary = useMemo(() => {
+    const total = teamSeason.playerSquadMembers.length;
+
+    const valid = teamSeason.playerSquadMembers.filter((member) => {
+      const birthYear = getBirthYear(member.person.dateOfBirth);
+
+      return (
+        allowedBirthYears.length === 0 ||
+        (birthYear !== null && allowedBirthYears.includes(birthYear))
+      );
+    }).length;
+
+    return {
+      total,
+      valid,
+      warnings: total - valid,
+    };
+  }, [allowedBirthYears, teamSeason.playerSquadMembers]);
 
   async function handleSearch() {
     const trimmedQuery = searchQuery.trim();
@@ -689,7 +707,29 @@ export default function TeamSquadManagementCard({
           Noch keine Spieler im Kader dieser Team-Saison.
         </div>
       ) : (
-        <div className="mt-5 space-y-3">
+        <div className="mt-5 space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Kader</div>
+              <div className="mt-1 text-2xl font-bold text-slate-900">{squadJahrgangSummary.total}</div>
+            </div>
+            <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Jahrgang OK</div>
+              <div className="mt-1 text-2xl font-bold text-emerald-900">{squadJahrgangSummary.valid}</div>
+            </div>
+            <div className="rounded-[22px] border border-amber-200 bg-amber-50/70 px-4 py-3 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Prüfen</div>
+              <div className="mt-1 text-2xl font-bold text-amber-900">{squadJahrgangSummary.warnings}</div>
+            </div>
+          </div>
+
+          {squadJahrgangSummary.warnings > 0 ? (
+            <div className="fca-status-box fca-status-box-warn">
+              ⚠ Im aktuellen Kader gibt es Spieler, deren Jahrgang nicht zur Team-Saison passt oder deren Geburtsdatum fehlt.
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
           {teamSeason.playerSquadMembers.map((member) => {
             const memberBirthYear = getBirthYear(member.person.dateOfBirth);
             const memberFitsJahrgang =
@@ -743,6 +783,7 @@ export default function TeamSquadManagementCard({
               />
             );
           })}
+          </div>
         </div>
       )}
     </div>
@@ -770,4 +811,5 @@ function Toggle({
     </div>
   );
 }
+
 
