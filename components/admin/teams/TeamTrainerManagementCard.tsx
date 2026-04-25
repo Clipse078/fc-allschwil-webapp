@@ -83,7 +83,7 @@ const QUALIFICATION_TYPE_OPTIONS = [
 
 const QUALIFICATION_STATUS_OPTIONS = [
   { value: "UNKNOWN", label: "Unbekannt" },
-  { value: "VALID", label: "GÃ¼ltig" },
+  { value: "VALID", label: "Gültig" },
   { value: "IN_PROGRESS", label: "In Ausbildung" },
   { value: "EXPIRED", label: "Abgelaufen" },
   { value: "PLANNED", label: "Geplant" },
@@ -101,11 +101,11 @@ function getTrainerQualificationLabel(qualification: TrainerQualification) {
   const parts = [
     qualification.title,
     qualification.issuer,
-    qualification.status === "VALID" ? "gÃ¼ltig" : null,
-    qualification.isClubVerified ? "geprÃ¼ft" : null,
+    qualification.status === "VALID" ? "gültig" : null,
+    qualification.isClubVerified ? "geprüft" : null,
   ].filter(Boolean);
 
-  return parts.join(" Â· ");
+  return parts.join(" · ");
 }
 
 export default function TeamTrainerManagementCard({
@@ -153,6 +153,14 @@ export default function TeamTrainerManagementCard({
   const [qualificationMessage, setQualificationMessage] = useState<string | null>(null);
   const [qualificationError, setQualificationError] = useState<string | null>(null);
 
+  const [editingQualificationId, setEditingQualificationId] = useState<string | null>(null);
+  const [editQualificationTitle, setEditQualificationTitle] = useState("");
+  const [editQualificationType, setEditQualificationType] = useState("DIPLOMA");
+  const [editQualificationStatus, setEditQualificationStatus] = useState("UNKNOWN");
+  const [editQualificationIssuer, setEditQualificationIssuer] = useState("");
+  const [editQualificationVerified, setEditQualificationVerified] = useState(false);
+  const [updatingQualificationId, setUpdatingQualificationId] = useState<string | null>(null);
+
   async function handleSearch() {
     if (searchQuery.trim().length < 2) {
       setSearchError("Bitte mindestens 2 Zeichen eingeben.");
@@ -195,7 +203,7 @@ export default function TeamTrainerManagementCard({
     if (!canManage) return;
 
     if (!selectedPersonId) {
-      setAssignError("Bitte zuerst eine Person auswÃ¤hlen.");
+      setAssignError("Bitte zuerst eine Person auswählen.");
       setAssignMessage(null);
       return;
     }
@@ -226,10 +234,10 @@ export default function TeamTrainerManagementCard({
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Trainer konnte nicht dem Trainerteam hinzugefÃ¼gt werden.");
+        throw new Error(data?.error ?? "Trainer konnte nicht dem Trainerteam hinzugefügt werden.");
       }
 
-      setAssignMessage(data?.message ?? "Trainer erfolgreich dem Trainerteam hinzugefÃ¼gt.");
+      setAssignMessage(data?.message ?? "Trainer erfolgreich dem Trainerteam hinzugefügt.");
       setSelectedPersonId("");
       setSearchQuery("");
       setSearchResults([]);
@@ -288,6 +296,71 @@ export default function TeamTrainerManagementCard({
       setQualificationError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
     } finally {
       setQualificationLoading(false);
+    }
+  }
+
+  function startEditQualification(qualification: TrainerQualification) {
+    setEditingQualificationId(qualification.id);
+    setEditQualificationTitle(qualification.title);
+    setEditQualificationType(qualification.type);
+    setEditQualificationStatus(qualification.status);
+    setEditQualificationIssuer(qualification.issuer ?? "");
+    setEditQualificationVerified(qualification.isClubVerified);
+    setQualificationError(null);
+    setQualificationMessage(null);
+  }
+
+  function cancelEditQualification() {
+    setEditingQualificationId(null);
+    setEditQualificationTitle("");
+    setEditQualificationType("DIPLOMA");
+    setEditQualificationStatus("UNKNOWN");
+    setEditQualificationIssuer("");
+    setEditQualificationVerified(false);
+  }
+
+  async function handleUpdateQualification(personId: string, qualificationId: string) {
+    if (!canManage) return;
+
+    if (!editQualificationTitle.trim()) {
+      setQualificationError("Bitte einen Diplom- oder Kursnamen erfassen.");
+      setQualificationMessage(null);
+      return;
+    }
+
+    setUpdatingQualificationId(qualificationId);
+    setQualificationError(null);
+    setQualificationMessage(null);
+
+    try {
+      const response = await fetch(
+        "/api/people/" + personId + "/trainer-qualifications/" + qualificationId,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: editQualificationTitle,
+            type: editQualificationType,
+            status: editQualificationStatus,
+            issuer: editQualificationIssuer,
+            isClubVerified: editQualificationVerified,
+          }),
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Trainer-Diplom konnte nicht aktualisiert werden.");
+      }
+
+      setQualificationMessage(data?.message ?? "Trainer-Diplom erfolgreich aktualisiert.");
+      cancelEditQualification();
+      router.refresh();
+    } catch (err) {
+      setQualificationError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+    } finally {
+      setUpdatingQualificationId(null);
     }
   }
 
@@ -382,7 +455,7 @@ export default function TeamTrainerManagementCard({
 
       {!canManage ? (
         <div className="fca-status-box fca-status-box-warn mt-5">
-          Diese TrainerÃ¼bersicht ist aktuell nur lesbar.
+          Diese Trainerübersicht ist aktuell nur lesbar.
         </div>
       ) : (
         <div className="fca-section-card mt-5 p-5">
@@ -460,7 +533,7 @@ export default function TeamTrainerManagementCard({
 
               <div className="flex justify-end">
                 <button type="button" onClick={handleAssign} disabled={assignLoading || !selectedPersonId} className="fca-button-primary">
-                  {assignLoading ? "HinzufÃ¼gen..." : "Trainer hinzufÃ¼gen"}
+                  {assignLoading ? "Hinzufügen..." : "Trainer hinzufügen"}
                 </button>
               </div>
             </div>
@@ -489,7 +562,7 @@ export default function TeamTrainerManagementCard({
                 member.person.trainerQualifications && member.person.trainerQualifications.length > 0
                   ? "Diplome: " + member.person.trainerQualifications.map(getTrainerQualificationLabel).join(" | ")
                   : "Keine Diplome hinterlegt",
-              ].join(" â€¢ ")}
+              ].join(" • ")}
               meta={
                 <>
                   <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
@@ -517,7 +590,7 @@ export default function TeamTrainerManagementCard({
                     </button>
 
                     {expandedQualificationPersonId === member.person.id ? (
-                      <div className="mt-2 w-full min-w-[280px] rounded-[22px] border border-blue-100 bg-blue-50/60 p-4 text-left shadow-sm">
+                      <div className="mt-2 w-full min-w-[320px] rounded-[22px] border border-blue-100 bg-blue-50/60 p-4 text-left shadow-sm">
                         <div className="flex items-center justify-between gap-3">
                           <div className="fca-label">Interne Diplome / Zertifikate</div>
                           <span className="fca-pill">Intern</span>
@@ -526,10 +599,60 @@ export default function TeamTrainerManagementCard({
                           <div className="mt-3 space-y-2">
                             {member.person.trainerQualifications.map((qualification) => (
                               <div key={qualification.id} className="rounded-[18px] border border-blue-100 bg-white px-3 py-2">
-                                <div className="font-semibold text-slate-900">{qualification.title}</div>
-                                <div className="mt-1 text-xs text-slate-500">
-                                  {[qualification.issuer, qualification.status, qualification.isClubVerified ? "geprÃ¼ft" : null].filter(Boolean).join(" Â· ") || "Keine Zusatzdaten"}
-                                </div>
+                                {editingQualificationId === qualification.id ? (
+                                  <div className="grid gap-3">
+                                    <input className="fca-input" value={editQualificationTitle} onChange={(event) => setEditQualificationTitle(event.target.value)} />
+                                    <input className="fca-input" value={editQualificationIssuer} onChange={(event) => setEditQualificationIssuer(event.target.value)} placeholder="Aussteller" />
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      <select className="fca-select" value={editQualificationType} onChange={(event) => setEditQualificationType(event.target.value)}>
+                                        {QUALIFICATION_TYPE_OPTIONS.map((option) => (
+                                          <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                      </select>
+                                      <select className="fca-select" value={editQualificationStatus} onChange={(event) => setEditQualificationStatus(event.target.value)}>
+                                        {QUALIFICATION_STATUS_OPTIONS.map((option) => (
+                                          <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <Toggle label="Vom Club geprüft" value={editQualificationVerified} onChange={setEditQualificationVerified} />
+                                    <div className="flex flex-wrap justify-end gap-2">
+                                      <button type="button" onClick={cancelEditQualification} className="fca-button-secondary">
+                                        Abbrechen
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateQualification(member.person.id, qualification.id)}
+                                        disabled={updatingQualificationId === qualification.id}
+                                        className="fca-button-primary"
+                                      >
+                                        {updatingQualificationId === qualification.id ? "Speichern..." : "Speichern"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <div className="font-semibold text-slate-900">{qualification.title}</div>
+                                      <div className="mt-1 text-xs text-slate-500">
+                                        {[qualification.issuer, qualification.status, qualification.isClubVerified ? "geprüft" : null].filter(Boolean).join(" · ") || "Keine Zusatzdaten"}
+                                      </div>
+                                    </div>
+                                    <div className="flex shrink-0 gap-2">
+                                      <button type="button" onClick={() => startEditQualification(qualification)} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteQualification(member.person.id, qualification)}
+                                        disabled={deletingQualificationId === qualification.id}
+                                        className="rounded-full border border-red-100 bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                      >
+                                        {deletingQualificationId === qualification.id ? "Löschen..." : "Löschen"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
