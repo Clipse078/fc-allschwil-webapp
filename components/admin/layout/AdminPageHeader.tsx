@@ -54,7 +54,7 @@ const DUMMY_RESULTS: SpotlightResult[] = [
   },
   {
     id: "p2",
-    title: "Nicole NÃ¼ssli",
+    title: "Nicole NÃƒÂ¼ssli",
     subtitle: "Vereinsleitung",
     href: "/dashboard/persons",
     type: "person",
@@ -69,14 +69,14 @@ const DUMMY_RESULTS: SpotlightResult[] = [
   {
     id: "m1",
     title: "Vereinsleitungssitzung Mai 2026",
-    subtitle: "02.05.2026 Â· Vereinsleitung",
+    subtitle: "02.05.2026 Ã‚Â· Vereinsleitung",
     href: "/vereinsleitung/meetings",
     type: "meeting",
   },
   {
     id: "i1",
     title: "Website Go-Live",
-    subtitle: "Initiative Â· In Umsetzung",
+    subtitle: "Initiative Ã‚Â· In Umsetzung",
     href: "/vereinsleitung/initiativen",
     type: "initiative",
   },
@@ -118,7 +118,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "2. Betrieb & Organisation",
       title: "Betrieb & Organisation",
       description:
-        "Demo-ModulÃ¼bersicht fÃ¼r Finanzen, Material, Medien, AktivitÃ¤ten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
+        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r Finanzen, Material, Medien, AktivitÃƒÂ¤ten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
     };
   }
 
@@ -127,7 +127,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "2. Betrieb & Organisation",
       title: humanizeSlug(pathname.replace("/dashboard/operations/", "")),
       description:
-        "Demo-Platzhalter fÃ¼r das kommende Modul. Diese Seite dient fÃ¼r die Freitag-Demo als zukÃ¼nftiger Modulanker.",
+        "Demo-Platzhalter fÃƒÂ¼r das kommende Modul. Diese Seite dient fÃƒÂ¼r die Freitag-Demo als zukÃƒÂ¼nftiger Modulanker.",
     };
   }
 
@@ -136,7 +136,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "3. Technische Kommission",
       title: "Technische Kommission",
       description:
-        "Demo-ModulÃ¼bersicht fÃ¼r Leistungsplan Aktive, Jugend-Ausbildungsplan, Meetings und Kommunikation HUB.",
+        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r Leistungsplan Aktive, Jugend-Ausbildungsplan, Meetings und Kommunikation HUB.",
     };
   }
 
@@ -145,7 +145,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "3. Technische Kommission",
       title: humanizeSlug(pathname.replace("/dashboard/technische-kommission/", "")),
       description:
-        "Demo-Platzhalter fÃ¼r das kommende Modul der Technischen Kommission.",
+        "Demo-Platzhalter fÃƒÂ¼r das kommende Modul der Technischen Kommission.",
     };
   }
 
@@ -154,25 +154,25 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Aktuelle Saison",
       description:
-        "ModulÃ¼bersicht fÃ¼r aktuelle Saisonprozesse mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "ModulÃƒÂ¼bersicht fÃƒÂ¼r aktuelle Saisonprozesse mit Teams, Jahresplan, Wochenplan und Tagesplan.",
     };
   }
 
   if (pathname === "/dashboard/next-season") {
     return {
-      eyebrow: "5. NÃ¤chste Saison",
-      title: "NÃ¤chste Saison",
+      eyebrow: "5. NÃƒÂ¤chste Saison",
+      title: "NÃƒÂ¤chste Saison",
       description:
-        "Demo-ModulÃ¼bersicht fÃ¼r die kommende Saison mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r die kommende Saison mit Teams, Jahresplan, Wochenplan und Tagesplan.",
     };
   }
 
   if (pathname.startsWith("/dashboard/next-season/")) {
     return {
-      eyebrow: "5. NÃ¤chste Saison",
+      eyebrow: "5. NÃƒÂ¤chste Saison",
       title: humanizeSlug(pathname.replace("/dashboard/next-season/", "")),
       description:
-        "Demo-Platzhalter fÃ¼r die kommende Saisonplanung.",
+        "Demo-Platzhalter fÃƒÂ¼r die kommende Saisonplanung.",
     };
   }
 
@@ -181,16 +181,16 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Personen",
       description:
-        "Personenmodul fÃ¼r Trainer, Spieler, VereinsfunktionÃ¤re und externe Kontakte.",
+        "Personenmodul fÃƒÂ¼r Trainer, Spieler, VereinsfunktionÃƒÂ¤re und externe Kontakte.",
     };
   }
 
   if (pathname === "/dashboard/vereinsfunktionaere") {
     return {
       eyebrow: "6. Personen",
-      title: "VereinsfunktionÃ¤re",
+      title: "VereinsfunktionÃƒÂ¤re",
       description:
-        "Demo-Platzhalter fÃ¼r VereinsfunktionÃ¤re als eigenes Personen-Teilmodul.",
+        "Demo-Platzhalter fÃƒÂ¼r VereinsfunktionÃƒÂ¤re als eigenes Personen-Teilmodul.",
     };
   }
 
@@ -199,7 +199,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Externe Kontakte",
       description:
-        "Demo-Platzhalter fÃ¼r externe Kontakte als eigenes Personen-Teilmodul.",
+        "Demo-Platzhalter fÃƒÂ¼r externe Kontakte als eigenes Personen-Teilmodul.",
     };
   }
 
@@ -208,7 +208,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Trainer",
       description:
-        "Trainerdaten strukturiert verwalten und fÃ¼r Organisation und Website bereitstellen.",
+        "Trainerdaten strukturiert verwalten und fÃƒÂ¼r Organisation und Website bereitstellen.",
     };
   }
 
@@ -217,7 +217,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "6. Personen",
       title: "Spieler",
       description:
-        "Spielerdaten zentral verwalten und fÃ¼r spÃ¤tere Prozesse und Teams nutzbar machen.",
+        "Spielerdaten zentral verwalten und fÃƒÂ¼r spÃƒÂ¤tere Prozesse und Teams nutzbar machen.",
     };
   }
 
@@ -226,7 +226,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "7. Neue Anmeldungen",
       title: "Neue Anmeldungen",
       description:
-        "Demo-ModulÃ¼bersicht fÃ¼r neue Trainer, neue Spieler und neue VereinsfunktionÃ¤re.",
+        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r neue Trainer, neue Spieler und neue VereinsfunktionÃƒÂ¤re.",
     };
   }
 
@@ -235,7 +235,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "7. Neue Anmeldungen",
       title: humanizeSlug(pathname.replace("/dashboard/neu-anmeldungen/", "")),
       description:
-        "Demo-Platzhalter fÃ¼r eingehende Neuanmeldungen.",
+        "Demo-Platzhalter fÃƒÂ¼r eingehende Neuanmeldungen.",
     };
   }
 
@@ -253,7 +253,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Jahresplan",
       description:
-        "FÃ¼hrende Saisonplanung mit Trainings, Matches, Turnieren, weiteren Events und Ferienperioden Ã¼ber die ganze Saison.",
+        "FÃƒÂ¼hrende Saisonplanung mit Trainings, Matches, Turnieren, weiteren Events und Ferienperioden ÃƒÂ¼ber die ganze Saison.",
     };
   }
 
@@ -262,7 +262,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Wochenplan",
       description:
-        "Operative Wochenplanung pro Kalenderwoche. Diese Sicht ist fÃ¼r Website und spÃ¤ter Mobile App vorgesehen.",
+        "Operative Wochenplanung pro Kalenderwoche. Diese Sicht ist fÃƒÂ¼r Website und spÃƒÂ¤ter Mobile App vorgesehen.",
     };
   }
 
@@ -271,7 +271,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Tagesplan",
       description:
-        "Operative Tagesplanung fÃ¼r den Live-Betrieb und die direkte Ausspielung auf das Infoboard.",
+        "Operative Tagesplanung fÃƒÂ¼r den Live-Betrieb und die direkte Ausspielung auf das Infoboard.",
     };
   }
 
@@ -279,7 +279,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Meetings",
-      description: "Ãœbersicht aller Sitzungen â€“ absteigend vom neuesten zum Ã¤ltesten Eintrag.",
+      description: "ÃƒÅ“bersicht aller Sitzungen Ã¢â‚¬â€œ absteigend vom neuesten zum ÃƒÂ¤ltesten Eintrag.",
     };
   }
 
@@ -287,7 +287,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Meeting planen",
-      description: "Neues Meeting erfassen und direkt mit Pendenzen verknÃ¼pfen.",
+      description: "Neues Meeting erfassen und direkt mit Pendenzen verknÃƒÂ¼pfen.",
     };
   }
 
@@ -296,7 +296,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: humanizeSlug(slug),
-      description: "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen.",
+      description: "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen.",
     };
   }
 
@@ -305,7 +305,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: humanizeSlug(slug),
-      description: "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
+      description: "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
     };
   }
 
@@ -313,14 +313,14 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Initiativen",
-      description: "Ãœbersicht aller Initiativen â€“ absteigend vom neuesten zum Ã¤ltesten Eintrag.",
+      description: "ÃƒÅ“bersicht aller Initiativen Ã¢â‚¬â€œ absteigend vom neuesten zum ÃƒÂ¤ltesten Eintrag.",
     };
   }
 
   if (pathname.startsWith("/vereinsleitung/initiativen/")) {
     return {
       eyebrow: "1. Vereinsleitung",
-      title: "Initiative â€“ Details",
+      title: "Initiative Ã¢â‚¬â€œ Details",
       description: "Fortschritt, Aufgaben, Meetings und Entscheidungen.",
     };
   }
@@ -330,7 +330,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "1. Vereinsleitung",
       title: "Kommunikation HUB",
       description:
-        "Demo-Platzhalter fÃ¼r den kÃ¼nftigen Kommunikations-Hub der Vereinsleitung.",
+        "Demo-Platzhalter fÃƒÂ¼r den kÃƒÂ¼nftigen Kommunikations-Hub der Vereinsleitung.",
     };
   }
 
@@ -338,14 +338,14 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "KPIs",
-      description: "Kennzahlen und Trends fÃ¼r die strategische Steuerung des Vereins.",
+      description: "Kennzahlen und Trends fÃƒÂ¼r die strategische Steuerung des Vereins.",
     };
   }
 
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return {
       eyebrow: "1. Vereinsleitung",
-      title: "Vereinsleitung â€“ Ãœbersicht",
+      title: "Vereinsleitung Ã¢â‚¬â€œ ÃƒÅ“bersicht",
       description:
         "Strategische Steuerung des Vereins mit Zielen, Initiativen, Meetings, Aufgaben und Entscheidungen an einem Ort.",
     };
@@ -356,7 +356,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "Saisons",
       title: "Saisonplanung",
       description:
-        "Neue zukÃ¼nftige Saisons sind in Planung. Die aktuelle Saison ist laufend. Vergangene Saisons werden nach Saisonende automatisch abgeschlossen.",
+        "Neue zukÃƒÂ¼nftige Saisons sind in Planung. Die aktuelle Saison ist laufend. Vergangene Saisons werden nach Saisonende automatisch abgeschlossen.",
     };
   }
 
@@ -365,7 +365,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Events",
       description:
-        "Events sind saisongefÃ¼hrt und umfassen Matches, Turniere, Trainings sowie weitere Vereinsereignisse pro gewÃ¤hlter Saison.",
+        "Events sind saisongefÃƒÂ¼hrt und umfassen Matches, Turniere, Trainings sowie weitere Vereinsereignisse pro gewÃƒÂ¤hlter Saison.",
     };
   }
 
@@ -374,7 +374,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Teams",
       description:
-        "Teams sind saisongefÃ¼hrt und werden dynamisch pro Saison und Teamkategorie verwaltet.",
+        "Teams sind saisongefÃƒÂ¼hrt und werden dynamisch pro Saison und Teamkategorie verwaltet.",
     };
   }
 
@@ -453,7 +453,7 @@ function SpotlightSearch() {
     function handleKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setIsOpen((current) => !current);
+        setIsOpen((current) => { const next = !current; if (next) setHighlightedIndex(0); return next; });
       }
 
       if (event.key === "Escape") {
@@ -483,7 +483,6 @@ function SpotlightSearch() {
 
   useEffect(() => {
     if (!isOpen) {
-      setHighlightedIndex(0);
       return;
     }
 
@@ -540,7 +539,7 @@ function SpotlightSearch() {
                     autoFocus
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Nach Personen, Teams, Meetings oder Initiativen suchen â€¦"
+                    placeholder="Nach Personen, Teams, Meetings oder Initiativen suchen Ã¢â‚¬Â¦"
                     className="w-full bg-transparent text-sm text-slate-900 outline-none"
                   />
                   <button
@@ -647,7 +646,7 @@ function SpotlightSearch() {
       <div ref={containerRef} className="relative w-full max-w-[820px]">
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
+          onClick={() => { setHighlightedIndex(0); setIsOpen(true); }}
           className="group flex w-full items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
         >
           <div className="flex min-w-0 items-center gap-4">
@@ -660,7 +659,7 @@ function SpotlightSearch() {
                 Global suchen
               </div>
               <div className="truncate text-sm text-slate-500">
-                Spieler, Teams, Meetings, Initiativen â€¦
+                Spieler, Teams, Meetings, Initiativen Ã¢â‚¬Â¦
               </div>
             </div>
           </div>
@@ -732,8 +731,8 @@ export default function AdminPageHeader({
             eyebrow: "1. Vereinsleitung",
             title: humanizeSlug(slug),
             description: isEdit
-              ? "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen."
-              : "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
+              ? "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen."
+              : "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
           });
           return;
         }
@@ -745,8 +744,8 @@ export default function AdminPageHeader({
             meeting.subtitle && meeting.subtitle.trim().length > 0
               ? meeting.subtitle
               : isEdit
-                ? "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen."
-                : "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
+                ? "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen."
+                : "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
         });
       } catch {
         if (isCancelled) {
@@ -757,8 +756,8 @@ export default function AdminPageHeader({
           eyebrow: "1. Vereinsleitung",
           title: humanizeSlug(slug),
           description: isEdit
-            ? "Meeting-Daten und Pendenzen-VerknÃ¼pfungen anpassen."
-            : "Protokoll, Teilnehmer, BeschlÃ¼sse und Pendenzen.",
+            ? "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen."
+            : "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
         });
       }
     }
