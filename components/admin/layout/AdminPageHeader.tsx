@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { ChevronRight, Command, Search, Users, Shield, CalendarDays, Flag, X } from "lucide-react";
+import { CalendarDays, ChevronRight, Command, Flag, Search, Shield, Users, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -10,12 +10,6 @@ type HeaderContent = {
   eyebrow: string;
   title: string;
   description?: string;
-};
-
-type MeetingHeaderResponseItem = {
-  slug: string;
-  title: string;
-  subtitle?: string | null;
 };
 
 type SpotlightResult = {
@@ -54,7 +48,7 @@ const DUMMY_RESULTS: SpotlightResult[] = [
   },
   {
     id: "p2",
-    title: "Nicole NÃƒÂ¼ssli",
+    title: "Nicole Nüssli",
     subtitle: "Vereinsleitung",
     href: "/dashboard/persons",
     type: "person",
@@ -63,20 +57,20 @@ const DUMMY_RESULTS: SpotlightResult[] = [
     id: "t1",
     title: "E4",
     subtitle: "Aktuelle Saison",
-    href: "/dashboard/teams",
+    href: "/dashboard/seasons",
     type: "team",
   },
   {
     id: "m1",
     title: "Vereinsleitungssitzung Mai 2026",
-    subtitle: "02.05.2026 Ã‚Â· Vereinsleitung",
+    subtitle: "02.05.2026 · Vereinsleitung",
     href: "/vereinsleitung/meetings",
     type: "meeting",
   },
   {
     id: "i1",
     title: "Website Go-Live",
-    subtitle: "Initiative Ã‚Â· In Umsetzung",
+    subtitle: "Initiative · In Umsetzung",
     href: "/vereinsleitung/initiativen",
     type: "initiative",
   },
@@ -94,14 +88,8 @@ function getDayGreeting(firstName?: string) {
   const hour = new Date().getHours();
   const safeFirstName = (firstName ?? "").trim() || "Michael";
 
-  if (hour < 12) {
-    return `Guten Morgen, ${safeFirstName}`;
-  }
-
-  if (hour < 18) {
-    return `Guten Tag, ${safeFirstName}`;
-  }
-
+  if (hour < 12) return `Guten Morgen, ${safeFirstName}`;
+  if (hour < 18) return `Guten Tag, ${safeFirstName}`;
   return `Guten Abend, ${safeFirstName}`;
 }
 
@@ -118,7 +106,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "2. Betrieb & Organisation",
       title: "Betrieb & Organisation",
       description:
-        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r Finanzen, Material, Medien, AktivitÃƒÂ¤ten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
+        "Demo-Modulübersicht für Finanzen, Material, Medien, Aktivitäten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
     };
   }
 
@@ -127,7 +115,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "2. Betrieb & Organisation",
       title: humanizeSlug(pathname.replace("/dashboard/operations/", "")),
       description:
-        "Demo-Platzhalter fÃƒÂ¼r das kommende Modul. Diese Seite dient fÃƒÂ¼r die Freitag-Demo als zukÃƒÂ¼nftiger Modulanker.",
+        "Demo-Platzhalter für das kommende Modul. Diese Seite dient für die Freitag-Demo als zukünftiger Modulanker.",
     };
   }
 
@@ -136,7 +124,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "3. Technische Kommission",
       title: "Technische Kommission",
       description:
-        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r Leistungsplan Aktive, Jugend-Ausbildungsplan, Meetings und Kommunikation HUB.",
+        "Demo-Modulübersicht für Leistungsplan Aktive, Jugend-Ausbildungsplan, Meetings und Kommunikation HUB.",
     };
   }
 
@@ -144,8 +132,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "3. Technische Kommission",
       title: humanizeSlug(pathname.replace("/dashboard/technische-kommission/", "")),
-      description:
-        "Demo-Platzhalter fÃƒÂ¼r das kommende Modul der Technischen Kommission.",
+      description: "Demo-Platzhalter für das kommende Modul der Technischen Kommission.",
     };
   }
 
@@ -154,25 +141,24 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Aktuelle Saison",
       description:
-        "ModulÃƒÂ¼bersicht fÃƒÂ¼r aktuelle Saisonprozesse mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "Modulübersicht für aktuelle Saisonprozesse mit Teams, Jahresplan, Wochenplan und Tagesplan.",
     };
   }
 
   if (pathname === "/dashboard/next-season") {
     return {
-      eyebrow: "5. NÃƒÂ¤chste Saison",
-      title: "NÃƒÂ¤chste Saison",
+      eyebrow: "5. Nächste Saison",
+      title: "Nächste Saison",
       description:
-        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r die kommende Saison mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "Demo-Modulübersicht für die kommende Saison mit Teams, Jahresplan, Wochenplan und Tagesplan.",
     };
   }
 
   if (pathname.startsWith("/dashboard/next-season/")) {
     return {
-      eyebrow: "5. NÃƒÂ¤chste Saison",
+      eyebrow: "5. Nächste Saison",
       title: humanizeSlug(pathname.replace("/dashboard/next-season/", "")),
-      description:
-        "Demo-Platzhalter fÃƒÂ¼r die kommende Saisonplanung.",
+      description: "Demo-Platzhalter für die kommende Saisonplanung.",
     };
   }
 
@@ -180,17 +166,15 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "6. Personen",
       title: "Personen",
-      description:
-        "Personenmodul fÃƒÂ¼r Trainer, Spieler, VereinsfunktionÃƒÂ¤re und externe Kontakte.",
+      description: "Personenmodul für Trainer, Spieler, Vereinsfunktionäre und externe Kontakte.",
     };
   }
 
   if (pathname === "/dashboard/vereinsfunktionaere") {
     return {
       eyebrow: "6. Personen",
-      title: "VereinsfunktionÃƒÂ¤re",
-      description:
-        "Demo-Platzhalter fÃƒÂ¼r VereinsfunktionÃƒÂ¤re als eigenes Personen-Teilmodul.",
+      title: "Vereinsfunktionäre",
+      description: "Demo-Platzhalter für Vereinsfunktionäre als eigenes Personen-Teilmodul.",
     };
   }
 
@@ -198,8 +182,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "6. Personen",
       title: "Externe Kontakte",
-      description:
-        "Demo-Platzhalter fÃƒÂ¼r externe Kontakte als eigenes Personen-Teilmodul.",
+      description: "Demo-Platzhalter für externe Kontakte als eigenes Personen-Teilmodul.",
     };
   }
 
@@ -207,8 +190,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "6. Personen",
       title: "Trainer",
-      description:
-        "Trainerdaten strukturiert verwalten und fÃƒÂ¼r Organisation und Website bereitstellen.",
+      description: "Trainerdaten strukturiert verwalten und für Organisation und Website bereitstellen.",
     };
   }
 
@@ -216,8 +198,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "6. Personen",
       title: "Spieler",
-      description:
-        "Spielerdaten zentral verwalten und fÃƒÂ¼r spÃƒÂ¤tere Prozesse und Teams nutzbar machen.",
+      description: "Spielerdaten zentral verwalten und für spätere Prozesse und Teams nutzbar machen.",
     };
   }
 
@@ -225,8 +206,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "7. Neue Anmeldungen",
       title: "Neue Anmeldungen",
-      description:
-        "Demo-ModulÃƒÂ¼bersicht fÃƒÂ¼r neue Trainer, neue Spieler und neue VereinsfunktionÃƒÂ¤re.",
+      description: "Demo-Modulübersicht für neue Trainer, neue Spieler und neue Vereinsfunktionäre.",
     };
   }
 
@@ -234,8 +214,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "7. Neue Anmeldungen",
       title: humanizeSlug(pathname.replace("/dashboard/neu-anmeldungen/", "")),
-      description:
-        "Demo-Platzhalter fÃƒÂ¼r eingehende Neuanmeldungen.",
+      description: "Demo-Platzhalter für eingehende Neuanmeldungen.",
     };
   }
 
@@ -243,8 +222,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "8. Benutzer & Rollen",
       title: "Benutzer & Rollen",
-      description:
-        "Benutzer, Rollen, Berechtigungen und Zugriffe sicher und zentral verwalten.",
+      description: "Benutzer, Rollen, Berechtigungen und Zugriffe sicher und zentral verwalten.",
     };
   }
 
@@ -253,7 +231,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Jahresplan",
       description:
-        "FÃƒÂ¼hrende Saisonplanung mit Trainings, Matches, Turnieren, weiteren Events und Ferienperioden ÃƒÂ¼ber die ganze Saison.",
+        "Führende Saisonplanung mit Trainings, Matches, Turnieren, weiteren Events und Ferienperioden über die ganze Saison.",
     };
   }
 
@@ -262,7 +240,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Wochenplan",
       description:
-        "Operative Wochenplanung pro Kalenderwoche. Diese Sicht ist fÃƒÂ¼r Website und spÃƒÂ¤ter Mobile App vorgesehen.",
+        "Operative Wochenplanung pro Kalenderwoche. Diese Sicht ist für Website und später Mobile App vorgesehen.",
     };
   }
 
@@ -270,8 +248,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "4. Aktuelle Saison",
       title: "Tagesplan",
-      description:
-        "Operative Tagesplanung fÃƒÂ¼r den Live-Betrieb und die direkte Ausspielung auf das Infoboard.",
+      description: "Operative Tagesplanung für den Live-Betrieb und die direkte Ausspielung auf das Infoboard.",
     };
   }
 
@@ -279,7 +256,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Meetings",
-      description: "ÃƒÅ“bersicht aller Sitzungen Ã¢â‚¬â€œ absteigend vom neuesten zum ÃƒÂ¤ltesten Eintrag.",
+      description: "Übersicht aller Sitzungen – absteigend vom neuesten zum ältesten Eintrag.",
     };
   }
 
@@ -287,7 +264,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Meeting planen",
-      description: "Neues Meeting erfassen und direkt mit Pendenzen verknÃƒÂ¼pfen.",
+      description: "Neues Meeting erfassen und direkt mit Pendenzen verknüpfen.",
     };
   }
 
@@ -296,7 +273,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: humanizeSlug(slug),
-      description: "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen.",
+      description: "Meeting-Daten und Pendenzen-Verknüpfungen anpassen.",
     };
   }
 
@@ -305,7 +282,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: humanizeSlug(slug),
-      description: "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
+      description: "Protokoll, Teilnehmer, Beschlüsse und Pendenzen.",
     };
   }
 
@@ -313,14 +290,14 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Initiativen",
-      description: "ÃƒÅ“bersicht aller Initiativen Ã¢â‚¬â€œ absteigend vom neuesten zum ÃƒÂ¤ltesten Eintrag.",
+      description: "Übersicht aller Initiativen – absteigend vom neuesten zum ältesten Eintrag.",
     };
   }
 
   if (pathname.startsWith("/vereinsleitung/initiativen/")) {
     return {
       eyebrow: "1. Vereinsleitung",
-      title: "Initiative Ã¢â‚¬â€œ Details",
+      title: "Initiative – Details",
       description: "Fortschritt, Aufgaben, Meetings und Entscheidungen.",
     };
   }
@@ -329,8 +306,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "Kommunikation HUB",
-      description:
-        "Demo-Platzhalter fÃƒÂ¼r den kÃƒÂ¼nftigen Kommunikations-Hub der Vereinsleitung.",
+      description: "Demo-Platzhalter für den künftigen Kommunikations-Hub der Vereinsleitung.",
     };
   }
 
@@ -338,25 +314,33 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "1. Vereinsleitung",
       title: "KPIs",
-      description: "Kennzahlen und Trends fÃƒÂ¼r die strategische Steuerung des Vereins.",
+      description: "Kennzahlen und Trends für die strategische Steuerung des Vereins.",
     };
   }
 
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return {
       eyebrow: "1. Vereinsleitung",
-      title: "Vereinsleitung Ã¢â‚¬â€œ ÃƒÅ“bersicht",
+      title: "Vereinsleitung – Übersicht",
       description:
         "Strategische Steuerung des Vereins mit Zielen, Initiativen, Meetings, Aufgaben und Entscheidungen an einem Ort.",
     };
   }
 
-  if (pathname === "/dashboard/seasons" || pathname.startsWith("/dashboard/seasons/")) {
+  if (pathname === "/dashboard/seasons") {
     return {
       eyebrow: "Saisons",
       title: "Saisonplanung",
       description:
-        "Neue zukÃƒÂ¼nftige Saisons sind in Planung. Die aktuelle Saison ist laufend. Vergangene Saisons werden nach Saisonende automatisch abgeschlossen.",
+        "Neue zukünftige Saisons sind in Planung. Die aktuelle Saison ist laufend. Vergangene Saisons werden nach Saisonende automatisch abgeschlossen.",
+    };
+  }
+
+  if (pathname.startsWith("/dashboard/seasons/")) {
+    return {
+      eyebrow: "4. Aktuelle Saison",
+      title: "Teams",
+      description: "Teams sind saisongeführt und werden dynamisch pro Saison und Teamkategorie verwaltet.",
     };
   }
 
@@ -365,7 +349,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
       eyebrow: "4. Aktuelle Saison",
       title: "Events",
       description:
-        "Events sind saisongefÃƒÂ¼hrt und umfassen Matches, Turniere, Trainings sowie weitere Vereinsereignisse pro gewÃƒÂ¤hlter Saison.",
+        "Events sind saisongeführt und umfassen Matches, Turniere, Trainings sowie weitere Vereinsereignisse pro gewählter Saison.",
     };
   }
 
@@ -373,8 +357,7 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     return {
       eyebrow: "4. Aktuelle Saison",
       title: "Teams",
-      description:
-        "Teams sind saisongefÃƒÂ¼hrt und werden dynamisch pro Saison und Teamkategorie verwaltet.",
+      description: "Teams sind saisongeführt und werden dynamisch pro Saison und Teamkategorie verwaltet.",
     };
   }
 
@@ -404,14 +387,11 @@ function SpotlightSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [portalStyle, setPortalStyle] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
+  const [portalStyle, setPortalStyle] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const filteredResults = useMemo(() => {
     const safeQuery = query.trim().toLowerCase();
+
     if (!safeQuery) {
       return DUMMY_RESULTS;
     }
@@ -432,9 +412,7 @@ function SpotlightSearch() {
   }, [filteredResults]);
 
   function updatePortalPosition() {
-    if (!containerRef.current) {
-      return;
-    }
+    if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
@@ -453,22 +431,22 @@ function SpotlightSearch() {
     function handleKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setIsOpen((current) => { const next = !current; if (next) setHighlightedIndex(0); return next; });
+        setIsOpen((current) => {
+          const next = !current;
+          if (next) setHighlightedIndex(0);
+          return next;
+        });
       }
 
       if (event.key === "Escape") {
         setIsOpen(false);
       }
 
-      if (!isOpen) {
-        return;
-      }
+      if (!isOpen) return;
 
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        setHighlightedIndex((current) =>
-          Math.min(current + 1, Math.max(filteredResults.length - 1, 0)),
-        );
+        setHighlightedIndex((current) => Math.min(current + 1, Math.max(filteredResults.length - 1, 0)));
       }
 
       if (event.key === "ArrowUp") {
@@ -482,9 +460,7 @@ function SpotlightSearch() {
   }, [isOpen, filteredResults.length]);
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
+    if (!isOpen) return;
 
     updatePortalPosition();
 
@@ -503,9 +479,7 @@ function SpotlightSearch() {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (!containerRef.current) {
-        return;
-      }
+      if (!containerRef.current) return;
 
       const portalElement = document.getElementById("admin-spotlight-portal");
 
@@ -524,116 +498,107 @@ function SpotlightSearch() {
   const portal =
     isOpen && portalStyle
       ? createPortal(
-          <div
-            id="admin-spotlight-portal"
-            className="fixed inset-x-0 top-24 z-[180] flex justify-center px-4"
-          >
+          <div id="admin-spotlight-portal" className="fixed inset-x-0 top-24 z-[180] flex justify-center px-4">
             <div className="w-full max-w-[820px]">
-            <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
-              <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+              <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
+                <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
 
-              <div className="border-b border-slate-100 px-5 py-4">
-                <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
-                  <Search className="h-4 w-4 text-[#0b4aa2]" />
-                  <input
-                    autoFocus
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Nach Personen, Teams, Meetings oder Initiativen suchen Ã¢â‚¬Â¦"
-                    className="w-full bg-transparent text-sm text-slate-900 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsOpen(false)}
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50"
-                  >
-                    <X className="mr-1 h-3.5 w-3.5" />
-                    ESC
-                  </button>
-                </div>
-              </div>
-
-              <div className="max-h-[520px] overflow-y-auto">
-                {groupedResults.length === 0 ? (
-                  <div className="px-5 py-8 text-sm text-slate-500">
-                    Keine Treffer gefunden.
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <div className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
+                    <Search className="h-4 w-4 text-[#0b4aa2]" />
+                    <input
+                      autoFocus
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Nach Personen, Teams, Meetings oder Initiativen suchen …"
+                      className="w-full bg-transparent text-sm text-slate-900 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsOpen(false)}
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50"
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      ESC
+                    </button>
                   </div>
-                ) : (
-                  <div>
-                    {(() => {
-                      let flatIndex = -1;
+                </div>
 
-                      return groupedResults.map((group) => (
-                        <div key={group.key} className="border-b border-slate-100 last:border-b-0">
-                          <div className="px-5 py-4">
-                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              {group.label}
+                <div className="max-h-[520px] overflow-y-auto">
+                  {groupedResults.length === 0 ? (
+                    <div className="px-5 py-8 text-sm text-slate-500">Keine Treffer gefunden.</div>
+                  ) : (
+                    <div>
+                      {(() => {
+                        let flatIndex = -1;
+
+                        return groupedResults.map((group) => (
+                          <div key={group.key} className="border-b border-slate-100 last:border-b-0">
+                            <div className="px-5 py-4">
+                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                {group.label}
+                              </div>
+                            </div>
+
+                            <div className="px-3 pb-3">
+                              {group.items.map((item) => {
+                                flatIndex += 1;
+                                const isHighlighted = flatIndex === highlightedIndex;
+                                const Icon = getSpotlightIcon(item.type);
+
+                                return (
+                                  <Link
+                                    key={item.id}
+                                    href={item.href}
+                                    onMouseEnter={() => setHighlightedIndex(flatIndex)}
+                                    onClick={() => setIsOpen(false)}
+                                    className={`mb-2 flex items-center justify-between gap-3 rounded-[20px] border px-4 py-3 transition last:mb-0 ${
+                                      isHighlighted
+                                        ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05]"
+                                        : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2]">
+                                        <Icon className="h-4 w-4" />
+                                      </div>
+
+                                      <div className="min-w-0">
+                                        <div className="truncate text-sm font-semibold text-slate-900">{item.title}</div>
+                                        <div className="truncate text-xs text-slate-500">{item.subtitle}</div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                      <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2] sm:inline-flex">
+                                        {group.label.slice(0, -1)}
+                                      </span>
+                                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                                    </div>
+                                  </Link>
+                                );
+                              })}
                             </div>
                           </div>
+                        ));
+                      })()}
 
-                          <div className="px-3 pb-3">
-                            {group.items.map((item) => {
-                              flatIndex += 1;
-                              const isHighlighted = flatIndex === highlightedIndex;
-                              const Icon = getSpotlightIcon(item.type);
-
-                              return (
-                                <Link
-                                  key={item.id}
-                                  href={item.href}
-                                  onMouseEnter={() => setHighlightedIndex(flatIndex)}
-                                  onClick={() => setIsOpen(false)}
-                                  className={`mb-2 flex items-center justify-between gap-3 rounded-[20px] border px-4 py-3 transition last:mb-0 ${
-                                    isHighlighted
-                                      ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05]"
-                                      : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"
-                                  }`}
-                                >
-                                  <div className="flex min-w-0 items-center gap-3">
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2]">
-                                      <Icon className="h-4 w-4" />
-                                    </div>
-
-                                    <div className="min-w-0">
-                                      <div className="truncate text-sm font-semibold text-slate-900">
-                                        {item.title}
-                                      </div>
-                                      <div className="truncate text-xs text-slate-500">
-                                        {item.subtitle}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-3">
-                                    <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2] sm:inline-flex">
-                                      {group.label.slice(0, -1)}
-                                    </span>
-                                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
-                                  </div>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ));
-                    })()}
-
-                    <div className="border-t border-slate-100 px-4 py-3">
-                      <Link
-                        href="/dashboard"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center justify-between rounded-[18px] px-4 py-3 text-sm font-semibold text-[#0b4aa2] transition hover:bg-slate-50"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <Search className="h-4 w-4" />
-                          Alle Ergebnisse anzeigen
-                        </span>
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
+                      <div className="border-t border-slate-100 px-4 py-3">
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center justify-between rounded-[18px] px-4 py-3 text-sm font-semibold text-[#0b4aa2] transition hover:bg-slate-50"
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Search className="h-4 w-4" />
+                            Alle Ergebnisse anzeigen
+                          </span>
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                )}
-            </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>,
@@ -646,7 +611,10 @@ function SpotlightSearch() {
       <div ref={containerRef} className="relative w-full max-w-[820px]">
         <button
           type="button"
-          onClick={() => { setHighlightedIndex(0); setIsOpen(true); }}
+          onClick={() => {
+            setHighlightedIndex(0);
+            setIsOpen(true);
+          }}
           className="group flex w-full items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
         >
           <div className="flex min-w-0 items-center gap-4">
@@ -655,11 +623,9 @@ function SpotlightSearch() {
             </div>
 
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900">
-                Global suchen
-              </div>
+              <div className="truncate text-sm font-semibold text-slate-900">Global suchen</div>
               <div className="truncate text-sm text-slate-500">
-                Spieler, Teams, Meetings, Initiativen Ã¢â‚¬Â¦
+                Spieler, Teams, Meetings, Initiativen …
               </div>
             </div>
           </div>
@@ -682,94 +648,11 @@ export default function AdminPageHeader({
   canManageSeasons,
 }: AdminPageHeaderProps) {
   const pathname = usePathname();
-  const staticContent = useMemo(
+  const headerContent = useMemo(
     () => getStaticHeaderContent(pathname, firstName),
     [pathname, firstName],
   );
-  const [dynamicContent, setDynamicContent] = useState<HeaderContent | null>(null);
 
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadMeetingHeader() {
-      const isMeetingDetail =
-        pathname.startsWith("/vereinsleitung/meetings/") &&
-        pathname !== "/vereinsleitung/meetings" &&
-        pathname !== "/vereinsleitung/meetings/new";
-
-      if (!isMeetingDetail) {
-        setDynamicContent(null);
-        return;
-      }
-
-      const isEdit = pathname.endsWith("/edit");
-      const slug = pathname
-        .replace("/vereinsleitung/meetings/", "")
-        .replace("/edit", "");
-
-      try {
-        const response = await fetch("/api/vereinsleitung/meetings", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          throw new Error("Meeting header fetch failed");
-        }
-
-        const data = (await response.json()) as MeetingHeaderResponseItem[];
-        const meeting = Array.isArray(data)
-          ? data.find((item) => item.slug === slug)
-          : null;
-
-        if (isCancelled) {
-          return;
-        }
-
-        if (!meeting) {
-          setDynamicContent({
-            eyebrow: "1. Vereinsleitung",
-            title: humanizeSlug(slug),
-            description: isEdit
-              ? "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen."
-              : "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
-          });
-          return;
-        }
-
-        setDynamicContent({
-          eyebrow: "1. Vereinsleitung",
-          title: meeting.title,
-          description:
-            meeting.subtitle && meeting.subtitle.trim().length > 0
-              ? meeting.subtitle
-              : isEdit
-                ? "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen."
-                : "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
-        });
-      } catch {
-        if (isCancelled) {
-          return;
-        }
-
-        setDynamicContent({
-          eyebrow: "1. Vereinsleitung",
-          title: humanizeSlug(slug),
-          description: isEdit
-            ? "Meeting-Daten und Pendenzen-VerknÃƒÂ¼pfungen anpassen."
-            : "Protokoll, Teilnehmer, BeschlÃƒÂ¼sse und Pendenzen.",
-        });
-      }
-    }
-
-    void loadMeetingHeader();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [pathname]);
-
-  const headerContent: HeaderContent = { eyebrow: "", title: getDayGreeting(firstName), description: undefined };
   const showDashboardSeasonPill =
     pathname === "/dashboard" &&
     Boolean(currentSeasonLabel) &&
@@ -779,9 +662,7 @@ export default function AdminPageHeader({
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
-          {headerContent.eyebrow ? (
-            <p className="fca-eyebrow">{headerContent.eyebrow}</p>
-          ) : null}
+          {headerContent.eyebrow ? <p className="fca-eyebrow">{headerContent.eyebrow}</p> : null}
 
           <h1 className="fca-heading mt-2">{headerContent.title}</h1>
 
@@ -808,6 +689,3 @@ export default function AdminPageHeader({
     </div>
   );
 }
-
-
-
