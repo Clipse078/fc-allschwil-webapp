@@ -492,6 +492,13 @@ model Team {
 }
 
 model TeamSeason {
+  teamPhotoUrl String?
+  teamPhotoX   Int      @default(50)
+  teamPhotoY   Int      @default(50)
+  teamPhotoZoom Int     @default(100)
+  teamPhotoRotate Int   @default(0)
+  teamPhotoVisible Boolean @default(false)
+
   id                        String           @id @default(cuid())
   teamId                    String
   seasonId                  String
@@ -502,6 +509,10 @@ model TeamSeason {
   infoboardVisible          Boolean          @default(true)
   squadWebsiteVisible       Boolean          @default(true)
   trainerTeamWebsiteVisible Boolean          @default(true)
+  trainingsWebsiteVisible   Boolean          @default(true)
+  upcomingMatchesWebsiteVisible Boolean       @default(true)
+  resultsWebsiteVisible     Boolean          @default(true)
+  standingsWebsiteVisible   Boolean          @default(true)
   createdAt                 DateTime         @default(now())
   updatedAt                 DateTime         @updatedAt
 
@@ -1010,5 +1021,7 @@ model WorkflowPolicy {
   @@index([domain])
   @@index([active])
 }
+
+
 
 

@@ -11,6 +11,10 @@ type Context = {
 const ALLOWED_STATUSES = ["ACTIVE", "INACTIVE", "ARCHIVED"] as const;
 type AllowedTeamSeasonStatus = (typeof ALLOWED_STATUSES)[number];
 
+function booleanFromBody(body: Record<string, unknown>, key: string, fallback: boolean) {
+  return typeof body[key] === "boolean" ? Boolean(body[key]) : fallback;
+}
+
 export async function PATCH(request: NextRequest, context: Context) {
   const access = await requireApiPermission(PERMISSIONS.TEAMS_MANAGE);
 
@@ -20,7 +24,7 @@ export async function PATCH(request: NextRequest, context: Context) {
 
   try {
     const { teamSeasonId } = await context.params;
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
 
     const existing = await prisma.teamSeason.findUnique({
       where: { id: teamSeasonId },
@@ -37,14 +41,14 @@ export async function PATCH(request: NextRequest, context: Context) {
       );
     }
 
-    const displayName = String(body.displayName ?? "").trim();
+    const displayName = String(body.displayName ?? existing.displayName).trim();
     const shortName =
-      body.shortName === null || body.shortName === undefined
-        ? null
-        : String(body.shortName).trim() || null;
-    const status = String(body.status ?? "").trim();
-    const websiteVisible = Boolean(body.websiteVisible);
-    const infoboardVisible = Boolean(body.infoboardVisible);
+      body.shortName === undefined
+        ? existing.shortName
+        : body.shortName === null
+          ? null
+          : String(body.shortName).trim() || null;
+    const status = String(body.status ?? existing.status).trim();
 
     if (!displayName) {
       return NextResponse.json(
@@ -55,7 +59,7 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     if (!ALLOWED_STATUSES.includes(status as AllowedTeamSeasonStatus)) {
       return NextResponse.json(
-        { error: "Ungueltiger Status fuer Team Season." },
+        { error: "Ungültiger Status für Team Season." },
         { status: 400 }
       );
     }
@@ -66,8 +70,14 @@ export async function PATCH(request: NextRequest, context: Context) {
         displayName,
         shortName,
         status: status as AllowedTeamSeasonStatus,
-        websiteVisible,
-        infoboardVisible,
+        websiteVisible: booleanFromBody(body, "websiteVisible", existing.websiteVisible),
+        infoboardVisible: booleanFromBody(body, "infoboardVisible", existing.infoboardVisible),
+        squadWebsiteVisible: booleanFromBody(body, "squadWebsiteVisible", existing.squadWebsiteVisible),
+        trainerTeamWebsiteVisible: booleanFromBody(body, "trainerTeamWebsiteVisible", existing.trainerTeamWebsiteVisible),
+        trainingsWebsiteVisible: booleanFromBody(body, "trainingsWebsiteVisible", existing.trainingsWebsiteVisible),
+        upcomingMatchesWebsiteVisible: booleanFromBody(body, "upcomingMatchesWebsiteVisible", existing.upcomingMatchesWebsiteVisible),
+        resultsWebsiteVisible: booleanFromBody(body, "resultsWebsiteVisible", existing.resultsWebsiteVisible),
+        standingsWebsiteVisible: booleanFromBody(body, "standingsWebsiteVisible", existing.standingsWebsiteVisible),
       },
       include: {
         season: true,
@@ -80,26 +90,8 @@ export async function PATCH(request: NextRequest, context: Context) {
       entityType: "TeamSeason",
       entityId: updated.id,
       action: "UPDATE",
-      beforeJson: {
-        id: existing.id,
-        teamId: existing.teamId,
-        seasonId: existing.seasonId,
-        displayName: existing.displayName,
-        shortName: existing.shortName,
-        status: existing.status,
-        websiteVisible: existing.websiteVisible,
-        infoboardVisible: existing.infoboardVisible,
-      },
-      afterJson: {
-        id: updated.id,
-        teamId: updated.teamId,
-        seasonId: updated.seasonId,
-        displayName: updated.displayName,
-        shortName: updated.shortName,
-        status: updated.status,
-        websiteVisible: updated.websiteVisible,
-        infoboardVisible: updated.infoboardVisible,
-      },
+      beforeJson: existing,
+      afterJson: updated,
       metadataJson: {
         teamName: existing.team.name,
         seasonName: existing.season.name,
@@ -126,4 +118,3 @@ export async function PATCH(request: NextRequest, context: Context) {
     );
   }
 }
-

@@ -282,42 +282,6 @@ export default function TeamSettingsCard({
             )}
           </div>
         </div>
-
-        <label className="block space-y-2 md:max-w-[220px]">
-          <span className="fca-label">Sortierung</span>
-          <input
-            type="number"
-            value={form.sortOrder}
-            disabled={!canManage}
-            onChange={(event) =>
-              updateField("sortOrder", Number(event.target.value))
-            }
-            className="fca-input"
-          />
-        </label>
-      </div>
-
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Toggle
-          label="Aktiv"
-          value={form.isActive}
-          disabled={!canManage}
-          onChange={(value) => updateField("isActive", value)}
-        />
-
-        <Toggle
-          label="Website sichtbar"
-          value={form.websiteVisible}
-          disabled={!canManage}
-          onChange={(value) => updateField("websiteVisible", value)}
-        />
-
-        <Toggle
-          label="Infoboard sichtbar"
-          value={form.infoboardVisible}
-          disabled={!canManage}
-          onChange={(value) => updateField("infoboardVisible", value)}
-        />
       </div>
 
       {canManage ? (
@@ -360,5 +324,6 @@ function Toggle({
     </div>
   );
 }
+
 
 

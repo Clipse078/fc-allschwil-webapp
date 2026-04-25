@@ -129,10 +129,21 @@ export function isBirthYearAllowedForTeamSeason(args: {
 
   const birthYear = birthDate.getUTCFullYear();
 
-  if (!allowedBirthYears.includes(birthYear)) {
+  if (allowedBirthYears.length === 0) {
+    return {
+      ok: true,
+      reason: null,
+      allowedBirthYears,
+      birthYear,
+    };
+  }
+
+  const oldestAllowedBirthYear = Math.min(...allowedBirthYears);
+
+  if (birthYear < oldestAllowedBirthYear) {
     return {
       ok: false,
-      reason: "Geburtsjahr nicht für diese Team-Saison zugelassen.",
+      reason: "Spieler ist älter als der älteste zugelassene Jahrgang.",
       allowedBirthYears,
       birthYear,
     };
@@ -145,4 +156,3 @@ export function isBirthYearAllowedForTeamSeason(args: {
     birthYear,
   };
 }
-

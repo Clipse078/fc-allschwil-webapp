@@ -1,12 +1,7 @@
-﻿import Link from "next/link";
-import { notFound } from "next/navigation";
-import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { redirect, notFound } from "next/navigation";
+import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
-import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getTeamDetailData } from "@/lib/teams/queries";
-import { getSeasonOptionsData } from "@/lib/seasons/queries";
 
 type Props = {
   params: Promise<{
@@ -14,42 +9,36 @@ type Props = {
   }>;
 };
 
-export default async function TeamDetailPage({ params }: Props) {
-  const session = await requireAnyPermission([
+export default async function TeamDetailRedirectPage({ params }: Props) {
+  await requireAnyPermission([
     PERMISSIONS.TEAMS_VIEW,
     PERMISSIONS.TEAMS_MANAGE,
   ]);
 
-  const canManage = hasPermission(session, PERMISSIONS.TEAMS_MANAGE);
   const { teamId } = await params;
 
-  const [team, availableSeasons] = await Promise.all([
-    getTeamDetailData(teamId),
-    getSeasonOptionsData(),
-  ]);
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: {
+      teamSeasons: {
+        include: { season: true },
+        orderBy: [{ season: { startDate: "desc" } }],
+      },
+    },
+  });
 
   if (!team) {
     notFound();
   }
 
-  return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Team"
-        title={team.name}
-        description="Stammdaten, Sichtbarkeit, Saisonzuordnungen sowie Kader- und Trainerteam-Management dieses Teams."
-        actions={
-          <Link href="/dashboard/teams" className="fca-button-secondary">
-            Zurück zu Teams
-          </Link>
-        }
-      />
+  const activeTeamSeason =
+    team.teamSeasons.find((entry) => entry.season.isActive) ??
+    team.teamSeasons[0] ??
+    null;
 
-      <TeamDetailCard
-        initialTeam={team}
-        availableSeasons={availableSeasons}
-        canManage={canManage}
-      />
-    </div>
-  );
+  if (!activeTeamSeason) {
+    redirect("/dashboard/teams");
+  }
+
+  redirect(`/dashboard/seasons/${activeTeamSeason.season.key}/teams/${team.slug}`);
 }

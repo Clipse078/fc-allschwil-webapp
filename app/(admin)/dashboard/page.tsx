@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   ArrowRight,
   Briefcase,
@@ -17,7 +17,7 @@ const DASHBOARD_MODULES = [
     number: "1",
     title: "Vereinsleitung",
     description:
-      "Strategische Steuerung mit Meetings, Initiativen, Organigramm und künftigem Kommunikation HUB.",
+      "Strategische Steuerung mit Meetings, Initiativen, Organigramm und kÃ¼nftigem Kommunikation HUB.",
     href: "/vereinsleitung",
     icon: Briefcase,
     carrySeason: false,
@@ -26,7 +26,7 @@ const DASHBOARD_MODULES = [
     number: "2",
     title: "Operations &\nOrganisation",
     description:
-      "Demo-Modul mit Finanzen, Material, Media, Aktivitäten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
+      "Demo-Modul mit Finanzen, Material, Media, AktivitÃ¤ten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
     href: "/dashboard/operations",
     icon: BriefcaseBusiness,
     carrySeason: false,
@@ -44,7 +44,7 @@ const DASHBOARD_MODULES = [
     number: "4",
     title: "Aktuelle Saison",
     description:
-      "Aktuelle Saison mit Teams, Planner, Jahresplan, Wochenplan und Tagesplan.",
+      "Aktuelle Saison mit Teams, Jahresplan, Wochenplan, Platzreservation und Infoboard.",
     href: "/dashboard/current-season",
     icon: CalendarRange,
     carrySeason: true,
@@ -52,9 +52,9 @@ const DASHBOARD_MODULES = [
   },
   {
     number: "5",
-    title: "Nächste Saison",
+    title: "NÃ¤chste Saison",
     description:
-      "Vorbereitung der kommenden Saison mit Teams, Planner, Jahresplan, Wochenplan und Tagesplan.",
+      "Vorbereitung der kommenden Saison mit Teams, Spielern und Trainern.",
     href: "/dashboard/next-season",
     icon: CalendarRange,
     carrySeason: false,
@@ -64,7 +64,7 @@ const DASHBOARD_MODULES = [
     number: "6",
     title: "Persons",
     description:
-      "Modul für Trainers, Players, Vereinsfunktionäre und External Contacts.",
+      "Modul fÃ¼r Trainers, Players, VereinsfunktionÃ¤re und External Contacts.",
     href: "/dashboard/persons",
     icon: UserCircle2,
     carrySeason: false,
@@ -73,7 +73,7 @@ const DASHBOARD_MODULES = [
     number: "7",
     title: "Neue\nAnmeldungen",
     description:
-      "Demo-Modul für neue Trainers, neue Players und neue Vereinsfunktionäre.",
+      "Demo-Modul fÃ¼r neue Trainers, neue Players und neue VereinsfunktionÃ¤re.",
     href: "/dashboard/neu-anmeldungen",
     icon: UserPlus,
     carrySeason: false,
@@ -82,7 +82,7 @@ const DASHBOARD_MODULES = [
     number: "8",
     title: "Users & Roles",
     description:
-      "Benutzer, Rollen und Berechtigungen für die WebApp zentral verwalten.",
+      "Benutzer, Rollen und Berechtigungen fÃ¼r die WebApp zentral verwalten.",
     href: "/dashboard/users",
     icon: Shield,
     carrySeason: false,
@@ -168,7 +168,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
                   <div className="mt-auto pt-7">
                     <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-[#0b4aa2] transition group-hover:border-[#0b4aa2]/20 group-hover:bg-[#0b4aa2]/5">
-                      Modul öffnen
+                      Modul Ã¶ffnen
                       <ArrowRight className="h-4 w-4" />
                     </span>
                   </div>

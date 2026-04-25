@@ -1,4 +1,4 @@
-﻿import TeamsTable from "@/components/admin/teams/TeamsTable";
+import TeamsTable from "@/components/admin/teams/TeamsTable";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";

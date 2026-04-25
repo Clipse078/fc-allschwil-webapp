@@ -235,3 +235,69 @@ export async function getTeamDetailData(teamId: string) {
     })),
   };
 }
+
+
+export async function getTeamDetailDataBySeasonKeyAndTeamSlug(seasonKey: string, teamSlug: string) {
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: {
+      season: { key: seasonKey },
+      team: { slug: teamSlug },
+    },
+    include: {
+      team: {
+        include: {
+          teamSeasons: {
+            where: { season: { key: seasonKey } },
+            include: {
+              season: true,
+              playerSquadMembers: {
+                include: { person: true },
+                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+              },
+              trainerTeamMembers: {
+                include: { person: true },
+                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!teamSeason) return null;
+
+  return {
+    ...teamSeason.team,
+    teamSeasons: teamSeason.team.teamSeasons.map((entry) => ({
+      ...entry,
+      season: {
+        ...entry.season,
+        startDate: entry.season.startDate.toISOString(),
+        endDate: entry.season.endDate.toISOString(),
+      },
+      playerSquadMembers: entry.playerSquadMembers.map((member) => ({
+        ...member,
+        createdAt: member.createdAt.toISOString(),
+        updatedAt: member.updatedAt.toISOString(),
+        person: {
+          ...member.person,
+          dateOfBirth: member.person.dateOfBirth?.toISOString() ?? null,
+          createdAt: undefined,
+          updatedAt: undefined,
+        },
+      })),
+      trainerTeamMembers: entry.trainerTeamMembers.map((member) => ({
+        ...member,
+        createdAt: member.createdAt.toISOString(),
+        updatedAt: member.updatedAt.toISOString(),
+        person: {
+          ...member.person,
+          dateOfBirth: member.person.dateOfBirth?.toISOString() ?? null,
+          createdAt: undefined,
+          updatedAt: undefined,
+        },
+      })),
+    })),
+  };
+}

@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
+import { isBirthYearAllowedForTeamSeason } from "@/lib/teams/jahrgang-rules";
 
 type SearchMode = "any" | "player" | "trainer" | "vereinsleitung";
 
@@ -33,9 +34,7 @@ type PersonRecord = {
       displayName: string;
       shortName: string | null;
       status: string;
-      team: {
-        name: string;
-      };
+      team: { name: string };
     };
   }[];
   playerSquadMembers: {
@@ -44,9 +43,7 @@ type PersonRecord = {
       displayName: string;
       shortName: string | null;
       status: string;
-      team: {
-        name: string;
-      };
+      team: { name: string };
     };
   }[];
 };
@@ -109,9 +106,7 @@ function matchesQuery(
   },
   query: string,
 ) {
-  if (!query) {
-    return true;
-  }
+  if (!query) return true;
 
   const normalizedQuery = query.toLowerCase();
 
@@ -162,10 +157,7 @@ function getActivePlayerAssignment(person: PersonRecord) {
 
 function getTeamLabelFromTrainer(person: PersonRecord) {
   const trainerAssignment = getActiveTrainerAssignment(person);
-
-  if (!trainerAssignment) {
-    return null;
-  }
+  if (!trainerAssignment) return null;
 
   return (
     trainerAssignment.teamSeason.shortName ||
@@ -176,10 +168,7 @@ function getTeamLabelFromTrainer(person: PersonRecord) {
 
 function getTeamLabelFromPlayer(person: PersonRecord) {
   const playerAssignment = getActivePlayerAssignment(person);
-
-  if (!playerAssignment) {
-    return null;
-  }
+  if (!playerAssignment) return null;
 
   return (
     playerAssignment.teamSeason.shortName ||
@@ -200,20 +189,13 @@ function getPrimaryRoleLabel(person: PersonRecord, mode: SearchMode) {
   }
 
   const sortedRoles = getSortedRoles(person);
-
-  if (sortedRoles.length > 0) {
-    return sortedRoles[0].role.name;
-  }
+  if (sortedRoles.length > 0) return sortedRoles[0].role.name;
 
   const trainerAssignment = getActiveTrainerAssignment(person);
-  if (trainerAssignment) {
-    return trainerAssignment.roleLabel?.trim() || "Trainer";
-  }
+  if (trainerAssignment) return trainerAssignment.roleLabel?.trim() || "Trainer";
 
   const playerAssignment = getActivePlayerAssignment(person);
-  if (playerAssignment) {
-    return "Player";
-  }
+  if (playerAssignment) return "Player";
 
   return "Person";
 }
@@ -226,31 +208,19 @@ function getSecondaryTeamLabel(person: PersonRecord, mode: SearchMode) {
   const sortedRoles = getSortedRoles(person);
   const primaryRoleKey = sortedRoles[0]?.role.key ?? null;
 
-  if (primaryRoleKey === "trainer") {
-    return getTeamLabelFromTrainer(person);
-  }
-
-  if (primaryRoleKey === "player") {
-    return getTeamLabelFromPlayer(person);
-  }
+  if (primaryRoleKey === "trainer") return getTeamLabelFromTrainer(person);
+  if (primaryRoleKey === "player") return getTeamLabelFromPlayer(person);
 
   if (!primaryRoleKey) {
-    if (person.isTrainer) {
-      return getTeamLabelFromTrainer(person);
-    }
-
-    if (person.isPlayer) {
-      return getTeamLabelFromPlayer(person);
-    }
+    if (person.isTrainer) return getTeamLabelFromTrainer(person);
+    if (person.isPlayer) return getTeamLabelFromPlayer(person);
   }
 
   return null;
 }
 
 function isEligibleForVereinsleitung(person: PersonRecord) {
-  if (isDemoVereinsleitungPerson(person)) {
-    return true;
-  }
+  if (isDemoVereinsleitungPerson(person)) return true;
 
   const sortedRoles = getSortedRoles(person);
 
@@ -308,15 +278,20 @@ export async function GET(request: NextRequest) {
     }
 
     let excludedPersonIds = new Set<string>();
+    let playerEligibilityContext: { teamAgeGroup: string | null; seasonKey: string } | null = null;
 
     if (teamSeasonId && mode === "player") {
       const teamSeason = await prisma.teamSeason.findUnique({
         where: { id: teamSeasonId },
         select: {
           playerSquadMembers: {
-            select: {
-              personId: true,
-            },
+            select: { personId: true },
+          },
+          team: {
+            select: { ageGroup: true },
+          },
+          season: {
+            select: { key: true },
           },
         },
       });
@@ -326,6 +301,10 @@ export async function GET(request: NextRequest) {
       }
 
       excludedPersonIds = new Set(teamSeason.playerSquadMembers.map((entry) => entry.personId));
+      playerEligibilityContext = {
+        teamAgeGroup: teamSeason.team.ageGroup,
+        seasonKey: teamSeason.season.key,
+      };
     }
 
     if (teamSeasonId && mode === "trainer") {
@@ -333,9 +312,7 @@ export async function GET(request: NextRequest) {
         where: { id: teamSeasonId },
         select: {
           trainerTeamMembers: {
-            select: {
-              personId: true,
-            },
+            select: { personId: true },
           },
         },
       });
@@ -400,9 +377,7 @@ export async function GET(request: NextRequest) {
                 shortName: true,
                 status: true,
                 team: {
-                  select: {
-                    name: true,
-                  },
+                  select: { name: true },
                 },
               },
             },
@@ -417,9 +392,7 @@ export async function GET(request: NextRequest) {
                 shortName: true,
                 status: true,
                 team: {
-                  select: {
-                    name: true,
-                  },
+                  select: { name: true },
                 },
               },
             },
@@ -429,25 +402,22 @@ export async function GET(request: NextRequest) {
     });
 
     const filtered = people.filter((person) => {
-      if (!matchesQuery(person, query)) {
-        return false;
-      }
-
-      if (excludedPersonIds.has(person.id)) {
-        return false;
-      }
+      if (!matchesQuery(person, query)) return false;
+      if (excludedPersonIds.has(person.id)) return false;
 
       if (mode === "player") {
-        return true;
+        if (!playerEligibilityContext) return true;
+
+        return isBirthYearAllowedForTeamSeason({
+          categoryCode: playerEligibilityContext.teamAgeGroup,
+          seasonStartDate: playerEligibilityContext.seasonKey,
+          birthDate: person.dateOfBirth,
+        }).ok;
       }
 
-      if (mode === "trainer") {
-        return true;
-      }
+      if (mode === "trainer") return true;
 
-      if (mode === "vereinsleitung") {
-        return isEligibleForVereinsleitung(person);
-      }
+      if (mode === "vereinsleitung") return isEligibleForVereinsleitung(person);
 
       return true;
     });

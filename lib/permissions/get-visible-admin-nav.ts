@@ -177,10 +177,10 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
   },
   {
-    label: "4.5 Tagesplan",
-    href: "/dashboard/planner/day",
+    label: "4.5 Infoboard",
+    href: "/dashboard/infoboard",
     parentLabel: "Current Season",
-    permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+    permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE],
   },
 
   {
@@ -191,24 +191,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
     label: "5.1 Teams",
     href: "/dashboard/next-season/teams",
-    parentLabel: "Next Season",
-    permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
-  },
-  {
-    label: "5.2 Jahresplan",
-    href: "/dashboard/next-season/jahresplan",
-    parentLabel: "Next Season",
-    permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
-  },
-  {
-    label: "5.3 Wochenplan",
-    href: "/dashboard/next-season/wochenplan",
-    parentLabel: "Next Season",
-    permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
-  },
-  {
-    label: "5.4 Tagesplan",
-    href: "/dashboard/next-season/tagesplan",
     parentLabel: "Next Season",
     permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
   },
@@ -285,4 +267,6 @@ export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavIte
     );
   });
 }
+
+
 

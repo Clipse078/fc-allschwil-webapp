@@ -1,17 +1,17 @@
-import AdminModulePlaceholder from "@/components/admin/shared/AdminModulePlaceholder";
+﻿import AdminModulePlaceholder from "@/components/admin/shared/AdminModulePlaceholder";
 
 export default function Page() {
   return (
     <AdminModulePlaceholder
-      eyebrow="4. Current Season"
-      title="Current Season"
-      description="Modulübersicht für die laufende Saison mit Teams, Planner, Jahresplan, Wochenplan und Tagesplan."
+      eyebrow="4. Aktuelle Saison"
+      title="Aktuelle Saison"
+      description="Modulübersicht für die laufende Saison mit Teams, Jahresplan, Wochenplan, Platzreservation und Infoboard."
       links={[
-        { title: "Teams", description: "Bestehender Teams-Bereich der aktuellen Saison.", href: "/dashboard/teams" },
-        { title: "Planner", description: "Bestehender Planner-Einstieg der aktuellen Saison.", href: "/dashboard/planner" },
-        { title: "Jahresplan", description: "Bestehender Jahresplan der aktuellen Saison.", href: "/dashboard/planner" },
-        { title: "Wochenplan", description: "Bestehender Wochenplan der aktuellen Saison.", href: "/dashboard/planner/week" },
-        { title: "Tagesplan", description: "Bestehender Tagesplan der aktuellen Saison.", href: "/dashboard/planner/day" },
+        { title: "Teams", description: "Teams, Spieler und Trainer der aktuellen Saison verwalten.", href: "/dashboard/teams" },
+        { title: "Jahresplan", description: "Langfristige Saisonplanung öffnen.", href: "/dashboard/planner" },
+        { title: "Wochenplan", description: "Operative Wochenplanung öffnen.", href: "/dashboard/planner/week" },
+        { title: "Platz reservieren", description: "Platzreservationen erfassen und prüfen.", href: "/dashboard/planner/reserve" },
+        { title: "Infoboard", description: "Infoboard verwalten und Live-Ansicht öffnen.", href: "/dashboard/infoboard" },
       ]}
     />
   );

@@ -106,6 +106,8 @@ function getNavIcon(label: string) {
       return CalendarDays;
     case "Tagesplan":
       return CalendarDays;
+    case "Infoboard":
+      return CalendarDays;
     case "Teams":
       return Users;
     case "Personen":
@@ -404,4 +406,7 @@ export default function VereinsOSSidebar({
     </aside>
   );
 }
+
+
+
 
