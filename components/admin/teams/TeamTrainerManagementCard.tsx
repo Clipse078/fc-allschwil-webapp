@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,18 @@ type TrainerMember = {
     displayName: string | null;
     email: string | null;
     phone: string | null;
+    trainerQualifications?: {
+      id: string;
+      type: string;
+      status: string;
+      title: string;
+      issuer: string | null;
+      licenseNumber: string | null;
+      issuedAt: string | null;
+      expiresAt: string | null;
+      remarks: string | null;
+      isClubVerified: boolean;
+    }[];
   };
 };
 
@@ -64,6 +76,22 @@ function getPersonName(person: {
   displayName: string | null;
 }) {
   return person.displayName || person.firstName + " " + person.lastName;
+}
+
+function getTrainerQualificationLabel(qualification: {
+  title: string;
+  issuer: string | null;
+  status: string;
+  isClubVerified: boolean;
+}) {
+  const parts = [
+    qualification.title,
+    qualification.issuer,
+    qualification.status === "VALID" ? "gültig" : null,
+    qualification.isClubVerified ? "geprüft" : null,
+  ].filter(Boolean);
+
+  return parts.join(" · ");
 }
 
 export default function TeamTrainerManagementCard({
@@ -445,12 +473,20 @@ export default function TeamTrainerManagementCard({
                 />
               }
               title={getPersonName(member.person)}
-              subtitle={member.roleLabel ?? "Keine Rolle hinterlegt"}
+              subtitle={[
+                member.roleLabel ?? "Keine Rolle hinterlegt",
+                member.person.trainerQualifications && member.person.trainerQualifications.length > 0
+                  ? "Diplome: " + member.person.trainerQualifications.map(getTrainerQualificationLabel).join(" | ")
+                  : "Keine Diplome hinterlegt",
+              ].join(" • ")}
               meta={
                 <>
                   <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
                   <span className="fca-pill">
                     Website: {member.isWebsiteVisible ? "Ja" : "Nein"}
+                  </span>
+                  <span className="fca-pill">
+                    Diplome: {member.person.trainerQualifications?.length ?? 0}
                   </span>
                 </>
               }
