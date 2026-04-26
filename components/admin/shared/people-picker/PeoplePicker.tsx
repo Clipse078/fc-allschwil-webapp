@@ -65,6 +65,13 @@ function getAssignmentTone(person: PeoplePickerPerson) {
   return "free";
 }
 
+function getModeLabel(searchMode: PeoplePickerProps["searchMode"]) {
+  if (searchMode === "player") return "Spieler";
+  if (searchMode === "trainer") return "Trainer";
+  if (searchMode === "vereinsleitung") return "Vereinsleitung";
+  return "Person";
+}
+
 export default function PeoplePicker({
   mode = "single",
   selected = null,
@@ -103,7 +110,7 @@ export default function PeoplePicker({
       }
 
       setDebouncedQuery(nextQuery);
-    }, 220);
+    }, 180);
 
     return () => window.clearTimeout(timeout);
   }, [query]);
@@ -225,18 +232,24 @@ export default function PeoplePicker({
   }
 
   const shouldShowDropdown = isOpen && debouncedQuery.length >= 2 && !disabled;
+  const modeLabel = getModeLabel(searchMode);
 
   return (
     <div ref={rootRef} className="relative z-20">
       {mode === "single" && selected ? (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.04] px-3 py-3">
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-[#0b4aa2]/25 bg-gradient-to-br from-[#0b4aa2]/[0.07] to-white px-3.5 py-3.5 shadow-[0_10px_28px_rgba(11,74,162,0.08)] ring-4 ring-[#0b4aa2]/[0.04]">
           <div className="flex min-w-0 items-center gap-3">
             <AdminAvatar name={selected.displayName} imageSrc={selected.imageSrc} size="sm" />
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900">
-                {selected.displayName}
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="truncate text-sm font-semibold text-slate-950">
+                  {selected.displayName}
+                </div>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  Ausgewählt
+                </span>
               </div>
-              <div className="truncate text-xs text-slate-500">
+              <div className="mt-1 truncate text-xs text-slate-500">
                 {buildMetaLabel(selected) || selected.email || "Person verknüpft"}
               </div>
             </div>
@@ -246,7 +259,7 @@ export default function PeoplePicker({
             type="button"
             onClick={() => onSelect?.(null)}
             disabled={disabled}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Lösen
           </button>
@@ -254,10 +267,12 @@ export default function PeoplePicker({
       ) : null}
 
       <div
-        className={`rounded-[20px] border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition ${
+        className={`rounded-[22px] border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition ${
           isOpen && !disabled
             ? "border-[#0b4aa2] ring-4 ring-[#0b4aa2]/10"
-            : "border-slate-200"
+            : selected
+              ? "border-[#0b4aa2]/25"
+              : "border-slate-200"
         } ${disabled ? "opacity-60" : ""}`}
       >
         {mode === "multiple" && selectedItems.length > 0 ? (
@@ -327,29 +342,42 @@ export default function PeoplePicker({
               if (event.key === "Escape") setIsOpen(false);
             }}
             placeholder={placeholder}
-            className={`w-full rounded-[20px] bg-white px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed ${
+            className={`w-full rounded-[22px] bg-white px-4 py-3.5 pr-28 text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed ${
               mode === "multiple" && selectedItems.length > 0 ? "rounded-t-none" : ""
             }`}
           />
 
-          {isLoading ? (
-            <div className="pointer-events-none absolute right-4 top-3.5 text-xs text-slate-400">
-              Suche...
-            </div>
-          ) : null}
+          <div className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            {isLoading ? (
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0b4aa2]" />
+                Suche
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
+                {modeLabel}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {shouldShowDropdown ? (
-        <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.14)]">
+        <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_22px_60px_rgba(15,23,42,0.16)]">
+          <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Ergebnisse
+          </div>
+
           {results.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-500">{emptyText}</div>
+            <div className="px-4 py-5">
+              <div className="text-sm font-semibold text-slate-700">Keine Treffer</div>
+              <div className="mt-1 text-sm text-slate-500">{emptyText}</div>
+            </div>
           ) : (
-            <div className="max-h-72 overflow-auto py-2">
+            <div className="max-h-80 overflow-auto py-2">
               {results.map((person, index) => {
                 const isSelected = selectedIds.has(person.id);
                 const isHighlighted = index === highlightedIndex;
-                const metaLabel = buildMetaLabel(person);
                 const assignmentTone = getAssignmentTone(person);
 
                 return (
@@ -366,18 +394,26 @@ export default function PeoplePicker({
                       applySingleSelect(person);
                     }}
                     className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
-                      isHighlighted ? "bg-slate-50" : "bg-white hover:bg-slate-50"
+                      isHighlighted ? "bg-[#0b4aa2]/[0.04]" : "bg-white hover:bg-slate-50"
                     }`}
                   >
                     <AdminAvatar name={person.displayName} imageSrc={person.imageSrc} size="sm" />
 
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-slate-900">
-                        {highlightText(person.displayName, debouncedQuery)}
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <div className="truncate text-sm font-semibold text-slate-950">
+                          {highlightText(person.displayName, debouncedQuery)}
+                        </div>
+                        {person.functionLabel ? (
+                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                            {person.functionLabel}
+                          </span>
+                        ) : null}
                       </div>
-                      <div className="truncate text-xs text-slate-500">
-                        {metaLabel
-                          ? highlightText(metaLabel, debouncedQuery)
+
+                      <div className="mt-1 truncate text-xs text-slate-500">
+                        {person.teamLabel
+                          ? highlightText(person.teamLabel, debouncedQuery)
                           : person.email
                             ? highlightText(person.email, debouncedQuery)
                             : "Keine Zusatzinfo"}
@@ -412,6 +448,10 @@ export default function PeoplePicker({
               })}
             </div>
           )}
+
+          <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] text-slate-400">
+            ↑↓ navigieren · Enter auswählen · Esc schliessen
+          </div>
         </div>
       ) : null}
     </div>
