@@ -17,6 +17,13 @@ type PersonRecord = {
   isPlayer: boolean;
   isTrainer: boolean;
   notes: string | null;
+  trainerQualifications: {
+    type: string;
+    status: string;
+    title: string;
+    issuer: string | null;
+    isClubVerified: boolean;
+  }[];
   user: {
     userRoles: {
       role: {
@@ -177,6 +184,23 @@ function getTeamLabelFromPlayer(person: PersonRecord) {
   );
 }
 
+function getTrainerQualificationLabel(person: PersonRecord) {
+  const priority = ["VALID", "IN_PROGRESS", "PLANNED", "UNKNOWN", "EXPIRED"];
+
+  const qualification = [...person.trainerQualifications].sort((a, b) => {
+    const statusDiff = priority.indexOf(a.status) - priority.indexOf(b.status);
+    if (statusDiff !== 0) return statusDiff;
+    if (a.isClubVerified !== b.isClubVerified) return a.isClubVerified ? -1 : 1;
+    return a.title.localeCompare(b.title);
+  })[0];
+
+  if (!qualification) return null;
+
+  return [qualification.title, qualification.issuer, qualification.status === "VALID" ? "gültig" : null]
+    .filter(Boolean)
+    .join(" • ");
+}
+
 function isDemoVereinsleitungPerson(person: PersonRecord) {
   const email = person.email?.toLowerCase() ?? "";
   const notes = person.notes?.toLowerCase() ?? "";
@@ -201,6 +225,8 @@ function getPrimaryRoleLabel(person: PersonRecord, mode: SearchMode) {
 }
 
 function getSecondaryTeamLabel(person: PersonRecord, mode: SearchMode) {
+  if (mode === "trainer") return getTrainerQualificationLabel(person) ?? getTeamLabelFromTrainer(person);
+
   if (mode === "vereinsleitung" && isDemoVereinsleitungPerson(person)) {
     return "Meeting Demo";
   }
@@ -351,6 +377,15 @@ export async function GET(request: NextRequest) {
         isPlayer: true,
         isTrainer: true,
         notes: true,
+        trainerQualifications: {
+          select: {
+            type: true,
+            status: true,
+            title: true,
+            issuer: true,
+            isClubVerified: true,
+          },
+        },
         user: {
           select: {
             userRoles: {
