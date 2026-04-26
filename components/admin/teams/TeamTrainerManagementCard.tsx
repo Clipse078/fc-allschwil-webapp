@@ -339,7 +339,7 @@ export default function TeamTrainerManagementCard({
     }
   }
 
-  async function handleInlineUpdate(member: TrainerMember, updates: Partial<Pick<TrainerMember, "isWebsiteVisible">>) {
+  async function handleInlineUpdate(member: TrainerMember, updates: Partial<Pick<TrainerMember, "isWebsiteVisible" | "roleLabel">>) {
     if (!canManage) return;
 
     setRemoveError(null);
@@ -515,7 +515,17 @@ export default function TeamTrainerManagementCard({
               avatar={<AdminAvatar name={getPersonName(member.person)} size="md" />}
               title={getPersonName(member.person)}
               subtitle={[
-                member.roleLabel ?? "Keine Rolle hinterlegt",
+                canManage ? (
+                  <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
+                    <span className="text-[11px] font-semibold text-slate-400">Rolle</span>
+                    <input
+                      type="text"
+                      defaultValue={member.roleLabel ?? ""}
+                      onBlur={(event) => handleInlineUpdate(member, { roleLabel: event.target.value.trim() || null })}
+                      className="w-32 bg-transparent text-xs font-semibold text-slate-700 outline-none"
+                    />
+                  </label>
+                ) : member.roleLabel ?? "Keine Rolle hinterlegt",
                 member.person.trainerQualifications && member.person.trainerQualifications.length > 0
                   ? "Diplome: " + member.person.trainerQualifications.map(getTrainerQualificationLabel).join(" | ")
                   : "Keine Diplome hinterlegt",
@@ -655,4 +665,5 @@ function Toggle({
     </div>
   );
 }
+
 
