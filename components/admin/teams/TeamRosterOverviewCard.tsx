@@ -99,7 +99,7 @@ function normalizeSearchPerson(item: any): Person {
     id: item.id,
     personId: item.id,
     name,
-    subline: item.email ?? item.phone ?? "",
+    subline: item.dateOfBirth ? "Jahrgang " + new Date(item.dateOfBirth).getUTCFullYear() : item.email ?? item.phone ?? "",
     meta: item.functionLabel ?? (item.isTrainer ? "Trainer" : item.isPlayer ? "Spieler" : "Person"),
     imageUrl: item.imageUrl ?? item.imageSrc ?? null,
     currentTeam: item.currentTeam ?? item.teamLabel ?? null,
@@ -472,3 +472,4 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
