@@ -207,6 +207,35 @@ export default function TeamSquadManagementCard({
     }
   }
 
+  async function handleInlineUpdate(member: SquadMember, updates: Partial<Pick<SquadMember, "isWebsiteVisible" | "isCaptain" | "isViceCaptain">>) {
+    if (!canManage) return;
+
+    setRemoveError(null);
+    setRemoveMessage(null);
+    setAssignError(null);
+    setAssignMessage(null);
+
+    try {
+      const response = await fetch(
+        "/api/teams/" + teamId + "/team-seasons/" + teamSeason.id + "/squad-members/" + member.id,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Kader-Eintrag konnte nicht aktualisiert werden.");
+      }
+
+      router.refresh();
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+    }
+  }
   async function handleRemove(member: SquadMember) {
     if (!canManage) return;
 
@@ -427,9 +456,9 @@ export default function TeamSquadManagementCard({
                       <span className={memberFitsJahrgang ? "fca-pill" : "rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800"}>
                         {memberFitsJahrgang ? "Jahrgang OK" : "⚠ Jahrgang prüfen"}
                       </span>
-                      <span className="fca-pill">Website: {member.isWebsiteVisible ? "Ja" : "Nein"}</span>
-                      {member.isCaptain ? <span className="fca-pill">Captain</span> : null}
-                      {member.isViceCaptain ? <span className="fca-pill">Vice-Captain</span> : null}
+                      <button type="button" onClick={() => handleInlineUpdate(member, { isWebsiteVisible: !member.isWebsiteVisible })} disabled={!canManage} className="fca-pill">Website: {member.isWebsiteVisible ? "Ja" : "Nein"}</button>
+                      <button type="button" onClick={() => handleInlineUpdate(member, { isCaptain: !member.isCaptain })} disabled={!canManage} className={member.isCaptain ? "fca-pill" : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500"}>{member.isCaptain ? "Captain" : "Captain setzen"}</button>
+                      <button type="button" onClick={() => handleInlineUpdate(member, { isViceCaptain: !member.isViceCaptain })} disabled={!canManage} className={member.isViceCaptain ? "fca-pill" : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500"}>{member.isViceCaptain ? "Vice-Captain" : "Vice setzen"}</button>
                     </>
                   }
                   actions={
@@ -477,3 +506,4 @@ function Toggle({
     </div>
   );
 }
+
