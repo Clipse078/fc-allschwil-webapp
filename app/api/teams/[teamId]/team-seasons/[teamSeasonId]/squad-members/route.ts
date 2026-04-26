@@ -24,7 +24,7 @@ export async function GET(_: Request, context: Context) {
         id: x.id,
         personId: x.personId,
         name: personName(x.person),
-        subline: [x.shirtNumber ? "Nr. " + x.shirtNumber : "", x.person.dateOfBirth ? new Date(x.person.dateOfBirth).toLocaleDateString("de-CH") : ""].filter(Boolean).join(" • "),
+        subline: [x.shirtNumber ? "Nr. " + x.shirtNumber : "", x.person.dateOfBirth ? "Jahrgang " + new Date(x.person.dateOfBirth).getUTCFullYear() : ""].filter(Boolean).join(" • "),
         meta: x.positionLabel ?? "",
         imageUrl: null,
       })),
@@ -56,7 +56,7 @@ export async function POST(req: Request, context: Context) {
       id: member.id,
       personId: member.personId,
       name: personName(member.person),
-      subline: [member.shirtNumber ? "Nr. " + member.shirtNumber : "", member.person.dateOfBirth ? new Date(member.person.dateOfBirth).toLocaleDateString("de-CH") : ""].filter(Boolean).join(" • "),
+      subline: [member.shirtNumber ? "Nr. " + member.shirtNumber : "", member.person.dateOfBirth ? "Jahrgang " + new Date(member.person.dateOfBirth).getUTCFullYear() : ""].filter(Boolean).join(" • "),
       meta: member.positionLabel ?? "",
       imageUrl: null,
     });
@@ -64,3 +64,4 @@ export async function POST(req: Request, context: Context) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Spieler konnte nicht hinzugefügt werden." }, { status: 500 });
   }
 }
+
