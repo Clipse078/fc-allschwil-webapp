@@ -3,7 +3,7 @@
 type AdminListItemProps = {
   avatar: ReactNode;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
 };
@@ -27,7 +27,9 @@ export default function AdminListItem({
             </h3>
 
             {subtitle ? (
-              <p className="mt-1 truncate text-sm text-slate-500">{subtitle}</p>
+              <div className="mt-1 text-sm text-slate-500">
+                {subtitle}
+              </div>
             ) : null}
           </div>
         </div>
