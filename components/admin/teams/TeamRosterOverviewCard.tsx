@@ -3,13 +3,24 @@
 import { GripVertical, Search, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+type TrainerQualification = {
+  title: string;
+  issuer: string | null;
+  status: string;
+  isClubVerified: boolean;
+};
+
 type RawMember = {
   id: string;
+  personId?: string;
   status?: string;
   roleLabel?: string | null;
   shirtNumber?: number | null;
   positionLabel?: string | null;
   sortOrder?: number;
+  subline?: string;
+  meta?: string;
+  currentTeam?: string | null;
   person?: {
     id: string;
     firstName: string;
@@ -18,6 +29,7 @@ type RawMember = {
     email: string | null;
     phone: string | null;
     dateOfBirth?: string | null;
+    trainerQualifications?: TrainerQualification[];
   };
   name?: string;
   imageUrl?: string | null;
@@ -63,13 +75,29 @@ function initials(name: string) {
     .join("");
 }
 
+function getBestQualificationLabel(qualifications?: TrainerQualification[]) {
+  if (!qualifications || qualifications.length === 0) return null;
+
+  const priority = ["VALID", "IN_PROGRESS", "PLANNED", "UNKNOWN", "EXPIRED"];
+  const best = [...qualifications].sort((a, b) => {
+    const statusDiff = priority.indexOf(a.status) - priority.indexOf(b.status);
+    if (statusDiff !== 0) return statusDiff;
+    if (a.isClubVerified !== b.isClubVerified) return a.isClubVerified ? -1 : 1;
+    return a.title.localeCompare(b.title);
+  })[0];
+
+  return [best.title, best.issuer, best.status === "VALID" ? "gültig" : null]
+    .filter(Boolean)
+    .join(" • ");
+}
+
 function normalizeTrainer(member: RawMember): Person {
   return {
     id: member.id,
-    personId: member.person?.id ?? member.id,
+    personId: member.personId ?? member.person?.id ?? member.id,
     name: personName(member),
-    subline: member.person?.email ?? "",
-    meta: member.roleLabel ?? "Trainer",
+    subline: member.subline ?? getBestQualificationLabel(member.person?.trainerQualifications) ?? member.person?.email ?? "",
+    meta: member.meta ?? member.roleLabel ?? "Trainer",
     imageUrl: member.imageUrl ?? null,
   };
 }
@@ -77,13 +105,17 @@ function normalizeTrainer(member: RawMember): Person {
 function normalizePlayer(member: RawMember): Person {
   return {
     id: member.id,
-    personId: member.person?.id ?? member.id,
+    personId: member.personId ?? member.person?.id ?? member.id,
     name: personName(member),
-    subline: [
-      member.shirtNumber ? "Nr. " + member.shirtNumber : "",
-      member.person?.dateOfBirth ? new Date(member.person.dateOfBirth).toLocaleDateString("de-CH") : "",
-    ].filter(Boolean).join(" • "),
-    meta: member.positionLabel ?? "",
+    subline:
+      member.subline ??
+      [
+        member.shirtNumber ? "Nr. " + member.shirtNumber : "",
+        member.person?.dateOfBirth ? "Jahrgang " + new Date(member.person.dateOfBirth).getUTCFullYear() : "",
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    meta: member.meta ?? member.positionLabel ?? "",
     imageUrl: member.imageUrl ?? null,
   };
 }
@@ -99,10 +131,14 @@ function normalizeSearchPerson(item: any): Person {
     id: item.id,
     personId: item.id,
     name,
-    subline: item.dateOfBirth ? "Jahrgang " + new Date(item.dateOfBirth).getUTCFullYear() : item.email ?? item.phone ?? "",
-    meta: item.functionLabel ?? (item.isTrainer ? "Trainer" : item.isPlayer ? "Spieler" : "Person"),
+    subline: item.isPlayer
+      ? item.dateOfBirth
+        ? "Jahrgang " + new Date(item.dateOfBirth).getUTCFullYear()
+        : "Jahrgang fehlt"
+      : item.teamLabel ?? item.email ?? item.phone ?? "",
+    meta: item.isTrainer ? "Trainer" : item.isPlayer ? "Spieler" : item.functionLabel ?? "Person",
     imageUrl: item.imageUrl ?? item.imageSrc ?? null,
-    currentTeam: item.currentTeam ?? item.teamLabel ?? null,
+    currentTeam: item.currentTeam ?? null,
   };
 }
 
@@ -114,6 +150,7 @@ function InlinePeoplePicker({
   emptyLabel,
   placeholder,
   onAssign,
+  assigningPersonId,
 }: {
   query: string;
   setQuery: (value: string) => void;
@@ -122,7 +159,7 @@ function InlinePeoplePicker({
   emptyLabel: string;
   placeholder: string;
   onAssign: (person: Person) => void;
-  assigningPersonId?: string | null;
+  assigningPersonId: string | null;
 }) {
   return (
     <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -160,14 +197,18 @@ function InlinePeoplePicker({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-black text-slate-900">{person.name}</p>
                     {person.meta ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-[#0b4aa2]">{person.meta}</span> : null}
-                    {person.currentTeam ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Bereits bei {person.currentTeam}</span> : null}
                   </div>
-                  {person.subline ? <p className="mt-0.5 truncate text-xs text-slate-500">{person.subline}</p> : null}
+                  {person.subline ? <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{person.subline}</p> : null}
                 </div>
               </div>
 
-              <button type="button" onClick={() => onAssign(person)} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-[#0b4aa2] hover:border-[#0b4aa2] hover:bg-blue-50">
-                Hinzufügen
+              <button
+                type="button"
+                onClick={() => onAssign(person)}
+                disabled={assigningPersonId === person.personId}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-[#0b4aa2] transition hover:border-[#0b4aa2] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {assigningPersonId === person.personId ? "Wird hinzugefügt..." : "Hinzufügen"}
               </button>
             </div>
           ))
@@ -226,7 +267,7 @@ function PersonRow({
             <p className="truncate text-sm font-bold text-slate-900">{person.name}</p>
             {person.meta ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-[#0b4aa2]">{person.meta}</span> : null}
           </div>
-          {person.subline ? <p className="mt-0.5 truncate text-xs text-slate-500">{person.subline}</p> : null}
+          {person.subline ? <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{person.subline}</p> : null}
         </div>
       </div>
 
@@ -263,6 +304,27 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
   }, [initialTrainers, initialPlayers]);
 
   useEffect(() => {
+    const teamSeasonId = resolvedTeamSeason?.id;
+    if (!teamSeasonId) return;
+
+    async function load() {
+      try {
+        const [trainerResponse, playerResponse] = await Promise.all([
+          fetch(`/api/teams/${teamId}/team-seasons/${teamSeasonId}/trainer-members`),
+          fetch(`/api/teams/${teamId}/team-seasons/${teamSeasonId}/squad-members`),
+        ]);
+
+        if (trainerResponse.ok) setTrainers((await trainerResponse.json()).map(normalizeTrainer));
+        if (playerResponse.ok) setPlayers((await playerResponse.json()).map(normalizePlayer));
+      } catch {
+        setActionError("Kaderdaten konnten nicht geladen werden. Bitte Seite neu laden.");
+      }
+    }
+
+    void load();
+  }, [teamId, resolvedTeamSeason?.id]);
+
+  useEffect(() => {
     if (!resolvedTeamSeason?.id || trainerQuery.trim().length < 2) {
       setTrainerResults([]);
       return;
@@ -272,8 +334,10 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
       setTrainerSearchLoading(true);
       try {
         const response = await fetch(`/api/people/search?mode=trainer&teamSeasonId=${resolvedTeamSeason.id}&q=${encodeURIComponent(trainerQuery)}`);
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
         setTrainerResults(Array.isArray(data) ? data.map(normalizeSearchPerson) : []);
+      } catch {
+        setTrainerResults([]);
       } finally {
         setTrainerSearchLoading(false);
       }
@@ -292,8 +356,10 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
       setPlayerSearchLoading(true);
       try {
         const response = await fetch(`/api/people/search?mode=player&teamSeasonId=${resolvedTeamSeason.id}&q=${encodeURIComponent(playerQuery)}`);
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
         setPlayerResults(Array.isArray(data) ? data.map(normalizeSearchPerson) : []);
+      } catch {
+        setPlayerResults([]);
       } finally {
         setPlayerSearchLoading(false);
       }
@@ -318,46 +384,60 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     if (!resolvedTeamSeason?.id) return;
 
     setActionError(null);
+    setAssigningPersonId(person.personId);
 
-    const response = await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/trainer-members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ personId: person.personId }),
-    });
+    try {
+      const response = await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/trainer-members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personId: person.personId }),
+      });
 
-    const data = await response.json().catch(() => null);
+      const data = await response.json().catch(() => null);
 
-    if (!response.ok) {
-      setActionError(data?.error ?? "Trainer konnte nicht hinzugefügt werden.");
-      return;
+      if (!response.ok) {
+        setActionError(data?.error ?? "Trainer konnte nicht hinzugefügt werden.");
+        return;
+      }
+
+      setTrainers((current) => [...current, normalizeTrainer({ ...data, subline: data?.subline ?? person.subline })]);
+      setTrainerQuery("");
+      setTrainerResults([]);
+    } catch {
+      setActionError("Trainer konnte nicht hinzugefügt werden.");
+    } finally {
+      setAssigningPersonId(null);
     }
-
-    setTrainers((current) => [...current, { ...person, id: data?.id ?? data?.member?.id ?? person.id }]);
-    setTrainerQuery("");
-    setTrainerResults([]);
   }
 
   async function assignPlayer(person: Person) {
     if (!resolvedTeamSeason?.id) return;
 
     setActionError(null);
+    setAssigningPersonId(person.personId);
 
-    const response = await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/squad-members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ personId: person.personId }),
-    });
+    try {
+      const response = await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/squad-members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personId: person.personId }),
+      });
 
-    const data = await response.json().catch(() => null);
+      const data = await response.json().catch(() => null);
 
-    if (!response.ok) {
-      setActionError(data?.error ?? "Spieler konnte nicht hinzugefügt werden.");
-      return;
+      if (!response.ok) {
+        setActionError(data?.error ?? "Spieler konnte nicht hinzugefügt werden.");
+        return;
+      }
+
+      setPlayers((current) => [...current, normalizePlayer({ ...data, subline: data?.subline ?? person.subline })]);
+      setPlayerQuery("");
+      setPlayerResults([]);
+    } catch {
+      setActionError("Spieler konnte nicht hinzugefügt werden.");
+    } finally {
+      setAssigningPersonId(null);
     }
-
-    setPlayers((current) => [...current, { ...person, id: data?.id ?? data?.member?.id ?? person.id }]);
-    setPlayerQuery("");
-    setPlayerResults([]);
   }
 
   async function removeTrainer(memberId: string) {
@@ -397,9 +477,9 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
                   }}
                   onDrop={() => {
                     setDragging(null);
-                    persistOrder("trainer", trainers);
+                    void persistOrder("trainer", trainers);
                   }}
-                  onRemove={() => removeTrainer(trainer.id)}
+                  onRemove={() => void removeTrainer(trainer.id)}
                 />
               ))
             )}
@@ -414,6 +494,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
               placeholder="Trainer suchen..."
               emptyLabel="Keine passenden Trainer gefunden."
               onAssign={assignTrainer}
+              assigningPersonId={assigningPersonId}
             />
           ) : null}
         </div>
@@ -444,9 +525,9 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
                   }}
                   onDrop={() => {
                     setDragging(null);
-                    persistOrder("player", players);
+                    void persistOrder("player", players);
                   }}
-                  onRemove={() => removePlayer(player.id)}
+                  onRemove={() => void removePlayer(player.id)}
                 />
               ))
             )}
@@ -461,6 +542,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
               placeholder="Spieler suchen..."
               emptyLabel="Keine passenden Spieler gefunden."
               onAssign={assignPlayer}
+              assigningPersonId={assigningPersonId}
             />
           ) : null}
         </div>
@@ -474,5 +556,3 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
-
-
