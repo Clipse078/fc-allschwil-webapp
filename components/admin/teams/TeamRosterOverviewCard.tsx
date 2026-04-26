@@ -360,6 +360,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
   return (
     <div className="space-y-7">
       {actionError ? <div className="rounded-[22px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{actionError}</div> : null}
+      {actionError ? <div className="rounded-[22px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{actionError}</div> : null}
       <section className="grid gap-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:grid-cols-[1fr_320px]">
         <div>
           <p className="fca-eyebrow">Trainerstaff</p>
@@ -452,4 +453,6 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
+
 
