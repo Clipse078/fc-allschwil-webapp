@@ -122,6 +122,7 @@ function InlinePeoplePicker({
   emptyLabel: string;
   placeholder: string;
   onAssign: (person: Person) => void;
+  assigningPersonId?: string | null;
 }) {
   return (
     <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -251,6 +252,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
   const [players, setPlayers] = useState<Person[]>([]);
   const [dragging, setDragging] = useState<{ type: "trainer" | "player"; id: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [assigningPersonId, setAssigningPersonId] = useState<string | null>(null);
 
   const initialTrainers = useMemo(() => (resolvedTeamSeason?.trainerTeamMembers ?? []).map(normalizeTrainer), [resolvedTeamSeason?.trainerTeamMembers]);
   const initialPlayers = useMemo(() => (resolvedTeamSeason?.playerSquadMembers ?? []).map(normalizePlayer), [resolvedTeamSeason?.playerSquadMembers]);
@@ -472,4 +474,5 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
 
