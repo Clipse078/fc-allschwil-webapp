@@ -339,6 +339,35 @@ export default function TeamTrainerManagementCard({
     }
   }
 
+  async function handleInlineUpdate(member: TrainerMember, updates: Partial<Pick<TrainerMember, "isWebsiteVisible">>) {
+    if (!canManage) return;
+
+    setRemoveError(null);
+    setRemoveMessage(null);
+    setAssignError(null);
+    setAssignMessage(null);
+
+    try {
+      const response = await fetch(
+        "/api/teams/" + teamId + "/team-seasons/" + teamSeason.id + "/trainer-members/" + member.id,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Trainerteam-Eintrag konnte nicht aktualisiert werden.");
+      }
+
+      router.refresh();
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+    }
+  }
   async function handleRemove(member: TrainerMember) {
     if (!canManage) return;
 
@@ -494,7 +523,7 @@ export default function TeamTrainerManagementCard({
               meta={
                 <>
                   <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
-                  <span className="fca-pill">Website: {member.isWebsiteVisible ? "Ja" : "Nein"}</span>
+                  <button type="button" onClick={() => handleInlineUpdate(member, { isWebsiteVisible: !member.isWebsiteVisible })} disabled={!canManage} className="fca-pill">Website: {member.isWebsiteVisible ? "Ja" : "Nein"}</button>
                   <button type="button" onClick={() => setExpandedQualificationPersonId(expandedQualificationPersonId === member.person.id ? null : member.person.id)} className="fca-pill">Diplome: {member.person.trainerQualifications?.length ?? 0}</button>
                 </>
               }
@@ -626,3 +655,4 @@ function Toggle({
     </div>
   );
 }
+
