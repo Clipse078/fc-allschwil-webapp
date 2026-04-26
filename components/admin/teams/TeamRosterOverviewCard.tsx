@@ -196,9 +196,9 @@ function InlinePeoplePicker({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-black text-slate-900">{person.name}</p>
-                    {person.meta ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-[#0b4aa2]">{person.meta}</span> : null}
+                    {person.meta ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#0b4aa2]">{person.meta}</span> : null}
                   </div>
-                  {person.subline ? <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{person.subline}</p> : null}
+                  {person.subline ? <p className="mt-1 truncate text-xs font-bold text-slate-500">{person.subline}</p> : null}
                 </div>
               </div>
 
@@ -256,24 +256,24 @@ function PersonRow({
         event.preventDefault();
         onDrop();
       }}
-      className={`flex cursor-grab items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${isDragging ? "opacity-40" : ""}`}
+      className={`group flex cursor-grab items-center justify-between rounded-[22px] border border-slate-200 bg-white/95 px-5 py-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#0b4aa2]/20 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)] ${isDragging ? "opacity-40" : ""}`}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-slate-600">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#0b4aa2]/10 bg-gradient-to-br from-blue-50 to-slate-50 text-sm font-black text-[#0b4aa2] shadow-sm">
           {person.imageUrl ? <img src={person.imageUrl} alt={person.name} className="h-full w-full object-cover" /> : initials(person.name)}
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-bold text-slate-900">{person.name}</p>
-            {person.meta ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-[#0b4aa2]">{person.meta}</span> : null}
+            <p className="truncate text-[15px] font-black tracking-tight text-slate-950">{person.name}</p>
+            {person.meta ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#0b4aa2]">{person.meta}</span> : null}
           </div>
-          {person.subline ? <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{person.subline}</p> : null}
+          {person.subline ? <p className="mt-1 truncate text-xs font-bold text-slate-500">{person.subline}</p> : null}
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        <GripVertical className="h-4 w-4 text-slate-300" />
-        <button type="button" onClick={onRemove} className="rounded-full border border-red-100 bg-white px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50">
+        <GripVertical className="h-4 w-4 text-slate-300 transition group-hover:text-[#0b4aa2]" />
+        <button type="button" onClick={onRemove} className="rounded-full border border-red-100 bg-white px-4 py-2 text-xs font-black text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50 disabled:opacity-60">
           Entfernen
         </button>
       </div>
@@ -556,3 +556,4 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
