@@ -1,12 +1,16 @@
 ﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
+type Context = {
+  params: Promise<{ teamId: string; teamSeasonId: string }>;
+};
+
 function personName(person: { displayName: string | null; firstName: string; lastName: string }) {
   return person.displayName || `${person.firstName} ${person.lastName}`.trim();
 }
 
-export async function GET(req: Request, { params }: any) {
-  const { teamSeasonId } = params;
+export async function GET(_: Request, context: Context) {
+  const { teamSeasonId } = await context.params;
 
   try {
     const data = await prisma.playerSquadMember.findMany({
@@ -17,36 +21,46 @@ export async function GET(req: Request, { params }: any) {
 
     return NextResponse.json(
       data.map((x) => ({
-        id: x.person.id,
+        id: x.id,
+        personId: x.personId,
         name: personName(x.person),
+        subline: [x.shirtNumber ? "Nr. " + x.shirtNumber : "", x.person.dateOfBirth ? new Date(x.person.dateOfBirth).toLocaleDateString("de-CH") : ""].filter(Boolean).join(" • "),
+        meta: x.positionLabel ?? "",
         imageUrl: null,
-      }))
+      })),
     );
-  } catch {
-    return NextResponse.json({ error: "Failed to load players" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Spieler konnten nicht geladen werden." }, { status: 500 });
   }
 }
 
-export async function POST(req: Request, { params }: any) {
-  const { teamSeasonId } = params;
+export async function POST(req: Request, context: Context) {
+  const { teamSeasonId } = await context.params;
 
   try {
     const body = await req.json();
     const personId = body?.personId;
 
     if (!personId) {
-      return NextResponse.json({ error: "personId is required" }, { status: 400 });
+      return NextResponse.json({ error: "personId fehlt." }, { status: 400 });
     }
 
-    await prisma.playerSquadMember.upsert({
+    const member = await prisma.playerSquadMember.upsert({
       where: { teamSeasonId_personId: { teamSeasonId, personId } },
       update: { status: "ACTIVE" },
       create: { teamSeasonId, personId },
+      include: { person: true },
     });
 
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to assign player" }, { status: 500 });
+    return NextResponse.json({
+      id: member.id,
+      personId: member.personId,
+      name: personName(member.person),
+      subline: [member.shirtNumber ? "Nr. " + member.shirtNumber : "", member.person.dateOfBirth ? new Date(member.person.dateOfBirth).toLocaleDateString("de-CH") : ""].filter(Boolean).join(" • "),
+      meta: member.positionLabel ?? "",
+      imageUrl: null,
+    });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Spieler konnte nicht hinzugefügt werden." }, { status: 500 });
   }
 }
-
