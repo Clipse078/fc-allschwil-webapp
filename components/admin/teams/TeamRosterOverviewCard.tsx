@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { GripVertical, Search, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -71,7 +71,7 @@ function normalizePlayer(member: RawMember): Person {
   return {
     id: member.person?.id ?? member.id,
     name: personName(member),
-    subline: [member.shirtNumber, member.person?.dateOfBirth ? new Date(member.person.dateOfBirth).toLocaleDateString("de-CH") : ""].filter(Boolean).join(" · "),
+    subline: [member.shirtNumber, member.person?.dateOfBirth ? new Date(member.person.dateOfBirth).toLocaleDateString("de-CH") : ""].filter(Boolean).join(" Â· "),
     meta: member.positionLabel ?? "",
     imageUrl: member.imageUrl ?? null,
   };
@@ -127,7 +127,7 @@ function InlinePeoplePicker({
           </div>
         ) : loading ? (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
-            Suche läuft...
+            Suche lÃ¤uft...
           </div>
         ) : results.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
@@ -151,7 +151,7 @@ function InlinePeoplePicker({
               </div>
 
               <button type="button" onClick={() => onAssign(person.id)} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-[#0b4aa2] hover:border-[#0b4aa2] hover:bg-blue-50">
-                Hinzufügen
+                HinzufÃ¼gen
               </button>
             </div>
           ))
@@ -236,6 +236,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
   const [trainers, setTrainers] = useState<Person[]>([]);
   const [players, setPlayers] = useState<Person[]>([]);
   const [dragging, setDragging] = useState<{ type: "trainer" | "player"; id: string } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const initialTrainers = useMemo(() => (resolvedTeamSeason?.trainerTeamMembers ?? []).map(normalizeTrainer), [resolvedTeamSeason?.trainerTeamMembers]);
   const initialPlayers = useMemo(() => (resolvedTeamSeason?.playerSquadMembers ?? []).map(normalizePlayer), [resolvedTeamSeason?.playerSquadMembers]);
@@ -358,6 +359,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
 
   return (
     <div className="space-y-7">
+      {actionError ? <div className="rounded-[22px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{actionError}</div> : null}
       <section className="grid gap-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:grid-cols-[1fr_320px]">
         <div>
           <p className="fca-eyebrow">Trainerstaff</p>
@@ -399,7 +401,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
         <div className="flex flex-col justify-center border-t border-slate-200 pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-[#0b4aa2]"><Users className="h-6 w-6" /></div>
           <h3 className="mt-4 text-sm font-bold text-slate-900">Trainer verwalten</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-500">Füge Trainer und Betreuer hinzu und pflege die Reihenfolge für die Teamseite.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-500">FÃ¼ge Trainer und Betreuer hinzu und pflege die Reihenfolge fÃ¼r die Teamseite.</p>
         </div>
       </section>
 
@@ -444,9 +446,10 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
         <div className="flex flex-col justify-center border-t border-slate-200 pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-[#0b4aa2]"><Users className="h-6 w-6" /></div>
           <h3 className="mt-4 text-sm font-bold text-slate-900">Kader verwalten</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-500">Füge Spieler hinzu, verwalte die Reihenfolge und stelle sicher, dass der Kader aktuell ist.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-500">FÃ¼ge Spieler hinzu, verwalte die Reihenfolge und stelle sicher, dass der Kader aktuell ist.</p>
         </div>
       </section>
     </div>
   );
 }
+
