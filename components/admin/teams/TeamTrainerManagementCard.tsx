@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminListItem from "@/components/admin/shared/AdminListItem";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
+import PeoplePicker, { PeoplePickerPerson } from "@/components/admin/shared/people-picker/PeoplePicker";
 import { getCanonicalSeasonLabel } from "@/lib/teams/jahrgang-rules";
 
 type TrainerQualification = {
@@ -36,15 +37,6 @@ type TrainerMember = {
     phone: string | null;
     trainerQualifications?: TrainerQualification[];
   };
-};
-
-type PersonSearchResult = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  displayName: string | null;
-  email: string | null;
-  phone: string | null;
 };
 
 type Props = {
@@ -116,18 +108,10 @@ export default function TeamTrainerManagementCard({
   const router = useRouter();
 
   const saisonLabel = useMemo(() => {
-    return (
-      getCanonicalSeasonLabel(teamSeason.season.startDate) ??
-      teamSeason.season.name
-    );
+    return getCanonicalSeasonLabel(teamSeason.season.startDate) ?? teamSeason.season.name;
   }, [teamSeason.season.startDate, teamSeason.season.name]);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<PersonSearchResult[]>([]);
-  const [selectedPersonId, setSelectedPersonId] = useState("");
-
+  const [selectedPerson, setSelectedPerson] = useState<PeoplePickerPerson | null>(null);
   const [assignStatus, setAssignStatus] = useState("ACTIVE");
   const [roleLabel, setRoleLabel] = useState("");
   const [isWebsiteVisible, setIsWebsiteVisible] = useState(true);
@@ -161,48 +145,10 @@ export default function TeamTrainerManagementCard({
   const [editQualificationVerified, setEditQualificationVerified] = useState(false);
   const [updatingQualificationId, setUpdatingQualificationId] = useState<string | null>(null);
 
-  async function handleSearch() {
-    if (searchQuery.trim().length < 2) {
-      setSearchError("Bitte mindestens 2 Zeichen eingeben.");
-      setSearchResults([]);
-      setSelectedPersonId("");
-      return;
-    }
-
-    setSearchLoading(true);
-    setSearchError(null);
-
-    try {
-      const response = await fetch(
-        "/api/people/search?q=" +
-          encodeURIComponent(searchQuery.trim()) +
-          "&mode=trainer&teamSeasonId=" +
-          encodeURIComponent(teamSeason.id),
-        { method: "GET", cache: "no-store" }
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Trainersuche konnte nicht geladen werden.");
-      }
-
-      const results = Array.isArray(data) ? (data as PersonSearchResult[]) : [];
-      setSearchResults(results);
-      setSelectedPersonId(results[0]?.id ?? "");
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
-      setSearchResults([]);
-      setSelectedPersonId("");
-    } finally {
-      setSearchLoading(false);
-    }
-  }
-
   async function handleAssign() {
     if (!canManage) return;
 
-    if (!selectedPersonId) {
+    if (!selectedPerson) {
       setAssignError("Bitte zuerst eine Person auswählen.");
       setAssignMessage(null);
       return;
@@ -221,14 +167,14 @@ export default function TeamTrainerManagementCard({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            personId: selectedPersonId,
+            personId: selectedPerson.id,
             status: assignStatus,
             roleLabel,
             isWebsiteVisible,
             sortOrder: sortOrder.trim(),
             remarks,
           }),
-        }
+        },
       );
 
       const data = await response.json().catch(() => null);
@@ -238,9 +184,7 @@ export default function TeamTrainerManagementCard({
       }
 
       setAssignMessage(data?.message ?? "Trainer erfolgreich dem Trainerteam hinzugefügt.");
-      setSelectedPersonId("");
-      setSearchQuery("");
-      setSearchResults([]);
+      setSelectedPerson(null);
       setRoleLabel("");
       setIsWebsiteVisible(true);
       setSortOrder("0");
@@ -345,7 +289,7 @@ export default function TeamTrainerManagementCard({
             issuer: editQualificationIssuer,
             isClubVerified: editQualificationVerified,
           }),
-        }
+        },
       );
 
       const data = await response.json().catch(() => null);
@@ -367,10 +311,7 @@ export default function TeamTrainerManagementCard({
   async function handleDeleteQualification(personId: string, qualification: TrainerQualification) {
     if (!canManage) return;
 
-    const confirmed = window.confirm(
-      'Diplom "' + qualification.title + '" wirklich löschen?'
-    );
-
+    const confirmed = window.confirm('Diplom "' + qualification.title + '" wirklich löschen?');
     if (!confirmed) return;
 
     setDeletingQualificationId(qualification.id);
@@ -380,7 +321,7 @@ export default function TeamTrainerManagementCard({
     try {
       const response = await fetch(
         "/api/people/" + personId + "/trainer-qualifications/" + qualification.id,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
 
       const data = await response.json().catch(() => null);
@@ -402,7 +343,7 @@ export default function TeamTrainerManagementCard({
     if (!canManage) return;
 
     const confirmed = window.confirm(
-      'Trainer "' + getPersonName(member.person) + '" wirklich aus diesem Trainerteam entfernen?'
+      'Trainer "' + getPersonName(member.person) + '" wirklich aus diesem Trainerteam entfernen?',
     );
 
     if (!confirmed) return;
@@ -413,13 +354,8 @@ export default function TeamTrainerManagementCard({
 
     try {
       const response = await fetch(
-        "/api/teams/" +
-          teamId +
-          "/team-seasons/" +
-          teamSeason.id +
-          "/trainer-members/" +
-          member.id,
-        { method: "DELETE" }
+        "/api/teams/" + teamId + "/team-seasons/" + teamSeason.id + "/trainer-members/" + member.id,
+        { method: "DELETE" },
       );
 
       const data = await response.json().catch(() => null);
@@ -462,51 +398,43 @@ export default function TeamTrainerManagementCard({
           <div>
             <h5 className="fca-eyebrow">Trainer zuweisen</h5>
             <p className="fca-body-muted mt-2">
-              Neue Personen werden nur im People-Modul angelegt.
+              Neue Personen werden nur im People-Modul angelegt. Die Suche zeigt nur zuweisbare Trainer.
             </p>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Aktiven Trainer suchen nach Name, E-Mail oder Telefon"
-              className="fca-input"
+          <div className="mt-4">
+            <PeoplePicker
+              selected={selectedPerson}
+              onSelect={setSelectedPerson}
+              searchMode="trainer"
+              teamSeasonId={teamSeason.id}
+              placeholder="Trainer suchen..."
+              emptyText="Keine passenden Trainer gefunden."
             />
-            <button type="button" onClick={handleSearch} disabled={searchLoading} className="fca-button-primary">
-              {searchLoading ? "Suche..." : "Suchen"}
-            </button>
           </div>
 
-          {searchError ? <div className="fca-status-box fca-status-box-error mt-4">{searchError}</div> : null}
-
-          {searchResults.length === 0 ? (
-            <div className="fca-status-box fca-status-box-muted mt-4">
-              Keine passenden aktiven Trainer gefunden. Neue Personen bitte im People-Modul anlegen.
-            </div>
-          ) : null}
-
-          {searchResults.length > 0 ? (
+          {selectedPerson ? (
             <div className="mt-4 grid gap-4">
-              <label className="block space-y-2">
-                <span className="fca-label">Trainer</span>
-                <select value={selectedPersonId} onChange={(event) => setSelectedPersonId(event.target.value)} className="fca-select">
-                  {searchResults.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {getPersonName(person)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="fca-card p-4">
+                <div className="flex items-center gap-4">
+                  <AdminAvatar name={selectedPerson.displayName} imageSrc={selectedPerson.imageSrc} size="md" />
+                  <div>
+                    <div className="font-semibold text-slate-900">{selectedPerson.displayName}</div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      {[selectedPerson.email, selectedPerson.phone].filter(Boolean).join(" • ") || "Keine Kontaktdaten"}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      {[selectedPerson.functionLabel, selectedPerson.teamLabel].filter(Boolean).join(" • ") || "Trainer"}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div className="grid gap-4 md:grid-cols-3">
                 <label className="block space-y-2">
                   <span className="fca-label">Status</span>
                   <select value={assignStatus} onChange={(event) => setAssignStatus(event.target.value)} className="fca-select">
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
+                    {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
                 </label>
 
@@ -532,7 +460,7 @@ export default function TeamTrainerManagementCard({
               {assignMessage ? <div className="fca-status-box fca-status-box-success">{assignMessage}</div> : null}
 
               <div className="flex justify-end">
-                <button type="button" onClick={handleAssign} disabled={assignLoading || !selectedPersonId} className="fca-button-primary">
+                <button type="button" onClick={handleAssign} disabled={assignLoading || !selectedPerson} className="fca-button-primary">
                   {assignLoading ? "Hinzufügen..." : "Trainer hinzufügen"}
                 </button>
               </div>
@@ -605,27 +533,16 @@ export default function TeamTrainerManagementCard({
                                     <input className="fca-input" value={editQualificationIssuer} onChange={(event) => setEditQualificationIssuer(event.target.value)} placeholder="Aussteller" />
                                     <div className="grid gap-3 md:grid-cols-2">
                                       <select className="fca-select" value={editQualificationType} onChange={(event) => setEditQualificationType(event.target.value)}>
-                                        {QUALIFICATION_TYPE_OPTIONS.map((option) => (
-                                          <option key={option.value} value={option.value}>{option.label}</option>
-                                        ))}
+                                        {QUALIFICATION_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                       </select>
                                       <select className="fca-select" value={editQualificationStatus} onChange={(event) => setEditQualificationStatus(event.target.value)}>
-                                        {QUALIFICATION_STATUS_OPTIONS.map((option) => (
-                                          <option key={option.value} value={option.value}>{option.label}</option>
-                                        ))}
+                                        {QUALIFICATION_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                       </select>
                                     </div>
                                     <Toggle label="Vom Club geprüft" value={editQualificationVerified} onChange={setEditQualificationVerified} />
                                     <div className="flex flex-wrap justify-end gap-2">
-                                      <button type="button" onClick={cancelEditQualification} className="fca-button-secondary">
-                                        Abbrechen
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpdateQualification(member.person.id, qualification.id)}
-                                        disabled={updatingQualificationId === qualification.id}
-                                        className="fca-button-primary"
-                                      >
+                                      <button type="button" onClick={cancelEditQualification} className="fca-button-secondary">Abbrechen</button>
+                                      <button type="button" onClick={() => handleUpdateQualification(member.person.id, qualification.id)} disabled={updatingQualificationId === qualification.id} className="fca-button-primary">
                                         {updatingQualificationId === qualification.id ? "Speichern..." : "Speichern"}
                                       </button>
                                     </div>
@@ -639,15 +556,8 @@ export default function TeamTrainerManagementCard({
                                       </div>
                                     </div>
                                     <div className="flex shrink-0 gap-2">
-                                      <button type="button" onClick={() => startEditQualification(qualification)} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteQualification(member.person.id, qualification)}
-                                        disabled={deletingQualificationId === qualification.id}
-                                        className="rounded-full border border-red-100 bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                      >
+                                      <button type="button" onClick={() => startEditQualification(qualification)} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">Edit</button>
+                                      <button type="button" onClick={() => handleDeleteQualification(member.person.id, qualification)} disabled={deletingQualificationId === qualification.id} className="rounded-full border border-red-100 bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
                                         {deletingQualificationId === qualification.id ? "Löschen..." : "Löschen"}
                                       </button>
                                     </div>
@@ -670,22 +580,13 @@ export default function TeamTrainerManagementCard({
                           <input className="fca-input" value={qualificationIssuer} onChange={(event) => setQualificationIssuer(event.target.value)} placeholder="Aussteller, z. B. SFV / FVNWS" />
                           <div className="grid gap-3 md:grid-cols-2">
                             <select className="fca-select" value={qualificationType} onChange={(event) => setQualificationType(event.target.value)}>
-                              {QUALIFICATION_TYPE_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
+                              {QUALIFICATION_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                             </select>
                             <select className="fca-select" value={qualificationStatus} onChange={(event) => setQualificationStatus(event.target.value)}>
-                              {QUALIFICATION_STATUS_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
+                              {QUALIFICATION_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                             </select>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleCreateQualification(member.person.id)}
-                            disabled={qualificationLoading}
-                            className="fca-button-primary"
-                          >
+                          <button type="button" onClick={() => handleCreateQualification(member.person.id)} disabled={qualificationLoading} className="fca-button-primary">
                             {qualificationLoading ? "Speichern..." : "Intern speichern"}
                           </button>
                         </div>
