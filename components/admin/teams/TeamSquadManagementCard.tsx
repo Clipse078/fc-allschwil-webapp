@@ -207,7 +207,7 @@ export default function TeamSquadManagementCard({
     }
   }
 
-  async function handleInlineUpdate(member: SquadMember, updates: Partial<Pick<SquadMember, "isWebsiteVisible" | "isCaptain" | "isViceCaptain">>) {
+  async function handleInlineUpdate(member: SquadMember, updates: Partial<Pick<SquadMember, "isWebsiteVisible" | "isCaptain" | "isViceCaptain" | "shirtNumber" | "positionLabel">>) {
     if (!canManage) return;
 
     setRemoveError(null);
@@ -506,4 +506,5 @@ function Toggle({
     </div>
   );
 }
+
 
