@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
@@ -13,6 +13,9 @@ export type PeoplePickerPerson = {
   imageSrc?: string | null;
   functionLabel?: string | null;
   teamLabel?: string | null;
+  dateOfBirth?: string | null;
+  isPlayer?: boolean;
+  isTrainer?: boolean;
 };
 
 type PeoplePickerProps = {
@@ -24,6 +27,8 @@ type PeoplePickerProps = {
   placeholder?: string;
   searchMode?: "any" | "player" | "trainer" | "vereinsleitung";
   emptyText?: string;
+  teamSeasonId?: string;
+  disabled?: boolean;
 };
 
 const searchCache = new Map<string, PeoplePickerPerson[]>();
@@ -33,9 +38,7 @@ function escapeRegExp(value: string) {
 }
 
 function highlightText(text: string, query: string) {
-  if (!query.trim()) {
-    return text;
-  }
+  if (!query.trim()) return text;
 
   const regex = new RegExp("(" + escapeRegExp(query.trim()) + ")", "ig");
   const parts = text.split(regex);
@@ -43,23 +46,23 @@ function highlightText(text: string, query: string) {
   return parts.map((part, index) => {
     const isMatch = part.toLowerCase() === query.trim().toLowerCase();
 
-    if (isMatch) {
-      return (
-        <mark
-          key={index}
-          className="rounded bg-amber-100 px-0.5 text-slate-900"
-        >
-          {part}
-        </mark>
-      );
-    }
+    if (!isMatch) return <span key={index}>{part}</span>;
 
-    return <span key={index}>{part}</span>;
+    return (
+      <mark key={index} className="rounded bg-amber-100 px-0.5 text-slate-900">
+        {part}
+      </mark>
+    );
   });
 }
 
 function buildMetaLabel(person: PeoplePickerPerson) {
-  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" â€¢ ");
+  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" • ");
+}
+
+function getAssignmentTone(person: PeoplePickerPerson) {
+  if (person.teamLabel) return "assigned";
+  return "free";
 }
 
 export default function PeoplePicker({
@@ -71,6 +74,8 @@ export default function PeoplePicker({
   placeholder = "Name, Gruppe oder E-Mail suchen",
   searchMode = "any",
   emptyText = "Keine passende Person gefunden.",
+  teamSeasonId,
+  disabled = false,
 }: PeoplePickerProps) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -83,30 +88,41 @@ export default function PeoplePicker({
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedIds = useMemo(() => {
-    if (mode === "multiple") {
-      return new Set(selectedItems.map((item) => item.id));
-    }
-
+    if (mode === "multiple") return new Set(selectedItems.map((item) => item.id));
     return new Set(selected ? [selected.id] : []);
   }, [mode, selected, selectedItems]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      const nextQuery = query.trim(); if (nextQuery.length < 2) { setResults([]); setIsLoading(false); setHighlightedIndex(0); } setDebouncedQuery(nextQuery);
-    }, 250);
+      const nextQuery = query.trim();
+
+      if (nextQuery.length < 2) {
+        setResults([]);
+        setIsLoading(false);
+        setHighlightedIndex(0);
+      }
+
+      setDebouncedQuery(nextQuery);
+    }, 220);
 
     return () => window.clearTimeout(timeout);
   }, [query]);
 
   useEffect(() => {
-    if (debouncedQuery.length < 2) {
+    if (debouncedQuery.length < 2 || disabled) {
       setResults([]);
       setIsLoading(false);
       setHighlightedIndex(0);
       return;
     }
 
-    const cacheKey = searchMode + "::" + debouncedQuery.toLowerCase();
+    const cacheKey =
+      searchMode +
+      "::" +
+      (teamSeasonId ?? "global") +
+      "::" +
+      debouncedQuery.toLowerCase();
+
     const cached = searchCache.get(cacheKey);
 
     if (cached) {
@@ -119,17 +135,19 @@ export default function PeoplePicker({
     const controller = new AbortController();
     setIsLoading(true);
 
-    fetch(
-      "/api/people/search?q=" +
-        encodeURIComponent(debouncedQuery) +
-        "&mode=" +
-        encodeURIComponent(searchMode),
-      {
-        method: "GET",
-        cache: "no-store",
-        signal: controller.signal,
-      },
-    )
+    const params = new URLSearchParams();
+    params.set("q", debouncedQuery);
+    params.set("mode", searchMode);
+
+    if (teamSeasonId) {
+      params.set("teamSeasonId", teamSeasonId);
+    }
+
+    fetch("/api/people/search?" + params.toString(), {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    })
       .then(async (response) => {
         const data = await response.json().catch(() => null);
 
@@ -143,18 +161,14 @@ export default function PeoplePicker({
         setHighlightedIndex(0);
       })
       .catch(() => {
-        if (!controller.signal.aborted) {
-          setResults([]);
-        }
+        if (!controller.signal.aborted) setResults([]);
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
+        if (!controller.signal.aborted) setIsLoading(false);
       });
 
     return () => controller.abort();
-  }, [debouncedQuery, searchMode]);
+  }, [debouncedQuery, disabled, searchMode, teamSeasonId]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -167,19 +181,22 @@ export default function PeoplePicker({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function applySingleSelect(person: PeoplePickerPerson) {
-    onSelect?.(person);
+  function resetAfterSelect(keepOpen: boolean) {
     setQuery("");
     setDebouncedQuery("");
     setResults([]);
     setHighlightedIndex(0);
-    setIsOpen(false);
+    setIsOpen(keepOpen);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  function applySingleSelect(person: PeoplePickerPerson) {
+    onSelect?.(person);
+    resetAfterSelect(false);
   }
 
   function applyMultiSelect(person: PeoplePickerPerson) {
-    if (!onChange) {
-      return;
-    }
+    if (!onChange) return;
 
     const exists = selectedItems.some((item) => item.id === person.id);
     const nextItems = exists
@@ -187,27 +204,17 @@ export default function PeoplePicker({
       : [...selectedItems, person];
 
     onChange(nextItems);
-    setQuery("");
-    setDebouncedQuery("");
-    setResults([]);
-    setHighlightedIndex(0);
-    setIsOpen(true);
-    inputRef.current?.focus();
+    resetAfterSelect(true);
   }
 
   function removeChip(personId: string) {
-    if (mode !== "multiple" || !onChange) {
-      return;
-    }
-
+    if (mode !== "multiple" || !onChange) return;
     onChange(selectedItems.filter((item) => item.id !== personId));
   }
 
   function selectHighlighted() {
     const person = results[highlightedIndex];
-    if (!person) {
-      return;
-    }
+    if (!person) return;
 
     if (mode === "multiple") {
       applyMultiSelect(person);
@@ -217,24 +224,20 @@ export default function PeoplePicker({
     applySingleSelect(person);
   }
 
-  const shouldShowDropdown = isOpen && debouncedQuery.length >= 2;
+  const shouldShowDropdown = isOpen && debouncedQuery.length >= 2 && !disabled;
 
   return (
     <div ref={rootRef} className="relative z-20">
       {mode === "single" && selected ? (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-[18px] border border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.04] px-3 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <AdminAvatar
-              name={selected.displayName}
-              imageSrc={selected.imageSrc}
-              size="sm"
-            />
+            <AdminAvatar name={selected.displayName} imageSrc={selected.imageSrc} size="sm" />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-slate-900">
                 {selected.displayName}
               </div>
               <div className="truncate text-xs text-slate-500">
-                {buildMetaLabel(selected) || selected.email || "Person verknÃ¼pft"}
+                {buildMetaLabel(selected) || selected.email || "Person verknüpft"}
               </div>
             </div>
           </div>
@@ -242,19 +245,20 @@ export default function PeoplePicker({
           <button
             type="button"
             onClick={() => onSelect?.(null)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+            disabled={disabled}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            LÃ¶sen
+            Lösen
           </button>
         </div>
       ) : null}
 
       <div
         className={`rounded-[20px] border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition ${
-          isOpen
+          isOpen && !disabled
             ? "border-[#0b4aa2] ring-4 ring-[#0b4aa2]/10"
             : "border-slate-200"
-        }`}
+        } ${disabled ? "opacity-60" : ""}`}
       >
         {mode === "multiple" && selectedItems.length > 0 ? (
           <div className="flex flex-wrap gap-2 border-b border-slate-100 px-3 pb-2 pt-3">
@@ -267,10 +271,11 @@ export default function PeoplePicker({
                 <button
                   type="button"
                   onClick={() => removeChip(item.id)}
-                  className="rounded-full text-[#0b4aa2]/70 transition hover:text-rose-600"
+                  disabled={disabled}
+                  className="rounded-full text-[#0b4aa2]/70 transition hover:text-rose-600 disabled:cursor-not-allowed"
                   aria-label={item.displayName + " entfernen"}
                 >
-                  Ã—
+                  ×
                 </button>
               </div>
             ))}
@@ -281,6 +286,7 @@ export default function PeoplePicker({
           <input
             ref={inputRef}
             value={query}
+            disabled={disabled}
             onChange={(event) => {
               setQuery(event.target.value);
               setIsOpen(true);
@@ -318,12 +324,10 @@ export default function PeoplePicker({
                 selectHighlighted();
               }
 
-              if (event.key === "Escape") {
-                setIsOpen(false);
-              }
+              if (event.key === "Escape") setIsOpen(false);
             }}
             placeholder={placeholder}
-            className={`w-full rounded-[20px] bg-white px-4 py-3 text-sm text-slate-900 outline-none ${
+            className={`w-full rounded-[20px] bg-white px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed ${
               mode === "multiple" && selectedItems.length > 0 ? "rounded-t-none" : ""
             }`}
           />
@@ -339,15 +343,14 @@ export default function PeoplePicker({
       {shouldShowDropdown ? (
         <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.14)]">
           {results.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-500">
-              {emptyText}
-            </div>
+            <div className="px-4 py-3 text-sm text-slate-500">{emptyText}</div>
           ) : (
             <div className="max-h-72 overflow-auto py-2">
               {results.map((person, index) => {
                 const isSelected = selectedIds.has(person.id);
                 const isHighlighted = index === highlightedIndex;
                 const metaLabel = buildMetaLabel(person);
+                const assignmentTone = getAssignmentTone(person);
 
                 return (
                   <button
@@ -363,16 +366,10 @@ export default function PeoplePicker({
                       applySingleSelect(person);
                     }}
                     className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
-                      isHighlighted
-                        ? "bg-slate-50"
-                        : "bg-white hover:bg-slate-50"
+                      isHighlighted ? "bg-slate-50" : "bg-white hover:bg-slate-50"
                     }`}
                   >
-                    <AdminAvatar
-                      name={person.displayName}
-                      imageSrc={person.imageSrc}
-                      size="sm"
-                    />
+                    <AdminAvatar name={person.displayName} imageSrc={person.imageSrc} size="sm" />
 
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-slate-900">
@@ -387,21 +384,29 @@ export default function PeoplePicker({
                       </div>
                     </div>
 
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                        isSelected
-                          ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] text-[#0b4aa2]"
-                          : "border-slate-200 bg-white text-slate-600"
-                      }`}
-                    >
-                      {mode === "multiple"
-                        ? isSelected
-                          ? "Entfernen"
-                          : "HinzufÃ¼gen"
-                        : isSelected
-                          ? "VerknÃ¼pft"
-                          : "AuswÃ¤hlen"}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {assignmentTone === "assigned" ? (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">
+                          Bereits zugeteilt
+                        </span>
+                      ) : null}
+
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                          isSelected
+                            ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] text-[#0b4aa2]"
+                            : "border-slate-200 bg-white text-slate-600"
+                        }`}
+                      >
+                        {mode === "multiple"
+                          ? isSelected
+                            ? "Entfernen"
+                            : "Hinzufügen"
+                          : isSelected
+                            ? "Verknüpft"
+                            : "Auswählen"}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
