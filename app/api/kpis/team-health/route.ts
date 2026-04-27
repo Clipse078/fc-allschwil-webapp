@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
 function normalizeLabel(value: string | null | undefined) {
@@ -41,7 +41,7 @@ export async function GET() {
   try {
     const clubConfig = await prisma.clubConfig.findFirst({
       include: {
-        teamCategoryRules: true,
+        teamCategoryRules: { include: { qualificationRequirements: { include: { qualificationDefinition: true }, orderBy: [{ sortOrder: "asc" }] } } },
       },
       orderBy: {
         createdAt: "asc",
@@ -117,9 +117,10 @@ export async function GET() {
         member.person.trainerQualifications.map((qualification) => qualification.title)
       );
 
-      const requiredDiploma = rule?.requiredDiploma ?? null;
+      const firstRequirement = rule?.qualificationRequirements?.[0] ?? null;
+      const requiredDiploma = firstRequirement?.qualificationDefinition?.name ?? null;
       const requiredDiplomaRank = getDiplomaRank(requiredDiploma);
-      const requiredDiplomaTrainerCount = rule?.requiredDiplomaTrainerCount ?? 1;
+      const requiredDiplomaTrainerCount = firstRequirement?.requiredTrainerCount ?? 1;
       const matchingDiplomaTrainerCount =
         requiredDiplomaRank === 0
           ? 0
@@ -186,3 +187,5 @@ export async function GET() {
     );
   }
 }
+
+

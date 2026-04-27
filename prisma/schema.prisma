@@ -445,25 +445,27 @@ model Person {
 }
 
 model TrainerQualification {
-  id               String                     @id @default(cuid())
-  personId         String
-  type             TrainerQualificationType   @default(DIPLOMA)
-  status           TrainerQualificationStatus @default(UNKNOWN)
-  title            String
-  issuer           String?
-  licenseNumber    String?
-  issuedAt         DateTime?
-  expiresAt        DateTime?
-  documentUrl      String?
-  remarks          String?
-  isClubVerified   Boolean                    @default(false)
-  isWebsiteVisible Boolean                    @default(false)
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
+  id                        String                     @id @default(cuid())
+  personId                  String
+  qualificationDefinitionId String?
+  type                      TrainerQualificationType   @default(DIPLOMA)
+  status                    TrainerQualificationStatus @default(UNKNOWN)
+  title                     String
+  issuer                    String?
+  licenseNumber             String?
+  issuedAt                  DateTime?
+  expiresAt                 DateTime?
+  documentUrl               String?
+  remarks                   String?
+  isClubVerified            Boolean                    @default(false)
+  isWebsiteVisible          Boolean                    @default(false)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
 
   person Person @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([personId])
+  @@index([qualificationDefinitionId])
   @@index([type])
   @@index([status])
   @@index([expiresAt])

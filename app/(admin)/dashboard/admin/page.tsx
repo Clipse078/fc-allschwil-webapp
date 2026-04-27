@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   BarChart3,
   CalendarSync,
@@ -73,7 +73,7 @@ const adminCards = [
   },
   {
     title: "Season Switcher",
-    label: "Aktive Saison, Ãœbergangsdatum",
+    label: "Aktive Saison, ÃƒÅ“bergangsdatum",
     icon: Settings,
     href: "/dashboard/current-season",
     status: "Basis aktiv",
@@ -85,7 +85,7 @@ export default async function AdminConfigurationPage() {
 
   const clubConfig = await prisma.clubConfig.findFirst({
     include: {
-      teamCategoryRules: true,
+      teamCategoryRules: { include: { qualificationRequirements: { include: { qualificationDefinition: true }, orderBy: [{ sortOrder: "asc" }] } } },
       qualificationDefinitions: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
     },
     orderBy: {
@@ -161,7 +161,7 @@ export default async function AdminConfigurationPage() {
       <AdminSectionHeader
         eyebrow="Admin"
         title="Club-Konfiguration"
-        description="Zentrale Steuerung fÃ¼r Verein, Rollen, Workflows, Regeln, Website-Anzeige und spÃ¤tere Mandanten-Konfiguration."
+        description="Zentrale Steuerung fÃƒÂ¼r Verein, Rollen, Workflows, Regeln, Website-Anzeige und spÃƒÂ¤tere Mandanten-Konfiguration."
       />
 
       <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
@@ -171,7 +171,7 @@ export default async function AdminConfigurationPage() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Tenant</p>
               <h2 className="mt-3 text-3xl font-black">{clubConfig?.clubName ?? "FC Allschwil"}</h2>
               <p className="mt-2 text-sm font-semibold text-blue-100">
-                {clubConfig?.country ?? "CH"} Â· {activeSeason?.name ?? "Keine aktive Saison"} Â· {clubConfig?.teamCategoryRules.length ?? 0} Teamregeln
+                {clubConfig?.country ?? "CH"} Ã‚Â· {activeSeason?.name ?? "Keine aktive Saison"} Ã‚Â· {clubConfig?.teamCategoryRules.length ?? 0} Teamregeln
               </p>
             </div>
             <span className="w-fit rounded-full border border-emerald-200/60 bg-emerald-400/15 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-emerald-100">
@@ -232,7 +232,7 @@ export default async function AdminConfigurationPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Admin Modul</p>
               <h2 className="mt-2 text-2xl font-black">Team Management</h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-blue-100">Zentrale Steuerung für Teamkategorien, Trainer-/Diplom-Regeln, Health-KPIs und Website/Mobile Anzeige pro Team.</p>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-blue-100">Zentrale Steuerung fÃ¼r Teamkategorien, Trainer-/Diplom-Regeln, Health-KPIs und Website/Mobile Anzeige pro Team.</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white">
               <Goal className="h-6 w-6" />
@@ -245,22 +245,33 @@ export default async function AdminConfigurationPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="fca-eyebrow">Teamregeln</p>
-              <h2 className="mt-2 text-xl font-black text-slate-900">ClubConfig â†’ TeamCategoryRule</h2>
+              <h2 className="mt-2 text-xl font-black text-slate-900">ClubConfig Ã¢â€ â€™ TeamCategoryRule</h2>
             </div>
             <DatabaseZap className="h-6 w-6 text-[#0b4aa2]" />
           </div>
 
           <TeamCategoryRulesEditor
             clubConfigId={clubConfig?.id ?? null}
+            qualificationDefinitions={(clubConfig?.qualificationDefinitions ?? []).map((definition) => ({
+              id: definition.id,
+              name: definition.name,
+              type: definition.type,
+              isActive: definition.isActive,
+            }))}
             rules={orderedTeamCategoryRules.map((rule) => ({
               id: rule.id,
               category: rule.category,
               minTrainerCount: rule.minTrainerCount,
-              requiredDiploma: rule.requiredDiploma,
-              requiredDiplomaTrainerCount: rule.requiredDiplomaTrainerCount,
               maxPlayersPerTrainer: rule.maxPlayersPerTrainer,
               allowedBirthYears: rule.allowedBirthYears,
               sortOrder: rule.sortOrder,
+              qualificationRequirements: rule.qualificationRequirements.map((requirement) => ({
+                id: requirement.id,
+                qualificationDefinitionId: requirement.qualificationDefinitionId,
+                qualificationDefinitionName: requirement.qualificationDefinition.name,
+                requiredTrainerCount: requirement.requiredTrainerCount,
+                sortOrder: requirement.sortOrder,
+              })),
             }))}
           />
         </div>
@@ -270,7 +281,7 @@ export default async function AdminConfigurationPage() {
                 <p className="fca-eyebrow">Qualifikationen</p>
                 <h2 className="mt-2 text-xl font-black text-slate-900">Diplome & Zertifikate</h2>
                 <p className="mt-2 text-sm font-semibold text-slate-500">
-                  Mandantenfähige Qualifikationen als Grundlage für Teamregeln, z.B. D-Diplom oder First Aid.
+                  MandantenfÃ¤hige Qualifikationen als Grundlage fÃ¼r Teamregeln, z.B. D-Diplom oder First Aid.
                 </p>
               </div>
               <ShieldCheck className="h-6 w-6 text-[#0b4aa2]" />

@@ -1,14 +1,32 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 function parseAllowedBirthYears(value: unknown) {
   if (!Array.isArray(value)) return [];
+  return value.map((item) => Number(item)).filter((item) => Number.isInteger(item) && item >= 1900 && item <= 2100);
+}
+
+function parseRequirements(value: unknown) {
+  if (!Array.isArray(value)) return [];
 
   return value
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item >= 1900 && item <= 2100);
+    .map((item, index) => {
+      const record = item as { qualificationDefinitionId?: unknown; requiredTrainerCount?: unknown };
+      return {
+        qualificationDefinitionId: String(record.qualificationDefinitionId ?? "").trim(),
+        requiredTrainerCount: Number(record.requiredTrainerCount ?? 1),
+        sortOrder: index,
+      };
+    })
+    .filter(
+      (item) =>
+        item.qualificationDefinitionId &&
+        Number.isInteger(item.requiredTrainerCount) &&
+        item.requiredTrainerCount >= 0 &&
+        item.requiredTrainerCount <= 20
+    );
 }
 
 export async function POST(request: NextRequest) {
@@ -16,32 +34,22 @@ export async function POST(request: NextRequest) {
     await requirePermission(PERMISSIONS.USERS_MANAGE);
 
     const body = await request.json();
-
     const clubConfigId = String(body.clubConfigId ?? "").trim();
     const category = String(body.category ?? "").trim().toUpperCase();
     const minTrainerCount = Number(body.minTrainerCount);
-    const requiredDiploma = String(body.requiredDiploma ?? "").trim();
-    const requiredDiplomaTrainerCount = Number(body.requiredDiplomaTrainerCount ?? 1);
+    const maxPlayersPerTrainer = Number(body.maxPlayersPerTrainer ?? 10);
     const allowedBirthYears = parseAllowedBirthYears(body.allowedBirthYears);
+    const qualificationRequirements = parseRequirements(body.qualificationRequirements);
 
-    if (!clubConfigId) {
-      return NextResponse.json({ error: "ClubConfig fehlt." }, { status: 400 });
-    }
-
-    if (!category) {
-      return NextResponse.json({ error: "Kategorie darf nicht leer sein." }, { status: 400 });
-    }
+    if (!clubConfigId) return NextResponse.json({ error: "ClubConfig fehlt." }, { status: 400 });
+    if (!category) return NextResponse.json({ error: "Kategorie darf nicht leer sein." }, { status: 400 });
 
     if (!Number.isInteger(minTrainerCount) || minTrainerCount < 0 || minTrainerCount > 20) {
       return NextResponse.json({ error: "Traineranzahl muss zwischen 0 und 20 liegen." }, { status: 400 });
     }
 
-    if (!requiredDiploma) {
-      return NextResponse.json({ error: "Pflichtdiplom darf nicht leer sein." }, { status: 400 });
-    }
-
-    if (!Number.isInteger(requiredDiplomaTrainerCount) || requiredDiplomaTrainerCount < 0 || requiredDiplomaTrainerCount > 20) {
-      return NextResponse.json({ error: "Diplom-Anzahl muss zwischen 0 und 20 liegen." }, { status: 400 });
+    if (!Number.isInteger(maxPlayersPerTrainer) || maxPlayersPerTrainer < 1 || maxPlayersPerTrainer > 50) {
+      return NextResponse.json({ error: "Spieler pro Trainer muss zwischen 1 und 50 liegen." }, { status: 400 });
     }
 
     const rule = await prisma.teamCategoryRule.create({
@@ -49,34 +57,39 @@ export async function POST(request: NextRequest) {
         clubConfigId,
         category,
         minTrainerCount,
-        requiredDiploma,
-        requiredDiplomaTrainerCount,
+        maxPlayersPerTrainer,
         allowedBirthYears,
+        qualificationRequirements: {
+          create: qualificationRequirements.map((requirement) => ({
+            qualificationDefinitionId: requirement.qualificationDefinitionId,
+            requiredTrainerCount: requirement.requiredTrainerCount,
+            sortOrder: requirement.sortOrder,
+          })),
+        },
+      },
+      include: {
+        qualificationRequirements: {
+          include: { qualificationDefinition: true },
+          orderBy: [{ sortOrder: "asc" }],
+        },
       },
     });
 
     return NextResponse.json({ rule }, { status: 201 });
   } catch (error) {
     console.error("Failed to create team category rule", error);
-
-    return NextResponse.json(
-      { error: "Teamkategorie konnte nicht erstellt werden. Prüfe, ob sie bereits existiert." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Teamkategorie konnte nicht erstellt werden. Prüfe, ob sie bereits existiert." }, { status: 500 });
   }
 }
+
 export async function PATCH(request: NextRequest) {
   try {
     await requirePermission(PERMISSIONS.USERS_MANAGE);
 
     const body = await request.json();
-    const orderedIds = Array.isArray(body.orderedIds)
-      ? body.orderedIds.map((id: unknown) => String(id))
-      : [];
+    const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.map((id: unknown) => String(id)) : [];
 
-    if (orderedIds.length === 0) {
-      return NextResponse.json({ error: "Keine Sortierung erhalten." }, { status: 400 });
-    }
+    if (orderedIds.length === 0) return NextResponse.json({ error: "Keine Sortierung erhalten." }, { status: 400 });
 
     await prisma.$transaction(
       orderedIds.map((id: string, index: number) =>
@@ -90,10 +103,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Failed to reorder team category rules", error);
-
-    return NextResponse.json(
-      { error: "Sortierung konnte nicht gespeichert werden." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Sortierung konnte nicht gespeichert werden." }, { status: 500 });
   }
 }
