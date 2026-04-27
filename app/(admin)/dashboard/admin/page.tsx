@@ -106,8 +106,10 @@ export default async function AdminConfigurationPage() {
 
   const orderedTeamCategoryRules = [...(clubConfig?.teamCategoryRules ?? [])].sort(
     (a, b) =>
-      (teamRuleOrder.indexOf(a.category) === -1 ? 999 : teamRuleOrder.indexOf(a.category)) -
-      (teamRuleOrder.indexOf(b.category) === -1 ? 999 : teamRuleOrder.indexOf(b.category))
+      (a.sortOrder !== b.sortOrder
+        ? a.sortOrder - b.sortOrder
+        : (teamRuleOrder.indexOf(a.category) === -1 ? 999 : teamRuleOrder.indexOf(a.category)) -
+          (teamRuleOrder.indexOf(b.category) === -1 ? 999 : teamRuleOrder.indexOf(b.category)))
   );
   const activeSeason = await prisma.season.findFirst({
     where: {
@@ -240,6 +242,7 @@ export default async function AdminConfigurationPage() {
               requiredDiploma: rule.requiredDiploma,
               requiredDiplomaTrainerCount: rule.requiredDiplomaTrainerCount,
               allowedBirthYears: rule.allowedBirthYears,
+              sortOrder: rule.sortOrder,
             }))}
           />
         </div>

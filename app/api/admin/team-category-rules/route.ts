@@ -65,3 +65,35 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+export async function PATCH(request: NextRequest) {
+  try {
+    await requirePermission(PERMISSIONS.USERS_MANAGE);
+
+    const body = await request.json();
+    const orderedIds = Array.isArray(body.orderedIds)
+      ? body.orderedIds.map((id: unknown) => String(id))
+      : [];
+
+    if (orderedIds.length === 0) {
+      return NextResponse.json({ error: "Keine Sortierung erhalten." }, { status: 400 });
+    }
+
+    await prisma.$transaction(
+      orderedIds.map((id: string, index: number) =>
+        prisma.teamCategoryRule.update({
+          where: { id },
+          data: { sortOrder: index },
+        })
+      )
+    );
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to reorder team category rules", error);
+
+    return NextResponse.json(
+      { error: "Sortierung konnte nicht gespeichert werden." },
+      { status: 500 }
+    );
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { GripVertical, Plus, Save, Trash2 } from "lucide-react";
 
 type TeamCategoryRuleEditorItem = {
   id: string;
@@ -10,6 +10,7 @@ type TeamCategoryRuleEditorItem = {
   requiredDiploma: string;
   requiredDiplomaTrainerCount: number;
   allowedBirthYears: number[];
+  sortOrder: number;
 };
 
 type TeamCategoryRulesEditorProps = {
@@ -51,8 +52,59 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [draggedRuleId, setDraggedRuleId] = useState<string | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function moveRule(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+
+    setItems((current) => {
+      const draggedIndex = current.findIndex((item) => item.id === draggedId);
+      const targetIndex = current.findIndex((item) => item.id === targetId);
+
+      if (draggedIndex === -1 || targetIndex === -1) return current;
+
+      const next = [...current];
+      const [draggedItem] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, draggedItem);
+
+      return next.map((item, index) => ({
+        ...item,
+        sortOrder: index,
+      }));
+    });
+  }
+
+  function saveOrder() {
+    setSavingOrder(true);
+    setMessage(null);
+
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/admin/team-category-rules", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderedIds: items.map((item) => item.id),
+          }),
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(payload?.error ?? "Sortierung konnte nicht gespeichert werden.");
+        }
+
+        setMessage("✅ Sortierung gespeichert.");
+      } catch (error) {
+        setMessage(error instanceof Error ? `❌ ${error.message}` : "❌ Sortierung konnte nicht gespeichert werden.");
+      } finally {
+        setSavingOrder(false);
+      }
+    });
+  }
 
   function updateItem(ruleId: string, field: keyof EditableRule, value: string | number) {
     setItems((current) =>
@@ -138,7 +190,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           throw new Error(payload.error ?? "Kategorie konnte nicht erstellt werden.");
         }
 
-        setItems((current) => [...current, toEditableRule(payload.rule)]);
+        setItems((current) => [...current, toEditableRule({ ...payload.rule, sortOrder: current.length })]);
         setNewRule({
           category: "",
           minTrainerCount: 2,
@@ -260,12 +312,46 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
         </div>
       </div>
 
+      <div className="flex items-center justify-between gap-3 rounded-[22px] border border-slate-200 bg-white px-4 py-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Reihenfolge</p>
+          <p className="mt-1 text-sm font-bold text-slate-600">Kategorien per Drag & Drop sortieren.</p>
+        </div>
+        <button
+          type="button"
+          onClick={saveOrder}
+          disabled={isPending || savingOrder}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#0b4aa2]/20 bg-white px-5 text-sm font-black text-[#0b4aa2] shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          {savingOrder ? "Speichert..." : "Reihenfolge speichern"}
+        </button>
+      </div>
+
       {items.map((rule) => (
-        <div key={rule.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+        <div
+          key={rule.id}
+          draggable
+          onDragStart={() => setDraggedRuleId(rule.id)}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={() => {
+            if (draggedRuleId) moveRule(draggedRuleId, rule.id);
+            setDraggedRuleId(null);
+          }}
+          onDragEnd={() => setDraggedRuleId(null)}
+          className={`rounded-[24px] border border-slate-200 bg-slate-50 p-5 transition ${
+            draggedRuleId === rule.id ? "opacity-50" : ""
+          }`}
+        >
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Kategorie</p>
-              <h3 className="mt-1 text-lg font-black text-slate-900">{rule.category}</h3>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 cursor-grab items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400">
+                <GripVertical className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Kategorie</p>
+                <h3 className="mt-1 text-lg font-black text-slate-900">{rule.category}</h3>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-4 xl:min-w-[680px]">
