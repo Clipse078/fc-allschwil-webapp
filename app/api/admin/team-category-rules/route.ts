@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     const category = String(body.category ?? "").trim().toUpperCase();
     const minTrainerCount = Number(body.minTrainerCount);
     const requiredDiploma = String(body.requiredDiploma ?? "").trim();
+    const requiredDiplomaTrainerCount = Number(body.requiredDiplomaTrainerCount ?? 1);
     const allowedBirthYears = parseAllowedBirthYears(body.allowedBirthYears);
 
     if (!clubConfigId) {
@@ -39,12 +40,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Pflichtdiplom darf nicht leer sein." }, { status: 400 });
     }
 
+    if (!Number.isInteger(requiredDiplomaTrainerCount) || requiredDiplomaTrainerCount < 0 || requiredDiplomaTrainerCount > 20) {
+      return NextResponse.json({ error: "Diplom-Anzahl muss zwischen 0 und 20 liegen." }, { status: 400 });
+    }
+
     const rule = await prisma.teamCategoryRule.create({
       data: {
         clubConfigId,
         category,
         minTrainerCount,
         requiredDiploma,
+        requiredDiplomaTrainerCount,
         allowedBirthYears,
       },
     });

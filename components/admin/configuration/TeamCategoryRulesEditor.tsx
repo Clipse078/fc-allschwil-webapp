@@ -8,6 +8,7 @@ type TeamCategoryRuleEditorItem = {
   category: string;
   minTrainerCount: number;
   requiredDiploma: string;
+  requiredDiplomaTrainerCount: number;
   allowedBirthYears: number[];
 };
 
@@ -44,6 +45,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
     category: "",
     minTrainerCount: 2,
     requiredDiploma: "D-Diplom",
+    requiredDiplomaTrainerCount: 1,
     allowedBirthYearsInput: "",
   });
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           body: JSON.stringify({
             minTrainerCount: item.minTrainerCount,
             requiredDiploma: item.requiredDiploma,
+            requiredDiplomaTrainerCount: item.requiredDiplomaTrainerCount,
             allowedBirthYears: parseBirthYears(item.allowedBirthYearsInput),
           }),
         });
@@ -124,6 +127,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
             category: newRule.category,
             minTrainerCount: newRule.minTrainerCount,
             requiredDiploma: newRule.requiredDiploma,
+            requiredDiplomaTrainerCount: newRule.requiredDiplomaTrainerCount,
             allowedBirthYears: parseBirthYears(newRule.allowedBirthYearsInput),
           }),
         });
@@ -139,6 +143,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           category: "",
           minTrainerCount: 2,
           requiredDiploma: "D-Diplom",
+          requiredDiplomaTrainerCount: 1,
           allowedBirthYearsInput: "",
         });
         setMessage("✅ Teamkategorie erstellt.");
@@ -185,7 +190,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
   return (
     <div className="mt-5 space-y-3">
       <div className="rounded-[24px] border border-blue-100 bg-blue-50/60 p-5">
-        <div className="grid gap-3 xl:grid-cols-[1fr_0.8fr_1fr_1fr_auto] xl:items-end">
+        <div className="grid gap-3 xl:grid-cols-[1fr_0.7fr_0.9fr_0.7fr_1fr_auto] xl:items-end">
           <label className="space-y-1">
             <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Neue Kategorie</span>
             <input
@@ -222,6 +227,18 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           </label>
 
           <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Diplom-Anz.</span>
+            <input
+              type="number"
+              min={0}
+              max={20}
+              value={newRule.requiredDiplomaTrainerCount}
+              onChange={(event) => setNewRule((current) => ({ ...current, requiredDiplomaTrainerCount: Number(event.target.value) }))}
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-300"
+            />
+          </label>
+
+          <label className="space-y-1">
             <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Jahrgänge</span>
             <input
               value={newRule.allowedBirthYearsInput}
@@ -251,7 +268,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
               <h3 className="mt-1 text-lg font-black text-slate-900">{rule.category}</h3>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[560px]">
+            <div className="grid gap-3 sm:grid-cols-4 xl:min-w-[680px]">
               <label className="space-y-1">
                 <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Trainer</span>
                 <input
@@ -275,6 +292,18 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
                     <option key={option} value={option}>{option}</option>
                   ))}
                 </select>
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Diplom-Anz.</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={rule.requiredDiplomaTrainerCount}
+                  onChange={(event) => updateItem(rule.id, "requiredDiplomaTrainerCount", Number(event.target.value))}
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-300"
+                />
               </label>
 
               <label className="space-y-1">

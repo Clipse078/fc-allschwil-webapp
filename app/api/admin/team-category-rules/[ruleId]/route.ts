@@ -26,6 +26,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const minTrainerCount = Number(body.minTrainerCount);
     const requiredDiploma = String(body.requiredDiploma ?? "").trim();
+    const requiredDiplomaTrainerCount = Number(body.requiredDiplomaTrainerCount ?? 1);
     const allowedBirthYears = parseAllowedBirthYears(body.allowedBirthYears);
 
     if (!Number.isInteger(minTrainerCount) || minTrainerCount < 0 || minTrainerCount > 20) {
@@ -42,11 +43,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    if (!Number.isInteger(requiredDiplomaTrainerCount) || requiredDiplomaTrainerCount < 0 || requiredDiplomaTrainerCount > 20) {
+      return NextResponse.json(
+        { error: "Diplom-Anzahl muss zwischen 0 und 20 liegen." },
+        { status: 400 }
+      );
+    }
+
     const updatedRule = await prisma.teamCategoryRule.update({
       where: { id: ruleId },
       data: {
         minTrainerCount,
         requiredDiploma,
+        requiredDiplomaTrainerCount,
         allowedBirthYears,
       },
     });

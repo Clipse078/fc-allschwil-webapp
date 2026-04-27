@@ -238,6 +238,7 @@ export default async function AdminConfigurationPage() {
               category: rule.category,
               minTrainerCount: rule.minTrainerCount,
               requiredDiploma: rule.requiredDiploma,
+              requiredDiplomaTrainerCount: rule.requiredDiplomaTrainerCount,
               allowedBirthYears: rule.allowedBirthYears,
             }))}
           />

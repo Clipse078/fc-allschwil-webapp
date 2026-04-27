@@ -1042,6 +1042,7 @@ model TeamCategoryRule {
   category           String
   minTrainerCount    Int      @default(1)
   requiredDiploma    String
+  requiredDiplomaTrainerCount Int @default(1)
   allowedBirthYears  Int[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

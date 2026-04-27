@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
 function normalizeLabel(value: string | null | undefined) {
@@ -119,12 +119,20 @@ export async function GET() {
 
       const requiredDiploma = rule?.requiredDiploma ?? null;
       const requiredDiplomaRank = getDiplomaRank(requiredDiploma);
-      const hasRequired =
+      const requiredDiplomaTrainerCount = rule?.requiredDiplomaTrainerCount ?? 1;
+      const matchingDiplomaTrainerCount =
         requiredDiplomaRank === 0
-          ? false
-          : trainerDiplomas.some(
-              (diploma) => getDiplomaRank(diploma) >= requiredDiplomaRank
-            );
+          ? 0
+          : activeSeason.trainerTeamMembers.filter((member) =>
+              member.person.trainerQualifications.some(
+                (qualification) => getDiplomaRank(qualification.title) >= requiredDiplomaRank
+              )
+            ).length;
+
+      const hasRequired =
+        requiredDiplomaTrainerCount === 0
+          ? true
+          : matchingDiplomaTrainerCount >= requiredDiplomaTrainerCount;
 
       const requiredTrainerCount = rule?.minTrainerCount ?? null;
       const trainerCount = activeSeason.trainerTeamMembers.length;
@@ -140,6 +148,8 @@ export async function GET() {
         ageGroup: team.ageGroup,
         requiredDiploma,
         requiredTrainerCount,
+        requiredDiplomaTrainerCount,
+        matchingDiplomaTrainerCount,
         matchedRuleCategory: rule?.category ?? null,
         hasRequired,
         hasEnoughTrainers,
