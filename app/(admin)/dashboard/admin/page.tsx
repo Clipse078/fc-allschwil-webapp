@@ -83,17 +83,32 @@ export default async function AdminConfigurationPage() {
 
   const clubConfig = await prisma.clubConfig.findFirst({
     include: {
-      teamCategoryRules: {
-        orderBy: {
-          category: "asc",
-        },
-      },
+      teamCategoryRules: true,
     },
     orderBy: {
       createdAt: "asc",
     },
   });
 
+  const teamRuleOrder = [
+    "AKTIVE",
+    "FRAUEN",
+    "A",
+    "B",
+    "C",
+    "D9",
+    "D7",
+    "E",
+    "F",
+    "G",
+    "TRAININGSGRUPPE",
+  ];
+
+  const orderedTeamCategoryRules = [...(clubConfig?.teamCategoryRules ?? [])].sort(
+    (a, b) =>
+      (teamRuleOrder.indexOf(a.category) === -1 ? 999 : teamRuleOrder.indexOf(a.category)) -
+      (teamRuleOrder.indexOf(b.category) === -1 ? 999 : teamRuleOrder.indexOf(b.category))
+  );
   const activeSeason = await prisma.season.findFirst({
     where: {
       isActive: true,
@@ -217,7 +232,7 @@ export default async function AdminConfigurationPage() {
           </div>
 
           <TeamCategoryRulesEditor
-            rules={(clubConfig?.teamCategoryRules ?? []).map((rule) => ({
+            rules={orderedTeamCategoryRules.map((rule) => ({
               id: rule.id,
               category: rule.category,
               minTrainerCount: rule.minTrainerCount,
