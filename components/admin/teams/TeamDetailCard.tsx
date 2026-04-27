@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import {
@@ -105,11 +105,11 @@ type Props = {
 function formatGenderGroup(value: string | null) {
   const normalized = String(value ?? "").toUpperCase();
 
-  if (normalized === "MEN" || normalized === "MALE" || normalized === "MÄNNER" || normalized === "MANNER") return "Männer";
+  if (normalized === "MEN" || normalized === "MALE" || normalized === "MÃ„NNER" || normalized === "MANNER") return "MÃ¤nner";
   if (normalized === "WOMEN" || normalized === "FEMALE" || normalized === "FRAUEN") return "Frauen";
   if (normalized === "MIXED" || normalized === "GEMISCHT") return "Mixed";
 
-  return "–";
+  return "â€“";
 }
 
 function VisibilityTile({
@@ -137,7 +137,7 @@ function VisibilityTile({
         <span className={`relative h-7 w-12 rounded-full transition ${active ? "bg-emerald-500" : "bg-slate-300"}`}>
           <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${active ? "left-6" : "left-1"}`} />
         </span>
-        <span className={`text-xs font-semibold ${active ? "text-green-600" : "text-slate-900"}`}>{active ? "Sichtbar" : "Aus"}</span>
+        <span className={`text-xs font-semibold ${active ? "text-green-600" : "text-slate-900"}`}>{active ? "Sichtbar auf Website" : "Nicht sichtbar"}</span>
       </div>
     </button>
   );
@@ -311,7 +311,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           <p className="fca-eyebrow">Team Management</p>
           <h1 className="fca-heading mt-2">Team Verwaltung</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
-            Verwalte die wichtigsten Informationen, Website-Sichtbarkeit, Teamfoto, Trainerstaff und Kader für die öffentliche Teamseite.
+            Verwalte die wichtigsten Informationen, Website-Sichtbarkeit, Teamfoto, Trainerstaff und Kader fÃ¼r die Ã¶ffentliche Teamseite.
           </p>
         </div>
 
@@ -343,7 +343,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
 
                 <div className="mt-5 grid gap-4 text-sm text-slate-600 sm:grid-cols-2">
                   <div>
-                    <div className="text-xs font-semibold text-slate-400">Teamkürzel</div>
+                    <div className="text-xs font-semibold text-slate-400">TeamkÃ¼rzel</div>
                     <div className="mt-1 font-semibold text-slate-900">{team.slug}</div>
                   </div>
                   <div>
@@ -357,7 +357,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                 {team.ageGroup && activeTeamSeason && (
                   <div className="mt-5">
                     <div className="text-xs font-semibold text-slate-400">
-                      Jahrgänge für Saison {activeTeamSeason.season.name}
+                      JahrgÃ¤nge fÃ¼r Saison {activeTeamSeason.season.name}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">2015</span>
@@ -399,13 +399,13 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
         )}
         <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="fca-eyebrow">Website-Sichtbarkeit</p>
-          <p className="mt-3 text-sm text-slate-500">Steuere, welche Bereiche auf der öffentlichen Teamseite angezeigt werden.</p>
+          <p className="mt-3 text-sm text-slate-500">Steuere, welche Bereiche auf der Ã¶ffentlichen Teamseite angezeigt werden.</p>
 
                     <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7">
             <VisibilityTile icon={<ImageIcon className="h-6 w-6" />} title="Teamfoto" active={teamPhotoVisible} onToggle={() => { setTeamPhotoVisible((current) => !current); setTeamPhotoSaved(false); }} />
             <VisibilityTile icon={<Users className="h-6 w-6" />} title="Trainerstaff" active={visibility.trainerstaff} onToggle={() => toggleWebsiteVisibility("trainerstaff", !visibility.trainerstaff, "trainerTeamWebsiteVisible")} />
             <VisibilityTile icon={<CalendarDays className="h-6 w-6" />} title="Trainingszeiten" active={visibility.trainings} onToggle={() => toggleWebsiteVisibility("trainings", !visibility.trainings, "trainingsWebsiteVisible")} />
-            <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="Nächste Spiele" active={visibility.upcoming} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
+            <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="NÃ¤chste Spiele" active={visibility.upcoming} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
             <VisibilityTile icon={<Check className="h-6 w-6" />} title="Resultate" active={visibility.results} onToggle={() => toggleWebsiteVisibility("results", !visibility.results, "resultsWebsiteVisible")} />
             <VisibilityTile icon={<BarChart3 className="h-6 w-6" />} title="Rangliste" active={visibility.standings} onToggle={() => toggleWebsiteVisibility("standings", !visibility.standings, "standingsWebsiteVisible")} />
             <VisibilityTile icon={<Users className="h-6 w-6" />} title="Spielerkader" active={visibility.playersquad} onToggle={() => toggleWebsiteVisibility("playersquad", !visibility.playersquad, "squadWebsiteVisible")} />
@@ -464,7 +464,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                     <ImageIcon className="h-7 w-7" />
                   </div>
                   <p className="mt-5 text-sm font-bold text-slate-900">Noch kein Teamfoto hinterlegt</p>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Foto auswählen oder direkt hier hineinziehen.</p>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Foto auswÃ¤hlen oder direkt hier hineinziehen.</p>
                   <label htmlFor="team-photo-upload" className="mt-5 inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50">
                     <Camera className="h-4 w-4" />Foto hochladen
                   </label>
@@ -474,21 +474,21 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Tipps für das perfekte Teamfoto</h3>
+              <h3 className="text-sm font-bold text-slate-900">Tipps fÃ¼r das perfekte Teamfoto</h3>
               <div className="mt-4 space-y-3 text-sm text-slate-500">
-                <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Bild im Querformat wählen</p>
+                <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Bild im Querformat wÃ¤hlen</p>
                 <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Gute Beleuchtung und ruhiger Hintergrund</p>
                 <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Alle Personen gut sichtbar</p>
                 <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Empfohlene Mindestbreite: 2000px</p>
               </div>
               <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-[#0b4aa2]">
-                Nach dem Upload kannst du das Bild zuschneiden und auf der Teamseite veröffentlichen.
+                Nach dem Upload kannst du das Bild zuschneiden und auf der Teamseite verÃ¶ffentlichen.
               </div>
             </div>
           </div>
         </section>
 
-        <TeamRosterOverviewCard teamId={team.id} teamAgeGroup={team.ageGroup} canManage={canManage} teamSeasons={activeTeamSeason ? [activeTeamSeason as any] : []} />
+        <TeamRosterOverviewCard teamId={team.id} teamAgeGroup={team.ageGroup} canManage={canManage} trainerSectionVisible={visibility.trainerstaff} playerSectionVisible={visibility.playersquad} teamSeasons={activeTeamSeason ? [activeTeamSeason as any] : []} />
       </div>
     </div>
   );

@@ -66,6 +66,8 @@ type Props = {
   teamSeasons?: TeamSeason[];
   canManage: boolean;
   teamAgeGroup?: string | null;
+  trainerSectionVisible?: boolean;
+  playerSectionVisible?: boolean;
 };
 
 function personName(member: RawMember) {
@@ -384,7 +386,7 @@ function PersonRow({
   );
 }
 
-export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons, canManage }: Props) {
+export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons, canManage, trainerSectionVisible = true, playerSectionVisible = true }: Props) {
   const resolvedTeamSeason = teamSeason ?? teamSeasons?.[0] ?? null;
   const [trainerQuery, setTrainerQuery] = useState("");
   const [playerQuery, setPlayerQuery] = useState("");
@@ -709,6 +711,8 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
+
 
 
 
