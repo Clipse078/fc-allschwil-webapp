@@ -117,6 +117,28 @@ export async function GET() {
         member.person.trainerQualifications.map((qualification) => qualification.title)
       );
 
+      const requirementResults =
+        rule?.qualificationRequirements?.map((requirement) => {
+          const requiredRank = getDiplomaRank(requirement.qualificationDefinition?.name ?? null);
+          const matchingTrainerCount =
+            requiredRank === 0
+              ? 0
+              : activeSeason.trainerTeamMembers.filter((member) =>
+                  member.person.trainerQualifications.some(
+                    (qualification) => getDiplomaRank(qualification.title) >= requiredRank
+                  )
+                ).length;
+
+          return {
+            requiredDiploma: requirement.qualificationDefinition?.name ?? null,
+            requiredTrainerCount: requirement.requiredTrainerCount,
+            matchingTrainerCount,
+            isFulfilled:
+              requirement.requiredTrainerCount === 0
+                ? true
+                : matchingTrainerCount >= requirement.requiredTrainerCount,
+          };
+        }) ?? [];
       const firstRequirement = rule?.qualificationRequirements?.[0] ?? null;
       const requiredDiploma = firstRequirement?.qualificationDefinition?.name ?? null;
       const requiredDiplomaRank = getDiplomaRank(requiredDiploma);
@@ -152,6 +174,7 @@ export async function GET() {
         requiredDiplomaTrainerCount,
         matchingDiplomaTrainerCount,
         matchedRuleCategory: rule?.category ?? null,
+        qualificationRequirements: requirementResults,
         hasRequired,
         hasEnoughTrainers,
         trainerCount,
@@ -187,6 +210,8 @@ export async function GET() {
     );
   }
 }
+
+
 
 
 
