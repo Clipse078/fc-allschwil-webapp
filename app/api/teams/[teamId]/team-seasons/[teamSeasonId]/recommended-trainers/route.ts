@@ -5,10 +5,6 @@ type Context = {
   params: Promise<{ teamId: string; teamSeasonId: string }>;
 };
 
-function displayName(person: { displayName: string | null; firstName: string; lastName: string }) {
-  return person.displayName || [person.firstName, person.lastName].filter(Boolean).join(" ");
-}
-
 function normalizeLabel(value: string | null | undefined) {
   return String(value ?? "").trim().toLowerCase().replace(/\s+/g, "").replace(/-/g, "");
 }
@@ -25,14 +21,8 @@ function getDiplomaRank(label: string | null | undefined) {
   return 0;
 }
 
-function getTeamRuleKeys(team: { category: string | null; ageGroup: string | null; name: string }) {
-  return Array.from(
-    new Set(
-      [team.ageGroup, team.category, team.name.match(/\b(D7|D9|[GFECBA])\b/i)?.[1]]
-        .filter(Boolean)
-        .map((value) => String(value).trim().toUpperCase()),
-    ),
-  );
+function personName(person: { displayName: string | null; firstName: string; lastName: string }) {
+  return person.displayName || `${person.firstName} ${person.lastName}`.trim();
 }
 
 export async function GET(_: Request, context: Context) {
@@ -41,17 +31,8 @@ export async function GET(_: Request, context: Context) {
 
     const teamSeason = await prisma.teamSeason.findUnique({
       where: { id: teamSeasonId },
-      select: {
-        id: true,
-        teamId: true,
-        team: {
-          select: {
-            id: true,
-            name: true,
-            category: true,
-            ageGroup: true,
-          },
-        },
+      include: {
+        team: true,
         trainerTeamMembers: {
           select: { personId: true },
         },
@@ -59,7 +40,7 @@ export async function GET(_: Request, context: Context) {
     });
 
     if (!teamSeason || teamSeason.teamId !== teamId) {
-      return NextResponse.json({ error: "Team season not found." }, { status: 404 });
+      return NextResponse.json({ error: "Team-Saison nicht gefunden." }, { status: 404 });
     }
 
     const clubConfig = await prisma.clubConfig.findFirst({
@@ -76,111 +57,73 @@ export async function GET(_: Request, context: Context) {
       orderBy: { createdAt: "asc" },
     });
 
-    const ruleKeys = getTeamRuleKeys(teamSeason.team);
+    const excludedIds = new Set(teamSeason.trainerTeamMembers.map((entry) => entry.personId));
+    const ruleKey = String(teamSeason.team.ageGroup ?? teamSeason.team.category ?? "").trim().toUpperCase();
+
     const rule =
-      clubConfig?.teamCategoryRules.find((candidate) =>
-        ruleKeys.includes(candidate.category.trim().toUpperCase()),
-      ) ?? null;
+      clubConfig?.teamCategoryRules.find((entry) => entry.category.trim().toUpperCase() === ruleKey) ??
+      clubConfig?.teamCategoryRules.find((entry) => entry.category.trim().toUpperCase() === String(teamSeason.team.category).trim().toUpperCase()) ??
+      null;
 
-    const requiredDiploma =
-      rule?.qualificationRequirements?.[0]?.qualificationDefinition?.name ?? null;
-    const requiredRank = getDiplomaRank(requiredDiploma);
-    const assignedPersonIds = new Set(teamSeason.trainerTeamMembers.map((member) => member.personId));
+    const requiredRank = Math.max(
+      0,
+      ...(rule?.qualificationRequirements ?? []).map((requirement) =>
+        getDiplomaRank(requirement.qualificationDefinition?.name ?? null),
+      ),
+    );
 
-    const trainers = await prisma.person.findMany({
+    const people = await prisma.person.findMany({
       where: {
         isActive: true,
         isTrainer: true,
-        id: { notIn: Array.from(assignedPersonIds) },
       },
-      take: 30,
+      take: 80,
+      include: {
+        trainerQualifications: true,
+        trainerTeamMembers: true,
+      },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        displayName: true,
-        email: true,
-        phone: true,
-        trainerQualifications: {
-          select: {
-            title: true,
-            issuer: true,
-            status: true,
-            isClubVerified: true,
-          },
-        },
-        trainerTeamMembers: {
-          where: { status: "ACTIVE" },
-          select: {
-            teamSeason: {
-              select: {
-                displayName: true,
-                shortName: true,
-                status: true,
-                team: { select: { name: true } },
-              },
-            },
-          },
-        },
-      },
     });
 
-    const recommendations = trainers
-      .map((trainer) => {
-        const bestQualification = [...trainer.trainerQualifications].sort((a, b) => {
-          const rankDiff = getDiplomaRank(b.title) - getDiplomaRank(a.title);
-          if (rankDiff !== 0) return rankDiff;
-          if (a.status !== b.status) return a.status === "VALID" ? -1 : 1;
-          if (a.isClubVerified !== b.isClubVerified) return a.isClubVerified ? -1 : 1;
-          return a.title.localeCompare(b.title);
-        })[0];
-
-        const bestRank = getDiplomaRank(bestQualification?.title);
-        const qualificationMatches = requiredRank === 0 || bestRank >= requiredRank;
-        const activeAssignments = trainer.trainerTeamMembers.filter(
-          (member) => member.teamSeason.status === "ACTIVE",
+    const scored = people
+      .filter((person) => !excludedIds.has(person.id))
+      .map((person) => {
+        const bestRank = Math.max(
+          0,
+          ...person.trainerQualifications.map((qualification) => getDiplomaRank(qualification.title)),
         );
 
-        const score =
-          (qualificationMatches ? 60 : 0) +
-          (bestQualification?.status === "VALID" ? 20 : 0) +
-          (bestQualification?.isClubVerified ? 10 : 0) +
-          Math.max(0, 10 - activeAssignments.length * 3);
+        const activeAssignments = person.trainerTeamMembers.filter((assignment) => assignment.status === "ACTIVE").length;
+        const hasRequiredDiploma = requiredRank === 0 || bestRank >= requiredRank;
+
+        let score = 50;
+
+        if (hasRequiredDiploma) score += 35;
+        if (bestRank > requiredRank) score += 10;
+        if (activeAssignments === 0) score += 15;
+        if (activeAssignments === 1) score += 5;
+        if (activeAssignments >= 3) score -= 15;
+
+        const reason = [
+          hasRequiredDiploma ? "Diploma match" : "Diploma below requirement",
+          activeAssignments === 0 ? "currently free" : `${activeAssignments} active assignment(s)`,
+        ].join(" • ");
 
         return {
-          id: trainer.id,
-          displayName: displayName(trainer),
-          email: trainer.email,
-          phone: trainer.phone,
-          bestQualification: bestQualification
-            ? [bestQualification.title, bestQualification.issuer, bestQualification.status === "VALID" ? "valid" : null]
-                .filter(Boolean)
-                .join(" - ")
-            : null,
-          requiredDiploma,
-          qualificationMatches,
-          activeAssignmentCount: activeAssignments.length,
-          activeAssignments: activeAssignments.map((assignment) =>
-            assignment.teamSeason.shortName ||
-            assignment.teamSeason.team.name ||
-            assignment.teamSeason.displayName,
-          ),
+          id: person.id,
+          displayName: personName(person),
+          functionLabel: "Trainer",
+          teamLabel: reason,
           score,
-          reason: qualificationMatches
-            ? "Best match for the required diploma level."
-            : "Available trainer, but diploma level should be checked.",
+          reason,
         };
       })
       .sort((a, b) => b.score - a.score || a.displayName.localeCompare(b.displayName))
-      .slice(0, 3);
+      .slice(0, 5);
 
-    return NextResponse.json({ requiredDiploma, recommendations });
+    return NextResponse.json(scored);
   } catch (error) {
     console.error("Recommended trainers failed:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Recommended trainers could not be loaded." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Empfohlene Trainer konnten nicht geladen werden." }, { status: 500 });
   }
 }
