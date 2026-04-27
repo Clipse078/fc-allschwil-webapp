@@ -232,7 +232,7 @@ export default async function AdminConfigurationPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Admin Modul</p>
               <h2 className="mt-2 text-2xl font-black">Team Management</h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-blue-100">Zentrale Steuerung fÃ¼r Teamkategorien, Trainer-/Diplom-Regeln, Health-KPIs und Website/Mobile Anzeige pro Team.</p>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-blue-100">Zentrale Steuerung für Teamkategorien, Trainer-/Diplom-Regeln, Health-KPIs und Website/Mobile Anzeige pro Team.</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white">
               <Goal className="h-6 w-6" />
@@ -245,7 +245,7 @@ export default async function AdminConfigurationPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="fca-eyebrow">Teamregeln</p>
-              <h2 className="mt-2 text-xl font-black text-slate-900">ClubConfig Ã¢â€ â€™ TeamCategoryRule</h2>
+              <h2 className="mt-2 text-xl font-black text-slate-900">Teamkategorien & Regeln</h2>
             </div>
             <DatabaseZap className="h-6 w-6 text-[#0b4aa2]" />
           </div>
@@ -279,9 +279,9 @@ export default async function AdminConfigurationPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="fca-eyebrow">Qualifikationen</p>
-                <h2 className="mt-2 text-xl font-black text-slate-900">Diplome & Zertifikate</h2>
+                <h2 className="mt-2 text-xl font-black text-slate-900">Qualifikationskatalog</h2>
                 <p className="mt-2 text-sm font-semibold text-slate-500">
-                  MandantenfÃ¤hige Qualifikationen als Grundlage fÃ¼r Teamregeln, z.B. D-Diplom oder First Aid.
+                  MandantenfÃ¤hige Qualifikationen als Grundlage für Teamregeln, z.B. D-Diplom oder First Aid.
                 </p>
               </div>
               <ShieldCheck className="h-6 w-6 text-[#0b4aa2]" />
@@ -329,4 +329,5 @@ export default async function AdminConfigurationPage() {
     </div>
   );
 }
+
 

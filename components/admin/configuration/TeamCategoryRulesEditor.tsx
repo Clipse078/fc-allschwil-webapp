@@ -349,7 +349,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
           </label>
 
           <label className="space-y-1">
-            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Spieler / Trainer</span>
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Spieler pro Trainer</span>
             <input type="number" min={1} max={50} value={newRule.maxPlayersPerTrainer} onChange={(event) => setNewRule((current) => ({ ...current, maxPlayersPerTrainer: Number(event.target.value) }))} className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-300" />
           </label>
 
@@ -366,8 +366,8 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
 
         <div className="mt-4 rounded-[20px] border border-blue-100 bg-white/70 p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Anforderungen neue Kategorie</p>
-            <button type="button" onClick={addNewRuleRequirement} className="rounded-full border border-blue-100 bg-white px-3 py-2 text-xs font-black text-[#0b4aa2] hover:bg-blue-50">+ Anforderung</button>
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Qualifikationen neue Kategorie</p>
+            <button type="button" onClick={addNewRuleRequirement} className="rounded-full border border-blue-100 bg-white px-3 py-2 text-xs font-black text-[#0b4aa2] hover:bg-blue-50">+ Qualifikation</button>
           </div>
 
           <div className="mt-3 grid gap-2">
@@ -380,7 +380,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
                 <button type="button" onClick={() => removeNewRuleRequirement(index)} className="h-10 rounded-full border border-slate-200 bg-white px-3 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
               </div>
             ))}
-            {newRule.qualificationRequirements.length === 0 ? <p className="text-sm font-semibold text-slate-500">Keine Qualifikationsanforderung gesetzt.</p> : null}
+            {newRule.qualificationRequirements.length === 0 ? <p className="text-sm font-semibold text-slate-500">Keine Qualifikation erforderlich.</p> : null}
           </div>
         </div>
       </div>
@@ -423,7 +423,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
                   <input type="number" min={0} max={20} value={rule.minTrainerCount} onChange={(event) => updateItem(rule.id, "minTrainerCount", Number(event.target.value))} className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-300" />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Spieler / Trainer</span>
+                  <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Spieler pro Trainer</span>
                   <input type="number" min={1} max={50} value={rule.maxPlayersPerTrainer} onChange={(event) => updateItem(rule.id, "maxPlayersPerTrainer", Number(event.target.value))} className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-300" />
                 </label>
                 <label className="space-y-1">
@@ -434,8 +434,8 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
 
               <div className="rounded-[20px] border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Qualifikationsanforderungen</p>
-                  <button type="button" onClick={() => addRequirement(rule.id)} className="rounded-full border border-blue-100 bg-white px-3 py-2 text-xs font-black text-[#0b4aa2] hover:bg-blue-50">+ Anforderung</button>
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Qualifikationen</p>
+                  <button type="button" onClick={() => addRequirement(rule.id)} className="rounded-full border border-blue-100 bg-white px-3 py-2 text-xs font-black text-[#0b4aa2] hover:bg-blue-50">+ Qualifikation</button>
                 </div>
                 <div className="mt-3 grid gap-2">
                   {rule.qualificationRequirements.map((requirement, index) => (
@@ -447,7 +447,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
                       <button type="button" onClick={() => removeRequirement(rule.id, index)} className="h-10 rounded-full border border-slate-200 bg-white px-3 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
                     </div>
                   ))}
-                  {rule.qualificationRequirements.length === 0 ? <p className="text-sm font-semibold text-slate-500">Keine Qualifikationsanforderung gesetzt.</p> : null}
+                  {rule.qualificationRequirements.length === 0 ? <p className="text-sm font-semibold text-slate-500">Keine Qualifikation erforderlich.</p> : null}
                 </div>
               </div>
             </div>
@@ -469,6 +469,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
     </div>
   );
 }
+
 
 
 
