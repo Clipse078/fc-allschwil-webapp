@@ -1,32 +1,49 @@
 ﻿export type DiplomaRequirement = "D-Diplom" | "C-Diplom" | "B-Diplom" | null;
 
 export function getDiplomaRequirement(category: string | null, ageGroup: string | null): DiplomaRequirement {
-  const cat = String(category ?? "").toUpperCase();
-  const age = String(ageGroup ?? "").toUpperCase();
+  const normalizedCategory = String(category ?? "").toUpperCase();
+  const normalizedAgeGroup = String(ageGroup ?? "").toUpperCase();
 
-  if (["G","F","E"].includes(age) || cat.includes("KINDERFUSSBALL")) return "D-Diplom";
-  if (["C","B","A"].includes(age) || cat.includes("JUNIOREN")) return "C-Diplom";
-  if (cat.includes("AKTIVE")) return "B-Diplom";
+  if (["G", "F", "E"].includes(normalizedAgeGroup) || normalizedCategory.includes("KINDERFUSSBALL")) {
+    return "D-Diplom";
+  }
+
+  if (["C", "B", "A"].includes(normalizedAgeGroup) || normalizedCategory.includes("JUNIOREN")) {
+    return "C-Diplom";
+  }
+
+  if (normalizedCategory.includes("AKTIVE") || normalizedAgeGroup.includes("AKTIVE")) {
+    return "B-Diplom";
+  }
 
   return null;
 }
 
-export function isRequirementMet(requirement: DiplomaRequirement, diplomas: string[]) {
+export function diplomaMatchesRequirement(label: string, requirement: DiplomaRequirement) {
   if (!requirement) return true;
 
-  const all = diplomas.join(" ").toUpperCase();
+  const normalized = label.toUpperCase();
 
   if (requirement === "D-Diplom") {
-    return all.includes("D-DIPLOM") || all.includes("SFV D") || all.includes("KINDERFUSSBALL");
+    return normalized.includes("D-DIPLOM") || normalized.includes("SFV D") || normalized.includes("KINDERFUSSBALL");
   }
 
   if (requirement === "C-Diplom") {
-    return all.includes("C-DIPLOM") || all.includes("UEFA C");
+    return normalized.includes("C-DIPLOM") || normalized.includes("UEFA C");
   }
 
   if (requirement === "B-Diplom") {
-    return all.includes("B-DIPLOM") || all.includes("UEFA B");
+    return normalized.includes("B-DIPLOM") || normalized.includes("UEFA B");
   }
 
   return false;
+}
+
+export function isDiplomaRequirementMet(requirement: DiplomaRequirement, diplomaLabels: string[]) {
+  if (!requirement) return true;
+  return diplomaLabels.some((label) => diplomaMatchesRequirement(label, requirement));
+}
+
+export function getDiplomaRequirementLabel(requirement: DiplomaRequirement) {
+  return requirement ?? "Keine Anforderung";
 }
