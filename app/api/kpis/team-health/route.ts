@@ -40,7 +40,7 @@ export async function GET() {
         teamSeasons: {
           include: {
             season: true,
-            trainerMembers: {
+            trainerTeamMembers: {
               include: {
                 person: {
                   include: {
@@ -69,8 +69,8 @@ export async function GET() {
 
       const required = getRequiredDiploma(team.category);
 
-      const trainerDiplomas = activeSeason.trainerMembers.flatMap((tm) =>
-        tm.person.trainerQualifications.map((q) => q.name)
+      const trainerDiplomas = activeSeason.trainerTeamMembers.flatMap((tm) =>
+        tm.person.trainerQualifications.map((q) => q.title)
       );
 
       const ok = meetsRequirement(required, trainerDiplomas);
@@ -81,7 +81,7 @@ export async function GET() {
         category: team.category,
         requiredDiploma: required,
         hasRequired: ok,
-        trainerCount: activeSeason.trainerMembers.length,
+        trainerCount: activeSeason.trainerTeamMembers.length,
       };
     });
 
@@ -99,3 +99,4 @@ export async function GET() {
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
 }
+
