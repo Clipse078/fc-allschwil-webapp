@@ -253,7 +253,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
   return (
     <div className="mt-5 space-y-3">
       <div className="rounded-[24px] border border-blue-100 bg-blue-50/60 p-5">
-        <div className="grid gap-3 xl:grid-cols-[1fr_0.7fr_0.9fr_0.7fr_1fr_auto] xl:items-end">
+        <div className="grid gap-3 xl:grid-cols-[1fr_0.55fr_0.8fr_0.65fr_0.65fr_1fr_auto] xl:items-end">
           <label className="space-y-1">
             <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Neue Kategorie</span>
             <input
@@ -373,7 +373,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
               </h3>
             </div>
 
-            <div className="grid min-w-0 gap-3 sm:grid-cols-4">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-5">
               <label className="space-y-1">
                 <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Trainer</span>
                 <input
