@@ -107,7 +107,7 @@ export async function GET(_: Request, context: Context) {
         const reason = [
           hasRequiredDiploma ? "Diploma match" : "Diploma below requirement",
           activeAssignments === 0 ? "currently free" : `${activeAssignments} active assignment(s)`,
-        ].join(" • ");
+        ].join(" â€¢ ");
 
         return {
           id: person.id,
