@@ -232,6 +232,7 @@ export default async function AdminConfigurationPage() {
           </div>
 
           <TeamCategoryRulesEditor
+            clubConfigId={clubConfig?.id ?? null}
             rules={orderedTeamCategoryRules.map((rule) => ({
               id: rule.id,
               category: rule.category,

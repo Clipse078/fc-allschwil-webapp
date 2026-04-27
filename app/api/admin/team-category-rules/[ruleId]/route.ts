@@ -61,3 +61,23 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
   }
 }
+export async function DELETE(_request: NextRequest, context: RouteContext) {
+  try {
+    await requirePermission(PERMISSIONS.USERS_MANAGE);
+
+    const { ruleId } = await context.params;
+
+    await prisma.teamCategoryRule.delete({
+      where: { id: ruleId },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to delete team category rule", error);
+
+    return NextResponse.json(
+      { error: "Teamkategorie konnte nicht gelöscht werden." },
+      { status: 500 }
+    );
+  }
+}
