@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   BarChart3,
   CalendarSync,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TeamCategoryRulesEditor from "@/components/admin/configuration/TeamCategoryRulesEditor";
+import QualificationDefinitionsEditor from "@/components/admin/configuration/QualificationDefinitionsEditor";
 import TeamDisplaySettingsEditor from "@/components/admin/configuration/TeamDisplaySettingsEditor";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -85,6 +86,7 @@ export default async function AdminConfigurationPage() {
   const clubConfig = await prisma.clubConfig.findFirst({
     include: {
       teamCategoryRules: true,
+      qualificationDefinitions: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
     },
     orderBy: {
       createdAt: "asc",
@@ -262,7 +264,30 @@ export default async function AdminConfigurationPage() {
             }))}
           />
         </div>
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="fca-eyebrow">Qualifikationen</p>
+                <h2 className="mt-2 text-xl font-black text-slate-900">Diplome & Zertifikate</h2>
+                <p className="mt-2 text-sm font-semibold text-slate-500">
+                  Mandantenfähige Qualifikationen als Grundlage für Teamregeln, z.B. D-Diplom oder First Aid.
+                </p>
+              </div>
+              <ShieldCheck className="h-6 w-6 text-[#0b4aa2]" />
+            </div>
 
+            <QualificationDefinitionsEditor
+              clubConfigId={clubConfig?.id ?? null}
+              definitions={(clubConfig?.qualificationDefinitions ?? []).map((definition) => ({
+                id: definition.id,
+                name: definition.name,
+                type: definition.type,
+                description: definition.description,
+                isActive: definition.isActive,
+                sortOrder: definition.sortOrder,
+              }))}
+            />
+          </div>
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>

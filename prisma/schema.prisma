@@ -65,6 +65,7 @@ enum TrainerQualificationStatus {
   PLANNED
   UNKNOWN
 }
+
 enum EventType {
   MATCH
   TOURNAMENT
@@ -443,7 +444,6 @@ model Person {
   @@index([isTrainer])
 }
 
-
 model TrainerQualification {
   id               String                     @id @default(cuid())
   personId         String
@@ -469,6 +469,7 @@ model TrainerQualification {
   @@index([expiresAt])
   @@index([isClubVerified])
 }
+
 model Team {
   id               String       @id @default(cuid())
   name             String
@@ -492,29 +493,29 @@ model Team {
 }
 
 model TeamSeason {
-  teamPhotoUrl String?
-  teamPhotoX   Int      @default(50)
-  teamPhotoY   Int      @default(50)
-  teamPhotoZoom Int     @default(100)
-  teamPhotoRotate Int   @default(0)
+  teamPhotoUrl     String?
+  teamPhotoX       Int     @default(50)
+  teamPhotoY       Int     @default(50)
+  teamPhotoZoom    Int     @default(100)
+  teamPhotoRotate  Int     @default(0)
   teamPhotoVisible Boolean @default(false)
 
-  id                        String           @id @default(cuid())
-  teamId                    String
-  seasonId                  String
-  displayName               String
-  shortName                 String?
-  status                    TeamSeasonStatus @default(ACTIVE)
-  websiteVisible            Boolean          @default(true)
-  infoboardVisible          Boolean          @default(true)
-  squadWebsiteVisible       Boolean          @default(true)
-  trainerTeamWebsiteVisible Boolean          @default(true)
-  trainingsWebsiteVisible   Boolean          @default(true)
-  upcomingMatchesWebsiteVisible Boolean       @default(true)
-  resultsWebsiteVisible     Boolean          @default(true)
-  standingsWebsiteVisible   Boolean          @default(true)
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
+  id                            String           @id @default(cuid())
+  teamId                        String
+  seasonId                      String
+  displayName                   String
+  shortName                     String?
+  status                        TeamSeasonStatus @default(ACTIVE)
+  websiteVisible                Boolean          @default(true)
+  infoboardVisible              Boolean          @default(true)
+  squadWebsiteVisible           Boolean          @default(true)
+  trainerTeamWebsiteVisible     Boolean          @default(true)
+  trainingsWebsiteVisible       Boolean          @default(true)
+  upcomingMatchesWebsiteVisible Boolean          @default(true)
+  resultsWebsiteVisible         Boolean          @default(true)
+  standingsWebsiteVisible       Boolean          @default(true)
+  createdAt                     DateTime         @default(now())
+  updatedAt                     DateTime         @updatedAt
 
   team               Team                @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   season             Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -986,19 +987,19 @@ enum BusinessClubSponsorTier {
 }
 
 model BusinessClubSponsor {
-  id                  String                  @id @default(cuid())
-  displayName         String
-  companyName         String?
-  tier                BusinessClubSponsorTier @default(PARTNER)
-  logoUrl             String?
-  websiteUrl          String?
-  active              Boolean                 @default(true)
-  infoboardVisible    Boolean                 @default(false)
-  infoboardWeight     Int                     @default(1)
-  infoboardSortOrder  Int                     @default(0)
-  remarks             String?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
+  id                 String                  @id @default(cuid())
+  displayName        String
+  companyName        String?
+  tier               BusinessClubSponsorTier @default(PARTNER)
+  logoUrl            String?
+  websiteUrl         String?
+  active             Boolean                 @default(true)
+  infoboardVisible   Boolean                 @default(false)
+  infoboardWeight    Int                     @default(1)
+  infoboardSortOrder Int                     @default(0)
+  remarks            String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   @@index([active])
   @@index([infoboardVisible])
@@ -1007,24 +1008,20 @@ model BusinessClubSponsor {
 }
 
 model WorkflowPolicy {
-  id                 String   @id @default(cuid())
-  domain             String   // JAHRESPLAN | WOCHENPLAN | TAGESPLAN
-  editorRoleKeys     String[] // roles allowed to edit
-  reviewerRoleKeys   String[] // roles allowed to review/publish
-  targetGroups       String[] // G,F,E,D,C,B,A,AKTIVE,FRAUEN etc
-  requireReview      Boolean  @default(true)
-  allowSelfApproval  Boolean  @default(false)
-  active             Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default(cuid())
+  domain            String // JAHRESPLAN | WOCHENPLAN | TAGESPLAN
+  editorRoleKeys    String[] // roles allowed to edit
+  reviewerRoleKeys  String[] // roles allowed to review/publish
+  targetGroups      String[] // G,F,E,D,C,B,A,AKTIVE,FRAUEN etc
+  requireReview     Boolean  @default(true)
+  allowSelfApproval Boolean  @default(false)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([domain])
   @@index([active])
 }
-
-
-
-
 
 model ClubConfig {
   id        String   @id @default(cuid())
@@ -1033,24 +1030,59 @@ model ClubConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teamCategoryRules TeamCategoryRule[]
+  teamCategoryRules        TeamCategoryRule[]
+  qualificationDefinitions QualificationDefinition[]
 }
 
 model TeamCategoryRule {
-  id                 String   @id @default(cuid())
-  clubConfigId       String
-  category           String
-  minTrainerCount    Int      @default(1)
-  requiredDiploma    String
-  requiredDiplomaTrainerCount Int @default(1)
-  maxPlayersPerTrainer Int @default(10)
-  allowedBirthYears  Int[]
-  sortOrder          Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                          String   @id @default(cuid())
+  clubConfigId                String
+  category                    String
+  minTrainerCount             Int      @default(1)
+  requiredDiploma             String
+  requiredDiplomaTrainerCount Int      @default(1)
+  maxPlayersPerTrainer        Int      @default(10)
+  allowedBirthYears           Int[]
+  sortOrder                   Int      @default(0)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 
-  clubConfig ClubConfig @relation(fields: [clubConfigId], references: [id], onDelete: Cascade)
+  clubConfig                ClubConfig                             @relation(fields: [clubConfigId], references: [id], onDelete: Cascade)
+  qualificationRequirements TeamCategoryQualificationRequirement[]
 
   @@unique([clubConfigId, category])
 }
 
+model QualificationDefinition {
+  id           String                   @id @default(cuid())
+  clubConfigId String
+  name         String
+  type         TrainerQualificationType @default(DIPLOMA)
+  description  String?
+  isActive     Boolean                  @default(true)
+  sortOrder    Int                      @default(0)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  clubConfig               ClubConfig                             @relation(fields: [clubConfigId], references: [id], onDelete: Cascade)
+  teamCategoryRequirements TeamCategoryQualificationRequirement[]
+
+  @@unique([clubConfigId, name])
+  @@index([clubConfigId, isActive, sortOrder])
+}
+
+model TeamCategoryQualificationRequirement {
+  id                        String   @id @default(cuid())
+  teamCategoryRuleId        String
+  qualificationDefinitionId String
+  requiredTrainerCount      Int      @default(1)
+  sortOrder                 Int      @default(0)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  teamCategoryRule        TeamCategoryRule        @relation(fields: [teamCategoryRuleId], references: [id], onDelete: Cascade)
+  qualificationDefinition QualificationDefinition @relation(fields: [qualificationDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([teamCategoryRuleId, qualificationDefinitionId])
+  @@index([teamCategoryRuleId, sortOrder])
+}
