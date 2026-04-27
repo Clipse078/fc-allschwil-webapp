@@ -1,9 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   BarChart3,
   CalendarSync,
   ChevronRight,
   DatabaseZap,
+  Goal,
   Globe2,
   Network,
   Palette,
@@ -71,7 +72,7 @@ const adminCards = [
   },
   {
     title: "Season Switcher",
-    label: "Aktive Saison, Übergangsdatum",
+    label: "Aktive Saison, Ãœbergangsdatum",
     icon: Settings,
     href: "/dashboard/current-season",
     status: "Basis aktiv",
@@ -158,7 +159,7 @@ export default async function AdminConfigurationPage() {
       <AdminSectionHeader
         eyebrow="Admin"
         title="Club-Konfiguration"
-        description="Zentrale Steuerung für Verein, Rollen, Workflows, Regeln, Website-Anzeige und spätere Mandanten-Konfiguration."
+        description="Zentrale Steuerung fÃ¼r Verein, Rollen, Workflows, Regeln, Website-Anzeige und spÃ¤tere Mandanten-Konfiguration."
       />
 
       <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
@@ -168,7 +169,7 @@ export default async function AdminConfigurationPage() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Tenant</p>
               <h2 className="mt-3 text-3xl font-black">{clubConfig?.clubName ?? "FC Allschwil"}</h2>
               <p className="mt-2 text-sm font-semibold text-blue-100">
-                {clubConfig?.country ?? "CH"} · {activeSeason?.name ?? "Keine aktive Saison"} · {clubConfig?.teamCategoryRules.length ?? 0} Teamregeln
+                {clubConfig?.country ?? "CH"} Â· {activeSeason?.name ?? "Keine aktive Saison"} Â· {clubConfig?.teamCategoryRules.length ?? 0} Teamregeln
               </p>
             </div>
             <span className="w-fit rounded-full border border-emerald-200/60 bg-emerald-400/15 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-emerald-100">
@@ -223,12 +224,26 @@ export default async function AdminConfigurationPage() {
         })}
       </section>
 
-      <section className="space-y-5">
-        <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="overflow-hidden rounded-[36px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
+        <div className="bg-gradient-to-br from-slate-950 via-[#0b4aa2] to-[#123f7a] p-6 text-white">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Admin Modul</p>
+              <h2 className="mt-2 text-2xl font-black">Team Management</h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-blue-100">Zentrale Steuerung für Teamkategorien, Trainer-/Diplom-Regeln, Health-KPIs und Website/Mobile Anzeige pro Team.</p>
+            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white">
+              <Goal className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-5 p-5 lg:p-6">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="fca-eyebrow">Teamregeln</p>
-              <h2 className="mt-2 text-xl font-black text-slate-900">ClubConfig → TeamCategoryRule</h2>
+              <h2 className="mt-2 text-xl font-black text-slate-900">ClubConfig â†’ TeamCategoryRule</h2>
             </div>
             <DatabaseZap className="h-6 w-6 text-[#0b4aa2]" />
           </div>
@@ -241,16 +256,17 @@ export default async function AdminConfigurationPage() {
               minTrainerCount: rule.minTrainerCount,
               requiredDiploma: rule.requiredDiploma,
               requiredDiplomaTrainerCount: rule.requiredDiplomaTrainerCount,
+              maxPlayersPerTrainer: rule.maxPlayersPerTrainer,
               allowedBirthYears: rule.allowedBirthYears,
               sortOrder: rule.sortOrder,
             }))}
           />
         </div>
 
-        <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="fca-eyebrow">Admin Regel</p>
+              <p className="fca-eyebrow">Team Anzeige</p>
               <h2 className="mt-2 text-xl font-black text-slate-900">Website / Mobile Anzeige</h2>
             </div>
             <ShieldCheck className="h-6 w-6 text-[#0b4aa2]" />
@@ -271,11 +287,10 @@ export default async function AdminConfigurationPage() {
               standingsWebsiteVisible: entry.standingsWebsiteVisible,
             }))}
           />
+          </div>
         </div>
       </section>
     </div>
   );
 }
-
-
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState, useTransition } from "react";
 import { GripVertical, Plus, Save, Trash2 } from "lucide-react";
@@ -9,6 +9,7 @@ type TeamCategoryRuleEditorItem = {
   minTrainerCount: number;
   requiredDiploma: string;
   requiredDiplomaTrainerCount: number;
+  maxPlayersPerTrainer: number;
   allowedBirthYears: number[];
   sortOrder: number;
 };
@@ -47,6 +48,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
     minTrainerCount: 2,
     requiredDiploma: "D-Diplom",
     requiredDiplomaTrainerCount: 1,
+    maxPlayersPerTrainer: 10,
     allowedBirthYearsInput: "",
   });
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null);
@@ -108,9 +110,9 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           throw new Error(payload?.error ?? "Sortierung konnte nicht gespeichert werden.");
         }
 
-        setMessage("✅ Sortierung gespeichert.");
+        setMessage("âœ… Sortierung gespeichert.");
       } catch (error) {
-        setMessage(error instanceof Error ? `❌ ${error.message}` : "❌ Sortierung konnte nicht gespeichert werden.");
+        setMessage(error instanceof Error ? `âŒ ${error.message}` : "âŒ Sortierung konnte nicht gespeichert werden.");
       } finally {
         setSavingOrder(false);
       }
@@ -146,6 +148,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
             minTrainerCount: item.minTrainerCount,
             requiredDiploma: item.requiredDiploma,
             requiredDiplomaTrainerCount: item.requiredDiplomaTrainerCount,
+            maxPlayersPerTrainer: item.maxPlayersPerTrainer,
             allowedBirthYears: parseBirthYears(item.allowedBirthYearsInput),
           }),
         });
@@ -162,9 +165,9 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           )
         );
 
-        setMessage("✅ Teamregel gespeichert.");
+        setMessage("âœ… Teamregel gespeichert.");
       } catch (error) {
-        setMessage(error instanceof Error ? `❌ ${error.message}` : "❌ Teamregel konnte nicht gespeichert werden.");
+        setMessage(error instanceof Error ? `âŒ ${error.message}` : "âŒ Teamregel konnte nicht gespeichert werden.");
       } finally {
         setSavingRuleId(null);
       }
@@ -173,7 +176,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
 
   function createRule() {
     if (!clubConfigId) {
-      setMessage("❌ ClubConfig fehlt.");
+      setMessage("âŒ ClubConfig fehlt.");
       return;
     }
 
@@ -191,6 +194,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
             minTrainerCount: newRule.minTrainerCount,
             requiredDiploma: newRule.requiredDiploma,
             requiredDiplomaTrainerCount: newRule.requiredDiplomaTrainerCount,
+            maxPlayersPerTrainer: newRule.maxPlayersPerTrainer,
             allowedBirthYears: parseBirthYears(newRule.allowedBirthYearsInput),
           }),
         });
@@ -207,11 +211,12 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           minTrainerCount: 2,
           requiredDiploma: "D-Diplom",
           requiredDiplomaTrainerCount: 1,
+          maxPlayersPerTrainer: 10,
           allowedBirthYearsInput: "",
         });
-        setMessage("✅ Teamkategorie erstellt.");
+        setMessage("âœ… Teamkategorie erstellt.");
       } catch (error) {
-        setMessage(error instanceof Error ? `❌ ${error.message}` : "❌ Teamkategorie konnte nicht erstellt werden.");
+        setMessage(error instanceof Error ? `âŒ ${error.message}` : "âŒ Teamkategorie konnte nicht erstellt werden.");
       } finally {
         setCreating(false);
       }
@@ -222,7 +227,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
     const item = items.find((candidate) => candidate.id === ruleId);
     if (!item) return;
 
-    const confirmed = window.confirm(`Teamkategorie "${item.category}" wirklich löschen?`);
+    const confirmed = window.confirm(`Teamkategorie "${item.category}" wirklich lÃ¶schen?`);
     if (!confirmed) return;
 
     setDeletingRuleId(ruleId);
@@ -237,13 +242,13 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-          throw new Error(payload?.error ?? "Kategorie konnte nicht gelöscht werden.");
+          throw new Error(payload?.error ?? "Kategorie konnte nicht gelÃ¶scht werden.");
         }
 
         setItems((current) => current.filter((candidate) => candidate.id !== ruleId));
-        setMessage("✅ Teamkategorie gelöscht.");
+        setMessage("âœ… Teamkategorie gelÃ¶scht.");
       } catch (error) {
-        setMessage(error instanceof Error ? `❌ ${error.message}` : "❌ Teamkategorie konnte nicht gelöscht werden.");
+        setMessage(error instanceof Error ? `âŒ ${error.message}` : "âŒ Teamkategorie konnte nicht gelÃ¶scht werden.");
       } finally {
         setDeletingRuleId(null);
       }
@@ -302,7 +307,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           </label>
 
           <label className="space-y-1">
-            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Jahrgänge</span>
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">JahrgÃ¤nge</span>
             <input
               value={newRule.allowedBirthYearsInput}
               onChange={(event) => setNewRule((current) => ({ ...current, allowedBirthYearsInput: event.target.value }))}
@@ -318,7 +323,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
             className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#0b4aa2]/20 bg-white px-5 text-sm font-black text-[#0b4aa2] shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
-            {creating ? "Erstellt..." : "Hinzufügen"}
+            {creating ? "Erstellt..." : "HinzufÃ¼gen"}
           </button>
         </div>
       </div>
@@ -412,7 +417,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
               </label>
 
               <label className="space-y-1">
-                <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Jahrgänge</span>
+                <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">JahrgÃ¤nge</span>
                 <input
                   value={rule.allowedBirthYearsInput}
                   onChange={(event) => updateItem(rule.id, "allowedBirthYearsInput", event.target.value)}
@@ -438,7 +443,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
                 onClick={() => deleteRule(rule.id)}
                 disabled={isPending || deletingRuleId === rule.id}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label={`${rule.category} löschen`}
+                aria-label={`${rule.category} lÃ¶schen`}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -454,3 +459,4 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
     </div>
   );
 }
+
