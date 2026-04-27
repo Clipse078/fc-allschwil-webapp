@@ -14,6 +14,9 @@ type QualificationRequirementItem = {
   id?: string;
   qualificationDefinitionId: string;
   qualificationDefinitionName: string;
+  qualificationDefinition?: {
+    name: string;
+  };
   requiredTrainerCount: number;
   sortOrder: number;
 };
@@ -204,7 +207,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
       qualificationRequirements: (rule.qualificationRequirements ?? []).map((requirement, index) => ({
         id: requirement.id,
         qualificationDefinitionId: requirement.qualificationDefinitionId,
-        qualificationDefinitionName: (requirement as any).qualificationDefinition?.name ?? requirement.qualificationDefinitionName ?? getQualificationName(requirement.qualificationDefinitionId),
+        qualificationDefinitionName: requirement.qualificationDefinition?.name ?? requirement.qualificationDefinitionName ?? getQualificationName(requirement.qualificationDefinitionId),
         requiredTrainerCount: requirement.requiredTrainerCount,
         sortOrder: requirement.sortOrder ?? index,
       })),
@@ -466,5 +469,6 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
     </div>
   );
 }
+
 
 
