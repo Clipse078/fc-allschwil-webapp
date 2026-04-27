@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   BarChart3,
   CalendarSync,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TeamCategoryRulesEditor from "@/components/admin/configuration/TeamCategoryRulesEditor";
+import TeamDisplaySettingsEditor from "@/components/admin/configuration/TeamDisplaySettingsEditor";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
@@ -101,6 +102,39 @@ export default async function AdminConfigurationPage() {
       startDate: "desc",
     },
   });
+  const activeSeasonTeamSettings = activeSeason
+    ? await prisma.teamSeason.findMany({
+        where: {
+          seasonId: activeSeason.id,
+        },
+        orderBy: {
+          team: {
+            sortOrder: "asc",
+          },
+        },
+        select: {
+          id: true,
+          squadWebsiteVisible: true,
+          trainerTeamWebsiteVisible: true,
+          trainingsWebsiteVisible: true,
+          upcomingMatchesWebsiteVisible: true,
+          resultsWebsiteVisible: true,
+          standingsWebsiteVisible: true,
+          season: {
+            select: {
+              name: true,
+            },
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              websiteVisible: true,
+            },
+          },
+        },
+      })
+    : [];
 
   return (
     <div className="space-y-8">
@@ -202,18 +236,21 @@ export default async function AdminConfigurationPage() {
             <ShieldCheck className="h-6 w-6 text-[#0b4aa2]" />
           </div>
 
-          <div className="mt-5 space-y-3">
-            {[
-              "Teamseiten-Anzeige wird zentral im Admin Modul gesteuert.",
-              "Auf Teamseiten für Nicht-Admins nur read-only.",
-              "Admin darf zentral und auf Teamdetailseite steuern.",
-              "Später tenant-spezifisch pro Club konfigurierbar.",
-            ].map((item) => (
-              <div key={item} className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
-                {item}
-              </div>
-            ))}
-          </div>
+          <TeamDisplaySettingsEditor
+            teams={activeSeasonTeamSettings.map((entry) => ({
+              teamId: entry.team.id,
+              teamName: entry.team.name,
+              teamSeasonId: entry.id,
+              seasonName: entry.season.name,
+              teamPageWebsiteVisible: entry.team.websiteVisible,
+              squadWebsiteVisible: entry.squadWebsiteVisible,
+              trainerTeamWebsiteVisible: entry.trainerTeamWebsiteVisible,
+              trainingsWebsiteVisible: entry.trainingsWebsiteVisible,
+              upcomingMatchesWebsiteVisible: entry.upcomingMatchesWebsiteVisible,
+              resultsWebsiteVisible: entry.resultsWebsiteVisible,
+              standingsWebsiteVisible: entry.standingsWebsiteVisible,
+            }))}
+          />
         </div>
       </section>
     </div>
