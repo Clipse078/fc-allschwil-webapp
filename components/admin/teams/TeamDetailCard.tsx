@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import {
@@ -112,11 +112,11 @@ type Props = {
 function formatGenderGroup(value: string | null) {
   const normalized = String(value ?? "").toUpperCase();
 
-  if (normalized === "MEN" || normalized === "MALE" || normalized === "MÃƒâ€žNNER" || normalized === "MANNER") return "MÃƒÂ¤nner";
+  if (normalized === "MEN" || normalized === "MALE" || normalized === "MÃƒÆ’Ã¢â‚¬Å¾NNER" || normalized === "MANNER") return "MÃƒÆ’Ã‚Â¤nner";
   if (normalized === "WOMEN" || normalized === "FEMALE" || normalized === "FRAUEN") return "Frauen";
   if (normalized === "MIXED" || normalized === "GEMISCHT") return "Mixed";
 
-  return "Ã¢â‚¬â€œ";
+  return "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“";
 }
 
 function getDiplomaRequirementForTeam(category: string | null, ageGroup: string | null) {
@@ -191,6 +191,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
   const [teamPhotoDrag, setTeamPhotoDrag] = useState<{ startX: number; startY: number; photoX: number; photoY: number } | null>(null);
   const [trainerDiplomaCounts, setTrainerDiplomaCounts] = useState<{ label: string; count: number }[]>([]);
   const [teamHealthKpi, setTeamHealthKpi] = useState<TeamHealthKpi | null>(null);
+  const [kpiBreakdown, setKpiBreakdown] = useState<{ name: string; required: number; actual: number }[]>([]);
 
   useEffect(() => {
     setTeam(initialTeam);
@@ -272,7 +273,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           const subline = String(trainer.subline ?? "").trim();
           if (!subline) continue;
 
-          const diploma = subline.split("â€¢")[0]?.trim();
+          const diploma = subline.split("Ã¢â‚¬Â¢")[0]?.trim();
           if (!diploma) continue;
 
           counts.set(diploma, (counts.get(diploma) ?? 0) + 1);
@@ -301,8 +302,10 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           maxPlayersPerTrainer: typeof match.maxPlayersPerTrainer === "number" ? match.maxPlayersPerTrainer : null,
           hasHealthyPlayerTrainerRatio: typeof match.hasHealthyPlayerTrainerRatio === "boolean" ? match.hasHealthyPlayerTrainerRatio : null,
         } : null);
+        setKpiBreakdown(Array.isArray(match?.qualificationRequirements) ? match.qualificationRequirements.map((item: { qualificationName?: string | null; requiredTrainerCount?: number; matchingTrainerCount?: number }) => ({ name: item.qualificationName ?? "Qualifikation", required: item.requiredTrainerCount ?? 0, actual: item.matchingTrainerCount ?? 0 })) : []);
       } catch {
         setTeamHealthKpi(null);
+        setKpiBreakdown([]);
       }
     }
 
@@ -423,7 +426,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           <p className="fca-eyebrow">Team Management</p>
           <h1 className="fca-heading mt-2">Team Verwaltung</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
-            Verwalte die wichtigsten Informationen, Website-Sichtbarkeit, Teamfoto, Trainerstaff und Kader fÃƒÂ¼r die ÃƒÂ¶ffentliche Teamseite.
+            Verwalte die wichtigsten Informationen, Website-Sichtbarkeit, Teamfoto, Trainerstaff und Kader fÃƒÆ’Ã‚Â¼r die ÃƒÆ’Ã‚Â¶ffentliche Teamseite.
           </p>
         </div>
 
@@ -455,7 +458,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
 
                 <div className="mt-5 grid gap-4 text-sm text-slate-600 sm:grid-cols-2">
                   <div>
-                    <div className="text-xs font-semibold text-slate-400">TeamkÃƒÂ¼rzel</div>
+                    <div className="text-xs font-semibold text-slate-400">TeamkÃƒÆ’Ã‚Â¼rzel</div>
                     <div className="mt-1 font-semibold text-slate-900">{team.slug}</div>
                   </div>
                   <div>
@@ -486,6 +489,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                       canManage={canManage}
                       trainerCount={activeTeamSeason.trainerTeamMembers?.length ?? 0}
                       hasHealthyPlayerTrainerRatio={teamHealthKpi?.hasHealthyPlayerTrainerRatio ?? null}
+                      kpiBreakdown={kpiBreakdown}
                     />
                   </div>
                 ) : null}              </div>
@@ -525,7 +529,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
           <div className="p-6">
             <p className="fca-eyebrow">Website Darstellung steuern</p>
-            <p className="mt-3 text-sm text-slate-500">{canManage ? "Diese Einstellungen bestimmen, was auf der Ã¶ffentlichen Teamseite sichtbar ist." : "Diese Einstellungen sind read-only und werden im Admin Modul gesteuert."}</p>
+            <p className="mt-3 text-sm text-slate-500">{canManage ? "Diese Einstellungen bestimmen, was auf der ÃƒÂ¶ffentlichen Teamseite sichtbar ist." : "Diese Einstellungen sind read-only und werden im Admin Modul gesteuert."}</p>
 
             <div className="mt-6 space-y-6">
               <div>
@@ -541,7 +545,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                 <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Spielbetrieb</div>
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                   <VisibilityTile icon={<CalendarDays className="h-6 w-6" />} title="Trainingszeiten" active={visibility.trainings} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("trainings", !visibility.trainings, "trainingsWebsiteVisible")} />
-                  <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="NÃ¤chste Spiele" active={visibility.upcoming} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
+                  <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="NÃƒÂ¤chste Spiele" active={visibility.upcoming} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
                   <VisibilityTile icon={<Check className="h-6 w-6" />} title="Resultate" active={visibility.results} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("results", !visibility.results, "resultsWebsiteVisible")} />
                   <VisibilityTile icon={<BarChart3 className="h-6 w-6" />} title="Rangliste" active={visibility.standings} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("standings", !visibility.standings, "standingsWebsiteVisible")} />
                 </div>
@@ -603,7 +607,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                     <ImageIcon className="h-7 w-7" />
                   </div>
                   <p className="mt-5 text-sm font-bold text-slate-900">Noch kein Teamfoto hinterlegt</p>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Foto auswÃƒÂ¤hlen oder direkt hier hineinziehen.</p>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">Foto auswÃƒÆ’Ã‚Â¤hlen oder direkt hier hineinziehen.</p>
                   <label htmlFor="team-photo-upload" className="mt-5 inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50">
                     <Camera className="h-4 w-4" />Foto hochladen
                   </label>
@@ -613,15 +617,15 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Tipps fÃƒÂ¼r das perfekte Teamfoto</h3>
+              <h3 className="text-sm font-bold text-slate-900">Tipps fÃƒÆ’Ã‚Â¼r das perfekte Teamfoto</h3>
               <div className="mt-4 space-y-3 text-sm text-slate-500">
-                <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Bild im Querformat wÃƒÂ¤hlen</p>
+                <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Bild im Querformat wÃƒÆ’Ã‚Â¤hlen</p>
                 <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Gute Beleuchtung und ruhiger Hintergrund</p>
                 <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Alle Personen gut sichtbar</p>
                 <p className="flex gap-3"><Check className="h-4 w-4 text-[#0b4aa2]" />Empfohlene Mindestbreite: 2000px</p>
               </div>
               <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-[#0b4aa2]">
-                Nach dem Upload kannst du das Bild zuschneiden und auf der Teamseite verÃƒÂ¶ffentlichen.
+                Nach dem Upload kannst du das Bild zuschneiden und auf der Teamseite verÃƒÆ’Ã‚Â¶ffentlichen.
               </div>
             </div>
           </div>
@@ -632,6 +636,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
 
