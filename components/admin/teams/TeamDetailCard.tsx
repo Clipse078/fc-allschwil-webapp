@@ -493,7 +493,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                       teamId={team.id}
                       teamSeasonId={activeTeamSeason.id}
                       canManage={canManage}
-                      trainerCount={activeTeamSeason.trainerTeamMembers?.length ?? 0}
+                      trainerCount={teamHealthKpi?.trainerCount ?? activeTeamSeason.trainerTeamMembers?.length ?? 0}
                       hasHealthyPlayerTrainerRatio={teamHealthKpi?.hasHealthyPlayerTrainerRatio ?? null}
                       kpiBreakdown={kpiBreakdown}
                     />
@@ -642,6 +642,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
 
