@@ -65,6 +65,21 @@ function normalizeRequirements(requirements: QualificationRequirementItem[]) {
     }));
 }
 
+function getRuleSummaryBadges(rule: Pick<TeamCategoryRuleEditorItem, "minTrainerCount" | "maxPlayersPerTrainer" | "qualificationRequirements"> & { allowedBirthYears?: number[]; allowedBirthYearsInput?: string }) {
+  const birthYears = "allowedBirthYearsInput" in rule ? parseBirthYears(rule.allowedBirthYearsInput ?? "") : rule.allowedBirthYears ?? [];
+  return [
+    `${rule.minTrainerCount} Trainer`,
+    `${rule.maxPlayersPerTrainer} Spieler/Trainer`,
+    birthYears.length > 0 ? birthYears.join(" + ") : "Jahrgänge offen",
+    rule.qualificationRequirements.length > 0
+      ? `${rule.qualificationRequirements.length} Qualifikation${rule.qualificationRequirements.length === 1 ? "" : "en"}`
+      : "Keine Qualifikation",
+  ];
+}
+
+function getRequirementLabel(requirement: QualificationRequirementItem) {
+  return `${requirement.requiredTrainerCount}x ${requirement.qualificationDefinitionName}`;
+}
 export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDefinitions, rules }: Props) {
   const activeQualificationDefinitions = qualificationDefinitions.filter((definition) => definition.isActive);
   const firstQualificationId = activeQualificationDefinitions[0]?.id ?? "";
@@ -364,6 +379,12 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
           </button>
         </div>
 
+        <div className="mt-4 flex flex-wrap gap-2">
+          {getRuleSummaryBadges(newRule).map((badge) => (
+            <span key={badge} className="rounded-full border border-blue-100 bg-white px-3 py-1.5 text-xs font-black text-[#0b4aa2] shadow-sm">{badge}</span>
+          ))}
+        </div>
+
         <div className="mt-4 rounded-[20px] border border-blue-100 bg-white/70 p-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Qualifikationen neue Kategorie</p>
@@ -414,6 +435,11 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Kategorie</p>
               <h3 className="mt-1 truncate text-[15px] font-black uppercase tracking-tight text-slate-950" title={rule.category}>{rule.category}</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {getRuleSummaryBadges(rule).map((badge) => (
+                  <span key={badge} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-600 shadow-sm">{badge}</span>
+                ))}
+              </div>
             </div>
 
             <div className="grid min-w-0 gap-3">
@@ -469,6 +495,9 @@ export default function TeamCategoryRulesEditor({ clubConfigId, qualificationDef
     </div>
   );
 }
+
+
+
 
 
 
