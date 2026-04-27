@@ -397,19 +397,34 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
             onSaved={handleTeamSaved}
           />
         )}
-        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="fca-eyebrow">Website-Sichtbarkeit</p>
-          <p className="mt-3 text-sm text-slate-500">Steuere, welche Bereiche auf der Ã¶ffentlichen Teamseite angezeigt werden.</p>
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+          <div className="p-6">
+            <p className="fca-eyebrow">Website Darstellung steuern</p>
+            <p className="mt-3 text-sm text-slate-500">Diese Einstellungen bestimmen, was auf der öffentlichen Teamseite sichtbar ist.</p>
 
-                    <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7">
-            <VisibilityTile icon={<ImageIcon className="h-6 w-6" />} title="Teamfoto" active={teamPhotoVisible} onToggle={() => { setTeamPhotoVisible((current) => !current); setTeamPhotoSaved(false); }} />
-            <VisibilityTile icon={<Users className="h-6 w-6" />} title="Trainerstaff" active={visibility.trainerstaff} onToggle={() => toggleWebsiteVisibility("trainerstaff", !visibility.trainerstaff, "trainerTeamWebsiteVisible")} />
-            <VisibilityTile icon={<CalendarDays className="h-6 w-6" />} title="Trainingszeiten" active={visibility.trainings} onToggle={() => toggleWebsiteVisibility("trainings", !visibility.trainings, "trainingsWebsiteVisible")} />
-            <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="NÃ¤chste Spiele" active={visibility.upcoming} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
-            <VisibilityTile icon={<Check className="h-6 w-6" />} title="Resultate" active={visibility.results} onToggle={() => toggleWebsiteVisibility("results", !visibility.results, "resultsWebsiteVisible")} />
-            <VisibilityTile icon={<BarChart3 className="h-6 w-6" />} title="Rangliste" active={visibility.standings} onToggle={() => toggleWebsiteVisibility("standings", !visibility.standings, "standingsWebsiteVisible")} />
-            <VisibilityTile icon={<Users className="h-6 w-6" />} title="Spielerkader" active={visibility.playersquad} onToggle={() => toggleWebsiteVisibility("playersquad", !visibility.playersquad, "squadWebsiteVisible")} />
-          </div>        </section>
+            <div className="mt-6 space-y-6">
+              <div>
+                <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Inhalte</div>
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <VisibilityTile icon={<ImageIcon className="h-6 w-6" />} title="Teamfoto" active={teamPhotoVisible} onToggle={() => { setTeamPhotoVisible((current) => !current); setTeamPhotoSaved(false); }} />
+                  <VisibilityTile icon={<Users className="h-6 w-6" />} title="Trainerstaff" active={visibility.trainerstaff} onToggle={() => toggleWebsiteVisibility("trainerstaff", !visibility.trainerstaff, "trainerTeamWebsiteVisible")} />
+                  <VisibilityTile icon={<Users className="h-6 w-6" />} title="Spielerkader" active={visibility.playersquad} onToggle={() => toggleWebsiteVisibility("playersquad", !visibility.playersquad, "squadWebsiteVisible")} />
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Spielbetrieb</div>
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                  <VisibilityTile icon={<CalendarDays className="h-6 w-6" />} title="Trainingszeiten" active={visibility.trainings} onToggle={() => toggleWebsiteVisibility("trainings", !visibility.trainings, "trainingsWebsiteVisible")} />
+                  <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="Nächste Spiele" active={visibility.upcoming} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
+                  <VisibilityTile icon={<Check className="h-6 w-6" />} title="Resultate" active={visibility.results} onToggle={() => toggleWebsiteVisibility("results", !visibility.results, "resultsWebsiteVisible")} />
+                  <VisibilityTile icon={<BarChart3 className="h-6 w-6" />} title="Rangliste" active={visibility.standings} onToggle={() => toggleWebsiteVisibility("standings", !visibility.standings, "standingsWebsiteVisible")} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="fca-eyebrow">Teamfoto</p>
@@ -493,4 +508,5 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
