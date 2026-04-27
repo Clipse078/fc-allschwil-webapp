@@ -223,7 +223,7 @@ export default async function AdminConfigurationPage() {
         })}
       </section>
 
-      <section className="grid gap-5 2xl:grid-cols-[minmax(0,1.15fr)_minmax(460px,0.85fr)]">
+      <section className="space-y-5">
         <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
