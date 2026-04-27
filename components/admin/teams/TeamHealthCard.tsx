@@ -18,6 +18,34 @@ type Props = {
   diplomas: DiplomaCount[];
 };
 
+function getRatioLabel(playerCount: number, trainerCount: number) {
+  if (trainerCount <= 0) return "-";
+  const ratio = Math.round((playerCount / trainerCount) * 10) / 10;
+  return `${ratio}:1`;
+}
+
+function getRatioClass(playerCount: number, trainerCount: number) {
+  if (trainerCount <= 0) return "border-slate-200 bg-slate-50 text-slate-500";
+  const ratio = playerCount / trainerCount;
+
+  if (ratio <= 6) return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  if (ratio <= 10) return "border-amber-100 bg-amber-50 text-amber-700";
+
+  return "border-red-100 bg-red-50 text-red-700";
+}
+
+function diplomaPriority(label: string) {
+  const normalized = label.toUpperCase();
+
+  if (normalized.includes("A-DIPLOM") || normalized.includes("UEFA A")) return 1;
+  if (normalized.includes("B-DIPLOM") || normalized.includes("UEFA B")) return 2;
+  if (normalized.includes("C-DIPLOM") || normalized.includes("UEFA C")) return 3;
+  if (normalized.includes("D-DIPLOM") || normalized.includes("SFV D")) return 4;
+  if (normalized.includes("KINDERFUSSBALL")) return 5;
+
+  return 99;
+}
+
 export default function TeamHealthCard({
   seasonLabel,
   playerCount,
@@ -25,17 +53,22 @@ export default function TeamHealthCard({
   birthYears,
   diplomas,
 }: Props) {
-  const ratio = trainerCount > 0 ? `${Math.round(playerCount / trainerCount)}:1` : "-";
+  const ratioLabel = getRatioLabel(playerCount, trainerCount);
+  const ratioClass = getRatioClass(playerCount, trainerCount);
+  const sortedDiplomas = [...diplomas].sort((a, b) => diplomaPriority(a.label) - diplomaPriority(b.label) || a.label.localeCompare(b.label));
 
   return (
     <div className="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-sm">
       <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
 
       <div className="p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="fca-eyebrow">Team Health</p>
+            <p className="fca-eyebrow">Team Übersicht</p>
             <p className="mt-1 text-sm font-black text-slate-900">Saison {seasonLabel}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              Total: {playerCount} Spieler · {trainerCount} Trainer
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -45,8 +78,8 @@ export default function TeamHealthCard({
             <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#0b4aa2] shadow-sm">
               {trainerCount} Trainer
             </span>
-            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm">
-              Verhältnis {ratio}
+            <span className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm ${ratioClass}`}>
+              Verhältnis {ratioLabel}
             </span>
           </div>
         </div>
@@ -57,8 +90,9 @@ export default function TeamHealthCard({
             <div className="mt-2 flex flex-wrap gap-2">
               {birthYears.length > 0 ? (
                 birthYears.map((item) => (
-                  <span key={item.year} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-[#0b4aa2] shadow-sm">
-                    {item.year}: {item.count} Spieler
+                  <span key={item.year} className="inline-flex flex-col rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs shadow-sm">
+                    <span className="font-black text-[#0b4aa2]">{item.year}</span>
+                    <span className="font-bold text-slate-500">{item.count} Spieler</span>
                   </span>
                 ))
               ) : (
@@ -72,15 +106,15 @@ export default function TeamHealthCard({
           <div>
             <div className="text-xs font-semibold text-slate-400">Trainerlizenzen</div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {diplomas.length > 0 ? (
-                diplomas.map((item) => (
+              {sortedDiplomas.length > 0 ? (
+                sortedDiplomas.map((item) => (
                   <span key={item.label} className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-[#0b4aa2] shadow-sm">
-                    {item.label}: {item.count}
+                    🎓 {item.label}: {item.count}
                   </span>
                 ))
               ) : (
                 <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">
-                  Keine Trainerlizenzen
+                  Keine Diplome erfasst
                 </span>
               )}
             </div>
