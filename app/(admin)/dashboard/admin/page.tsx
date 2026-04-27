@@ -13,6 +13,7 @@ import {
   Workflow,
 } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import TeamCategoryRulesEditor from "@/components/admin/configuration/TeamCategoryRulesEditor";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
@@ -181,28 +182,15 @@ export default async function AdminConfigurationPage() {
             <DatabaseZap className="h-6 w-6 text-[#0b4aa2]" />
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-2">
-            {(clubConfig?.teamCategoryRules ?? []).map((rule) => (
-              <div key={rule.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-black text-slate-900">{rule.category}</h3>
-                  <span className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-black text-[#0b4aa2]">
-                    {rule.minTrainerCount} Trainer
-                  </span>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
-                    {rule.requiredDiploma}
-                  </span>
-                  {rule.allowedBirthYears.length > 0 ? (
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-500">
-                      {rule.allowedBirthYears.join(" + ")}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
+          <TeamCategoryRulesEditor
+            rules={(clubConfig?.teamCategoryRules ?? []).map((rule) => ({
+              id: rule.id,
+              category: rule.category,
+              minTrainerCount: rule.minTrainerCount,
+              requiredDiploma: rule.requiredDiploma,
+              allowedBirthYears: rule.allowedBirthYears,
+            }))}
+          />
         </div>
 
         <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -231,5 +219,6 @@ export default async function AdminConfigurationPage() {
     </div>
   );
 }
+
 
 
