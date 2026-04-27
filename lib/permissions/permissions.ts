@@ -1,6 +1,8 @@
-export const PERMISSIONS = {
+﻿export const PERMISSIONS = {
   USERS_MANAGE: "users.manage",
   USERS_IMPERSONATE: "users.impersonate",
+
+  ADMIN_MANAGE: "admin.manage",
 
   SEASONS_VIEW: "seasons.view",
   SEASONS_MANAGE: "seasons.manage",
@@ -43,3 +45,4 @@ export const PERMISSIONS = {
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+

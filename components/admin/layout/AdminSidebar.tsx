@@ -25,6 +25,7 @@ import {
   Megaphone,
   Network,
   ScrollText,
+  Settings,
   Shield,
   ShieldCheck,
   UserCircle2,
@@ -406,6 +407,7 @@ export default function VereinsOSSidebar({
     </aside>
   );
 }
+
 
 
 
