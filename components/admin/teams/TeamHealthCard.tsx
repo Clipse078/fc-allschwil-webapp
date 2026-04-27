@@ -19,6 +19,8 @@ type Props = {
   birthYears: BirthYearCount[];
   diplomas: DiplomaCount[];
   diplomaRequirement?: DiplomaRequirement;
+  maxPlayersPerTrainer?: number;
+  hasHealthyPlayerTrainerRatio?: boolean;
 };
 
 function getRatioLabel(playerCount: number, trainerCount: number) {
@@ -27,13 +29,17 @@ function getRatioLabel(playerCount: number, trainerCount: number) {
   return `${ratio}:1`;
 }
 
-function getRatioClass(playerCount: number, trainerCount: number) {
+function getRatioClass(playerCount: number, trainerCount: number, maxPlayersPerTrainer?: number, hasHealthy?: boolean) {
   if (trainerCount <= 0) return "border-slate-200 bg-slate-50 text-slate-500";
-  const ratio = playerCount / trainerCount;
 
+  if (typeof maxPlayersPerTrainer === "number") {
+    if (hasHealthy) return "border-emerald-100 bg-emerald-50 text-emerald-700";
+    return "border-red-100 bg-red-50 text-red-700";
+  }
+
+  const ratio = playerCount / trainerCount;
   if (ratio <= 6) return "border-emerald-100 bg-emerald-50 text-emerald-700";
   if (ratio <= 10) return "border-amber-100 bg-amber-50 text-amber-700";
-
   return "border-red-100 bg-red-50 text-red-700";
 }
 
@@ -76,9 +82,11 @@ export default function TeamHealthCard({
   birthYears,
   diplomas,
   diplomaRequirement = null,
+  maxPlayersPerTrainer,
+  hasHealthyPlayerTrainerRatio,
 }: Props) {
   const ratioLabel = getRatioLabel(playerCount, trainerCount);
-  const ratioClass = getRatioClass(playerCount, trainerCount);
+  const ratioClass = getRatioClass(playerCount, trainerCount, maxPlayersPerTrainer, hasHealthyPlayerTrainerRatio);
   const sortedDiplomas = [...diplomas].sort((a, b) => diplomaPriority(a.label) - diplomaPriority(b.label) || a.label.localeCompare(b.label));
   const requirementMet = diplomaRequirement ? sortedDiplomas.some((item) => diplomaMatchesRequirement(item.label, diplomaRequirement)) : null;
   const requirementClass =
@@ -110,7 +118,7 @@ export default function TeamHealthCard({
               {trainerCount} Trainer
             </span>
             <span className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm ${ratioClass}`}>
-              Verhältnis {ratioLabel}
+              Verhältnis {ratioLabel} {maxPlayersPerTrainer ? `· Soll ≤ ${maxPlayersPerTrainer}` : ""}
             </span>
             {diplomaRequirement ? (
               <span className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm ${requirementClass}`}>
@@ -160,4 +168,8 @@ export default function TeamHealthCard({
     </div>
   );
 }
+
+
+
+
 
