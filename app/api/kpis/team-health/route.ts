@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
 function normalizeLabel(value: string | null | undefined) {
@@ -166,6 +166,7 @@ export async function GET() {
 
       return {
         teamId: team.id,
+        teamSeasonId: activeSeason.id,
         teamName: team.name,
         category: team.category,
         ageGroup: team.ageGroup,
