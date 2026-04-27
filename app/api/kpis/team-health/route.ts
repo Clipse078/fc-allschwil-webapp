@@ -1,50 +1,76 @@
 ﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
-function getRequiredDiploma(category: string | null) {
-  if (!category) return "D-Diplom";
-
-  if (["G", "F", "E"].includes(category)) return "D-Diplom";
-  if (["D7", "D9", "C", "B", "A"].includes(category)) return "C-Diplom";
-
-  return "B-Diplom"; // Aktive / default
+function normalizeLabel(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/-/g, "");
 }
 
-function normalizeDiploma(label: string) {
-  return label.toLowerCase();
+function getDiplomaRank(label: string | null | undefined) {
+  const value = normalizeLabel(label);
+
+  if (!value) return 0;
+  if (value.includes("a")) return 4;
+  if (value.includes("b")) return 3;
+  if (value.includes("c")) return 2;
+  if (value.includes("d")) return 1;
+
+  return 0;
 }
 
-function meetsRequirement(required: string, trainerDiplomas: string[]) {
-  const req = normalizeDiploma(required);
+function getTeamRuleKeys(team: {
+  category: string | null;
+  ageGroup: string | null;
+  name: string;
+}) {
+  const keys = [
+    team.ageGroup,
+    team.category,
+    team.name.match(/\b(D7|D9|[GFECBA])\b/i)?.[1],
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).trim().toUpperCase());
 
-  return trainerDiplomas.some((d) => {
-    const diploma = normalizeDiploma(d);
-
-    if (req.includes("d")) {
-      return diploma.includes("d") || diploma.includes("c") || diploma.includes("b") || diploma.includes("a");
-    }
-    if (req.includes("c")) {
-      return diploma.includes("c") || diploma.includes("b") || diploma.includes("a");
-    }
-    if (req.includes("b")) {
-      return diploma.includes("b") || diploma.includes("a");
-    }
-    return false;
-  });
+  return Array.from(new Set(keys));
 }
 
 export async function GET() {
   try {
+    const clubConfig = await prisma.clubConfig.findFirst({
+      include: {
+        teamCategoryRules: true,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    const rules = clubConfig?.teamCategoryRules ?? [];
+
     const teams = await prisma.team.findMany({
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       include: {
         teamSeasons: {
           include: {
             season: true,
             trainerTeamMembers: {
+              where: {
+                status: "ACTIVE",
+              },
               include: {
                 person: {
                   include: {
-                    trainerQualifications: true,
+                    trainerQualifications: {
+                      where: {
+                        type: "DIPLOMA",
+                        status: {
+                          in: ["VALID", "IN_PROGRESS", "UNKNOWN"],
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -56,47 +82,97 @@ export async function GET() {
 
     const results = teams.map((team) => {
       const activeSeason =
-        team.teamSeasons.find((s) => s.season.isActive) ??
+        team.teamSeasons.find((teamSeason) => teamSeason.season.isActive) ??
         team.teamSeasons[0];
 
       if (!activeSeason) {
         return {
           teamId: team.id,
           teamName: team.name,
+          category: team.category,
+          ageGroup: team.ageGroup,
           status: "unknown",
+          hasRequired: false,
+          hasEnoughTrainers: false,
+          trainerCount: 0,
+          requiredTrainerCount: null,
+          requiredDiploma: null,
+          matchedRuleCategory: null,
         };
       }
 
-      const required = getRequiredDiploma(team.category);
+      const ruleKeys = getTeamRuleKeys(team);
+      const rule =
+        rules.find((candidate) =>
+          ruleKeys.includes(candidate.category.trim().toUpperCase())
+        ) ??
+        rules.find(
+          (candidate) =>
+            candidate.category.trim().toUpperCase() ===
+            String(team.category).trim().toUpperCase()
+        ) ??
+        null;
 
-      const trainerDiplomas = activeSeason.trainerTeamMembers.flatMap((tm) =>
-        tm.person.trainerQualifications.map((q) => q.title)
+      const trainerDiplomas = activeSeason.trainerTeamMembers.flatMap((member) =>
+        member.person.trainerQualifications.map((qualification) => qualification.title)
       );
 
-      const ok = meetsRequirement(required, trainerDiplomas);
+      const requiredDiploma = rule?.requiredDiploma ?? null;
+      const requiredDiplomaRank = getDiplomaRank(requiredDiploma);
+      const hasRequired =
+        requiredDiplomaRank === 0
+          ? false
+          : trainerDiplomas.some(
+              (diploma) => getDiplomaRank(diploma) >= requiredDiplomaRank
+            );
+
+      const requiredTrainerCount = rule?.minTrainerCount ?? null;
+      const trainerCount = activeSeason.trainerTeamMembers.length;
+      const hasEnoughTrainers =
+        typeof requiredTrainerCount === "number"
+          ? trainerCount >= requiredTrainerCount
+          : false;
 
       return {
         teamId: team.id,
         teamName: team.name,
         category: team.category,
-        requiredDiploma: required,
-        hasRequired: ok,
-        trainerCount: activeSeason.trainerTeamMembers.length,
+        ageGroup: team.ageGroup,
+        requiredDiploma,
+        requiredTrainerCount,
+        matchedRuleCategory: rule?.category ?? null,
+        hasRequired,
+        hasEnoughTrainers,
+        trainerCount,
+        trainerDiplomas,
+        status: hasRequired && hasEnoughTrainers ? "healthy" : "attention",
       };
     });
 
     const summary = {
       total: results.length,
-      compliant: results.filter((r) => r.hasRequired).length,
-      nonCompliant: results.filter((r) => !r.hasRequired).length,
+      compliant: results.filter((result) => result.hasRequired && result.hasEnoughTrainers).length,
+      nonCompliant: results.filter((result) => !result.hasRequired || !result.hasEnoughTrainers).length,
+      missingRule: results.filter((result) => !result.matchedRuleCategory).length,
     };
 
     return NextResponse.json({
+      config: clubConfig
+        ? {
+            club: clubConfig.clubName,
+            country: clubConfig.country,
+            rules: rules.length,
+          }
+        : null,
       summary,
       teams: results,
     });
-  } catch (e) {
-    return NextResponse.json({ error: "failed" }, { status: 500 });
+  } catch (error) {
+    console.error("Failed to load team health KPIs", error);
+
+    return NextResponse.json(
+      { error: "Team health KPIs konnten nicht geladen werden." },
+      { status: 500 }
+    );
   }
 }
-
