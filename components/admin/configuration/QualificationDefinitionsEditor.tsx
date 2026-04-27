@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, Save } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 
 type QualificationDefinitionItem = {
   id: string;
@@ -29,26 +29,16 @@ const qualificationTypes = [
 export default function QualificationDefinitionsEditor({ clubConfigId, definitions }: Props) {
   const initialItems = useMemo(() => definitions, [definitions]);
   const [items, setItems] = useState(initialItems);
-  const [newItem, setNewItem] = useState({
-    name: "",
-    type: "DIPLOMA",
-    description: "",
-  });
+  const [newItem, setNewItem] = useState({ name: "", type: "DIPLOMA", description: "" });
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function updateItem(id: string, field: keyof QualificationDefinitionItem, value: string | boolean) {
     setItems((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              [field]: value,
-            }
-          : item
-      )
+      current.map((item) => (item.id === id ? { ...item, [field]: value } : item))
     );
   }
 
@@ -66,19 +56,12 @@ export default function QualificationDefinitionsEditor({ clubConfigId, definitio
         const response = await fetch("/api/admin/qualification-definitions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clubConfigId,
-            name: newItem.name,
-            type: newItem.type,
-            description: newItem.description,
-          }),
+          body: JSON.stringify(newItem),
         });
 
         const payload = await response.json();
 
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Qualifikation konnte nicht erstellt werden.");
-        }
+        if (!response.ok) throw new Error(payload.error ?? "Qualifikation konnte nicht erstellt werden.");
 
         setItems((current) => [...current, payload.definition]);
         setNewItem({ name: "", type: "DIPLOMA", description: "" });
@@ -103,28 +86,49 @@ export default function QualificationDefinitionsEditor({ clubConfigId, definitio
         const response = await fetch(`/api/admin/qualification-definitions/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: item.name,
-            type: item.type,
-            description: item.description ?? "",
-            isActive: item.isActive,
-          }),
+          body: JSON.stringify(item),
         });
 
         const payload = await response.json();
 
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Qualifikation konnte nicht gespeichert werden.");
-        }
+        if (!response.ok) throw new Error(payload.error ?? "Qualifikation konnte nicht gespeichert werden.");
 
-        setItems((current) =>
-          current.map((candidate) => (candidate.id === id ? payload.definition : candidate))
-        );
+        setItems((current) => current.map((candidate) => (candidate.id === id ? payload.definition : candidate)));
         setMessage("✅ Qualifikation gespeichert.");
       } catch (error) {
         setMessage(error instanceof Error ? `❌ ${error.message}` : "❌ Qualifikation konnte nicht gespeichert werden.");
       } finally {
         setSavingId(null);
+      }
+    });
+  }
+
+  function deleteDefinition(id: string) {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item) return;
+
+    const confirmed = window.confirm(`Qualifikation "${item.name}" wirklich löschen? Löschen ist nur möglich, wenn sie nirgends verwendet wird.`);
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    setMessage(null);
+
+    startTransition(async () => {
+      try {
+        const response = await fetch(`/api/admin/qualification-definitions/${id}`, {
+          method: "DELETE",
+        });
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) throw new Error(payload?.error ?? "Qualifikation konnte nicht gelöscht werden.");
+
+        setItems((current) => current.filter((candidate) => candidate.id !== id));
+        setMessage("✅ Qualifikation gelöscht.");
+      } catch (error) {
+        setMessage(error instanceof Error ? `❌ ${error.message}` : "❌ Qualifikation konnte nicht gelöscht werden.");
+      } finally {
+        setDeletingId(null);
       }
     });
   }
@@ -151,9 +155,7 @@ export default function QualificationDefinitionsEditor({ clubConfigId, definitio
               className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-300"
             >
               {qualificationTypes.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
+                <option key={type.value} value={type.value}>{type.label}</option>
               ))}
             </select>
           </label>
@@ -183,7 +185,7 @@ export default function QualificationDefinitionsEditor({ clubConfigId, definitio
       <div className="grid gap-3">
         {items.map((item) => (
           <div key={item.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-            <div className="grid gap-3 lg:grid-cols-[1fr_200px_1fr_140px_auto] lg:items-end">
+            <div className="grid gap-3 lg:grid-cols-[1fr_200px_1fr_140px_auto_auto] lg:items-end">
               <label className="space-y-1">
                 <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Name</span>
                 <input
@@ -201,9 +203,7 @@ export default function QualificationDefinitionsEditor({ clubConfigId, definitio
                   className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-300"
                 >
                   {qualificationTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
+                    <option key={type.value} value={type.value}>{type.label}</option>
                   ))}
                 </select>
               </label>
@@ -235,6 +235,16 @@ export default function QualificationDefinitionsEditor({ clubConfigId, definitio
               >
                 <Save className="h-4 w-4" />
                 {savingId === item.id ? "Speichert..." : "Speichern"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => deleteDefinition(item.id)}
+                disabled={isPending || deletingId === item.id}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label={`${item.name} löschen`}
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </div>

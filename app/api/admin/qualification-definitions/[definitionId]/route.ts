@@ -25,6 +25,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const isActive = Boolean(body.isActive ?? true);
 
     if (!name) return NextResponse.json({ error: "Name darf nicht leer sein." }, { status: 400 });
+
     if (!ALLOWED_TYPES.includes(type as (typeof ALLOWED_TYPES)[number])) {
       return NextResponse.json({ error: "Ungültiger Qualifikationstyp." }, { status: 400 });
     }
@@ -42,7 +43,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ definition });
   } catch (error) {
     console.error("Failed to update qualification definition", error);
-    return NextResponse.json({ error: "Qualifikation konnte nicht gespeichert werden." }, { status: 500 });
+
+    return NextResponse.json(
+      { error: "Qualifikation konnte nicht gespeichert werden." },
+      { status: 500 }
+    );
   }
 }
 
@@ -52,6 +57,37 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
     const { definitionId } = await context.params;
 
+    const definition = await prisma.qualificationDefinition.findUnique({
+      where: { id: definitionId },
+      include: {
+        teamCategoryRequirements: true,
+      },
+    });
+
+    if (!definition) {
+      return NextResponse.json({ error: "Qualifikation nicht gefunden." }, { status: 404 });
+    }
+
+    if (definition.teamCategoryRequirements.length > 0) {
+      return NextResponse.json(
+        { error: "Diese Qualifikation kann nicht gelöscht werden, weil sie noch in Teamregeln verwendet wird." },
+        { status: 409 }
+      );
+    }
+
+    const trainerUsageCount = await prisma.trainerQualification.count({
+      where: {
+        title: definition.name,
+      },
+    });
+
+    if (trainerUsageCount > 0) {
+      return NextResponse.json(
+        { error: "Diese Qualifikation kann nicht gelöscht werden, weil sie noch bei mindestens einem Trainer hinterlegt ist. Deaktiviere sie stattdessen." },
+        { status: 409 }
+      );
+    }
+
     await prisma.qualificationDefinition.delete({
       where: { id: definitionId },
     });
@@ -59,8 +95,9 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Failed to delete qualification definition", error);
+
     return NextResponse.json(
-      { error: "Qualifikation konnte nicht gelöscht werden. Prüfe, ob sie noch in Teamregeln verwendet wird." },
+      { error: "Qualifikation konnte nicht gelöscht werden." },
       { status: 500 }
     );
   }
