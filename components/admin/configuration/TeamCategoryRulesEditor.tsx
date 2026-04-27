@@ -355,24 +355,25 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
             draggedRuleId === rule.id ? "opacity-50" : ""
           }`}
         >
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="flex items-center gap-3">
-              <div
-                draggable
-                onDragStart={(event) => handleRuleDragStart(event, rule.id)}
-                onDragEnd={() => setDraggedRuleId(null)}
-                className="flex h-10 w-10 cursor-grab items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 active:cursor-grabbing"
-                title="Ziehen zum Sortieren"
-              >
-                <GripVertical className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Kategorie</p>
-                <h3 className="mt-1 text-lg font-black text-slate-900">{rule.category}</h3>
-              </div>
+          <div className="grid gap-4 xl:grid-cols-[44px_180px_minmax(0,1fr)_auto] xl:items-end">
+            <div
+              draggable
+              onDragStart={(event) => handleRuleDragStart(event, rule.id)}
+              onDragEnd={() => setDraggedRuleId(null)}
+              className="flex h-10 w-10 cursor-grab items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 active:cursor-grabbing"
+              title="Ziehen zum Sortieren"
+            >
+              <GripVertical className="h-4 w-4" />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-4 xl:min-w-[680px]">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Kategorie</p>
+              <h3 className="mt-1 truncate text-[15px] font-black uppercase tracking-tight text-slate-950" title={rule.category}>
+                {rule.category}
+              </h3>
+            </div>
+
+            <div className="grid min-w-0 gap-3 sm:grid-cols-4">
               <label className="space-y-1">
                 <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Trainer</span>
                 <input
@@ -421,7 +422,7 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
               </label>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-2">
               <button
                 type="button"
                 onClick={() => saveRule(rule.id)}
@@ -445,7 +446,6 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
           </div>
         </div>
       ))}
-
       {message ? (
         <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700">
           {message}
