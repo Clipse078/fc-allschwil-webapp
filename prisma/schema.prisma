@@ -424,6 +424,8 @@ model Person {
   isActive    Boolean   @default(true)
   isPlayer    Boolean   @default(false)
   isTrainer   Boolean   @default(false)
+  trainerExperienceYears Int?
+  clubJoinDate DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

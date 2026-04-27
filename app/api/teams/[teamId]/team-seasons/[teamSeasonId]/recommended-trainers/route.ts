@@ -11,18 +11,32 @@ function normalizeLabel(value: string | null | undefined) {
 
 function getDiplomaRank(label: string | null | undefined) {
   const value = normalizeLabel(label);
-
   if (!value) return 0;
   if (value.includes("a")) return 4;
   if (value.includes("b")) return 3;
   if (value.includes("c")) return 2;
   if (value.includes("d")) return 1;
-
   return 0;
 }
 
 function personName(person: { displayName: string | null; firstName: string; lastName: string }) {
   return person.displayName || `${person.firstName} ${person.lastName}`.trim();
+}
+
+function yearsSince(date: Date | null) {
+  if (!date) return null;
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return 0;
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+function isDiplomaStillValid(qualification: {
+  status: string;
+  expiresAt: Date | null;
+}) {
+  if (qualification.status !== "VALID") return false;
+  if (!qualification.expiresAt) return true;
+  return qualification.expiresAt.getTime() >= Date.now();
 }
 
 export async function GET(_: Request, context: Context) {
@@ -73,10 +87,7 @@ export async function GET(_: Request, context: Context) {
     );
 
     const people = await prisma.person.findMany({
-      where: {
-        isActive: true,
-        isTrainer: true,
-      },
+      where: { isActive: true, isTrainer: true },
       take: 80,
       include: {
         trainerQualifications: true,
@@ -88,26 +99,36 @@ export async function GET(_: Request, context: Context) {
     const scored = people
       .filter((person) => !excludedIds.has(person.id))
       .map((person) => {
-        const bestRank = Math.max(
-          0,
-          ...person.trainerQualifications.map((qualification) => getDiplomaRank(qualification.title)),
-        );
-
+        const validDiplomas = person.trainerQualifications.filter(isDiplomaStillValid);
+        const bestRank = Math.max(0, ...validDiplomas.map((qualification) => getDiplomaRank(qualification.title)));
+        const hasValidDiploma = validDiplomas.length > 0;
         const activeAssignments = person.trainerTeamMembers.filter((assignment) => assignment.status === "ACTIVE").length;
         const hasRequiredDiploma = requiredRank === 0 || bestRank >= requiredRank;
+        const experienceYears = person.trainerExperienceYears ?? 0;
+        const yearsAtClub = yearsSince(person.clubJoinDate);
 
         let score = 50;
 
-        if (hasRequiredDiploma) score += 35;
-        if (bestRank > requiredRank) score += 10;
+        if (hasRequiredDiploma) score += 30;
+        if (bestRank > requiredRank) score += 8;
+        if (hasValidDiploma) score += 12;
+        if (experienceYears >= 5) score += 15;
+        else if (experienceYears >= 3) score += 10;
+        else if (experienceYears >= 1) score += 5;
+        if ((yearsAtClub ?? 0) >= 5) score += 12;
+        else if ((yearsAtClub ?? 0) >= 3) score += 8;
+        else if ((yearsAtClub ?? 0) >= 1) score += 4;
         if (activeAssignments === 0) score += 15;
         if (activeAssignments === 1) score += 5;
         if (activeAssignments >= 3) score -= 15;
 
         const reason = [
-          hasRequiredDiploma ? "Diploma match" : "Diploma below requirement",
+          hasValidDiploma ? "Diploma valid: yes" : "Diploma valid: no",
+          requiredRank === 0 ? "No diploma target configured" : hasRequiredDiploma ? "Meets diploma target" : "Below diploma target",
+          `Experience: ${experienceYears} year(s)`,
+          yearsAtClub === null ? "Years at club: unknown" : `Years at club: ${yearsAtClub}`,
           activeAssignments === 0 ? "currently free" : `${activeAssignments} active assignment(s)`,
-        ].join(" â€¢ ");
+        ].join(" • ");
 
         return {
           id: person.id,
@@ -116,6 +137,9 @@ export async function GET(_: Request, context: Context) {
           teamLabel: reason,
           score,
           reason,
+          experienceYears,
+          yearsAtClub,
+          diplomaValid: hasValidDiploma,
         };
       })
       .sort((a, b) => b.score - a.score || a.displayName.localeCompare(b.displayName))
