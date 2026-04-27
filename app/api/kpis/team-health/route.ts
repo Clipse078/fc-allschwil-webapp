@@ -178,6 +178,21 @@ export async function GET() {
               ? requirement.qualificationDefinition.hierarchyLevel
               : getFallbackDiplomaLevel(qualificationName);
 
+                    const matchingQualifications =
+            requiredLevel === 0
+              ? []
+              : activeSeason.trainerTeamMembers.flatMap((member) =>
+                  member.person.trainerQualifications
+                    .filter(
+                      (qualification) =>
+                        getQualificationLevel(qualification.title, definitionLevels) >= requiredLevel,
+                    )
+                    .map((qualification) => ({
+                      title: qualification.title,
+                      level: getQualificationLevel(qualification.title, definitionLevels),
+                    })),
+                );
+
           const matchingTrainerCount =
             requiredLevel === 0
               ? 0
@@ -188,12 +203,16 @@ export async function GET() {
                   ),
                 ).length;
 
+          const fulfilledByQualificationName =
+            matchingQualifications.sort((a, b) => b.level - a.level || a.title.localeCompare(b.title))[0]?.title ?? null;
+
           return {
             qualificationName,
             requiredDiploma: qualificationName,
             requiredLevel,
             requiredTrainerCount: requirement.requiredTrainerCount,
             matchingTrainerCount,
+            fulfilledByQualificationName,
             isFulfilled:
               requirement.requiredTrainerCount === 0
                 ? true
@@ -289,3 +308,4 @@ export async function GET() {
     );
   }
 }
+

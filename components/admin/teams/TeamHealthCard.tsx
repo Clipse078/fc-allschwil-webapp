@@ -15,6 +15,7 @@ type QualificationRequirement = {
   requiredTrainerCount: number;
   matchingTrainerCount: number;
   isFulfilled: boolean;
+  fulfilledByQualificationName?: string | null;
 };
 
 type Props = {
@@ -117,7 +118,10 @@ export default function TeamHealthCard({
     null;
 
   const requirementMet = relevantRequirement ? relevantRequirement.isFulfilled : null;
-  const requirementLabel = relevantRequirement?.qualificationName ?? diplomaRequirement;
+    const requirementLabel = relevantRequirement?.qualificationName ?? diplomaRequirement;
+  const fulfilledByLabel = relevantRequirement?.fulfilledByQualificationName ?? null;
+  const showFulfillmentExplanation =
+    Boolean(requirementMet && requirementLabel && fulfilledByLabel && fulfilledByLabel !== requirementLabel);
 
   const requirementClass =
     requirementMet === null
@@ -154,7 +158,7 @@ export default function TeamHealthCard({
             </span>
             {requirementLabel ? (
               <span className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm ${requirementClass}`}>
-                {requirementMet ? "Diplom erfüllt" : "Diplom fehlt"} · Soll: {requirementLabel}
+                {requirementMet ? "Diplom erfüllt" : "Diplom fehlt"} · Soll: {requirementLabel}{showFulfillmentExplanation ? ` · ${fulfilledByLabel} deckt ab` : ""}
               </span>
             ) : null}
           </div>
@@ -200,3 +204,4 @@ export default function TeamHealthCard({
     </div>
   );
 }
+
