@@ -17,6 +17,8 @@ type RawMember = {
   roleLabel?: string | null;
   shirtNumber?: number | null;
   positionLabel?: string | null;
+  isCaptain?: boolean;
+  isViceCaptain?: boolean;
   sortOrder?: number;
   subline?: string;
   meta?: string;
@@ -49,6 +51,11 @@ type Person = {
   meta?: string;
   imageUrl?: string | null;
   currentTeam?: string | null;
+  roleLabel?: string | null;
+  shirtNumber?: number | null;
+  positionLabel?: string | null;
+  isCaptain?: boolean;
+  isViceCaptain?: boolean;
 };
 
 type Props = {
@@ -91,6 +98,12 @@ function getBestQualificationLabel(qualifications?: TrainerQualification[]) {
     .join(" • ");
 }
 
+function buildPlayerSubline(person: Person) {
+  return [person.shirtNumber ? "Nr. " + person.shirtNumber : "", person.subline?.includes("Jahrgang") ? person.subline : ""]
+    .filter(Boolean)
+    .join(" • ");
+}
+
 function normalizeTrainer(member: RawMember): Person {
   return {
     id: member.id,
@@ -98,24 +111,24 @@ function normalizeTrainer(member: RawMember): Person {
     name: personName(member),
     subline: member.subline ?? getBestQualificationLabel(member.person?.trainerQualifications) ?? member.person?.email ?? "",
     meta: member.meta ?? member.roleLabel ?? "Trainer",
+    roleLabel: member.roleLabel ?? member.meta ?? "Trainer",
     imageUrl: member.imageUrl ?? null,
   };
 }
 
 function normalizePlayer(member: RawMember): Person {
+  const yearLabel = member.person?.dateOfBirth ? "Jahrgang " + new Date(member.person.dateOfBirth).getUTCFullYear() : "";
+
   return {
     id: member.id,
     personId: member.personId ?? member.person?.id ?? member.id,
     name: personName(member),
-    subline:
-      member.subline ??
-      [
-        member.shirtNumber ? "Nr. " + member.shirtNumber : "",
-        member.person?.dateOfBirth ? "Jahrgang " + new Date(member.person.dateOfBirth).getUTCFullYear() : "",
-      ]
-        .filter(Boolean)
-        .join(" • "),
+    subline: member.subline ?? [member.shirtNumber ? "Nr. " + member.shirtNumber : "", yearLabel].filter(Boolean).join(" • "),
     meta: member.meta ?? member.positionLabel ?? "",
+    shirtNumber: member.shirtNumber ?? null,
+    positionLabel: member.positionLabel ?? member.meta ?? "",
+    isCaptain: Boolean(member.isCaptain),
+    isViceCaptain: Boolean(member.isViceCaptain),
     imageUrl: member.imageUrl ?? null,
   };
 }
@@ -229,16 +242,54 @@ function reorder(list: Person[], draggedId: string, targetId: string) {
   return next;
 }
 
+function InlineEdit({
+  value,
+  placeholder,
+  onSave,
+  type = "text",
+}: {
+  value: string;
+  placeholder: string;
+  onSave: (value: string) => void;
+  type?: "text" | "number";
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <input
+      type={type}
+      value={draft}
+      placeholder={placeholder}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => onSave(draft)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+      className="h-9 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-[#0b4aa2] focus:ring-4 focus:ring-blue-100"
+    />
+  );
+}
+
 function PersonRow({
   person,
+  type,
+  canManage,
   onRemove,
+  onPatch,
   onDragStart,
   onDragOver,
   onDrop,
   isDragging,
 }: {
   person: Person;
+  type: "trainer" | "player";
+  canManage: boolean;
   onRemove: () => void;
+  onPatch: (updates: Partial<Person>) => void;
   onDragStart: () => void;
   onDragOver: () => void;
   onDrop: () => void;
@@ -246,7 +297,7 @@ function PersonRow({
 }) {
   return (
     <div
-      draggable
+      draggable={canManage}
       onDragStart={onDragStart}
       onDragOver={(event) => {
         event.preventDefault();
@@ -256,27 +307,73 @@ function PersonRow({
         event.preventDefault();
         onDrop();
       }}
-      className={`group flex cursor-grab items-center justify-between rounded-[22px] border border-slate-200 bg-white/95 px-5 py-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#0b4aa2]/20 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)] ${isDragging ? "opacity-40" : ""}`}
+      className={`group rounded-[22px] border border-slate-200 bg-white/95 px-5 py-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[#0b4aa2]/20 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)] ${canManage ? "cursor-grab" : ""} ${isDragging ? "opacity-40" : ""}`}
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#0b4aa2]/10 bg-gradient-to-br from-blue-50 to-slate-50 text-sm font-black text-[#0b4aa2] shadow-sm">
-          {person.imageUrl ? <img src={person.imageUrl} alt={person.name} className="h-full w-full object-cover" /> : initials(person.name)}
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-[15px] font-black tracking-tight text-slate-950">{person.name}</p>
-            {person.meta ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#0b4aa2]">{person.meta}</span> : null}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#0b4aa2]/10 bg-gradient-to-br from-blue-50 to-slate-50 text-sm font-black text-[#0b4aa2] shadow-sm">
+            {person.imageUrl ? <img src={person.imageUrl} alt={person.name} className="h-full w-full object-cover" /> : initials(person.name)}
           </div>
-          {person.subline ? <p className="mt-1 truncate text-xs font-bold text-slate-500">{person.subline}</p> : null}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-[15px] font-black tracking-tight text-slate-950">{person.name}</p>
+              {person.meta ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#0b4aa2]">{person.meta}</span> : null}
+              {type === "player" && person.isCaptain ? <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-amber-700">Captain</span> : null}
+              {type === "player" && person.isViceCaptain ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-slate-600">Vice</span> : null}
+            </div>
+            {person.subline ? <p className="mt-1 truncate text-xs font-bold text-slate-500">{person.subline}</p> : null}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {canManage ? <GripVertical className="h-4 w-4 text-slate-300 transition group-hover:text-[#0b4aa2]" /> : null}
+          {canManage ? (
+            <button type="button" onClick={onRemove} className="rounded-full border border-red-100 bg-white px-4 py-2 text-xs font-black text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50 disabled:opacity-60">
+              Entfernen
+            </button>
+          ) : null}
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <GripVertical className="h-4 w-4 text-slate-300 transition group-hover:text-[#0b4aa2]" />
-        <button type="button" onClick={onRemove} className="rounded-full border border-red-100 bg-white px-4 py-2 text-xs font-black text-red-600 shadow-sm transition hover:border-red-200 hover:bg-red-50 disabled:opacity-60">
-          Entfernen
-        </button>
-      </div>
+      {canManage ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+          {type === "trainer" ? (
+            <InlineEdit
+              value={person.roleLabel ?? ""}
+              placeholder="Rolle"
+              onSave={(value) => onPatch({ roleLabel: value, meta: value || "Trainer" })}
+            />
+          ) : (
+            <>
+              <InlineEdit
+                type="number"
+                value={person.shirtNumber ? String(person.shirtNumber) : ""}
+                placeholder="Nr."
+                onSave={(value) => onPatch({ shirtNumber: value.trim() ? Number(value) : null })}
+              />
+              <InlineEdit
+                value={person.positionLabel ?? ""}
+                placeholder="Position / Rolle"
+                onSave={(value) => onPatch({ positionLabel: value, meta: value })}
+              />
+              <button
+                type="button"
+                onClick={() => onPatch({ isCaptain: !person.isCaptain })}
+                className={`h-9 rounded-full border px-3 text-xs font-black transition ${person.isCaptain ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`}
+              >
+                Captain
+              </button>
+              <button
+                type="button"
+                onClick={() => onPatch({ isViceCaptain: !person.isViceCaptain })}
+                className={`h-9 rounded-full border px-3 text-xs font-black transition ${person.isViceCaptain ? "border-slate-300 bg-slate-100 text-slate-700" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`}
+              >
+                Vice
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -440,6 +537,49 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     }
   }
 
+  async function patchTrainer(memberId: string, updates: Partial<Person>) {
+    if (!resolvedTeamSeason?.id) return;
+
+    setTrainers((current) => current.map((person) => (person.id === memberId ? { ...person, ...updates } : person)));
+
+    const response = await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/trainer-members/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roleLabel: updates.roleLabel }),
+    });
+
+    if (!response.ok) setActionError("Trainerrolle konnte nicht gespeichert werden.");
+  }
+
+  async function patchPlayer(memberId: string, updates: Partial<Person>) {
+    if (!resolvedTeamSeason?.id) return;
+
+    setPlayers((current) =>
+      current.map((person) => {
+        if (person.id !== memberId) return person;
+        const next = { ...person, ...updates };
+        return {
+          ...next,
+          subline: buildPlayerSubline(next),
+          meta: next.positionLabel ?? "",
+        };
+      }),
+    );
+
+    const response = await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/squad-members/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shirtNumber: updates.shirtNumber,
+        positionLabel: updates.positionLabel,
+        isCaptain: updates.isCaptain,
+        isViceCaptain: updates.isViceCaptain,
+      }),
+    });
+
+    if (!response.ok) setActionError("Spielerdaten konnten nicht gespeichert werden.");
+  }
+
   async function removeTrainer(memberId: string) {
     if (!resolvedTeamSeason?.id) return;
 
@@ -468,6 +608,8 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
               trainers.map((trainer) => (
                 <PersonRow
                   key={trainer.id}
+                  type="trainer"
+                  canManage={canManage}
                   person={trainer}
                   isDragging={dragging?.type === "trainer" && dragging.id === trainer.id}
                   onDragStart={() => setDragging({ type: "trainer", id: trainer.id })}
@@ -479,6 +621,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
                     setDragging(null);
                     void persistOrder("trainer", trainers);
                   }}
+                  onPatch={(updates) => void patchTrainer(trainer.id, updates)}
                   onRemove={() => void removeTrainer(trainer.id)}
                 />
               ))
@@ -516,6 +659,8 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
               players.map((player) => (
                 <PersonRow
                   key={player.id}
+                  type="player"
+                  canManage={canManage}
                   person={player}
                   isDragging={dragging?.type === "player" && dragging.id === player.id}
                   onDragStart={() => setDragging({ type: "player", id: player.id })}
@@ -527,6 +672,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
                     setDragging(null);
                     void persistOrder("player", players);
                   }}
+                  onPatch={(updates) => void patchPlayer(player.id, updates)}
                   onRemove={() => void removePlayer(player.id)}
                 />
               ))
@@ -556,4 +702,3 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
-
