@@ -82,8 +82,8 @@ export default function TeamQuickActionsCard({
         throw new Error(data?.error ?? "Trainer could not be assigned.");
       }
 
-      setSelectedTrainer(null);
-      setMessage(data?.message ?? "Trainer assigned successfully.");
+      // keep picker open for fast assignment`r`nsetSelectedTrainer(null);
+      setMessage(data?.message ?? "Trainer erfolgreich zugewiesen.");
       router.refresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Trainer could not be assigned.");
@@ -107,10 +107,10 @@ return (
     <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="fca-eyebrow">Quick actions</p>
-          <h3 className="mt-2 text-lg font-black text-[#0b4aa2]">Fix team health</h3>
+          <p className="fca-eyebrow">Schnellaktionen</p>
+          <h3 className="mt-2 text-lg font-black text-[#0b4aa2]">Team verbessern</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Assign a trainer directly or use smart recommendations.
+            Trainer direkt zuweisen oder Empfehlungen nutzen.
           </p>
         </div>
 
@@ -121,7 +121,7 @@ return (
               : "border-emerald-100 bg-emerald-50 text-emerald-700"
           }`}
         >
-          {shouldSuggestTrainer ? "Action recommended" : "No urgent action"}
+          {shouldSuggestTrainer ? "Aktion empfohlen" : "Keine Aktion nötig"}
         </span>
       </div>
 
@@ -162,7 +162,7 @@ return (
 
       {/* ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â MANUAL PICKER */}
       <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-black text-slate-900">Manual assign</p>
+        <p className="text-sm font-black text-slate-900">Manuell zuweisen</p>
 
         <div className="mt-3">
           <PeoplePicker
@@ -170,7 +170,7 @@ return (
             onSelect={setSelectedTrainer}
             searchMode="trainer"
             teamSeasonId={teamSeasonId}
-            placeholder="Search trainer..."
+            placeholder="Trainer suchen..."
             disabled={isAssigning}
           />
         </div>
@@ -190,13 +190,14 @@ return (
             disabled={!selectedTrainer || isAssigning}
             className="rounded-full border border-red-200 bg-white px-5 py-2 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
-            Assign trainer
+            Trainer zuweisen
           </button>
         </div>
       </div>
     </section>
   );
 }
+
 
 
 

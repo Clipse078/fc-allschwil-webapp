@@ -194,7 +194,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
   const [kpiBreakdown, setKpiBreakdown] = useState<{ name: string; required: number; actual: number }[]>([]);
 
   useEffect(() => {
-    setTeam(initialTeam);
+    setTeam({...initialTeam});
   }, [initialTeam]);
 
   const activeTeamSeason = useMemo(() => {
@@ -636,6 +636,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
 

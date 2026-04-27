@@ -701,7 +701,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
 
       <section className="grid gap-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:grid-cols-[1fr_320px]">
         <div>
-          <p className="fca-eyebrow">Spielerkader</p>
+          <p className="fca-eyebrow">Spielerkader <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{players.length} Spieler</span></p>
           <div className="mt-5 space-y-3">
             {players.length === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">Noch keine Spieler im Kader.</div>
@@ -752,6 +752,8 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
+
 
 
 
