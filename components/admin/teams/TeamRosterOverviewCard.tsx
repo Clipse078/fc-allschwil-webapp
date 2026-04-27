@@ -589,6 +589,35 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     if (!response.ok) setActionError("Spielerdaten konnten nicht gespeichert werden.");
   }
 
+  async function patchTrainerSectionVisibility(value: boolean) {
+    if (!resolvedTeamSeason?.id) return;
+
+    await fetch(`/api/team-seasons/${resolvedTeamSeason.id}/website-visibility`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        teamId,
+        trainerTeamWebsiteVisible: value,
+      }),
+    });
+
+    window.location.reload();
+  }
+
+  async function patchPlayerSectionVisibility(value: boolean) {
+    if (!resolvedTeamSeason?.id) return;
+
+    await fetch(`/api/team-seasons/${resolvedTeamSeason.id}/website-visibility`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        teamId,
+        squadWebsiteVisible: value,
+      }),
+    });
+
+    window.location.reload();
+  }
   async function removeTrainer(memberId: string) {
     if (!resolvedTeamSeason?.id) return;
 
@@ -711,6 +740,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
 
 
 
