@@ -10,12 +10,15 @@ type DiplomaCount = {
   count: number;
 };
 
+type DiplomaRequirement = "D-Diplom" | "C-Diplom" | "B-Diplom" | null;
+
 type Props = {
   seasonLabel: string;
   playerCount: number;
   trainerCount: number;
   birthYears: BirthYearCount[];
   diplomas: DiplomaCount[];
+  diplomaRequirement?: DiplomaRequirement;
 };
 
 function getRatioLabel(playerCount: number, trainerCount: number) {
@@ -32,6 +35,26 @@ function getRatioClass(playerCount: number, trainerCount: number) {
   if (ratio <= 10) return "border-amber-100 bg-amber-50 text-amber-700";
 
   return "border-red-100 bg-red-50 text-red-700";
+}
+
+function diplomaMatchesRequirement(label: string, requirement: DiplomaRequirement) {
+  if (!requirement) return true;
+
+  const normalized = label.toUpperCase();
+
+  if (requirement === "D-Diplom") {
+    return normalized.includes("D-DIPLOM") || normalized.includes("SFV D") || normalized.includes("KINDERFUSSBALL");
+  }
+
+  if (requirement === "C-Diplom") {
+    return normalized.includes("C-DIPLOM") || normalized.includes("UEFA C");
+  }
+
+  if (requirement === "B-Diplom") {
+    return normalized.includes("B-DIPLOM") || normalized.includes("UEFA B");
+  }
+
+  return false;
 }
 
 function diplomaPriority(label: string) {
@@ -52,10 +75,18 @@ export default function TeamHealthCard({
   trainerCount,
   birthYears,
   diplomas,
+  diplomaRequirement = null,
 }: Props) {
   const ratioLabel = getRatioLabel(playerCount, trainerCount);
   const ratioClass = getRatioClass(playerCount, trainerCount);
   const sortedDiplomas = [...diplomas].sort((a, b) => diplomaPriority(a.label) - diplomaPriority(b.label) || a.label.localeCompare(b.label));
+  const requirementMet = diplomaRequirement ? sortedDiplomas.some((item) => diplomaMatchesRequirement(item.label, diplomaRequirement)) : null;
+  const requirementClass =
+    requirementMet === null
+      ? "border-slate-200 bg-slate-50 text-slate-500"
+      : requirementMet
+        ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+        : "border-amber-100 bg-amber-50 text-amber-700";
 
   return (
     <div className="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-sm">
@@ -81,6 +112,11 @@ export default function TeamHealthCard({
             <span className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm ${ratioClass}`}>
               Verhältnis {ratioLabel}
             </span>
+            {diplomaRequirement ? (
+              <span className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm ${requirementClass}`}>
+                {requirementMet ? "Diplom erfüllt" : "Diplom fehlt"} · Soll: {diplomaRequirement}
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -124,3 +160,4 @@ export default function TeamHealthCard({
     </div>
   );
 }
+

@@ -113,6 +113,25 @@ function formatGenderGroup(value: string | null) {
   return "â€“";
 }
 
+function getDiplomaRequirementForTeam(category: string | null, ageGroup: string | null) {
+  const normalizedCategory = String(category ?? "").toUpperCase();
+  const normalizedAgeGroup = String(ageGroup ?? "").toUpperCase();
+
+  if (["G", "F", "E"].includes(normalizedAgeGroup) || normalizedCategory.includes("KINDERFUSSBALL")) {
+    return "D-Diplom" as const;
+  }
+
+  if (["C", "B", "A"].includes(normalizedAgeGroup) || normalizedCategory.includes("JUNIOREN")) {
+    return "C-Diplom" as const;
+  }
+
+  if (normalizedCategory.includes("AKTIVE") || normalizedAgeGroup.includes("AKTIVE")) {
+    return "B-Diplom" as const;
+  }
+
+  return null;
+}
+
 function VisibilityTile({
   icon,
   title,
@@ -421,6 +440,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                     trainerCount={activeTeamSeason.trainerTeamMembers?.length ?? 0}
                     birthYears={playerBirthYearCounts}
                     diplomas={trainerDiplomaCounts}
+                    diplomaRequirement={getDiplomaRequirementForTeam(team.category, team.ageGroup)}
                   />
                 )}              </div>
             </div>
@@ -566,6 +586,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
 
