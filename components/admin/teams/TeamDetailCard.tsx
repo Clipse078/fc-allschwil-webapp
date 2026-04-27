@@ -488,8 +488,9 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           </div>
         </section>
 
-        <TeamRosterOverviewCard teamId={team.id} teamAgeGroup={team.ageGroup} canManage={canManage} trainerSectionVisible={visibility.trainerstaff} playerSectionVisible={visibility.playersquad} teamSeasons={activeTeamSeason ? [activeTeamSeason as any] : []} />
+        <TeamRosterOverviewCard teamId={team.id} teamAgeGroup={team.ageGroup} canManage={canManage} trainerSectionVisible={visibility.trainerstaff} playerSectionVisible={visibility.playersquad} onTrainerSectionVisibilityChange={(value) => setVisibility((current) => ({ ...current, trainerstaff: value }))} onPlayerSectionVisibilityChange={(value) => setVisibility((current) => ({ ...current, playersquad: value }))} teamSeasons={activeTeamSeason ? [activeTeamSeason as any] : []} />
       </div>
     </div>
   );
 }
+

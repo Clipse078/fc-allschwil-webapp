@@ -68,6 +68,8 @@ type Props = {
   teamAgeGroup?: string | null;
   trainerSectionVisible?: boolean;
   playerSectionVisible?: boolean;
+  onTrainerSectionVisibilityChange?: (value: boolean) => void;
+  onPlayerSectionVisibilityChange?: (value: boolean) => void;
 };
 
 function personName(member: RawMember) {
@@ -386,7 +388,7 @@ function PersonRow({
   );
 }
 
-export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons, canManage, trainerSectionVisible = true, playerSectionVisible = true }: Props) {
+export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons, canManage, trainerSectionVisible = true, playerSectionVisible = true, onTrainerSectionVisibilityChange, onPlayerSectionVisibilityChange }: Props) {
   const resolvedTeamSeason = teamSeason ?? teamSeasons?.[0] ?? null;
   const [trainerQuery, setTrainerQuery] = useState("");
   const [playerQuery, setPlayerQuery] = useState("");
@@ -592,7 +594,9 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
   async function patchTrainerSectionVisibility(value: boolean) {
     if (!resolvedTeamSeason?.id) return;
 
-    await fetch(`/api/team-seasons/${resolvedTeamSeason.id}/website-visibility`, {
+    onTrainerSectionVisibilityChange?.(value);
+
+    const response = await fetch(`/api/team-seasons/${resolvedTeamSeason.id}/website-visibility`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -601,13 +605,18 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
       }),
     });
 
-    window.location.reload();
+    if (!response.ok) {
+      onTrainerSectionVisibilityChange?.(!value);
+      setActionError("Trainerstaff-Sichtbarkeit konnte nicht gespeichert werden.");
+    }
   }
 
   async function patchPlayerSectionVisibility(value: boolean) {
     if (!resolvedTeamSeason?.id) return;
 
-    await fetch(`/api/team-seasons/${resolvedTeamSeason.id}/website-visibility`, {
+    onPlayerSectionVisibilityChange?.(value);
+
+    const response = await fetch(`/api/team-seasons/${resolvedTeamSeason.id}/website-visibility`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -616,7 +625,10 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
       }),
     });
 
-    window.location.reload();
+    if (!response.ok) {
+      onPlayerSectionVisibilityChange?.(!value);
+      setActionError("Kader-Sichtbarkeit konnte nicht gespeichert werden.");
+    }
   }
   async function removeTrainer(memberId: string) {
     if (!resolvedTeamSeason?.id) return;
@@ -740,6 +752,8 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
+
 
 
 
