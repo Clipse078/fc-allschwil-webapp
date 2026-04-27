@@ -325,7 +325,7 @@ function PersonRow({
               {person.meta ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#0b4aa2]">{person.meta}</span> : null}
               {type === "player" && person.isCaptain ? <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-amber-700">Captain</span> : null}
               {type === "player" && person.isViceCaptain ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-slate-600">Vice</span> : null}
-              {person.isWebsiteVisible === false ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">Website aus</span> : <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700">Website</span>}
+              {person.isWebsiteVisible === false ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">Nicht auf Website</span> : <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700">Auf Website</span>}
             </div>
             {person.subline ? <p className="mt-1 truncate text-xs font-bold text-slate-500">{person.subline}</p> : null}
           </div>
@@ -709,5 +709,6 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
 
 
