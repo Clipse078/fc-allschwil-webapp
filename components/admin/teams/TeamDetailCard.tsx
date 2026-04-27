@@ -106,9 +106,15 @@ type QualificationRequirement = {
   fulfilledByQualificationName?: string | null;
 };
 
+type BirthYearCount = {
+  year: number;
+  count: number;
+};
+
 type TeamHealthKpi = {
   playerCount: number | null;
   trainerCount: number | null;
+  birthYearCounts: BirthYearCount[];
   maxPlayersPerTrainer: number | null;
   hasHealthyPlayerTrainerRatio: boolean | null;
   requiredDiploma: string | null;
@@ -295,6 +301,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
         setTeamHealthKpi(match ? {
           playerCount: typeof match.playerCount === "number" ? match.playerCount : null,
           trainerCount: typeof match.trainerCount === "number" ? match.trainerCount : null,
+          birthYearCounts: Array.isArray(match.birthYearCounts) ? match.birthYearCounts : [],
           maxPlayersPerTrainer: typeof match.maxPlayersPerTrainer === "number" ? match.maxPlayersPerTrainer : null,
           hasHealthyPlayerTrainerRatio: typeof match.hasHealthyPlayerTrainerRatio === "boolean" ? match.hasHealthyPlayerTrainerRatio : null,
           requiredDiploma: typeof match.requiredDiploma === "string" ? match.requiredDiploma : null,
@@ -472,7 +479,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                     seasonLabel={activeTeamSeason.season.name}
                     playerCount={teamHealthKpi?.playerCount ?? activeTeamSeason.playerSquadMembers?.length ?? 0}
                     trainerCount={teamHealthKpi?.trainerCount ?? activeTeamSeason.trainerTeamMembers?.length ?? 0}
-                    birthYears={playerBirthYearCounts}
+                    birthYears={teamHealthKpi?.birthYearCounts?.length ? teamHealthKpi.birthYearCounts : playerBirthYearCounts}
                     diplomas={trainerDiplomaCounts}
                     diplomaRequirement={teamHealthKpi?.requiredDiploma ?? null}
                     qualificationRequirements={teamHealthKpi?.qualificationRequirements ?? []}
@@ -635,6 +642,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
 

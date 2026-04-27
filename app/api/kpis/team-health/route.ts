@@ -112,8 +112,12 @@ export async function GET() {
               where: {
                 status: "ACTIVE",
               },
-              select: {
-                id: true,
+              include: {
+                person: {
+                  select: {
+                    dateOfBirth: true,
+                  },
+                },
               },
             },
           },
@@ -162,6 +166,20 @@ export async function GET() {
         null;
 
       const playerCount = activeSeason.playerSquadMembers.length;
+      const birthYearCounts = Array.from(
+        activeSeason.playerSquadMembers.reduce((counts, member) => {
+          const value = member.person.dateOfBirth;
+          if (!value) return counts;
+
+          const year = value.getUTCFullYear();
+          if (!Number.isFinite(year)) return counts;
+
+          counts.set(year, (counts.get(year) ?? 0) + 1);
+          return counts;
+        }, new Map<number, number>()),
+      )
+        .sort(([a], [b]) => a - b)
+        .map(([year, count]) => ({ year, count }));
       const trainerCount = activeSeason.trainerTeamMembers.length;
       const requiredTrainerCount = rule?.minTrainerCount ?? null;
       const maxPlayersPerTrainer = rule?.maxPlayersPerTrainer ?? null;
@@ -248,6 +266,7 @@ export async function GET() {
         category: team.category,
         ageGroup: team.ageGroup,
         playerCount,
+        birthYearCounts,
         trainerCount,
         requiredDiploma,
         requiredDiplomaLevel,
@@ -308,4 +327,5 @@ export async function GET() {
     );
   }
 }
+
 
