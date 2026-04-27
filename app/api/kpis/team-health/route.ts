@@ -9,7 +9,7 @@ function normalizeLabel(value: string | null | undefined) {
     .replace(/-/g, "");
 }
 
-function getDiplomaRank(label: string | null | undefined) {
+function getFallbackDiplomaLevel(label: string | null | undefined) {
   const value = normalizeLabel(label);
 
   if (!value) return 0;
@@ -37,11 +37,35 @@ function getTeamRuleKeys(team: {
   return Array.from(new Set(keys));
 }
 
+function getQualificationLevel(
+  title: string | null | undefined,
+  definitionLevels: Map<string, number>,
+) {
+  const normalizedTitle = normalizeLabel(title);
+  const configuredLevel = definitionLevels.get(normalizedTitle);
+
+  if (typeof configuredLevel === "number" && configuredLevel > 0) {
+    return configuredLevel;
+  }
+
+  return getFallbackDiplomaLevel(title);
+}
+
 export async function GET() {
   try {
     const clubConfig = await prisma.clubConfig.findFirst({
       include: {
-        teamCategoryRules: { include: { qualificationRequirements: { include: { qualificationDefinition: true }, orderBy: [{ sortOrder: "asc" }] } } },
+        qualificationDefinitions: true,
+        teamCategoryRules: {
+          include: {
+            qualificationRequirements: {
+              include: {
+                qualificationDefinition: true,
+              },
+              orderBy: [{ sortOrder: "asc" }],
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: "asc",
@@ -49,6 +73,15 @@ export async function GET() {
     });
 
     const rules = clubConfig?.teamCategoryRules ?? [];
+
+    const definitionLevels = new Map<string, number>(
+      (clubConfig?.qualificationDefinitions ?? []).map((definition) => [
+        normalizeLabel(definition.name),
+        definition.hierarchyLevel > 0
+          ? definition.hierarchyLevel
+          : getFallbackDiplomaLevel(definition.name),
+      ]),
+    );
 
     const teams = await prisma.team.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -75,6 +108,14 @@ export async function GET() {
                 },
               },
             },
+            playerSquadMembers: {
+              where: {
+                status: "ACTIVE",
+              },
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -94,43 +135,63 @@ export async function GET() {
           status: "unknown",
           hasRequired: false,
           hasEnoughTrainers: false,
+          hasHealthyPlayerTrainerRatio: null,
+          playerCount: 0,
           trainerCount: 0,
           requiredTrainerCount: null,
+          maxPlayersPerTrainer: null,
           requiredDiploma: null,
+          requiredDiplomaLevel: null,
+          requiredDiplomaTrainerCount: null,
+          matchingDiplomaTrainerCount: 0,
           matchedRuleCategory: null,
+          qualificationRequirements: [],
         };
       }
 
       const ruleKeys = getTeamRuleKeys(team);
       const rule =
         rules.find((candidate) =>
-          ruleKeys.includes(candidate.category.trim().toUpperCase())
+          ruleKeys.includes(candidate.category.trim().toUpperCase()),
         ) ??
         rules.find(
           (candidate) =>
             candidate.category.trim().toUpperCase() ===
-            String(team.category).trim().toUpperCase()
+            String(team.category).trim().toUpperCase(),
         ) ??
         null;
 
+      const playerCount = activeSeason.playerSquadMembers.length;
+      const trainerCount = activeSeason.trainerTeamMembers.length;
+      const requiredTrainerCount = rule?.minTrainerCount ?? null;
+      const maxPlayersPerTrainer = rule?.maxPlayersPerTrainer ?? null;
+
       const trainerDiplomas = activeSeason.trainerTeamMembers.flatMap((member) =>
-        member.person.trainerQualifications.map((qualification) => qualification.title)
+        member.person.trainerQualifications.map((qualification) => qualification.title),
       );
 
       const requirementResults =
         rule?.qualificationRequirements?.map((requirement) => {
-          const requiredRank = getDiplomaRank(requirement.qualificationDefinition?.name ?? null);
+          const qualificationName = requirement.qualificationDefinition?.name ?? null;
+          const requiredLevel =
+            requirement.qualificationDefinition?.hierarchyLevel && requirement.qualificationDefinition.hierarchyLevel > 0
+              ? requirement.qualificationDefinition.hierarchyLevel
+              : getFallbackDiplomaLevel(qualificationName);
+
           const matchingTrainerCount =
-            requiredRank === 0
+            requiredLevel === 0
               ? 0
               : activeSeason.trainerTeamMembers.filter((member) =>
                   member.person.trainerQualifications.some(
-                    (qualification) => getDiplomaRank(qualification.title) >= requiredRank
-                  )
+                    (qualification) =>
+                      getQualificationLevel(qualification.title, definitionLevels) >= requiredLevel,
+                  ),
                 ).length;
 
           return {
-            requiredDiploma: requirement.qualificationDefinition?.name ?? null,
+            qualificationName,
+            requiredDiploma: qualificationName,
+            requiredLevel,
             requiredTrainerCount: requirement.requiredTrainerCount,
             matchingTrainerCount,
             isFulfilled:
@@ -139,30 +200,27 @@ export async function GET() {
                 : matchingTrainerCount >= requirement.requiredTrainerCount,
           };
         }) ?? [];
-      const firstRequirement = rule?.qualificationRequirements?.[0] ?? null;
-      const requiredDiploma = firstRequirement?.qualificationDefinition?.name ?? null;
-      const requiredDiplomaRank = getDiplomaRank(requiredDiploma);
-      const requiredDiplomaTrainerCount = firstRequirement?.requiredTrainerCount ?? 1;
-      const matchingDiplomaTrainerCount =
-        requiredDiplomaRank === 0
-          ? 0
-          : activeSeason.trainerTeamMembers.filter((member) =>
-              member.person.trainerQualifications.some(
-                (qualification) => getDiplomaRank(qualification.title) >= requiredDiplomaRank
-              )
-            ).length;
+
+      const firstRequirement = requirementResults[0] ?? null;
+      const requiredDiploma = firstRequirement?.qualificationName ?? null;
+      const requiredDiplomaLevel = firstRequirement?.requiredLevel ?? null;
+      const requiredDiplomaTrainerCount = firstRequirement?.requiredTrainerCount ?? null;
+      const matchingDiplomaTrainerCount = firstRequirement?.matchingTrainerCount ?? 0;
 
       const hasRequired =
-        requiredDiplomaTrainerCount === 0
+        requirementResults.length === 0
           ? true
-          : matchingDiplomaTrainerCount >= requiredDiplomaTrainerCount;
+          : requirementResults.every((requirement) => requirement.isFulfilled);
 
-      const requiredTrainerCount = rule?.minTrainerCount ?? null;
-      const trainerCount = activeSeason.trainerTeamMembers.length;
       const hasEnoughTrainers =
         typeof requiredTrainerCount === "number"
           ? trainerCount >= requiredTrainerCount
           : false;
+
+      const hasHealthyPlayerTrainerRatio =
+        typeof maxPlayersPerTrainer === "number" && maxPlayersPerTrainer > 0
+          ? trainerCount > 0 && playerCount / trainerCount <= maxPlayersPerTrainer
+          : null;
 
       return {
         teamId: team.id,
@@ -170,24 +228,43 @@ export async function GET() {
         teamName: team.name,
         category: team.category,
         ageGroup: team.ageGroup,
+        playerCount,
+        trainerCount,
         requiredDiploma,
+        requiredDiplomaLevel,
         requiredTrainerCount,
+        maxPlayersPerTrainer,
         requiredDiplomaTrainerCount,
         matchingDiplomaTrainerCount,
         matchedRuleCategory: rule?.category ?? null,
         qualificationRequirements: requirementResults,
         hasRequired,
         hasEnoughTrainers,
-        trainerCount,
+        hasHealthyPlayerTrainerRatio,
         trainerDiplomas,
-        status: hasRequired && hasEnoughTrainers ? "healthy" : "attention",
+        status:
+          hasRequired &&
+          hasEnoughTrainers &&
+          (hasHealthyPlayerTrainerRatio === null || hasHealthyPlayerTrainerRatio)
+            ? "healthy"
+            : "attention",
       };
     });
 
     const summary = {
       total: results.length,
-      compliant: results.filter((result) => result.hasRequired && result.hasEnoughTrainers).length,
-      nonCompliant: results.filter((result) => !result.hasRequired || !result.hasEnoughTrainers).length,
+      compliant: results.filter(
+        (result) =>
+          result.hasRequired &&
+          result.hasEnoughTrainers &&
+          (result.hasHealthyPlayerTrainerRatio === null || result.hasHealthyPlayerTrainerRatio),
+      ).length,
+      nonCompliant: results.filter(
+        (result) =>
+          !result.hasRequired ||
+          !result.hasEnoughTrainers ||
+          result.hasHealthyPlayerTrainerRatio === false,
+      ).length,
       missingRule: results.filter((result) => !result.matchedRuleCategory).length,
     };
 
@@ -197,6 +274,7 @@ export async function GET() {
             club: clubConfig.clubName,
             country: clubConfig.country,
             rules: rules.length,
+            qualificationDefinitions: clubConfig.qualificationDefinitions.length,
           }
         : null,
       summary,
@@ -207,20 +285,7 @@ export async function GET() {
 
     return NextResponse.json(
       { error: "Team health KPIs konnten nicht geladen werden." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

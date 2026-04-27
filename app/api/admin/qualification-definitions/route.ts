@@ -6,6 +6,26 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 const ALLOWED_TYPES = ["DIPLOMA", "CERTIFICATE", "COURSE", "WORKSHOP", "FIRST_AID", "OTHER"] as const;
 
+function parseHierarchyLevel(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.round(parsed));
+}
+
+function fallbackHierarchyLevel(name: string, type: string) {
+  if (type !== "DIPLOMA") return 0;
+
+  const value = name.trim().toLowerCase().replace(/\s+/g, "").replace(/-/g, "");
+
+  if (!value) return 0;
+  if (value.includes("a")) return 4;
+  if (value.includes("b")) return 3;
+  if (value.includes("c")) return 2;
+  if (value.includes("d")) return 1;
+
+  return 0;
+}
+
 export async function POST(request: NextRequest) {
   try {
     await requirePermission(PERMISSIONS.USERS_MANAGE);
@@ -15,6 +35,8 @@ export async function POST(request: NextRequest) {
     const name = String(body.name ?? "").trim();
     const type = String(body.type ?? "DIPLOMA").trim();
     const description = String(body.description ?? "").trim() || null;
+    const submittedHierarchyLevel = parseHierarchyLevel(body.hierarchyLevel);
+    const hierarchyLevel = submittedHierarchyLevel > 0 ? submittedHierarchyLevel : fallbackHierarchyLevel(name, type);
 
     if (!clubConfigId) return NextResponse.json({ error: "ClubConfig fehlt." }, { status: 400 });
     if (!name) return NextResponse.json({ error: "Name darf nicht leer sein." }, { status: 400 });
@@ -30,6 +52,7 @@ export async function POST(request: NextRequest) {
         name,
         type: type as TrainerQualificationType,
         description,
+        hierarchyLevel,
         sortOrder: count,
       },
     });
@@ -39,7 +62,7 @@ export async function POST(request: NextRequest) {
     console.error("Failed to create qualification definition", error);
     return NextResponse.json(
       { error: "Qualifikation konnte nicht erstellt werden. Prüfe, ob sie bereits existiert." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

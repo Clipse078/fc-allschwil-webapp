@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 type BirthYearCount = {
   year: number;
@@ -10,7 +10,12 @@ type DiplomaCount = {
   count: number;
 };
 
-type DiplomaRequirement = "D-Diplom" | "C-Diplom" | "B-Diplom" | "A-Diplom" | null;
+type QualificationRequirement = {
+  qualificationName: string | null;
+  requiredTrainerCount: number;
+  matchingTrainerCount: number;
+  isFulfilled: boolean;
+};
 
 type Props = {
   seasonLabel: string;
@@ -18,7 +23,8 @@ type Props = {
   trainerCount: number;
   birthYears: BirthYearCount[];
   diplomas: DiplomaCount[];
-  diplomaRequirement?: DiplomaRequirement;
+  diplomaRequirement?: string | null;
+  qualificationRequirements?: QualificationRequirement[];
   maxPlayersPerTrainer?: number | null;
   hasHealthyPlayerTrainerRatio?: boolean | null;
 };
@@ -32,7 +38,7 @@ function getRatioState(
   playerCount: number,
   trainerCount: number,
   maxPlayersPerTrainer?: number | null,
-  hasHealthyPlayerTrainerRatio?: boolean | null
+  hasHealthyPlayerTrainerRatio?: boolean | null,
 ) {
   const playersPerTrainer = getPlayersPerTrainer(playerCount, trainerCount);
 
@@ -71,30 +77,6 @@ function getRatioState(
   };
 }
 
-function diplomaMatchesRequirement(label: string, requirement: DiplomaRequirement) {
-  if (!requirement) return true;
-
-  const normalized = label.toUpperCase();
-
-  if (requirement === "D-Diplom") {
-    return normalized.includes("D-DIPLOM") || normalized.includes("SFV D") || normalized.includes("KINDERFUSSBALL");
-  }
-
-  if (requirement === "C-Diplom") {
-    return normalized.includes("C-DIPLOM") || normalized.includes("UEFA C");
-  }
-
-  if (requirement === "B-Diplom") {
-    return normalized.includes("B-DIPLOM") || normalized.includes("UEFA B");
-  }
-
-  if (requirement === "A-Diplom") {
-    return normalized.includes("A-DIPLOM") || normalized.includes("UEFA A");
-  }
-
-  return false;
-}
-
 function diplomaPriority(label: string) {
   const normalized = label.toUpperCase();
 
@@ -114,12 +96,29 @@ export default function TeamHealthCard({
   birthYears,
   diplomas,
   diplomaRequirement = null,
+  qualificationRequirements = [],
   maxPlayersPerTrainer = null,
   hasHealthyPlayerTrainerRatio = null,
 }: Props) {
-  const ratioState = getRatioState(playerCount, trainerCount, maxPlayersPerTrainer, hasHealthyPlayerTrainerRatio);
-  const sortedDiplomas = [...diplomas].sort((a, b) => diplomaPriority(a.label) - diplomaPriority(b.label) || a.label.localeCompare(b.label));
-  const requirementMet = diplomaRequirement ? sortedDiplomas.some((item) => diplomaMatchesRequirement(item.label, diplomaRequirement)) : null;
+  const ratioState = getRatioState(
+    playerCount,
+    trainerCount,
+    maxPlayersPerTrainer,
+    hasHealthyPlayerTrainerRatio,
+  );
+
+  const sortedDiplomas = [...diplomas].sort(
+    (a, b) => diplomaPriority(a.label) - diplomaPriority(b.label) || a.label.localeCompare(b.label),
+  );
+
+  const relevantRequirement =
+    qualificationRequirements.find((item) => item.qualificationName === diplomaRequirement) ??
+    qualificationRequirements[0] ??
+    null;
+
+  const requirementMet = relevantRequirement ? relevantRequirement.isFulfilled : null;
+  const requirementLabel = relevantRequirement?.qualificationName ?? diplomaRequirement;
+
   const requirementClass =
     requirementMet === null
       ? "border-slate-200 bg-slate-50 text-slate-500"
@@ -153,9 +152,9 @@ export default function TeamHealthCard({
               <span>{ratioState.label}</span>
               <span className="font-semibold opacity-80">{ratioState.description}</span>
             </span>
-            {diplomaRequirement ? (
+            {requirementLabel ? (
               <span className={`rounded-full border px-3 py-1.5 text-xs font-bold shadow-sm ${requirementClass}`}>
-                {requirementMet ? "Diplom erfüllt" : "Diplom fehlt"} · Soll: {diplomaRequirement}
+                {requirementMet ? "Diplom erfüllt" : "Diplom fehlt"} · Soll: {requirementLabel}
               </span>
             ) : null}
           </div>

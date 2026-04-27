@@ -12,6 +12,12 @@ type RouteContext = {
 
 const ALLOWED_TYPES = ["DIPLOMA", "CERTIFICATE", "COURSE", "WORKSHOP", "FIRST_AID", "OTHER"] as const;
 
+function parseHierarchyLevel(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.round(parsed));
+}
+
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     await requirePermission(PERMISSIONS.USERS_MANAGE);
@@ -23,6 +29,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const type = String(body.type ?? "DIPLOMA").trim();
     const description = String(body.description ?? "").trim() || null;
     const isActive = Boolean(body.isActive ?? true);
+    const hierarchyLevel = parseHierarchyLevel(body.hierarchyLevel);
 
     if (!name) return NextResponse.json({ error: "Name darf nicht leer sein." }, { status: 400 });
 
@@ -37,6 +44,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         type: type as TrainerQualificationType,
         description,
         isActive,
+        hierarchyLevel,
       },
     });
 
@@ -46,7 +54,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json(
       { error: "Qualifikation konnte nicht gespeichert werden." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -71,7 +79,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     if (definition.teamCategoryRequirements.length > 0) {
       return NextResponse.json(
         { error: "Diese Qualifikation kann nicht gelöscht werden, weil sie noch in Teamregeln verwendet wird." },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -84,7 +92,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     if (trainerUsageCount > 0) {
       return NextResponse.json(
         { error: "Diese Qualifikation kann nicht gelöscht werden, weil sie noch bei mindestens einem Trainer hinterlegt ist. Deaktiviere sie stattdessen." },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -98,7 +106,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
     return NextResponse.json(
       { error: "Qualifikation konnte nicht gelöscht werden." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

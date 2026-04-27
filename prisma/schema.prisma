@@ -1063,6 +1063,7 @@ model QualificationDefinition {
   description  String?
   isActive     Boolean                  @default(true)
   sortOrder    Int                      @default(0)
+  hierarchyLevel Int                     @default(0)
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
 
@@ -1071,6 +1072,7 @@ model QualificationDefinition {
 
   @@unique([clubConfigId, name])
   @@index([clubConfigId, isActive, sortOrder])
+  @@index([clubConfigId, type, hierarchyLevel])
 }
 
 model TeamCategoryQualificationRequirement {
@@ -1088,3 +1090,5 @@ model TeamCategoryQualificationRequirement {
   @@unique([teamCategoryRuleId, qualificationDefinitionId])
   @@index([teamCategoryRuleId, sortOrder])
 }
+
+
