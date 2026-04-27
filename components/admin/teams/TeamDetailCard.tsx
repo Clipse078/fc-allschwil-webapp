@@ -98,9 +98,21 @@ type SeasonOption = {
   endDate: Date | string;
 };
 
+type QualificationRequirement = {
+  qualificationName: string | null;
+  requiredTrainerCount: number;
+  matchingTrainerCount: number;
+  isFulfilled: boolean;
+  fulfilledByQualificationName?: string | null;
+};
+
 type TeamHealthKpi = {
+  playerCount: number | null;
+  trainerCount: number | null;
   maxPlayersPerTrainer: number | null;
   hasHealthyPlayerTrainerRatio: boolean | null;
+  requiredDiploma: string | null;
+  qualificationRequirements: QualificationRequirement[];
 };
 
 type Props = {
@@ -117,25 +129,6 @@ function formatGenderGroup(value: string | null) {
   if (normalized === "MIXED" || normalized === "GEMISCHT") return "Mixed";
 
   return "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“";
-}
-
-function getDiplomaRequirementForTeam(category: string | null, ageGroup: string | null) {
-  const normalizedCategory = String(category ?? "").toUpperCase();
-  const normalizedAgeGroup = String(ageGroup ?? "").toUpperCase();
-
-  if (["G", "F", "E"].includes(normalizedAgeGroup) || normalizedCategory.includes("KINDERFUSSBALL")) {
-    return "D-Diplom" as const;
-  }
-
-  if (["C", "B", "A"].includes(normalizedAgeGroup) || normalizedCategory.includes("JUNIOREN")) {
-    return "C-Diplom" as const;
-  }
-
-  if (normalizedCategory.includes("AKTIVE") || normalizedAgeGroup.includes("AKTIVE")) {
-    return "B-Diplom" as const;
-  }
-
-  return null;
 }
 
 function VisibilityTile({
@@ -192,6 +185,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
   const [trainerDiplomaCounts, setTrainerDiplomaCounts] = useState<{ label: string; count: number }[]>([]);
   const [teamHealthKpi, setTeamHealthKpi] = useState<TeamHealthKpi | null>(null);
   const [kpiBreakdown, setKpiBreakdown] = useState<{ name: string; required: number; actual: number }[]>([]);
+  const [rosterRefreshKey, setRosterRefreshKey] = useState(0);
 
   useEffect(() => {
     setTeam({...initialTeam});
@@ -273,7 +267,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           const subline = String(trainer.subline ?? "").trim();
           if (!subline) continue;
 
-          const diploma = subline.split("Ã¢â‚¬Â¢")[0]?.trim();
+          const diploma = subline.split("•")[0]?.trim();
           if (!diploma) continue;
 
           counts.set(diploma, (counts.get(diploma) ?? 0) + 1);
@@ -299,8 +293,12 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
         const match = Array.isArray(data?.teams) ? data.teams.find((entry: { teamId?: string }) => entry.teamId === team.id) : null;
 
         setTeamHealthKpi(match ? {
+          playerCount: typeof match.playerCount === "number" ? match.playerCount : null,
+          trainerCount: typeof match.trainerCount === "number" ? match.trainerCount : null,
           maxPlayersPerTrainer: typeof match.maxPlayersPerTrainer === "number" ? match.maxPlayersPerTrainer : null,
           hasHealthyPlayerTrainerRatio: typeof match.hasHealthyPlayerTrainerRatio === "boolean" ? match.hasHealthyPlayerTrainerRatio : null,
+          requiredDiploma: typeof match.requiredDiploma === "string" ? match.requiredDiploma : null,
+          qualificationRequirements: Array.isArray(match.qualificationRequirements) ? match.qualificationRequirements : [],
         } : null);
         setKpiBreakdown(Array.isArray(match?.qualificationRequirements) ? match.qualificationRequirements.map((item: { qualificationName?: string | null; requiredTrainerCount?: number; matchingTrainerCount?: number }) => ({ name: item.qualificationName ?? "Qualifikation", required: item.requiredTrainerCount ?? 0, actual: item.matchingTrainerCount ?? 0 })) : []);
       } catch {
@@ -310,7 +308,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     }
 
     void loadTeamHealthKpi();
-  }, [team.id]);
+  }, [team.id, rosterRefreshKey]);
 
   async function toggleWebsiteVisibility(
     key: "trainings" | "upcoming" | "standings" | "results" | "trainerstaff" | "playersquad" | "teamPage",
@@ -472,11 +470,12 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                 {activeTeamSeason && (
                   <TeamHealthCard
                     seasonLabel={activeTeamSeason.season.name}
-                    playerCount={activeTeamSeason.playerSquadMembers?.length ?? 0}
-                    trainerCount={activeTeamSeason.trainerTeamMembers?.length ?? 0}
+                    playerCount={teamHealthKpi?.playerCount ?? activeTeamSeason.playerSquadMembers?.length ?? 0}
+                    trainerCount={teamHealthKpi?.trainerCount ?? activeTeamSeason.trainerTeamMembers?.length ?? 0}
                     birthYears={playerBirthYearCounts}
                     diplomas={trainerDiplomaCounts}
-                    diplomaRequirement={getDiplomaRequirementForTeam(team.category, team.ageGroup)}
+                    diplomaRequirement={teamHealthKpi?.requiredDiploma ?? null}
+                    qualificationRequirements={teamHealthKpi?.qualificationRequirements ?? []}
                     maxPlayersPerTrainer={teamHealthKpi?.maxPlayersPerTrainer ?? null}
                     hasHealthyPlayerTrainerRatio={teamHealthKpi?.hasHealthyPlayerTrainerRatio ?? null}
                   />
@@ -631,7 +630,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           </div>
         </section>
 
-        <TeamRosterOverviewCard teamId={team.id} teamAgeGroup={team.ageGroup} canManage={canManage} trainerSectionVisible={visibility.trainerstaff} playerSectionVisible={visibility.playersquad} onTrainerSectionVisibilityChange={(value) => setVisibility((current) => ({ ...current, trainerstaff: value }))} onPlayerSectionVisibilityChange={(value) => setVisibility((current) => ({ ...current, playersquad: value }))} teamSeasons={activeTeamSeason ? [activeTeamSeason as any] : []} />
+        <TeamRosterOverviewCard onRosterChanged={() => setRosterRefreshKey((current) => current + 1)} teamId={team.id} teamAgeGroup={team.ageGroup} canManage={canManage} trainerSectionVisible={visibility.trainerstaff} playerSectionVisible={visibility.playersquad} onTrainerSectionVisibilityChange={(value) => setVisibility((current) => ({ ...current, trainerstaff: value }))} onPlayerSectionVisibilityChange={(value) => setVisibility((current) => ({ ...current, playersquad: value }))} teamSeasons={activeTeamSeason ? [activeTeamSeason as any] : []} />
       </div>
     </div>
   );

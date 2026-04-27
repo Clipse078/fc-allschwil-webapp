@@ -70,6 +70,7 @@ type Props = {
   playerSectionVisible?: boolean;
   onTrainerSectionVisibilityChange?: (value: boolean) => void;
   onPlayerSectionVisibilityChange?: (value: boolean) => void;
+  onRosterChanged?: () => void;
 };
 
 function personName(member: RawMember) {
@@ -388,7 +389,7 @@ function PersonRow({
   );
 }
 
-export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons, canManage, trainerSectionVisible = true, playerSectionVisible = true, onTrainerSectionVisibilityChange, onPlayerSectionVisibilityChange }: Props) {
+export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons, canManage, trainerSectionVisible = true, playerSectionVisible = true, onTrainerSectionVisibilityChange, onPlayerSectionVisibilityChange, onRosterChanged }: Props) {
   const resolvedTeamSeason = teamSeason ?? teamSeasons?.[0] ?? null;
   const [trainerQuery, setTrainerQuery] = useState("");
   const [playerQuery, setPlayerQuery] = useState("");
@@ -508,6 +509,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
       }
 
       setTrainers((current) => [...current, normalizeTrainer({ ...data, subline: data?.subline ?? person.subline })]);
+      onRosterChanged?.();
       setTrainerQuery("");
       setTrainerResults([]);
     } catch {
@@ -538,6 +540,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
       }
 
       setPlayers((current) => [...current, normalizePlayer({ ...data, subline: data?.subline ?? person.subline })]);
+      onRosterChanged?.();
       setPlayerQuery("");
       setPlayerResults([]);
     } catch {
@@ -635,6 +638,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
 
     setTrainers((current) => current.filter((person) => person.id !== memberId));
     await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/trainer-members/${memberId}`, { method: "DELETE" });
+    onRosterChanged?.();
   }
 
   async function removePlayer(memberId: string) {
@@ -642,6 +646,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
 
     setPlayers((current) => current.filter((person) => person.id !== memberId));
     await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/squad-members/${memberId}`, { method: "DELETE" });
+    onRosterChanged?.();
   }
 
   return (
@@ -752,6 +757,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
 
 
 
