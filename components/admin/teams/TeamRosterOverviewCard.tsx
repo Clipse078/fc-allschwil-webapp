@@ -19,6 +19,7 @@ type RawMember = {
   positionLabel?: string | null;
   isCaptain?: boolean;
   isViceCaptain?: boolean;
+  isWebsiteVisible?: boolean;
   sortOrder?: number;
   subline?: string;
   meta?: string;
@@ -56,6 +57,7 @@ type Person = {
   positionLabel?: string | null;
   isCaptain?: boolean;
   isViceCaptain?: boolean;
+  isWebsiteVisible?: boolean;
 };
 
 type Props = {
@@ -113,6 +115,7 @@ function normalizeTrainer(member: RawMember): Person {
     meta: member.meta ?? member.roleLabel ?? "Trainer",
     roleLabel: member.roleLabel ?? member.meta ?? "Trainer",
     imageUrl: member.imageUrl ?? null,
+    isWebsiteVisible: member.isWebsiteVisible ?? true,
   };
 }
 
@@ -129,6 +132,7 @@ function normalizePlayer(member: RawMember): Person {
     positionLabel: member.positionLabel ?? member.meta ?? "",
     isCaptain: Boolean(member.isCaptain),
     isViceCaptain: Boolean(member.isViceCaptain),
+    isWebsiteVisible: member.isWebsiteVisible ?? true,
     imageUrl: member.imageUrl ?? null,
   };
 }
@@ -152,6 +156,7 @@ function normalizeSearchPerson(item: any): Person {
     meta: item.isTrainer ? "Trainer" : item.isPlayer ? "Spieler" : item.functionLabel ?? "Person",
     imageUrl: item.imageUrl ?? item.imageSrc ?? null,
     currentTeam: item.currentTeam ?? null,
+    isWebsiteVisible: true,
   };
 }
 
@@ -320,6 +325,7 @@ function PersonRow({
               {person.meta ? <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#0b4aa2]">{person.meta}</span> : null}
               {type === "player" && person.isCaptain ? <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-amber-700">Captain</span> : null}
               {type === "player" && person.isViceCaptain ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-slate-600">Vice</span> : null}
+              {person.isWebsiteVisible === false ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">Website aus</span> : <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700">Website</span>}
             </div>
             {person.subline ? <p className="mt-1 truncate text-xs font-bold text-slate-500">{person.subline}</p> : null}
           </div>
@@ -545,7 +551,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     const response = await fetch(`/api/teams/${teamId}/team-seasons/${resolvedTeamSeason.id}/trainer-members/${memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roleLabel: updates.roleLabel }),
+      body: JSON.stringify({ roleLabel: updates.roleLabel, isWebsiteVisible: updates.isWebsiteVisible }),
     });
 
     if (!response.ok) setActionError("Trainerrolle konnte nicht gespeichert werden.");
@@ -574,6 +580,7 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
         positionLabel: updates.positionLabel,
         isCaptain: updates.isCaptain,
         isViceCaptain: updates.isViceCaptain,
+        isWebsiteVisible: updates.isWebsiteVisible,
       }),
     });
 
@@ -702,3 +709,5 @@ export default function TeamRosterOverviewCard({ teamId, teamSeason, teamSeasons
     </div>
   );
 }
+
+

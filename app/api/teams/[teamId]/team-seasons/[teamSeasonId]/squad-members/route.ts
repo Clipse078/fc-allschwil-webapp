@@ -27,6 +27,7 @@ export async function GET(_: Request, context: Context) {
         subline: [x.shirtNumber ? "Nr. " + x.shirtNumber : "", x.person.dateOfBirth ? "Jahrgang " + new Date(x.person.dateOfBirth).getUTCFullYear() : ""].filter(Boolean).join(" • "),
         meta: x.positionLabel ?? "",
         imageUrl: null,
+        isWebsiteVisible: x.isWebsiteVisible,
       })),
     );
   } catch (error) {
@@ -59,9 +60,11 @@ export async function POST(req: Request, context: Context) {
       subline: [member.shirtNumber ? "Nr. " + member.shirtNumber : "", member.person.dateOfBirth ? "Jahrgang " + new Date(member.person.dateOfBirth).getUTCFullYear() : ""].filter(Boolean).join(" • "),
       meta: member.positionLabel ?? "",
       imageUrl: null,
+      isWebsiteVisible: member.isWebsiteVisible,
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Spieler konnte nicht hinzugefügt werden." }, { status: 500 });
   }
 }
+
 

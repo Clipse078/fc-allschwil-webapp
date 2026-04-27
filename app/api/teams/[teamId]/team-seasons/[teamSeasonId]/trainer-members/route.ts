@@ -63,6 +63,7 @@ export async function GET(_: Request, context: Context) {
         subline: bestQualificationLabel(x.person) || x.person.email || "",
         meta: x.roleLabel ?? "Trainer",
         imageUrl: null,
+        isWebsiteVisible: x.isWebsiteVisible,
       })),
     );
   } catch (error) {
@@ -108,8 +109,10 @@ export async function POST(req: Request, context: Context) {
       subline: bestQualificationLabel(member.person) || member.person.email || "",
       meta: member.roleLabel ?? "Trainer",
       imageUrl: null,
+      isWebsiteVisible: member.isWebsiteVisible,
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Trainer konnte nicht hinzugefügt werden." }, { status: 500 });
   }
 }
+
