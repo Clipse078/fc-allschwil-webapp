@@ -1,4 +1,5 @@
-import { prisma } from "../lib/db/prisma";
+﻿import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
 
 async function main() {
   // prevent duplicates
@@ -28,3 +29,4 @@ async function main() {
 }
 
 main().finally(() => prisma.$disconnect());
+
