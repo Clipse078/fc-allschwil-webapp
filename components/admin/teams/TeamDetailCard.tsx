@@ -156,6 +156,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
   const [teamPhotoRotate, setTeamPhotoRotate] = useState(0);
   const [teamPhotoSaved, setTeamPhotoSaved] = useState(false);
   const [teamPhotoDrag, setTeamPhotoDrag] = useState<{ startX: number; startY: number; photoX: number; photoY: number } | null>(null);
+  const [trainerDiplomaCounts, setTrainerDiplomaCounts] = useState<{ label: string; count: number }[]>([]);
 
   useEffect(() => {
     setTeam(initialTeam);
@@ -214,6 +215,47 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     }
   }, [activeTeamSeason, team.websiteVisible]);
 
+  useEffect(() => {
+    const teamSeasonId = activeTeamSeason?.id;
+    if (!teamSeasonId) {
+      setTrainerDiplomaCounts([]);
+      return;
+    }
+
+    async function loadTrainerDiplomas() {
+      try {
+        const response = await fetch(`/api/teams/${team.id}/team-seasons/${teamSeasonId}/trainer-members`);
+        const data = await response.json().catch(() => []);
+
+        if (!Array.isArray(data)) {
+          setTrainerDiplomaCounts([]);
+          return;
+        }
+
+        const counts = new Map<string, number>();
+
+        for (const trainer of data) {
+          const subline = String(trainer.subline ?? "").trim();
+          if (!subline) continue;
+
+          const diploma = subline.split("•")[0]?.trim();
+          if (!diploma) continue;
+
+          counts.set(diploma, (counts.get(diploma) ?? 0) + 1);
+        }
+
+        setTrainerDiplomaCounts(
+          Array.from(counts.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([label, count]) => ({ label, count })),
+        );
+      } catch {
+        setTrainerDiplomaCounts([]);
+      }
+    }
+
+    void loadTrainerDiplomas();
+  }, [activeTeamSeason?.id, team.id]);
   async function toggleWebsiteVisibility(
     key: "trainings" | "upcoming" | "standings" | "results" | "trainerstaff" | "playersquad" | "teamPage",
     value: boolean,
@@ -372,20 +414,37 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
 
                 </div>
                 {team.ageGroup && activeTeamSeason && (
-                  <div className="mt-5">
-                    <div className="text-xs font-semibold text-slate-400">
-                      JahrgÃ¤nge fÃ¼r Saison {activeTeamSeason.season.name}
+                  <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-400">
+                        Jahrgänge für Saison {activeTeamSeason.season.name}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {playerBirthYearCounts.length > 0 ? (
+                          playerBirthYearCounts.map((item) => (
+                            <span key={item.year} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">
+                              {item.year}: {item.count} Spieler
+                            </span>
+                          ))
+                        ) : (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-500">Noch keine Spieler mit Jahrgang</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {playerBirthYearCounts.length > 0 ? (
-                        playerBirthYearCounts.map((item) => (
-                          <span key={item.year} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">
-                            {item.year}: {item.count} Spieler
-                          </span>
-                        ))
-                      ) : (
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-500">Noch keine Spieler mit Jahrgang</span>
-                      )}
+
+                    <div>
+                      <div className="text-xs font-semibold text-slate-400">Trainerdiplome</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {trainerDiplomaCounts.length > 0 ? (
+                          trainerDiplomaCounts.map((item) => (
+                            <span key={item.label} className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">
+                              {item.label}: {item.count}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-500">Noch keine Trainerdiplome</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}              </div>
@@ -532,6 +591,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
 
