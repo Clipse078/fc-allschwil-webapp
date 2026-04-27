@@ -1,8 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PeoplePicker, { PeoplePickerPerson } from "@/components/admin/shared/people-picker/PeoplePicker";
+
+type RecommendedTrainer = {
+  id: string;
+  displayName: string;
+  email?: string | null;
+  bestQualification?: string | null;
+  qualificationMatches: boolean;
+  activeAssignmentCount: number;
+  reason: string;
+};
 
 type Props = {
   teamId: string;
@@ -20,6 +30,10 @@ export default function TeamQuickActionsCard({
   hasHealthyPlayerTrainerRatio = null,
 }: Props) {
   const router = useRouter();
+
+  const [recommended, setRecommended] = useState<RecommendedTrainer[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+
   const [selectedTrainer, setSelectedTrainer] = useState<PeoplePickerPerson | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -28,9 +42,33 @@ export default function TeamQuickActionsCard({
   const shouldSuggestTrainer =
     trainerCount === 0 || hasHealthyPlayerTrainerRatio === false;
 
-  async function assignTrainer() {
-    if (!selectedTrainer || !canManage) return;
+  useEffect(() => {
+    async function loadRecommendations() {
+      try {
+        setLoadingRecommendations(true);
 
+        const res = await fetch(
+          `/api/teams/${teamId}/team-seasons/${teamSeasonId}/recommended-trainers`
+        );
+
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) throw new Error(data?.error);
+
+        setRecommended(Array.isArray(data?.recommendations) ? data.recommendations : []);
+      } catch {
+        setRecommended([]);
+      } finally {
+        setLoadingRecommendations(false);
+      }
+    }
+
+    if (shouldSuggestTrainer) {
+      void loadRecommendations();
+    }
+  }, [teamId, teamSeasonId, shouldSuggestTrainer]);
+
+  async function assignTrainerById(personId: string) {
     setIsAssigning(true);
     setMessage(null);
     setErrorMessage(null);
@@ -41,21 +79,19 @@ export default function TeamQuickActionsCard({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ personId: selectedTrainer.id }),
+          body: JSON.stringify({ personId }),
         },
       );
 
       const data = await response.json().catch(() => null);
 
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Trainer could not be assigned.");
-      }
+      if (!response.ok) throw new Error(data?.error);
 
+      setMessage("Trainer assigned successfully.");
       setSelectedTrainer(null);
-      setMessage(data?.message ?? "Trainer assigned successfully.");
       router.refresh();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Trainer could not be assigned.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed.");
     } finally {
       setIsAssigning(false);
     }
@@ -65,69 +101,92 @@ export default function TeamQuickActionsCard({
 
   return (
     <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex justify-between items-start">
         <div>
           <p className="fca-eyebrow">Quick actions</p>
           <h3 className="mt-2 text-lg font-black text-[#0b4aa2]">Fix team health</h3>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Assign a trainer directly from the team health context without leaving this page.
-          </p>
         </div>
 
-        <span
-          className={`rounded-full border px-3 py-1.5 text-xs font-black ${
-            shouldSuggestTrainer
-              ? "border-red-100 bg-red-50 text-red-700"
-              : "border-emerald-100 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {shouldSuggestTrainer ? "Action recommended" : "No urgent action"}
+        <span className={`rounded-full px-3 py-1.5 text-xs font-black ${
+          shouldSuggestTrainer
+            ? "bg-red-50 text-red-700"
+            : "bg-emerald-50 text-emerald-700"
+        }`}>
+          {shouldSuggestTrainer ? "Action recommended" : "Healthy"}
         </span>
       </div>
 
-      <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-        <div>
-          <p className="text-sm font-black text-slate-900">Assign trainer</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Search only shows eligible trainer-type people for this team season.
-          </p>
-        </div>
+      {/* 🔥 RECOMMENDED TRAINERS */}
+      {shouldSuggestTrainer && (
+        <div className="mt-6">
+          <p className="text-sm font-black text-slate-900">Recommended trainers</p>
 
-        <div className="mt-4">
+          {loadingRecommendations ? (
+            <p className="text-sm text-slate-500 mt-2">Loading recommendations...</p>
+          ) : recommended.length === 0 ? (
+            <p className="text-sm text-slate-500 mt-2">No strong matches found.</p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              {recommended.map((trainer) => (
+                <div
+                  key={trainer.id}
+                  className="flex items-center justify-between rounded-[18px] border border-slate-200 px-4 py-3"
+                >
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {trainer.displayName}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {trainer.bestQualification || "No diploma info"} ·{" "}
+                      {trainer.activeAssignmentCount} teams
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => assignTrainerById(trainer.id)}
+                    disabled={isAssigning}
+                    className="rounded-full border border-red-200 px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50"
+                  >
+                    Assign
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 🔎 MANUAL PICKER */}
+      <div className="mt-6">
+        <p className="text-sm font-black text-slate-900">Manual assign</p>
+
+        <div className="mt-3">
           <PeoplePicker
             selected={selectedTrainer}
             onSelect={setSelectedTrainer}
             searchMode="trainer"
             teamSeasonId={teamSeasonId}
-            placeholder="Search trainer..."
-            emptyText="No eligible trainer found."
-            disabled={isAssigning}
           />
         </div>
 
-        {errorMessage ? (
-          <div className="mt-4 rounded-[18px] border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-            {errorMessage}
-          </div>
-        ) : null}
-
-        {message ? (
-          <div className="mt-4 rounded-[18px] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-            {message}
-          </div>
-        ) : null}
-
-        <div className="mt-4 flex justify-end">
+        <div className="mt-3 flex justify-end">
           <button
-            type="button"
-            onClick={assignTrainer}
+            onClick={() => selectedTrainer && assignTrainerById(selectedTrainer.id)}
             disabled={!selectedTrainer || isAssigning}
-            className="inline-flex h-11 items-center justify-center rounded-full border border-red-200 bg-white px-5 text-sm font-black text-red-600 shadow-sm transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-red-200 px-5 py-2 text-sm font-black text-red-600 hover:bg-red-50"
           >
-            {isAssigning ? "Assigning..." : "Assign trainer"}
+            Assign trainer
           </button>
         </div>
       </div>
+
+      {errorMessage && (
+        <div className="mt-4 text-sm text-red-600">{errorMessage}</div>
+      )}
+
+      {message && (
+        <div className="mt-4 text-sm text-emerald-600">{message}</div>
+      )}
     </section>
   );
 }
