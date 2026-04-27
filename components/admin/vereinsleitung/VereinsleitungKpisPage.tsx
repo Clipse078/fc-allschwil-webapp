@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type QualificationRequirement = {
@@ -189,6 +190,36 @@ export default function VereinsleitungKpisPage() {
                 >
                   Trainers {team.trainerCount}/{team.requiredTrainerCount ?? "?"}
                 </span>
+              </div>
+
+              {team.status === "attention" ? (
+                <div className="mt-4 rounded-[20px] border border-red-100 bg-white p-3">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-red-600">Suggested action</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    {team.qualificationRequirements.length === 0
+                      ? "Configure the missing team category rule in Admin."
+                      : !team.hasEnoughTrainers
+                        ? "Add or assign an additional trainer to this team."
+                        : "Assign a trainer with the required diploma level."}
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href={`/dashboard/teams/${team.teamId}`}
+                  className="inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-4 py-2 text-xs font-black text-red-600 shadow-sm transition hover:bg-red-50 hover:text-red-700"
+                >
+                  Open team
+                </Link>
+                {team.qualificationRequirements.length === 0 ? (
+                  <Link
+                    href="/dashboard/admin"
+                    className="inline-flex items-center justify-center rounded-full border border-amber-200 bg-white px-4 py-2 text-xs font-black text-amber-700 shadow-sm transition hover:bg-amber-50"
+                  >
+                    Configure rule
+                  </Link>
+                ) : null}
               </div>
             </div>
           ))}
