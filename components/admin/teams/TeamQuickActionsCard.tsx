@@ -99,7 +99,11 @@ export default function TeamQuickActionsCard({
 
   if (!canManage) return null;
 
-  return (
+  const needsTrainer = typeof trainerCount === "number" && trainerCount < 2;
+const ratioProblem = hasHealthyPlayerTrainerRatio === false;
+const missingDiploma = false;
+
+return (
     <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -193,4 +197,6 @@ export default function TeamQuickActionsCard({
     </section>
   );
 }
+
+
 
