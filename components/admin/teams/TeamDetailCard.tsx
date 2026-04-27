@@ -414,36 +414,54 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
 
                 </div>
                 {team.ageGroup && activeTeamSeason && (
-                  <div className="mt-5 grid gap-5 lg:grid-cols-2">
-                    <div>
-                      <div className="text-xs font-semibold text-slate-400">
-                        Jahrgänge für Saison {activeTeamSeason.season.name}
+                  <div className="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-gradient-to-br from-slate-50 to-white shadow-sm">
+                    <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+                    <div className="p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Team Overview</div>
+                          <div className="mt-1 text-sm font-black text-slate-900">Saison {activeTeamSeason.season.name}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600">
+                            {activeTeamSeason.playerSquadMembers?.length ?? 0} Spieler
+                          </span>
+                          <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#0b4aa2]">
+                            {activeTeamSeason.trainerTeamMembers?.length ?? 0} Trainer
+                          </span>
+                        </div>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {playerBirthYearCounts.length > 0 ? (
-                          playerBirthYearCounts.map((item) => (
-                            <span key={item.year} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">
-                              {item.year}: {item.count} Spieler
-                            </span>
-                          ))
-                        ) : (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-500">Noch keine Spieler mit Jahrgang</span>
-                        )}
-                      </div>
-                    </div>
 
-                    <div>
-                      <div className="text-xs font-semibold text-slate-400">Trainerdiplome</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {trainerDiplomaCounts.length > 0 ? (
-                          trainerDiplomaCounts.map((item) => (
-                            <span key={item.label} className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">
-                              {item.label}: {item.count}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-500">Noch keine Trainerdiplome</span>
-                        )}
+                      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                        <div>
+                          <div className="text-xs font-semibold text-slate-400">Jahrgänge</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {playerBirthYearCounts.length > 0 ? (
+                              playerBirthYearCounts.map((item) => (
+                                <span key={item.year} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-[#0b4aa2] shadow-sm">
+                                  {item.year}: {item.count}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">Noch keine Spieler mit Jahrgang</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-xs font-semibold text-slate-400">Trainerqualität</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {trainerDiplomaCounts.length > 0 ? (
+                              trainerDiplomaCounts.map((item) => (
+                                <span key={item.label} className="rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-[#0b4aa2] shadow-sm">
+                                  {item.label}: {item.count}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-500 shadow-sm">Noch keine Trainerdiplome</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -591,6 +609,7 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
 
