@@ -112,12 +112,8 @@ export async function GET(_: Request, context: Context) {
         if (hasRequiredDiploma) score += 30;
         if (bestRank > requiredRank) score += 8;
         if (hasValidDiploma) score += 12;
-        if (experienceYears >= 5) score += 15;
-        else if (experienceYears >= 3) score += 10;
-        else if (experienceYears >= 1) score += 5;
-        if ((yearsAtClub ?? 0) >= 5) score += 12;
-        else if ((yearsAtClub ?? 0) >= 3) score += 8;
-        else if ((yearsAtClub ?? 0) >= 1) score += 4;
+        score += Math.min(experienceYears * 3, 15);
+        score += Math.min((yearsAtClub ?? 0) * 2, 12);
         if (activeAssignments === 0) score += 15;
         if (activeAssignments === 1) score += 5;
         if (activeAssignments >= 3) score -= 15;
