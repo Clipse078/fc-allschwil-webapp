@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ type RecommendedTrainer = {
 };
 
 type Props = {
+  kpiBreakdown?: { name: string; required: number; actual: number }[];
   teamId: string;
   teamSeasonId: string;
   canManage: boolean;
@@ -120,7 +121,7 @@ export default function TeamQuickActionsCard({
         </span>
       </div>
 
-      {/* ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ RECOMMENDED TRAINERS */}
+      {/* ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ RECOMMENDED TRAINERS */}
       {shouldSuggestTrainer && recommended.length > 0 && (
         <div className="mt-6">
           <p className="text-sm font-black text-slate-900">Top recommendations</p>
@@ -137,7 +138,7 @@ export default function TeamQuickActionsCard({
                   </div>
                   <div className="text-xs text-slate-500">
                     {trainer.functionLabel || "Trainer"}
-                    {trainer.teamLabel ? ` ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ${trainer.teamLabel}` : ""}
+                    {trainer.teamLabel ? ` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ${trainer.teamLabel}` : ""}
                   </div>
                 </div>
 
@@ -155,7 +156,7 @@ export default function TeamQuickActionsCard({
         </div>
       )}
 
-      {/* ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â MANUAL PICKER */}
+      {/* ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â MANUAL PICKER */}
       <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-black text-slate-900">Manual assign</p>
 
@@ -192,3 +193,4 @@ export default function TeamQuickActionsCard({
     </section>
   );
 }
+
