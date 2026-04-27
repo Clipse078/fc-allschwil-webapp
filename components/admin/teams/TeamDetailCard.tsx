@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import {
@@ -136,18 +136,25 @@ function VisibilityTile({
   icon,
   title,
   active,
+  disabled,
   onToggle,
 }: {
   icon: ReactNode;
   title: string;
   active: boolean;
+  disabled: boolean;
   onToggle: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onToggle}
-      className="group flex min-h-[168px] flex-col items-center justify-center rounded-[24px] border border-slate-200 bg-white p-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onToggle();
+      }}
+      className={`group flex min-h-[168px] flex-col items-center justify-center rounded-[24px] border border-slate-200 bg-white p-5 text-center shadow-sm transition ${
+        disabled ? "cursor-not-allowed opacity-75" : "hover:-translate-y-0.5 hover:shadow-md"
+      }`}
     >
       <div className="flex h-14 w-14 items-center justify-center rounded-full border border-blue-100 bg-blue-50 text-[#0b4aa2] shadow-sm group-hover:bg-red-50 group-hover:text-[#d62839]">
         {icon}
@@ -157,7 +164,7 @@ function VisibilityTile({
         <span className={`relative h-7 w-12 rounded-full transition ${active ? "bg-emerald-500" : "bg-slate-300"}`}>
           <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${active ? "left-6" : "left-1"}`} />
         </span>
-        <span className={`text-xs font-semibold ${active ? "text-green-600" : "text-slate-900"}`}>{active ? "Sichtbar auf Website" : "Nicht sichtbar"}</span>
+        <span className={`text-xs font-semibold ${active ? "text-green-600" : "text-slate-900"}`}>{disabled ? "Gesteuert im Admin" : active ? "Sichtbar auf Website" : "Nicht sichtbar"}</span>
       </div>
     </button>
   );
@@ -479,25 +486,25 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
           <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
           <div className="p-6">
             <p className="fca-eyebrow">Website Darstellung steuern</p>
-            <p className="mt-3 text-sm text-slate-500">Diese Einstellungen bestimmen, was auf der öffentlichen Teamseite sichtbar ist.</p>
+            <p className="mt-3 text-sm text-slate-500">{canManage ? "Diese Einstellungen bestimmen, was auf der öffentlichen Teamseite sichtbar ist." : "Diese Einstellungen sind read-only und werden im Admin Modul gesteuert."}</p>
 
             <div className="mt-6 space-y-6">
               <div>
                 <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Inhalte</div>
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  <VisibilityTile icon={<ImageIcon className="h-6 w-6" />} title="Teamfoto" active={teamPhotoVisible} onToggle={() => { setTeamPhotoVisible((current) => !current); setTeamPhotoSaved(false); }} />
-                  <VisibilityTile icon={<Users className="h-6 w-6" />} title="Trainerstaff" active={visibility.trainerstaff} onToggle={() => toggleWebsiteVisibility("trainerstaff", !visibility.trainerstaff, "trainerTeamWebsiteVisible")} />
-                  <VisibilityTile icon={<Users className="h-6 w-6" />} title="Spielerkader" active={visibility.playersquad} onToggle={() => toggleWebsiteVisibility("playersquad", !visibility.playersquad, "squadWebsiteVisible")} />
+                  <VisibilityTile icon={<ImageIcon className="h-6 w-6" />} title="Teamfoto" active={teamPhotoVisible} disabled={!canManage} onToggle={() => { setTeamPhotoVisible((current) => !current); setTeamPhotoSaved(false); }} />
+                  <VisibilityTile icon={<Users className="h-6 w-6" />} title="Trainerstaff" active={visibility.trainerstaff} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("trainerstaff", !visibility.trainerstaff, "trainerTeamWebsiteVisible")} />
+                  <VisibilityTile icon={<Users className="h-6 w-6" />} title="Spielerkader" active={visibility.playersquad} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("playersquad", !visibility.playersquad, "squadWebsiteVisible")} />
                 </div>
               </div>
 
               <div>
                 <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-400">Spielbetrieb</div>
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                  <VisibilityTile icon={<CalendarDays className="h-6 w-6" />} title="Trainingszeiten" active={visibility.trainings} onToggle={() => toggleWebsiteVisibility("trainings", !visibility.trainings, "trainingsWebsiteVisible")} />
-                  <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="Nächste Spiele" active={visibility.upcoming} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
-                  <VisibilityTile icon={<Check className="h-6 w-6" />} title="Resultate" active={visibility.results} onToggle={() => toggleWebsiteVisibility("results", !visibility.results, "resultsWebsiteVisible")} />
-                  <VisibilityTile icon={<BarChart3 className="h-6 w-6" />} title="Rangliste" active={visibility.standings} onToggle={() => toggleWebsiteVisibility("standings", !visibility.standings, "standingsWebsiteVisible")} />
+                  <VisibilityTile icon={<CalendarDays className="h-6 w-6" />} title="Trainingszeiten" active={visibility.trainings} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("trainings", !visibility.trainings, "trainingsWebsiteVisible")} />
+                  <VisibilityTile icon={<Trophy className="h-6 w-6" />} title="Nächste Spiele" active={visibility.upcoming} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("upcoming", !visibility.upcoming, "upcomingMatchesWebsiteVisible")} />
+                  <VisibilityTile icon={<Check className="h-6 w-6" />} title="Resultate" active={visibility.results} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("results", !visibility.results, "resultsWebsiteVisible")} />
+                  <VisibilityTile icon={<BarChart3 className="h-6 w-6" />} title="Rangliste" active={visibility.standings} disabled={!canManage} onToggle={() => toggleWebsiteVisibility("standings", !visibility.standings, "standingsWebsiteVisible")} />
                 </div>
               </div>
             </div>
