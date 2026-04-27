@@ -77,6 +77,17 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
     });
   }
 
+  function handleRuleDragStart(event: React.DragEvent<HTMLDivElement>, ruleId: string) {
+    setDraggedRuleId(ruleId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", ruleId);
+  }
+
+  function handleRuleDragEnter(targetRuleId: string) {
+    if (!draggedRuleId || draggedRuleId === targetRuleId) return;
+    moveRule(draggedRuleId, targetRuleId);
+  }
+
   function saveOrder() {
     setSavingOrder(true);
     setMessage(null);
@@ -331,21 +342,28 @@ export default function TeamCategoryRulesEditor({ clubConfigId, rules }: TeamCat
       {items.map((rule) => (
         <div
           key={rule.id}
-          draggable
-          onDragStart={() => setDraggedRuleId(rule.id)}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={() => {
-            if (draggedRuleId) moveRule(draggedRuleId, rule.id);
+          onDragEnter={() => handleRuleDragEnter(rule.id)}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
             setDraggedRuleId(null);
           }}
-          onDragEnd={() => setDraggedRuleId(null)}
           className={`rounded-[24px] border border-slate-200 bg-slate-50 p-5 transition ${
             draggedRuleId === rule.id ? "opacity-50" : ""
           }`}
         >
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 cursor-grab items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400">
+              <div
+                draggable
+                onDragStart={(event) => handleRuleDragStart(event, rule.id)}
+                onDragEnd={() => setDraggedRuleId(null)}
+                className="flex h-10 w-10 cursor-grab items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 active:cursor-grabbing"
+                title="Ziehen zum Sortieren"
+              >
                 <GripVertical className="h-4 w-4" />
               </div>
               <div>

@@ -167,8 +167,8 @@ export default function TeamDisplaySettingsEditor({ teams }: Props) {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white">
-        <div className="grid grid-cols-[minmax(150px,1.4fr)_repeat(7,minmax(74px,0.7fr))] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-[0.1em] text-slate-400">
+      <div className="overflow-x-auto rounded-[24px] border border-slate-200 bg-white">
+        <div className="grid min-w-[820px] grid-cols-[minmax(130px,1.2fr)_repeat(7,minmax(68px,0.65fr))] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-[0.1em] text-slate-400">
           <div>Team</div>
           {columns.map((column) => (
             <div key={column.key} className="text-center">
@@ -181,7 +181,7 @@ export default function TeamDisplaySettingsEditor({ teams }: Props) {
           {items.map((team) => (
             <div
               key={team.teamSeasonId}
-              className="grid grid-cols-[minmax(150px,1.4fr)_repeat(7,minmax(74px,0.7fr))] items-center px-4 py-3"
+              className="grid min-w-[820px] grid-cols-[minmax(130px,1.2fr)_repeat(7,minmax(68px,0.65fr))] items-center px-4 py-3"
             >
               <div>
                 <p className="font-black text-slate-900">{team.teamName}</p>
