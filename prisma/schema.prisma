@@ -1035,17 +1035,15 @@ model ClubConfig {
 }
 
 model TeamCategoryRule {
-  id                          String   @id @default(cuid())
-  clubConfigId                String
-  category                    String
-  minTrainerCount             Int      @default(1)
-  requiredDiploma             String
-  requiredDiplomaTrainerCount Int      @default(1)
-  maxPlayersPerTrainer        Int      @default(10)
-  allowedBirthYears           Int[]
-  sortOrder                   Int      @default(0)
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  clubConfigId         String
+  category             String
+  minTrainerCount      Int      @default(1)
+  maxPlayersPerTrainer Int      @default(10)
+  allowedBirthYears    Int[]
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   clubConfig                ClubConfig                             @relation(fields: [clubConfigId], references: [id], onDelete: Cascade)
   qualificationRequirements TeamCategoryQualificationRequirement[]
