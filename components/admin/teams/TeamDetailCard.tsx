@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import {
@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import TeamRosterOverviewCard from "@/components/admin/teams/TeamRosterOverviewCard";
 import TeamHealthCard from "@/components/admin/teams/TeamHealthCard";
 import TeamSettingsCard from "@/components/admin/teams/TeamSettingsCard";
+import TeamQuickActionsCard from "@/components/admin/teams/TeamQuickActionsCard";
 
 type TeamSeasonStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
@@ -476,7 +477,18 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                     maxPlayersPerTrainer={teamHealthKpi?.maxPlayersPerTrainer ?? null}
                     hasHealthyPlayerTrainerRatio={teamHealthKpi?.hasHealthyPlayerTrainerRatio ?? null}
                   />
-                )}              </div>
+                )}
+                {activeTeamSeason ? (
+                  <div className="mt-6">
+                    <TeamQuickActionsCard
+                      teamId={team.id}
+                      teamSeasonId={activeTeamSeason.id}
+                      canManage={canManage}
+                      trainerCount={activeTeamSeason.trainerTeamMembers?.length ?? 0}
+                      hasHealthyPlayerTrainerRatio={teamHealthKpi?.hasHealthyPlayerTrainerRatio ?? null}
+                    />
+                  </div>
+                ) : null}              </div>
             </div>
 
             {canManage && (
