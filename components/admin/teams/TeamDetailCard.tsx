@@ -165,6 +165,23 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     return team.teamSeasons.find((entry) => entry.season.isActive) ?? team.teamSeasons[0] ?? null;
   }, [team.teamSeasons]);
 
+  const playerBirthYearCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+
+    for (const member of activeTeamSeason?.playerSquadMembers ?? []) {
+      const value = member.person.dateOfBirth;
+      if (!value) continue;
+
+      const year = new Date(value).getUTCFullYear();
+      if (!Number.isFinite(year)) continue;
+
+      counts.set(year, (counts.get(year) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([year, count]) => ({ year, count }));
+  }, [activeTeamSeason?.playerSquadMembers]);
   const [visibility, setVisibility] = useState({
     trainings: activeTeamSeason?.trainingsWebsiteVisible ?? true,
     upcoming: activeTeamSeason?.upcomingMatchesWebsiteVisible ?? true,
@@ -360,8 +377,15 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
                       JahrgÃ¤nge fÃ¼r Saison {activeTeamSeason.season.name}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">2015</span>
-                      <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">2016</span>
+                      {playerBirthYearCounts.length > 0 ? (
+                        playerBirthYearCounts.map((item) => (
+                          <span key={item.year} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0b4aa2]">
+                            {item.year}: {item.count} Spieler
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-500">Noch keine Spieler mit Jahrgang</span>
+                      )}
                     </div>
                   </div>
                 )}              </div>
@@ -508,5 +532,6 @@ export default function TeamDetailCard({ initialTeam, canManage }: Props) {
     </div>
   );
 }
+
 
 
