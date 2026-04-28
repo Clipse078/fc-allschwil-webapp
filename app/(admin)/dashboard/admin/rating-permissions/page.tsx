@@ -6,6 +6,16 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 
+function getPersonLabel(input: {
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+  email?: string | null;
+}) {
+  const fullName = `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim();
+  return input.displayName ?? (fullName || input.email || "Unbekannt");
+}
+
 export default async function RatingPermissionsAdminPage() {
   await requirePermission(PERMISSIONS.USERS_MANAGE);
 
@@ -55,6 +65,58 @@ export default async function RatingPermissionsAdminPage() {
       }),
     ]);
 
+  const teamSeasonIds = ratingTeamSeasons.map((teamSeason) => teamSeason.id);
+  const roleIds = ratingRoles.map((role) => role.id);
+
+  const [trainerMembers, usersWithRoles] = await Promise.all([
+    prisma.trainerTeamMember.findMany({
+      where: {
+        status: "ACTIVE",
+        teamSeasonId: { in: teamSeasonIds },
+        person: { isActive: true },
+      },
+      orderBy: [{ sortOrder: "asc" }, { person: { lastName: "asc" } }, { person: { firstName: "asc" } }],
+      select: {
+        teamSeasonId: true,
+        roleLabel: true,
+        person: {
+          select: {
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    }),
+    prisma.user.findMany({
+      where: {
+        isActive: true,
+        userRoles: { some: { roleId: { in: roleIds } } },
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        person: {
+          select: {
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            email: true,
+            isActive: true,
+          },
+        },
+        userRoles: {
+          select: {
+            roleId: true,
+          },
+        },
+      },
+    }),
+  ]);
+
   const teamSeasons = ratingTeamSeasons.map((teamSeason) => ({
     id: teamSeason.id,
     displayName: teamSeason.displayName,
@@ -64,6 +126,41 @@ export default async function RatingPermissionsAdminPage() {
     seasonName: teamSeason.season.name,
     seasonKey: teamSeason.season.key,
   }));
+
+  const trainersByTeamSeason = new Map<string, string[]>();
+  for (const trainerMember of trainerMembers) {
+    const current = trainersByTeamSeason.get(trainerMember.teamSeasonId) ?? [];
+    const name = getPersonLabel(trainerMember.person);
+    current.push(trainerMember.roleLabel ? `${name} (${trainerMember.roleLabel})` : name);
+    trainersByTeamSeason.set(trainerMember.teamSeasonId, current);
+  }
+
+  const usersByRole = new Map<string, string[]>();
+  for (const user of usersWithRoles) {
+    const name = getPersonLabel(user.person?.isActive ? user.person : user);
+    for (const userRole of user.userRoles) {
+      const current = usersByRole.get(userRole.roleId) ?? [];
+      current.push(name);
+      usersByRole.set(userRole.roleId, current);
+    }
+  }
+
+  const allowedRaterPreview = teamSeasons.map((teamSeason) => {
+    const teamPermissions = ratingPermissions.filter((permission) => permission.teamSeasonId === teamSeason.id && permission.isActive);
+    const trainerPermissionActive = teamPermissions.some((permission) => permission.includeTeamTrainers);
+    const rolePermissions = teamPermissions.filter((permission) => permission.roleId && permission.role);
+
+    return {
+      teamSeasonId: teamSeason.id,
+      trainerPermissionActive,
+      trainerNames: trainerPermissionActive ? Array.from(new Set(trainersByTeamSeason.get(teamSeason.id) ?? [])) : [],
+      roleRaters: rolePermissions.map((permission) => ({
+        roleId: permission.roleId ?? "",
+        roleName: permission.role?.name ?? "Rolle",
+        names: Array.from(new Set(usersByRole.get(permission.roleId ?? "") ?? [])),
+      })),
+    };
+  });
 
   return (
     <div className="space-y-8">
@@ -109,6 +206,7 @@ export default async function RatingPermissionsAdminPage() {
         roles={ratingRoles}
         permissions={ratingPermissions}
         areas={ratingAreas}
+        allowedRaterPreview={allowedRaterPreview}
       />
 
       <div className="rounded-[28px] border border-blue-100 bg-blue-50/60 p-5">
@@ -125,3 +223,6 @@ export default async function RatingPermissionsAdminPage() {
     </div>
   );
 }
+
+
+

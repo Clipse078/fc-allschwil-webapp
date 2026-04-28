@@ -13,6 +13,7 @@ import {
 type SeasonOption = { id: string; key: string; name: string; isActive: boolean };
 type TeamSeasonOption = { id: string; displayName: string; shortName: string | null; teamName: string; seasonId: string; seasonName: string; seasonKey: string };
 type RoleOption = { id: string; key: string; name: string };
+type AllowedRaterPreview = { teamSeasonId: string; trainerPermissionActive: boolean; trainerNames: string[]; roleRaters: { roleId: string; roleName: string; names: string[] }[] };
 
 type RatingPermission = {
   id: string;
@@ -49,6 +50,7 @@ type Props = {
   permissions: RatingPermission[];
   areas: RatingArea[];
   people?: unknown[];
+  allowedRaterPreview?: AllowedRaterPreview[];
 };
 
 function getPermissionLabel(permission: RatingPermission) {
@@ -57,7 +59,52 @@ function getPermissionLabel(permission: RatingPermission) {
   return "Admin only";
 }
 
-export default function RatingGovernanceCard({ seasons, teamSeasons, roles, permissions, areas }: Props) {
+
+function AllowedRaterPreviewCard({ preview }: { preview?: AllowedRaterPreview }) {
+  if (!preview) return null;
+
+  const hasTrainerNames = preview.trainerNames.length > 0;
+  const hasRoleNames = preview.roleRaters.some((roleRater) => roleRater.names.length > 0);
+
+  return (
+    <div className="mb-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+      <p className="text-xs font-black uppercase tracking-[0.12em] text-[#0b4aa2]">Aktuelle Bewerter</p>
+
+      <div className="mt-2 space-y-2">
+        <div>
+          <p className="text-xs font-bold text-slate-700">
+            Trainerteam {preview.trainerPermissionActive ? "aktiv" : "deaktiviert"}
+          </p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+            {preview.trainerPermissionActive
+              ? hasTrainerNames
+                ? preview.trainerNames.join(", ")
+                : "Keine aktiven Trainer zugeordnet"
+              : "Trainer dürfen aktuell nicht bewerten"}
+          </p>
+        </div>
+
+        {preview.roleRaters.length > 0 ? (
+          <div className="space-y-1">
+            {preview.roleRaters.map((roleRater) => (
+              <div key={roleRater.roleId}>
+                <p className="text-xs font-bold text-slate-700">{roleRater.roleName}</p>
+                <p className="text-xs font-semibold leading-5 text-slate-500">
+                  {roleRater.names.length > 0 ? roleRater.names.join(", ") : "Keine aktiven Benutzer mit dieser Rolle"}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {!preview.trainerPermissionActive && !hasRoleNames ? (
+          <p className="text-xs font-semibold text-slate-500">Nur Admin/Superadmin darf bewerten.</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+export default function RatingGovernanceCard({ seasons, teamSeasons, roles, permissions, areas, allowedRaterPreview = [] }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -347,3 +394,7 @@ export default function RatingGovernanceCard({ seasons, teamSeasons, roles, perm
     </div>
   );
 }
+
+
+
+
