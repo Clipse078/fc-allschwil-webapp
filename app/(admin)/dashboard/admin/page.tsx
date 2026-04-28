@@ -1,4 +1,4 @@
-import { SeasonTransitionSettingsCard } from "@/components/admin/seasons/SeasonTransitionSettingsCard";
+﻿import { SeasonTransitionSettingsCard } from "@/components/admin/seasons/SeasonTransitionSettingsCard";
 import Link from "next/link";
 import {
   BarChart3,
@@ -46,6 +46,13 @@ const adminCards = [
     status: "Admin-only",
   },
   {
+    title: "Bewertungsrechte",
+    label: "Spielerbewertungen pro Team-Saison",
+    icon: ShieldCheck,
+    href: "/dashboard/admin/rating-permissions",
+    status: "Aktiv",
+  },
+  {
     title: "Organigramm Builder",
     label: "Divisions, Departments, Rollen",
     icon: Network,
@@ -75,7 +82,7 @@ const adminCards = [
   },
   {
     title: "Season Switcher",
-    label: "Aktive Saison, ÃƒÅ“bergangsdatum",
+    label: "Aktive Saison, ÃƒÆ’Ã…â€œbergangsdatum",
     icon: Settings,
     href: "/dashboard/current-season",
     status: "Basis aktiv",
@@ -212,7 +219,7 @@ export default async function AdminConfigurationPage() {
       <AdminSectionHeader
         eyebrow="Admin"
         title="Club-Konfiguration"
-        description="Zentrale Steuerung fÃƒÂ¼r Verein, Rollen, Workflows, Regeln, Website-Anzeige und spÃƒÂ¤tere Mandanten-Konfiguration."
+        description="Zentrale Steuerung fÃƒÆ’Ã‚Â¼r Verein, Rollen, Workflows, Regeln, Website-Anzeige und spÃƒÆ’Ã‚Â¤tere Mandanten-Konfiguration."
       />
 
       <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
@@ -222,7 +229,7 @@ export default async function AdminConfigurationPage() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Tenant</p>
               <h2 className="mt-3 text-3xl font-black">{clubConfig?.clubName ?? "FC Allschwil"}</h2>
               <p className="mt-2 text-sm font-semibold text-blue-100">
-                {clubConfig?.country ?? "CH"} Ã‚Â· {activeSeason?.name ?? "Keine aktive Saison"} Ã‚Â· {clubConfig?.teamCategoryRules.length ?? 0} Teamregeln
+                {clubConfig?.country ?? "CH"} Ãƒâ€šÃ‚Â· {activeSeason?.name ?? "Keine aktive Saison"} Ãƒâ€šÃ‚Â· {clubConfig?.teamCategoryRules.length ?? 0} Teamregeln
               </p>
             </div>
             <span className="w-fit rounded-full border border-emerald-200/60 bg-emerald-400/15 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-emerald-100">
@@ -285,7 +292,7 @@ export default async function AdminConfigurationPage() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Admin Modul</p>
               <h2 className="mt-2 text-2xl font-black">Team Management</h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-blue-100">Zentrale Steuerung für Teamkategorien, Trainer-/Diplom-Regeln, Health-KPIs und Website/Mobile Anzeige pro Team.</p>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-blue-100">Zentrale Steuerung fÃ¼r Teamkategorien, Trainer-/Diplom-Regeln, Health-KPIs und Website/Mobile Anzeige pro Team.</p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white">
               <Goal className="h-6 w-6" />
@@ -334,7 +341,7 @@ export default async function AdminConfigurationPage() {
                 <p className="fca-eyebrow">Qualifikationen</p>
                 <h2 className="mt-2 text-xl font-black text-slate-900">Qualifikationskatalog</h2>
                 <p className="mt-2 text-sm font-semibold text-slate-500">
-                  MandantenfÃ¤hige Qualifikationen als Grundlage für Teamregeln, z.B. D-Diplom oder First Aid.
+                  MandantenfÃƒÂ¤hige Qualifikationen als Grundlage fÃ¼r Teamregeln, z.B. D-Diplom oder First Aid.
                 </p>
               </div>
               <ShieldCheck className="h-6 w-6 text-[#0b4aa2]" />
@@ -402,6 +409,8 @@ export default async function AdminConfigurationPage() {
     </div>
   );
 }
+
+
 
 
 
