@@ -53,6 +53,18 @@ async function assertPlayer(personId: string) {
 }
 
 async function assertCanRatePlayer(personId: string, seasonId: string) {
+  const season = await prisma.season.findUnique({
+    where: { id: seasonId },
+    select: { id: true, isActive: true },
+  });
+
+  if (!season || !season.isActive) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Saison abgeschlossen – keine Bewertungen mehr möglich",
+    };
+  }
   const access = await requireApiPermission(PERMISSIONS.PEOPLE_VIEW);
 
   if (!access.ok) {
@@ -226,6 +238,9 @@ export async function DELETE(request: NextRequest, context: Context) {
 
   return NextResponse.json({ message: "Spielerbewertung gelöscht." });
 }
+
+
+
 
 
 
