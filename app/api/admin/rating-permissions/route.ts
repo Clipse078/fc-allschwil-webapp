@@ -8,17 +8,27 @@ function clean(value: unknown) {
   return normalized ? normalized : null;
 }
 
+const permissionInclude = {
+  teamSeason: {
+    select: {
+      id: true,
+      displayName: true,
+      shortName: true,
+      season: { select: { id: true, key: true, name: true, isActive: true } },
+      team: { select: { id: true, name: true, slug: true } },
+    },
+  },
+  season: { select: { id: true, key: true, name: true, isActive: true } },
+  role: { select: { id: true, key: true, name: true } },
+};
+
 export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const permissions = await prisma.playerRatingPermission.findMany({
     orderBy: [{ teamSeason: { season: { startDate: "desc" } } }, { teamSeason: { team: { sortOrder: "asc" } } }],
-    include: {
-      teamSeason: { select: { id: true, displayName: true, shortName: true, season: { select: { id: true, key: true, name: true, isActive: true } }, team: { select: { id: true, name: true, slug: true } } } },
-      season: { select: { id: true, key: true, name: true, isActive: true } },
-      role: { select: { id: true, key: true, name: true } },
-    },
+    include: permissionInclude,
   });
 
   return NextResponse.json({ permissions });
@@ -40,14 +50,46 @@ export async function POST(request: NextRequest) {
   const teamSeason = await prisma.teamSeason.findUnique({ where: { id: teamSeasonId }, select: { id: true, seasonId: true } });
   if (!teamSeason) return NextResponse.json({ error: "Team-Saison nicht gefunden." }, { status: 404 });
 
-  const permission = await prisma.playerRatingPermission.create({
-    data: { teamSeasonId, seasonId: teamSeason.seasonId, roleId, personId: null, includeTeamTrainers, label, isActive: body.isActive === false ? false : true },
-    include: {
-      teamSeason: { select: { id: true, displayName: true, shortName: true, season: { select: { id: true, key: true, name: true, isActive: true } }, team: { select: { id: true, name: true, slug: true } } } },
-      season: { select: { id: true, key: true, name: true, isActive: true } },
-      role: { select: { id: true, key: true, name: true } },
+  if (roleId) {
+    const role = await prisma.role.findUnique({ where: { id: roleId }, select: { id: true } });
+    if (!role) return NextResponse.json({ error: "Rolle nicht gefunden." }, { status: 404 });
+  }
+
+  const existing = await prisma.playerRatingPermission.findFirst({
+    where: {
+      teamSeasonId,
+      includeTeamTrainers,
+      roleId: roleId ?? null,
+      personId: null,
     },
+    select: { id: true },
   });
 
-  return NextResponse.json({ permission, message: "Bewertungsrecht gespeichert." }, { status: 201 });
+  const permission = existing
+    ? await prisma.playerRatingPermission.update({
+        where: { id: existing.id },
+        data: {
+          seasonId: teamSeason.seasonId,
+          roleId,
+          personId: null,
+          includeTeamTrainers,
+          label,
+          isActive: body.isActive === false ? false : true,
+        },
+        include: permissionInclude,
+      })
+    : await prisma.playerRatingPermission.create({
+        data: {
+          teamSeasonId,
+          seasonId: teamSeason.seasonId,
+          roleId,
+          personId: null,
+          includeTeamTrainers,
+          label,
+          isActive: body.isActive === false ? false : true,
+        },
+        include: permissionInclude,
+      });
+
+  return NextResponse.json({ permission, message: existing ? "Bewertungsrecht aktualisiert." : "Bewertungsrecht gespeichert." }, { status: existing ? 200 : 201 });
 }
