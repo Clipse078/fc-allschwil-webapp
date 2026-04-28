@@ -269,46 +269,6 @@ export default async function PlayerProfilePage({ params }: Props) {
           </AdminSurfaceCard>
 
           <AdminSurfaceCard className="p-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Bewertungsrechte
-                </p>
-                <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-                  Wer darf bewerten?
-                </h2>
-              </div>
-              <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                Read-only
-              </span>
-            </div>
-
-            {person.playerRatingPermissions.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-500">
-                Für dieses Spielerprofil sind noch keine expliziten Bewertungsrechte sichtbar.
-              </div>
-            ) : (
-              <div className="mt-5 space-y-3">
-                {person.playerRatingPermissions.map((permission) => {
-                  const assignee =
-                    permission.person?.displayName ??
-                    (permission.person ? `${permission.person.firstName} ${permission.person.lastName}`.trim() : null) ??
-                    permission.role?.name ??
-                    "Unbekannt";
-
-                  return (
-                    <div key={permission.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <p className="text-sm font-semibold text-slate-900">{assignee}</p>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {permission.teamSeason.team.name} · {permission.teamSeason.season.name} · {permission.label ?? "Bewertung"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </AdminSurfaceCard>
-          <AdminSurfaceCard className="p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="fca-eyebrow">Bewertungsrechte</p>
