@@ -6,15 +6,24 @@ type CanRatePlayerArgs = {
   seasonId: string;
 };
 
+type RatingPermissionReasonArgs = CanRatePlayerArgs;
+
 const ADMIN_ROLE_KEYS = new Set(["ADMIN", "SUPERADMIN"]);
 
-export async function canRatePlayerForSeason({
+function unique(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+export async function getPlayerRatingPermissionReasons({
   userId,
   personId,
   seasonId,
-}: CanRatePlayerArgs) {
+}: RatingPermissionReasonArgs) {
   if (!userId || !personId || !seasonId) {
-    return false;
+    return {
+      canRate: false,
+      reasons: ["Nur Leserechte"],
+    };
   }
 
   const user = await prisma.user.findUnique({
@@ -29,6 +38,7 @@ export async function canRatePlayerForSeason({
           role: {
             select: {
               key: true,
+              name: true,
             },
           },
         },
@@ -37,14 +47,20 @@ export async function canRatePlayerForSeason({
   });
 
   if (!user || !user.isActive) {
-    return false;
+    return {
+      canRate: false,
+      reasons: ["Benutzer nicht aktiv"],
+    };
   }
 
   const roleKeys = user.userRoles.map((entry) => entry.role.key);
   const roleIds = user.userRoles.map((entry) => entry.roleId);
 
   if (roleKeys.some((key) => ADMIN_ROLE_KEYS.has(key))) {
-    return true;
+    return {
+      canRate: true,
+      reasons: ["Admin/Superadmin"],
+    };
   }
 
   const playerTeamSeasons = await prisma.playerSquadMember.findMany({
@@ -56,13 +72,27 @@ export async function canRatePlayerForSeason({
     },
     select: {
       teamSeasonId: true,
+      teamSeason: {
+        select: {
+          shortName: true,
+          displayName: true,
+          team: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
     },
   });
 
   const teamSeasonIds = playerTeamSeasons.map((entry) => entry.teamSeasonId);
 
   if (teamSeasonIds.length === 0) {
-    return false;
+    return {
+      canRate: false,
+      reasons: ["Keine Team-Saison-Zuordnung"],
+    };
   }
 
   const permissions = await prisma.playerRatingPermission.findMany({
@@ -78,43 +108,94 @@ export async function canRatePlayerForSeason({
       roleId: true,
       includeTeamTrainers: true,
       teamSeasonId: true,
+      role: {
+        select: {
+          name: true,
+        },
+      },
+      teamSeason: {
+        select: {
+          shortName: true,
+          displayName: true,
+          team: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
     },
   });
 
   if (permissions.length === 0) {
-    return false;
+    return {
+      canRate: false,
+      reasons: ["Keine zusätzliche Freigabe"],
+    };
   }
 
-  const hasRolePermission = permissions.some(
-    (permission) => permission.roleId && roleIds.includes(permission.roleId),
-  );
+  const reasons: string[] = [];
 
-  if (hasRolePermission) {
-    return true;
+  for (const permission of permissions) {
+    const target =
+      permission.teamSeason.shortName ??
+      permission.teamSeason.displayName ??
+      permission.teamSeason.team.name;
+
+    if (permission.roleId && roleIds.includes(permission.roleId)) {
+      reasons.push(`Rolle: ${permission.role?.name ?? "Freigegebene Rolle"} (${target})`);
+    }
   }
 
   const trainerPermissionTeamSeasonIds = permissions
     .filter((permission) => permission.includeTeamTrainers)
     .map((permission) => permission.teamSeasonId);
 
-  if (!user.personId || trainerPermissionTeamSeasonIds.length === 0) {
-    return false;
+  if (user.personId && trainerPermissionTeamSeasonIds.length > 0) {
+    const trainerAssignments = await prisma.trainerTeamMember.findMany({
+      where: {
+        personId: user.personId,
+        status: "ACTIVE",
+        teamSeasonId: {
+          in: trainerPermissionTeamSeasonIds,
+        },
+      },
+      select: {
+        teamSeason: {
+          select: {
+            shortName: true,
+            displayName: true,
+            team: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    for (const assignment of trainerAssignments) {
+      const target =
+        assignment.teamSeason.shortName ??
+        assignment.teamSeason.displayName ??
+        assignment.teamSeason.team.name;
+
+      reasons.push(`Trainerteam: ${target}`);
+    }
   }
 
-  const trainerAssignment = await prisma.trainerTeamMember.findFirst({
-    where: {
-      personId: user.personId,
-      status: "ACTIVE",
-      teamSeasonId: {
-        in: trainerPermissionTeamSeasonIds,
-      },
-    },
-    select: {
-      id: true,
-    },
-  });
+  const finalReasons = unique(reasons);
 
-  return Boolean(trainerAssignment);
+  return {
+    canRate: finalReasons.length > 0,
+    reasons: finalReasons.length > 0 ? finalReasons : ["Keine passende Freigabe"],
+  };
+}
+
+export async function canRatePlayerForSeason(args: CanRatePlayerArgs) {
+  const result = await getPlayerRatingPermissionReasons(args);
+  return result.canRate;
 }
 
 export async function getRatingPermissionSummaryForPlayer({

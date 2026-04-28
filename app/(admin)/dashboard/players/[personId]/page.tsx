@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getCurrentSeasonOptionData, getSeasonOptionsData } from "@/lib/seasons/queries";
-import { canRatePlayerForSeason, getRatingPermissionSummaryForPlayer } from "@/lib/players/player-rating-permissions";
+import { getPlayerRatingPermissionReasons, getRatingPermissionSummaryForPlayer } from "@/lib/players/player-rating-permissions";
 
 type Props = {
   params: Promise<{ personId: string }>;
@@ -128,13 +128,14 @@ export default async function PlayerProfilePage({ params }: Props) {
   }));
 
   const actorUserId = session?.user?.effectiveUserId ?? session?.user?.id ?? null;
-  const canEditCurrentSeasonRating = currentSeason?.id
-    ? await canRatePlayerForSeason({
+  const ratingPermissionReasons = currentSeason?.id
+    ? await getPlayerRatingPermissionReasons({
         userId: actorUserId,
         personId: person.id,
         seasonId: currentSeason.id,
       })
-    : false;
+    : { canRate: false, reasons: ["Keine aktive Saison"] };
+  const canEditCurrentSeasonRating = ratingPermissionReasons.canRate;
 
   const ratingPermissionSummary = await getRatingPermissionSummaryForPlayer({
     personId: person.id,
@@ -319,6 +320,14 @@ export default async function PlayerProfilePage({ params }: Props) {
           <span className={"w-fit rounded-full border px-3 py-1.5 text-xs font-black " + (canEditCurrentSeasonRating ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500")}>
             {canEditCurrentSeasonRating ? "Du darfst bewerten" : "Nur Leserechte"}
           </span>
+
+          <div className="space-y-1">
+            {ratingPermissionReasons.reasons.map((reason) => (
+              <p key={reason} className="text-xs font-semibold text-slate-500">
+                • {reason}
+              </p>
+            ))}
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -387,6 +396,10 @@ function ContactItem({
     </div>
   );
 }
+
+
+
+
 
 
 
