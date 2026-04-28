@@ -11,25 +11,41 @@ import {
 } from "@/components/admin/shared/form";
 
 type SeasonOption = { id: string; key: string; name: string; isActive: boolean };
-type TeamSeasonOption = { id: string; displayName: string; shortName: string | null; teamName: string; seasonId: string; seasonName: string; seasonKey: string };
-type RoleOption = { id: string; key: string; name: string };
-type AllowedRaterPreview = { teamSeasonId: string; trainerPermissionActive: boolean; trainerNames: string[]; roleRaters: { roleId: string; roleName: string; names: string[] }[] };
+
+type TeamSeasonOption = {
+  id: string;
+  displayName?: string;
+  shortName?: string | null;
+  teamName: string;
+  seasonId?: string;
+  seasonName: string;
+  seasonKey?: string;
+};
+
+type RoleOption = { id: string; key?: string; name: string };
+
+type AllowedRaterPreview = {
+  teamSeasonId: string;
+  trainerPermissionActive: boolean;
+  trainerNames: string[];
+  roleRaters: { roleId: string; roleName: string; names: string[] }[];
+};
 
 type RatingPermission = {
   id: string;
   teamSeasonId: string;
-  seasonId: string;
+  seasonId?: string;
   roleId: string | null;
   label: string | null;
   isActive: boolean;
   includeTeamTrainers: boolean;
-  teamSeason: {
+  teamSeason?: {
     displayName: string;
     shortName: string | null;
     team: { name: string };
     season: { name: string; key: string; isActive: boolean };
   };
-  role: { id: string; key: string; name: string } | null;
+  role: { id: string; key?: string; name: string } | null;
 };
 
 type RatingArea = {
@@ -59,61 +75,16 @@ function getPermissionLabel(permission: RatingPermission) {
   return "Admin only";
 }
 
-
-function AllowedRaterPreviewCard({ preview }: { preview?: AllowedRaterPreview }) {
-  if (!preview) return null;
-
-  const hasTrainerNames = preview.trainerNames.length > 0;
-  const hasRoleNames = preview.roleRaters.some((roleRater) => roleRater.names.length > 0);
-
-  return (
-    <div className="mb-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-[#0b4aa2]">Aktuelle Bewerter</p>
-
-      <div className="mt-2 space-y-2">
-        <div>
-          <p className="text-xs font-bold text-slate-700">
-            Trainerteam {preview.trainerPermissionActive ? "aktiv" : "deaktiviert"}
-          </p>
-          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-            {preview.trainerPermissionActive
-              ? hasTrainerNames
-                ? preview.trainerNames.join(", ")
-                : "Keine aktiven Trainer zugeordnet"
-              : "Trainer dürfen aktuell nicht bewerten"}
-          </p>
-        </div>
-
-        {preview.roleRaters.length > 0 ? (
-          <div className="space-y-1">
-            {preview.roleRaters.map((roleRater) => (
-              <div key={roleRater.roleId}>
-                <p className="text-xs font-bold text-slate-700">{roleRater.roleName}</p>
-                <p className="text-xs font-semibold leading-5 text-slate-500">
-                  {roleRater.names.length > 0 ? roleRater.names.join(", ") : "Keine aktiven Benutzer mit dieser Rolle"}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {!preview.trainerPermissionActive && !hasRoleNames ? (
-          <p className="text-xs font-semibold text-slate-500">Nur Admin/Superadmin darf bewerten.</p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-export default function RatingGovernanceCard({ seasons, teamSeasons, roles, permissions, areas, allowedRaterPreview = [] }: Props) {
+export default function RatingGovernanceCard({
+  seasons,
+  teamSeasons,
+  roles,
+  permissions,
+  areas,
+  allowedRaterPreview = [],
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-
-  const [permissionTeamSeasonId, setPermissionTeamSeasonId] = useState(teamSeasons[0]?.id ?? "");
-  const [permissionMode, setPermissionMode] = useState<"trainers" | "role">("trainers");
-  const [permissionRoleId, setPermissionRoleId] = useState("");
-  const [permissionLabel, setPermissionLabel] = useState("");
-  const [permissionError, setPermissionError] = useState<string | null>(null);
-  const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
 
   const [areaSeasonId, setAreaSeasonId] = useState("");
   const [areaLabel, setAreaLabel] = useState("");
@@ -121,42 +92,111 @@ export default function RatingGovernanceCard({ seasons, teamSeasons, roles, perm
   const [areaSortOrder, setAreaSortOrder] = useState("0");
   const [areaError, setAreaError] = useState<string | null>(null);
   const [areaMessage, setAreaMessage] = useState<string | null>(null);
+  const [controlMessage, setControlMessage] = useState<string | null>(null);
+  const [controlError, setControlError] = useState<string | null>(null);
 
   const groupedPermissions = useMemo(() => {
     return permissions.reduce<Record<string, RatingPermission[]>>((acc, permission) => {
-      const key = `${permission.teamSeason.team.name} · ${permission.teamSeason.season.name}`;
+      const teamName = permission.teamSeason?.team.name ?? teamSeasons.find((team) => team.id === permission.teamSeasonId)?.teamName ?? "Team";
+      const seasonName = permission.teamSeason?.season.name ?? teamSeasons.find((team) => team.id === permission.teamSeasonId)?.seasonName ?? "Saison";
+      const key = `${teamName} · ${seasonName}`;
       acc[key] = acc[key] ?? [];
       acc[key].push(permission);
       return acc;
     }, {});
-  }, [permissions]);
+  }, [permissions, teamSeasons]);
 
-  async function createPermission() {
-    setPermissionError(null);
-    setPermissionMessage(null);
+  function activePermissionsForTeamSeason(teamSeasonId: string) {
+    return permissions.filter((permission) => permission.teamSeasonId === teamSeasonId && permission.isActive);
+  }
+
+  function previewForTeamSeason(teamSeasonId: string) {
+    return allowedRaterPreview.find((preview) => preview.teamSeasonId === teamSeasonId);
+  }
+
+  async function deletePermissionById(permissionId: string) {
+    const response = await fetch(`/api/admin/rating-permissions/${permissionId}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.error ?? "Bewertungsrecht konnte nicht entfernt werden.");
+    }
+  }
+
+  async function createPermission(input: { teamSeasonId: string; includeTeamTrainers: boolean; roleId?: string | null; label?: string | null }) {
+    const response = await fetch("/api/admin/rating-permissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        teamSeasonId: input.teamSeasonId,
+        includeTeamTrainers: input.includeTeamTrainers,
+        roleId: input.roleId ?? null,
+        label: input.label ?? null,
+        isActive: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.error ?? "Bewertungsrecht konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function toggleTrainerPermission(teamSeasonId: string, enabled: boolean) {
+    setControlError(null);
+    setControlMessage(null);
 
     startTransition(async () => {
       try {
-        const response = await fetch("/api/admin/rating-permissions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            teamSeasonId: permissionTeamSeasonId,
-            includeTeamTrainers: permissionMode === "trainers",
-            roleId: permissionMode === "role" ? permissionRoleId : null,
-            label: permissionLabel,
-            isActive: true,
-          }),
-        });
+        const existingTrainerPermissions = permissions.filter(
+          (permission) => permission.teamSeasonId === teamSeasonId && permission.includeTeamTrainers
+        );
 
-        const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(data?.error ?? "Bewertungsrecht konnte nicht gespeichert werden.");
+        if (enabled && existingTrainerPermissions.length === 0) {
+          await createPermission({ teamSeasonId, includeTeamTrainers: true, label: "Trainerteam" });
+        }
 
-        setPermissionMessage(data?.message ?? "Bewertungsrecht gespeichert.");
-        setPermissionLabel("");
+        if (!enabled) {
+          for (const permission of existingTrainerPermissions) {
+            await deletePermissionById(permission.id);
+          }
+        }
+
+        setControlMessage("Bewertungsrecht aktualisiert.");
         router.refresh();
       } catch (error) {
-        setPermissionError(error instanceof Error ? error.message : "Bewertungsrecht konnte nicht gespeichert werden.");
+        setControlError(error instanceof Error ? error.message : "Bewertungsrecht konnte nicht aktualisiert werden.");
+      }
+    });
+  }
+
+  async function setRolePermission(teamSeasonId: string, roleId: string) {
+    setControlError(null);
+    setControlMessage(null);
+
+    startTransition(async () => {
+      try {
+        const existingRolePermissions = permissions.filter(
+          (permission) => permission.teamSeasonId === teamSeasonId && permission.roleId
+        );
+
+        for (const permission of existingRolePermissions) {
+          await deletePermissionById(permission.id);
+        }
+
+        if (roleId) {
+          const role = roles.find((entry) => entry.id === roleId);
+          await createPermission({
+            teamSeasonId,
+            includeTeamTrainers: false,
+            roleId,
+            label: role?.name ?? "Rolle",
+          });
+        }
+
+        setControlMessage("Rollenfreigabe aktualisiert.");
+        router.refresh();
+      } catch (error) {
+        setControlError(error instanceof Error ? error.message : "Rollenfreigabe konnte nicht aktualisiert werden.");
       }
     });
   }
@@ -236,7 +276,7 @@ export default function RatingGovernanceCard({ seasons, teamSeasons, roles, perm
           <p className="fca-eyebrow">Bewertungsrechte</p>
           <h2 className="mt-2 text-xl font-black text-slate-900">Spielerbewertungen steuern</h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-            Standard: nur Admin. Optional können Trainer der Team-Saison und/oder ausgewählte Rollen bewerten.
+            Standard: nur Admin. Optional können Trainer der Team-Saison und/oder eine ausgewählte Rolle bewerten.
           </p>
         </div>
         <ShieldCheck className="h-6 w-6 shrink-0 text-[#0b4aa2]" />
@@ -248,51 +288,83 @@ export default function RatingGovernanceCard({ seasons, teamSeasons, roles, perm
         </AdminInlineStatusMessage>
       </div>
 
+      <div className="mt-6 rounded-[28px] border border-blue-100 bg-blue-50/50 p-4">
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0b4aa2]">Schnellsteuerung</p>
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+          {teamSeasons.map((teamSeason) => {
+            const activePermissions = activePermissionsForTeamSeason(teamSeason.id);
+            const trainerEnabled = activePermissions.some((permission) => permission.includeTeamTrainers);
+            const rolePermission = activePermissions.find((permission) => permission.roleId);
+            const preview = previewForTeamSeason(teamSeason.id);
+
+            return (
+              <div key={teamSeason.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-slate-900">{teamSeason.teamName}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">{teamSeason.seasonName}</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => toggleTrainerPermission(teamSeason.id, !trainerEnabled)}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black transition ${
+                      trainerEnabled ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                  >
+                    Trainer {trainerEnabled ? "aktiv" : "aus"}
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  <label className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Andere Bewerter</label>
+                  <select
+                    className="fca-select mt-1 w-full"
+                    value={rolePermission?.roleId ?? ""}
+                    disabled={isPending}
+                    onChange={(event) => setRolePermission(teamSeason.id, event.target.value)}
+                  >
+                    <option value="">Keine Rolle</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-xs font-bold text-slate-700">Aktuelle Bewerter</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                    {trainerEnabled
+                      ? preview?.trainerNames.length
+                        ? preview.trainerNames.join(", ")
+                        : "Trainerteam aktiv, aber keine aktiven Trainer zugeordnet"
+                      : "Trainerteam nicht aktiv"}
+                  </p>
+                  {preview?.roleRaters.length ? (
+                    <div className="mt-2 space-y-1">
+                      {preview.roleRaters.map((roleRater) => (
+                        <p key={roleRater.roleId} className="text-xs font-semibold leading-5 text-slate-500">
+                          <span className="font-black text-slate-700">{roleRater.roleName}:</span>{" "}
+                          {roleRater.names.length ? roleRater.names.join(", ") : "Keine aktiven Benutzer"}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {controlError ? <div className="mt-4"><AdminInlineStatusMessage tone="error">{controlError}</AdminInlineStatusMessage></div> : null}
+        {controlMessage ? <div className="mt-4"><AdminInlineStatusMessage tone="success">{controlMessage}</AdminInlineStatusMessage></div> : null}
+      </div>
+
       <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-2">
-        <AdminFormCard title="Rechte hinzufügen" icon={<ShieldCheck className="h-5 w-5" />}>
-          <div className="grid gap-4">
-            <AdminFormField label="Team / Saison">
-              <select className="fca-select w-full max-w-full" value={permissionTeamSeasonId} onChange={(event) => setPermissionTeamSeasonId(event.target.value)}>
-                {teamSeasons.map((teamSeason) => (
-                  <option key={teamSeason.id} value={teamSeason.id}>
-                    {teamSeason.teamName} · {teamSeason.seasonName}
-                  </option>
-                ))}
-              </select>
-            </AdminFormField>
-
-            <AdminFormField label="Freigabe">
-              <select className="fca-select w-full max-w-full" value={permissionMode} onChange={(event) => setPermissionMode(event.target.value as "trainers" | "role")}>
-                <option value="trainers">+ Trainerteam dieser Team-Saison</option>
-                <option value="role">+ Bestimmte Rolle</option>
-              </select>
-            </AdminFormField>
-
-            {permissionMode === "role" ? (
-              <AdminFormField label="Rolle">
-                <select className="fca-select w-full max-w-full" value={permissionRoleId} onChange={(event) => setPermissionRoleId(event.target.value)}>
-                  <option value="">Bitte auswählen</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
-                  ))}
-                </select>
-              </AdminFormField>
-            ) : null}
-
-            <AdminFormField label="Bemerkung">
-              <input className="fca-input w-full max-w-full" value={permissionLabel} onChange={(event) => setPermissionLabel(event.target.value)} placeholder="z.B. Haupttrainer, Koordinator, Sichtung" />
-            </AdminFormField>
-
-            {permissionError ? <AdminInlineStatusMessage tone="error">{permissionError}</AdminInlineStatusMessage> : null}
-            {permissionMessage ? <AdminInlineStatusMessage tone="success">{permissionMessage}</AdminInlineStatusMessage> : null}
-
-            <button type="button" onClick={createPermission} disabled={isPending} className="fca-button-primary w-fit">
-              <Save className="h-4 w-4" />
-              Bewertungsrecht speichern
-            </button>
-          </div>
-
-          <div className="mt-6 space-y-4">
+        <AdminFormCard title="Aktive Rechte" icon={<ShieldCheck className="h-5 w-5" />}>
+          <div className="space-y-4">
             {Object.entries(groupedPermissions).length === 0 ? (
               <AdminActionListCard emptyText="Nur Admins dürfen bewerten. Keine zusätzlichen Freigaben erfasst." />
             ) : (
@@ -394,8 +466,3 @@ export default function RatingGovernanceCard({ seasons, teamSeasons, roles, perm
     </div>
   );
 }
-
-
-
-
-
