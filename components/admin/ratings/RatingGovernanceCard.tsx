@@ -358,7 +358,9 @@ export default function RatingGovernanceCard({
                   </div>
                 </div>
 
-                {seasonLocked ? <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-3 text-xs font-bold leading-5 text-red-700">Diese Saison ist abgeschlossen. Bestehende Freigaben bleiben dokumentiert, neue Bewertungen sind gesperrt.</div> : null}`r`n`r`n                <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-3">
+                {seasonLocked ? <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-3 text-xs font-bold leading-5 text-red-700">Diese Saison ist abgeschlossen. Bestehende Freigaben bleiben dokumentiert, neue Bewertungen sind gesperrt.</div> : null}
+
+                <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-3">
                   <div className="flex items-center gap-2">
                     <UsersRound className="h-4 w-4 text-slate-400" />
                     <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Aktuelle Bewerter</p>
@@ -497,5 +499,6 @@ export default function RatingGovernanceCard({
     </div>
   );
 }
+
 
 
