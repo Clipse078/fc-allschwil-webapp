@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { getPlayerRatingPermissionReasons } from "@/lib/players/player-rating-permissions";
 
 type Context = {
   params: Promise<{ personId: string }>;
@@ -52,115 +53,29 @@ async function assertPlayer(personId: string) {
 }
 
 async function assertCanRatePlayer(personId: string, seasonId: string) {
-  const session = await auth();
+  const access = await requireApiPermission(PERMISSIONS.PEOPLE_VIEW);
 
-  if (!session?.user?.id) {
+  if (!access.ok) {
     return {
       ok: false as const,
-      status: 401,
-      error: "Unauthorized",
+      status: access.status,
+      error: access.error,
     };
   }
 
-  const isHighPrivilege =
-    hasPermission(session, PERMISSIONS.USERS_MANAGE) ||
-    (session.user.roleKeys ?? []).some((roleKey) => roleKey === "ADMIN" || roleKey === "SUPERADMIN");
+  const actorUserId = access.session?.user?.effectiveUserId ?? access.session?.user?.id ?? null;
 
-  if (isHighPrivilege) {
-    return {
-      ok: true as const,
-      status: 200,
-      error: null,
-    };
-  }
-
-  const actorUserId = session.user.effectiveUserId ?? session.user.id;
-
-  const [actorUser, playerTeamSeason] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: actorUserId },
-      select: {
-        personId: true,
-        userRoles: {
-          select: {
-            roleId: true,
-            role: {
-              select: {
-                id: true,
-                key: true,
-              },
-            },
-          },
-        },
-      },
-    }),
-    prisma.playerSquadMember.findFirst({
-      where: {
-        personId,
-        teamSeason: {
-          seasonId,
-        },
-      },
-      select: {
-        teamSeasonId: true,
-      },
-      orderBy: {
-        updatedAt: "desc",
-      },
-    }),
-  ]);
-
-  if (!actorUser) {
-    return {
-      ok: false as const,
-      status: 403,
-      error: "Benutzer konnte nicht geprüft werden.",
-    };
-  }
-
-  if (!playerTeamSeason) {
-    return {
-      ok: false as const,
-      status: 403,
-      error: "Für diesen Spieler wurde in dieser Saison keine Teamzuordnung gefunden.",
-    };
-  }
-
-  const actorRoleIds = actorUser.userRoles.map((userRole) => userRole.roleId).filter(Boolean);
-  const actorRoleKeys = actorUser.userRoles.map((userRole) => userRole.role.key).filter(Boolean);
-
-  const isAllocatedTrainer =
-    actorUser.personId
-      ? await prisma.trainerTeamMember.findFirst({
-          where: {
-            personId: actorUser.personId,
-            teamSeasonId: playerTeamSeason.teamSeasonId,
-            status: "ACTIVE",
-          },
-          select: { id: true },
-        })
-      : null;
-
-  const permission = await prisma.playerRatingPermission.findFirst({
-    where: {
-      isActive: true,
-      teamSeasonId: playerTeamSeason.teamSeasonId,
-      seasonId,
-      OR: [
-        isAllocatedTrainer ? { includeTeamTrainers: true } : undefined,
-        actorRoleIds.length > 0 ? { roleId: { in: actorRoleIds } } : undefined,
-      ].filter(Boolean) as Array<{ includeTeamTrainers: true } | { roleId: { in: string[] } }>,
-    },
-    select: {
-      id: true,
-    },
+  const permission = await getPlayerRatingPermissionReasons({
+    userId: actorUserId,
+    personId,
+    seasonId,
   });
 
-  if (!permission) {
+  if (!permission.canRate) {
     return {
       ok: false as const,
       status: 403,
-      error: `Keine Bewertungsrechte für dieses Team in dieser Saison. Rollen: ${actorRoleKeys.join(", ") || "keine"}.`,
+      error: `Du darfst diesen Spieler in dieser Saison nicht bewerten. Grund: ${permission.reasons.join(", ")}`,
     };
   }
 
@@ -311,6 +226,7 @@ export async function DELETE(request: NextRequest, context: Context) {
 
   return NextResponse.json({ message: "Spielerbewertung gelöscht." });
 }
+
 
 
 
