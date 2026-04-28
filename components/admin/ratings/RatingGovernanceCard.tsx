@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { CheckCircle2, RefreshCw, Save, ShieldCheck, SlidersHorizontal, Trash2, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -69,6 +69,8 @@ type Props = {
   allowedRaterPreview?: AllowedRaterPreview[];
 };
 
+const EXCLUDED_ROLE_KEYS = new Set(["ADMIN", "SUPERADMIN", "PLAYER", "SPIELER"]);
+
 function permissionTitle(permission: RatingPermission) {
   if (permission.includeTeamTrainers) return "Trainerteam";
   if (permission.role) return permission.role.name;
@@ -89,6 +91,10 @@ export default function RatingGovernanceCard({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const assignableRoles = useMemo(() => {
+    return roles.filter((role) => !EXCLUDED_ROLE_KEYS.has((role.key ?? "").toUpperCase()));
+  }, [roles]);
 
   const [areaSeasonId, setAreaSeasonId] = useState("");
   const [areaLabel, setAreaLabel] = useState("");
@@ -158,34 +164,35 @@ export default function RatingGovernanceCard({
     });
   }
 
-  async function setRolePermission(teamSeasonId: string, roleId: string) {
+  async function toggleRolePermission(teamSeasonId: string, role: RoleOption, enabled: boolean) {
     setControlError(null);
     setControlMessage(null);
 
     startTransition(async () => {
       try {
         const existingRolePermissions = permissions.filter(
-          (permission) => permission.teamSeasonId === teamSeasonId && permission.roleId
+          (permission) => permission.teamSeasonId === teamSeasonId && permission.roleId === role.id
         );
 
-        for (const permission of existingRolePermissions) {
-          await deletePermissionById(permission.id);
-        }
-
-        if (roleId) {
-          const role = roles.find((entry) => entry.id === roleId);
+        if (enabled && existingRolePermissions.length === 0) {
           await createPermission({
             teamSeasonId,
             includeTeamTrainers: false,
-            roleId,
-            label: role?.name ?? "Rolle",
+            roleId: role.id,
+            label: role.name,
           });
         }
 
-        setControlMessage("Rollenfreigabe aktualisiert.");
+        if (!enabled) {
+          for (const permission of existingRolePermissions) {
+            await deletePermissionById(permission.id);
+          }
+        }
+
+        setControlMessage("Zusatzrolle aktualisiert.");
         router.refresh();
       } catch (error) {
-        setControlError(error instanceof Error ? error.message : "Rollenfreigabe konnte nicht aktualisiert werden.");
+        setControlError(error instanceof Error ? error.message : "Zusatzrolle konnte nicht aktualisiert werden.");
       }
     });
   }
@@ -277,7 +284,7 @@ export default function RatingGovernanceCard({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.14em] text-[#0b4aa2]">Team-Saison Steuerung</p>
-            <p className="mt-1 text-sm font-semibold text-slate-500">Trainerteam toggeln, optionale Zusatzrolle auswählen.</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Trainerteam toggeln, eine oder mehrere Zusatzrollen auswählen.</p>
           </div>
           {(controlError || controlMessage) ? (
             <div className="lg:max-w-md">
@@ -291,9 +298,9 @@ export default function RatingGovernanceCard({
           {teamSeasons.map((teamSeason) => {
             const activePermissions = activePermissionsForTeamSeason(permissions, teamSeason.id);
             const trainerEnabled = activePermissions.some((permission) => permission.includeTeamTrainers);
-            const rolePermission = activePermissions.find((permission) => permission.roleId);
+            const activeRolePermissions = activePermissions.filter((permission) => permission.roleId);
             const preview = previewForTeamSeason(teamSeason.id);
-            const hasAnyRater = trainerEnabled || Boolean(rolePermission);
+            const hasAnyRater = trainerEnabled || activeRolePermissions.length > 0;
 
             return (
               <div key={teamSeason.id} className={`rounded-[24px] border bg-white p-4 shadow-sm transition ${hasAnyRater ? "border-blue-100 ring-1 ring-blue-50" : "border-slate-200"}`}>
@@ -308,7 +315,7 @@ export default function RatingGovernanceCard({
                   </span>
                 </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-[auto_1fr] md:items-center">
+                <div className="mt-4">
                   <button
                     type="button"
                     disabled={isPending}
@@ -319,21 +326,34 @@ export default function RatingGovernanceCard({
                   >
                     Trainerteam {trainerEnabled ? "aktiv" : "aus"}
                   </button>
+                </div>
 
-                  <select
-                    aria-label={`Andere Bewerter für ${teamSeason.teamName}`}
-                    className="fca-select w-full"
-                    value={rolePermission?.roleId ?? ""}
-                    disabled={isPending}
-                    onChange={(event) => setRolePermission(teamSeason.id, event.target.value)}
-                  >
-                    <option value="">Keine Zusatzrolle</option>
-                    {roles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="mt-4">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Zusatzrollen</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {assignableRoles.length === 0 ? (
+                      <span className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-500">Keine Rollen verfügbar</span>
+                    ) : (
+                      assignableRoles.map((role) => {
+                        const isActive = activeRolePermissions.some((permission) => permission.roleId === role.id);
+                        return (
+                          <button
+                            key={role.id}
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => toggleRolePermission(teamSeason.id, role, !isActive)}
+                            className={`rounded-full border px-3 py-2 text-xs font-black transition ${
+                              isActive
+                                ? "border-blue-200 bg-blue-50 text-[#0b4aa2] hover:bg-blue-100"
+                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                            }`}
+                          >
+                            {role.name}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-3">
@@ -468,7 +488,7 @@ export default function RatingGovernanceCard({
         <AdminInlineStatusMessage>
           <span className="inline-flex items-center gap-2">
             <RefreshCw className="h-4 w-4" />
-            Änderungen werden nach dem Speichern automatisch in den Spielerprofilen sichtbar.
+            Änderungen werden automatisch in den Spielerprofilen sichtbar.
           </span>
         </AdminInlineStatusMessage>
       </div>
