@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 
 export type PeoplePickerPerson = {
-  id: string;
+  // BACKWARD COMPATIBILITY
   firstName?: string;
   lastName?: string;
+  id: string;
   displayName: string;
   email?: string | null;
   phone?: string | null;
@@ -16,6 +17,15 @@ export type PeoplePickerPerson = {
   dateOfBirth?: string | null;
   isPlayer?: boolean;
   isTrainer?: boolean;
+
+  // NEW
+  playerSuggestion?: {
+    tone: "PERFECT" | "YOUNGER_ALLOWED" | "NOT_MATCHING" | "UNKNOWN";
+    label: string;
+    sortRank: number;
+  } | null;
+  ratingScore?: number | null;
+  ratingLabel?: string | null;
 };
 
 type PeoplePickerProps = {
@@ -31,429 +41,109 @@ type PeoplePickerProps = {
   disabled?: boolean;
 };
 
-const searchCache = new Map<string, PeoplePickerPerson[]>();
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function highlightText(text: string, query: string) {
-  if (!query.trim()) return text;
-
-  const regex = new RegExp("(" + escapeRegExp(query.trim()) + ")", "ig");
-  const parts = text.split(regex);
-
-  return parts.map((part, index) => {
-    const isMatch = part.toLowerCase() === query.trim().toLowerCase();
-
-    if (!isMatch) return <span key={index}>{part}</span>;
-
-    return (
-      <mark key={index} className="rounded bg-amber-100 px-0.5 text-slate-900">
-        {part}
-      </mark>
-    );
-  });
-}
-
-function buildMetaLabel(person: PeoplePickerPerson) {
-  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" • ");
-}
-
-function getAssignmentTone(person: PeoplePickerPerson) {
-  if (person.teamLabel) return "assigned";
-  return "free";
-}
-
-function getModeLabel(searchMode: PeoplePickerProps["searchMode"]) {
-  if (searchMode === "player") return "Spieler";
-  if (searchMode === "trainer") return "Trainer";
-  if (searchMode === "vereinsleitung") return "Vereinsleitung";
-  return "Person";
-}
-
 export default function PeoplePicker({
-  mode = "single",
-  selected = null,
-  selectedItems = [],
+  selected,
   onSelect,
-  onChange,
-  placeholder = "Name, Gruppe oder E-Mail suchen",
+  placeholder = "Suchen...",
   searchMode = "any",
-  emptyText = "Keine passende Person gefunden.",
   teamSeasonId,
-  disabled = false,
 }: PeoplePickerProps) {
   const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [results, setResults] = useState<PeoplePickerPerson[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [open, setOpen] = useState(false);
 
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const selectedIds = useMemo(() => {
-    if (mode === "multiple") return new Set(selectedItems.map((item) => item.id));
-    return new Set(selected ? [selected.id] : []);
-  }, [mode, selected, selectedItems]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      const nextQuery = query.trim();
+    if (query.length < 2) return;
 
-      if (nextQuery.length < 2) {
-        setResults([]);
-        setIsLoading(false);
-        setHighlightedIndex(0);
-      }
+    const timeout = setTimeout(async () => {
+      const params = new URLSearchParams();
+      params.set("q", query);
+      params.set("mode", searchMode);
+      if (teamSeasonId) params.set("teamSeasonId", teamSeasonId);
 
-      setDebouncedQuery(nextQuery);
-    }, 180);
+      const res = await fetch("/api/people/search?" + params.toString());
+      const data = await res.json();
+      setResults(data);
+      setOpen(true);
+    }, 200);
 
-    return () => window.clearTimeout(timeout);
-  }, [query]);
+    return () => clearTimeout(timeout);
+  }, [query, searchMode, teamSeasonId]);
 
-  useEffect(() => {
-    if (debouncedQuery.length < 2 || disabled) {
-      setResults([]);
-      setIsLoading(false);
-      setHighlightedIndex(0);
-      return;
+  function getSuggestionStyle(tone?: string) {
+    switch (tone) {
+      case "PERFECT":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "YOUNGER_ALLOWED":
+        return "bg-amber-50 text-amber-700 border-amber-200";
+      case "NOT_MATCHING":
+        return "bg-rose-50 text-rose-700 border-rose-200";
+      default:
+        return "bg-slate-50 text-slate-500 border-slate-200";
     }
-
-    const cacheKey =
-      searchMode +
-      "::" +
-      (teamSeasonId ?? "global") +
-      "::" +
-      debouncedQuery.toLowerCase();
-
-    const cached = searchCache.get(cacheKey);
-
-    if (cached) {
-      setResults(cached);
-      setIsLoading(false);
-      setHighlightedIndex(0);
-      return;
-    }
-
-    const controller = new AbortController();
-    setIsLoading(true);
-
-    const params = new URLSearchParams();
-    params.set("q", debouncedQuery);
-    params.set("mode", searchMode);
-
-    if (teamSeasonId) {
-      params.set("teamSeasonId", teamSeasonId);
-    }
-
-    fetch("/api/people/search?" + params.toString(), {
-      method: "GET",
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        const data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          throw new Error(data?.error ?? "Die Personensuche konnte nicht geladen werden.");
-        }
-
-        const nextResults = Array.isArray(data) ? (data as PeoplePickerPerson[]) : [];
-        searchCache.set(cacheKey, nextResults);
-        setResults(nextResults);
-        setHighlightedIndex(0);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setResults([]);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [debouncedQuery, disabled, searchMode, teamSeasonId]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  function resetAfterSelect(keepOpen: boolean) {
-    setQuery("");
-    setDebouncedQuery("");
-    setResults([]);
-    setHighlightedIndex(0);
-    setIsOpen(keepOpen);
-    window.setTimeout(() => inputRef.current?.focus(), 0);
   }
-
-  function applySingleSelect(person: PeoplePickerPerson) {
-    onSelect?.(person);
-    resetAfterSelect(false);
-  }
-
-  function applyMultiSelect(person: PeoplePickerPerson) {
-    if (!onChange) return;
-
-    const exists = selectedItems.some((item) => item.id === person.id);
-    const nextItems = exists
-      ? selectedItems.filter((item) => item.id !== person.id)
-      : [...selectedItems, person];
-
-    onChange(nextItems);
-    resetAfterSelect(true);
-  }
-
-  function removeChip(personId: string) {
-    if (mode !== "multiple" || !onChange) return;
-    onChange(selectedItems.filter((item) => item.id !== personId));
-  }
-
-  function selectHighlighted() {
-    const person = results[highlightedIndex];
-    if (!person) return;
-
-    if (mode === "multiple") {
-      applyMultiSelect(person);
-      return;
-    }
-
-    applySingleSelect(person);
-  }
-
-  const shouldShowDropdown = isOpen && debouncedQuery.length >= 2 && !disabled;
-  const modeLabel = getModeLabel(searchMode);
 
   return (
-    <div ref={rootRef} className="relative z-20">
-      {mode === "single" && selected ? (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-[#0b4aa2]/25 bg-gradient-to-br from-[#0b4aa2]/[0.07] to-white px-3.5 py-3.5 shadow-[0_10px_28px_rgba(11,74,162,0.08)] ring-4 ring-[#0b4aa2]/[0.04]">
-          <div className="flex min-w-0 items-center gap-3">
-            <AdminAvatar name={selected.displayName} imageSrc={selected.imageSrc} size="sm" />
-            <div className="min-w-0">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <div className="truncate text-sm font-semibold text-slate-950">
-                  {selected.displayName}
+    <div className="relative">
+      <input
+        ref={inputRef}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-xl border px-4 py-3"
+      />
+
+      {open && results.length > 0 && (
+        <div className="absolute mt-2 w-full rounded-xl border bg-white shadow-xl">
+          {results.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => {
+                onSelect?.(p);
+                setOpen(false);
+                setQuery("");
+              }}
+              className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50"
+            >
+              <div className="flex items-center gap-3">
+                <AdminAvatar name={p.displayName} imageSrc={p.imageSrc} size="sm" />
+                <div>
+                  <div className="font-semibold">{p.displayName}</div>
+                  <div className="text-xs text-slate-500">
+                    {p.teamLabel || p.email}
+                  </div>
                 </div>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  Ausgewählt
+              </div>
+
+              {searchMode === "player" && p.ratingLabel && (
+                <span className="text-[10px] px-2 py-1 rounded-full border font-semibold bg-blue-50 text-blue-700 border-blue-200">
+                  {p.ratingLabel} · {p.ratingScore ?? 50}
                 </span>
-              </div>
-              <div className="mt-1 truncate text-xs text-slate-500">
-                {buildMetaLabel(selected) || selected.email || "Person verknüpft"}
-              </div>
-            </div>
-          </div>
+              )}
 
-          <button
-            type="button"
-            onClick={() => onSelect?.(null)}
-            disabled={disabled}
-            className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Lösen
-          </button>
-        </div>
-      ) : null}
-
-      <div
-        className={`rounded-[22px] border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition ${
-          isOpen && !disabled
-            ? "border-[#0b4aa2] ring-4 ring-[#0b4aa2]/10"
-            : selected
-              ? "border-[#0b4aa2]/25"
-              : "border-slate-200"
-        } ${disabled ? "opacity-60" : ""}`}
-      >
-        {mode === "multiple" && selectedItems.length > 0 ? (
-          <div className="flex flex-wrap gap-2 border-b border-slate-100 px-3 pb-2 pt-3">
-            {selectedItems.map((item) => (
-              <div
-                key={item.id}
-                className="inline-flex items-center gap-2 rounded-full border border-[#0b4aa2]/15 bg-[#0b4aa2]/[0.05] px-2.5 py-1.5 text-xs font-semibold text-[#0b4aa2]"
-              >
-                <span className="max-w-[180px] truncate">{item.displayName}</span>
-                <button
-                  type="button"
-                  onClick={() => removeChip(item.id)}
-                  disabled={disabled}
-                  className="rounded-full text-[#0b4aa2]/70 transition hover:text-rose-600 disabled:cursor-not-allowed"
-                  aria-label={item.displayName + " entfernen"}
+              {searchMode === "player" && p.playerSuggestion && (
+                <span
+                  className={`text-[10px] px-2 py-1 rounded-full border font-semibold ${getSuggestionStyle(
+                    p.playerSuggestion.tone
+                  )}`}
                 >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="relative">
-          <input
-            ref={inputRef}
-            value={query}
-            disabled={disabled}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setIsOpen(true);
-            }}
-            onFocus={() => setIsOpen(true)}
-            onKeyDown={(event) => {
-              if (
-                mode === "multiple" &&
-                event.key === "Backspace" &&
-                !query.trim() &&
-                selectedItems.length > 0
-              ) {
-                removeChip(selectedItems[selectedItems.length - 1].id);
-                return;
-              }
-
-              if (!shouldShowDropdown && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-                return;
-              }
-
-              if (event.key === "ArrowDown") {
-                event.preventDefault();
-                setHighlightedIndex((current) =>
-                  Math.min(current + 1, Math.max(results.length - 1, 0)),
-                );
-              }
-
-              if (event.key === "ArrowUp") {
-                event.preventDefault();
-                setHighlightedIndex((current) => Math.max(current - 1, 0));
-              }
-
-              if (event.key === "Enter" && shouldShowDropdown && results.length > 0) {
-                event.preventDefault();
-                selectHighlighted();
-              }
-
-              if (event.key === "Escape") setIsOpen(false);
-            }}
-            placeholder={placeholder}
-            className={`w-full rounded-[22px] bg-white px-4 py-3.5 pr-28 text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed ${
-              mode === "multiple" && selectedItems.length > 0 ? "rounded-t-none" : ""
-            }`}
-          />
-
-          <div className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            {isLoading ? (
-              <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0b4aa2]" />
-                Suche
-              </span>
-            ) : (
-              <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
-                {modeLabel}
-              </span>
-            )}
-          </div>
+                  {p.playerSuggestion.label}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
-      </div>
-
-      {shouldShowDropdown ? (
-        <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_22px_60px_rgba(15,23,42,0.16)]">
-          <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Ergebnisse
-          </div>
-
-          {results.length === 0 ? (
-            <div className="px-4 py-5">
-              <div className="text-sm font-semibold text-slate-700">Keine Treffer</div>
-              <div className="mt-1 text-sm text-slate-500">{emptyText}</div>
-            </div>
-          ) : (
-            <div className="max-h-80 overflow-auto py-2">
-              {results.map((person, index) => {
-                const isSelected = selectedIds.has(person.id);
-                const isHighlighted = index === highlightedIndex;
-                const assignmentTone = getAssignmentTone(person);
-
-                return (
-                  <button
-                    key={person.id}
-                    type="button"
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                    onClick={() => {
-                      if (mode === "multiple") {
-                        applyMultiSelect(person);
-                        return;
-                      }
-
-                      applySingleSelect(person);
-                    }}
-                    className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
-                      isHighlighted ? "bg-[#0b4aa2]/[0.04]" : "bg-white hover:bg-slate-50"
-                    }`}
-                  >
-                    <AdminAvatar name={person.displayName} imageSrc={person.imageSrc} size="sm" />
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <div className="truncate text-sm font-semibold text-slate-950">
-                          {highlightText(person.displayName, debouncedQuery)}
-                        </div>
-                        {person.functionLabel ? (
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                            {person.functionLabel}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-1 truncate text-xs text-slate-500">
-                        {person.teamLabel
-                          ? highlightText(person.teamLabel, debouncedQuery)
-                          : person.email
-                            ? highlightText(person.email, debouncedQuery)
-                            : "Keine Zusatzinfo"}
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      {assignmentTone === "assigned" ? (
-                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800">
-                          Bereits zugeteilt
-                        </span>
-                      ) : null}
-
-                      <span
-                        className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                          isSelected
-                            ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/[0.05] text-[#0b4aa2]"
-                            : "border-slate-200 bg-white text-slate-600"
-                        }`}
-                      >
-                        {mode === "multiple"
-                          ? isSelected
-                            ? "Entfernen"
-                            : "Hinzufügen"
-                          : isSelected
-                            ? "Verknüpft"
-                            : "Auswählen"}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] text-slate-400">
-            ↑↓ navigieren · Enter auswählen · Esc schliessen
-          </div>
-        </div>
-      ) : null}
+      )}
     </div>
   );
 }
+
+
+
+
+
+
+
+

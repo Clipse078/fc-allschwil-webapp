@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import Link from "next/link";
+
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminListItem from "@/components/admin/shared/AdminListItem";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
@@ -63,9 +65,11 @@ export default function PlayersList({ players }: PlayersListProps) {
               />
             </>
           }
-          actions={<span className="text-sm text-slate-400">Spielerprofil folgt</span>}
+          actions={<Link href={`/dashboard/players/${player.id}`} className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50">Profil öffnen</Link>}
         />
       ))}
     </div>
   );
 }
+
+

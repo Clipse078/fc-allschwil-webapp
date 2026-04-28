@@ -312,7 +312,6 @@ model Role {
   rolePermissions           RolePermission[]
   workflowRules             RoleWorkflowRule[]
   workflowReviewAssignments RoleWorkflowReviewAssignment[] @relation("WorkflowReviewerRole")
-  playerRatingPermissions   PlayerRatingPermission[]
   organigrammDepartment     OrganigrammDepartment?         @relation(fields: [organigrammDepartmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([name])
@@ -415,12 +414,9 @@ model Season {
   teamSeasons                    TeamSeason[]
   events                         Event[]
   eventImportRuns                EventImportRun[]
-  activeForClubConfigs           ClubConfig[]                 @relation("ClubConfigActiveSeason")
-  nextForClubConfigs             ClubConfig[]                 @relation("ClubConfigNextSeason")
-  websitePublishedForClubConfigs ClubConfig[]                 @relation("ClubConfigWebsitePublishedSeason")
-  playerSeasonRatings            PlayerSeasonRating[]
-  playerRatingPermissions        PlayerRatingPermission[]
-  playerRatingAreaDefinitions    PlayerRatingAreaDefinition[]
+  activeForClubConfigs           ClubConfig[]     @relation("ClubConfigActiveSeason")
+  nextForClubConfigs             ClubConfig[]     @relation("ClubConfigNextSeason")
+  websitePublishedForClubConfigs ClubConfig[]     @relation("ClubConfigWebsitePublishedSeason")
 
   @@index([isActive])
 }
@@ -445,9 +441,6 @@ model Person {
   user                        User?
   playerSquadMembers          PlayerSquadMember[]
   trainerTeamMembers          TrainerTeamMember[]
-  playerSeasonRatings         PlayerSeasonRating[]
-  playerRatingPermissions     PlayerRatingPermission[]
-  playerRatingAreaDefinitions PlayerRatingAreaDefinition[]
   trainerQualifications       TrainerQualification[]
   vereinsleitungOwnedMatters  VereinsleitungMatter[]
   meetingParticipants         VereinsleitungMeetingParticipant[]
@@ -460,74 +453,6 @@ model Person {
   @@index([isActive])
   @@index([isPlayer])
   @@index([isTrainer])
-}
-
-model PlayerRatingPermission {
-  id                  String   @id @default(cuid())
-  teamSeasonId        String
-  seasonId            String
-  personId            String?
-  roleId              String?
-  includeTeamTrainers Boolean  @default(false)
-  label               String?
-  isActive            Boolean  @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  teamSeason TeamSeason @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  season     Season     @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  person     Person?    @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  role       Role?      @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  @@index([teamSeasonId])
-  @@index([seasonId])
-  @@index([personId])
-  @@index([roleId])
-  @@index([isActive])
-}
-
-model PlayerRatingAreaDefinition {
-  id          String   @id @default(cuid())
-  seasonId    String?
-  key         String
-  label       String
-  description String?
-  sortOrder   Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  season   Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  person   Person? @relation(fields: [personId], references: [id])
-  personId String?
-
-  @@unique([seasonId, key])
-  @@index([seasonId])
-  @@index([isActive])
-  @@index([sortOrder])
-}
-
-model PlayerSeasonRating {
-  id              String   @id @default(cuid())
-  personId        String
-  seasonId        String
-  overallRating   Int      @default(50)
-  potentialRating Int?
-  technicalRating Int?
-  tacticalRating  Int?
-  physicalRating  Int?
-  mentalityRating Int?
-  socialRating    Int?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  person Person @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  @@unique([personId, seasonId])
-  @@index([seasonId, overallRating])
-  @@index([personId])
 }
 
 model TrainerQualification {
@@ -605,11 +530,10 @@ model TeamSeason {
   createdAt                     DateTime         @default(now())
   updatedAt                     DateTime         @updatedAt
 
-  team                    Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  season                  Season                   @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  playerSquadMembers      PlayerSquadMember[]
-  trainerTeamMembers      TrainerTeamMember[]
-  playerRatingPermissions PlayerRatingPermission[]
+  team               Team                @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  season             Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  playerSquadMembers PlayerSquadMember[]
+  trainerTeamMembers TrainerTeamMember[]
 
   @@unique([teamId, seasonId])
   @@index([seasonId])

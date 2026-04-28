@@ -61,6 +61,8 @@ function getNavIcon(label: string) {
   switch (normalized) {
     case "Dashboard":
       return LayoutDashboard;
+    case "Admin":
+      return Settings;
     case "Vereinsleitung":
       return Briefcase;
     case "Meetings":
@@ -217,10 +219,10 @@ export default function VereinsOSSidebar({
 
   return (
     <aside
-      className={`${resolvedCollapsed ? "w-[92px]" : "w-[286px]"} flex min-h-screen shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] duration-200`}
+      className={`${resolvedCollapsed ? "w-[92px]" : "w-[286px]"} flex min-h-screen shrink-0 flex-col border-r border-slate-200/80 bg-white/95 shadow-[18px_0_50px_rgba(15,23,42,0.05)] backdrop-blur-xl transition-[width] duration-200`}
     >
       <div className={resolvedCollapsed ? "px-3 py-4" : "px-4 py-4"}>
-        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+        <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_16px_38px_rgba(15,23,42,0.08)]">
           <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
           <div className={resolvedCollapsed ? "p-3" : "p-4"}>
             <div className="flex items-start justify-between gap-3">
@@ -280,6 +282,16 @@ export default function VereinsOSSidebar({
         </div>
       </div>
 
+      {!resolvedCollapsed ? (
+        <div className="mx-4 mb-5 overflow-hidden rounded-[26px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/70 to-slate-50 px-4 py-4 shadow-[0_14px_34px_rgba(11,74,162,0.10)]">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-red-600">
+            Saison
+          </p>
+          <p className="mt-2 font-[var(--font-display)] text-[2rem] font-bold leading-none tracking-[-0.05em] text-[#0b4aa2]">
+            {currentSeasonLabel}
+          </p>
+        </div>
+      ) : null}
       <nav className={resolvedCollapsed ? "flex-1 px-3 py-2" : "flex-1 px-3 py-2"}>
         <ul className="space-y-2">
           {topLevelItems.map((item) => {
@@ -308,10 +320,10 @@ export default function VereinsOSSidebar({
                     isActive
                       ? resolvedCollapsed
                         ? "flex h-12 items-center justify-center rounded-[18px] border border-slate-200 bg-slate-50 text-[#0b4aa2] shadow-sm"
-                        : "group relative flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-[#0b4aa2] shadow-sm"
+                        : "group relative flex items-center gap-3 rounded-[22px] border border-blue-100 bg-gradient-to-r from-blue-50 to-white px-4 py-3 text-sm font-semibold text-[#0b4aa2] shadow-[0_10px_24px_rgba(11,74,162,0.08)]"
                       : resolvedCollapsed
                         ? "flex h-12 items-center justify-center rounded-[18px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                        : "group flex items-center gap-3 rounded-[20px] px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                        : "group flex items-center gap-3 rounded-[20px] px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-950 hover:shadow-sm"
                   }
                 >
                   {!resolvedCollapsed && isActive ? (
@@ -407,6 +419,8 @@ export default function VereinsOSSidebar({
     </aside>
   );
 }
+
+
 
 
 

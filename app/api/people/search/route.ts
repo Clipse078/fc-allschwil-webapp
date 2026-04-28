@@ -1,8 +1,10 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { calculatePlayerRecommendationRatingScore, getPlayerRatingLabel } from "@/lib/players/player-rating-score";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
-import { isBirthYearAllowedForTeamSeason } from "@/lib/teams/jahrgang-rules";
+import { getAllowedBirthYearsForSeason } from "@/lib/teams/jahrgang-rules";
+import { buildPlayerSuggestion } from "@/lib/teams/player-suggestion";
 
 type SearchMode = "any" | "player" | "trainer" | "vereinsleitung";
 
@@ -23,6 +25,15 @@ type PersonRecord = {
     title: string;
     issuer: string | null;
     isClubVerified: boolean;
+  }[];
+  playerSeasonRatings: {
+    overallRating: number | null;
+    potentialRating: number | null;
+    technicalRating: number | null;
+    tacticalRating: number | null;
+    physicalRating: number | null;
+    mentalityRating: number | null;
+    socialRating: number | null;
   }[];
   user: {
     userRoles: {
@@ -196,9 +207,9 @@ function getTrainerQualificationLabel(person: PersonRecord) {
 
   if (!qualification) return null;
 
-  return [qualification.title, qualification.issuer, qualification.status === "VALID" ? "gültig" : null]
+  return [qualification.title, qualification.issuer, qualification.status === "VALID" ? "gÃ¼ltig" : null]
     .filter(Boolean)
-    .join(" • ");
+    .join(" â€¢ ");
 }
 
 function isDemoVereinsleitungPerson(person: PersonRecord) {
@@ -219,7 +230,7 @@ function getPrimaryRoleLabel(person: PersonRecord, mode: SearchMode) {
   if (trainerAssignment) return trainerAssignment.roleLabel?.trim() || "Trainer";
 
   const playerAssignment = getActivePlayerAssignment(person);
-  if (playerAssignment) return "Player";
+  if (playerAssignment) return "Spieler";
 
   return "Person";
 }
@@ -266,7 +277,40 @@ function getPersonImageSrc(person: PersonRecord) {
   return DEMO_PERSON_IMAGE_MAP[person.id] ?? null;
 }
 
-function toSearchItem(person: PersonRecord, mode: SearchMode) {
+function toSearchItem(
+  person: PersonRecord,
+  mode: SearchMode,
+  targetBirthYears: number[],
+) {
+  const playerSuggestion =
+    mode === "player"
+      ? buildPlayerSuggestion({
+          dateOfBirth: person.dateOfBirth,
+          targetBirthYears,
+        })
+      : null;
+
+  const latestRating = person.playerSeasonRatings?.[0] ?? null;
+  const ratingScore =
+    mode === "player"
+      ? calculatePlayerRecommendationRatingScore(
+          latestRating
+            ? {
+                overallRating: latestRating.overallRating,
+                potentialRating: latestRating.potentialRating,
+                technicalRating: latestRating.technicalRating,
+                tacticalRating: latestRating.tacticalRating,
+                physicalRating: latestRating.physicalRating,
+                mentalityRating: latestRating.mentalityRating,
+                socialRating: latestRating.socialRating,
+              }
+            : null,
+        )
+      : null;
+
+  const ratingLabel =
+    typeof ratingScore === "number" ? getPlayerRatingLabel(ratingScore) : null;
+
   return {
     id: person.id,
     firstName: person.firstName,
@@ -280,6 +324,9 @@ function toSearchItem(person: PersonRecord, mode: SearchMode) {
     teamLabel: getSecondaryTeamLabel(person, mode),
     isPlayer: person.isPlayer,
     isTrainer: person.isTrainer,
+    playerSuggestion,
+    ratingScore,
+    ratingLabel,
   };
 }
 
@@ -296,7 +343,7 @@ export async function GET(request: NextRequest) {
     const teamSeasonId = request.nextUrl.searchParams.get("teamSeasonId")?.trim() ?? "";
 
     if (!["any", "player", "trainer", "vereinsleitung"].includes(mode)) {
-      return NextResponse.json({ error: "Ungültiger Suchmodus." }, { status: 400 });
+      return NextResponse.json({ error: "UngÃ¼ltiger Suchmodus." }, { status: 400 });
     }
 
     if (query.length < 2) {
@@ -304,7 +351,7 @@ export async function GET(request: NextRequest) {
     }
 
     let excludedPersonIds = new Set<string>();
-    let playerEligibilityContext: { teamAgeGroup: string | null; seasonKey: string } | null = null;
+    let targetBirthYears: number[] = [];
 
     if (teamSeasonId && mode === "player") {
       const teamSeason = await prisma.teamSeason.findUnique({
@@ -313,11 +360,19 @@ export async function GET(request: NextRequest) {
           playerSquadMembers: {
             select: { personId: true },
           },
+          displayName: true,
+          shortName: true,
           team: {
-            select: { ageGroup: true },
+            select: {
+              ageGroup: true,
+              name: true,
+            },
           },
           season: {
-            select: { key: true },
+            select: {
+              key: true,
+              name: true,
+            },
           },
         },
       });
@@ -327,10 +382,10 @@ export async function GET(request: NextRequest) {
       }
 
       excludedPersonIds = new Set(teamSeason.playerSquadMembers.map((entry) => entry.personId));
-      playerEligibilityContext = {
-        teamAgeGroup: teamSeason.team.ageGroup,
-        seasonKey: teamSeason.season.key,
-      };
+      targetBirthYears = getAllowedBirthYearsForSeason(
+        teamSeason.team.ageGroup ?? teamSeason.displayName ?? teamSeason.shortName ?? teamSeason.team.name,
+        teamSeason.season.key,
+      );
     }
 
     if (teamSeasonId && mode === "trainer") {
@@ -386,6 +441,19 @@ export async function GET(request: NextRequest) {
             isClubVerified: true,
           },
         },
+        playerSeasonRatings: {
+          orderBy: { season: { startDate: "desc" } },
+          take: 1,
+          select: {
+            overallRating: true,
+            potentialRating: true,
+            technicalRating: true,
+            tacticalRating: true,
+            physicalRating: true,
+            mentalityRating: true,
+            socialRating: true,
+          },
+        },
         user: {
           select: {
             userRoles: {
@@ -439,25 +507,26 @@ export async function GET(request: NextRequest) {
     const filtered = people.filter((person) => {
       if (!matchesQuery(person, query)) return false;
       if (excludedPersonIds.has(person.id)) return false;
-
-      if (mode === "player") {
-        if (!playerEligibilityContext) return true;
-
-        return isBirthYearAllowedForTeamSeason({
-          categoryCode: playerEligibilityContext.teamAgeGroup,
-          seasonStartDate: playerEligibilityContext.seasonKey,
-          birthDate: person.dateOfBirth,
-        }).ok;
-      }
-
-      if (mode === "trainer") return true;
-
       if (mode === "vereinsleitung") return isEligibleForVereinsleitung(person);
-
       return true;
     });
 
-    return NextResponse.json(filtered.slice(0, 20).map((person) => toSearchItem(person, mode)));
+    const mapped = filtered.map((person) => toSearchItem(person, mode, targetBirthYears));
+
+    const sorted =
+      mode === "player"
+        ? mapped.sort((a, b) => {
+            const rankA = a.playerSuggestion?.sortRank ?? 99;
+            const rankB = b.playerSuggestion?.sortRank ?? 99;
+            if (rankA !== rankB) return rankA - rankB;
+            const ratingA = a.ratingScore ?? 50;
+            const ratingB = b.ratingScore ?? 50;
+            if (ratingA !== ratingB) return ratingB - ratingA;
+            return a.displayName.localeCompare(b.displayName);
+          })
+        : mapped;
+
+    return NextResponse.json(sorted.slice(0, 20));
   } catch (error) {
     console.error("Search people failed:", error);
 
@@ -474,3 +543,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+
+

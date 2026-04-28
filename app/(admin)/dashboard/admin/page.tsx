@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+import { SeasonTransitionSettingsCard } from "@/components/admin/seasons/SeasonTransitionSettingsCard";
+import Link from "next/link";
 import {
   BarChart3,
   CalendarSync,
@@ -17,6 +18,7 @@ import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TeamCategoryRulesEditor from "@/components/admin/configuration/TeamCategoryRulesEditor";
 import QualificationDefinitionsEditor from "@/components/admin/configuration/QualificationDefinitionsEditor";
 import TeamDisplaySettingsEditor from "@/components/admin/configuration/TeamDisplaySettingsEditor";
+import RatingGovernanceCard from "@/components/admin/ratings/RatingGovernanceCard";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
@@ -156,6 +158,55 @@ export default async function AdminConfigurationPage() {
       })
     : [];
 
+  const [ratingPermissions, ratingAreas, ratingTeamSeasons, ratingRoles, ratingPeople, ratingSeasons] =
+    await Promise.all([
+      prisma.playerRatingPermission.findMany({
+        orderBy: [{ teamSeason: { season: { startDate: "desc" } } }, { teamSeason: { team: { sortOrder: "asc" } } }],
+        include: {
+          teamSeason: {
+            select: {
+              id: true,
+              displayName: true,
+              shortName: true,
+              season: { select: { id: true, key: true, name: true, isActive: true } },
+              team: { select: { id: true, name: true, slug: true } },
+            },
+          },
+          season: { select: { id: true, key: true, name: true, isActive: true } },
+          person: { select: { id: true, firstName: true, lastName: true, displayName: true, email: true } },
+          role: { select: { id: true, key: true, name: true } },
+        },
+      }),
+      prisma.playerRatingAreaDefinition.findMany({
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+        include: { season: { select: { id: true, key: true, name: true, isActive: true } } },
+      }),
+      prisma.teamSeason.findMany({
+        orderBy: [{ season: { startDate: "desc" } }, { team: { sortOrder: "asc" } }],
+        select: {
+          id: true,
+          displayName: true,
+          shortName: true,
+          seasonId: true,
+          season: { select: { id: true, key: true, name: true, isActive: true } },
+          team: { select: { name: true } },
+        },
+      }),
+      prisma.role.findMany({
+        orderBy: [{ name: "asc" }],
+        select: { id: true, key: true, name: true },
+      }),
+      prisma.person.findMany({
+        where: { isActive: true },
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        select: { id: true, firstName: true, lastName: true, displayName: true, email: true, isTrainer: true },
+      }),
+      prisma.season.findMany({
+        orderBy: [{ startDate: "desc" }],
+        select: { id: true, key: true, name: true, isActive: true },
+      }),
+    ]);
+
   return (
     <div className="space-y-8">
       <AdminSectionHeader
@@ -199,6 +250,8 @@ export default async function AdminConfigurationPage() {
           </div>
         </div>
       </section>
+
+      <SeasonTransitionSettingsCard />
 
       <section className="grid gap-5 lg:grid-cols-4">
         {adminCards.map((card) => {
@@ -299,7 +352,27 @@ export default async function AdminConfigurationPage() {
               }))}
             />
           </div>
-          <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <RatingGovernanceCard
+            seasons={ratingSeasons}
+            teamSeasons={ratingTeamSeasons.map((entry) => ({
+              id: entry.id,
+              displayName: entry.displayName,
+              shortName: entry.shortName,
+              teamName: entry.team.name,
+              seasonId: entry.seasonId,
+              seasonName: entry.season.name,
+              seasonKey: entry.season.key,
+            }))}
+            roles={ratingRoles}
+            people={ratingPeople.map((person) => ({
+              id: person.id,
+              name: person.displayName ?? `${person.firstName} ${person.lastName}`.trim(),
+              email: person.email,
+            }))}
+            permissions={ratingPermissions}
+            areas={ratingAreas}
+          />
+<div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="fca-eyebrow">Team Anzeige</p>
@@ -329,5 +402,7 @@ export default async function AdminConfigurationPage() {
     </div>
   );
 }
+
+
 
 

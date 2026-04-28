@@ -16,6 +16,7 @@ type Person = {
 };
 
 type Props = {
+  disabled?: boolean;
   open: boolean;
   onClose: () => void;
   mode: Mode;
@@ -208,4 +209,5 @@ export default function PeoplePickerModal({
     </div>
   );
 }
+
 

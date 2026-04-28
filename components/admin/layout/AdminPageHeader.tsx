@@ -101,6 +101,14 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     };
   }
 
+  if (pathname === "/dashboard/admin") {
+    return {
+      eyebrow: "",
+      title: "Dashboard",
+      description: undefined,
+    };
+  }
+
   if (pathname === "/dashboard/operations") {
     return {
       eyebrow: "2. Betrieb & Organisation",
@@ -138,19 +146,19 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
 
   if (pathname === "/dashboard/current-season") {
     return {
-      eyebrow: "4. Aktuelle Saison",
+      eyebrow: "",
       title: "Aktuelle Saison",
       description:
-        "Modulübersicht für aktuelle Saisonprozesse mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "Teams, Jahresplan, Wochenplan, Platzreservation und Infoboard.",
     };
   }
 
   if (pathname === "/dashboard/next-season") {
     return {
-      eyebrow: "5. Nächste Saison",
+      eyebrow: "",
       title: "Nächste Saison",
       description:
-        "Demo-Modulübersicht für die kommende Saison mit Teams, Jahresplan, Wochenplan und Tagesplan.",
+        "Vorbereitung der kommenden Saison mit Teams, Spielern und Trainern.",
     };
   }
 
@@ -499,7 +507,7 @@ function SpotlightSearch() {
     isOpen && portalStyle
       ? createPortal(
           <div id="admin-spotlight-portal" className="fixed inset-x-0 top-24 z-[180] flex justify-center px-4">
-            <div className="w-full max-w-[820px]">
+            <div className="w-full max-w-[1080px]">
               <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.18)]">
                 <div className="h-[3px] w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
 
@@ -608,14 +616,14 @@ function SpotlightSearch() {
 
   return (
     <>
-      <div ref={containerRef} className="relative w-full max-w-[820px]">
+      <div ref={containerRef} className="relative w-full max-w-none">
         <button
           type="button"
           onClick={() => {
             setHighlightedIndex(0);
             setIsOpen(true);
           }}
-          className="group flex w-full items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+          className="group flex w-full min-w-[860px] items-center justify-between rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
         >
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[#0b4aa2] transition group-hover:bg-[#0b4aa2]/[0.06]">
@@ -648,44 +656,20 @@ export default function AdminPageHeader({
   canManageSeasons,
 }: AdminPageHeaderProps) {
   const pathname = usePathname();
-  const headerContent = useMemo(
-    () => getStaticHeaderContent(pathname, firstName),
-    [pathname, firstName],
-  );
-
-  const showDashboardSeasonPill =
-    pathname === "/dashboard" &&
-    Boolean(currentSeasonLabel) &&
-    Boolean(canManageSeasons);
+  const headerTitle = getDayGreeting(firstName);
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
-          {headerContent.eyebrow ? <p className="fca-eyebrow">{headerContent.eyebrow}</p> : null}
-
-          <h1 className="fca-heading mt-2">{headerContent.title}</h1>
-
-          {headerContent.description ? (
-            <p className="mt-3 max-w-2xl text-sm text-slate-500">
-              {headerContent.description}
-            </p>
-          ) : null}
-        </div>
-
-        {showDashboardSeasonPill ? (
-          <Link
-            href="/dashboard/seasons"
-            className="group inline-flex w-fit items-center gap-3 rounded-full border border-[#d7e3f8] bg-[#f3f7fd] px-4 py-2.5 text-sm font-semibold text-[#0b4aa2] shadow-sm transition hover:border-[#bdd1f3] hover:bg-white hover:shadow-[0_10px_24px_rgba(11,74,162,0.10)]"
-          >
-            <span className="text-slate-500">Saison</span>
-            <span>{currentSeasonLabel}</span>
-            <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-          </Link>
-        ) : null}
+        <div className="min-w-0"><h1 className="fca-heading mt-2">{headerTitle}</h1></div>
       </div>
 
       <SpotlightSearch />
     </div>
   );
 }
+
+
+
+
+
