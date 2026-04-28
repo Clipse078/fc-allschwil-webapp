@@ -20,6 +20,7 @@ type TeamSeasonOption = {
   seasonId?: string;
   seasonName: string;
   seasonKey?: string;
+  seasonIsActive?: boolean;
 };
 
 type RoleOption = { id: string; key?: string; name: string };
@@ -301,24 +302,25 @@ export default function RatingGovernanceCard({
             const activeRolePermissions = activePermissions.filter((permission) => permission.roleId);
             const preview = previewForTeamSeason(teamSeason.id);
             const hasAnyRater = trainerEnabled || activeRolePermissions.length > 0;
+            const seasonLocked = teamSeason.seasonIsActive === false;
 
             return (
               <div key={teamSeason.id} className={`rounded-[24px] border bg-white p-4 shadow-sm transition ${hasAnyRater ? "border-blue-100 ring-1 ring-blue-50" : "border-slate-200"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-slate-900">{teamSeason.teamName}</p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">{teamSeason.seasonName}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">{teamSeason.seasonName}</p>{seasonLocked ? <p className="mt-2 w-fit rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-red-600">Saison abgeschlossen · Bewertungen gesperrt</p> : <p className="mt-2 w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-700">Bewertungen offen</p>}
                   </div>
                   <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-black ${hasAnyRater ? "bg-blue-50 text-[#0b4aa2]" : "bg-slate-100 text-slate-500"}`}>
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    {hasAnyRater ? "Freigabe aktiv" : "Admin only"}
+                    {seasonLocked ? "Saison gesperrt" : hasAnyRater ? "Freigabe aktiv" : "Admin only"}
                   </span>
                 </div>
 
                 <div className="mt-4">
                   <button
                     type="button"
-                    disabled={isPending}
+                    disabled={isPending || seasonLocked}
                     onClick={() => toggleTrainerPermission(teamSeason.id, !trainerEnabled)}
                     className={`inline-flex w-fit items-center justify-center rounded-full px-4 py-2 text-xs font-black transition ${
                       trainerEnabled ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -340,8 +342,8 @@ export default function RatingGovernanceCard({
                           <button
                             key={role.id}
                             type="button"
-                            disabled={isPending}
-                            onClick={() => toggleRolePermission(teamSeason.id, role, !isActive)}
+                            disabled={isPending || seasonLocked}
+                    onClick={() => toggleRolePermission(teamSeason.id, role, !isActive)}
                             className={`rounded-full border px-3 py-2 text-xs font-black transition ${
                               isActive
                                 ? "border-blue-200 bg-blue-50 text-[#0b4aa2] hover:bg-blue-100"
@@ -356,7 +358,7 @@ export default function RatingGovernanceCard({
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-3">
+                {seasonLocked ? <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-3 text-xs font-bold leading-5 text-red-700">Diese Saison ist abgeschlossen. Bestehende Freigaben bleiben dokumentiert, neue Bewertungen sind gesperrt.</div> : null}`r`n`r`n                <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-3">
                   <div className="flex items-center gap-2">
                     <UsersRound className="h-4 w-4 text-slate-400" />
                     <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">Aktuelle Bewerter</p>
@@ -495,3 +497,5 @@ export default function RatingGovernanceCard({
     </div>
   );
 }
+
+

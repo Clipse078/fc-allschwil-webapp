@@ -125,6 +125,7 @@ export default async function RatingPermissionsAdminPage() {
     seasonId: teamSeason.seasonId,
     seasonName: teamSeason.season.name,
     seasonKey: teamSeason.season.key,
+    seasonIsActive: teamSeason.season.isActive,
   }));
 
   const trainersByTeamSeason = new Map<string, string[]>();
@@ -223,6 +224,7 @@ export default async function RatingPermissionsAdminPage() {
     </div>
   );
 }
+
 
 
 
