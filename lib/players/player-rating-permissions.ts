@@ -20,10 +20,7 @@ export async function getPlayerRatingPermissionReasons({
   seasonId,
 }: RatingPermissionReasonArgs) {
   if (!userId || !personId || !seasonId) {
-    return {
-      canRate: false,
-      reasons: ["Nur Leserechte"],
-    };
+    return { canRate: false, reasons: ["Nur Leserechte"] };
   }
 
   const user = await prisma.user.findUnique({
@@ -35,108 +32,74 @@ export async function getPlayerRatingPermissionReasons({
       userRoles: {
         select: {
           roleId: true,
-          role: {
-            select: {
-              key: true,
-              name: true,
-            },
-          },
+          role: { select: { key: true, name: true } },
         },
       },
     },
   });
 
   if (!user || !user.isActive) {
-    return {
-      canRate: false,
-      reasons: ["Benutzer nicht aktiv"],
-    };
+    return { canRate: false, reasons: ["Benutzer nicht aktiv"] };
   }
 
   const roleKeys = user.userRoles.map((entry) => entry.role.key);
   const roleIds = user.userRoles.map((entry) => entry.roleId);
 
   if (roleKeys.some((key) => ADMIN_ROLE_KEYS.has(key))) {
-    return {
-      canRate: true,
-      reasons: ["Admin/Superadmin"],
-    };
+    return { canRate: true, reasons: ["Admin/Superadmin"] };
   }
 
   const playerTeamSeasons = await prisma.playerSquadMember.findMany({
     where: {
       personId,
-      teamSeason: {
-        seasonId,
-      },
+      status: "ACTIVE",
+      teamSeason: { seasonId },
     },
     select: {
       teamSeasonId: true,
-      teamSeason: {
-        select: {
-          shortName: true,
-          displayName: true,
-          team: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
     },
   });
 
   const teamSeasonIds = playerTeamSeasons.map((entry) => entry.teamSeasonId);
 
   if (teamSeasonIds.length === 0) {
-    return {
-      canRate: false,
-      reasons: ["Keine Team-Saison-Zuordnung"],
-    };
+    return { canRate: false, reasons: ["Keine aktive Team-Saison-Zuordnung"] };
   }
 
   const permissions = await prisma.playerRatingPermission.findMany({
     where: {
       isActive: true,
       seasonId,
-      teamSeasonId: {
-        in: teamSeasonIds,
-      },
+      teamSeasonId: { in: teamSeasonIds },
     },
     select: {
       id: true,
       roleId: true,
       includeTeamTrainers: true,
       teamSeasonId: true,
-      role: {
-        select: {
-          name: true,
-        },
-      },
+      role: { select: { name: true } },
       teamSeason: {
         select: {
           shortName: true,
           displayName: true,
-          team: {
-            select: {
-              name: true,
-            },
-          },
+          team: { select: { name: true } },
         },
       },
     },
   });
 
   if (permissions.length === 0) {
-    return {
-      canRate: false,
-      reasons: ["Keine zusätzliche Freigabe"],
-    };
+    return { canRate: false, reasons: ["Keine zusätzliche Freigabe"] };
   }
+
+  const validTeamSeasonIds = new Set(teamSeasonIds);
+  const relevantPermissions = permissions.filter((permission) =>
+    validTeamSeasonIds.has(permission.teamSeasonId),
+  );
 
   const reasons: string[] = [];
 
-  for (const permission of permissions) {
+  for (const permission of relevantPermissions) {
     const target =
       permission.teamSeason.shortName ??
       permission.teamSeason.displayName ??
@@ -147,7 +110,7 @@ export async function getPlayerRatingPermissionReasons({
     }
   }
 
-  const trainerPermissionTeamSeasonIds = permissions
+  const trainerPermissionTeamSeasonIds = relevantPermissions
     .filter((permission) => permission.includeTeamTrainers)
     .map((permission) => permission.teamSeasonId);
 
@@ -156,20 +119,14 @@ export async function getPlayerRatingPermissionReasons({
       where: {
         personId: user.personId,
         status: "ACTIVE",
-        teamSeasonId: {
-          in: trainerPermissionTeamSeasonIds,
-        },
+        teamSeasonId: { in: trainerPermissionTeamSeasonIds },
       },
       select: {
         teamSeason: {
           select: {
             shortName: true,
             displayName: true,
-            team: {
-              select: {
-                name: true,
-              },
-            },
+            team: { select: { name: true } },
           },
         },
       },
@@ -215,9 +172,8 @@ export async function getRatingPermissionSummaryForPlayer({
   const playerTeamSeasons = await prisma.playerSquadMember.findMany({
     where: {
       personId,
-      teamSeason: {
-        seasonId,
-      },
+      status: "ACTIVE",
+      teamSeason: { seasonId },
     },
     select: {
       teamSeasonId: true,
@@ -229,7 +185,7 @@ export async function getRatingPermissionSummaryForPlayer({
   if (teamSeasonIds.length === 0) {
     return {
       canBeRatedByConfiguredUsers: false,
-      labels: ["Admin", "Keine Team-Saison-Zuordnung"],
+      labels: ["Admin", "Keine aktive Team-Saison-Zuordnung"],
     };
   }
 
@@ -237,25 +193,15 @@ export async function getRatingPermissionSummaryForPlayer({
     where: {
       isActive: true,
       seasonId,
-      teamSeasonId: {
-        in: teamSeasonIds,
-      },
+      teamSeasonId: { in: teamSeasonIds },
     },
     include: {
-      role: {
-        select: {
-          name: true,
-        },
-      },
+      role: { select: { name: true } },
       teamSeason: {
         select: {
           shortName: true,
           displayName: true,
-          team: {
-            select: {
-              name: true,
-            },
-          },
+          team: { select: { name: true } },
         },
       },
     },
