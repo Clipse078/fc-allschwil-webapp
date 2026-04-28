@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Plus, Save, Trash2, X } from "lucide-react";
+import { CheckCircle2, LockKeyhole, Plus, Save, Trash2, X } from "lucide-react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import {
   calculatePlayerRecommendationRatingScore,
@@ -36,6 +36,7 @@ type Props = {
   currentSeasonId: string | null;
   initialRatings: RatingItem[];
   canEdit: boolean;
+  permissionReasons: string[];
 };
 
 const ratingFields = [
@@ -134,6 +135,7 @@ export default function PlayerSeasonRatingsCard({
   currentSeasonId,
   initialRatings,
   canEdit,
+  permissionReasons,
 }: Props) {
   const fallbackSeasonId = currentSeasonId ?? seasons[0]?.id ?? "";
   const [ratings, setRatings] = useState<RatingItem[]>(initialRatings);
@@ -151,6 +153,9 @@ export default function PlayerSeasonRatingsCard({
   const averageAllRatings = useMemo(() => getAverageRating(ratings), [ratings]);
   const averagePriorRatings = useMemo(() => getAverageRating(priorRatings), [priorRatings]);
   const formOverallScore = calculateOverallScore(form);
+  const selectedSeason = seasons.find((season) => season.id === form.seasonId) ?? null;
+  const selectedSeasonLocked = selectedSeason?.isActive === false;
+  const canSaveRating = canEdit && !selectedSeasonLocked && Boolean(form.seasonId);
 
   const currentScore = currentRating ? getRatingScore(currentRating) : null;
   const combinedScore = ratings.length ? getRatingScore(averageAllRatings) : null;
@@ -237,19 +242,10 @@ export default function PlayerSeasonRatingsCard({
       <div className="space-y-6 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600">
-              Player Rating
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Season Ratings
-            </h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600">Spielerbewertung</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Saisonbewertungen</h2>
           </div>
 
-          <button
-            type="button"
-            onClick={resetToNew}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-          >
+          <button type="button" onClick={resetToNew} disabled={!canEdit} className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
             <Plus className="h-4 w-4" />
             Neue Bewertung
           </button>
@@ -260,6 +256,7 @@ export default function PlayerSeasonRatingsCard({
           <RatingSummaryCard label="Ø Vorherige Saisons" score={priorScore} emptyText="Noch keine Historie" />
           <RatingSummaryCard label="Ø Gesamt inkl. aktuell" score={combinedScore} emptyText="Noch keine Bewertung" highlight />
         </div>
+        <div className={"rounded-[26px] border px-4 py-4 " + (canEdit ? "border-emerald-200 bg-emerald-50/70" : "border-slate-200 bg-slate-50/80")}><div className="flex items-start gap-3">{canEdit ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /> : <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />}<div className="min-w-0"><p className={"text-sm font-black " + (canEdit ? "text-emerald-800" : "text-slate-700")}>{canEdit ? "Du darfst die aktuelle Saison bewerten." : "Du hast für die aktuelle Saison nur Leserechte."}</p><div className="mt-2 flex flex-wrap gap-2">{permissionReasons.map((reason) => (<span key={reason} className={"rounded-full border px-3 py-1.5 text-xs font-bold " + (canEdit ? "border-emerald-200 bg-white text-emerald-700" : "border-slate-200 bg-white text-slate-500")}>{reason}</span>))}</div></div></div></div>
 
         <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
           <div className="space-y-3">
@@ -293,7 +290,7 @@ export default function PlayerSeasonRatingsCard({
                         <button type="button" onClick={() => editRating(rating)} className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
                           Bearbeiten
                         </button>
-                        <button type="button" onClick={() => deleteRating(rating.seasonId)} disabled={isPending || !canEdit} className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50">
+                        <button type="button" onClick={() => deleteRating(rating.seasonId)} disabled={isPending || !canEdit || rating.season.isActive === false} className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -376,6 +373,8 @@ export default function PlayerSeasonRatingsCard({
                 />
               </label>
 
+              <div className={"rounded-2xl border px-4 py-3 text-sm font-semibold leading-6 " + (canSaveRating ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800")}>{canSaveRating ? "Bewertung kann gespeichert werden." : selectedSeasonLocked ? "Diese Saison ist abgeschlossen. Bewertungen können nicht mehr geändert werden." : "Speichern ist für dich aktuell gesperrt."}</div>
+
               {error ? (
                 <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>
               ) : null}
@@ -385,7 +384,7 @@ export default function PlayerSeasonRatingsCard({
                   <X className="h-4 w-4" />
                   Abbrechen
                 </button>
-                <button type="button" onClick={saveRating} disabled={isPending || !canEdit || !form.seasonId} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#d62839] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(214,40,57,0.25)] transition hover:bg-[#b91f2f] disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={saveRating} disabled={isPending || !canSaveRating} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#d62839] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(214,40,57,0.25)] transition hover:bg-[#b91f2f] disabled:cursor-not-allowed disabled:opacity-50">
                   <Save className="h-4 w-4" />
                   {isPending ? "Speichern..." : "Speichern"}
                 </button>
@@ -500,6 +499,8 @@ function StarRatingInput({
     </div>
   );
 }
+
+
 
 
 

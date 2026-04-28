@@ -343,7 +343,7 @@ export default async function PlayerProfilePage({ params }: Props) {
             seasons={seasonOptions}
             currentSeasonId={currentSeason?.id ?? null}
             initialRatings={ratings}
-          canEdit={canEditCurrentSeasonRating} />
+          canEdit={canEditCurrentSeasonRating} permissionReasons={ratingPermissionReasons.reasons} />
         </div>
       </div>
 
@@ -396,6 +396,7 @@ function ContactItem({
     </div>
   );
 }
+
 
 
 
