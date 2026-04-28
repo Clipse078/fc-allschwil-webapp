@@ -58,20 +58,6 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
   {
-    key: "players",
-    title: "Spieler",
-    description: "Spielerübersichten, Kaderbezug und spätere Website-Publikation vorbereiten.",
-    href: "/dashboard/players",
-    requiredPermissions: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-  },
-  {
-    key: "trainers",
-    title: "Trainer",
-    description: "Trainerprofile, Teamzuordnung und Funktionsrollen im FCA Premium UX verwalten.",
-    href: "/dashboard/trainers",
-    requiredPermissions: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-  },
-  {
     key: "logs",
     title: "Admin Log",
     description: "Änderungen und wichtige Systemaktionen nachvollziehen.",
@@ -79,4 +65,5 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.USERS_MANAGE],
   },
 ];
+
 

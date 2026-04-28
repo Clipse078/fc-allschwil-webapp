@@ -200,30 +200,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/dashboard/persons",
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
-  {
-    label: "6.1 Trainers",
-    href: "/dashboard/trainers",
-    parentLabel: "Persons",
-    permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-  },
-  {
-    label: "6.2 Players",
-    href: "/dashboard/players",
-    parentLabel: "Persons",
-    permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-  },
-  {
-    label: "6.3 VereinsfunktionÃ¤re",
-    href: "/dashboard/vereinsfunktionaere",
-    parentLabel: "Persons",
-    permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-  },
-  {
-    label: "6.4 External Contacts",
-    href: "/dashboard/external-contacts",
-    parentLabel: "Persons",
-    permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-  },
 
   {
     label: "Neue Anmeldungen",
@@ -267,6 +243,7 @@ export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavIte
     );
   });
 }
+
 
 
 
