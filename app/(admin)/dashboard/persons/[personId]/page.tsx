@@ -72,6 +72,7 @@ export default async function PersonDetailPage({ params }: Props) {
       isTrainer: true,
       trainerExperienceYears: true,
       clubJoinDate: true,
+      photoUrl: true,
       user: {
         select: {
           isActive: true,
@@ -227,10 +228,7 @@ export default async function PersonDetailPage({ params }: Props) {
         <div className="p-6">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-start gap-5">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[28px] bg-gradient-to-br from-blue-50 to-red-50 text-2xl font-black text-[#0b4aa2]">
-                {person.firstName.charAt(0)}
-                {person.lastName.charAt(0)}
-              </div>
+              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br from-blue-50 to-red-50 text-2xl font-black text-[#0b4aa2]">{person.photoUrl ? <img src={person.photoUrl} alt={name} className="h-full w-full object-cover" /> : <>{person.firstName.charAt(0)}{person.lastName.charAt(0)}</>}</div>
 
               <div>
                 <p className="fca-eyebrow">Personenprofil · {primaryType}</p>
@@ -448,6 +446,7 @@ export default async function PersonDetailPage({ params }: Props) {
     </div>
   );
 }
+
 
 
 

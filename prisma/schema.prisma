@@ -439,6 +439,7 @@ model Person {
   isTrainer              Boolean   @default(false)
   trainerExperienceYears Int?
   clubJoinDate           DateTime?
+  photoUrl               String?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -1192,3 +1193,4 @@ model TeamCategoryQualificationRequirement {
   @@unique([teamCategoryRuleId, qualificationDefinitionId])
   @@index([teamCategoryRuleId, sortOrder])
 }
+

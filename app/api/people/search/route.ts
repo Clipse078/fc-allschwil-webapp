@@ -16,6 +16,7 @@ type PersonRecord = {
   email: string | null;
   phone: string | null;
   dateOfBirth: Date | null;
+  photoUrl?: string | null;
   isPlayer: boolean;
   isTrainer: boolean;
   notes: string | null;
@@ -205,7 +206,7 @@ function getTrainerQualificationLabel(person: PersonRecord) {
     return a.title.localeCompare(b.title);
   })[0];
 
-  if (!qualification) return null;
+  if (!qualification) return person.photoUrl ?? null;
 
   return [qualification.title, qualification.issuer, qualification.status === "VALID" ? "gÃ¼ltig" : null]
     .filter(Boolean)
@@ -253,7 +254,7 @@ function getSecondaryTeamLabel(person: PersonRecord, mode: SearchMode) {
     if (person.isPlayer) return getTeamLabelFromPlayer(person);
   }
 
-  return null;
+  return person.photoUrl ?? null;
 }
 
 function isEligibleForVereinsleitung(person: PersonRecord) {
@@ -429,6 +430,7 @@ export async function GET(request: NextRequest) {
         email: true,
         phone: true,
         dateOfBirth: true,
+      photoUrl: true,
         isPlayer: true,
         isTrainer: true,
         notes: true,
@@ -543,6 +545,9 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+
 
 
 

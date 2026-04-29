@@ -22,6 +22,7 @@ export default async function PersonsPage() {
       isTrainer: true,
       trainerExperienceYears: true,
       clubJoinDate: true,
+      photoUrl: true,
       playerSquadMembers: {
         where: { status: "ACTIVE" },
         take: 1,
@@ -81,7 +82,7 @@ export default async function PersonsPage() {
       name,
       email: person.email,
       phone: person.phone,
-      imageSrc: null,
+      imageSrc: person.photoUrl,
       isActive: person.isActive,
       typeLabels,
       primaryType: person.isTrainer ? "Trainer" : person.isPlayer ? "Spieler" : roleNames.length ? "Vereinsfunktionär" : "Person",
@@ -110,3 +111,4 @@ export default async function PersonsPage() {
     </div>
   );
 }
+
