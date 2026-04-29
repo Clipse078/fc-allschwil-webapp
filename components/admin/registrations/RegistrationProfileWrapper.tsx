@@ -1,5 +1,6 @@
 ﻿import { Prisma, Registration } from "@prisma/client";
 import RegistrationActions from "./RegistrationActions";
+import RegistrationWorkflowStepCompleteButton from "./RegistrationWorkflowStepCompleteButton";
 import { ProfileCard } from "@/components/admin/persons/profile/PersonProfileLayout";
 
 type RegistrationWithWorkflow = Prisma.RegistrationGetPayload<{
@@ -88,7 +89,9 @@ export default function RegistrationProfileWrapper({
 }) {
   const meta = statusMeta[registration.status] ?? statusMeta.NEW;
   const name = getDisplayName(registration);
-  const activeStep = registration.workflowSteps.find((step) => step.status === "IN_PROGRESS") ?? registration.workflowSteps.find((step) => step.status === "OPEN");
+  const activeStep =
+    registration.workflowSteps.find((step) => step.status === "IN_PROGRESS") ??
+    registration.workflowSteps.find((step) => step.status === "OPEN");
 
   return (
     <div className="space-y-6">
@@ -162,8 +165,19 @@ export default function RegistrationProfileWrapper({
           ) : (
             registration.workflowSteps.map((step, index) => {
               const overdue = isOverdue(step.dueDate) && step.status !== "DONE";
+              const isActiveStep = activeStep?.id === step.id;
+
               return (
-                <div key={step.id} className="flex gap-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                <div
+                  key={step.id}
+                  className={`flex gap-4 rounded-[24px] border p-4 shadow-sm ${
+                    isActiveStep
+                      ? "border-blue-200 bg-blue-50/40"
+                      : step.status === "DONE"
+                        ? "border-emerald-100 bg-emerald-50/30"
+                        : "border-slate-200 bg-white"
+                  }`}
+                >
                   <div className="flex flex-col items-center">
                     <div className={`flex h-9 w-9 items-center justify-center rounded-full border text-xs font-black ${step.status === "DONE" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : overdue ? "border-red-200 bg-red-50 text-red-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}>
                       {index + 1}
@@ -172,20 +186,28 @@ export default function RegistrationProfileWrapper({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 className="font-black text-slate-950">{step.title}</h3>
                         <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">{step.description || "—"}</p>
                       </div>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-black ${overdue ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
-                        {stepStatusLabels[step.status] ?? step.status}
-                      </span>
+
+                      <div className="flex flex-col items-start gap-2 sm:items-end">
+                        <span className={`rounded-full border px-3 py-1 text-xs font-black ${overdue ? "border-red-200 bg-red-50 text-red-700" : isActiveStep ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+                          {isActiveStep ? "Aktuell" : stepStatusLabels[step.status] ?? step.status}
+                        </span>
+
+                        {isActiveStep && registration.status !== "APPROVED" && registration.status !== "CONVERTED" ? (
+                          <RegistrationWorkflowStepCompleteButton registrationId={registration.id} stepId={step.id} />
+                        ) : null}
+                      </div>
                     </div>
 
-                    <div className="mt-4 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-3">
+                    <div className="mt-4 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-4">
                       <p>Fällig: <span className={overdue ? "text-red-600" : "text-slate-800"}>{formatDate(step.dueDate)}</span></p>
                       <p>Rolle: <span className="text-slate-800">{step.assignedRole?.name ?? "—"}</span></p>
                       <p>Person: <span className="text-slate-800">{getPersonName(step.assignedPerson)}</span></p>
+                      <p>Erledigt: <span className="text-slate-800">{formatDate(step.completedAt)}</span></p>
                     </div>
                   </div>
                 </div>
