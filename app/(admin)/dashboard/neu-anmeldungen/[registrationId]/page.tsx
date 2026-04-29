@@ -11,6 +11,16 @@ export default async function RegistrationDetailPage({
 
   const registration = await prisma.registration.findUnique({
     where: { id: registrationId },
+    include: {
+      workflowSteps: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          assignedRole: true,
+          assignedPerson: true,
+        },
+      },
+      linkedPerson: true,
+    },
   });
 
   if (!registration) {
