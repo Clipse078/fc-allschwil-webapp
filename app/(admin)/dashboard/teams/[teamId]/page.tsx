@@ -42,3 +42,4 @@ export default async function TeamDetailRedirectPage({ params }: Props) {
 
   redirect(`/dashboard/seasons/${activeTeamSeason.season.key}/teams/${team.slug}`);
 }
+
