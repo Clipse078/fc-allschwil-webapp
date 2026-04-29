@@ -2,6 +2,7 @@
 import { ArrowLeft, Workflow } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import RegistrationWorkflowTemplateForm from "@/components/admin/registrations/RegistrationWorkflowTemplateForm";
+import RegistrationWorkflowTemplateStepsEditor from "@/components/admin/registrations/RegistrationWorkflowTemplateStepsEditor";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -97,13 +98,15 @@ export default async function RegistrationWorkflowsAdminPage() {
             <p className="fca-eyebrow">Workflow Templates</p>
             <h2 className="mt-2 text-xl font-black text-slate-900">Zielgruppen-Konfiguration</h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              Nächster Ausbau: Formular zum Erstellen/Bearbeiten von Templates und Schritten direkt in dieser Ansicht.
+              Templates und Schritte steuern, wer neue Anmeldungen weiterbearbeitet und welche Aufgaben automatisch entstehen.
             </p>
           </div>
           <Workflow className="h-6 w-6 text-[#0b4aa2]" />
         </div>
 
-         <RegistrationWorkflowTemplateForm roles={roles} people={peopleOptions} /> <div className="mt-6 grid gap-4">
+        <RegistrationWorkflowTemplateForm roles={roles} people={peopleOptions} />
+
+        <div className="mt-6 grid gap-4">
           {templates.length === 0 ? (
             <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-6">
               <p className="font-black text-slate-900">Noch keine Workflow-Templates definiert.</p>
@@ -132,6 +135,10 @@ export default async function RegistrationWorkflowsAdminPage() {
                   <p>Rolle: <span className="font-black text-slate-900">{template.responsibleRole?.name ?? "—"}</span></p>
                   <p>Person: <span className="font-black text-slate-900">{personName(template.responsiblePerson)}</span></p>
                 </div>
+
+                <div className="mt-5">
+                  <RegistrationWorkflowTemplateStepsEditor templateId={template.id} />
+                </div>
               </div>
             ))
           )}
@@ -140,7 +147,3 @@ export default async function RegistrationWorkflowsAdminPage() {
     </div>
   );
 }
-
-
-
-

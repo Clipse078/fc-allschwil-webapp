@@ -2,7 +2,12 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { addDays, classifyRegistrationTargetGroup, getDefaultConversionRole, getDefaultWorkflowSteps } from "@/lib/registrations/registration-classification";
+import {
+  addDays,
+  classifyRegistrationTargetGroup,
+  getDefaultConversionRole,
+  getDefaultWorkflowSteps,
+} from "@/lib/registrations/registration-classification";
 
 export async function GET() {
   await requireApiAnyPermission([PERMISSIONS.PEOPLE_VIEW]);
@@ -24,13 +29,17 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const dateOfBirth = body.dateOfBirth ? new Date(body.dateOfBirth) : null;
-  const targetGroup = body.targetGroup ?? classifyRegistrationTargetGroup({
-    type: body.type,
-    dateOfBirth,
-    gender: body.gender ?? null,
-  });
-  const conversionRole = body.conversionRole ?? getDefaultConversionRole(body.type);
   const submittedAt = new Date();
+
+  const targetGroup =
+    body.targetGroup ??
+    classifyRegistrationTargetGroup({
+      type: body.type,
+      dateOfBirth,
+      gender: body.gender ?? null,
+    });
+
+  const conversionRole = body.conversionRole ?? getDefaultConversionRole(body.type);
 
   const template = await prisma.registrationWorkflowTemplate.findFirst({
     where: {
@@ -46,10 +55,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  const fallbackSteps = getDefaultWorkflowSteps(targetGroup);
-
-  const templateSteps =
-    template?.registrationWorkflowTemplateSteps && template.registrationWorkflowTemplateSteps.length > 0
+  const workflowSteps =
+    template && template.registrationWorkflowTemplateSteps.length > 0
       ? template.registrationWorkflowTemplateSteps.map((step) => ({
           title: step.title,
           description: step.description,
@@ -58,31 +65,22 @@ export async function POST(request: NextRequest) {
           assignedRoleId: step.assignedRoleId ?? template.responsibleRoleId,
           assignedPersonId: step.assignedPersonId ?? template.responsiblePersonId,
         }))
-      : null;
-
-  const workflowSteps = templateSteps
-    ? templateSteps
-    : template
-      ? [
-          {
-            title: template.name,
-            description: "Automatisch aus Admin Workflow-Template erstellt.",
-            sortOrder: 10,
-            defaultDueDays: template.defaultDueDays,
-            assignedRoleId: template.responsibleRoleId,
-            assignedPersonId: template.responsiblePersonId,
-          },
-          ...fallbackSteps.slice(1).map((step) => ({
+      : template
+        ? [
+            {
+              title: template.name,
+              description: "Automatisch aus Admin Workflow-Template erstellt.",
+              sortOrder: 10,
+              defaultDueDays: template.defaultDueDays,
+              assignedRoleId: template.responsibleRoleId,
+              assignedPersonId: template.responsiblePersonId,
+            },
+          ]
+        : getDefaultWorkflowSteps(targetGroup).map((step) => ({
             ...step,
-            assignedRoleId: template.responsibleRoleId,
-            assignedPersonId: template.responsiblePersonId,
-          })),
-        ]
-      : fallbackSteps.map((step) => ({
-          ...step,
-          assignedRoleId: null,
-          assignedPersonId: null,
-        }));
+            assignedRoleId: null,
+            assignedPersonId: null,
+          }));
 
   const registration = await prisma.registration.create({
     data: {
@@ -97,12 +95,13 @@ export async function POST(request: NextRequest) {
       gender: body.gender ?? null,
       targetGroup,
       conversionRole,
-      assignedTo: body.assignedTo ?? null,
+      assignedTo: body.assignedTo ?? template?.responsiblePersonId ?? null,
       notes: body.notes ?? null,
       formData: {
         ...(typeof body.formData === "object" && body.formData !== null ? body.formData : {}),
         source: body.source ?? body.formData?.source ?? "WEBAPP_MANUAL",
         workflowTemplateId: template?.id ?? null,
+        workflowSource: template ? "TEMPLATE" : "FALLBACK",
       },
       submittedBy: body.submittedBy ?? null,
       workflowSteps: {
@@ -125,4 +124,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ registration });
 }
-
