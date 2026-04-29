@@ -7,6 +7,28 @@ type Context = {
   params: Promise<{ registrationId: string; stepId: string }>;
 };
 
+async function findPersonIdForRole(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], roleId?: string | null) {
+  if (!roleId) return null;
+
+  const userRole = await tx.userRole.findFirst({
+    where: {
+      roleId,
+      user: {
+        isActive: true,
+        personId: { not: null },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      user: {
+        select: { personId: true },
+      },
+    },
+  });
+
+  return userRole?.user.personId ?? null;
+}
+
 export async function POST(_request: NextRequest, context: Context) {
   await requireApiAnyPermission([PERMISSIONS.PEOPLE_MANAGE]);
 
@@ -42,14 +64,23 @@ export async function POST(_request: NextRequest, context: Context) {
     });
 
     if (nextStep) {
+      const autoAssignedPersonId =
+        nextStep.assignedPersonId ?? (await findPersonIdForRole(tx, nextStep.assignedRoleId));
+
       await tx.registrationWorkflowStep.update({
         where: { id: nextStep.id },
-        data: { status: "IN_PROGRESS" },
+        data: {
+          status: "IN_PROGRESS",
+          assignedPersonId: autoAssignedPersonId,
+        },
       });
 
       await tx.registration.update({
         where: { id: registrationId },
-        data: { status: "IN_REVIEW" },
+        data: {
+          status: "IN_REVIEW",
+          assignedTo: autoAssignedPersonId ?? nextStep.assignedRoleId ?? null,
+        },
       });
     } else {
       await tx.registration.update({
