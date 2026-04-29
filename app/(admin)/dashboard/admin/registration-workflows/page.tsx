@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import { ArrowLeft, Workflow } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import RegistrationWorkflowTemplateForm from "@/components/admin/registrations/RegistrationWorkflowTemplateForm";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -48,6 +49,11 @@ export default async function RegistrationWorkflowsAdminPage() {
     if (!person) return "—";
     return person.displayName ?? (`${person.firstName} ${person.lastName}`.trim() || person.email || "—");
   }
+
+  const peopleOptions = people.map((person) => ({
+    id: person.id,
+    name: person.displayName ?? (`${person.firstName} ${person.lastName}`.trim() || person.email || "Unbekannt"),
+  }));
 
   return (
     <div className="space-y-8">
@@ -97,7 +103,7 @@ export default async function RegistrationWorkflowsAdminPage() {
           <Workflow className="h-6 w-6 text-[#0b4aa2]" />
         </div>
 
-        <div className="mt-6 grid gap-4">
+         <RegistrationWorkflowTemplateForm roles={roles} people={peopleOptions} /> <div className="mt-6 grid gap-4">
           {templates.length === 0 ? (
             <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-6">
               <p className="font-black text-slate-900">Noch keine Workflow-Templates definiert.</p>
@@ -134,4 +140,7 @@ export default async function RegistrationWorkflowsAdminPage() {
     </div>
   );
 }
+
+
+
 

@@ -63,7 +63,7 @@ const adminCards = [
     title: "Roles & Workflow",
     label: "Prepare, Review, Approve, Publish",
     icon: Workflow,
-    href: "/dashboard/users",
+    href: "/dashboard/admin/registration-workflows",
     status: "Config-driven",
   },
   {
@@ -409,6 +409,7 @@ export default async function AdminConfigurationPage() {
     </div>
   );
 }
+
 
 
 
