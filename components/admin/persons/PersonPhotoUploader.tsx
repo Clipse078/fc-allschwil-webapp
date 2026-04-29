@@ -76,9 +76,9 @@ export default function PersonPhotoUploader({
   }
 
   return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-[26px] border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-        <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-[30px] border border-slate-200 bg-gradient-to-br from-blue-50 to-red-50 shadow-sm">
+        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[30px] border border-slate-200 bg-gradient-to-br from-blue-50 to-red-50 shadow-sm">
           {previewUrl ? (
             <Image src={previewUrl} alt={name} fill className="object-cover" sizes="112px" />
           ) : (
@@ -90,7 +90,7 @@ export default function PersonPhotoUploader({
 
         <div className="min-w-0 flex-1">
           <p className="fca-eyebrow">Profilfoto</p>
-          <h3 className="mt-2 text-xl font-black text-slate-950">Foto der Person</h3>
+          <h3 className="mt-2 text-lg font-black text-slate-950">Foto der Person</h3>
           <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
             Wird zentral im Personenprofil gespeichert und später in Teamlisten, People Picker und Organigramm verwendet.
           </p>
@@ -142,3 +142,4 @@ export default function PersonPhotoUploader({
     </div>
   );
 }
+

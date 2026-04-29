@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 export default function TrainerProfile({ person, name, primaryType, typeLabels, qualificationsEditor }: { person: any; name: string; primaryType: string; typeLabels: string[]; qualificationsEditor: ReactNode }) {
   return (
     <ProfileShell person={person} name={name} primaryType={primaryType} typeLabels={typeLabels}>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <ProfileCard eyebrow="Zertifizierungen & Lizenzen" title="Qualifikationen" action={<span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-black text-[#0b4aa2]">{person.trainerExperienceYears ?? 0} Jahre Erfahrung</span>}>
           <div className="grid gap-3">
             {person.trainerQualifications.length === 0 ? <Empty text="Noch keine Qualifikationen hinterlegt." /> : person.trainerQualifications.map((q: any) => (
@@ -29,7 +29,7 @@ export default function TrainerProfile({ person, name, primaryType, typeLabels, 
         </ProfileCard>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_0.8fr]">
         <ProfileCard eyebrow="Wochenplan" title="Auszug">
           <div className="space-y-3 text-sm font-semibold text-slate-600">
             <div className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3"><CalendarDays className="h-4 w-4 text-[#0b4aa2]" />Trainings und Spiele werden später aus dem Wochenplan geladen.</div>
@@ -48,3 +48,4 @@ export default function TrainerProfile({ person, name, primaryType, typeLabels, 
 function Empty({ text }: { text: string }) {
   return <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">{text}</p>;
 }
+

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 export default function PlayerProfile({ person, name, primaryType, typeLabels, ratings }: { person: any; name: string; primaryType: string; typeLabels: string[]; ratings: ReactNode }) {
   return (
     <ProfileShell person={person} name={name} primaryType={primaryType} typeLabels={typeLabels}>
-      <ProfileCard eyebrow="Spielerprofil" title="Team Assignment">
+      <ProfileCard eyebrow="Spielerprofil" title="Teamzuordnung">
         <div className="grid gap-3">
           {person.playerSquadMembers.length === 0 ? <Empty text="Noch keinem Team zugeordnet." /> : person.playerSquadMembers.map((assignment: any) => {
             const teamName = assignment.teamSeason.shortName ?? assignment.teamSeason.displayName ?? assignment.teamSeason.team.name;
@@ -12,7 +12,7 @@ export default function PlayerProfile({ person, name, primaryType, typeLabels, r
           })}
         </div>
       </ProfileCard>
-      <ProfileCard eyebrow="Coach Notes" title="Interne Notizen">
+      <ProfileCard eyebrow="Trainernotizen" title="Interne Notizen">
         <textarea className="min-h-40 w-full rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 outline-none focus:border-blue-300" placeholder="Notizen, Beobachtungen oder Feedback zum Spieler..." defaultValue={person.notes ?? ""} />
       </ProfileCard>
       {ratings}
@@ -23,3 +23,4 @@ export default function PlayerProfile({ person, name, primaryType, typeLabels, r
 function Empty({ text }: { text: string }) {
   return <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">{text}</p>;
 }
+

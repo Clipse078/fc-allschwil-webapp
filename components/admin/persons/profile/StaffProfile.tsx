@@ -17,7 +17,7 @@ export default function StaffProfile({ person, name, primaryType, typeLabels, ro
         {departments.length ? <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">Bereiche: {departments.join(", ")}</p> : null}
       </ProfileCard>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <ProfileCard eyebrow="Zugewiesene Aufgaben" title="Pendenzen">
           <div className="space-y-3">
             {person.vereinsleitungOwnedMatters.length === 0 ? <Empty text="Keine offenen Einträge sichtbar." /> : person.vereinsleitungOwnedMatters.map((matter: any) => <div key={matter.title} className="rounded-2xl bg-slate-50 px-4 py-3"><p className="font-bold text-slate-900">{matter.title}</p><p className="mt-1 text-xs font-semibold text-slate-500">{matter.status} · {matter.priority} · {formatDate(matter.dueDate)}</p></div>)}
@@ -40,3 +40,4 @@ function Kpi({ icon, label, value, highlight }: { icon: React.ReactNode; label: 
 function Empty({ text }: { text: string }) {
   return <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">{text}</p>;
 }
+
