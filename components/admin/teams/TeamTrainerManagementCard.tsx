@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
@@ -64,23 +65,6 @@ const STATUS_OPTIONS = [
   { value: "ARCHIVED", label: "Archiviert" },
 ];
 
-const QUALIFICATION_TYPE_OPTIONS = [
-  { value: "DIPLOMA", label: "Diplom" },
-  { value: "CERTIFICATE", label: "Zertifikat" },
-  { value: "COURSE", label: "Kurs" },
-  { value: "WORKSHOP", label: "Workshop" },
-  { value: "FIRST_AID", label: "Erste Hilfe" },
-  { value: "OTHER", label: "Sonstiges" },
-];
-
-const QUALIFICATION_STATUS_OPTIONS = [
-  { value: "UNKNOWN", label: "Unbekannt" },
-  { value: "VALID", label: "Gültig" },
-  { value: "IN_PROGRESS", label: "In Ausbildung" },
-  { value: "EXPIRED", label: "Abgelaufen" },
-  { value: "PLANNED", label: "Geplant" },
-];
-
 function getPersonName(person: {
   firstName: string;
   lastName: string;
@@ -126,24 +110,7 @@ export default function TeamTrainerManagementCard({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [removeMessage, setRemoveMessage] = useState<string | null>(null);
 
-  const [qualificationPersonId, setQualificationPersonId] = useState<string | null>(null);
   const [expandedQualificationPersonId, setExpandedQualificationPersonId] = useState<string | null>(null);
-  const [qualificationTitle, setQualificationTitle] = useState("");
-  const [qualificationType, setQualificationType] = useState("DIPLOMA");
-  const [qualificationStatus, setQualificationStatus] = useState("UNKNOWN");
-  const [qualificationIssuer, setQualificationIssuer] = useState("");
-  const [qualificationLoading, setQualificationLoading] = useState(false);
-  const [deletingQualificationId, setDeletingQualificationId] = useState<string | null>(null);
-  const [qualificationMessage, setQualificationMessage] = useState<string | null>(null);
-  const [qualificationError, setQualificationError] = useState<string | null>(null);
-
-  const [editingQualificationId, setEditingQualificationId] = useState<string | null>(null);
-  const [editQualificationTitle, setEditQualificationTitle] = useState("");
-  const [editQualificationType, setEditQualificationType] = useState("DIPLOMA");
-  const [editQualificationStatus, setEditQualificationStatus] = useState("UNKNOWN");
-  const [editQualificationIssuer, setEditQualificationIssuer] = useState("");
-  const [editQualificationVerified, setEditQualificationVerified] = useState(false);
-  const [updatingQualificationId, setUpdatingQualificationId] = useState<string | null>(null);
 
   async function handleAssign() {
     if (!canManage) return;
@@ -197,148 +164,6 @@ export default function TeamTrainerManagementCard({
     }
   }
 
-  async function handleCreateQualification(personId: string) {
-    if (!canManage) return;
-
-    if (!qualificationTitle.trim()) {
-      setQualificationError("Bitte einen Diplom- oder Kursnamen erfassen.");
-      setQualificationMessage(null);
-      return;
-    }
-
-    setQualificationLoading(true);
-    setQualificationError(null);
-    setQualificationMessage(null);
-
-    try {
-      const response = await fetch("/api/people/" + personId + "/trainer-qualifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: qualificationTitle,
-          type: qualificationType,
-          status: qualificationStatus,
-          issuer: qualificationIssuer,
-          isClubVerified: false,
-        }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Trainer-Diplom konnte nicht gespeichert werden.");
-      }
-
-      setQualificationMessage(data?.message ?? "Trainer-Diplom erfolgreich hinterlegt.");
-      setQualificationTitle("");
-      setQualificationType("DIPLOMA");
-      setQualificationStatus("UNKNOWN");
-      setQualificationIssuer("");
-      setQualificationPersonId(null);
-      router.refresh();
-    } catch (err) {
-      setQualificationError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
-    } finally {
-      setQualificationLoading(false);
-    }
-  }
-
-  function startEditQualification(qualification: TrainerQualification) {
-    setEditingQualificationId(qualification.id);
-    setEditQualificationTitle(qualification.title);
-    setEditQualificationType(qualification.type);
-    setEditQualificationStatus(qualification.status);
-    setEditQualificationIssuer(qualification.issuer ?? "");
-    setEditQualificationVerified(qualification.isClubVerified);
-    setQualificationError(null);
-    setQualificationMessage(null);
-  }
-
-  function cancelEditQualification() {
-    setEditingQualificationId(null);
-    setEditQualificationTitle("");
-    setEditQualificationType("DIPLOMA");
-    setEditQualificationStatus("UNKNOWN");
-    setEditQualificationIssuer("");
-    setEditQualificationVerified(false);
-  }
-
-  async function handleUpdateQualification(personId: string, qualificationId: string) {
-    if (!canManage) return;
-
-    if (!editQualificationTitle.trim()) {
-      setQualificationError("Bitte einen Diplom- oder Kursnamen erfassen.");
-      setQualificationMessage(null);
-      return;
-    }
-
-    setUpdatingQualificationId(qualificationId);
-    setQualificationError(null);
-    setQualificationMessage(null);
-
-    try {
-      const response = await fetch(
-        "/api/people/" + personId + "/trainer-qualifications/" + qualificationId,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: editQualificationTitle,
-            type: editQualificationType,
-            status: editQualificationStatus,
-            issuer: editQualificationIssuer,
-            isClubVerified: editQualificationVerified,
-          }),
-        },
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Trainer-Diplom konnte nicht aktualisiert werden.");
-      }
-
-      setQualificationMessage(data?.message ?? "Trainer-Diplom erfolgreich aktualisiert.");
-      cancelEditQualification();
-      router.refresh();
-    } catch (err) {
-      setQualificationError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
-    } finally {
-      setUpdatingQualificationId(null);
-    }
-  }
-
-  async function handleDeleteQualification(personId: string, qualification: TrainerQualification) {
-    if (!canManage) return;
-
-    const confirmed = window.confirm('Diplom "' + qualification.title + '" wirklich löschen?');
-    if (!confirmed) return;
-
-    setDeletingQualificationId(qualification.id);
-    setQualificationError(null);
-    setQualificationMessage(null);
-
-    try {
-      const response = await fetch(
-        "/api/people/" + personId + "/trainer-qualifications/" + qualification.id,
-        { method: "DELETE" },
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Trainer-Diplom konnte nicht gelöscht werden.");
-      }
-
-      setQualificationMessage(data?.message ?? "Trainer-Diplom erfolgreich gelöscht.");
-      router.refresh();
-    } catch (err) {
-      setQualificationError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
-    } finally {
-      setDeletingQualificationId(null);
-    }
-  }
-
   async function handleInlineUpdate(member: TrainerMember, updates: Partial<Pick<TrainerMember, "isWebsiteVisible" | "roleLabel">>) {
     if (!canManage) return;
 
@@ -368,6 +193,7 @@ export default function TeamTrainerManagementCard({
       setRemoveError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
     }
   }
+
   async function handleRemove(member: TrainerMember) {
     if (!canManage) return;
 
@@ -427,7 +253,7 @@ export default function TeamTrainerManagementCard({
           <div>
             <h5 className="fca-eyebrow">Trainer zuweisen</h5>
             <p className="fca-body-muted mt-2">
-              Neue Personen werden nur im People-Modul angelegt. Die Suche zeigt nur zuweisbare Trainer.
+              Neue Personen werden nur im Personenmodul angelegt. Die Suche zeigt nur zuweisbare Trainer.
             </p>
           </div>
 
@@ -498,8 +324,6 @@ export default function TeamTrainerManagementCard({
         </div>
       )}
 
-      {qualificationError ? <div className="fca-status-box fca-status-box-error mt-4">{qualificationError}</div> : null}
-      {qualificationMessage ? <div className="fca-status-box fca-status-box-success mt-4">{qualificationMessage}</div> : null}
       {removeError ? <div className="fca-status-box fca-status-box-error mt-4">{removeError}</div> : null}
       {removeMessage ? <div className="fca-status-box fca-status-box-success mt-4">{removeMessage}</div> : null}
 
@@ -509,44 +333,40 @@ export default function TeamTrainerManagementCard({
         </div>
       ) : (
         <div className="mt-5 space-y-3">
-          {teamSeason.trainerTeamMembers.map((member) => (
-            <AdminListItem
-              key={member.id}
-              avatar={<AdminAvatar name={getPersonName(member.person)} size="md" />}
-              title={getPersonName(member.person)}
-              subtitle={[
-                canManage ? (
-                  <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
-                    <span className="text-[11px] font-semibold text-slate-400">Rolle</span>
-                    <input
-                      type="text"
-                      defaultValue={member.roleLabel ?? ""}
-                      onBlur={(event) => handleInlineUpdate(member, { roleLabel: event.target.value.trim() || null })}
-                      className="w-32 bg-transparent text-xs font-semibold text-slate-700 outline-none"
-                    />
-                  </label>
-                ) : member.roleLabel ?? "Keine Rolle hinterlegt",
-                member.person.trainerQualifications && member.person.trainerQualifications.length > 0
-                  ? "Diplome: " + member.person.trainerQualifications.map(getTrainerQualificationLabel).join(" | ")
-                  : "Keine Diplome hinterlegt",
-              ].join(" • ")}
-              meta={
-                <>
-                  <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
-                  <button type="button" onClick={() => handleInlineUpdate(member, { isWebsiteVisible: !member.isWebsiteVisible })} disabled={!canManage} className="fca-pill">Website: {member.isWebsiteVisible ? "Ja" : "Nein"}</button>
-                  <button type="button" onClick={() => setExpandedQualificationPersonId(expandedQualificationPersonId === member.person.id ? null : member.person.id)} className="fca-pill">Diplome: {member.person.trainerQualifications?.length ?? 0}</button>
-                </>
-              }
-              actions={
-                canManage ? (
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setQualificationPersonId(qualificationPersonId === member.person.id ? null : member.person.id)}
-                      className="fca-button-secondary"
-                    >
-                      Diplom erfassen
-                    </button>
+          {teamSeason.trainerTeamMembers.map((member) => {
+            const qualifications = member.person.trainerQualifications ?? [];
+
+            return (
+              <AdminListItem
+                key={member.id}
+                avatar={<AdminAvatar name={getPersonName(member.person)} size="md" />}
+                title={getPersonName(member.person)}
+                subtitle={[
+                  canManage ? (
+                    <label className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
+                      <span className="text-[11px] font-semibold text-slate-400">Rolle</span>
+                      <input
+                        type="text"
+                        defaultValue={member.roleLabel ?? ""}
+                        onBlur={(event) => handleInlineUpdate(member, { roleLabel: event.target.value.trim() || null })}
+                        className="w-32 bg-transparent text-xs font-semibold text-slate-700 outline-none"
+                      />
+                    </label>
+                  ) : member.roleLabel ?? "Keine Rolle hinterlegt",
+                  qualifications.length > 0
+                    ? "Diplome: " + qualifications.map(getTrainerQualificationLabel).join(" | ")
+                    : "Keine Diplome hinterlegt",
+                ].join(" • ")}
+                meta={
+                  <>
+                    <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
+                    <button type="button" onClick={() => handleInlineUpdate(member, { isWebsiteVisible: !member.isWebsiteVisible })} disabled={!canManage} className="fca-pill">Website: {member.isWebsiteVisible ? "Ja" : "Nein"}</button>
+                    <button type="button" onClick={() => setExpandedQualificationPersonId(expandedQualificationPersonId === member.person.id ? null : member.person.id)} className="fca-pill">Diplome: {qualifications.length}</button>
+                    <Link href={`/dashboard/persons/${member.person.id}`} className="fca-pill">Profil öffnen</Link>
+                  </>
+                }
+                actions={
+                  canManage ? (
                     <button
                       type="button"
                       onClick={() => handleRemove(member)}
@@ -555,89 +375,12 @@ export default function TeamTrainerManagementCard({
                     >
                       {removingMemberId === member.id ? "Entfernen..." : "Entfernen"}
                     </button>
-
-                    {expandedQualificationPersonId === member.person.id ? (
-                      <div className="mt-2 w-full min-w-[320px] rounded-[22px] border border-blue-100 bg-blue-50/60 p-4 text-left shadow-sm">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="fca-label">Interne Diplome / Zertifikate</div>
-                          <span className="fca-pill">Intern</span>
-                        </div>
-                        {member.person.trainerQualifications && member.person.trainerQualifications.length > 0 ? (
-                          <div className="mt-3 space-y-2">
-                            {member.person.trainerQualifications.map((qualification) => (
-                              <div key={qualification.id} className="rounded-[18px] border border-blue-100 bg-white px-3 py-2">
-                                {editingQualificationId === qualification.id ? (
-                                  <div className="grid gap-3">
-                                    <input className="fca-input" value={editQualificationTitle} onChange={(event) => setEditQualificationTitle(event.target.value)} />
-                                    <input className="fca-input" value={editQualificationIssuer} onChange={(event) => setEditQualificationIssuer(event.target.value)} placeholder="Aussteller" />
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                      <select className="fca-select" value={editQualificationType} onChange={(event) => setEditQualificationType(event.target.value)}>
-                                        {QUALIFICATION_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                                      </select>
-                                      <select className="fca-select" value={editQualificationStatus} onChange={(event) => setEditQualificationStatus(event.target.value)}>
-                                        {QUALIFICATION_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                                      </select>
-                                    </div>
-                                    <Toggle label="Vom Club geprüft" value={editQualificationVerified} onChange={setEditQualificationVerified} />
-                                    <div className="flex flex-wrap justify-end gap-2">
-                                      <button type="button" onClick={cancelEditQualification} className="fca-button-secondary">Abbrechen</button>
-                                      <button type="button" onClick={() => handleUpdateQualification(member.person.id, qualification.id)} disabled={updatingQualificationId === qualification.id} className="fca-button-primary">
-                                        {updatingQualificationId === qualification.id ? "Speichern..." : "Speichern"}
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <div className="font-semibold text-slate-900">{qualification.title}</div>
-                                      <div className="mt-1 text-xs text-slate-500">
-                                        {[qualification.issuer, qualification.status, qualification.isClubVerified ? "geprüft" : null].filter(Boolean).join(" · ") || "Keine Zusatzdaten"}
-                                      </div>
-                                    </div>
-                                    <div className="flex shrink-0 gap-2">
-                                      <button type="button" onClick={() => startEditQualification(qualification)} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">Edit</button>
-                                      <button type="button" onClick={() => handleDeleteQualification(member.person.id, qualification)} disabled={deletingQualificationId === qualification.id} className="rounded-full border border-red-100 bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
-                                        {deletingQualificationId === qualification.id ? "Löschen..." : "Löschen"}
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="fca-status-box fca-status-box-muted mt-3">Noch keine Diplome hinterlegt.</div>
-                        )}
-                      </div>
-                    ) : null}
-
-                    {qualificationPersonId === member.person.id ? (
-                      <div className="mt-2 w-full min-w-[280px] rounded-[22px] border border-slate-200 bg-white p-4 text-left shadow-sm">
-                        <div className="fca-label">Internes Diplom / Zertifikat</div>
-                        <div className="mt-3 grid gap-3">
-                          <input className="fca-input" value={qualificationTitle} onChange={(event) => setQualificationTitle(event.target.value)} placeholder="z. B. SFV Kinderfussball-Diplom" />
-                          <input className="fca-input" value={qualificationIssuer} onChange={(event) => setQualificationIssuer(event.target.value)} placeholder="Aussteller, z. B. SFV / FVNWS" />
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <select className="fca-select" value={qualificationType} onChange={(event) => setQualificationType(event.target.value)}>
-                              {QUALIFICATION_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                            </select>
-                            <select className="fca-select" value={qualificationStatus} onChange={(event) => setQualificationStatus(event.target.value)}>
-                              {QUALIFICATION_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                            </select>
-                          </div>
-                          <button type="button" onClick={() => handleCreateQualification(member.person.id)} disabled={qualificationLoading} className="fca-button-primary">
-                            {qualificationLoading ? "Speichern..." : "Intern speichern"}
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-400">Nur lesen</span>
-                )
-              }
-            />
-          ))}
+                  ) : (
+                    <span className="text-xs text-slate-400">Nur lesen</span>
+                  )
+                } />
+            );
+          })}
         </div>
       )}
     </div>
@@ -665,6 +408,4 @@ function Toggle({
     </div>
   );
 }
-
-
 
