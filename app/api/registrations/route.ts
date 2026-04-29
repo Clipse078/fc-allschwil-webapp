@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { createWorkflowForRegistration } from "@/lib/registrations/workflow-engine";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
@@ -122,5 +123,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json({ registration });
+  await createWorkflowForRegistration(registration.id);
+return NextResponse.json({ registration });
 }
+
+
