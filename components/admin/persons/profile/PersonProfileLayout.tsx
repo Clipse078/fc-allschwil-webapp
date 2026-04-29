@@ -79,3 +79,49 @@ export function ProfileCard({ eyebrow, title, children, action }: { eyebrow?: st
   );
 }
 
+
+export function ProfileEmptyState({ text }: { text: string }) {
+  return (
+    <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">
+      {text}
+    </p>
+  );
+}
+
+export function ProfileKpiTile({
+  icon,
+  label,
+  value,
+  highlight,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className={"rounded-[26px] border p-5 shadow-sm " + (highlight ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white")}>
+      <div className="flex items-center gap-3 text-slate-500">
+        {icon}
+        <span className="text-xs font-black uppercase tracking-[0.14em]">{label}</span>
+      </div>
+      <p className="mt-3 text-3xl font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+export function CareerTimelinePlaceholder({
+  title = "Karriere & Historie",
+  text = "Die saisonbasierte Laufbahn wird später aus dem Karriere-/Historienmodell geladen.",
+}: {
+  title?: string;
+  text?: string;
+}) {
+  return (
+    <ProfileCard eyebrow="Saisonhistorie" title={title}>
+      <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/80 p-5">
+        <p className="text-sm font-semibold leading-6 text-slate-600">{text}</p>
+      </div>
+    </ProfileCard>
+  );
+}
