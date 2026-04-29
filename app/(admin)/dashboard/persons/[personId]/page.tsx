@@ -1,4 +1,7 @@
 ﻿import Link from "next/link";
+import PlayerSeasonRatingsCard from "@/components/admin/players/PlayerSeasonRatingsCard";
+import { auth } from "@/auth";
+import { getPlayerRatingPermissionReasons } from "@/lib/players/player-rating-permissions";
 import { notFound } from "next/navigation";
 import { Award, BadgeCheck, BriefcaseBusiness, CalendarDays, Mail, Phone, ShieldCheck, UserRound, Users } from "lucide-react";
 
@@ -49,6 +52,7 @@ function InfoTile({
 
 export default async function PersonDetailPage({ params }: Props) {
   await requirePermission(PERMISSIONS.PEOPLE_VIEW);
+  const session = await auth();
   const { personId } = await params;
 
   const person = await prisma.person.findUnique({
@@ -133,6 +137,30 @@ export default async function PersonDetailPage({ params }: Props) {
           createdAt: true,
         },
       },
+      playerSeasonRatings: {
+        orderBy: { season: { startDate: "desc" } },
+        select: {
+          id: true,
+          personId: true,
+          seasonId: true,
+          overallRating: true,
+          potentialRating: true,
+          technicalRating: true,
+          tacticalRating: true,
+          physicalRating: true,
+          mentalityRating: true,
+          socialRating: true,
+          notes: true,
+          season: {
+            select: {
+              id: true,
+              key: true,
+              name: true,
+              isActive: true,
+            },
+          },
+        },
+      },
       vereinsleitungOwnedMatters: {
         orderBy: { createdAt: "desc" },
         take: 5,
@@ -173,6 +201,22 @@ export default async function PersonDetailPage({ params }: Props) {
     roleNames.length ? "Vereinsfunktionär" : null,
     !person.isPlayer && !person.isTrainer && roleNames.length === 0 ? "Person" : null,
   ].filter((value): value is string => Boolean(value));
+  const seasons = person.isPlayer
+    ? await prisma.season.findMany({
+        orderBy: { startDate: "desc" },
+        select: { id: true, key: true, name: true, isActive: true },
+      })
+    : [];
+  const currentSeason = seasons.find((season) => season.isActive) ?? null;
+  const actorUserId = session?.user?.effectiveUserId ?? session?.user?.id ?? null;
+  const ratingPermission = person.isPlayer && currentSeason
+    ? await getPlayerRatingPermissionReasons({
+        userId: actorUserId ?? null,
+        personId: person.id,
+        seasonId: currentSeason.id,
+      })
+    : { canRate: false, reasons: ["Keine aktive Saison gefunden."] };
+
 
   return (
     <div className="space-y-8">
@@ -384,6 +428,22 @@ export default async function PersonDetailPage({ params }: Props) {
           </div>
         </section>
       ) : null}
+
+      {person.isPlayer ? (
+        <PlayerSeasonRatingsCard
+          personId={person.id}
+          seasons={seasons}
+          currentSeasonId={currentSeason?.id ?? null}
+          initialRatings={person.playerSeasonRatings}
+          canEdit={ratingPermission.canRate}
+          permissionReasons={ratingPermission.reasons}
+        />
+      ) : null}
     </div>
   );
 }
+
+
+
+
+
