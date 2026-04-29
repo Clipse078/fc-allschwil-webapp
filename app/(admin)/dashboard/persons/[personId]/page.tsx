@@ -1,5 +1,6 @@
 ﻿import PlayerSeasonRatingsCard from "@/components/admin/players/PlayerSeasonRatingsCard";
 import TrainerQualificationsCard from "@/components/admin/players/TrainerQualificationsCard";
+import BasePersonProfile from "@/components/admin/persons/profile/BasePersonProfile";
 import PlayerProfile from "@/components/admin/persons/profile/PlayerProfile";
 import StaffProfile from "@/components/admin/persons/profile/StaffProfile";
 import TrainerProfile from "@/components/admin/persons/profile/TrainerProfile";
@@ -198,6 +199,16 @@ export default async function PersonDetailPage({ params }: Props) {
     );
   }
 
-  return <StaffProfile person={person} name={name} primaryType={primaryType} typeLabels={typeLabels} roleNames={roleNames} departments={departments} />;
+  if (roleNames.length) {
+    return <StaffProfile person={person} name={name} primaryType={primaryType} typeLabels={typeLabels} roleNames={roleNames} departments={departments} />;
+  }
+
+  return <BasePersonProfile person={person} name={name} primaryType={primaryType} typeLabels={typeLabels} />;
 }
+
+
+
+
+
+
 
