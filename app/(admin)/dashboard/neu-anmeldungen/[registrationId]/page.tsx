@@ -1,27 +1,21 @@
-﻿import RegistrationProfileWrapper from "@/components/admin/registrations/RegistrationProfileWrapper";
+﻿import { notFound } from "next/navigation";
+import RegistrationProfileWrapper from "@/components/admin/registrations/RegistrationProfileWrapper";
+import { prisma } from "@/lib/db/prisma";
 
-export default function RegistrationDetailPage() {
-  const mockPerson = {
-    firstName: "Max",
-    lastName: "Mustermann",
-    isPlayer: true,
-    isTrainer: false,
-    isActive: true,
-    playerSquadMembers: [],
-    trainerTeamMembers: [],
-    trainerQualifications: [],
-  };
+export default async function RegistrationDetailPage({
+  params,
+}: {
+  params: Promise<{ registrationId: string }>;
+}) {
+  const { registrationId } = await params;
 
-  const name = mockPerson.firstName + " " + mockPerson.lastName;
-  const primaryType = "Spieler";
-  const typeLabels = ["Spieler"];
+  const registration = await prisma.registration.findUnique({
+    where: { id: registrationId },
+  });
 
-  return (
-    <RegistrationProfileWrapper
-      person={mockPerson}
-      name={name}
-      primaryType={primaryType}
-      typeLabels={typeLabels}
-    />
-  );
+  if (!registration) {
+    notFound();
+  }
+
+  return <RegistrationProfileWrapper registration={registration} />;
 }
