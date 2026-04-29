@@ -2,32 +2,11 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { findBestPersonIdForRole } from "@/lib/registrations/auto-assignment";
 
 type Context = {
   params: Promise<{ registrationId: string; stepId: string }>;
 };
-
-async function findPersonIdForRole(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], roleId?: string | null) {
-  if (!roleId) return null;
-
-  const userRole = await tx.userRole.findFirst({
-    where: {
-      roleId,
-      user: {
-        isActive: true,
-        personId: { not: null },
-      },
-    },
-    orderBy: { createdAt: "asc" },
-    select: {
-      user: {
-        select: { personId: true },
-      },
-    },
-  });
-
-  return userRole?.user.personId ?? null;
-}
 
 export async function POST(_request: NextRequest, context: Context) {
   await requireApiAnyPermission([PERMISSIONS.PEOPLE_MANAGE]);
@@ -65,7 +44,7 @@ export async function POST(_request: NextRequest, context: Context) {
 
     if (nextStep) {
       const autoAssignedPersonId =
-        nextStep.assignedPersonId ?? (await findPersonIdForRole(tx, nextStep.assignedRoleId));
+        nextStep.assignedPersonId ?? (await findBestPersonIdForRole(tx, nextStep.assignedRoleId));
 
       await tx.registrationWorkflowStep.update({
         where: { id: nextStep.id },
