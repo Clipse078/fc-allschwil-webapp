@@ -2,27 +2,10 @@
 import { ArrowLeft, Workflow } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import RegistrationWorkflowTemplateForm from "@/components/admin/registrations/RegistrationWorkflowTemplateForm";
-import RegistrationWorkflowTemplateStepsEditor from "@/components/admin/registrations/RegistrationWorkflowTemplateStepsEditor";
+import RegistrationWorkflowTemplateCard from "@/components/admin/registrations/RegistrationWorkflowTemplateCard";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-
-const targetGroupLabels: Record<string, string> = {
-  KINDERFUSSBALL: "Kinderfussball",
-  JUNIOREN: "Junioren",
-  FRAUEN: "Frauen",
-  AKTIVE: "Aktive",
-  TRAININGSGRUPPE: "Trainingsgruppe",
-  TRAINERSTAFF: "Trainerstaff",
-  OTHER: "Andere",
-};
-
-const typeLabels: Record<string, string> = {
-  PLAYER: "Spieler",
-  TRAINER: "Trainer",
-  STAFF: "Staff",
-  EXTERNAL: "Extern",
-};
 
 export default async function RegistrationWorkflowsAdminPage() {
   await requirePermission(PERMISSIONS.USERS_MANAGE);
@@ -46,11 +29,6 @@ export default async function RegistrationWorkflowsAdminPage() {
     }),
   ]);
 
-  function personName(person: { firstName: string; lastName: string; displayName?: string | null; email?: string | null } | null) {
-    if (!person) return "—";
-    return person.displayName ?? (`${person.firstName} ${person.lastName}`.trim() || person.email || "—");
-  }
-
   const peopleOptions = people.map((person) => ({
     id: person.id,
     name: person.displayName ?? (`${person.firstName} ${person.lastName}`.trim() || person.email || "Unbekannt"),
@@ -62,7 +40,7 @@ export default async function RegistrationWorkflowsAdminPage() {
         <AdminSectionHeader
           eyebrow="Admin · Workflows"
           title="Anmelde-Workflows"
-          description="Steuere Zielgruppen, Zuständigkeiten und Standard-Fristen für neue Anmeldungen. Diese Konfiguration ersetzt später hardcodierte Regeln."
+          description="Steuere Zielgruppen, Zuständigkeiten und Fristen für neue Anmeldungen."
         />
 
         <Link
@@ -116,30 +94,12 @@ export default async function RegistrationWorkflowsAdminPage() {
             </div>
           ) : (
             templates.map((template) => (
-              <div key={template.id} className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-black text-slate-950">{template.name}</h3>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">
-                      {targetGroupLabels[template.targetGroup] ?? template.targetGroup}
-                      {template.registrationType ? ` · ${typeLabels[template.registrationType] ?? template.registrationType}` : " · Alle Typen"}
-                    </p>
-                  </div>
-                  <span className={`rounded-full border px-3 py-1 text-xs font-black ${template.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
-                    {template.isActive ? "Aktiv" : "Inaktiv"}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid gap-3 text-sm font-semibold text-slate-600 md:grid-cols-3">
-                  <p>Standardfrist: <span className="font-black text-slate-900">{template.defaultDueDays} Tage</span></p>
-                  <p>Rolle: <span className="font-black text-slate-900">{template.responsibleRole?.name ?? "—"}</span></p>
-                  <p>Person: <span className="font-black text-slate-900">{personName(template.responsiblePerson)}</span></p>
-                </div>
-
-                <div className="mt-5">
-                  <RegistrationWorkflowTemplateStepsEditor templateId={template.id} />
-                </div>
-              </div>
+              <RegistrationWorkflowTemplateCard
+                key={template.id}
+                template={template}
+                roles={roles}
+                people={peopleOptions}
+              />
             ))
           )}
         </div>
