@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import PlayerSeasonRatingsCard from "@/components/admin/players/PlayerSeasonRatingsCard";
 import TrainerQualificationsCard from "@/components/admin/players/TrainerQualificationsCard";
+import PersonPhotoUploader from "@/components/admin/persons/PersonPhotoUploader";
 import { auth } from "@/auth";
 import { getPlayerRatingPermissionReasons } from "@/lib/players/player-rating-permissions";
 import { notFound } from "next/navigation";
@@ -446,6 +447,7 @@ export default async function PersonDetailPage({ params }: Props) {
     </div>
   );
 }
+
 
 
 
