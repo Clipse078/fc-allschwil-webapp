@@ -178,38 +178,6 @@ function getStaticHeaderContent(pathname: string, firstName?: string): HeaderCon
     };
   }
 
-  if (pathname === "/dashboard/vereinsfunktionaere") {
-    return {
-      eyebrow: "6. Personen",
-      title: "Vereinsfunktionäre",
-      description: "Demo-Platzhalter für Vereinsfunktionäre als eigenes Personen-Teilmodul.",
-    };
-  }
-
-  if (pathname === "/dashboard/external-contacts") {
-    return {
-      eyebrow: "6. Personen",
-      title: "Externe Kontakte",
-      description: "Demo-Platzhalter für externe Kontakte als eigenes Personen-Teilmodul.",
-    };
-  }
-
-  if (pathname === "/dashboard/trainers") {
-    return {
-      eyebrow: "6. Personen",
-      title: "Trainer",
-      description: "Trainerdaten strukturiert verwalten und für Organisation und Website bereitstellen.",
-    };
-  }
-
-  if (pathname === "/dashboard/players") {
-    return {
-      eyebrow: "6. Personen",
-      title: "Spieler",
-      description: "Spielerdaten zentral verwalten und für spätere Prozesse und Teams nutzbar machen.",
-    };
-  }
-
   if (pathname === "/dashboard/neu-anmeldungen") {
     return {
       eyebrow: "7. Neue Anmeldungen",
@@ -668,6 +636,7 @@ export default function AdminPageHeader({
     </div>
   );
 }
+
 
 
 

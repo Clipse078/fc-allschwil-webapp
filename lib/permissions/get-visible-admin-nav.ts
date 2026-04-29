@@ -81,7 +81,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
   },
   {
-    label: "2.4 AktivitÃ¤ten / Events",
+    label: "2.4 Aktivitäten / Events",
     href: "/dashboard/operations/aktivitaeten-events",
     parentLabel: "Operations & Organisation",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
@@ -196,7 +196,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
 
   {
-    label: "Persons",
+    label: "Personen",
     href: "/dashboard/persons",
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
@@ -219,7 +219,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
   },
   {
-    label: "7.3 Neue VereinsfunktionÃ¤re",
+    label: "7.3 Neue Vereinsfunktionäre",
     href: "/dashboard/neu-anmeldungen/neue-vereinsfunktionaere",
     parentLabel: "Neue Anmeldungen",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
@@ -243,6 +243,7 @@ export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavIte
     );
   });
 }
+
 
 
 

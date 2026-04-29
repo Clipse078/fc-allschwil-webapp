@@ -81,7 +81,7 @@ function getNavIcon(label: string) {
       return Wrench;
     case "Medien":
       return ImageIcon;
-    case "AktivitÃ¤ten / Events":
+    case "Aktivitäten / Events":
       return CalendarDays;
     case "Business Club":
       return ShieldCheck;
@@ -98,7 +98,7 @@ function getNavIcon(label: string) {
     case "Aktuelle Saison":
     case "Current Season":
       return CalendarRange;
-    case "NÃ¤chste Saison":
+    case "Nächste Saison":
     case "Next Season":
       return CalendarRange;
     case "Jahresplan":
@@ -117,16 +117,7 @@ function getNavIcon(label: string) {
     case "Persons":
       return UserCircle2;
     case "Trainer":
-    case "Trainers":
-      return BadgeIcon;
     case "Spieler":
-    case "Players":
-      return UserRound;
-    case "VereinsfunktionÃ¤re":
-      return Users;
-    case "Externe Kontakte":
-    case "External Contacts":
-      return UserCircle2;
     case "Neue Anmeldungen":
       return UserPlus;
     case "Neue Trainer":
@@ -161,15 +152,9 @@ function getDisplayLabel(label: string) {
     case "Current Season":
       return "Aktuelle Saison";
     case "Next Season":
-      return "NÃ¤chste Saison";
+      return "Nächste Saison";
     case "Persons":
       return "Personen";
-    case "Trainers":
-      return "Trainer";
-    case "Players":
-      return "Spieler";
-    case "External Contacts":
-      return "Externe Kontakte";
     case "Users & Roles":
       return "Benutzer & Rollen";
     case "Media":
@@ -258,7 +243,7 @@ export default function VereinsOSSidebar({
                 <button
                   type="button"
                   onClick={handleToggle}
-                  aria-label="MenÃ¼ einklappen"
+                  aria-label="Menü einklappen"
                   className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -271,7 +256,7 @@ export default function VereinsOSSidebar({
                 <button
                   type="button"
                   onClick={handleToggle}
-                  aria-label="MenÃ¼ erweitern"
+                  aria-label="Menü erweitern"
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -419,6 +404,7 @@ export default function VereinsOSSidebar({
     </aside>
   );
 }
+
 
 
 
