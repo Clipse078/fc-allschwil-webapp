@@ -108,7 +108,7 @@ export default function RegistrationProfileWrapper({
           <span className={`rounded-full border px-3 py-1 text-xs font-black ${meta.className}`}>
             {meta.label}
           </span>
-          <RegistrationActions registrationId={registration.id} status={registration.status} />
+          <RegistrationActions registrationId={registration.id} status={registration.status} linkedPersonId={registration.linkedPersonId} />
         </div>
       </div>
 
@@ -219,3 +219,4 @@ export default function RegistrationProfileWrapper({
     </div>
   );
 }
+
