@@ -36,40 +36,53 @@ export async function POST(request: NextRequest) {
     where: {
       targetGroup,
       isActive: true,
-      OR: [
-        { registrationType: body.type },
-        { registrationType: null },
-      ],
+      OR: [{ registrationType: body.type }, { registrationType: null }],
     },
-    orderBy: [
-      { registrationType: "desc" },
-      { sortOrder: "asc" },
-      { createdAt: "asc" },
-    ],
+    orderBy: [{ registrationType: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    include: {
+      registrationWorkflowTemplateSteps: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
   });
 
   const fallbackSteps = getDefaultWorkflowSteps(targetGroup);
-  const workflowSteps = template
-    ? [
-        {
-          title: template.name,
-          description: "Automatisch aus Admin Workflow-Template erstellt.",
-          sortOrder: 10,
-          defaultDueDays: template.defaultDueDays,
-          assignedRoleId: template.responsibleRoleId,
-          assignedPersonId: template.responsiblePersonId,
-        },
-        ...fallbackSteps.slice(1).map((step) => ({
+
+  const templateSteps =
+    template?.registrationWorkflowTemplateSteps && template.registrationWorkflowTemplateSteps.length > 0
+      ? template.registrationWorkflowTemplateSteps.map((step) => ({
+          title: step.title,
+          description: step.description,
+          sortOrder: step.sortOrder,
+          defaultDueDays: step.defaultDueDays,
+          assignedRoleId: step.assignedRoleId ?? template.responsibleRoleId,
+          assignedPersonId: step.assignedPersonId ?? template.responsiblePersonId,
+        }))
+      : null;
+
+  const workflowSteps = templateSteps
+    ? templateSteps
+    : template
+      ? [
+          {
+            title: template.name,
+            description: "Automatisch aus Admin Workflow-Template erstellt.",
+            sortOrder: 10,
+            defaultDueDays: template.defaultDueDays,
+            assignedRoleId: template.responsibleRoleId,
+            assignedPersonId: template.responsiblePersonId,
+          },
+          ...fallbackSteps.slice(1).map((step) => ({
+            ...step,
+            assignedRoleId: template.responsibleRoleId,
+            assignedPersonId: template.responsiblePersonId,
+          })),
+        ]
+      : fallbackSteps.map((step) => ({
           ...step,
-          assignedRoleId: template.responsibleRoleId,
-          assignedPersonId: template.responsiblePersonId,
-        })),
-      ]
-    : fallbackSteps.map((step) => ({
-        ...step,
-        assignedRoleId: null,
-        assignedPersonId: null,
-      }));
+          assignedRoleId: null,
+          assignedPersonId: null,
+        }));
 
   const registration = await prisma.registration.create({
     data: {
@@ -112,3 +125,4 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ registration });
 }
+
