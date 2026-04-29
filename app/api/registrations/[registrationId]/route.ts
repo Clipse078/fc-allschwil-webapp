@@ -9,10 +9,12 @@ type Context = {
 };
 
 const allowedTransitions: Record<RegistrationStatus, RegistrationStatus[]> = {
-  NEW: ["IN_REVIEW", "APPROVED", "REJECTED"],
-  IN_REVIEW: ["APPROVED", "REJECTED"],
-  APPROVED: [],
+  NEW: ["IN_REVIEW", "APPROVED", "REJECTED", "WITHDRAWN"],
+  IN_REVIEW: ["APPROVED", "REJECTED", "WITHDRAWN"],
+  APPROVED: ["CONVERTED"],
   REJECTED: [],
+  WITHDRAWN: [],
+  CONVERTED: [],
 };
 
 function getPersonFlags(type: RegistrationType) {
@@ -157,3 +159,5 @@ export async function POST(request: NextRequest, context: Context) {
 
   return NextResponse.json({ error: "Ungültige Aktion." }, { status: 400 });
 }
+
+

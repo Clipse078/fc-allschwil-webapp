@@ -18,7 +18,36 @@ enum RegistrationStatus {
   IN_REVIEW
   APPROVED
   REJECTED
+  WITHDRAWN
+  CONVERTED
 }
+
+enum RegistrationTargetGroup {
+  KINDERFUSSBALL
+  JUNIOREN
+  FRAUEN
+  AKTIVE
+  TRAININGSGRUPPE
+  TRAINERSTAFF
+  OTHER
+}
+
+enum RegistrationWorkflowStepStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  SKIPPED
+  BLOCKED
+}
+
+enum RegistrationConversionRole {
+  PLAYER
+  TRAINER
+  STAFF
+  MEMBER
+  OTHER
+}
+
 enum PermissionModule {
   USERS
   SEASONS
@@ -277,10 +306,11 @@ model User {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
-  person     Person?     @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  userRoles  UserRole[]
-  auditLogs  AuditLog[]  @relation("AuditActor")
-  userTokens UserToken[]
+  person                             Person?                    @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  userRoles                          UserRole[]
+  auditLogs                          AuditLog[]                 @relation("AuditActor")
+  completedRegistrationWorkflowSteps RegistrationWorkflowStep[]
+  userTokens                         UserToken[]
 
   @@index([isActive])
   @@index([accessState])
@@ -321,12 +351,14 @@ model Role {
   organigrammSortOrder            Int      @default(0)
   organigrammIsGroupRole          Boolean  @default(false)
 
-  userRoles                 UserRole[]
-  rolePermissions           RolePermission[]
-  workflowRules             RoleWorkflowRule[]
-  workflowReviewAssignments RoleWorkflowReviewAssignment[] @relation("WorkflowReviewerRole")
-  playerRatingPermissions   PlayerRatingPermission[]
-  organigrammDepartment     OrganigrammDepartment?         @relation(fields: [organigrammDepartmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  userRoles                     UserRole[]
+  rolePermissions               RolePermission[]
+  workflowRules                 RoleWorkflowRule[]
+  workflowReviewAssignments     RoleWorkflowReviewAssignment[] @relation("WorkflowReviewerRole")
+  playerRatingPermissions       PlayerRatingPermission[]
+  registrationWorkflowTemplates RegistrationWorkflowTemplate[]
+  registrationWorkflowSteps     RegistrationWorkflowStep[]
+  organigrammDepartment         OrganigrammDepartment?         @relation(fields: [organigrammDepartmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([name])
   @@index([canAccessVereinsleitung])
@@ -438,12 +470,11 @@ model Season {
   @@index([isActive])
 }
 
-
 model Registration {
-  id             String             @id @default(cuid())
+  id             String                      @id @default(cuid())
   type           RegistrationType
-  status         RegistrationStatus @default(NEW)
-  submittedAt    DateTime           @default(now())
+  status         RegistrationStatus          @default(NEW)
+  submittedAt    DateTime                    @default(now())
   submittedBy    String?
   firstName      String
   lastName       String
@@ -451,20 +482,76 @@ model Registration {
   email          String?
   phone          String?
   dateOfBirth    DateTime?
+  gender         String?
+  targetGroup    RegistrationTargetGroup     @default(OTHER)
+  conversionRole RegistrationConversionRole?
   assignedTo     String?
   notes          String?
   formData       Json?
   linkedPersonId String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
 
-  linkedPerson Person? @relation(fields: [linkedPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  linkedPerson  Person?                    @relation(fields: [linkedPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  workflowSteps RegistrationWorkflowStep[]
 
   @@index([type])
   @@index([status])
+  @@index([targetGroup])
   @@index([submittedAt])
   @@index([linkedPersonId])
 }
+
+model RegistrationWorkflowTemplate {
+  id                  String                  @id @default(cuid())
+  name                String
+  targetGroup         RegistrationTargetGroup
+  registrationType    RegistrationType?
+  isActive            Boolean                 @default(true)
+  sortOrder           Int                     @default(0)
+  defaultDueDays      Int                     @default(7)
+  responsibleRoleId   String?
+  responsiblePersonId String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  responsibleRole   Role?   @relation(fields: [responsibleRoleId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  responsiblePerson Person? @relation(fields: [responsiblePersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([targetGroup])
+  @@index([registrationType])
+  @@index([isActive])
+  @@index([responsibleRoleId])
+  @@index([responsiblePersonId])
+}
+
+model RegistrationWorkflowStep {
+  id                String                         @id @default(cuid())
+  registrationId    String
+  title             String
+  description       String?
+  status            RegistrationWorkflowStepStatus @default(OPEN)
+  sortOrder         Int                            @default(0)
+  dueDate           DateTime?
+  assignedRoleId    String?
+  assignedPersonId  String?
+  completedAt       DateTime?
+  completedByUserId String?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  registration    Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assignedRole    Role?        @relation(fields: [assignedRoleId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  assignedPerson  Person?      @relation(fields: [assignedPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  completedByUser User?        @relation(fields: [completedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([registrationId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([assignedRoleId])
+  @@index([assignedPersonId])
+}
+
 model Person {
   id                     String    @id @default(cuid())
   firstName              String
@@ -483,19 +570,21 @@ model Person {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  user                        User?
-  playerSquadMembers          PlayerSquadMember[]
-  trainerTeamMembers          TrainerTeamMember[]
-  playerSeasonRatings         PlayerSeasonRating[]
-  playerRatingPermissions     PlayerRatingPermission[]
-  playerRatingAreaDefinitions PlayerRatingAreaDefinition[]
-  trainerQualifications       TrainerQualification[]
-  vereinsleitungOwnedMatters  VereinsleitungMatter[]
-  meetingParticipants         VereinsleitungMeetingParticipant[]
-  responsibleMeetingDecisions VereinsleitungMeetingDecision[]
-  ownedInitiatives            VereinsleitungInitiative[]
-  assignedInitiativeWorkItems VereinsleitungInitiativeWorkItem[]
-  registrations              Registration[]
+  user                                     User?
+  playerSquadMembers                       PlayerSquadMember[]
+  trainerTeamMembers                       TrainerTeamMember[]
+  playerSeasonRatings                      PlayerSeasonRating[]
+  playerRatingPermissions                  PlayerRatingPermission[]
+  responsibleRegistrationWorkflowTemplates RegistrationWorkflowTemplate[]
+  assignedRegistrationWorkflowSteps        RegistrationWorkflowStep[]
+  playerRatingAreaDefinitions              PlayerRatingAreaDefinition[]
+  trainerQualifications                    TrainerQualification[]
+  vereinsleitungOwnedMatters               VereinsleitungMatter[]
+  meetingParticipants                      VereinsleitungMeetingParticipant[]
+  responsibleMeetingDecisions              VereinsleitungMeetingDecision[]
+  ownedInitiatives                         VereinsleitungInitiative[]
+  assignedInitiativeWorkItems              VereinsleitungInitiativeWorkItem[]
+  registrations                            Registration[]
 
   @@index([lastName, firstName])
   @@index([email])
@@ -1234,5 +1323,3 @@ model TeamCategoryQualificationRequirement {
   @@unique([teamCategoryRuleId, qualificationDefinitionId])
   @@index([teamCategoryRuleId, sortOrder])
 }
-
-
