@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -31,7 +31,45 @@ export async function POST(request: NextRequest) {
   });
   const conversionRole = body.conversionRole ?? getDefaultConversionRole(body.type);
   const submittedAt = new Date();
-  const workflowSteps = getDefaultWorkflowSteps(targetGroup);
+
+  const template = await prisma.registrationWorkflowTemplate.findFirst({
+    where: {
+      targetGroup,
+      isActive: true,
+      OR: [
+        { registrationType: body.type },
+        { registrationType: null },
+      ],
+    },
+    orderBy: [
+      { registrationType: "desc" },
+      { sortOrder: "asc" },
+      { createdAt: "asc" },
+    ],
+  });
+
+  const fallbackSteps = getDefaultWorkflowSteps(targetGroup);
+  const workflowSteps = template
+    ? [
+        {
+          title: template.name,
+          description: "Automatisch aus Admin Workflow-Template erstellt.",
+          sortOrder: 10,
+          defaultDueDays: template.defaultDueDays,
+          assignedRoleId: template.responsibleRoleId,
+          assignedPersonId: template.responsiblePersonId,
+        },
+        ...fallbackSteps.slice(1).map((step) => ({
+          ...step,
+          assignedRoleId: template.responsibleRoleId,
+          assignedPersonId: template.responsiblePersonId,
+        })),
+      ]
+    : fallbackSteps.map((step) => ({
+        ...step,
+        assignedRoleId: null,
+        assignedPersonId: null,
+      }));
 
   const registration = await prisma.registration.create({
     data: {
@@ -48,7 +86,11 @@ export async function POST(request: NextRequest) {
       conversionRole,
       assignedTo: body.assignedTo ?? null,
       notes: body.notes ?? null,
-      formData: body.formData ?? null,
+      formData: {
+        ...(typeof body.formData === "object" && body.formData !== null ? body.formData : {}),
+        source: body.source ?? body.formData?.source ?? "WEBAPP_MANUAL",
+        workflowTemplateId: template?.id ?? null,
+      },
       submittedBy: body.submittedBy ?? null,
       workflowSteps: {
         create: workflowSteps.map((step) => ({
@@ -56,6 +98,8 @@ export async function POST(request: NextRequest) {
           description: step.description,
           sortOrder: step.sortOrder,
           dueDate: addDays(submittedAt, step.defaultDueDays),
+          assignedRoleId: step.assignedRoleId,
+          assignedPersonId: step.assignedPersonId,
         })),
       },
     },
