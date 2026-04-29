@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import PlayerSeasonRatingsCard from "@/components/admin/players/PlayerSeasonRatingsCard";
+import TrainerQualificationsCard from "@/components/admin/players/TrainerQualificationsCard";
 import { auth } from "@/auth";
 import { getPlayerRatingPermissionReasons } from "@/lib/players/player-rating-permissions";
 import { notFound } from "next/navigation";
@@ -126,6 +127,7 @@ export default async function PersonDetailPage({ params }: Props) {
       trainerQualifications: {
         orderBy: { createdAt: "desc" },
         select: {
+          id: true,
           title: true,
           type: true,
           status: true,
@@ -331,6 +333,10 @@ export default async function PersonDetailPage({ params }: Props) {
         </section>
       ) : null}
 
+      {person.isTrainer ? (
+        <TrainerQualificationsCard personId={person.id} initialQualifications={person.trainerQualifications} canEdit={true} />
+      ) : null}
+
       {roleNames.length > 0 ? (
         <section className="rounded-[32px] border border-violet-100 bg-gradient-to-br from-white via-violet-50/50 to-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
@@ -442,6 +448,10 @@ export default async function PersonDetailPage({ params }: Props) {
     </div>
   );
 }
+
+
+
+
 
 
 
