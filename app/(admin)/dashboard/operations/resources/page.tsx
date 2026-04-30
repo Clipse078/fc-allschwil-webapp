@@ -1,5 +1,5 @@
 ﻿import PlanningResourcesManager from "@/components/admin/resources/PlanningResourcesManager";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
@@ -10,31 +10,24 @@ export default async function ResourcesPage() {
   await requirePermission(PERMISSIONS.EVENTS_MANAGE);
 
   const resources = await prisma.planningResource.findMany({
-    orderBy: [
-      { type: "asc" },
-      { sortOrder: "asc" },
-      { name: "asc" },
-    ],
-    select: {
-      id: true,
-      key: true,
-      name: true,
-      type: true,
-      sortOrder: true,
-      isActive: true,
-      notes: true,
-    },
+    orderBy: [{ type: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, key: true, name: true, type: true, sortOrder: true, isActive: true, notes: true },
   });
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Operations & Organisation"
         title="Ressourcen"
         description="Zentrale Verwaltung von Spielfeldern, Garderoben, Hallen und weiteren Infrastruktur-Ressourcen für Jahresplan, Wochenplan, Tagesplan und Infoboard."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Operations", href: "/dashboard/operations" },
+          { label: "Ressourcen" },
+        ]}
       />
 
       <PlanningResourcesManager resources={resources} />
-    </div>
+    </PageShell>
   );
 }
