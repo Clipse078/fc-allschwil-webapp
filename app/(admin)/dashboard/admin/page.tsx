@@ -14,7 +14,7 @@ import {
   Trophy,
   Workflow,
 } from "lucide-react";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import TeamCategoryRulesEditor from "@/components/admin/configuration/TeamCategoryRulesEditor";
 import QualificationDefinitionsEditor from "@/components/admin/configuration/QualificationDefinitionsEditor";
 import TeamDisplaySettingsEditor from "@/components/admin/configuration/TeamDisplaySettingsEditor";
@@ -215,12 +215,17 @@ export default async function AdminConfigurationPage() {
     ]);
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Admin"
-        title="Club-Konfiguration"
-        description="Zentrale Steuerung fÃƒÆ’Ã‚Â¼r Verein, Rollen, Workflows, Regeln, Website-Anzeige und spÃƒÆ’Ã‚Â¤tere Mandanten-Konfiguration."
-      />
+    <PageShell>
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Admin"
+          title="Club-Konfiguration"
+          description="Zentrale Steuerung für Verein, Rollen, Workflows, Regeln, Website-Anzeige und spätere Mandanten-Konfiguration."
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Admin" },
+          ]}
+        />
 
       <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
         <div className="bg-gradient-to-br from-[#0b4aa2] via-[#123f7a] to-slate-950 p-6 text-white">
@@ -406,7 +411,8 @@ export default async function AdminConfigurationPage() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </PageShell>
   );
 }
 
