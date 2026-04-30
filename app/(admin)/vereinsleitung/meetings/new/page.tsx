@@ -1,5 +1,5 @@
-import VereinsleitungMeetingCreateForm from "@/components/admin/vereinsleitung/VereinsleitungMeetingCreateForm";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+﻿import VereinsleitungMeetingCreateForm from "@/components/admin/vereinsleitung/VereinsleitungMeetingCreateForm";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -77,17 +77,22 @@ export default async function VereinsleitungMeetingNewPage() {
   }));
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Meetings"
         title="Meeting planen"
         description="Neues Meeting erfassen und direkt mit Pendenzen verknüpfen."
+        breadcrumbs={[
+          { label: "Vereinsleitung", href: "/vereinsleitung" },
+          { label: "Meetings", href: "/vereinsleitung/meetings" },
+          { label: "Neu" },
+        ]}
       />
 
       <VereinsleitungMeetingCreateForm
         matterOptions={matterOptions}
         initiativeOptions={initiativeOptions}
       />
-    </div>
+    </PageShell>
   );
 }
