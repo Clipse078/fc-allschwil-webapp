@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
+import { PageShell } from "@/components/shared/page";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -32,10 +33,12 @@ export default async function SeasonTeamDetailPage({ params }: Props) {
   }
 
   return (
-    <TeamDetailCard
-      initialTeam={team}
-      availableSeasons={availableSeasons}
-      canManage={canManage}
-    />
+    <PageShell>
+      <TeamDetailCard
+        initialTeam={team}
+        availableSeasons={availableSeasons}
+        canManage={canManage}
+      />
+    </PageShell>
   );
 }
