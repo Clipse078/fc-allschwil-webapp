@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import VereinsleitungMeetingCreateForm from "@/components/admin/vereinsleitung/VereinsleitungMeetingCreateForm";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -139,11 +139,17 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
   }));
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Meetings"
         title="Meeting bearbeiten"
         description="Meeting-Daten und Pendenzen-Verknüpfungen anpassen."
+        breadcrumbs={[
+          { label: "Vereinsleitung", href: "/vereinsleitung" },
+          { label: "Meetings", href: "/vereinsleitung/meetings" },
+          { label: meeting.title, href: "/vereinsleitung/meetings/" + meeting.slug },
+          { label: "Bearbeiten" },
+        ]}
       />
 
       <VereinsleitungMeetingCreateForm
@@ -182,6 +188,6 @@ export default async function EditMeetingPage({ params }: EditMeetingPageProps) 
         }))}
         matterOptions={matterOptions}
       />
-    </div>
+    </PageShell>
   );
 }
