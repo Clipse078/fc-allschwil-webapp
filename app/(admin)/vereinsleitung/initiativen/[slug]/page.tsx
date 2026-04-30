@@ -1,5 +1,5 @@
-import { notFound } from "next/navigation";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+﻿import { notFound } from "next/navigation";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import VereinsleitungInitiativeDetail, {
   type InitiativeDetailWorkItem,
 } from "@/components/admin/vereinsleitung/VereinsleitungInitiativeDetail";
@@ -111,14 +111,19 @@ export default async function InitiativeSlugPage({
   });
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Vereinsleitung"
         title={initiative.title}
         description={
           initiative.subtitle ??
           "Status, Verantwortlichkeit, Roadmap und Arbeitspakete dieser Initiative."
         }
+        breadcrumbs={[
+          { label: "Vereinsleitung", href: "/vereinsleitung" },
+          { label: "Initiativen", href: "/vereinsleitung/initiativen" },
+          { label: initiative.title },
+        ]}
       />
 
       <VereinsleitungInitiativeDetail
@@ -158,6 +163,6 @@ export default async function InitiativeSlugPage({
         }}
         workItems={workItems}
       />
-    </div>
+    </PageShell>
   );
 }
