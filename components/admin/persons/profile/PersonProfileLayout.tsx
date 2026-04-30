@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { CalendarDays, Mail, Phone, ShieldCheck } from "lucide-react";
 import PersonPhotoUploader from "@/components/admin/persons/PersonPhotoUploader";
+import { PageShell } from "@/components/shared/page";
 
 export function formatDate(value: Date | string | null | undefined) {
   if (!value) return "Offen";
@@ -10,7 +11,7 @@ export function formatDate(value: Date | string | null | undefined) {
 
 export function ProfileShell({ person, name, primaryType, typeLabels, children }: { person: any; name: string; primaryType: string; typeLabels: string[]; children: ReactNode }) {
   return (
-    <div className="space-y-5">
+    <PageShell className="space-y-5">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="fca-eyebrow">Personenprofil · {primaryType}</p>
@@ -51,7 +52,7 @@ export function ProfileShell({ person, name, primaryType, typeLabels, children }
 
         <main className="space-y-5">{children}</main>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -125,3 +126,4 @@ export function CareerTimelinePlaceholder({
     </ProfileCard>
   );
 }
+
