@@ -1,5 +1,5 @@
-import Link from "next/link";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+﻿import Link from "next/link";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
@@ -63,17 +63,18 @@ export default async function VereinsleitungInitiativenPage() {
   });
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Vereinsleitung"
         title="Initiativen"
         description="Alle Initiativen im Überblick – mit Status, Fortschritt, Verantwortlichkeit und direktem Einstieg in die Detailansicht."
+        breadcrumbs={[
+          { label: "Vereinsleitung", href: "/vereinsleitung" },
+          { label: "Initiativen" },
+        ]}
         actions={
           <form action="/api/vereinsleitung/initiativen" method="POST">
-            <button
-              type="submit"
-              className="fca-button-primary"
-            >
+            <button type="submit" className="fca-button-primary">
               Neue Initiative
             </button>
           </form>
@@ -202,6 +203,6 @@ export default async function VereinsleitungInitiativenPage() {
           })}
         </section>
       )}
-    </div>
+    </PageShell>
   );
 }
