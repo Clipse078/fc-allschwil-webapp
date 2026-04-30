@@ -1,7 +1,7 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import VereinsleitungMeetingDetail from "@/components/admin/vereinsleitung/VereinsleitungMeetingDetail";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
@@ -42,11 +42,16 @@ export default async function VereinsleitungMeetingSlugPage({
   }
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Meeting Detail"
         title={meeting.title}
         description="DB-basierte Meeting-Ansicht mit Pendenzen, Teilnehmern, Protokoll und vorbereitetem Beschlussbereich."
+        breadcrumbs={[
+          { label: "Vereinsleitung", href: "/vereinsleitung" },
+          { label: "Meetings", href: "/vereinsleitung/meetings" },
+          { label: meeting.title },
+        ]}
         actions={
           <Link href="/vereinsleitung/meetings" className="fca-button-secondary">
             Zurück zur Übersicht
@@ -60,7 +65,6 @@ export default async function VereinsleitungMeetingSlugPage({
         canReviewMeetings={canReviewMeetings}
         canApproveMeetings={canApproveMeetings}
       />
-    </div>
+    </PageShell>
   );
 }
-
