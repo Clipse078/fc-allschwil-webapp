@@ -1,5 +1,6 @@
 ﻿import { notFound } from "next/navigation";
 import RegistrationProfileWrapper from "@/components/admin/registrations/RegistrationProfileWrapper";
+import { PageShell } from "@/components/shared/page";
 import { prisma } from "@/lib/db/prisma";
 
 export default async function RegistrationDetailPage({
@@ -27,5 +28,9 @@ export default async function RegistrationDetailPage({
     notFound();
   }
 
-  return <RegistrationProfileWrapper registration={registration} />;
+  return (
+    <PageShell>
+      <RegistrationProfileWrapper registration={registration} />
+    </PageShell>
+  );
 }
