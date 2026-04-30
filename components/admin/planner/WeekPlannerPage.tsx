@@ -1,7 +1,7 @@
 ﻿import Link from "next/link";
 import { CalendarDays, ClipboardList, Plus } from "lucide-react";
 import WochenplanBoard from "@/components/admin/wochenplan/WochenplanBoard";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { getWeekPlannerData } from "@/lib/planner/queries";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
@@ -115,12 +115,8 @@ export default async function WeekPlannerPage({
   const reserveHref = withSeason("/dashboard/planner/reserve", selectedSeasonKey);
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Wochenplan"
-        title="Website-Wochenraster"
-        description="Operative Wochenplanung im gleichen Raster wie die Website. Du arbeitest hier direkt auf der später sichtbaren Wochenplan-Logik, ergänzt um Drag & Drop, Garderoben und Publikationssteuerung."
-        actions={
+    <PageShell>
+      <PageHeader eyebrow="Wochenplan" title="Website-Wochenraster" description="Operative Wochenplanung im gleichen Raster wie die Website. Du arbeitest hier direkt auf der später sichtbaren Wochenplan-Logik, ergänzt um Drag & Drop, Garderoben und Publikationssteuerung." breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Planner", href: "/dashboard/planner" }, { label: "Wochenplan" }]} actions={
           <div className="flex flex-wrap gap-2">
             <Link href={reserveHref} className="fca-button-primary">
               <Plus className="h-4 w-4" />
@@ -193,8 +189,13 @@ export default async function WeekPlannerPage({
         currentDayKey={currentDayKey}
         weekStartDate={getIsoWeekStartDate(boardData.weekWindow.start)}
       />
-    </div>
+    </PageShell>
   );
 }
+
+
+
+
+
 
 

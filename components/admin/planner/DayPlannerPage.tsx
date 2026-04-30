@@ -5,7 +5,7 @@ import {
   Pencil,
   Plus,
 } from "lucide-react";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import PlannerEntryPublicationBadges from "@/components/admin/planner/PlannerEntryPublicationBadges";
 import PlannerEntryTypeBadge from "@/components/admin/planner/PlannerEntryTypeBadge";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
@@ -73,12 +73,8 @@ export default async function DayPlannerPage({
     : "/dashboard/planner/new";
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Tagesplanner"
-        title="Tagesagenda"
-        description="Operative Tagesplanung für den Live-Betrieb. Diese Sicht speist das Infoboard direkt."
-      />
+    <PageShell>
+      <PageHeader eyebrow="Tagesplanner" title="Tagesagenda" description="Operative Tagesplanung für den Live-Betrieb. Diese Sicht speist das Infoboard direkt." breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Planner", href: "/dashboard/planner" }, { label: "Tagesagenda" }]} />
 
       <SeasonContextSelector
         title="Aktive Saison"
@@ -238,6 +234,11 @@ export default async function DayPlannerPage({
           </article>
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 }
+
+
+
+
+

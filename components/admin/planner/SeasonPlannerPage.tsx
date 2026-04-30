@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import PlannerEntryPublicationBadges from "@/components/admin/planner/PlannerEntryPublicationBadges";
 import PlannerEntryTypeBadge from "@/components/admin/planner/PlannerEntryTypeBadge";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { getSeasonPlannerData } from "@/lib/planner/queries";
 
@@ -166,18 +166,14 @@ export default async function SeasonPlannerPage({ seasonKey, status }: SeasonPla
   }
 
   return (
-    <div className="space-y-8">
+    <PageShell>
       {feedback ? (
         <section className={`rounded-[24px] border px-5 py-4 text-sm font-medium ${feedback.className}`}>
           {feedback.text}
         </section>
       ) : null}
 
-      <AdminSectionHeader
-        eyebrow="Jahresplan"
-        title="Agenda Manager"
-        description="Premium-Jahresplanung als langfristiger Einstiegspunkt. Von hier drillst du in Monat, Woche oder Tag und planst wiederkehrende Events oder Platzreservationen."
-      />
+      <PageHeader eyebrow="Jahresplan" title="Agenda Manager" description="Premium-Jahresplanung als langfristiger Einstiegspunkt. Von hier drillst du in Monat, Woche oder Tag und planst wiederkehrende Events oder Platzreservationen." breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Planner", href: "/dashboard/planner" }, { label: "Jahresplan" }]} />
 
       <SeasonContextSelector
         title="Aktive Saison"
@@ -340,6 +336,11 @@ export default async function SeasonPlannerPage({ seasonKey, status }: SeasonPla
           })}
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 }
+
+
+
+
+
