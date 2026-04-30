@@ -1,6 +1,6 @@
 ﻿import Link from "next/link";
 import { ArrowLeft, Workflow } from "lucide-react";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import RegistrationWorkflowTemplateForm from "@/components/admin/registrations/RegistrationWorkflowTemplateForm";
 import RegistrationWorkflowTemplateCard from "@/components/admin/registrations/RegistrationWorkflowTemplateCard";
 import { prisma } from "@/lib/db/prisma";
@@ -35,22 +35,26 @@ export default async function RegistrationWorkflowsAdminPage() {
   }));
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <AdminSectionHeader
-          eyebrow="Admin · Workflows"
-          title="Anmelde-Workflows"
-          description="Steuere Zielgruppen, Zuständigkeiten und Fristen für neue Anmeldungen."
-        />
-
-        <Link
-          href="/dashboard/admin"
-          className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Zurück zur Admin-Übersicht
-        </Link>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Admin · Workflows"
+        title="Anmelde-Workflows"
+        description="Steuere Zielgruppen, Zuständigkeiten und Fristen für neue Anmeldungen."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Admin", href: "/dashboard/admin" },
+          { label: "Anmelde-Workflows" },
+        ]}
+        actions={
+          <Link
+            href="/dashboard/admin"
+            className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Zurück zur Admin-Übersicht
+          </Link>
+        }
+      />
 
       <section className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -104,6 +108,6 @@ export default async function RegistrationWorkflowsAdminPage() {
           )}
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 }
