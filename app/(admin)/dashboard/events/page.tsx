@@ -1,6 +1,6 @@
-﻿import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
+﻿import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import EventsModuleHub from "@/components/admin/events/EventsModuleHub";
+import { PageHeader, PageShell, SectionCard } from "@/components/shared/page";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons } from "@/lib/teams/queries";
@@ -80,11 +80,15 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   const submittedMessage = getSubmittedMessage(params.submitted, params.count);
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Events"
         title="Events pro Saison"
         description="Saisongeführte Eventverwaltung. Die gewählte Saison ist führend; darunter werden Eventtypen dynamisch strukturiert."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Events" },
+        ]}
       />
 
       {submittedMessage ? (
@@ -134,15 +138,12 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
         ))}
       </section>
 
-      <section className="space-y-6">
-        <AdminSectionHeader
-          eyebrow="Detaildaten"
-          title={`Eventverwaltung ${selectedSeason?.name ?? ""}`.trim()}
-          description="Bestehende Eventfunktionen bleiben erhalten und werden im saisongeführten Kontext dargestellt."
-        />
-
+      <SectionCard
+        title={`Eventverwaltung ${selectedSeason?.name ?? ""}`.trim()}
+        description="Bestehende Eventfunktionen bleiben erhalten und werden im saisongeführten Kontext dargestellt."
+      >
         <EventsModuleHub selectedSeasonName={selectedSeason?.name} />
-      </section>
-    </div>
+      </SectionCard>
+    </PageShell>
   );
 }
