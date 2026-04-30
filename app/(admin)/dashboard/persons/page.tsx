@@ -1,5 +1,5 @@
-﻿import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import PersonsList from "@/components/admin/persons/PersonsList";
+﻿import PersonsList from "@/components/admin/persons/PersonsList";
+import { PageHeader, PageShell } from "@/components/shared/page";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -100,15 +100,18 @@ export default async function PersonsPage() {
   });
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Personen"
         title="Personen"
         description="Eine zentrale Personenübersicht für Spieler, Trainer, Vereinsfunktionäre, Sponsor-Kontakte und weitere Rollen."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Personen" },
+        ]}
       />
 
       <PersonsList persons={persons} />
-    </div>
+    </PageShell>
   );
 }
-
