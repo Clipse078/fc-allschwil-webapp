@@ -1009,6 +1009,10 @@ model VereinsleitungMatter {
 }
 
 model VereinsleitungMeeting {
+  // 🔹 SCOPED ARCHITECTURE (NEW)
+  scopeType String?
+  scopeId   String?
+  audience  Json?
   id                        String                              @id @default(cuid())
   title                     String
   slug                      String                              @unique
@@ -1348,3 +1352,4 @@ model TeamCategoryQualificationRequirement {
   @@unique([teamCategoryRuleId, qualificationDefinitionId])
   @@index([teamCategoryRuleId, sortOrder])
 }
+

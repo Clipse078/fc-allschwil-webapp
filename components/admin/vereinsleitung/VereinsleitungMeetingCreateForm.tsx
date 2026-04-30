@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import ScopedVisibilityPicker from "@/components/admin/shared/ScopedVisibilityPicker";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -319,7 +320,7 @@ function inferProviderUi(
 }
 
 function buildParticipantRoleLabel(person: PeoplePickerPerson) {
-  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" â€¢ ");
+  return [person.functionLabel, person.teamLabel].filter(Boolean).join(" Ã¢â‚¬Â¢ ");
 }
 
 function formatBytes(bytes: number) {
@@ -508,7 +509,7 @@ function getAgendaBudgetTone(plannedMinutes: number, availableMinutes: number) {
     return {
       pill: "border-slate-200 bg-slate-50 text-slate-600",
       bar: "bg-slate-400",
-      hint: "Zeitbudget noch unvollstÃ¤ndig.",
+      hint: "Zeitbudget noch unvollstÃƒÂ¤ndig.",
     };
   }
 
@@ -516,7 +517,7 @@ function getAgendaBudgetTone(plannedMinutes: number, availableMinutes: number) {
     return {
       pill: "border-rose-200 bg-rose-50 text-rose-700",
       bar: "bg-rose-500",
-      hint: "Traktanden dauern lÃ¤nger als das Meeting.",
+      hint: "Traktanden dauern lÃƒÂ¤nger als das Meeting.",
     };
   }
 
@@ -524,14 +525,14 @@ function getAgendaBudgetTone(plannedMinutes: number, availableMinutes: number) {
     return {
       pill: "border-amber-200 bg-amber-50 text-amber-700",
       bar: "bg-amber-500",
-      hint: "Zeitbudget fast ausgeschÃ¶pft.",
+      hint: "Zeitbudget fast ausgeschÃƒÂ¶pft.",
     };
   }
 
   return {
     pill: "border-emerald-200 bg-emerald-50 text-emerald-700",
     bar: "bg-emerald-500",
-    hint: "Zeitbudget im grÃ¼nen Bereich.",
+    hint: "Zeitbudget im grÃƒÂ¼nen Bereich.",
   };
 }
 
@@ -547,7 +548,7 @@ function renderInitiativePreview(
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-[#0b4aa2]/20 hover:text-[#0b4aa2] hover:shadow-[0_6px_16px_rgba(11,74,162,0.08)]"
-          title="Initiative in neuem Tab Ã¶ffnen"
+          title="Initiative in neuem Tab ÃƒÂ¶ffnen"
         >
           <span className="truncate max-w-[180px]">{selectedInitiative.title}</span>
           <ExternalLink className="h-3 w-3 shrink-0" />
@@ -584,7 +585,7 @@ function renderInitiativePreview(
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/10 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2]">
-          VerknÃ¼pft
+          VerknÃƒÂ¼pft
         </span>
 
         <span
@@ -621,8 +622,8 @@ function renderInitiativePreview(
           type="button"
           onClick={onUnlink}
           className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
-          title="Initiative lÃ¶sen"
-          aria-label="Initiative lÃ¶sen"
+          title="Initiative lÃƒÂ¶sen"
+          aria-label="Initiative lÃƒÂ¶sen"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -707,8 +708,8 @@ function ToggleNoteButton({
           ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/10 text-[#0b4aa2]"
           : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
       }`}
-      title={isActive ? "Notiz ausblenden" : "Notiz hinzufÃ¼gen"}
-      aria-label={isActive ? "Notiz ausblenden" : "Notiz hinzufÃ¼gen"}
+      title={isActive ? "Notiz ausblenden" : "Notiz hinzufÃƒÂ¼gen"}
+      aria-label={isActive ? "Notiz ausblenden" : "Notiz hinzufÃƒÂ¼gen"}
     >
       <Plus className="h-4 w-4" />
     </button>
@@ -956,7 +957,7 @@ function InitiativePicker({
                           </div>
                           {selectedInitiativeId === initiative.id ? (
                             <span className="inline-flex items-center rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/10 px-2 py-0.5 text-[10px] font-semibold text-[#0b4aa2]">
-                              VerknÃ¼pft
+                              VerknÃƒÂ¼pft
                             </span>
                           ) : null}
                         </div>
@@ -989,7 +990,7 @@ function InitiativePicker({
                           rel="noreferrer"
                           onClick={(event) => event.stopPropagation()}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-[#0b4aa2]/20 hover:text-[#0b4aa2]"
-                          title="Initiative Ã¶ffnen"
+                          title="Initiative ÃƒÂ¶ffnen"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </Link>
@@ -1128,6 +1129,9 @@ export default function VereinsleitungMeetingCreateForm({
       : [createAgendaItem()],
   );
   const [pickerItems, setPickerItems] = useState<PeoplePickerPerson[]>([]);
+const [visibility, setVisibility] = useState({
+  audience: { isPublic: true }
+});
   const [draggingAgendaKey, setDraggingAgendaKey] = useState<string | null>(null);
   const [agendaDropTargetKey, setAgendaDropTargetKey] = useState<string | null>(null);
   const [draggingMatterKey, setDraggingMatterKey] = useState<string | null>(null);
@@ -1407,9 +1411,9 @@ export default function VereinsleitungMeetingCreateForm({
         const attachments = matterAttachments[matter.id] ?? [];
 
         return [
-          `VerknÃ¼pfte Pendenz ${index + 1}: ${matter.title}`,
+          `VerknÃƒÂ¼pfte Pendenz ${index + 1}: ${matter.title}`,
           matter.ownerName ? `Assignee: ${matter.ownerName}` : null,
-          matter.dueDateLabel ? `FÃ¤llig: ${matter.dueDateLabel}` : null,
+          matter.dueDateLabel ? `FÃƒÂ¤llig: ${matter.dueDateLabel}` : null,
           attachments.length > 0
             ? `Beilagen: ${attachments.map((attachment) => attachment.name).join(", ")}`
             : null,
@@ -1426,8 +1430,8 @@ export default function VereinsleitungMeetingCreateForm({
         return [
           `Manuelle Pendenz ${index + 1}: ${item.title.trim()}`,
           item.assigneeName ? `Assignee: ${item.assigneeName}` : null,
-          item.dueDate ? `FÃ¤llig: ${item.dueDate}` : null,
-          item.priority ? `PrioritÃ¤t: ${item.priority}` : null,
+          item.dueDate ? `FÃƒÂ¤llig: ${item.dueDate}` : null,
+          item.priority ? `PrioritÃƒÂ¤t: ${item.priority}` : null,
           item.notes.trim() ? `Notiz: ${item.notes.trim()}` : null,
           item.initiativeId
             ? `Initiative: ${
@@ -1482,6 +1486,7 @@ export default function VereinsleitungMeetingCreateForm({
         matterIds: selectedMatterIds,
         participants: normalizedParticipants,
         agendaItems: normalizedAgendaItems,
+        visibility: visibility,
       };
 
       const response = await fetch(endpoint, {
@@ -1519,209 +1524,10 @@ export default function VereinsleitungMeetingCreateForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.85fr)]">
-        <SectionCard
-          title="Meeting-Details"
-          description="Die wichtigsten Sitzungsdaten in einem klaren, premium aufgebauten Bereich."
-          accent="blue"
-        >
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-slate-900">
-                Titel *
-              </label>
-              <input
-                value={form.title}
-                onChange={(event) => updateField("title", event.target.value)}
-                placeholder="z. B. Vereinsleitungssitzung Mai 2026"
-                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
-              />
-            </div>
+        
 
-            <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <CalendarDays className="h-4 w-4 text-[#0b4aa2]" />
-                Datum *
-              </label>
-              <input
-                type="date"
-                value={form.meetingDate}
-                onChange={(event) => updateField("meetingDate", event.target.value)}
-                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <MapPin className="h-4 w-4 text-[#0b4aa2]" />
-                Ort
-              </label>
-              <input
-                value={form.location}
-                onChange={(event) => updateField("location", event.target.value)}
-                placeholder="z. B. Clubhaus Sitzungszimmer 1"
-                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <Clock3 className="h-4 w-4 text-[#0b4aa2]" />
-                Startzeit *
-              </label>
-              <input
-                type="time"
-                value={form.startTime}
-                onChange={(event) => updateField("startTime", event.target.value)}
-                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <Clock3 className="h-4 w-4 text-[#0b4aa2]" />
-                Endzeit
-              </label>
-              <input
-                type="time"
-                value={form.endTime}
-                onChange={(event) => updateField("endTime", event.target.value)}
-                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
-              />
-            </div>
-
-            <div className="md:col-span-2 rounded-[24px] border border-slate-200 bg-gradient-to-br from-white via-slate-50/50 to-white p-4">
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <MonitorSmartphone className="h-4 w-4 text-[#0b4aa2]" />
-                Online-Provider
-              </label>
-
-              <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <ProviderTile
-                  isActive={form.providerUi === "MICROSOFT_TEAMS"}
-                  title={PROVIDER_LOGOS.MICROSOFT_TEAMS.title}
-                  src={PROVIDER_LOGOS.MICROSOFT_TEAMS.src}
-                  onClick={() => updateField("providerUi", "MICROSOFT_TEAMS")}
-                />
-                <ProviderTile
-                  isActive={form.providerUi === "SKYPE"}
-                  title={PROVIDER_LOGOS.SKYPE.title}
-                  src={PROVIDER_LOGOS.SKYPE.src}
-                  onClick={() => updateField("providerUi", "SKYPE")}
-                />
-                <ProviderTile
-                  isActive={form.providerUi === "ZOOM"}
-                  title={PROVIDER_LOGOS.ZOOM.title}
-                  src={PROVIDER_LOGOS.ZOOM.src}
-                  onClick={() => updateField("providerUi", "ZOOM")}
-                />
-                <ProviderTile
-                  isActive={form.providerUi === "GOOGLE_MEET"}
-                  title={PROVIDER_LOGOS.GOOGLE_MEET.title}
-                  src={PROVIDER_LOGOS.GOOGLE_MEET.src}
-                  onClick={() => updateField("providerUi", "GOOGLE_MEET")}
-                />
-              </div>
-
-              {form.providerUi !== "NONE" ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  {showMeetingLinkField ? (
-                    <a
-                      href={providerAppUrl || "#"}
-                      target="_self"
-                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition ${
-                        providerAppUrl
-                          ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/5 text-[#0b4aa2] hover:bg-[#0b4aa2]/10"
-                          : "pointer-events-none border-slate-200 bg-slate-50 text-slate-400"
-                      }`}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      App Ã¶ffnen
-                    </a>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    onClick={() => updateField("providerUi", "NONE")}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Provider entfernen
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            {showMeetingLinkField ? (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-900">
-                  {form.providerUi === "MICROSOFT_TEAMS" ? "Teams Join-URL" : "Meeting-Link"}
-                </label>
-                <input
-                  value={form.meetingLink}
-                  onChange={(event) => updateField("meetingLink", event.target.value)}
-                  placeholder="https://..."
-                  className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
-                />
-              </div>
-            ) : null}
-
-            {showTeamsFields ? (
-              <div className="md:col-span-2 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">
-                      Microsoft Teams Vorbereitung
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Diese Felder bleiben vorerst manuell. Eine echte Microsoft-Integration folgt spÃ¤ter separat.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <select
-                      value={form.teamsSyncStatus}
-                      onChange={(event) =>
-                        updateField("teamsSyncStatus", event.target.value as TeamsSyncStatus)
-                      }
-                      className="rounded-[16px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/15"
-                    >
-                      {TEAMS_SYNC_STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    <span
-                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${getTeamsSyncStatusClass(
-                        form.teamsSyncStatus,
-                      )}`}
-                    >
-                      {TEAMS_SYNC_STATUS_OPTIONS.find(
-                        (option) => option.value === form.teamsSyncStatus,
-                      )?.label ?? form.teamsSyncStatus}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="md:col-span-2">
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <Plus className="h-4 w-4 text-[#0b4aa2]" />
-                Notizen / Kontext
-              </label>
-              <textarea
-                value={form.description}
-                onChange={(event) => updateField("description", event.target.value)}
-                rows={6}
-                placeholder="Kontext, Vorbereitungen und Hinweise ..."
-                className="mt-2 w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)] outline-none transition focus:border-[#0b4aa2] focus:ring-4 focus:ring-[#0b4aa2]/10"
-              />
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Eingeladene Personen"
+<SectionCard
+  title="Eingeladene Personen"
           description="Teilnehmende direkt rechts daneben pflegen."
           accent="blue"
         >
@@ -1730,7 +1536,7 @@ export default function VereinsleitungMeetingCreateForm({
               {participants.length} Teilnehmer
             </div>
             <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              {participants.filter((participant) => participant.status === "CONFIRMED").length} bestÃ¤tigt
+              {participants.filter((participant) => participant.status === "CONFIRMED").length} bestÃƒÂ¤tigt
             </div>
           </div>
 
@@ -1740,7 +1546,7 @@ export default function VereinsleitungMeetingCreateForm({
               searchMode="vereinsleitung"
               selectedItems={pickerItems}
               onChange={setPickerItems}
-              placeholder="Personen suchen und hinzufÃ¼gen"
+              placeholder="Personen suchen und hinzufÃƒÂ¼gen"
               emptyText="Keine passende Person gefunden."
             />
           </div>
@@ -1756,7 +1562,7 @@ export default function VereinsleitungMeetingCreateForm({
                     Noch keine Teilnehmer
                   </div>
                   <div className="mt-1 text-sm text-slate-500">
-                    Suche oben nach Namen und fÃ¼ge Mitglieder direkt dem Meeting hinzu.
+                    Suche oben nach Namen und fÃƒÂ¼ge Mitglieder direkt dem Meeting hinzu.
                   </div>
                 </div>
               </div>
@@ -1861,10 +1667,10 @@ export default function VereinsleitungMeetingCreateForm({
               Geplante Dauer {agendaTotalMinutes} Min.
             </span>
             <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${agendaBudgetTone.pill}`}>
-              Meeting {meetingDurationMinutes > 0 ? meetingDurationMinutes : "â€”"} Min.
+              Meeting {meetingDurationMinutes > 0 ? meetingDurationMinutes : "Ã¢â‚¬â€"} Min.
             </span>
             <span className="text-xs text-slate-500">
-              Ziehe EintrÃ¤ge am Griff, um die Reihenfolge zu Ã¤ndern.
+              Ziehe EintrÃƒÂ¤ge am Griff, um die Reihenfolge zu ÃƒÂ¤ndern.
             </span>
           </div>
 
@@ -2050,14 +1856,14 @@ export default function VereinsleitungMeetingCreateForm({
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <Plus className="h-4 w-4" />
-            Traktand hinzufÃ¼gen
+            Traktand hinzufÃƒÂ¼gen
           </button>
         </div>
       </SectionCard>
 
       <SectionCard
         title="Pendenzen"
-        description="Bestehende Pendenzen plus manuelle JIRA-artige Liste mit Drag & Drop, Assignee, PrioritÃ¤t, FÃ¤lligkeit, Notiz, Initiative und Beilagen."
+        description="Bestehende Pendenzen plus manuelle JIRA-artige Liste mit Drag & Drop, Assignee, PrioritÃƒÂ¤t, FÃƒÂ¤lligkeit, Notiz, Initiative und Beilagen."
         accent="blue"
       >
         <div className="space-y-3">
@@ -2139,7 +1945,7 @@ export default function VereinsleitungMeetingCreateForm({
               {manualMatters.length} manuelle Pendenzen
             </span>
             <span className="text-xs text-slate-500">
-              Ziehe manuelle Pendenzen am Griff, um die Reihenfolge zu Ã¤ndern.
+              Ziehe manuelle Pendenzen am Griff, um die Reihenfolge zu ÃƒÂ¤ndern.
             </span>
           </div>
 
@@ -2321,7 +2127,7 @@ export default function VereinsleitungMeetingCreateForm({
             className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <Plus className="h-4 w-4" />
-            Manuelle Pendenz hinzufÃ¼gen
+            Manuelle Pendenz hinzufÃƒÂ¼gen
           </button>
         </div>
 
@@ -2341,10 +2147,15 @@ export default function VereinsleitungMeetingCreateForm({
           </button>
 
           <Link href={cancelHref} className="fca-button-secondary">
-            ZurÃ¼ck
+            ZurÃƒÂ¼ck
           </Link>
         </div>
       </SectionCard>
     </form>
   );
 }
+
+
+
+
+
