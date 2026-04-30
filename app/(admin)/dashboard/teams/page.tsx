@@ -1,6 +1,6 @@
-import TeamsTable from "@/components/admin/teams/TeamsTable";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+﻿import TeamsTable from "@/components/admin/teams/TeamsTable";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
+import { PageHeader, PageShell, SectionCard } from "@/components/shared/page";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons, getTeamsListData } from "@/lib/teams/queries";
@@ -75,11 +75,15 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
   const teams = await getTeamsListData(selectedSeasonKey);
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell>
+      <PageHeader
         eyebrow="Teams"
         title="Teams pro Saison"
         description="Saisongeführte Teamverwaltung. Die gewählte Saison ist führend; darunter werden die Teamkategorien dynamisch aufgebaut."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Teams" },
+        ]}
       />
 
       <SeasonContextSelector
@@ -123,15 +127,12 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
         ))}
       </section>
 
-      <section className="space-y-6">
-        <AdminSectionHeader
-          eyebrow="Detaildaten"
-          title={`Teamdaten ${selectedSeason?.name ?? ""}`.trim()}
-          description="Bestehende Teamdaten bleiben erhalten und werden nun im saisongeführten Kontext dargestellt."
-        />
-
+      <SectionCard
+        title={`Teamdaten ${selectedSeason?.name ?? ""}`.trim()}
+        description="Bestehende Teamdaten bleiben erhalten und werden nun im saisongeführten Kontext dargestellt."
+      >
         <TeamsTable initialTeams={teams} />
-      </section>
-    </div>
+      </SectionCard>
+    </PageShell>
   );
 }
