@@ -1,13 +1,25 @@
-﻿import { prisma } from "@/lib/db/prisma";
+﻿import { auth } from "@/auth";
+import { prisma } from "@/lib/db/prisma";
 import MyRegistrationTasksPanel from "@/components/admin/tasks/MyRegistrationTasksPanel";
+import { requirePermission } from "@/lib/permissions/require-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 export default async function TasksPage() {
-  // TEMP: fallback user (replace later with real auth)
-  const user = await prisma.user.findFirst({
-    where: {
-      isActive: true,
-      personId: { not: null },
-    },
+  // 🔒 enforce permission
+  await requirePermission(PERMISSIONS.PEOPLE_VIEW);
+
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return (
+      <div className="text-sm text-slate-500">
+        Nicht eingeloggt.
+      </div>
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
     select: { personId: true },
   });
 
@@ -16,7 +28,7 @@ export default async function TasksPage() {
   if (!personId) {
     return (
       <div className="text-sm text-slate-500">
-        Kein Benutzer zugeordnet.
+        Kein Profil (Person) mit diesem Benutzer verknüpft.
       </div>
     );
   }

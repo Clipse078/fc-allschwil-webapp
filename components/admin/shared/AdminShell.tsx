@@ -34,13 +34,10 @@ export default function AdminShell({
             : "w-[248px] shrink-0 transition-all duration-300"
         }
       >
-        <AdminSidebar
+        <AdminSidebar navItems={[]}
           firstName={firstName}
           lastName={lastName}
-          email={email}
-          permissionKeys={permissionKeys}
           currentSeasonLabel={currentSeasonLabel}
-          nextSeasonLabel={nextSeasonLabel}
           collapsed={collapsed}
           onToggle={() => setCollapsed((current) => !current)}
         />
@@ -82,5 +79,6 @@ export default function AdminShell({
     </div>
   );
 }
+
 
 

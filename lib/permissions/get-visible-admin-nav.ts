@@ -16,6 +16,8 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/dashboard",
   },
 
+  { label: "Meine Aufgaben", href: "/dashboard/tasks", permissionKeys: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.PEOPLE_MANAGE] },
+
   {
     label: "Vereinsleitung",
     href: "/vereinsleitung",
@@ -243,6 +245,7 @@ export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavIte
     );
   });
 }
+
 
 
 

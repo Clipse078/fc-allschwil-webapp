@@ -4,10 +4,8 @@ import { createWorkflowForRegistration } from "@/lib/registrations/workflow-engi
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
-  addDays,
   classifyRegistrationTargetGroup,
   getDefaultConversionRole,
-  getDefaultWorkflowSteps,
 } from "@/lib/registrations/registration-classification";
 
 export async function GET() {
@@ -30,7 +28,6 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const dateOfBirth = body.dateOfBirth ? new Date(body.dateOfBirth) : null;
-  const submittedAt = new Date();
 
   const targetGroup =
     body.targetGroup ??
@@ -41,47 +38,6 @@ export async function POST(request: NextRequest) {
     });
 
   const conversionRole = body.conversionRole ?? getDefaultConversionRole(body.type);
-
-  const template = await prisma.registrationWorkflowTemplate.findFirst({
-    where: {
-      targetGroup,
-      isActive: true,
-      OR: [{ registrationType: body.type }, { registrationType: null }],
-    },
-    orderBy: [{ registrationType: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
-    include: {
-      registrationWorkflowTemplateSteps: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
-    },
-  });
-
-  const workflowSteps =
-    template && template.registrationWorkflowTemplateSteps.length > 0
-      ? template.registrationWorkflowTemplateSteps.map((step) => ({
-          title: step.title,
-          description: step.description,
-          sortOrder: step.sortOrder,
-          defaultDueDays: step.defaultDueDays,
-          assignedRoleId: step.assignedRoleId ?? template.responsibleRoleId,
-          assignedPersonId: step.assignedPersonId ?? template.responsiblePersonId,
-        }))
-      : template
-        ? [
-            {
-              title: template.name,
-              description: "Automatisch aus Admin Workflow-Template erstellt.",
-              sortOrder: 10,
-              defaultDueDays: template.defaultDueDays,
-              assignedRoleId: template.responsibleRoleId,
-              assignedPersonId: template.responsiblePersonId,
-            },
-          ]
-        : getDefaultWorkflowSteps(targetGroup).map((step) => ({
-            ...step,
-            assignedRoleId: null,
-            assignedPersonId: null,
-          }));
 
   const registration = await prisma.registration.create({
     data: {
@@ -96,35 +52,30 @@ export async function POST(request: NextRequest) {
       gender: body.gender ?? null,
       targetGroup,
       conversionRole,
-      assignedTo: body.assignedTo ?? template?.responsiblePersonId ?? null,
+      assignedTo: body.assignedTo ?? null,
       notes: body.notes ?? null,
       formData: {
         ...(typeof body.formData === "object" && body.formData !== null ? body.formData : {}),
         source: body.source ?? body.formData?.source ?? "WEBAPP_MANUAL",
-        workflowTemplateId: template?.id ?? null,
-        workflowSource: template ? "TEMPLATE" : "FALLBACK",
       },
       submittedBy: body.submittedBy ?? null,
-      workflowSteps: {
-        create: workflowSteps.map((step) => ({
-          title: step.title,
-          description: step.description,
-          sortOrder: step.sortOrder,
-          dueDate: addDays(submittedAt, step.defaultDueDays),
-          assignedRoleId: step.assignedRoleId,
-          assignedPersonId: step.assignedPersonId,
-        })),
-      },
-    },
-    include: {
-      workflowSteps: {
-        orderBy: { sortOrder: "asc" },
-      },
     },
   });
 
   await createWorkflowForRegistration(registration.id);
-return NextResponse.json({ registration });
+
+  const hydratedRegistration = await prisma.registration.findUnique({
+    where: { id: registration.id },
+    include: {
+      workflowSteps: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          assignedRole: true,
+          assignedPerson: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json({ registration: hydratedRegistration ?? registration });
 }
-
-

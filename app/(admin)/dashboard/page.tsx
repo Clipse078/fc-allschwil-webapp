@@ -8,16 +8,28 @@ import {
   Shield,
   UserCircle2,
   UserPlus,
+  CheckCircle2,
 } from "lucide-react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
+import { getMyTaskCount } from "@/lib/tasks/get-my-task-count";
 
 const DASHBOARD_MODULES = [
+  {
+    number: "0",
+    title: "Meine\nAufgaben",
+    description:
+      "Deine offenen Aufgaben aus allen Bereichen – direkt bearbeiten und vorwärts bringen.",
+    href: "/dashboard/tasks",
+    icon: CheckCircle2,
+    highlight: true,
+  },
+
   {
     number: "1",
     title: "Vereinsleitung",
     description:
-      "Strategische Steuerung mit Meetings, Initiativen, Organigramm und kÃ¼nftigem Kommunikation HUB.",
+      "Strategische Steuerung mit Meetings, Initiativen, Organigramm und künftigem Kommunikation HUB.",
     href: "/vereinsleitung",
     icon: Briefcase,
     carrySeason: false,
@@ -26,7 +38,7 @@ const DASHBOARD_MODULES = [
     number: "2",
     title: "Operations &\nOrganisation",
     description:
-      "Demo-Modul mit Finanzen, Material, Media, AktivitÃ¤ten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
+      "Demo-Modul mit Finanzen, Material, Media, Aktivitäten / Events, Business Club, Archiv, Meetings und Kommunikation HUB.",
     href: "/dashboard/operations",
     icon: BriefcaseBusiness,
     carrySeason: false,
@@ -52,7 +64,7 @@ const DASHBOARD_MODULES = [
   },
   {
     number: "5",
-    title: "NÃ¤chste Saison",
+    title: "Nächste Saison",
     description:
       "Vorbereitung der kommenden Saison mit Teams, Spielern und Trainern.",
     href: "/dashboard/next-season",
@@ -64,7 +76,7 @@ const DASHBOARD_MODULES = [
     number: "6",
     title: "Persons",
     description:
-      "Modul fÃ¼r Trainers, Players, VereinsfunktionÃ¤re und External Contacts.",
+      "Modul für Trainers, Players, Vereinsfunktionäre und External Contacts.",
     href: "/dashboard/persons",
     icon: UserCircle2,
     carrySeason: false,
@@ -73,7 +85,7 @@ const DASHBOARD_MODULES = [
     number: "7",
     title: "Neue\nAnmeldungen",
     description:
-      "Demo-Modul fÃ¼r neue Trainers, neue Players und neue VereinsfunktionÃ¤re.",
+      "Demo-Modul für neue Trainers, neue Players und neue Vereinsfunktionäre.",
     href: "/dashboard/neu-anmeldungen",
     icon: UserPlus,
     carrySeason: false,
@@ -82,7 +94,7 @@ const DASHBOARD_MODULES = [
     number: "8",
     title: "Users & Roles",
     description:
-      "Benutzer, Rollen und Berechtigungen fÃ¼r die WebApp zentral verwalten.",
+      "Benutzer, Rollen und Berechtigungen für die WebApp zentral verwalten.",
     href: "/dashboard/users",
     icon: Shield,
     carrySeason: false,
@@ -98,6 +110,7 @@ type DashboardPageProps = {
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = (await searchParams) ?? {};
   const seasonOptions = await getSeasonOptionsData();
+  const taskCount = await getMyTaskCount();
 
   const selectedSeason =
     seasonOptions.find((season) => season.key === params.season) ??
@@ -106,69 +119,64 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     null;
 
   const selectedSeasonKey = selectedSeason?.key ?? "";
-  const currentSeasonLabel = selectedSeason?.name ?? selectedSeason?.key ?? "2025/2026";
-  const nextSeasonLabel =
-    seasonOptions.find((season) => !season.isActive && season.key !== selectedSeasonKey)?.name ?? seasonOptions.find((season) => !season.isActive && season.key !== selectedSeasonKey)?.key ??
-    seasonOptions.find((season) => season.key !== selectedSeasonKey)?.name ?? seasonOptions.find((season) => season.key !== selectedSeasonKey)?.key ??
-    "2026/2027";
 
   return (
     <div className="space-y-6">
       <AdminSurfaceCard className="overflow-hidden rounded-[34px] p-0">
         <div className="h-1.5 w-full bg-gradient-to-r from-[#0b4aa2] via-[#6a5acd] to-[#d62839]" />
+
         <div className="p-6 lg:p-8">
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             {DASHBOARD_MODULES.map((module) => {
               const Icon = module.icon;
+
               const href =
                 selectedSeasonKey && module.carrySeason
                   ? `${module.href}?season=${encodeURIComponent(selectedSeasonKey)}`
                   : module.href;
 
-              const seasonBadgeLabel =
-                module.seasonBadgeTone === "current"
-                  ? currentSeasonLabel
-                  : module.seasonBadgeTone === "next"
-                    ? nextSeasonLabel
-                    : null;
+              const isTasks = module.number === "0";
 
               return (
                 <Link
                   key={module.title}
                   href={href}
-                  className="group flex min-h-[278px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white px-6 pb-6 pt-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-[3px] hover:shadow-[0_20px_44px_rgba(15,23,42,0.08)]"
+                  className={`group flex min-h-[278px] flex-col overflow-hidden rounded-[28px] border px-6 pb-6 pt-6 transition duration-200 hover:-translate-y-[3px]
+                  ${
+                    isTasks
+                      ? "border-red-300 bg-red-50 shadow-[0_12px_30px_rgba(220,38,38,0.15)]"
+                      : "border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)] hover:shadow-[0_20px_44px_rgba(15,23,42,0.08)]"
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-red-600">
-                        Modul {module.number}
-                      </p>
-                    </div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-red-600">
+                      Modul {module.number}
+                    </p>
 
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[#0b4aa2] shadow-sm transition group-hover:scale-105">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2] shadow-sm">
                       <Icon className="h-6 w-6" />
                     </div>
                   </div>
 
-                  <div className="mt-6 flex flex-wrap items-start gap-2">
-                    <h3 className="whitespace-pre-line font-[var(--font-display)] text-[1.95rem] font-bold leading-[0.94] tracking-[-0.045em] text-[#0b4aa2]">
+                  <div className="mt-6 flex flex-wrap items-center gap-2">
+                    <h3 className="whitespace-pre-line font-[var(--font-display)] text-[1.9rem] font-bold leading-[0.94] tracking-[-0.045em] text-[#0b4aa2]">
                       {module.title}
                     </h3>
 
-                    {seasonBadgeLabel ? (
-                      <span className="mt-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                        {seasonBadgeLabel}
+                    {isTasks && taskCount > 0 && (
+                      <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">
+                        {taskCount}
                       </span>
-                    ) : null}
+                    )}
                   </div>
 
-                  <p className="mt-7 text-[15px] leading-8 text-slate-600">
+                  <p className="mt-6 text-[15px] leading-7 text-slate-600">
                     {module.description}
                   </p>
 
-                  <div className="mt-auto pt-7">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-[#0b4aa2] transition group-hover:border-[#0b4aa2]/20 group-hover:bg-[#0b4aa2]/5">
-                      Modul Ã¶ffnen
+                  <div className="mt-auto pt-6">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-[#0b4aa2]">
+                      Modul öffnen
                       <ArrowRight className="h-4 w-4" />
                     </span>
                   </div>
