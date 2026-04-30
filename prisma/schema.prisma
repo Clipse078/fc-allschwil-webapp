@@ -337,19 +337,20 @@ model UserToken {
 }
 
 model Role {
-  id                              String   @id @default(cuid())
-  key                             String   @unique
+  visibilityRuleRoles             VisibilityRuleRole[]
+  id                              String               @id @default(cuid())
+  key                             String               @unique
   name                            String
   description                     String?
-  canAccessVereinsleitung         Boolean  @default(false)
-  canAttendVereinsleitungMeetings Boolean  @default(false)
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  canAccessVereinsleitung         Boolean              @default(false)
+  canAttendVereinsleitungMeetings Boolean              @default(false)
+  createdAt                       DateTime             @default(now())
+  updatedAt                       DateTime             @updatedAt
   organigrammDepartmentId         String?
   organigrammDisplayName          String?
   organigrammDescription          String?
-  organigrammSortOrder            Int      @default(0)
-  organigrammIsGroupRole          Boolean  @default(false)
+  organigrammSortOrder            Int                  @default(0)
+  organigrammIsGroupRole          Boolean              @default(false)
 
   userRoles                         UserRole[]
   rolePermissions                   RolePermission[]
@@ -577,7 +578,8 @@ model RegistrationWorkflowStep {
 }
 
 model Person {
-  id                     String    @id @default(cuid())
+  visibilityRulePersons  VisibilityRulePerson[]
+  id                     String                 @id @default(cuid())
   firstName              String
   lastName               String
   displayName            String?
@@ -585,14 +587,14 @@ model Person {
   phone                  String?
   dateOfBirth            DateTime?
   notes                  String?
-  isActive               Boolean   @default(true)
-  isPlayer               Boolean   @default(false)
-  isTrainer              Boolean   @default(false)
+  isActive               Boolean                @default(true)
+  isPlayer               Boolean                @default(false)
+  isTrainer              Boolean                @default(false)
   trainerExperienceYears Int?
   clubJoinDate           DateTime?
   photoUrl               String?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
   user                                     User?
   playerSquadMembers                       PlayerSquadMember[]
@@ -1009,10 +1011,10 @@ model VereinsleitungMatter {
 }
 
 model VereinsleitungMeeting {
-  // 🔹 SCOPED ARCHITECTURE (NEW)
-  scopeType String?
-  scopeId   String?
-  audience  Json?
+  // Ã°Å¸â€Â¹ SCOPED ARCHITECTURE (NEW)
+  scopeType                 String?
+  scopeId                   String?
+  audience                  Json?
   id                        String                              @id @default(cuid())
   title                     String
   slug                      String                              @unique
@@ -1055,6 +1057,8 @@ model VereinsleitungMeeting {
   decisions               VereinsleitungMeetingDecision[]
   protocolEntries         VereinsleitungMeetingProtocolEntry[]
   sourcedWorkItems        VereinsleitungInitiativeWorkItem[]   @relation("InitiativeWorkItemSourceMeeting")
+  visibilityRule          VisibilityRule?                      @relation(fields: [visibilityRuleId], references: [id])
+  visibilityRuleId        String?
 
   @@index([startAt])
   @@index([status])
@@ -1353,3 +1357,39 @@ model TeamCategoryQualificationRequirement {
   @@index([teamCategoryRuleId, sortOrder])
 }
 
+model VisibilityRule {
+  id       String  @id @default(cuid())
+  isPublic Boolean @default(true)
+
+  persons VisibilityRulePerson[]
+  roles   VisibilityRuleRole[]
+
+  meetings VereinsleitungMeeting[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VisibilityRulePerson {
+  id               String @id @default(cuid())
+  visibilityRuleId String
+  personId         String
+
+  visibilityRule VisibilityRule @relation(fields: [visibilityRuleId], references: [id], onDelete: Cascade)
+  person         Person         @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([visibilityRuleId])
+  @@index([personId])
+}
+
+model VisibilityRuleRole {
+  id               String @id @default(cuid())
+  visibilityRuleId String
+  roleId           String
+
+  visibilityRule VisibilityRule @relation(fields: [visibilityRuleId], references: [id], onDelete: Cascade)
+  role           Role           @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([visibilityRuleId])
+  @@index([roleId])
+}

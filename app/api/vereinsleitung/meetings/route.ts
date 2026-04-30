@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 import { getMeetings } from "@/lib/modules/meetings/get-meetings";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import {
@@ -32,7 +33,7 @@ function normalizeAudience(input: unknown): VisibilityAudience {
   };
 
   if (obj.isPublic !== false) {
-    return { isPublic: true };
+    return { isPublic: true, personIds: [], roleIds: [] };
   }
 
   if (Array.isArray(obj.personIds) && obj.personIds.length > 0) {
@@ -51,11 +52,27 @@ function normalizeAudience(input: unknown): VisibilityAudience {
     };
   }
 
-  return { isPublic: true };
+  return { isPublic: true, personIds: [], roleIds: [] };
 }
 
 function resolveAudience(audience: unknown): VisibilityAudience {
   return normalizeAudience(audience);
+}
+
+function buildVisibilityRuleCreate(input: VisibilityAudience) {
+  const audience = normalizeAudience(input) ?? { isPublic: true, personIds: [], roleIds: [] };
+  const personIds = audience.personIds ?? [];
+  const roleIds = audience.roleIds ?? [];
+
+  return {
+    isPublic: audience.isPublic !== false,
+    persons: {
+      create: personIds.map((personId) => ({ personId })),
+    },
+    roles: {
+      create: roleIds.map((roleId) => ({ roleId })),
+    },
+  };
 }
 
 export async function GET() {
@@ -99,7 +116,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const access = await requireApiAnyPermission([
-    "vereinsleitung.meetings.manage",  ]);
+    "vereinsleitung.meetings.manage",
+  ]);
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
@@ -116,6 +134,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const rawStartAt =
+      typeof body.startAt === "string" && body.startAt.trim()
+        ? new Date(body.startAt)
+        : new Date();
+
+    if (Number.isNaN(rawStartAt.getTime())) {
+      return NextResponse.json(
+        { error: "Startzeit ist ungültig." },
+        { status: 400 },
+      );
+    }
+
     const audience = normalizeAudience(body.audience);
     const baseSlug = slugify(title) || "meeting";
     const slug = `${baseSlug}-${Date.now()}`;
@@ -124,13 +154,25 @@ export async function POST(request: Request) {
       data: {
         title,
         slug,
+        startAt: rawStartAt,
         subtitle: typeof body.subtitle === "string" ? body.subtitle : null,
         description:
           typeof body.description === "string" ? body.description : null,
         scopeType: typeof body.scopeType === "string" ? body.scopeType : null,
         scopeId: typeof body.scopeId === "string" ? body.scopeId : null,
-        audience,
-      } as any,
+        audience: audience as Prisma.InputJsonValue,
+        visibilityRule: {
+          create: buildVisibilityRuleCreate(audience),
+        },
+      },
+      include: {
+        visibilityRule: {
+          include: {
+            persons: true,
+            roles: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json(meeting, { status: 201 });
@@ -150,4 +192,13 @@ export async function POST(request: Request) {
     );
   }
 }
+
+
+
+
+
+
+
+
+
 
