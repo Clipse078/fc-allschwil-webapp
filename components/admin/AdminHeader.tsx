@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 function getPageTitle(pathname: string) {
-  if (pathname.startsWith("/vereinsleitung/meetings")) return "Meetings";
-  if (pathname.startsWith("/vereinsleitung/initiativen")) return "Initiativen";
+  if (pathname.startsWith("/meetings")) return "Meetings";
+  if (pathname.startsWith("/initiatives")) return "Initiativen";
   if (pathname.startsWith("/vereinsleitung")) return "Vereinsleitung";
   if (pathname.startsWith("/teams")) return "Teams";
   if (pathname.startsWith("/users")) return "Benutzer";
@@ -38,8 +38,9 @@ export default function AdminHeader() {
 
       {/* Right side placeholder (future: user menu / search) */}
       <div className="flex items-center gap-3">
-        {/* keep empty for now → avoids layout shift later */}
+        {/* keep empty for now â†’ avoids layout shift later */}
       </div>
     </header>
   );
 }
+
