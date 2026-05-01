@@ -20,7 +20,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
 
   {
     label: "Meetings",
-    href: "/vereinsleitung/meetings",
+    href: "/meetings",
     permissionKeys: [
       PERMISSIONS.VEREINSLEITUNG_MEETINGS_VIEW,
       PERMISSIONS.VEREINSLEITUNG_MEETINGS_MANAGE,
@@ -28,7 +28,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
   {
     label: "Initiativen",
-    href: "/vereinsleitung/initiativen",
+    href: "/initiatives",
     permissionKeys: [
       PERMISSIONS.VEREINSLEITUNG_INITIATIVES_VIEW,
       PERMISSIONS.VEREINSLEITUNG_INITIATIVES_MANAGE,
@@ -171,6 +171,7 @@ export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavIte
     );
   });
 }
+
 
 
 
