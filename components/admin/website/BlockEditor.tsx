@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Copy,
   Lightbulb,
   Plus,
   Save,
@@ -148,6 +149,7 @@ function BlockSection({
   onUpdateProp,
   onMoveUp,
   onMoveDown,
+  onDuplicate,
   onRemove,
 }: {
   block: Block;
@@ -158,6 +160,7 @@ function BlockSection({
   onUpdateProp: (id: string, key: string, val: unknown) => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -186,6 +189,12 @@ function BlockSection({
           <span className="text-sm font-semibold text-slate-900">{blockLabel}</span>
           <span className="text-[11px] text-slate-400">{block.type}</span>
           {open ? <ChevronUp className="ml-auto h-4 w-4 text-slate-400" /> : <ChevronDown className="ml-auto h-4 w-4 text-slate-400" />}
+        </button>
+
+        {/* Duplicate */}
+        <button type="button" onClick={() => onDuplicate(block.id)} title="Block duplizieren"
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-300 hover:border-[#0b4aa2]/30 hover:text-[#0b4aa2]">
+          <Copy className="h-3 w-3" />
         </button>
 
         {/* Remove */}
@@ -303,6 +312,22 @@ export default function BlockEditor({ pageId, initialBlocks, blockLabels, curren
     setBlocks((prev) => prev.filter((b) => b.id !== blockId).map((b, i) => ({ ...b, sortOrder: i + 1 })));
   }
 
+  function duplicateBlock(blockId: string) {
+    markDirty();
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === blockId);
+      if (idx === -1) return prev;
+      const copy: Block = {
+        id: newBlockId(),
+        type: prev[idx].type,
+        props: { ...prev[idx].props },
+        sortOrder: 0,
+      };
+      const updated = [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
+      return updated.map((b, i) => ({ ...b, sortOrder: i + 1 }));
+    });
+  }
+
   function addBlock(type: string) {
     const def = BLOCK_CATALOG.find((b) => b.type === type);
     if (!def) return;
@@ -375,6 +400,7 @@ export default function BlockEditor({ pageId, initialBlocks, blockLabels, curren
             onUpdateProp={updateProp}
             onMoveUp={(id) => moveBlock(id, "up")}
             onMoveDown={(id) => moveBlock(id, "down")}
+            onDuplicate={duplicateBlock}
             onRemove={removeBlock}
           />
         ))}

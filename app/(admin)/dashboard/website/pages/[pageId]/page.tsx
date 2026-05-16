@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Info, Lightbulb } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Info, Lightbulb } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
@@ -89,6 +89,24 @@ export default async function PageEditRoute({ params }: Props) {
     page.publishedAt !== null &&
     latestVersion !== null &&
     latestVersion.createdAt > page.publishedAt;
+
+  // Snapshot history
+  const snapshots = await prisma.websitePublishSnapshot.findMany({
+    where: { pageId },
+    orderBy: { publishedAt: "desc" },
+    take: 10,
+    select: { id: true, versionRef: true, publishedAt: true, publishedByUserId: true },
+  });
+
+  const publisherIds = [...new Set(snapshots.map((s) => s.publishedByUserId).filter(Boolean))] as string[];
+  const publishers =
+    publisherIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: publisherIds } },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
+  const publisherMap = new Map(publishers.map((u) => [u.id, `${u.firstName} ${u.lastName}`]));
 
   const blocks = parseBlocks(latestVersion?.blocksJson ?? []);
   const version = latestVersion?.version ?? 0;
@@ -222,6 +240,73 @@ export default async function PageEditRoute({ params }: Props) {
           </p>
         </div>
       )}
+
+      {/* Snapshot history */}
+      <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[1.05rem] font-semibold text-slate-900">
+            Snapshot-Historie
+          </h2>
+          {snapshots.length > 0 && (
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+              {snapshots.length}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-start gap-2.5 rounded-[14px] border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+          <p className="text-[12px] text-emerald-800">
+            Publizierte Snapshots sind sichere Prüfpunkte. Entwurfsversionen bleiben
+            jederzeit editierbar.
+          </p>
+        </div>
+
+        {snapshots.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-400">
+            Noch keine Snapshots publiziert. Drücke «Publizieren» um den ersten
+            öffentlichen Checkpoint zu erstellen.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {snapshots.map((snap, i) => (
+              <div
+                key={snap.id}
+                className="flex items-center justify-between gap-3 rounded-[14px] border border-slate-200/80 bg-slate-50 px-4 py-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  {i === 0 && (
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                      Aktuell live
+                    </span>
+                  )}
+                  {snap.versionRef !== null && (
+                    <span className="text-[11px] text-slate-500">
+                      v{snap.versionRef}
+                    </span>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] text-slate-600">
+                    {new Intl.DateTimeFormat("de-CH", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }).format(snap.publishedAt)}
+                  </p>
+                  {snap.publishedByUserId && publisherMap.has(snap.publishedByUserId) && (
+                    <p className="text-[10px] text-slate-400">
+                      {publisherMap.get(snap.publishedByUserId)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
