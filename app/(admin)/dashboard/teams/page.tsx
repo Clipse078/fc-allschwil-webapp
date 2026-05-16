@@ -1,9 +1,11 @@
 ﻿import TeamsTable from "@/components/admin/teams/TeamsTable";
+import TeamsGuidanceSummary from "@/components/admin/training/TeamsGuidanceSummary";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons, getTeamsListData } from "@/lib/teams/queries";
+import { getTeamsGuidanceSummaries } from "@/lib/training/team-guidance";
 
 const TEAM_GROUPS = [
   {
@@ -74,6 +76,11 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
 
   const teams = await getTeamsListData(selectedSeasonKey);
 
+  const teamIds = teams.map((t) => t.id);
+  const guidanceSummaries = selectedSeason
+    ? await getTeamsGuidanceSummaries(selectedSeason.id, teamIds)
+    : new Map();
+
   return (
     <div className="space-y-8">
       <AdminSectionHeader
@@ -129,6 +136,14 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
           title={`Teamdaten ${selectedSeason?.name ?? ""}`.trim()}
           description="Bestehende Teamdaten bleiben erhalten und werden nun im saisongeführten Kontext dargestellt."
         />
+
+        {teams.length > 0 && selectedSeason && (
+          <TeamsGuidanceSummary
+            teams={teams.map((t) => ({ id: t.id, name: t.name, category: t.category ?? "" }))}
+            summaries={guidanceSummaries}
+            seasonKey={selectedSeasonKey}
+          />
+        )}
 
         <TeamsTable initialTeams={teams} />
       </section>
