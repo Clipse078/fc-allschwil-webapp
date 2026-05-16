@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import {
+  BookOpen,
   Briefcase,
   CalendarDays,
   CalendarRange,
@@ -29,6 +30,14 @@ const DASHBOARD_MODULES = [
       "Vereinsziele pro Modul definieren, empfohlene Ziele importieren und Trainingsblöcke gegen Ziele vergleichen.",
     href: "/dashboard/strategy",
     icon: Target,
+    carrySeason: false,
+  },
+  {
+    title: "Übungsdatenbank",
+    description:
+      "Premium-Übungsbibliothek für 7 Sportarten mit Coaching Points, Variationen und Zielgruppenfilter.",
+    href: "/dashboard/training/exercises",
+    icon: BookOpen,
     carrySeason: false,
   },
   {

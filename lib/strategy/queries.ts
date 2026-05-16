@@ -1,14 +1,7 @@
 import { TrainingFocus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-
-export const TRAINING_FOCUS_LABELS: Record<TrainingFocus, string> = {
-  TECHNICAL: "Technik",
-  TACTICAL: "Taktik",
-  PHYSICAL: "Kondition",
-  MENTAL: "Mental",
-  GOALKEEPING: "Torhüter",
-  OTHER: "Sonstiges",
-};
+import { TRAINING_FOCUS_LABELS } from "@/lib/training/labels";
+export { TRAINING_FOCUS_LABELS };
 
 export type TrainingBlockRow = {
   focus: TrainingFocus;

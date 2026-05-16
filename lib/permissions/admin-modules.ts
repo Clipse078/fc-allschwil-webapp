@@ -23,6 +23,13 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
   },
   {
+    key: "exercises",
+    title: "Übungsdatenbank",
+    description: "Premium-Übungsbibliothek für 7 Sportarten. Importieren, anpassen und im Vereinsbetrieb einsetzen.",
+    href: "/dashboard/training/exercises",
+    requiredPermissions: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
+  },
+  {
     key: "seasons",
     title: "Saisons",
     description: "Saisons als führende Club-Entität verwalten und die nächste Saison planen.",

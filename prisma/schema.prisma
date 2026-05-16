@@ -80,6 +80,22 @@ enum GoalModule {
   WEBSITE_PUBLISHING
 }
 
+enum ExerciseDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ExerciseSport {
+  FOOTBALL
+  BASKETBALL
+  HANDBALL
+  VOLLEYBALL
+  FUTSAL
+  TENNIS
+  FITNESS
+}
+
 enum EventSource {
   CLUBCORNER_FVNWS
   MANUAL
@@ -271,6 +287,7 @@ model Season {
   eventImportRuns EventImportRun[]
   strategyTargets StrategyTarget[]
   clubGoals       ClubGoal[]
+  clubExercises   ClubExercise[]
 
   @@index([isActive])
 }
@@ -319,6 +336,7 @@ model Team {
   eventImportRuns EventImportRun[]
   strategyTargets StrategyTarget[]
   clubGoals       ClubGoal[]
+  clubExercises   ClubExercise[]
 
   @@index([category, sortOrder])
   @@index([isActive])
@@ -562,6 +580,34 @@ model ClubGoal {
   team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([seasonId, module])
+  @@index([teamId])
+  @@index([templateId])
+}
+
+model ClubExercise {
+  id              String             @id @default(cuid())
+  templateId      String?
+  sport           ExerciseSport
+  focus           TrainingFocus
+  difficulty      ExerciseDifficulty @default(INTERMEDIATE)
+  title           String
+  description     String
+  setup           String?
+  coachingPoints  String?
+  variations      String?
+  equipment       String?
+  durationMinutes Int?
+  audienceTags    String[]
+  seasonId        String?
+  teamId          String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  season Season? @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([sport, focus])
+  @@index([seasonId])
   @@index([teamId])
   @@index([templateId])
 }
