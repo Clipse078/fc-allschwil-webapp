@@ -253,3 +253,163 @@ export async function restoreFromSnapshot(formData: FormData): Promise<RestoreRe
 
   return { ok: true, version: nextVersion };
 }
+
+// ── Submit for review ────────────────────────────────────────────────────────
+
+export type ReviewResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function submitForReview(formData: FormData): Promise<ReviewResult> {
+  const session = await requireAccess();
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  const note = String(formData.get("reviewNote") ?? "").trim() || null;
+
+  if (!pageId) return { ok: false, error: "Keine Seiten-ID." };
+
+  const page = await prisma.websitePage.findFirst({
+    where: { id: pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: { id: true, status: true },
+  });
+
+  if (!page) return { ok: false, error: "Seite nicht gefunden." };
+  if (page.status !== "DRAFT") {
+    return { ok: false, error: "Nur Entwürfe können zur Prüfung eingereicht werden." };
+  }
+
+  const latestVersion = await prisma.websitePageVersion.findFirst({
+    where: { pageId: page.id },
+    orderBy: { version: "desc" },
+    select: { id: true },
+  });
+
+  if (!latestVersion) {
+    return { ok: false, error: "Speichere zuerst eine Entwurfsversion." };
+  }
+
+  await prisma.websitePage.update({
+    where: { id: page.id },
+    data: {
+      status: "REVIEW",
+      reviewRequestedAt: new Date(),
+      reviewNotes: note,
+      reviewedByUserId: null,
+      reviewedAt: null,
+    },
+  });
+
+  revalidatePath(`/dashboard/website/pages/${pageId}`);
+  revalidatePath("/dashboard/website");
+  return { ok: true };
+}
+
+// ── Approve and publish ──────────────────────────────────────────────────────
+
+export async function approveAndPublish(formData: FormData): Promise<PublishResult> {
+  const session = await requireAccess();
+  const actorUserId = session.user.effectiveUserId ?? session.user.id ?? null;
+  const pageId = String(formData.get("pageId") ?? "").trim();
+
+  if (!pageId) return { ok: false, requiresReview: false, error: "Keine Seiten-ID." };
+
+  const page = await prisma.websitePage.findFirst({
+    where: { id: pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: {
+      id: true, slug: true, title: true, pageType: true, locale: true,
+      status: true, templateKey: true, metaTitle: true, metaDescription: true,
+      site: { select: { id: true, tenantKey: true } },
+    },
+  });
+
+  if (!page) return { ok: false, requiresReview: false, error: "Seite nicht gefunden." };
+  if (page.status !== "REVIEW") {
+    return { ok: false, requiresReview: false, error: "Nur Seiten in Prüfung können freigegeben werden." };
+  }
+
+  const latestVersion = await prisma.websitePageVersion.findFirst({
+    where: { pageId },
+    orderBy: { version: "desc" },
+    select: { version: true, blocksJson: true },
+  });
+
+  if (!latestVersion) {
+    return { ok: false, requiresReview: false, error: "Keine Version vorhanden." };
+  }
+
+  const now = new Date();
+  const snapshot = await prisma.$transaction(async (tx) => {
+    const newSnapshot = await tx.websitePublishSnapshot.create({
+      data: {
+        siteId: page.site.id,
+        pageId: page.id,
+        tenantKey: page.site.tenantKey,
+        slug: page.slug,
+        locale: page.locale,
+        pageType: page.pageType,
+        title: page.title,
+        blocksJson: latestVersion.blocksJson as Prisma.InputJsonValue,
+        metaTitle: page.metaTitle,
+        metaDescription: page.metaDescription,
+        versionRef: latestVersion.version,
+        publishedByUserId: actorUserId,
+        publishedAt: now,
+      },
+      select: { id: true },
+    });
+
+    await tx.websitePage.update({
+      where: { id: pageId },
+      data: {
+        status: "PUBLISHED",
+        publishedAt: now,
+        publishedByUserId: actorUserId,
+        reviewedAt: now,
+        reviewedByUserId: actorUserId,
+      },
+    });
+
+    return newSnapshot;
+  });
+
+  revalidatePath(`/dashboard/website/pages/${pageId}`);
+  revalidatePath("/dashboard/website");
+  revalidatePath("/api/public/website/pages");
+  revalidatePath("/api/public/website/page");
+
+  return { ok: true, snapshotId: snapshot.id };
+}
+
+// ── Reject review ────────────────────────────────────────────────────────────
+
+export async function rejectReview(formData: FormData): Promise<ReviewResult> {
+  const session = await requireAccess();
+  const actorUserId = session.user.effectiveUserId ?? session.user.id ?? null;
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  const note = String(formData.get("rejectNote") ?? "").trim() || null;
+
+  if (!pageId) return { ok: false, error: "Keine Seiten-ID." };
+
+  const page = await prisma.websitePage.findFirst({
+    where: { id: pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: { id: true, status: true },
+  });
+
+  if (!page) return { ok: false, error: "Seite nicht gefunden." };
+  if (page.status !== "REVIEW") {
+    return { ok: false, error: "Nur Seiten in Prüfung können abgelehnt werden." };
+  }
+
+  await prisma.websitePage.update({
+    where: { id: page.id },
+    data: {
+      status: "DRAFT",
+      reviewedAt: new Date(),
+      reviewedByUserId: actorUserId,
+      reviewNotes: note,
+    },
+  });
+
+  revalidatePath(`/dashboard/website/pages/${pageId}`);
+  revalidatePath("/dashboard/website");
+  return { ok: true };
+}

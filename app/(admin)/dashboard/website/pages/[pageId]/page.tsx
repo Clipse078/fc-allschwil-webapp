@@ -9,6 +9,12 @@ import { BLOCK_CATALOG } from "@/lib/website/block-catalog";
 import BlockEditor from "@/components/admin/website/BlockEditor";
 import PublishButton from "@/components/admin/website/PublishButton";
 import RestoreSnapshotButton from "@/components/admin/website/RestoreSnapshotButton";
+import {
+  ReviewApprovalPanel,
+  SubmitForReviewButton,
+} from "@/components/admin/website/ReviewActionsPanel";
+import { auth } from "@/auth";
+import { websitePublishRequiresReview } from "@/lib/website/governance";
 import type { WebsitePageStatus } from "@prisma/client";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
@@ -109,6 +115,20 @@ export default async function PageEditRoute({ params }: Props) {
       : [];
   const publisherMap = new Map(publishers.map((u) => [u.id, `${u.firstName} ${u.lastName}`]));
 
+  // Governance: check if current user's roles require review
+  const session = await auth();
+  const userId = session?.user?.id ?? "";
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId },
+    select: { roleId: true },
+  });
+  let requiresReview: boolean | null = null;
+  for (const { roleId } of userRoles) {
+    const check = await websitePublishRequiresReview(roleId);
+    if (check === false) { requiresReview = false; break; }
+    if (check === true) requiresReview = true;
+  }
+
   const blocks = parseBlocks(latestVersion?.blocksJson ?? []);
   const version = latestVersion?.version ?? 0;
 
@@ -165,17 +185,17 @@ export default async function PageEditRoute({ params }: Props) {
         </div>
       )}
 
-      {/* Publish panel */}
+      {/* Workflow panel */}
       {page.status !== "ARCHIVED" && (
         <div className="rounded-[22px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
-          <div className="flex items-start justify-between gap-4">
+          <div className="mb-1 flex items-start justify-between gap-4">
             <div>
               <h2 className="text-[1rem] font-semibold text-slate-900">
-                Publizieren
+                {page.status === "REVIEW" ? "Prüfung" : "Publizieren"}
               </h2>
               <p className="mt-0.5 text-[11px] text-slate-400">
-                Publizieren erstellt einen öffentlichen Snapshot aus der aktuellen
-                Version. Entwurfshistorie bleibt erhalten.
+                Review ist optional und per Verein konfigurierbar. Wenn aktiviert,
+                prüfen Reviewer vor der Publikation.
               </p>
             </div>
           </div>
@@ -184,14 +204,40 @@ export default async function PageEditRoute({ params }: Props) {
             <div className="mt-3 rounded-[12px] border border-slate-200 bg-slate-50 px-4 py-3 text-[12px] text-slate-500">
               Noch keine Version gespeichert.{" "}
               <span className="font-semibold">Bearbeite die Blöcke</span> und
-              speichere eine Entwurfsversion bevor du publizierst.
+              speichere eine Entwurfsversion.
+            </div>
+          ) : page.status === "REVIEW" ? (
+            <div className="mt-3 space-y-3">
+              <div className="rounded-[12px] border border-amber-100 bg-amber-50/70 px-3 py-2 text-[12px] text-amber-800">
+                Diese Seite wartet auf Prüfung und Freigabe.
+              </div>
+              <ReviewApprovalPanel pageId={page.id} />
             </div>
           ) : (
-            <div className="mt-3">
-              <PublishButton
-                pageId={page.id}
-                isAlreadyPublished={page.status === "PUBLISHED"}
-              />
+            <div className="mt-3 space-y-3">
+              {requiresReview === true ? (
+                <>
+                  <p className="text-[12px] text-slate-500">
+                    Dieser Verein erfordert eine Prüfung vor der Publikation.
+                  </p>
+                  <SubmitForReviewButton pageId={page.id} />
+                </>
+              ) : (
+                <>
+                  <PublishButton
+                    pageId={page.id}
+                    isAlreadyPublished={page.status === "PUBLISHED"}
+                  />
+                  <details className="group">
+                    <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600">
+                      Optional: Zur Prüfung einreichen
+                    </summary>
+                    <div className="mt-2">
+                      <SubmitForReviewButton pageId={page.id} />
+                    </div>
+                  </details>
+                </>
+              )}
             </div>
           )}
         </div>
