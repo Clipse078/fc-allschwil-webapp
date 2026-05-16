@@ -76,7 +76,7 @@ const STATUS_LABELS: Record<WebsitePageStatus, string> = {
 };
 
 export default async function WebsiteDashboardPage({ searchParams }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE, PERMISSIONS.EVENTS_MANAGE]);
+  await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
 
   const params = (await searchParams) ?? {};
   const feedback = getCreatePageFeedback(params.status, params.created, params.slug);

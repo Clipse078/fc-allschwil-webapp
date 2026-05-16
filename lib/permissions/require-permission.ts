@@ -13,7 +13,7 @@ export async function requirePermission(permissionKey: PermissionKey) {
   const allowed = hasPermission(session, permissionKey);
 
   if (!allowed) {
-    redirect("/dashboard");
+    redirect("/dashboard?error=access-denied");
   }
 
   return session;
