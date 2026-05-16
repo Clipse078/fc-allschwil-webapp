@@ -1,6 +1,6 @@
 import type React from "react";
 import Link from "next/link";
-import { Globe, Newspaper, Users, Zap } from "lucide-react";
+import { Globe, Newspaper, Users, Users2, Zap } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { requirePermission } from "@/lib/permissions/require-permission";
@@ -51,6 +51,12 @@ const MODULES: WebsiteModule[] = [
     description: "Partner verwalten und Sichtbarkeit für Website, Infoboard und Sponsor-Strip steuern.",
     href: "/dashboard/website/sponsoren",
     icon: Users,
+  },
+  {
+    title: "Teams (Public)",
+    description: "Öffentliche Team-Seiten werden automatisch aus den Stammdaten generiert. Sichtbarkeit via Team-Einstellungen steuern.",
+    href: "/dashboard/teams",
+    icon: Users2,
   },
 ];
 
