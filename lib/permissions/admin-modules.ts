@@ -104,6 +104,14 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
   },
   {
+    key: "inquiries",
+    title: "Anfragen",
+    description:
+      "Kontaktanfragen und Interessensmeldungen aus der öffentlichen Website verwalten und beantworten.",
+    href: "/dashboard/website/inquiries",
+    requiredPermissions: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
     key: "logs",
     title: "Admin Log",
     description: "Änderungen und wichtige Systemaktionen nachvollziehen.",

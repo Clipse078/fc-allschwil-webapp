@@ -1,6 +1,6 @@
 import type React from "react";
 import Link from "next/link";
-import { Globe, ImageIcon, Newspaper, Users, Users2, Zap } from "lucide-react";
+import { Globe, ImageIcon, Inbox, Newspaper, Users, Users2, Zap } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { requirePermission } from "@/lib/permissions/require-permission";
@@ -77,6 +77,12 @@ const MODULES: WebsiteModule[] = [
     description: "Bilder und Medien für die Website zentral verwalten. CDN-ready, upload-bereit.",
     href: "/dashboard/website/media",
     icon: ImageIcon,
+  },
+  {
+    title: "Anfragen",
+    description: "Kontaktanfragen und Interessensmeldungen aus der öffentlichen Website bearbeiten.",
+    href: "/dashboard/website/inquiries",
+    icon: Inbox,
   },
 ];
 

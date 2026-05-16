@@ -17,6 +17,7 @@ import {
   Globe,
   Handshake,
   ImageIcon,
+  Inbox,
   LayoutDashboard,
   Newspaper,
   ScrollText,
@@ -78,6 +79,8 @@ function getNavIcon(label: string) {
       return Handshake;
     case "Medien":
       return ImageIcon;
+    case "Anfragen":
+      return Inbox;
     default:
       return LayoutDashboard;
   }
@@ -92,7 +95,12 @@ function isPlannerChild(label: string) {
 }
 
 function isWebsiteChild(label: string) {
-  return label === "News" || label === "Sponsoren" || label === "Medien";
+  return (
+    label === "News" ||
+    label === "Sponsoren" ||
+    label === "Medien" ||
+    label === "Anfragen"
+  );
 }
 
 function shouldCarrySeason(href: string) {

@@ -32,6 +32,21 @@ enum WebsiteMediaAssetType {
   OTHER
 }
 
+enum WebsiteInquiryType {
+  CONTACT
+  REGISTRATION_INTEREST
+  SPONSOR_INTEREST
+  TRAINER_INTEREST
+  VOLUNTEER_INTEREST
+}
+
+enum WebsiteInquiryStatus {
+  NEW
+  IN_PROGRESS
+  RESOLVED
+  ARCHIVED
+}
+
 enum TeamCategory {
   KINDERFUSSBALL
   JUNIOREN
@@ -526,6 +541,7 @@ model WebsiteSite {
   publishSnapshots WebsitePublishSnapshot[]
   sponsors         Sponsor[]
   mediaAssets      WebsiteMediaAsset[]
+  inquiries        WebsiteInquiry[]
 
   @@index([isActive])
 }
@@ -574,6 +590,28 @@ model Sponsor {
   @@index([siteId, isActive, showOnWebsite])
   @@index([siteId, isActive, showOnInfoboard])
   @@index([siteId, tier, sortOrder])
+}
+
+model WebsiteInquiry {
+  id              String               @id @default(cuid())
+  siteId          String
+  type            WebsiteInquiryType   @default(CONTACT)
+  status          WebsiteInquiryStatus @default(NEW)
+  name            String
+  email           String
+  phone           String?
+  topic           String?
+  message         String
+  sourcePath      String?
+  handledByUserId String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([siteId, status])
+  @@index([siteId, type])
+  @@index([createdAt])
 }
 
 model WebsitePublishSnapshot {
