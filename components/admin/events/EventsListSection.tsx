@@ -22,6 +22,7 @@ type EventsListSectionProps = {
     wochenplanVisible: boolean;
     trainingsplanVisible: boolean;
     teamPageVisible: boolean;
+    trainingFocus: string | null;
     opponentName: string | null;
     organizerName: string | null;
     competitionLabel: string | null;

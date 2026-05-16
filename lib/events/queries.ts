@@ -33,6 +33,7 @@ export async function getEventsListData(filter: EventListFilter = "ALL") {
       wochenplanVisible: true,
       trainingsplanVisible: true,
       teamPageVisible: true,
+      trainingFocus: true,
       opponentName: true,
       organizerName: true,
       competitionLabel: true,

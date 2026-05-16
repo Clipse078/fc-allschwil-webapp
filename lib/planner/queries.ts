@@ -18,6 +18,7 @@ export type PlannerEntry = {
   websiteVisible: boolean;
   infoboardVisible: boolean;
   wochenplanVisible: boolean;
+  trainingFocus: string | null;
 };
 
 function getPlannerTypeLabel(type: EventType): string {
@@ -106,7 +107,7 @@ async function getPlannerEntries(args: {
         : {}),
     },
     orderBy: [{ startAt: "asc" }, { sortOrder: "asc" }, { title: "asc" }],
-    select: {
+      select: {
       id: true,
       title: true,
       type: true,
@@ -118,6 +119,7 @@ async function getPlannerEntries(args: {
       websiteVisible: true,
       infoboardVisible: true,
       wochenplanVisible: true,
+      trainingFocus: true,
       team: {
         select: {
           name: true,
@@ -141,6 +143,7 @@ async function getPlannerEntries(args: {
     websiteVisible: entry.websiteVisible,
     infoboardVisible: entry.infoboardVisible,
     wochenplanVisible: entry.wochenplanVisible,
+    trainingFocus: entry.trainingFocus ?? null,
   }));
 }
 

@@ -1,5 +1,7 @@
+import { Lightbulb } from "lucide-react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
+import { TRAINING_FOCUS_LABELS } from "@/lib/training/labels";
 
 type EventListCardProps = {
   event: {
@@ -21,6 +23,7 @@ type EventListCardProps = {
     opponentName: string | null;
     organizerName: string | null;
     competitionLabel: string | null;
+    trainingFocus: string | null;
     homeAway: string | null;
     resultLabel: string | null;
     season: {
@@ -113,10 +116,27 @@ export default function EventListCard({ event }: EventListCardProps) {
           <div className="mt-3 flex flex-wrap gap-2">
             <AdminStatusPill label={event.status} tone={event.status === "SCHEDULED" ? "success" : "muted"} />
             <span className="fca-pill">Quelle: {getSourceLabel(event.source)}</span>
+            {event.type === "TRAINING" && event.trainingFocus && (
+              <span className="rounded-full border border-[#0b4aa2]/25 bg-[#0b4aa2]/5 px-2.5 py-0.5 text-[11px] font-semibold text-[#0b4aa2]">
+                {TRAINING_FOCUS_LABELS[event.trainingFocus as keyof typeof TRAINING_FOCUS_LABELS] ?? event.trainingFocus}
+              </span>
+            )}
             {event.competitionLabel ? <span className="fca-pill">{event.competitionLabel}</span> : null}
             {event.homeAway ? <span className="fca-pill">{event.homeAway}</span> : null}
             {event.resultLabel ? <span className="fca-pill">Resultat: {event.resultLabel}</span> : null}
           </div>
+          {event.type === "TRAINING" && !event.trainingFocus && (
+            <div className="mt-3 flex items-center gap-2 rounded-[12px] border border-amber-100 bg-amber-50/70 px-3 py-2">
+              <Lightbulb className="h-3 w-3 shrink-0 text-amber-500" />
+              <p className="text-[11px] text-amber-800">
+                Kein Schwerpunkt gesetzt.{" "}
+                <a href={`/dashboard/training/bulk-tag`} className="font-semibold underline hover:text-amber-900">
+                  Schwerpunkt ergänzen
+                </a>{" "}
+                damit dieses Training zu Strategie-KPIs beiträgt.
+              </p>
+            </div>
+          )}
 
           <div className="mt-4 space-y-2 text-sm text-slate-600">
             <p>

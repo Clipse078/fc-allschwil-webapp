@@ -46,6 +46,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE, PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
   },
   {
+    label: "Schwerpunkt-Tags",
+    href: "/dashboard/training/bulk-tag",
+    permissionKeys: [PERMISSIONS.EVENTS_MANAGE],
+  },
+  {
     label: "Saisonplanner",
     href: "/dashboard/planner",
     permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
