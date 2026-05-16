@@ -9,6 +9,7 @@ import { BLOCK_CATALOG } from "@/lib/website/block-catalog";
 import BlockEditor from "@/components/admin/website/BlockEditor";
 import PublishButton from "@/components/admin/website/PublishButton";
 import RestoreSnapshotButton from "@/components/admin/website/RestoreSnapshotButton";
+import ArchivePageButton from "@/components/admin/website/ArchivePageButton";
 import {
   ReviewApprovalPanel,
   SubmitForReviewButton,
@@ -162,6 +163,12 @@ export default async function PageEditRoute({ params }: Props) {
             {page.locale.toUpperCase()} · Version {version}
           </p>
         </div>
+        {page.status !== "ARCHIVED" && (
+          <ArchivePageButton
+            pageId={page.id}
+            isPublished={page.status === "PUBLISHED"}
+          />
+        )}
       </div>
 
       {/* Guidance */}

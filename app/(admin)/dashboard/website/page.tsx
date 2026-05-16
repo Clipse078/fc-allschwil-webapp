@@ -14,6 +14,7 @@ import { prisma } from "@/lib/db/prisma";
 import { TEMPLATE_CATALOG, PAGE_TYPE_LABELS } from "@/lib/website/template-catalog";
 import { getCreatePageFeedback } from "@/lib/website/create-page-helpers";
 import CreatePageForm from "@/components/admin/website/CreatePageForm";
+import ArchivePageButton from "@/components/admin/website/ArchivePageButton";
 import type { WebsitePageStatus } from "@prisma/client";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
@@ -45,6 +46,11 @@ async function getSiteWithPages() {
           isVisible: true,
           publishedAt: true,
           updatedAt: true,
+          versions: {
+            orderBy: { version: "desc" },
+            take: 1,
+            select: { version: true, createdAt: true, blocksJson: true },
+          },
         },
       },
     },
@@ -190,36 +196,54 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
             </div>
           ) : (
             <div className="mt-4 space-y-2">
-              {pages.map((page) => (
-                <Link
-                  key={page.id}
-                  href={`/dashboard/website/pages/${page.id}`}
-                  className={`flex items-center justify-between gap-3 rounded-[16px] border px-4 py-3 transition hover:shadow-sm ${
-                    justCreated?.id === page.id
-                      ? "border-emerald-200 bg-emerald-50/50"
-                      : "border-slate-200/80 bg-slate-50 hover:bg-white"
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">
-                      {page.title}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400">
-                      /{page.slug} · {PAGE_TYPE_LABELS[page.pageType]}
-                    </p>
+              {pages.map((page) => {
+                const latestVer = page.versions[0] ?? null;
+                const blockCount = Array.isArray(latestVer?.blocksJson)
+                  ? (latestVer.blocksJson as unknown[]).length
+                  : null;
+                return (
+                  <div
+                    key={page.id}
+                    className={`rounded-[16px] border px-4 py-3 transition ${
+                      justCreated?.id === page.id
+                        ? "border-emerald-200 bg-emerald-50/50"
+                        : "border-slate-200/80 bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <Link
+                        href={`/dashboard/website/pages/${page.id}`}
+                        className="group min-w-0 flex-1"
+                      >
+                        <p className="truncate text-sm font-semibold text-slate-900 group-hover:text-[#0b4aa2]">
+                          {page.title}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          /{page.slug} · {PAGE_TYPE_LABELS[page.pageType]}
+                          {blockCount !== null ? ` · ${blockCount} Blöcke` : ""}
+                          {latestVer ? ` · v${latestVer.version}` : ""}
+                        </p>
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {page.publishedAt && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        )}
+                        <span
+                          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[page.status]}`}
+                        >
+                          {STATUS_LABELS[page.status]}
+                        </span>
+                        {page.status !== "ARCHIVED" && (
+                          <ArchivePageButton
+                            pageId={page.id}
+                            isPublished={page.publishedAt !== null}
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {page.publishedAt && (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    )}
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[page.status]}`}
-                    >
-                      {STATUS_LABELS[page.status]}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
 

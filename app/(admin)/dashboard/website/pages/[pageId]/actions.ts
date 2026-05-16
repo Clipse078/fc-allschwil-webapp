@@ -413,3 +413,29 @@ export async function rejectReview(formData: FormData): Promise<ReviewResult> {
   revalidatePath("/dashboard/website");
   return { ok: true };
 }
+
+// ── Archive page ─────────────────────────────────────────────────────────────
+
+export async function archivePage(formData: FormData): Promise<ReviewResult> {
+  await requireAccess();
+
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  if (!pageId) return { ok: false, error: "Keine Seiten-ID." };
+
+  const page = await prisma.websitePage.findFirst({
+    where: { id: pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: { id: true, status: true },
+  });
+
+  if (!page) return { ok: false, error: "Seite nicht gefunden." };
+  if (page.status === "ARCHIVED") return { ok: true };
+
+  await prisma.websitePage.update({
+    where: { id: page.id },
+    data: { status: "ARCHIVED" },
+  });
+
+  revalidatePath(`/dashboard/website/pages/${pageId}`);
+  revalidatePath("/dashboard/website");
+  return { ok: true };
+}
