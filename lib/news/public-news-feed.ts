@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 
 export type PublicNewsArticleSummary = {
   id: string;
-  tenantKey: string;
+  siteId: string;
   slug: string;
   locale: string;
   title: string;
@@ -16,14 +16,25 @@ export type PublicNewsArticleDetail = PublicNewsArticleSummary & {
   body: string | null;
 };
 
+async function resolveSiteId(tenantKey: string): Promise<string | null> {
+  const site = await prisma.websiteSite.findUnique({
+    where: { tenantKey, isActive: true },
+    select: { id: true },
+  });
+  return site?.id ?? null;
+}
+
 export async function getPublicNewsArticle(
   tenantKey: string,
   slug: string,
   locale = "de"
 ): Promise<PublicNewsArticleDetail | null> {
+  const siteId = await resolveSiteId(tenantKey);
+  if (!siteId) return null;
+
   const article = await prisma.newsArticle.findFirst({
     where: {
-      tenantKey,
+      siteId,
       slug,
       locale,
       status: "PUBLISHED",
@@ -31,7 +42,7 @@ export async function getPublicNewsArticle(
     },
     select: {
       id: true,
-      tenantKey: true,
+      siteId: true,
       slug: true,
       locale: true,
       title: true,
@@ -58,11 +69,14 @@ export async function getPublicNewsList(
   locale = "de",
   limit = 20
 ): Promise<PublicNewsArticleSummary[]> {
+  const siteId = await resolveSiteId(tenantKey);
+  if (!siteId) return [];
+
   const normalizedLimit = Math.max(1, Math.min(100, limit));
 
   const articles = await prisma.newsArticle.findMany({
     where: {
-      tenantKey,
+      siteId,
       locale,
       status: "PUBLISHED",
       publishedAt: { lte: new Date() },
@@ -71,7 +85,7 @@ export async function getPublicNewsList(
     take: normalizedLimit,
     select: {
       id: true,
-      tenantKey: true,
+      siteId: true,
       slug: true,
       locale: true,
       title: true,
@@ -82,7 +96,8 @@ export async function getPublicNewsList(
     },
   });
 
-  return articles.filter((a): a is PublicNewsArticleSummary & { publishedAt: Date } =>
-    a.publishedAt !== null
+  return articles.filter(
+    (a): a is PublicNewsArticleSummary & { publishedAt: Date } =>
+      a.publishedAt !== null
   );
 }

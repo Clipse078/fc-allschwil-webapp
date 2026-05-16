@@ -501,12 +501,42 @@ model AuditLog {
   @@index([createdAt])
 }
 
+model WebsiteSite {
+  id        String   @id @default(cuid())
+  tenantKey String   @unique
+  name      String
+  locale    String   @default("de")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  newsArticles     NewsArticle[]
+  publishSnapshots WebsitePublishSnapshot[]
+
+  @@index([isActive])
+}
+
+model WebsitePublishSnapshot {
+  id          String   @id @default(cuid())
+  siteId      String
+  pageKey     String
+  locale      String   @default("de")
+  contentJson Json
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([siteId, pageKey, locale])
+  @@index([publishedAt])
+}
+
 model NewsArticle {
-  id        String            @id @default(cuid())
-  tenantKey String
-  slug      String
-  locale    String            @default("de")
-  status    NewsArticleStatus @default(DRAFT)
+  id     String            @id @default(cuid())
+  siteId String
+  slug   String
+  locale String            @default("de")
+  status NewsArticleStatus @default(DRAFT)
 
   title         String
   listingText   String?
@@ -518,7 +548,9 @@ model NewsArticle {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([tenantKey, slug, locale])
-  @@index([tenantKey, status, publishedAt])
-  @@index([tenantKey, locale, status])
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([siteId, slug, locale])
+  @@index([siteId, status, publishedAt])
+  @@index([siteId, locale, status])
 }
