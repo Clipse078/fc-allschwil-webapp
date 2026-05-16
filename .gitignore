@@ -56,3 +56,9 @@ next-env.d.ts
 /SCAN-03-RUNTIME-ENV.txt
 /SCAN-04-CONFIG-AUTH.txt
 .vercel
+
+# large backup artifacts — never commit these
+*.i18n-backup
+*.prisma-backup
+prisma/schema.prisma.i18n-backup
+prisma/*.backup
