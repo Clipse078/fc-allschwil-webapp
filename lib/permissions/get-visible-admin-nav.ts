@@ -95,6 +95,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/dashboard/website/sponsoren",
     permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
   },
+  {
+    label: "Medien",
+    href: "/dashboard/website/media",
+    permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+  },
 ];
 
 export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavItem[] {

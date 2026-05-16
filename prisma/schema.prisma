@@ -25,6 +25,13 @@ enum NewsArticleStatus {
   PUBLISHED
 }
 
+enum WebsiteMediaAssetType {
+  IMAGE
+  VIDEO
+  PDF
+  OTHER
+}
+
 enum TeamCategory {
   KINDERFUSSBALL
   JUNIOREN
@@ -502,23 +509,49 @@ model AuditLog {
 }
 
 model WebsiteSite {
-  id           String   @id @default(cuid())
-  tenantKey    String   @unique
-  name         String
-  locale       String   @default("de")
-  isActive     Boolean  @default(true)
-  primaryColor String?
-  logoUrl      String?
-  footerText   String?
-  tagline      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  tenantKey     String   @unique
+  name          String
+  locale        String   @default("de")
+  isActive      Boolean  @default(true)
+  primaryColor  String?
+  logoUrl       String?
+  footerText    String?
+  tagline       String?
+  navConfigJson Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   newsArticles     NewsArticle[]
   publishSnapshots WebsitePublishSnapshot[]
   sponsors         Sponsor[]
+  mediaAssets      WebsiteMediaAsset[]
 
   @@index([isActive])
+}
+
+model WebsiteMediaAsset {
+  id               String                @id @default(cuid())
+  siteId           String
+  uploadedByUserId String?
+  type             WebsiteMediaAssetType @default(IMAGE)
+  title            String
+  altText          String?
+  url              String
+  width            Int?
+  height           Int?
+  sizeBytes        Int?
+  folder           String?
+  tags             String[]
+  isPublic         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([siteId, type])
+  @@index([siteId, folder])
+  @@index([siteId, isPublic])
 }
 
 model Sponsor {

@@ -1,6 +1,6 @@
 import type React from "react";
 import Link from "next/link";
-import { Globe, Newspaper, Users, Users2, Zap } from "lucide-react";
+import { Globe, ImageIcon, Newspaper, Users, Users2, Zap } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { requirePermission } from "@/lib/permissions/require-permission";
@@ -57,6 +57,12 @@ const MODULES: WebsiteModule[] = [
     description: "Öffentliche Team-Seiten werden automatisch aus den Stammdaten generiert. Sichtbarkeit via Team-Einstellungen steuern.",
     href: "/dashboard/teams",
     icon: Users2,
+  },
+  {
+    title: "Mediathek",
+    description: "Bilder und Medien für die Website zentral verwalten. CDN-ready, upload-bereit.",
+    href: "/dashboard/website/media",
+    icon: ImageIcon,
   },
 ];
 

@@ -96,6 +96,14 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
   },
   {
+    key: "media",
+    title: "Mediathek",
+    description:
+      "Bilder, Videos und Dokumente für die Website verwalten. CDN-ready und upload-bereit.",
+    href: "/dashboard/website/media",
+    requiredPermissions: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
     key: "logs",
     title: "Admin Log",
     description: "Änderungen und wichtige Systemaktionen nachvollziehen.",
