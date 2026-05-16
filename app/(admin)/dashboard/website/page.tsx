@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { auth } from "@/auth";
+import { isSuperAdmin } from "@/lib/permissions/is-super-admin";
 import { prisma } from "@/lib/db/prisma";
 import { TEMPLATE_CATALOG, PAGE_TYPE_LABELS } from "@/lib/website/template-catalog";
 import { getCreatePageFeedback } from "@/lib/website/create-page-helpers";
@@ -76,7 +78,8 @@ const STATUS_LABELS: Record<WebsitePageStatus, string> = {
 };
 
 export default async function WebsiteDashboardPage({ searchParams }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
+  const superAdmin = isSuperAdmin(session);
 
   const params = (await searchParams) ?? {};
   const feedback = getCreatePageFeedback(params.status, params.created, params.slug);
@@ -84,6 +87,12 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
   const site = await getSiteWithPages();
   const pages = site?.pages ?? [];
   const locale = site?.locale ?? "de";
+
+  // Setup readiness
+  const snapshotCount = site
+    ? await prisma.websitePublishSnapshot.count({ where: { tenantKey: SITE_TENANT_KEY } })
+    : 0;
+  const tenantKeySet = SITE_TENANT_KEY !== "default";
 
   type InfoboardDisplayOptions = {
     showClubLogo?: boolean;
@@ -350,6 +359,117 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
           </div>
         </div>
       )}
+
+      {/* Setup readiness */}
+      {(() => {
+        const checks = [
+          {
+            label: "SITE_TENANT_KEY konfiguriert",
+            ok: tenantKeySet,
+            action: superAdmin
+              ? `SITE_TENANT_KEY Umgebungsvariable setzen (aktuell: "${SITE_TENANT_KEY}")`
+              : "Tenant-Konfiguration mit dem Plattform-Administrator klären.",
+            superAdminOnly: true,
+          },
+          {
+            label: "WebsiteSite existiert",
+            ok: !!site,
+            action: "Website-Einstellungen öffnen und Vereinsnamen speichern.",
+            href: "/dashboard/website/settings",
+          },
+          {
+            label: "Website-Preset gewählt",
+            ok: !!sj.websitePresetKey,
+            action: "Preset in Einstellungen wählen.",
+            href: "/dashboard/website/settings",
+          },
+          {
+            label: "Infoboard-Preset gewählt",
+            ok: !!sj.infoboardPresetKey,
+            action: "Infoboard-Preset in Einstellungen wählen.",
+            href: "/dashboard/website/settings",
+          },
+          {
+            label: "Mindestens eine Seite erstellt",
+            ok: pages.length > 0,
+            action: "Erste Seite aus dem Vorlagenkatalog erstellen.",
+          },
+          {
+            label: "Mindestens ein publizierter Snapshot",
+            ok: snapshotCount > 0,
+            action: "Eine Seite bearbeiten und publizieren.",
+          },
+        ];
+        const doneCount = checks.filter((c) => c.ok).length;
+        const allDone = doneCount === checks.length;
+
+        if (allDone) return null; // hide when fully set up
+
+        return (
+          <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[1.05rem] font-semibold text-slate-900">
+                  Setup-Bereitschaft
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  {doneCount} von {checks.length} Schritte abgeschlossen
+                </p>
+              </div>
+              <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                doneCount === 0 ? "border-rose-200 bg-rose-50 text-rose-700"
+                : doneCount < checks.length ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}>
+                {Math.round((doneCount / checks.length) * 100)}%
+              </span>
+            </div>
+
+            <div className="mt-4 h-1.5 rounded-full bg-slate-100">
+              <div
+                className="h-1.5 rounded-full bg-[#0b4aa2] transition-all"
+                style={{ width: `${(doneCount / checks.length) * 100}%` }}
+              />
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {checks.map((check) => {
+                if (check.superAdminOnly && !superAdmin) return null;
+                return (
+                  <div
+                    key={check.label}
+                    className={`flex items-start gap-3 rounded-[14px] border px-4 py-2.5 ${
+                      check.ok
+                        ? "border-emerald-200 bg-emerald-50/50"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
+                  >
+                    <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                      check.ok ? "bg-emerald-500 text-white" : "bg-slate-300 text-white"
+                    }`}>
+                      {check.ok ? "✓" : "·"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-[12px] font-semibold ${check.ok ? "text-slate-500 line-through" : "text-slate-800"}`}>
+                        {check.label}
+                      </p>
+                      {!check.ok && (
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          {check.href ? (
+                            <Link href={check.href} className="font-semibold text-[#0b4aa2] hover:underline">
+                              {check.action}
+                            </Link>
+                          ) : check.action}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Governance note */}
       <div className="flex items-start gap-3 rounded-[20px] border border-[#0b4aa2]/15 bg-[#0b4aa2]/5 px-5 py-4">
