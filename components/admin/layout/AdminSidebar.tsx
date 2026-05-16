@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Flag,
   Globe,
+  Handshake,
   LayoutDashboard,
   Newspaper,
   ScrollText,
@@ -72,6 +73,8 @@ function getNavIcon(label: string) {
       return Globe;
     case "News":
       return Newspaper;
+    case "Sponsoren":
+      return Handshake;
     default:
       return LayoutDashboard;
   }
@@ -86,7 +89,7 @@ function isPlannerChild(label: string) {
 }
 
 function isWebsiteChild(label: string) {
-  return label === "News";
+  return label === "News" || label === "Sponsoren";
 }
 
 function shouldCarrySeason(href: string) {

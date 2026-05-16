@@ -13,7 +13,7 @@ export default function PublicWebsiteHeader({
   tenantKey,
 }: PublicWebsiteHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/95 backdrop-blur-xl shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
         <Link
           href={`/${tenantKey}`}

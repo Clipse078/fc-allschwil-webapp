@@ -88,6 +88,14 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.NEWS_MANAGE],
   },
   {
+    key: "sponsoren",
+    title: "Sponsoren",
+    description:
+      "Vereinspartner verwalten und deren Sichtbarkeit auf Website, Infoboard und Sponsor-Strip steuern.",
+    href: "/dashboard/website/sponsoren",
+    requiredPermissions: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
     key: "logs",
     title: "Admin Log",
     description: "Änderungen und wichtige Systemaktionen nachvollziehen.",

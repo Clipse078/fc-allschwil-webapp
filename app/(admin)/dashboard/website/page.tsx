@@ -1,3 +1,4 @@
+import type React from "react";
 import Link from "next/link";
 import { Globe, Newspaper, Users, Zap } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
@@ -18,8 +19,8 @@ const NUDGES = [
     icon: Users,
     title: "Sponsor pages help clubs present commercial partnerships professionally.",
     body: "Präsentiere Sponsoren strukturiert auf der Website und stärke die Aussenwirkung.",
-    href: null,
-    cta: null,
+    href: "/dashboard/website/sponsoren",
+    cta: "Sponsoren verwalten",
   },
   {
     icon: Zap,
@@ -30,7 +31,15 @@ const NUDGES = [
   },
 ];
 
-const MODULES = [
+type WebsiteModule = {
+  title: string;
+  description: string;
+  href: string | null;
+  icon: React.ComponentType<{ className?: string }>;
+  soon?: boolean;
+};
+
+const MODULES: WebsiteModule[] = [
   {
     title: "News & Artikel",
     description: "Beiträge erstellen, redigieren und auf der öffentlichen Website publizieren.",
@@ -39,10 +48,9 @@ const MODULES = [
   },
   {
     title: "Sponsoren",
-    description: "Partner verwalten und gruppiert auf der Website darstellen.",
-    href: null,
+    description: "Partner verwalten und Sichtbarkeit für Website, Infoboard und Sponsor-Strip steuern.",
+    href: "/dashboard/website/sponsoren",
     icon: Users,
-    soon: true,
   },
 ];
 
