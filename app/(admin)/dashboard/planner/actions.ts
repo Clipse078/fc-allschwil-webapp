@@ -1,6 +1,11 @@
 ﻿"use server";
 
-import { EventSource, EventStatus, EventType } from "@prisma/client";
+import {
+  EventSource,
+  EventStatus,
+  EventType,
+  ImprovementArea,
+} from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -77,6 +82,7 @@ async function validatePlannerForm(
   const teamId = toNullableString(formData.get("teamId"));
   const typeRaw = toNullableString(formData.get("type"));
   const sourceRaw = toNullableString(formData.get("source"));
+  const improvementAreaRaw = toNullableString(formData.get("improvementArea"));
   const title = toNullableString(formData.get("title"));
   const description = toNullableString(formData.get("description"));
   const location = toNullableString(formData.get("location"));
@@ -100,6 +106,12 @@ async function validatePlannerForm(
   if (!Object.values(EventSource).includes(sourceRaw as EventSource)) {
     redirect(buildPlannerRedirect({ seasonKey, status: `${prefix}-invalid-source` }));
   }
+
+  const improvementArea =
+    improvementAreaRaw &&
+    Object.values(ImprovementArea).includes(improvementAreaRaw as ImprovementArea)
+      ? (improvementAreaRaw as ImprovementArea)
+      : null;
 
   if (endAt && endAt.getTime() < startAt.getTime()) {
     redirect(
@@ -133,6 +145,7 @@ async function validatePlannerForm(
     teamId: team?.id ?? null,
     type: typeRaw as EventType,
     source: sourceRaw as EventSource,
+    improvementArea: typeRaw === EventType.TRAINING ? improvementArea : null,
     title,
     description,
     location,
@@ -177,6 +190,7 @@ export async function createPlannerEntryAction(formData: FormData) {
       opponentName: data.opponentName,
       organizerName: data.organizerName,
       competitionLabel: data.competitionLabel,
+      improvementArea: data.improvementArea,
       remarks: data.remarks,
       websiteVisible: data.websiteVisible,
       infoboardVisible: data.infoboardVisible,
@@ -230,6 +244,7 @@ export async function updatePlannerEntryAction(formData: FormData) {
       opponentName: data.opponentName,
       organizerName: data.organizerName,
       competitionLabel: data.competitionLabel,
+      improvementArea: data.improvementArea,
       remarks: data.remarks,
       websiteVisible: data.websiteVisible,
       infoboardVisible: data.infoboardVisible,

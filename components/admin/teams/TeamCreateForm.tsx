@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
+import SmartSuggestion from "@/components/admin/shared/SmartSuggestion";
 
 const CATEGORY_OPTIONS = [
   { value: "KINDERFUSSBALL", label: "Kinderfussball" },
@@ -158,6 +159,14 @@ export default function TeamCreateForm() {
             kann derselbe Teamname nur für eine neue zukünftige Saison erneut zugeordnet werden.
           </p>
         </div>
+
+        <SmartSuggestion
+          eyebrow="Organisation setup"
+          title="Team sauber in die Saison einordnen"
+          description="Saison, Kategorie und Teamstufe bilden später den Kontext für Kader, Trainer, Events und Trainingsstrategie."
+          nextAction="Aktive Saison prüfen, Kategorie wählen und Teamstufe ergänzen."
+          tone="neutral"
+        />
 
         {seasonsError ? (
           <div className="fca-status-box fca-status-box-error">{seasonsError}</div>

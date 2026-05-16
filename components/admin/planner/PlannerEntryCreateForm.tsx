@@ -1,10 +1,11 @@
-﻿import { EventSource, EventType } from "@prisma/client";
+﻿import { EventSource, EventType, ImprovementArea } from "@prisma/client";
 import Link from "next/link";
 import {
   createPlannerEntryAction,
   updatePlannerEntryAction,
 } from "@/app/(admin)/dashboard/planner/actions";
 import PlannerEntryDeleteButton from "@/components/admin/planner/PlannerEntryDeleteButton";
+import SmartSuggestion from "@/components/admin/shared/SmartSuggestion";
 
 type PlannerCreateFormData = {
   seasons: Array<{
@@ -33,6 +34,7 @@ type PlannerCreateFormData = {
     opponentName: string;
     organizerName: string;
     competitionLabel: string;
+    improvementArea: string;
     description: string;
     remarks: string;
     websiteVisible: boolean;
@@ -64,6 +66,14 @@ const SOURCE_OPTIONS: Array<{ value: EventSource; label: string }> = [
   { value: "MUNICIPALITY_API", label: "Gemeinde API" },
 ];
 
+const IMPROVEMENT_AREA_OPTIONS: Array<{ value: ImprovementArea; label: string }> = [
+  { value: "TECHNIK", label: "Technik" },
+  { value: "TAKTIK", label: "Taktik" },
+  { value: "ATHLETIK", label: "Athletik" },
+  { value: "MENTAL", label: "Mental" },
+  { value: "TEAMKULTUR", label: "Teamkultur" },
+];
+
 function buildTypeHref(
   seasonKey: string,
   type: EventType,
@@ -92,6 +102,7 @@ export default function PlannerEntryCreateForm({
   const defaults = data.defaults;
   const formAction =
     mode === "edit" ? updatePlannerEntryAction : createPlannerEntryAction;
+  const isTraining = data.selectedType === "TRAINING";
 
   return (
     <div className="space-y-8">
@@ -253,6 +264,26 @@ export default function PlannerEntryCreateForm({
                   />
                 </div>
 
+                {isTraining ? (
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      Verbesserungsbereich
+                    </label>
+                    <select
+                      name="improvementArea"
+                      defaultValue={defaults?.improvementArea ?? ""}
+                      className="mt-2 h-11 w-full rounded-[16px] border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-blue-300"
+                    >
+                      <option value="">Noch nicht zugeordnet</option>
+                      {IMPROVEMENT_AREA_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
                 <div>
                   <label className="text-sm font-medium text-slate-700">Gegner</label>
                   <input
@@ -317,6 +348,16 @@ export default function PlannerEntryCreateForm({
           </div>
 
           <div className="space-y-5">
+            {isTraining ? (
+              <SmartSuggestion
+                eyebrow="Planner edit training"
+                title="Training für Strategie-KPIs vorbereiten"
+                description="Endzeit und Verbesserungsbereich reichen aus, damit der Training Planner KPI Block-Anteil und Minuten ruhig auswerten kann."
+                nextAction="Dauer prüfen, Verbesserungsbereich setzen und speichern."
+                tone="blue"
+              />
+            ) : null}
+
             <article className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
               <h2 className="text-[1.05rem] font-semibold text-slate-900">
                 Publikation

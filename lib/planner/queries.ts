@@ -27,6 +27,10 @@ export type TrainingSessionBlocksPanelData = {
     teamId: string;
     teamName: string;
     totalTrainingBlocks: number;
+    totalTrainingMinutes: number;
+    mappedTrainingMinutes: number;
+    unmappedTrainingMinutes: number;
+    missingDurationBlocks: number;
     targets: Array<{
       id: string;
       title: string;
@@ -234,6 +238,8 @@ async function getTrainingSessionBlocksPanelData(args: {
       },
       select: {
         teamId: true,
+        startAt: true,
+        endAt: true,
         improvementArea: true,
       },
     }),
@@ -289,6 +295,35 @@ async function getTrainingSessionBlocksPanelData(args: {
           (plan) => plan.teamId === null || plan.teamId === teamSeason.team.id,
         );
         const totalTrainingBlocks = teamBlocks.length;
+        const blocksWithDuration = teamBlocks.map((block) => {
+          const durationMinutes = block.endAt
+            ? Math.max(
+                0,
+                Math.round(
+                  (block.endAt.getTime() - block.startAt.getTime()) / 60000,
+                ),
+              )
+            : 0;
+
+          return {
+            ...block,
+            durationMinutes,
+          };
+        });
+        const totalTrainingMinutes = blocksWithDuration.reduce(
+          (sum, block) => sum + block.durationMinutes,
+          0,
+        );
+        const mappedTrainingMinutes = blocksWithDuration
+          .filter((block) => block.improvementArea)
+          .reduce((sum, block) => sum + block.durationMinutes, 0);
+        const unmappedTrainingMinutes = Math.max(
+          0,
+          totalTrainingMinutes - mappedTrainingMinutes,
+        );
+        const missingDurationBlocks = teamBlocks.filter(
+          (block) => !block.endAt || block.endAt.getTime() <= block.startAt.getTime(),
+        ).length;
         const targets = relevantPlans.flatMap((plan) =>
           plan.targets.flatMap((target) => {
             if (!target.improvementArea || target.targetPercentage === null) {
@@ -323,6 +358,10 @@ async function getTrainingSessionBlocksPanelData(args: {
           teamId: teamSeason.team.id,
           teamName: teamSeason.team.name,
           totalTrainingBlocks,
+          totalTrainingMinutes,
+          mappedTrainingMinutes,
+          unmappedTrainingMinutes,
+          missingDurationBlocks,
           targets,
         };
       })
@@ -400,6 +439,7 @@ export async function getPlannerEditFormData(
       opponentName: true,
       organizerName: true,
       competitionLabel: true,
+      improvementArea: true,
       remarks: true,
       websiteVisible: true,
       infoboardVisible: true,
@@ -447,6 +487,7 @@ export async function getPlannerEditFormData(
       opponentName: event.opponentName ?? "",
       organizerName: event.organizerName ?? "",
       competitionLabel: event.competitionLabel ?? "",
+      improvementArea: event.improvementArea ?? "",
       description: event.description ?? "",
       remarks: event.remarks ?? "",
       websiteVisible: event.websiteVisible,

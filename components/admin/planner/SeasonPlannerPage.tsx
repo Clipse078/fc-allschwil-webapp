@@ -10,11 +10,13 @@ import {
   Trophy,
   Volleyball,
 } from "lucide-react";
+import { auth } from "@/auth";
 import PlannerEntryPublicationBadges from "@/components/admin/planner/PlannerEntryPublicationBadges";
 import PlannerEntryTypeBadge from "@/components/admin/planner/PlannerEntryTypeBadge";
 import TrainingSessionBlocksPanel from "@/components/admin/planner/TrainingSessionBlocksPanel";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getSeasonPlannerData } from "@/lib/planner/queries";
 
 const MODULE_META = [
@@ -153,8 +155,13 @@ export default async function SeasonPlannerPage({
   status,
 }: SeasonPlannerPageProps) {
   const data = await getSeasonPlannerData(seasonKey);
+  const session = await auth();
   const selectedSeasonKey = data.selectedSeason?.key ?? "";
   const feedback = getFeedback(status);
+  const permissionKeys = session?.user?.permissionKeys ?? [];
+  const canManagePlanner =
+    permissionKeys.includes(PERMISSIONS.WOCHENPLAN_MANAGE) ||
+    permissionKeys.includes(PERMISSIONS.EVENTS_MANAGE);
 
   const weekHref = selectedSeasonKey
     ? `/dashboard/planner/week?season=${encodeURIComponent(selectedSeasonKey)}`
@@ -287,7 +294,10 @@ export default async function SeasonPlannerPage({
         })}
       </section>
 
-      <TrainingSessionBlocksPanel data={data.trainingSessionBlocks} />
+      <TrainingSessionBlocksPanel
+        data={data.trainingSessionBlocks}
+        manageTrainingHref={canManagePlanner ? newEntryHref : undefined}
+      />
 
       <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <div className="flex items-center justify-between gap-3">
