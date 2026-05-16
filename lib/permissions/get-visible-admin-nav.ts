@@ -96,6 +96,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
   },
   {
+    label: "Website Prüfung",
+    href: "/dashboard/website/review",
+    permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
     label: "Benutzer",
     href: "/dashboard/users",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],

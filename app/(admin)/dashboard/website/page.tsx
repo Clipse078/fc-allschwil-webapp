@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   CheckCircle2,
+  Clock,
   FileText,
   Globe,
   Info,
@@ -246,6 +247,26 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
 
       {/* SmartSuggestions */}
       <div className="space-y-2">
+        {/* Review inbox */}
+        {reviewCount > 0 && (
+          <div className="flex items-center justify-between gap-4 rounded-[18px] border border-amber-200 bg-amber-50/80 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <p className="text-sm text-amber-900">
+                <span className="font-semibold">
+                  {reviewCount} {reviewCount === 1 ? "Seite wartet" : "Seiten warten"} auf Prüfung.
+                </span>
+              </p>
+            </div>
+            <Link
+              href="/dashboard/website/review"
+              className="shrink-0 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-[12px] font-semibold text-amber-800 transition hover:bg-amber-50"
+            >
+              Zur Prüfungs-Inbox
+            </Link>
+          </div>
+        )}
+
         {/* Unpublished pages */}
         {site && pages.length > 0 && publishedCount === 0 && (
           <div className="flex items-start gap-3 rounded-[18px] border border-amber-100 bg-amber-50/70 px-4 py-3">
