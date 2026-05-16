@@ -7,6 +7,22 @@ import SiteSettingsForm from "@/components/admin/website/SiteSettingsForm";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
 
+type InfoboardDisplayOptions = {
+  showClubLogo?: boolean;
+  showClubName?: boolean;
+  showSponsorRotation?: boolean;
+  showDateTime?: boolean;
+  showWeatherPlaceholder?: boolean;
+  showDressingRooms?: boolean;
+  showPitchNames?: boolean;
+  showEventTypeIcons?: boolean;
+  showAnnouncementTicker?: boolean;
+  showEmergencyBanner?: boolean;
+  showQrCode?: boolean;
+  density?: string;
+  sponsorVisibility?: string;
+};
+
 type SettingsJson = {
   logoUrl?: string | null;
   primaryColor?: string | null;
@@ -14,6 +30,7 @@ type SettingsJson = {
   websitePresetKey?: string | null;
   infoboardPresetKey?: string | null;
   infoboardMode?: string | null;
+  infoboardDisplayOptions?: InfoboardDisplayOptions | null;
 };
 
 export default async function WebsiteSettingsPage() {
@@ -49,6 +66,7 @@ export default async function WebsiteSettingsPage() {
 
       <SiteSettingsForm
         tenantKey={SITE_TENANT_KEY}
+        infoboardDisplayOptions={sj.infoboardDisplayOptions ?? {}}
         initialValues={{
           name: site?.name ?? "",
           locale: site?.locale ?? "de",

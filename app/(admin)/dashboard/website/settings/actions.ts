@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -34,6 +35,9 @@ export async function updateSiteSettings(formData: FormData): Promise<SettingsRe
   const websitePresetKey = String(formData.get("websitePresetKey") ?? "").trim() || null;
   const infoboardPresetKey = String(formData.get("infoboardPresetKey") ?? "").trim() || null;
   const infoboardMode = String(formData.get("infoboardMode") ?? "").trim() || null;
+  const infoboardDisplayOptionsRaw = String(formData.get("infoboardDisplayOptions") ?? "").trim();
+  let infoboardDisplayOptions: Record<string, unknown> | null = null;
+  try { infoboardDisplayOptions = infoboardDisplayOptionsRaw ? JSON.parse(infoboardDisplayOptionsRaw) : null; } catch { /* ignore */ }
 
   if (!name) return { ok: false, error: "Name ist erforderlich." };
 
@@ -50,7 +54,7 @@ export async function updateSiteSettings(formData: FormData): Promise<SettingsRe
         locale,
         sport,
         domain,
-        settingsJson: { logoUrl, primaryColor, footerText, websitePresetKey, infoboardPresetKey, infoboardMode },
+        settingsJson: { logoUrl, primaryColor, footerText, websitePresetKey, infoboardPresetKey, infoboardMode, infoboardDisplayOptions } as Prisma.InputJsonValue,
       },
     });
   } else {
@@ -61,7 +65,7 @@ export async function updateSiteSettings(formData: FormData): Promise<SettingsRe
         locale,
         sport,
         domain,
-        settingsJson: { logoUrl, primaryColor, footerText, websitePresetKey, infoboardPresetKey, infoboardMode },
+        settingsJson: { logoUrl, primaryColor, footerText, websitePresetKey, infoboardPresetKey, infoboardMode, infoboardDisplayOptions } as Prisma.InputJsonValue,
       },
     });
   }

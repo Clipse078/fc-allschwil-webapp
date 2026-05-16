@@ -24,8 +24,41 @@ const SPORT_OPTIONS = [
   { value: "other", label: "Andere Sportart" },
 ];
 
+type InfoboardDisplayOptions = {
+  showClubLogo: boolean;
+  showClubName: boolean;
+  showSponsorRotation: boolean;
+  showDateTime: boolean;
+  showWeatherPlaceholder: boolean;
+  showDressingRooms: boolean;
+  showPitchNames: boolean;
+  showEventTypeIcons: boolean;
+  showAnnouncementTicker: boolean;
+  showEmergencyBanner: boolean;
+  showQrCode: boolean;
+  density: string;
+  sponsorVisibility: string;
+};
+
+const DEFAULT_OPTIONS: InfoboardDisplayOptions = {
+  showClubLogo: true,
+  showClubName: true,
+  showSponsorRotation: true,
+  showDateTime: true,
+  showWeatherPlaceholder: false,
+  showDressingRooms: false,
+  showPitchNames: true,
+  showEventTypeIcons: true,
+  showAnnouncementTicker: true,
+  showEmergencyBanner: true,
+  showQrCode: false,
+  density: "balanced",
+  sponsorVisibility: "normal",
+};
+
 type Props = {
   tenantKey: string;
+  infoboardDisplayOptions?: Record<string, unknown>;
   initialValues: {
     name: string;
     locale: string;
@@ -40,13 +73,21 @@ type Props = {
   };
 };
 
-export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
+export default function SiteSettingsForm({ tenantKey, initialValues, infoboardDisplayOptions }: Props) {
   const [values, setValues] = useState({
     ...initialValues,
     websitePresetKey: initialValues.websitePresetKey ?? "",
     infoboardPresetKey: initialValues.infoboardPresetKey ?? "",
     infoboardMode: initialValues.infoboardMode ?? "",
   });
+  const [ibOptions, setIbOptions] = useState<InfoboardDisplayOptions>({
+    ...DEFAULT_OPTIONS,
+    ...(infoboardDisplayOptions as Partial<InfoboardDisplayOptions> ?? {}),
+  });
+  function setIb<K extends keyof InfoboardDisplayOptions>(k: K, v: InfoboardDisplayOptions[K]) {
+    setSaved(false);
+    setIbOptions((prev) => ({ ...prev, [k]: v }));
+  }
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -62,6 +103,7 @@ export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
     startTransition(async () => {
       const fd = new FormData();
       Object.entries(values).forEach(([k, v]) => fd.append(k, v));
+      fd.append("infoboardDisplayOptions", JSON.stringify(ibOptions));
       const result = await updateSiteSettings(fd);
       if (result.ok) setSaved(true);
       else setError(result.error);
@@ -285,6 +327,79 @@ export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
                 </div>
             </label>
           ))}
+        </div>
+      </div>
+
+      {/* Infoboard Display Options */}
+      <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_4px_12px_rgba(15,23,42,0.03)]">
+        <h2 className="text-[1rem] font-semibold text-slate-900">Infoboard Anzeigeoptionen</h2>
+        <div className="mt-1 flex items-start gap-2 rounded-[12px] border border-amber-100 bg-amber-50/70 px-3 py-2">
+          <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+          <p className="text-[11px] text-amber-800">
+            Infoboard-Optionen ermöglichen jedem Verein die Balance zwischen Übersichtlichkeit,
+            Sponsorenpräsenz und operativen Details selbst zu bestimmen.
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          {/* Toggles */}
+          <div>
+            <p className="mb-2 text-[11px] font-semibold text-slate-500">Anzeigeelemente</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                ["showClubLogo", "Vereinslogo anzeigen"],
+                ["showClubName", "Vereinsname anzeigen"],
+                ["showSponsorRotation", "Sponsor-Rotation anzeigen"],
+                ["showDateTime", "Datum & Uhrzeit anzeigen"],
+                ["showWeatherPlaceholder", "Wetter-Platzhalter anzeigen"],
+                ["showDressingRooms", "Garderoben anzeigen"],
+                ["showPitchNames", "Platz-/Ressourcenbezeichnungen"],
+                ["showEventTypeIcons", "Event-Typ-Icons anzeigen"],
+                ["showAnnouncementTicker", "Ankündigungs-Ticker anzeigen"],
+                ["showEmergencyBanner", "Notfall-Banner aktivierbar"],
+                ["showQrCode", "QR-Code-Platzhalter anzeigen"],
+              ] as [keyof InfoboardDisplayOptions, string][]).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(ibOptions[key])}
+                    onChange={(e) => setIb(key, e.target.checked as InfoboardDisplayOptions[typeof key])}
+                    className="accent-[#0b4aa2]"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Density */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-[11px] font-semibold text-slate-500">Layout-Dichte</label>
+              <select
+                className={`mt-1.5 h-9 ${base}`}
+                value={ibOptions.density}
+                onChange={(e) => setIb("density", e.target.value)}
+              >
+                <option value="compact">Kompakt</option>
+                <option value="balanced">Ausgewogen</option>
+                <option value="spacious">Grosszügig</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-slate-500">Sponsor-Sichtbarkeit</label>
+              <select
+                className={`mt-1.5 h-9 ${base}`}
+                value={ibOptions.sponsorVisibility}
+                onChange={(e) => setIb("sponsorVisibility", e.target.value)}
+              >
+                <option value="hidden">Versteckt</option>
+                <option value="subtle">Dezent</option>
+                <option value="normal">Normal</option>
+                <option value="prominent">Prominent</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
