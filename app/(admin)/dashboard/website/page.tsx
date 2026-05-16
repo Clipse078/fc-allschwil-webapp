@@ -190,12 +190,13 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
           ) : (
             <div className="mt-4 space-y-2">
               {pages.map((page) => (
-                <div
+                <Link
                   key={page.id}
-                  className={`flex items-center justify-between gap-3 rounded-[16px] border px-4 py-3 transition ${
+                  href={`/dashboard/website/pages/${page.id}`}
+                  className={`flex items-center justify-between gap-3 rounded-[16px] border px-4 py-3 transition hover:shadow-sm ${
                     justCreated?.id === page.id
                       ? "border-emerald-200 bg-emerald-50/50"
-                      : "border-slate-200/80 bg-slate-50"
+                      : "border-slate-200/80 bg-slate-50 hover:bg-white"
                   }`}
                 >
                   <div className="min-w-0">
@@ -216,7 +217,7 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
                       {STATUS_LABELS[page.status]}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
