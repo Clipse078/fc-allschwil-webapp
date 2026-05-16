@@ -120,7 +120,6 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     description: "Seiten die auf Review und Freigabe warten – Vier-Augen-Inbox.",
     href: "/dashboard/website/review",
     requiredPermissions: [PERMISSIONS.WEBSITE_MANAGE],
-    showInGrid: false,
   },
   {
     key: "website-settings",
@@ -128,7 +127,6 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     description: "Tenant-Konfiguration, Presets, Infoboard-Optionen und Branding.",
     href: "/dashboard/website/settings",
     requiredPermissions: [PERMISSIONS.WEBSITE_MANAGE],
-    showInGrid: false,
   },
   {
     key: "logs",
