@@ -1,0 +1,125 @@
+﻿import {
+  getCanonicalSwissFootballSeasonLabelFromSeasonStartDate,
+  getSwissFootballSeasonStartYearFromDate,
+} from "@/lib/seasons/season-logic";
+
+export type JuniorCategoryCode =
+  | "G"
+  | "F"
+  | "E"
+  | "D7"
+  | "D9"
+  | "C"
+  | "B"
+  | "A";
+
+const BASE_JAHRGANG_BY_CODE: Record<JuniorCategoryCode, number[]> = {
+  G: [2019, 2020],
+  F: [2017, 2018],
+  E: [2015, 2016],
+  D7: [2013, 2014],
+  D9: [2012, 2013],
+  C: [2010, 2011],
+  B: [2007, 2008, 2009],
+  A: [2005, 2006, 2007],
+};
+
+const BASE_SEASON_START_YEAR = 2025;
+
+export function normalizeJuniorCategoryCode(
+  value: string | null | undefined
+): JuniorCategoryCode | null {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace("-", "");
+
+  if (normalized === "G") return "G";
+  if (normalized === "F") return "F";
+  if (normalized === "E") return "E";
+  if (normalized === "D7") return "D7";
+  if (normalized === "D9") return "D9";
+  if (normalized === "C") return "C";
+  if (normalized === "B") return "B";
+  if (normalized === "A") return "A";
+
+  return null;
+}
+
+export function getSeasonStartYearFromDate(
+  dateInput: string | Date
+): number | null {
+  return getSwissFootballSeasonStartYearFromDate(dateInput);
+}
+
+export function getCanonicalSeasonLabel(
+  seasonStartDate: string | Date
+): string | null {
+  return getCanonicalSwissFootballSeasonLabelFromSeasonStartDate(seasonStartDate);
+}
+
+export function getAllowedBirthYearsForSeason(
+  categoryCode: string | null | undefined,
+  seasonStartDate: string | Date
+): number[] {
+  const normalizedCode = normalizeJuniorCategoryCode(categoryCode);
+  const seasonStartYear = getSeasonStartYearFromDate(seasonStartDate);
+
+  if (!normalizedCode || seasonStartYear === null) {
+    return [];
+  }
+
+  const shift = seasonStartYear - BASE_SEASON_START_YEAR;
+
+  return BASE_JAHRGANG_BY_CODE[normalizedCode].map((year) => year + shift);
+}
+
+export function isBirthYearAllowedForTeamSeason(args: {
+  categoryCode: string | null | undefined;
+  seasonStartDate: string | Date;
+  birthDate: string | Date | null | undefined;
+}) {
+  const allowedBirthYears = getAllowedBirthYearsForSeason(
+    args.categoryCode,
+    args.seasonStartDate
+  );
+
+  if (!args.birthDate) {
+    return {
+      ok: false,
+      reason: "Kein Geburtsdatum vorhanden.",
+      allowedBirthYears,
+      birthYear: null as number | null,
+    };
+  }
+
+  const birthDate = new Date(args.birthDate);
+
+  if (Number.isNaN(birthDate.getTime())) {
+    return {
+      ok: false,
+      reason: "Ungültiges Geburtsdatum.",
+      allowedBirthYears,
+      birthYear: null as number | null,
+    };
+  }
+
+  const birthYear = birthDate.getUTCFullYear();
+
+  if (!allowedBirthYears.includes(birthYear)) {
+    return {
+      ok: false,
+      reason: "Geburtsjahr nicht für diese Team-Saison zugelassen.",
+      allowedBirthYears,
+      birthYear,
+    };
+  }
+
+  return {
+    ok: true,
+    reason: null,
+    allowedBirthYears,
+    birthYear,
+  };
+}

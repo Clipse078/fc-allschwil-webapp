@@ -1,0 +1,91 @@
+﻿"use client";
+
+import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
+import TeamSeasonEditForm from "@/components/teams/TeamSeasonEditForm";
+
+type TeamSeasonStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
+
+type TeamSeasonItem = {
+  id: string;
+  displayName: string;
+  shortName: string | null;
+  status: TeamSeasonStatus;
+  websiteVisible: boolean;
+  infoboardVisible: boolean;
+  season: {
+    id: string;
+    key: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+  };
+};
+
+type SavedTeamSeasonPayload = {
+  id: string;
+  displayName: string;
+  shortName: string | null;
+  status: TeamSeasonStatus;
+  websiteVisible: boolean;
+  infoboardVisible: boolean;
+  season: {
+    id: string;
+    key: string;
+    name: string;
+    isActive: boolean;
+  };
+};
+
+type Props = {
+  teamId: string;
+  canManage: boolean;
+  teamSeasons: TeamSeasonItem[];
+  onSaved?: (updatedEntry: SavedTeamSeasonPayload) => void;
+};
+
+function sortTeamSeasonsDesc(entries: TeamSeasonItem[]) {
+  return [...entries].sort((a, b) => {
+    const aTime = new Date(a.season.startDate).getTime();
+    const bTime = new Date(b.season.startDate).getTime();
+
+    return bTime - aTime;
+  });
+}
+
+export default function TeamSeasonListCard({
+  teamId,
+  canManage,
+  teamSeasons,
+  onSaved,
+}: Props) {
+  return (
+    <AdminSurfaceCard className="p-6">
+      <div>
+        <p className="fca-eyebrow">Saison Übersicht</p>
+        <h3 className="fca-subheading mt-2">Team-Saisons</h3>
+        <p className="mt-3 text-sm text-slate-600">
+          Bestehende Saison-Einträge direkt bearbeiten und speichern.
+        </p>
+      </div>
+
+      {teamSeasons.length === 0 ? (
+        <div className="fca-status-box fca-status-box-muted mt-4">
+          Keine Saisonzuordnungen vorhanden.
+        </div>
+      ) : (
+        <div className="mt-6 grid gap-4">
+          {sortTeamSeasonsDesc(teamSeasons).map((entry) => (
+            <TeamSeasonEditForm
+              key={entry.id}
+              teamId={teamId}
+              canManage={canManage}
+              teamSeason={entry}
+              onSaved={onSaved}
+            />
+          ))}
+        </div>
+      )}
+    </AdminSurfaceCard>
+  );
+}
