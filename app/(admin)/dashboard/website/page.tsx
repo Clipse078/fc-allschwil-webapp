@@ -15,6 +15,9 @@ import { TEMPLATE_CATALOG, PAGE_TYPE_LABELS } from "@/lib/website/template-catal
 import { getCreatePageFeedback } from "@/lib/website/create-page-helpers";
 import CreatePageForm from "@/components/admin/website/CreatePageForm";
 import ArchivePageButton from "@/components/admin/website/ArchivePageButton";
+import PresetPreviewCard from "@/components/admin/website/PresetPreviewCard";
+import { getWebsitePresetByKey } from "@/lib/website/website-preset-catalog";
+import { getInfoboardPresetByKey, INFOBOARD_MODE_LABELS } from "@/lib/infoboard/infoboard-preset-catalog";
 import type { WebsitePageStatus } from "@prisma/client";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
@@ -35,6 +38,7 @@ async function getSiteWithPages() {
       name: true,
       locale: true,
       isActive: true,
+      settingsJson: true,
       pages: {
         orderBy: [{ sortOrder: "asc" }, { pageType: "asc" }],
         select: {
@@ -81,6 +85,15 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
   const pages = site?.pages ?? [];
   const locale = site?.locale ?? "de";
 
+  type SiteSettings = {
+    websitePresetKey?: string | null;
+    infoboardPresetKey?: string | null;
+    infoboardMode?: string | null;
+  };
+  const sj = (site?.settingsJson ?? {}) as SiteSettings;
+  const activeWebsitePreset = sj.websitePresetKey ? getWebsitePresetByKey(sj.websitePresetKey) : null;
+  const activeInfoboardPreset = sj.infoboardPresetKey ? getInfoboardPresetByKey(sj.infoboardPresetKey) : null;
+
   const publishedCount = pages.filter((p) => p.status === "PUBLISHED").length;
   const draftCount = pages.filter((p) => p.status === "DRAFT").length;
   const reviewCount = pages.filter((p) => p.status === "REVIEW").length;
@@ -121,6 +134,91 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
       {feedback?.kind === "forbidden" && (
         <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           Keine Berechtigung für Website-Verwaltung.
+        </div>
+      )}
+
+      {/* Active presets */}
+      {(activeWebsitePreset || activeInfoboardPreset) && (
+        <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-[1.05rem] font-semibold text-slate-900">
+                Aktive Presets
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-400">
+                Presets sind ein Ausgangspunkt. Redakteure können Seiten und Blöcke jederzeit anpassen.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/website/settings"
+              className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition hover:bg-slate-50"
+            >
+              Einstellungen
+            </Link>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {activeWebsitePreset && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Website Preset
+                </p>
+                <div className="flex items-start gap-3">
+                  <div className="w-24 shrink-0">
+                    <PresetPreviewCard preset={activeWebsitePreset} compact />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {activeWebsitePreset.name}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {activeWebsitePreset.visualTone}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {activeWebsitePreset.audienceClubType}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeInfoboardPreset && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Infoboard Preset
+                </p>
+                <div className="rounded-[14px] border border-slate-200/80 bg-slate-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {activeInfoboardPreset.name}
+                    </p>
+                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                      {INFOBOARD_MODE_LABELS[activeInfoboardPreset.mode]}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {activeInfoboardPreset.bestUseCase}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* No preset selected hint */}
+      {site && !activeWebsitePreset && (
+        <div className="flex items-start justify-between gap-4 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex items-start gap-2.5">
+            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <p className="text-[12px] text-slate-500">
+              Kein Website-Preset aktiv. Wähle ein Preset in den{" "}
+              <Link href="/dashboard/website/settings" className="font-semibold text-[#0b4aa2] underline">
+                Einstellungen
+              </Link>{" "}
+              um Struktur und visuellen Rhythmus festzulegen.
+            </p>
+          </div>
         </div>
       )}
 
