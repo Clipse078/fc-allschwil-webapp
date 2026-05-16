@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Lightbulb } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -14,6 +15,12 @@ async function getActiveSeason() {
   });
 }
 
+async function getUntaggedTrainingCount(seasonId: string) {
+  return prisma.event.count({
+    where: { seasonId, type: "TRAINING", trainingFocus: null },
+  });
+}
+
 export default async function StrategyPage() {
   await requireAnyPermission([
     PERMISSIONS.SEASONS_VIEW,
@@ -23,6 +30,9 @@ export default async function StrategyPage() {
   ]);
 
   const activeSeason = await getActiveSeason();
+  const untaggedCount = activeSeason
+    ? await getUntaggedTrainingCount(activeSeason.id)
+    : 0;
 
   return (
     <div className="space-y-7">
@@ -53,6 +63,25 @@ export default async function StrategyPage() {
         </div>
       ) : (
         <>
+          {untaggedCount > 0 && (
+            <div className="flex items-start gap-3 rounded-[20px] border border-amber-200 bg-amber-50/80 px-5 py-4">
+              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <p className="text-sm text-amber-900">
+                <span className="font-semibold">
+                  {untaggedCount} Training{untaggedCount !== 1 ? "s" : ""} ohne Schwerpunkt
+                </span>{" "}
+                in dieser Saison.{" "}
+                <Link
+                  href="/dashboard/training/bulk-tag"
+                  className="font-semibold underline hover:text-amber-950"
+                >
+                  Jetzt taggen
+                </Link>{" "}
+                um die KPI-Genauigkeit zu verbessern.
+              </p>
+            </div>
+          )}
+
           <TrendCardsPanel seasonId={activeSeason.id} />
 
           <div className="grid gap-7 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">

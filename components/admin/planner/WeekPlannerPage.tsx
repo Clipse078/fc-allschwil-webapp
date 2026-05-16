@@ -2,10 +2,12 @@
 import {
   CalendarDays,
   Globe,
+  Lightbulb,
   Pencil,
   Plus,
   Smartphone,
 } from "lucide-react";
+import { TRAINING_FOCUS_LABELS } from "@/lib/training/labels";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import PlannerEntryPublicationBadges from "@/components/admin/planner/PlannerEntryPublicationBadges";
 import PlannerEntryTypeBadge from "@/components/admin/planner/PlannerEntryTypeBadge";
@@ -194,6 +196,17 @@ export default async function WeekPlannerPage({
                             <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600">
                               {entry.sourceLabel}
                             </span>
+                            {entry.type === "TRAINING" && entry.trainingFocus && (
+                              <span className="rounded-full border border-[#0b4aa2]/25 bg-[#0b4aa2]/5 px-2 py-1 text-[10px] font-semibold text-[#0b4aa2]">
+                                {TRAINING_FOCUS_LABELS[entry.trainingFocus as keyof typeof TRAINING_FOCUS_LABELS] ?? entry.trainingFocus}
+                              </span>
+                            )}
+                            {entry.type === "TRAINING" && !entry.trainingFocus && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+                                <Lightbulb className="h-2.5 w-2.5" />
+                                Kein Schwerpunkt
+                              </span>
+                            )}
                             <PlannerEntryPublicationBadges
                               websiteVisible={entry.websiteVisible}
                               infoboardVisible={entry.infoboardVisible}
