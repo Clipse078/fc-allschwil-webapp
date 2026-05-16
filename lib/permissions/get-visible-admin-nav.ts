@@ -82,7 +82,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
   {
     label: "Website",
-    href: "/dashboard/website/news",
+    href: "/dashboard/website",
     permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
   },
   {

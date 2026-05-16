@@ -72,6 +72,14 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
   {
+    key: "website",
+    title: "Website",
+    description:
+      "Öffentliche Website-Inhalte: News, Sponsoren und Branding zentral verwalten.",
+    href: "/dashboard/website",
+    requiredPermissions: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
     key: "news",
     title: "News",
     description:

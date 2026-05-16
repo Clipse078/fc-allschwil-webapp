@@ -4,7 +4,7 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardList,
-  Newspaper,
+  Globe,
   Shield,
   UserCircle2,
   UserRound,
@@ -80,11 +80,11 @@ const DASHBOARD_MODULES = [
     carrySeason: false,
   },
   {
-    title: "News",
+    title: "Website",
     description:
-      "Aktuelle Vereinsnachrichten und Berichte für die öffentliche Website erstellen und publizieren.",
-    href: "/dashboard/website/news",
-    icon: Newspaper,
+      "Öffentliche Website-Inhalte verwalten: News, Sponsoren, Branding und mehr.",
+    href: "/dashboard/website",
+    icon: Globe,
     carrySeason: false,
   },
 ];
