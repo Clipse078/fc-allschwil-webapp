@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { websitePublishRequiresReview } from "@/lib/website/governance";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
 
@@ -77,4 +78,122 @@ export async function saveBlockVersion(formData: FormData): Promise<SaveResult> 
   revalidatePath("/dashboard/website");
 
   return { ok: true, version: nextVersion };
+}
+
+// ── Publish ──────────────────────────────────────────────────────────────────
+
+export type PublishResult =
+  | { ok: true; snapshotId: string }
+  | { ok: false; requiresReview: true; error: string }
+  | { ok: false; requiresReview: false; error: string };
+
+export async function publishPage(formData: FormData): Promise<PublishResult> {
+  const session = await requireAccess();
+  const actorUserId = session.user.effectiveUserId ?? session.user.id ?? null;
+
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  if (!pageId) return { ok: false, requiresReview: false, error: "Keine Seiten-ID." };
+
+  // Load page with site
+  const page = await prisma.websitePage.findFirst({
+    where: { id: pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      pageType: true,
+      locale: true,
+      status: true,
+      templateKey: true,
+      metaTitle: true,
+      metaDescription: true,
+      site: { select: { id: true, tenantKey: true } },
+    },
+  });
+
+  if (!page) return { ok: false, requiresReview: false, error: "Seite nicht gefunden." };
+  if (page.status === "ARCHIVED") {
+    return { ok: false, requiresReview: false, error: "Archivierte Seiten können nicht publiziert werden." };
+  }
+
+  // Load latest version
+  const latestVersion = await prisma.websitePageVersion.findFirst({
+    where: { pageId },
+    orderBy: { version: "desc" },
+    select: { version: true, blocksJson: true },
+  });
+
+  if (!latestVersion) {
+    return { ok: false, requiresReview: false, error: "Keine Version vorhanden. Speichere zuerst eine Entwurfsversion." };
+  }
+
+  // ── Governance check ──────────────────────────────────────────────────────
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: session.user.id ?? "" },
+    select: { roleId: true },
+  });
+
+  let requiresReview: boolean | null = null;
+  for (const { roleId } of userRoles) {
+    const check = await websitePublishRequiresReview(roleId);
+    if (check === false) { requiresReview = false; break; } // explicit direct manage
+    if (check === true) requiresReview = true;
+  }
+  // null = no rules configured → allow direct publish
+
+  if (requiresReview === true) {
+    await prisma.websitePage.update({
+      where: { id: pageId },
+      data: { status: "REVIEW", reviewRequestedAt: new Date() },
+    });
+    revalidatePath(`/dashboard/website/pages/${pageId}`);
+    revalidatePath("/dashboard/website");
+    return {
+      ok: false,
+      requiresReview: true,
+      error: "Dieser Verein erfordert eine Prüfung vor der Publikation. Seite wurde zur Prüfung eingereicht.",
+    };
+  }
+
+  // ── Direct publish ────────────────────────────────────────────────────────
+  const now = new Date();
+
+  const snapshot = await prisma.$transaction(async (tx) => {
+    const newSnapshot = await tx.websitePublishSnapshot.create({
+      data: {
+        siteId: page.site.id,
+        pageId: page.id,
+        tenantKey: page.site.tenantKey,
+        slug: page.slug,
+        locale: page.locale,
+        pageType: page.pageType,
+        title: page.title,
+        blocksJson: latestVersion.blocksJson as Prisma.InputJsonValue,
+        metaTitle: page.metaTitle,
+        metaDescription: page.metaDescription,
+        versionRef: latestVersion.version,
+        publishedByUserId: actorUserId,
+        publishedAt: now,
+      },
+      select: { id: true },
+    });
+
+    await tx.websitePage.update({
+      where: { id: pageId },
+      data: {
+        status: "PUBLISHED",
+        publishedAt: now,
+        publishedByUserId: actorUserId,
+      },
+    });
+
+    return newSnapshot;
+  });
+
+  revalidatePath(`/dashboard/website/pages/${pageId}`);
+  revalidatePath("/dashboard/website");
+  revalidatePath("/api/public/website/pages");
+  revalidatePath("/api/public/website/page");
+
+  return { ok: true, snapshotId: snapshot.id };
 }

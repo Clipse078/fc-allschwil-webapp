@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Info } from "lucide-react";
+import { ArrowLeft, Info, Lightbulb } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { PAGE_TYPE_LABELS } from "@/lib/website/template-catalog";
 import { BLOCK_CATALOG } from "@/lib/website/block-catalog";
 import BlockEditor from "@/components/admin/website/BlockEditor";
+import PublishButton from "@/components/admin/website/PublishButton";
 import type { WebsitePageStatus } from "@prisma/client";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
@@ -70,6 +71,7 @@ export default async function PageEditRoute({ params }: Props) {
       status: true,
       isVisible: true,
       templateKey: true,
+      publishedAt: true,
       site: { select: { name: true, tenantKey: true } },
     },
   });
@@ -81,6 +83,12 @@ export default async function PageEditRoute({ params }: Props) {
     orderBy: { version: "desc" },
     select: { version: true, blocksJson: true, changeNote: true, createdAt: true },
   });
+
+  // Detect newer draft changes after last publish
+  const hasNewerDraft =
+    page.publishedAt !== null &&
+    latestVersion !== null &&
+    latestVersion.createdAt > page.publishedAt;
 
   const blocks = parseBlocks(latestVersion?.blocksJson ?? []);
   const version = latestVersion?.version ?? 0;
@@ -126,6 +134,49 @@ export default async function PageEditRoute({ params }: Props) {
           separat und schreibt den öffentlichen Snapshot.
         </p>
       </div>
+
+      {/* Newer draft warning */}
+      {hasNewerDraft && (
+        <div className="flex items-start gap-2.5 rounded-[16px] border border-amber-100 bg-amber-50/70 px-4 py-3">
+          <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <p className="text-[12px] text-amber-800">
+            Diese Seite enthält neuere Entwurfsänderungen, die noch nicht
+            publiziert sind. Publiziere erneut um den Snapshot zu aktualisieren.
+          </p>
+        </div>
+      )}
+
+      {/* Publish panel */}
+      {page.status !== "ARCHIVED" && (
+        <div className="rounded-[22px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-[1rem] font-semibold text-slate-900">
+                Publizieren
+              </h2>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                Publizieren erstellt einen öffentlichen Snapshot aus der aktuellen
+                Version. Entwurfshistorie bleibt erhalten.
+              </p>
+            </div>
+          </div>
+
+          {!latestVersion ? (
+            <div className="mt-3 rounded-[12px] border border-slate-200 bg-slate-50 px-4 py-3 text-[12px] text-slate-500">
+              Noch keine Version gespeichert.{" "}
+              <span className="font-semibold">Bearbeite die Blöcke</span> und
+              speichere eine Entwurfsversion bevor du publizierst.
+            </div>
+          ) : (
+            <div className="mt-3">
+              <PublishButton
+                pageId={page.id}
+                isAlreadyPublished={page.status === "PUBLISHED"}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {page.status === "ARCHIVED" && (
         <div className="rounded-[14px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">

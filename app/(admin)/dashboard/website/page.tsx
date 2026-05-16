@@ -243,6 +243,57 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
           </div>
         </section>
       </div>
+
+      {/* SmartSuggestions */}
+      <div className="space-y-2">
+        {/* Unpublished pages */}
+        {site && pages.length > 0 && publishedCount === 0 && (
+          <div className="flex items-start gap-3 rounded-[18px] border border-amber-100 bg-amber-50/70 px-4 py-3">
+            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+            <p className="text-[12px] text-amber-800">
+              <span className="font-semibold">Noch keine Seite publiziert.</span>{" "}
+              Öffne eine Seite und klicke auf «Publizieren» um den ersten
+              öffentlichen Snapshot zu erstellen.
+            </p>
+          </div>
+        )}
+
+        {/* Public API ready */}
+        {publishedCount > 0 && (
+          <div className="flex items-start gap-3 rounded-[18px] border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <p className="text-[12px] text-emerald-800">
+              <span className="font-semibold">Öffentliche API aktiv.</span>{" "}
+              Externe Websites können Seiten unter{" "}
+              <span className="font-mono">
+                /api/public/website/pages?tenantKey={SITE_TENANT_KEY}
+              </span>{" "}
+              abrufen.
+            </p>
+          </div>
+        )}
+
+        {/* Templates unused */}
+        {site && pages.length < 3 && TEMPLATE_CATALOG.length > pages.length && (
+          <div className="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <p className="text-[12px] text-slate-500">
+              {TEMPLATE_CATALOG.length - pages.length} Seitenvorlagen noch nicht
+              genutzt. Erstelle weitere Seiten für einen vollständigen Webauftritt.
+            </p>
+          </div>
+        )}
+
+        {/* Review workflow */}
+        <div className="flex items-start gap-3 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <p className="text-[12px] text-slate-500">
+            <span className="font-semibold">Prüf-Workflow:</span>{" "}
+            Vier-Augen-Kontrolle kann später in den Admin-Einstellungen pro Rolle
+            und Seitentyp aktiviert werden.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
