@@ -65,12 +65,20 @@ export async function submitContactInquiryAction(formData: FormData) {
 
   try {
     const recipientEmail = getInquiryNotificationEmail(site.settingsJson, site.contactEmail);
-    await notifyWebsiteInquiryCreated(
+    const notifResult = await notifyWebsiteInquiryCreated(
       { id: inquiry.id, type: inquiry.type, name, email,
         phone: inquiry.phone, topic: inquiry.topic, message,
         sourcePath: inquiry.sourcePath },
       recipientEmail
     );
+    await prisma.websiteInquiry.update({
+      where: { id: inquiry.id },
+      data: {
+        notificationStatus: notifResult.status,
+        notificationLastAttemptAt: new Date(),
+        notificationError: notifResult.error ?? null,
+      },
+    });
   } catch (err) {
     console.error("[inquiry-notification] Contact notification failed:", err);
   }

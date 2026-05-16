@@ -12,7 +12,7 @@ import {
   INQUIRY_TYPE_LABELS,
   INQUIRY_STATUS_LABELS,
 } from "@/lib/website/inquiry-queries";
-import { getInquiryNotificationEmail, parseWebsiteSettings } from "@/lib/website/website-settings";
+import { getInquiryNotificationEmail } from "@/lib/website/website-settings";
 import {
   markInProgressAction,
   markResolvedAction,
@@ -36,6 +36,20 @@ const STATUS_TONES: Record<string, "success" | "muted" | "warning"> = {
   IN_PROGRESS: "warning",
   RESOLVED: "success",
   ARCHIVED: "muted",
+};
+
+const NOTIF_STATUS_CLS: Record<string, string> = {
+  SENT: "bg-green-100 text-green-700",
+  FAILED: "bg-red-100 text-red-700",
+  SKIPPED: "bg-slate-100 text-slate-500",
+  NOT_CONFIGURED: "bg-slate-100 text-slate-400",
+};
+
+const NOTIF_STATUS_LABELS: Record<string, string> = {
+  SENT: "✉ Gesendet",
+  FAILED: "✉ Fehlgeschlagen",
+  SKIPPED: "✉ Übersprungen",
+  NOT_CONFIGURED: "✉ Nicht konfiguriert",
 };
 
 function formatDate(date: Date): string {
@@ -158,8 +172,18 @@ export default async function InquiriesPage({ searchParams }: InquiriesPageProps
                     {inquiry.topic && (
                       <span className="fca-pill">{inquiry.topic}</span>
                     )}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        NOTIF_STATUS_CLS[inquiry.notificationStatus] ?? NOTIF_STATUS_CLS.NOT_CONFIGURED
+                      }`}
+                    >
+                      {NOTIF_STATUS_LABELS[inquiry.notificationStatus] ?? inquiry.notificationStatus}
+                    </span>
                     <span className="text-xs text-slate-400">{formatDate(inquiry.createdAt)}</span>
                   </div>
+                  {inquiry.notificationStatus === "FAILED" && inquiry.notificationError && (
+                    <p className="text-xs text-red-500">{inquiry.notificationError}</p>
+                  )}
 
                   <div>
                     <p className="text-sm font-semibold text-slate-900">

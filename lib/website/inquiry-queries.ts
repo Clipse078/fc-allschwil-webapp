@@ -10,6 +10,8 @@ export type InquiryListItem = {
   topic: string | null;
   message: string;
   sourcePath: string | null;
+  notificationStatus: string;
+  notificationError: string | null;
   createdAt: Date;
 };
 
@@ -50,6 +52,8 @@ export async function getInquiryList(
       topic: true,
       message: true,
       sourcePath: true,
+      notificationStatus: true,
+      notificationError: true,
       createdAt: true,
     },
   });
@@ -58,6 +62,7 @@ export async function getInquiryList(
 
 export type InquiryDetailData = InquiryListItem & {
   handledByUserId: string | null;
+  notificationLastAttemptAt: Date | null;
 };
 
 export async function getInquiryDetail(
@@ -77,6 +82,9 @@ export async function getInquiryDetail(
       message: true,
       sourcePath: true,
       handledByUserId: true,
+      notificationStatus: true,
+      notificationLastAttemptAt: true,
+      notificationError: true,
       createdAt: true,
     },
   });
@@ -86,5 +94,11 @@ export async function getInquiryDetail(
 export async function countNewInquiries(siteId: string): Promise<number> {
   return prisma.websiteInquiry.count({
     where: { siteId, status: "NEW" },
+  });
+}
+
+export async function countFailedNotifications(siteId: string): Promise<number> {
+  return prisma.websiteInquiry.count({
+    where: { siteId, notificationStatus: "FAILED" },
   });
 }

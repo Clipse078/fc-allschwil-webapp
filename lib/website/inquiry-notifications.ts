@@ -9,12 +9,24 @@ export type InquiryNotificationPayload = {
   sourcePath: string | null;
 };
 
-function hasEmailProvider(): boolean {
+export type NotificationResult = {
+  status: "NOT_CONFIGURED" | "SKIPPED" | "SENT" | "FAILED";
+  error?: string;
+};
+
+export function hasEmailProvider(): boolean {
   return Boolean(
     process.env.RESEND_API_KEY ||
       process.env.SENDGRID_API_KEY ||
       process.env.SMTP_HOST
   );
+}
+
+export function getActiveProviderName(): string | null {
+  if (process.env.RESEND_API_KEY) return "Resend";
+  if (process.env.SENDGRID_API_KEY) return "SendGrid";
+  if (process.env.SMTP_HOST) return "SMTP";
+  return null;
 }
 
 function formatNotificationBody(payload: InquiryNotificationPayload): string {
@@ -38,43 +50,41 @@ function formatNotificationBody(payload: InquiryNotificationPayload): string {
 export async function notifyWebsiteInquiryCreated(
   payload: InquiryNotificationPayload,
   recipientEmail: string | null
-): Promise<void> {
+): Promise<NotificationResult> {
   if (!recipientEmail) {
     console.log(
       "[inquiry-notification] No recipient configured — skipping. " +
         "Set inquiryNotificationEmail in Website-Einstellungen."
     );
-    return;
+    return { status: "NOT_CONFIGURED" };
   }
 
   if (!hasEmailProvider()) {
     console.log(
-      `[inquiry-notification] No email provider configured (RESEND_API_KEY / SENDGRID_API_KEY / SMTP_HOST). ` +
+      `[inquiry-notification] No email provider configured. ` +
         `Would notify ${recipientEmail} for inquiry ${payload.id}.`
     );
-    return;
+    return { status: "SKIPPED" };
   }
 
-  // Provider routing — extend here when a provider env var is present
   const body = formatNotificationBody(payload);
 
   if (process.env.RESEND_API_KEY) {
-    await sendViaResend(recipientEmail, payload, body);
-    return;
+    return sendViaResend(recipientEmail, payload, body);
   }
 
-  // Additional providers (SendGrid, SMTP) can be added here
   console.log(
-    `[inquiry-notification] Provider present but not yet wired for this key type. ` +
+    `[inquiry-notification] Provider env present but send path not wired for current key type. ` +
       `Would notify ${recipientEmail}.`
   );
+  return { status: "SKIPPED" };
 }
 
 async function sendViaResend(
   to: string,
   payload: InquiryNotificationPayload,
   body: string
-): Promise<void> {
+): Promise<NotificationResult> {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -91,12 +101,19 @@ async function sendViaResend(
     });
 
     if (!response.ok) {
-      const err = await response.text().catch(() => "unknown");
-      console.error(`[inquiry-notification] Resend error ${response.status}: ${err}`);
-    } else {
-      console.log(`[inquiry-notification] Sent via Resend to ${to} for inquiry ${payload.id}`);
+      const errText = await response.text().catch(() => "unknown");
+      const msg = `Resend ${response.status}: ${errText}`;
+      console.error(`[inquiry-notification] ${msg}`);
+      return { status: "FAILED", error: msg };
     }
+
+    console.log(
+      `[inquiry-notification] Sent via Resend to ${to} for inquiry ${payload.id}`
+    );
+    return { status: "SENT" };
   } catch (err) {
-    console.error("[inquiry-notification] Resend fetch failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[inquiry-notification] Resend fetch failed:", msg);
+    return { status: "FAILED", error: msg };
   }
 }

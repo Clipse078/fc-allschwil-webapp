@@ -6,7 +6,7 @@ import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getDefaultSite } from "@/lib/news/queries";
-import { countNewInquiries } from "@/lib/website/inquiry-queries";
+import { countNewInquiries, countFailedNotifications } from "@/lib/website/inquiry-queries";
 
 const NUDGES = [
   {
@@ -97,7 +97,10 @@ export default async function WebsiteOverviewPage() {
   await requirePermission(PERMISSIONS.NEWS_MANAGE);
 
   const site = await getDefaultSite();
-  const newInquiryCount = site ? await countNewInquiries(site.id) : 0;
+  const [newInquiryCount, failedNotifCount] = await Promise.all([
+    site ? countNewInquiries(site.id) : Promise.resolve(0),
+    site ? countFailedNotifications(site.id) : Promise.resolve(0),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -107,27 +110,46 @@ export default async function WebsiteOverviewPage() {
         description="Manage public-facing content for the club website. News, sponsors, pages and branding all live here."
       />
 
-      {newInquiryCount > 0 && (
-        <AdminSurfaceCard className="border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
-                {newInquiryCount}
-              </span>
-              <p className="text-sm font-semibold text-amber-900">
-                {newInquiryCount === 1
-                  ? "1 neue Anfrage wartet auf Antwort."
-                  : `${newInquiryCount} neue Anfragen warten auf Antwort.`}
-              </p>
-            </div>
-            <Link
-              href="/dashboard/website/inquiries?filter=NEW"
-              className="shrink-0 rounded-full bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-amber-700"
-            >
-              Inbox →
-            </Link>
-          </div>
-        </AdminSurfaceCard>
+      {(newInquiryCount > 0 || failedNotifCount > 0) && (
+        <div className="space-y-2">
+          {newInquiryCount > 0 && (
+            <AdminSurfaceCard className="border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                    {newInquiryCount}
+                  </span>
+                  <p className="text-sm font-semibold text-amber-900">
+                    {newInquiryCount === 1
+                      ? "1 neue Anfrage wartet auf Antwort."
+                      : `${newInquiryCount} neue Anfragen warten auf Antwort.`}
+                  </p>
+                </div>
+                <Link
+                  href="/dashboard/website/inquiries?filter=NEW"
+                  className="shrink-0 rounded-full bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-amber-700"
+                >
+                  Inbox →
+                </Link>
+              </div>
+            </AdminSurfaceCard>
+          )}
+          {failedNotifCount > 0 && (
+            <AdminSurfaceCard className="border-red-200 bg-red-50 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-semibold text-red-800">
+                  {failedNotifCount} Benachrichtigung{failedNotifCount !== 1 ? "en" : ""} fehlgeschlagen.
+                </p>
+                <Link
+                  href="/dashboard/website/inquiries?filter=ALL"
+                  className="shrink-0 text-sm font-medium text-red-700 hover:underline"
+                >
+                  Anfragen →
+                </Link>
+              </div>
+            </AdminSurfaceCard>
+          )}
+        </div>
       )}
 
       {!site && (

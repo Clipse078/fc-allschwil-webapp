@@ -1,4 +1,4 @@
-import { Bell } from "lucide-react";
+import { Bell, CheckCircle, XCircle } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -6,6 +6,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { getDefaultSite } from "@/lib/news/queries";
 import { parseWebsiteSettings } from "@/lib/website/website-settings";
+import { hasEmailProvider, getActiveProviderName } from "@/lib/website/inquiry-notifications";
 import { saveWebsiteSettingsAction } from "./actions";
 
 type SettingsPageProps = {
@@ -40,6 +41,8 @@ export default async function WebsiteSettingsPage({ searchParams }: SettingsPage
   const settings = parseWebsiteSettings(fullSite?.settingsJson);
   const currentNotificationEmail = settings.inquiryNotificationEmail ?? "";
   const currentContactEmail = fullSite?.contactEmail ?? "";
+  const providerActive = hasEmailProvider();
+  const providerName = getActiveProviderName();
 
   return (
     <div className="space-y-6">
@@ -54,11 +57,47 @@ export default async function WebsiteSettingsPage({ searchParams }: SettingsPage
           <Bell className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
           <p className="text-sm text-slate-700">
             <span className="font-semibold">
-              Lege eine Benachrichtigungs-E-Mail fest, damit neue Anfragen sofort
-              die richtige Person im Verein erreichen.
+              Notifications help clubs answer website inquiries faster.
             </span>{" "}
-            Ohne E-Mail-Adresse werden Anfragen nur in der Inbox gespeichert.
+            Lege eine Benachrichtigungs-E-Mail fest, damit neue Anfragen sofort
+            die richtige Person im Verein erreichen.
           </p>
+        </div>
+      </AdminSurfaceCard>
+
+      <AdminSurfaceCard className="p-5">
+        <h3 className="mb-4 fca-subheading">Provider-Status</h3>
+        <div className="flex items-center gap-3">
+          {providerActive ? (
+            <>
+              <CheckCircle className="h-5 w-5 shrink-0 text-green-500" />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  E-Mail-Provider aktiv: {providerName}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Benachrichtigungen werden gesendet, sobald eine E-Mail-Adresse
+                  hinterlegt ist.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <XCircle className="h-5 w-5 shrink-0 text-slate-400" />
+              <div>
+                <p className="text-sm font-semibold text-slate-600">
+                  Kein E-Mail-Provider konfiguriert
+                </p>
+                <p className="text-xs text-slate-400">
+                  Setze{" "}
+                  <code className="rounded bg-slate-100 px-1 text-[11px]">RESEND_API_KEY</code>
+                  {" "}oder{" "}
+                  <code className="rounded bg-slate-100 px-1 text-[11px]">SMTP_HOST</code>
+                  {" "}um E-Mail-Versand zu aktivieren. Anfragen werden weiterhin gespeichert.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </AdminSurfaceCard>
 
