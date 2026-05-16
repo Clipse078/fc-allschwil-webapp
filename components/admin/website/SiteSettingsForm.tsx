@@ -206,14 +206,18 @@ export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
                 onChange={() => { set("websitePresetKey", p.key); setSaved(false); }}
                 className="mt-0.5 shrink-0 accent-[#0b4aa2]"
               />
-              <div className="min-w-0">
-                <p className="text-[12px] font-semibold text-slate-900">{p.name}</p>
-                <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-                  {p.description}
-                </p>
-                <p className="mt-1 text-[10px] text-slate-400">
-                  {p.visualTone}
-                </p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {p.previewTokens?.primary && (
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full border border-white shadow-sm"
+                      style={{ backgroundColor: p.previewTokens.primary }}
+                    />
+                  )}
+                  <p className="text-[12px] font-semibold text-slate-900">{p.name}</p>
+                </div>
+                <p className="mt-0.5 text-[10px] text-slate-500">{p.visualTone}</p>
+                <p className="mt-1 text-[10px] italic text-slate-400">{p.setupTip}</p>
               </div>
             </label>
           ))}
@@ -248,16 +252,21 @@ export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
                 onChange={() => { set("infoboardPresetKey", p.key); set("infoboardMode", p.mode); setSaved(false); }}
                 className="mt-0.5 shrink-0 accent-[#0b4aa2]"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
+                  {p.previewTokens?.accent && (
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full border border-white shadow-sm"
+                      style={{ backgroundColor: p.previewTokens.accent === "#ffffff" || p.previewTokens.accent?.startsWith("#f") ? p.previewTokens.accent : p.previewTokens.accent }}
+                    />
+                  )}
                   <p className="text-[12px] font-semibold text-slate-900">{p.name}</p>
                   <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
                     {INFOBOARD_MODE_LABELS[p.mode]}
                   </span>
                 </div>
-                <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-                  {p.description}
-                </p>
+                <p className="mt-0.5 text-[10px] text-slate-500">{p.bestUseCase}</p>
+                <p className="mt-1 text-[10px] italic text-slate-400">{p.setupTip}</p>
               </div>
             </label>
           ))}

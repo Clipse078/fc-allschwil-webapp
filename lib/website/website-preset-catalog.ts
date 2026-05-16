@@ -8,6 +8,10 @@ export type WebsitePreset = {
   recommendedPages: string[];
   navigationStyle: string;
   homepageRhythm: string;
+  bestUsedWhen: string;
+  notIdealWhen: string;
+  setupTip: string;
+  firstRecommendedAction: string;
   previewTokens?: Record<string, string>;
 };
 
@@ -22,6 +26,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","CLUB_ABOUT","EVENTS_OVERVIEW","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → news-feed → events → team-grid → sponsors-bar",
+    bestUsedWhen: "Der Verein hat eine breite Mitgliederbasis und möchte einen vertrauenswürdigen, stabilen Auftritt.",
+    notIdealWhen: "Der Club sucht einen modernen, auffälligen Auftritt für ein jüngeres, digitales Publikum.",
+    setupTip: "Halte die Teamseiten und den Newsfeed aktuell – das sind die am häufigsten besuchten Seiten.",
+    firstRecommendedAction: "Homepage importieren und Logo, Vereinsname sowie Kurzbeschreibung eintragen.",
     previewTokens: { primary: "#1a3a6b", accent: "#e8f0fb" },
   },
   {
@@ -34,6 +42,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","EVENTS_OVERVIEW","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top with sticky",
     homepageRhythm: "full-width-hero → stats-row → event-list → team-grid → news-feed",
+    bestUsedWhen: "Der Club hat eine starke erste Mannschaft und möchte Leistungen, Resultate und Kader betonen.",
+    notIdealWhen: "Der Verein ist hauptsächlich familien- oder gemeinschaftsorientiert ohne Wettkampffokus.",
+    setupTip: "Befülle die Statistik-Zeile mit echten Saisonkennzahlen – das stärkt die Professionalität.",
+    firstRecommendedAction: "Fullscreen-Hero und Statistik-Zeile auf der Homepage einrichten.",
     previewTokens: { primary: "#0d0d0d", accent: "#ff3b00" },
   },
   {
@@ -46,6 +58,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","CLUB_ABOUT","EVENTS_OVERVIEW","REGISTRATION","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → intro-text → events → registration-cta → news-feed → contact-info",
+    bestUsedWhen: "Gemeinschaft, Inklusion und Zusammenhalt stehen im Mittelpunkt des Vereinslebens.",
+    notIdealWhen: "Der Fokus liegt primär auf sportlicher Leistung, Wettbewerb oder Sponsoring.",
+    setupTip: "Setze die Anmeldungsseite früh auf – sie ist das wichtigste Ziel für Neuzugänge.",
+    firstRecommendedAction: "Anmeldungsseite mit Registration-CTA und Kontaktdaten erstellen.",
     previewTokens: { primary: "#1d6e3c", accent: "#f0f9f4" },
   },
   {
@@ -58,6 +74,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","REGISTRATION","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → team-grid → event-list → registration-cta → news-feed",
+    bestUsedWhen: "Die Juniorenabteilung ist der Kern des Vereins und Eltern suchen regelmässig nach Infos.",
+    notIdealWhen: "Der Verein möchte primär die Erwachsenenmannschaft oder Sponsoring hervorheben.",
+    setupTip: "Erstelle für jede Alterskategorie eine eigene Teamseite mit Trainer und Trainingszeiten.",
+    firstRecommendedAction: "Teamübersicht nach Kategorien (G, F, E, D, etc.) aufbauen und Anmeldung verlinken.",
     previewTokens: { primary: "#f59e0b", accent: "#fffbeb" },
   },
   {
@@ -70,6 +90,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","SPONSORS_PARTNERS","EVENTS_OVERVIEW","NEWS_OVERVIEW","CLUB_ABOUT","CONTACT"],
     navigationStyle: "horizontal-top with secondary bar",
     homepageRhythm: "hero → stats-row → sponsors-bar → news-feed → event-list → team-grid",
+    bestUsedWhen: "Der Club pflegt aktive Sponsorenbeziehungen und möchte Partner prominent platzieren.",
+    notIdealWhen: "Der Verein ist ein Breitensportclub ohne nennenswerte Sponsoring-Strukturen.",
+    setupTip: "Pflege die Sponsorenseite sorgfältig mit Logos und Links – Sponsoren schätzen sichtbare Präsenz.",
+    firstRecommendedAction: "Sponsorenseite mit Business-Club-Logos aufbauen und Homepage-Sponsorenzeile einrichten.",
     previewTokens: { primary: "#1c1c1c", accent: "#c9a227" },
   },
   {
@@ -82,6 +106,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","EVENTS_OVERVIEW","CONTACT","LEGAL"],
     navigationStyle: "minimal single-row",
     homepageRhythm: "intro-text → event-list → contact-info",
+    bestUsedWhen: "Der Verein hat wenig Zeit für Webpflege und braucht eine einfache, funktionierende Lösung.",
+    notIdealWhen: "Der Club möchte aktiv Content pflegen, Kader zeigen oder Sponsoring abbilden.",
+    setupTip: "Beschränke dich auf wenige Seiten – lieber 3 gute als 10 halbfertige.",
+    firstRecommendedAction: "Einzige Homepage mit Veranstaltungskalender und Kontaktdaten erstellen.",
     previewTokens: { primary: "#374151", accent: "#f9fafb" },
   },
   {
@@ -94,6 +122,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","EVENTS_OVERVIEW","TEAMS_OVERVIEW","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → event-list → stats-row → news-feed → team-grid",
+    bestUsedWhen: "Die Fangemeinde ist gross und sucht primär Spielinformationen, Ergebnisse und Agenda.",
+    notIdealWhen: "Der Club hat kaum Matchbetrieb oder keinen starken Fanbereich.",
+    setupTip: "Synchronisiere Events aus dem Saisonplanner damit die Spielagenda immer aktuell ist.",
+    firstRecommendedAction: "Event-Übersicht als erste Seite nach der Homepage einrichten.",
     previewTokens: { primary: "#16a34a", accent: "#f0fdf4" },
   },
   {
@@ -106,6 +138,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","EVENTS_OVERVIEW","CLUB_ABOUT","REGISTRATION","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal with section tabs",
     homepageRhythm: "hero → team-grid → event-list → intro-text → sponsors-bar → news-feed",
+    bestUsedWhen: "Der Verein bietet mehrere Sportarten an und jede Abteilung soll sichtbar sein.",
+    notIdealWhen: "Der Club fokussiert auf eine Sportart und möchte klare, sportspezifische Kommunikation.",
+    setupTip: "Erstelle Teamseiten pro Sportart und nutze Kategorien für eine klare Struktur.",
+    firstRecommendedAction: "Teamübersicht mit allen Sportabteilungen aufbauen und kategorisieren.",
     previewTokens: { primary: "#4f46e5", accent: "#eef2ff" },
   },
   {
@@ -118,6 +154,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","EVENTS_OVERVIEW","CLUB_ABOUT","REGISTRATION","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → event-list → intro-text → registration-cta → news-feed",
+    bestUsedWhen: "Der Verein organisiert viele Events und Ehrenamtliche sind ein zentrales Thema.",
+    notIdealWhen: "Der Club hat kaum Vereinsanlässe und kommuniziert hauptsächlich über Sport.",
+    setupTip: "Pflege den Veranstaltungskalender aktiv – er ist das Herzstück dieses Presets.",
+    firstRecommendedAction: "Veranstaltungsübersicht als zentrale Seite einrichten und Events eintragen.",
     previewTokens: { primary: "#0891b2", accent: "#ecfeff" },
   },
   {
@@ -130,6 +170,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","REGISTRATION","NEWS_OVERVIEW","EVENTS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → team-grid → registration-cta → event-list → news-feed",
+    bestUsedWhen: "Die Frauenabteilung ist eigenständig oder möchte als Schwerpunkt des Vereins positioniert werden.",
+    notIdealWhen: "Der Verein möchte alle Mannschaften gleichwertig ohne Schwerpunkt darstellen.",
+    setupTip: "Zeige weibliche Vorbilder und Trainer-Profile prominent – das stärkt die Identifikation.",
+    firstRecommendedAction: "Homepage mit starkem Hero und Anmeldungsaufruf für Neuzugänge aufbauen.",
     previewTokens: { primary: "#be185d", accent: "#fdf2f8" },
   },
   {
@@ -142,6 +186,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","CLUB_ABOUT","REGISTRATION","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top with sticky",
     homepageRhythm: "full-width-hero → intro-text → team-grid → stats-row → news-feed → registration-cta",
+    bestUsedWhen: "Die Akademie positioniert sich als Talentförderungseinrichtung gegenüber Eltern und Spielern.",
+    notIdealWhen: "Es geht um Breitensport oder lokale Gemeinschaft ohne Leistungsanspruch.",
+    setupTip: "Dokumentiere Erfolgsstorys von Alumni und Kaderaufnahmen – das stärkt die Akademie-Positionierung.",
+    firstRecommendedAction: "Über-uns-Seite mit Philosophie und Trainerstab aufbauen.",
     previewTokens: { primary: "#1e3a5f", accent: "#e8f4fd" },
   },
   {
@@ -154,6 +202,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","CLUB_ABOUT","TEAMS_OVERVIEW","NEWS_OVERVIEW","EVENTS_OVERVIEW","CONTACT","LEGAL"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → intro-text → stats-row → news-feed → event-list → team-grid",
+    bestUsedWhen: "Der Verein feiert Jubiläen, pflegt Tradition und möchte Geschichte sichtbar machen.",
+    notIdealWhen: "Der Club ist jung und möchte frisch und modern wirken.",
+    setupTip: "Nutze die Über-uns-Seite für eine Vereinschronik mit Meilensteinen und historischen Fotos.",
+    firstRecommendedAction: "Über-uns-Seite mit Gründungsgeschichte und Eckdaten aufbauen.",
     previewTokens: { primary: "#78350f", accent: "#fef3c7" },
   },
   {
@@ -166,6 +218,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","NEWS_OVERVIEW","EVENTS_OVERVIEW","CONTACT"],
     navigationStyle: "full-width-top",
     homepageRhythm: "full-width-hero → news-feed → event-list → team-grid → sponsors-bar",
+    bestUsedWhen: "Der Club hat aktive Content-Ersteller und Social-Media-Präsenz, die sich im Web widerspiegeln soll.",
+    notIdealWhen: "Der Verein hat wenig Content-Ressourcen und kann die Seiten nicht regelmässig befüllen.",
+    setupTip: "Plane monatlich mindestens 2 News-Beiträge um den Newsfeed aktuell zu halten.",
+    firstRecommendedAction: "Homepage mit starkem Fullscreen-Hero und aktuellem Newsfeed einrichten.",
     previewTokens: { primary: "#7c3aed", accent: "#f5f3ff" },
   },
   {
@@ -178,6 +234,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","EVENTS_OVERVIEW","REGISTRATION","NEWS_OVERVIEW","CLUB_ABOUT","CONTACT"],
     navigationStyle: "horizontal-top",
     homepageRhythm: "hero → event-list → team-grid → registration-cta → news-feed → sponsors-bar",
+    bestUsedWhen: "Der Verein möchte Familien mit Kindern ansprechen und Anmeldungen aller Altersgruppen fördern.",
+    notIdealWhen: "Der Club kommuniziert primär mit Erwachsenen oder ist auf Leistungssport fokussiert.",
+    setupTip: "Stelle die Anmeldungsseite und Kontaktdaten sehr sichtbar – Eltern wollen schnell Infos finden.",
+    firstRecommendedAction: "Anmeldungsseite mit klaren Informationen zu Kategorien und Trainingszeiten erstellen.",
     previewTokens: { primary: "#0369a1", accent: "#e0f2fe" },
   },
   {
@@ -190,6 +250,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","SPONSORS_PARTNERS","EVENTS_OVERVIEW","TEAMS_OVERVIEW","CLUB_ABOUT","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top with secondary bar",
     homepageRhythm: "hero → sponsors-bar → stats-row → event-list → news-feed → registration-cta",
+    bestUsedWhen: "Sponsoring und Business-Club-Mitgliedschaften sind zentrale Einnahmequellen des Vereins.",
+    notIdealWhen: "Der Club hat kaum Sponsoren und möchte primär Sport und Gemeinschaft kommunizieren.",
+    setupTip: "Aktualisiere die Sponsorenseite bei jedem neuen Partner sofort – das zeigt Verlässlichkeit.",
+    firstRecommendedAction: "Sponsorenseite aufbauen und Sponsorenzeile auf der Homepage aktivieren.",
     previewTokens: { primary: "#064e3b", accent: "#ecfdf5" },
   },
   {
@@ -198,10 +262,14 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     description: "Hochwertiger Auftritt für Nachwuchsleistungszentren mit Fokus auf Förderung, Kader und Akademie.",
     audienceClubType: "Elite youth academy, talent development centre",
     visualTone: "Aspirational, professional, structured",
-    sportSuitability: ["football", "basketball", "handball", "tennis", "fitness"],
+    sportSuitability: ["football","basketball","handball","tennis","fitness"],
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","CLUB_ABOUT","REGISTRATION","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top with sticky",
     homepageRhythm: "full-width-hero → stats-row → team-grid → intro-text → news-feed → registration-cta",
+    bestUsedWhen: "Das Zentrum fördert Talente strukturiert und kommuniziert mit Spielern, Eltern und Scouts.",
+    notIdealWhen: "Es geht um Breitensport oder lokale Vereinstätigkeit ohne Leistungsstrukturen.",
+    setupTip: "Dokumentiere Trainingsphilosophie und Erfolge früherer Jahrgänge auf der Über-uns-Seite.",
+    firstRecommendedAction: "Über-uns-Seite mit Akademiekonzept, Trainerstab und Förderphilosophie aufbauen.",
     previewTokens: { primary: "#1a2e4a", accent: "#e8ecf0" },
   },
   {
@@ -214,6 +282,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","EVENTS_OVERVIEW","CLUB_ABOUT","CONTACT","LEGAL"],
     navigationStyle: "minimal single-row",
     homepageRhythm: "hero → event-list → intro-text → contact-info",
+    bestUsedWhen: "Ehrenamtliche betreiben den Verein und haben begrenzte Zeit für Webpflege.",
+    notIdealWhen: "Der Verein hat einen aktiven Content-Verantwortlichen und möchte regelmässig publizieren.",
+    setupTip: "Konzentriere dich auf die Event-Seite und Kontakt – diese werden am häufigsten gesucht.",
+    firstRecommendedAction: "Einzige Homepage mit Veranstaltungen, Kontakt und Impressum einrichten.",
     previewTokens: { primary: "#3b5f3b", accent: "#f0f5f0" },
   },
   {
@@ -222,10 +294,14 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     description: "Turnierspezifischer Auftritt für Vereine die als Gastgeber für regionale und nationale Turniere auftreten.",
     audienceClubType: "Tournament-hosting club, event organiser",
     visualTone: "Official, structured, event-forward",
-    sportSuitability: ["football", "basketball", "handball", "volleyball", "futsal", "tennis"],
+    sportSuitability: ["football","basketball","handball","volleyball","futsal","tennis"],
     recommendedPages: ["HOMEPAGE","EVENTS_OVERVIEW","TEAMS_OVERVIEW","SPONSORS_PARTNERS","CLUB_ABOUT","CONTACT","REGISTRATION"],
     navigationStyle: "horizontal-top with secondary bar",
     homepageRhythm: "full-width-hero → event-list → sponsors-bar → team-grid → registration-cta → news-feed",
+    bestUsedWhen: "Der Club organisiert Turniere und Events für externe Teams und Gäste.",
+    notIdealWhen: "Der Club nimmt an Turnieren teil, organisiert aber keine eigenen.",
+    setupTip: "Erstelle für jedes Turnier eine separate Event-Seite mit allen Infos für auswärtige Teams.",
+    firstRecommendedAction: "Veranstaltungsübersicht mit nächstem Turnier als Hauptevent einrichten.",
     previewTokens: { primary: "#b45309", accent: "#fef9ee" },
   },
   {
@@ -238,6 +314,10 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     recommendedPages: ["HOMEPAGE","TEAMS_OVERVIEW","EVENTS_OVERVIEW","REGISTRATION","NEWS_OVERVIEW","SPONSORS_PARTNERS","CONTACT"],
     navigationStyle: "full-width-top",
     homepageRhythm: "full-width-hero → team-grid → event-list → stats-row → sponsors-bar → registration-cta",
+    bestUsedWhen: "Das Sportzentrum richtet sich an ein urbanes, diverses Publikum mit mehreren Sportangeboten.",
+    notIdealWhen: "Der Club ist ländlich geprägt und möchte einen traditionellen, lokalen Charakter ausstrahlen.",
+    setupTip: "Hebe das vielfältige Angebot durch eine strukturierte Teamübersicht nach Sportarten hervor.",
+    firstRecommendedAction: "Teamübersicht mit allen Sportangeboten und klaren Anmeldungslinks aufbauen.",
     previewTokens: { primary: "#1f2937", accent: "#f3f4f6" },
   },
   {
@@ -246,10 +326,14 @@ export const WEBSITE_PRESETS: WebsitePreset[] = [
     description: "Maximale Sichtbarkeit für Sponsoren und Unternehmenspartner. Ideal für Clubs mit starkem Business-Club-Angebot.",
     audienceClubType: "Sponsor-centric club, Business Club host",
     visualTone: "Executive, polished, high-visibility",
-    sportSuitability: ["football", "basketball", "handball"],
+    sportSuitability: ["football","basketball","handball"],
     recommendedPages: ["HOMEPAGE","SPONSORS_PARTNERS","EVENTS_OVERVIEW","TEAMS_OVERVIEW","CLUB_ABOUT","NEWS_OVERVIEW","CONTACT"],
     navigationStyle: "horizontal-top with secondary bar",
     homepageRhythm: "full-width-hero → sponsors-bar → stats-row → event-list → team-grid → news-feed",
+    bestUsedWhen: "Sponsoren sind strategische Partner und erwarten professionelle Online-Präsenz.",
+    notIdealWhen: "Sponsoring spielt keine zentrale Rolle und der Fokus liegt auf Sport und Gemeinschaft.",
+    setupTip: "Integriere Sponsor-Logos in mehreren Bereichen der Website für maximale Sichtbarkeit.",
+    firstRecommendedAction: "Sponsorenseite mit Partnerlogos und Business-Club-Informationen erstellen.",
     previewTokens: { primary: "#18181b", accent: "#fafafa" },
   },
 ];
