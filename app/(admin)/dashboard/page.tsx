@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FileText,
   Globe,
+  Info,
   Lightbulb,
   Settings,
   Shield,
@@ -23,6 +24,7 @@ import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { ADMIN_MODULES } from "@/lib/permissions/admin-modules";
+import { isSuperAdmin } from "@/lib/permissions/is-super-admin";
 
 // ── Icon map keyed by module key ──────────────────────────────────────────────
 const MODULE_ICONS: Record<string, LucideIcon> = {
@@ -68,6 +70,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const params = (await searchParams) ?? {};
   const session = await auth();
   const permissionKeys = session?.user?.permissionKeys ?? [];
+  const superAdmin = isSuperAdmin(session);
 
   const seasonOptions = await getSeasonOptionsData();
   const selectedSeason =
@@ -83,8 +86,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       })
     : 0;
 
-  // Filter ADMIN_MODULES by user permissions and showInGrid
+  // Superadmin sees all modules (including showInGrid:false except dashboard itself)
   const visibleModules = ADMIN_MODULES.filter((m) => {
+    if (m.key === "dashboard") return false; // never show self-link
+    if (superAdmin) return true;             // superadmin sees everything
     if (m.showInGrid === false) return false;
     if (!m.requiredPermissions || m.requiredPermissions.length === 0) return true;
     return m.requiredPermissions.some((p) => permissionKeys.includes(p));
@@ -116,6 +121,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           werden dynamisch pro Saison verwaltet und darauf aufgebaut.
         </p>
       </section>
+
+      {/* Superadmin badge */}
+      {superAdmin && (
+        <div className="flex items-center gap-2 rounded-[16px] border border-[#0b4aa2]/20 bg-[#0b4aa2]/5 px-4 py-2.5">
+          <Info className="h-3.5 w-3.5 shrink-0 text-[#0b4aa2]" />
+          <p className="text-[12px] font-semibold text-[#0b4aa2]">
+            Superadmin-Zugriff aktiv — globale Plattformverwaltung.
+          </p>
+        </div>
+      )}
 
       {/* Access-denied feedback (from redirects) */}
       {params.error === "access-denied" && (

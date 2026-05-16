@@ -1,10 +1,14 @@
 import { getInfoboardFeed } from "@/lib/events/public-event-feed";
 import { prisma } from "@/lib/db/prisma";
 import { getInfoboardPresetByKey, INFOBOARD_MODE_LABELS } from "@/lib/infoboard/infoboard-preset-catalog";
+import InfoboardAutoRefresher from "@/components/infoboard/InfoboardAutoRefresher";
 
 const FALLBACK_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
+const MIN_REFRESH = 15;
+const MAX_REFRESH = 300;
+const DEFAULT_REFRESH = 60;
 
-type SearchProps = { searchParams?: Promise<{ tenantKey?: string }> };
+type SearchProps = { searchParams?: Promise<{ tenantKey?: string; refresh?: string }> };
 
 type InfoboardDisplayOptions = {
   showClubLogo?: boolean;
@@ -68,6 +72,10 @@ function isToday(d: Date, now: Date) {
 export default async function InfoboardPage({ searchParams }: SearchProps) {
   const params = (await searchParams) ?? {};
   const tenantKey = params.tenantKey?.trim() || FALLBACK_TENANT_KEY;
+  const rawRefresh = parseInt(params.refresh ?? "", 10);
+  const refreshSeconds = isNaN(rawRefresh)
+    ? DEFAULT_REFRESH
+    : Math.min(MAX_REFRESH, Math.max(MIN_REFRESH, rawRefresh));
 
   // Load site settings
   const site = await prisma.websiteSite.findUnique({
@@ -148,6 +156,10 @@ export default async function InfoboardPage({ searchParams }: SearchProps) {
         {opts.showDateTime !== false && (
           <div className="text-right">
             <p className="text-sm font-semibold text-white">{formatFullDateTime(now)}</p>
+            <InfoboardAutoRefresher
+              intervalSeconds={refreshSeconds}
+              showTimestamp={opts.showDateTime !== false as boolean}
+            />
           </div>
         )}
       </header>
