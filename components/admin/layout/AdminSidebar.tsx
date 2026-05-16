@@ -14,7 +14,9 @@ import {
   ChevronRight,
   ClipboardList,
   Flag,
+  Globe,
   LayoutDashboard,
+  Newspaper,
   ScrollText,
   Shield,
   UserCircle2,
@@ -66,6 +68,10 @@ function getNavIcon(label: string) {
       return BadgeIcon;
     case "Benutzer":
       return Shield;
+    case "Website":
+      return Globe;
+    case "News":
+      return Newspaper;
     default:
       return LayoutDashboard;
   }
@@ -77,6 +83,10 @@ function isVereinsleitungChild(label: string) {
 
 function isPlannerChild(label: string) {
   return label === "Wochenplanner" || label === "Tagesplanner";
+}
+
+function isWebsiteChild(label: string) {
+  return label === "News";
 }
 
 function shouldCarrySeason(href: string) {
@@ -113,12 +123,16 @@ export default function AdminSidebar({
       : () => setInternalCollapsed((current) => !current);
 
   const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+    (item) =>
+      !isVereinsleitungChild(item.label) &&
+      !isPlannerChild(item.label) &&
+      !isWebsiteChild(item.label),
   );
   const vereinsleitungChildren = navItems.filter((item) =>
     isVereinsleitungChild(item.label),
   );
   const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
+  const websiteChildren = navItems.filter((item) => isWebsiteChild(item.label));
 
   function buildHref(baseHref: string) {
     if (!selectedSeason || !shouldCarrySeason(baseHref)) {
@@ -260,6 +274,32 @@ export default function AdminSidebar({
                         <li key={child.href}>
                           <Link
                             href={childHref}
+                            className={
+                              childActive
+                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                            }
+                          >
+                            <ChildIcon className="h-4 w-4 shrink-0" />
+                            <span>{child.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+
+                {!resolvedCollapsed && item.label === "Website" ? (
+                  <ul className="mt-2 space-y-2 pl-7">
+                    {websiteChildren.map((child) => {
+                      const ChildIcon = getNavIcon(child.label);
+                      const childActive =
+                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+
+                      return (
+                        <li key={child.href}>
+                          <Link
+                            href={child.href}
                             className={
                               childActive
                                 ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"

@@ -4,6 +4,7 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardList,
+  Newspaper,
   Shield,
   UserCircle2,
   UserRound,
@@ -76,6 +77,14 @@ const DASHBOARD_MODULES = [
       "Benutzer, Rollen und Berechtigungen für die WebApp zentral verwalten.",
     href: "/dashboard/users",
     icon: Shield,
+    carrySeason: false,
+  },
+  {
+    title: "News",
+    description:
+      "Aktuelle Vereinsnachrichten und Berichte für die öffentliche Website erstellen und publizieren.",
+    href: "/dashboard/website/news",
+    icon: Newspaper,
     carrySeason: false,
   },
 ];

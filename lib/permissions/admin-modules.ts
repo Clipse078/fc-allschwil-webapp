@@ -72,6 +72,14 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
   {
+    key: "news",
+    title: "News",
+    description:
+      "Aktuelle Vereinsnachrichten und Berichte für die öffentliche Website erstellen und publizieren.",
+    href: "/dashboard/website/news",
+    requiredPermissions: [PERMISSIONS.NEWS_MANAGE],
+  },
+  {
     key: "logs",
     title: "Admin Log",
     description: "Änderungen und wichtige Systemaktionen nachvollziehen.",
