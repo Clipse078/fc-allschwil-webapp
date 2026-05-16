@@ -3,7 +3,13 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { getWebsitePresetByKey } from "@/lib/website/website-preset-catalog";
 import { resolveTheme } from "@/lib/website/theme-engine";
-import { getPublicEventsList, getPublicTeamsList, getPublishedPageNav } from "@/lib/website/public-queries";
+import {
+  getPublicEventsList,
+  getPublicNewsList,
+  getPublicSponsorsList,
+  getPublicTeamsList,
+  getPublishedPageNav,
+} from "@/lib/website/public-queries";
 import WebsiteBlockRenderer from "@/components/website/renderer/WebsiteBlockRenderer";
 
 // Reserved path prefixes that must not be handled by this route
@@ -115,9 +121,11 @@ export default async function TenantWebsitePage({ params, searchParams }: Props)
   const blocks = parseBlocks(snapshot.blocksJson);
 
   // Fetch live data for data-driven blocks
-  const [events, teams, navPages] = await Promise.all([
+  const [events, teams, news, sponsors, navPages] = await Promise.all([
     getPublicEventsList(tenantKey, 10),
     getPublicTeamsList(tenantKey, 12),
+    getPublicNewsList(tenantKey, snapshot.locale ?? "de", 6),
+    getPublicSponsorsList(tenantKey),
     getPublishedPageNav(tenantKey),
   ]);
 
@@ -171,6 +179,8 @@ export default async function TenantWebsitePage({ params, searchParams }: Props)
             theme={theme}
             events={events}
             teams={teams}
+            news={news}
+            sponsors={sponsors}
           />
         ) : (
           <div className="flex min-h-[400px] items-center justify-center px-6 text-center">

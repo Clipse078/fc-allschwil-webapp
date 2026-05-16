@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
+  Award,
   BookOpen,
   Briefcase,
   CalendarDays,
@@ -11,6 +12,7 @@ import {
   Globe,
   Info,
   Lightbulb,
+  Newspaper,
   Settings2,
   Settings,
   Shield,
@@ -44,6 +46,8 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   players: UserRound,
   trainers: UserRound,
   website: Globe,
+  "website-news": Newspaper,
+  "website-sponsors": Award,
   "website-review": ClipboardCheck,
   "website-settings": Settings2,
   logs: FileText,

@@ -115,6 +115,20 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.WEBSITE_MANAGE],
   },
   {
+    key: "website-news",
+    title: "Website News",
+    description: "News-Beiträge erstellen, publizieren und verwalten.",
+    href: "/dashboard/website/news",
+    requiredPermissions: [PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
+    key: "website-sponsors",
+    title: "Website Sponsoren",
+    description: "Sponsor-Einträge verwalten und auf Website und Infoboard einblenden.",
+    href: "/dashboard/website/sponsors",
+    requiredPermissions: [PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
     key: "website-review",
     title: "Website Prüfung",
     description: "Seiten die auf Review und Freigabe warten – Vier-Augen-Inbox.",

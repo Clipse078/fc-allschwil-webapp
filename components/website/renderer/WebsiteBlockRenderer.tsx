@@ -1,5 +1,5 @@
 import type { WebsiteTheme } from "@/lib/website/theme-engine";
-import type { PublicEventItem, PublicTeamItem } from "@/lib/website/public-queries";
+import type { PublicEventItem, PublicNewsItem, PublicSponsorItem, PublicTeamItem } from "@/lib/website/public-queries";
 
 import HeroBlock from "./blocks/HeroBlock";
 import RichTextBlock from "./blocks/RichTextBlock";
@@ -26,9 +26,11 @@ type Props = {
   theme: WebsiteTheme;
   events: PublicEventItem[];
   teams: PublicTeamItem[];
+  news: PublicNewsItem[];
+  sponsors: PublicSponsorItem[];
 };
 
-export default function WebsiteBlockRenderer({ blocks, theme, events, teams }: Props) {
+export default function WebsiteBlockRenderer({ blocks, theme, events, teams, news, sponsors }: Props) {
   return (
     <>
       {blocks.map((block) => {
@@ -60,10 +62,10 @@ export default function WebsiteBlockRenderer({ blocks, theme, events, teams }: P
             );
           case "NEWS_FEED":
           case "NEWS_GRID":
-            return <NewsGridBlock key={block.id} props={p as never} theme={theme} />;
+            return <NewsGridBlock key={block.id} props={p as never} theme={theme} news={news.slice(0, Number(p.limit ?? 6))} />;
           case "SPONSORS_BAR":
           case "SPONSOR_STRIP":
-            return <SponsorStripBlock key={block.id} props={p as never} theme={theme} />;
+            return <SponsorStripBlock key={block.id} props={p as never} theme={theme} sponsors={sponsors} />;
           case "CONTACT_INFO":
           case "CONTACT":
             return <ContactBlock key={block.id} props={p as never} theme={theme} />;

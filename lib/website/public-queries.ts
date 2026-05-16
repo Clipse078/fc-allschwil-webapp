@@ -95,6 +95,71 @@ export async function getPublicTeamsList(
   return teams;
 }
 
+// ── News ──────────────────────────────────────────────────────────────────────
+
+export type PublicNewsItem = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  coverImageUrl: string | null;
+  publishedAt: Date | null;
+  locale: string;
+};
+
+export async function getPublicNewsList(
+  tenantKey: string,
+  locale = "de",
+  limit = 6,
+): Promise<PublicNewsItem[]> {
+  const site = await prisma.websiteSite.findUnique({
+    where: { tenantKey },
+    select: { id: true },
+  });
+  if (!site) return [];
+
+  return prisma.newsArticle.findMany({
+    where: { siteId: site.id, locale, status: "PUBLISHED" },
+    orderBy: [{ publishedAt: "desc" }, { sortOrder: "asc" }],
+    take: limit,
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      excerpt: true,
+      coverImageUrl: true,
+      publishedAt: true,
+      locale: true,
+    },
+  });
+}
+
+// ── Sponsors ──────────────────────────────────────────────────────────────────
+
+export type PublicSponsorItem = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  tier: string | null;
+};
+
+export async function getPublicSponsorsList(
+  tenantKey: string,
+): Promise<PublicSponsorItem[]> {
+  const site = await prisma.websiteSite.findUnique({
+    where: { tenantKey },
+    select: { id: true },
+  });
+  if (!site) return [];
+
+  return prisma.sponsorEntry.findMany({
+    where: { siteId: site.id, isActive: true, showOnSponsorStrip: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, logoUrl: true, websiteUrl: true, tier: true },
+  });
+}
+
 // ── Page navigation ───────────────────────────────────────────────────────────
 
 export async function getPublishedPageNav(tenantKey: string) {

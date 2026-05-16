@@ -189,8 +189,9 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  userRoles UserRole[]
-  auditLogs AuditLog[] @relation("AuditActor")
+  userRoles    UserRole[]
+  auditLogs    AuditLog[]    @relation("AuditActor")
+  newsArticles NewsArticle[] @relation("NewsAuthor")
 
   @@index([isActive])
 }
@@ -648,8 +649,10 @@ model WebsiteSite {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  pages     WebsitePage[]
-  snapshots WebsitePublishSnapshot[]
+  pages        WebsitePage[]
+  snapshots    WebsitePublishSnapshot[]
+  newsArticles NewsArticle[]
+  sponsors     SponsorEntry[]
 
   @@index([tenantKey])
   @@index([isActive])
@@ -729,4 +732,58 @@ model WebsitePublishSnapshot {
   @@index([siteId])
   @@index([pageId])
   @@index([publishedAt])
+}
+
+// ── News & Sponsors ───────────────────────────────────────────────────────────
+
+enum NewsArticleStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model NewsArticle {
+  id            String            @id @default(cuid())
+  siteId        String
+  locale        String            @default("de")
+  slug          String
+  title         String
+  excerpt       String?
+  body          String?
+  coverImageUrl String?
+  status        NewsArticleStatus @default(DRAFT)
+  publishedAt   DateTime?
+  authorId      String?
+  sortOrder     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  site   WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  author User?       @relation("NewsAuthor", fields: [authorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([siteId, slug, locale])
+  @@index([siteId, status])
+  @@index([siteId, publishedAt])
+}
+
+model SponsorEntry {
+  id                 String   @id @default(cuid())
+  siteId             String
+  name               String
+  logoUrl            String?
+  websiteUrl         String?
+  tier               String?
+  showOnWebsite      Boolean  @default(true)
+  showOnInfoboard    Boolean  @default(true)
+  showOnSponsorStrip Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([siteId, isActive])
+  @@index([siteId, sortOrder])
 }
