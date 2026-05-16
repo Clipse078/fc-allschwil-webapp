@@ -37,6 +37,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
           lastName={session.user.lastName}
           email={session.user.email}
           permissionKeys={session.user.permissionKeys}
+          roleKeys={session.user.roleKeys}
         />
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">

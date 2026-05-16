@@ -41,6 +41,14 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     showInGrid: false,
   },
   {
+    key: "planner",
+    title: "Saisonplanner",
+    description: "Gesamte Saisonagenda mit Trainings, Matches, Turnieren, Events und Ferienperioden.",
+    href: "/dashboard/planner",
+    requiredPermissions: [PERMISSIONS.WOCHENPLAN_MANAGE, PERMISSIONS.EVENTS_MANAGE],
+    carrySeason: true,
+  },
+  {
     key: "seasons",
     title: "Saisons",
     description: "Saisons als führende Club-Entität verwalten und die nächste Saison planen.",

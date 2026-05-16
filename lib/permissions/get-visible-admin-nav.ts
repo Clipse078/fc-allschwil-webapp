@@ -112,14 +112,14 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
 ];
 
-export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavItem[] {
+export function getVisibleAdminNav(
+  permissionKeys: PermissionKey[],
+  roleKeys?: string[],
+): AdminNavItem[] {
+  const superAdmin = roleKeys?.includes("super_admin") ?? false;
   return ADMIN_NAV_ITEMS.filter((item) => {
-    if (!item.permissionKeys || item.permissionKeys.length === 0) {
-      return true;
-    }
-
-    return item.permissionKeys.some(function (permissionKey) {
-      return permissionKeys.includes(permissionKey);
-    });
+    if (superAdmin) return true;
+    if (!item.permissionKeys || item.permissionKeys.length === 0) return true;
+    return item.permissionKeys.some((p) => permissionKeys.includes(p));
   });
 }

@@ -30,6 +30,7 @@ type AdminSidebarProps = {
   lastName: string;
   email: string;
   permissionKeys: string[];
+  roleKeys?: string[];
   collapsed?: boolean;
   onToggle?: () => void;
 };
@@ -94,13 +95,14 @@ export default function AdminSidebar({
   lastName,
   email,
   permissionKeys,
+  roleKeys,
   collapsed,
   onToggle,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedSeason = searchParams.get("season");
-  const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[]);
+  const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[], roleKeys);
 
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
