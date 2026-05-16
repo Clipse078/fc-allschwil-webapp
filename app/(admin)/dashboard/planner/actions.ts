@@ -1,6 +1,6 @@
 ﻿"use server";
 
-import { EventSource, EventStatus, EventType } from "@prisma/client";
+import { EventSource, EventStatus, EventType, TrainingFocus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -127,6 +127,13 @@ async function validatePlannerForm(
     redirect(buildPlannerRedirect({ seasonKey, status: `${prefix}-invalid-team` }));
   }
 
+  const trainingFocusRaw = toNullableString(formData.get("trainingFocus"));
+  const allFocuses = Object.values(TrainingFocus) as string[];
+  const trainingFocus =
+    trainingFocusRaw && allFocuses.includes(trainingFocusRaw)
+      ? (trainingFocusRaw as TrainingFocus)
+      : null;
+
   return {
     season,
     seasonKey,
@@ -142,6 +149,7 @@ async function validatePlannerForm(
     remarks,
     startAt,
     endAt,
+    trainingFocus,
     websiteVisible: toBool(formData.get("websiteVisible")),
     infoboardVisible: toBool(formData.get("infoboardVisible")),
     homepageVisible: toBool(formData.get("homepageVisible")),
@@ -178,6 +186,7 @@ export async function createPlannerEntryAction(formData: FormData) {
       organizerName: data.organizerName,
       competitionLabel: data.competitionLabel,
       remarks: data.remarks,
+      trainingFocus: data.trainingFocus,
       websiteVisible: data.websiteVisible,
       infoboardVisible: data.infoboardVisible,
       homepageVisible: data.homepageVisible,
@@ -231,6 +240,7 @@ export async function updatePlannerEntryAction(formData: FormData) {
       organizerName: data.organizerName,
       competitionLabel: data.competitionLabel,
       remarks: data.remarks,
+      trainingFocus: data.trainingFocus,
       websiteVisible: data.websiteVisible,
       infoboardVisible: data.infoboardVisible,
       homepageVisible: data.homepageVisible,

@@ -1,5 +1,6 @@
-import { Lightbulb } from "lucide-react";
+import { BookOpen, Lightbulb } from "lucide-react";
 import { getTrainingBlocksVsTargets } from "@/lib/strategy/queries";
+import { EXERCISE_CATALOG } from "@/lib/training/exercise-catalog";
 
 type Props = {
   seasonId: string;
@@ -122,20 +123,49 @@ export default async function TrainingSessionBlocksPanel({
       </div>
 
       {suggestions.length > 0 && (
-        <div className="mt-5 space-y-2">
-          {suggestions.map((row) => (
-            <div
-              key={row.focus}
-              className="flex items-start gap-2.5 rounded-[16px] border border-amber-100 bg-amber-50/60 px-4 py-3"
-            >
-              <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-              <p className="text-xs text-amber-800">
-                <span className="font-semibold">{row.focusLabel}</span> liegt{" "}
-                {Math.abs(row.delta!)}% unter dem Zielwert. Erwäge, beim nächsten
-                Training einen Block mit diesem Schwerpunkt einzuplanen.
-              </p>
-            </div>
-          ))}
+        <div className="mt-5 space-y-3">
+          {suggestions.map((row) => {
+            const exercises = EXERCISE_CATALOG.filter(
+              (e) => e.focus === row.focus,
+            ).slice(0, 2);
+
+            return (
+              <div
+                key={row.focus}
+                className="rounded-[16px] border border-amber-100 bg-amber-50/60 px-4 py-3"
+              >
+                <div className="flex items-start gap-2.5">
+                  <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <p className="text-xs text-amber-800">
+                    <span className="font-semibold">{row.focusLabel}</span> liegt{" "}
+                    {Math.abs(row.delta!)}% unter dem Zielwert. Erwäge, beim nächsten
+                    Training einen Block mit diesem Schwerpunkt einzuplanen.
+                  </p>
+                </div>
+                {exercises.length > 0 && (
+                  <div className="mt-2.5 space-y-1.5 border-t border-amber-100 pt-2.5">
+                    <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                      <BookOpen className="h-3 w-3" />
+                      Übungsvorschläge
+                    </p>
+                    {exercises.map((ex) => (
+                      <div
+                        key={ex.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <p className="text-[11px] font-medium text-amber-900">
+                          {ex.title}
+                        </p>
+                        <span className="shrink-0 rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] text-amber-600">
+                          {ex.durationMinutes} Min.
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

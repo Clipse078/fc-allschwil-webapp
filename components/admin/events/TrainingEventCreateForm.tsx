@@ -63,6 +63,7 @@ export default function TrainingEventCreateForm() {
 
   const [seasonId, setSeasonId] = useState("");
   const [teamId, setTeamId] = useState("");
+  const [trainingFocus, setTrainingFocus] = useState("");
   const [title, setTitle] = useState("Training");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -238,6 +239,7 @@ export default function TrainingEventCreateForm() {
           wochenplanVisible,
           trainingsplanVisible,
           teamPageVisible,
+          trainingFocus: trainingFocus || null,
         }),
       });
 
@@ -312,6 +314,23 @@ export default function TrainingEventCreateForm() {
                   {formatTeamLabel(team)}
                 </option>
               ))}
+            </select>
+          </label>
+
+          <label className="block space-y-2">
+            <span className="fca-label">Trainingsschwerpunkt</span>
+            <select
+              value={trainingFocus}
+              onChange={(e) => setTrainingFocus(e.target.value)}
+              className="fca-select"
+            >
+              <option value="">Kein Schwerpunkt</option>
+              <option value="TECHNICAL">Technik</option>
+              <option value="TACTICAL">Taktik</option>
+              <option value="PHYSICAL">Kondition</option>
+              <option value="MENTAL">Mental</option>
+              <option value="GOALKEEPING">Torhüter</option>
+              <option value="OTHER">Sonstiges</option>
             </select>
           </label>
 

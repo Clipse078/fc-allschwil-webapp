@@ -11,6 +11,7 @@ import { resolveEventReviewDecision } from "@/lib/workflow/event-review-policy";
 const ALLOWED_TYPES = ["MATCH", "TOURNAMENT", "TRAINING", "OTHER"] as const;
 const ALLOWED_SOURCES = ["CLUBCORNER_FVNWS", "MANUAL", "CSV_EXCEL_IMPORT"] as const;
 const ALLOWED_STATUSES = ["DRAFT", "SCHEDULED", "LIVE", "COMPLETED", "CANCELLED", "POSTPONED", "ARCHIVED"] as const;
+const ALLOWED_TRAINING_FOCUSES = ["TECHNICAL", "TACTICAL", "PHYSICAL", "MENTAL", "GOALKEEPING", "OTHER"] as const;
 
 type AllowedEventType = (typeof ALLOWED_TYPES)[number];
 type AllowedEventSource = (typeof ALLOWED_SOURCES)[number];
@@ -160,6 +161,16 @@ export async function POST(request: NextRequest) {
       body.remarks === null || body.remarks === undefined
         ? null
         : String(body.remarks).trim() || null;
+
+    const trainingFocusRaw =
+      body.trainingFocus === null || body.trainingFocus === undefined || body.trainingFocus === ""
+        ? null
+        : String(body.trainingFocus).trim();
+    const trainingFocus =
+      trainingFocusRaw &&
+      ALLOWED_TRAINING_FOCUSES.includes(trainingFocusRaw as (typeof ALLOWED_TRAINING_FOCUSES)[number])
+        ? (trainingFocusRaw as (typeof ALLOWED_TRAINING_FOCUSES)[number])
+        : null;
 
     const sortOrder =
       body.sortOrder === null || body.sortOrder === undefined || body.sortOrder === ""
@@ -399,6 +410,7 @@ export async function POST(request: NextRequest) {
             wochenplanVisible,
             trainingsplanVisible,
             teamPageVisible,
+            trainingFocus,
             sortOrder,
             remarks,
           },

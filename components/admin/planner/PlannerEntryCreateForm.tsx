@@ -1,4 +1,5 @@
-﻿import { EventSource, EventType } from "@prisma/client";
+﻿import { EventSource, EventType, TrainingFocus } from "@prisma/client";
+import { TRAINING_FOCUS_LABELS } from "@/lib/training/labels";
 import Link from "next/link";
 import {
   createPlannerEntryAction,
@@ -41,6 +42,7 @@ type PlannerCreateFormData = {
     wochenplanVisible: boolean;
     trainingsplanVisible: boolean;
     teamPageVisible: boolean;
+    trainingFocus?: string;
   };
 };
 
@@ -286,6 +288,26 @@ export default function PlannerEntryCreateForm({
                     placeholder="Zum Beispiel BRACK.CH PlayMore"
                   />
                 </div>
+
+                {data.selectedType === "TRAINING" && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">
+                      Trainingsschwerpunkt
+                    </label>
+                    <select
+                      name="trainingFocus"
+                      defaultValue={defaults?.trainingFocus ?? ""}
+                      className="mt-2 h-11 w-full rounded-[16px] border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-blue-300"
+                    >
+                      <option value="">Kein Schwerpunkt</option>
+                      {(Object.keys(TRAINING_FOCUS_LABELS) as TrainingFocus[]).map((f) => (
+                        <option key={f} value={f}>
+                          {TRAINING_FOCUS_LABELS[f]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-slate-700">

@@ -220,6 +220,7 @@ export async function getPlannerEditFormData(
       trainingsplanVisible: true,
       teamPageVisible: true,
       teamId: true,
+      trainingFocus: true,
       season: {
         select: {
           key: true,
@@ -267,6 +268,7 @@ export async function getPlannerEditFormData(
       wochenplanVisible: event.wochenplanVisible,
       trainingsplanVisible: event.trainingsplanVisible,
       teamPageVisible: event.teamPageVisible,
+      trainingFocus: event.trainingFocus ?? "",
     },
   };
 }
