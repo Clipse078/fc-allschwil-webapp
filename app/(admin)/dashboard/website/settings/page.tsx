@@ -3,7 +3,10 @@ import { ArrowLeft } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
+import { auth } from "@/auth";
+import { isSuperAdmin } from "@/lib/permissions/is-super-admin";
 import SiteSettingsForm from "@/components/admin/website/SiteSettingsForm";
+import DomainManagementSection from "@/components/admin/website/DomainManagementSection";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
 
@@ -36,11 +39,15 @@ type SettingsJson = {
 export default async function WebsiteSettingsPage() {
   await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
 
+  const session = await auth();
+  const superAdmin = isSuperAdmin(session);
+
   const site = await prisma.websiteSite.findUnique({
     where: { tenantKey: SITE_TENANT_KEY },
     select: {
       id: true, name: true, tenantKey: true,
-      locale: true, sport: true, domain: true, settingsJson: true,
+      locale: true, sport: true, domain: true, apexDomain: true,
+      domainStatus: true, sslStatus: true, settingsJson: true,
     },
   });
 
@@ -80,6 +87,18 @@ export default async function WebsiteSettingsPage() {
           infoboardMode: sj.infoboardMode ?? "",
         }}
       />
+
+      {site && (
+        <DomainManagementSection
+          siteId={site.id}
+          tenantKey={SITE_TENANT_KEY}
+          initialDomain={site.domain ?? ""}
+          initialApexDomain={site.apexDomain ?? ""}
+          domainStatus={site.domainStatus}
+          sslStatus={site.sslStatus}
+          isSuperAdmin={superAdmin}
+        />
+      )}
     </div>
   );
 }

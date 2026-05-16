@@ -638,16 +638,19 @@ model ClubExercise {
 // ── Website Builder ──────────────────────────────────────────────────────────
 
 model WebsiteSite {
-  id           String   @id @default(cuid())
-  tenantKey    String   @unique
+  id           String       @id @default(cuid())
+  tenantKey    String       @unique
   name         String
-  locale       String   @default("de")
-  sport        String   @default("football")
-  domain       String?
-  isActive     Boolean  @default(true)
+  locale       String       @default("de")
+  sport        String       @default("football")
+  domain       String?      @unique
+  apexDomain   String?
+  domainStatus DomainStatus @default(NOT_CONFIGURED)
+  sslStatus    SslStatus    @default(UNKNOWN)
+  isActive     Boolean      @default(true)
   settingsJson Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   pages        WebsitePage[]
   snapshots    WebsitePublishSnapshot[]
@@ -656,6 +659,7 @@ model WebsiteSite {
 
   @@index([tenantKey])
   @@index([isActive])
+  @@index([domain])
 }
 
 model WebsitePage {
@@ -735,6 +739,21 @@ model WebsitePublishSnapshot {
 }
 
 // ── News & Sponsors ───────────────────────────────────────────────────────────
+
+enum DomainStatus {
+  NOT_CONFIGURED
+  DNS_PENDING
+  VERIFIED
+  LIVE
+  ERROR
+}
+
+enum SslStatus {
+  UNKNOWN
+  PENDING
+  ACTIVE
+  ERROR
+}
 
 enum NewsArticleStatus {
   DRAFT
