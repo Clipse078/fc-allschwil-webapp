@@ -8,6 +8,7 @@ import { PAGE_TYPE_LABELS } from "@/lib/website/template-catalog";
 import { BLOCK_CATALOG } from "@/lib/website/block-catalog";
 import BlockEditor from "@/components/admin/website/BlockEditor";
 import PublishButton from "@/components/admin/website/PublishButton";
+import RestoreSnapshotButton from "@/components/admin/website/RestoreSnapshotButton";
 import type { WebsitePageStatus } from "@prisma/client";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
@@ -270,37 +271,40 @@ export default async function PageEditRoute({ params }: Props) {
         ) : (
           <div className="mt-4 space-y-2">
             {snapshots.map((snap, i) => (
-              <div
+                <div
                 key={snap.id}
-                className="flex items-center justify-between gap-3 rounded-[14px] border border-slate-200/80 bg-slate-50 px-4 py-2.5"
+                className="rounded-[14px] border border-slate-200/80 bg-slate-50 px-4 py-2.5"
               >
-                <div className="flex items-center gap-2">
-                  {i === 0 && (
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                      Aktuell live
-                    </span>
-                  )}
-                  {snap.versionRef !== null && (
-                    <span className="text-[11px] text-slate-500">
-                      v{snap.versionRef}
-                    </span>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-[11px] text-slate-600">
-                    {new Intl.DateTimeFormat("de-CH", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }).format(snap.publishedAt)}
-                  </p>
-                  {snap.publishedByUserId && publisherMap.has(snap.publishedByUserId) && (
-                    <p className="text-[10px] text-slate-400">
-                      {publisherMap.get(snap.publishedByUserId)}
-                    </p>
-                  )}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {i === 0 && (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        Aktuell live
+                      </span>
+                    )}
+                    {snap.versionRef !== null && (
+                      <span className="text-[11px] text-slate-500">v{snap.versionRef}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-[11px] text-slate-600">
+                        {new Intl.DateTimeFormat("de-CH", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }).format(snap.publishedAt)}
+                      </p>
+                      {snap.publishedByUserId && publisherMap.has(snap.publishedByUserId) && (
+                        <p className="text-[10px] text-slate-400">
+                          {publisherMap.get(snap.publishedByUserId)}
+                        </p>
+                      )}
+                    </div>
+                    <RestoreSnapshotButton snapshotId={snap.id} />
+                  </div>
                 </div>
               </div>
             ))}

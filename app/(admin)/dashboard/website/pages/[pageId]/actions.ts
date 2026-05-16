@@ -197,3 +197,59 @@ export async function publishPage(formData: FormData): Promise<PublishResult> {
 
   return { ok: true, snapshotId: snapshot.id };
 }
+
+// ── Restore from snapshot ────────────────────────────────────────────────────
+
+export type RestoreResult =
+  | { ok: true; version: number }
+  | { ok: false; error: string };
+
+export async function restoreFromSnapshot(formData: FormData): Promise<RestoreResult> {
+  const session = await requireAccess();
+  const actorUserId = session.user.effectiveUserId ?? session.user.id ?? null;
+
+  const snapshotId = String(formData.get("snapshotId") ?? "").trim();
+  if (!snapshotId) return { ok: false, error: "Keine Snapshot-ID." };
+
+  // Load snapshot, verify it belongs to this tenant's site
+  const snapshot = await prisma.websitePublishSnapshot.findFirst({
+    where: { id: snapshotId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: { id: true, pageId: true, blocksJson: true, versionRef: true },
+  });
+
+  if (!snapshot) return { ok: false, error: "Snapshot nicht gefunden." };
+
+  const page = await prisma.websitePage.findFirst({
+    where: { id: snapshot.pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: { id: true, status: true },
+  });
+
+  if (!page) return { ok: false, error: "Seite nicht gefunden." };
+
+  const maxVer = await prisma.websitePageVersion.aggregate({
+    where: { pageId: page.id },
+    _max: { version: true },
+  });
+  const nextVersion = (maxVer._max.version ?? 0) + 1;
+
+  await prisma.$transaction([
+    prisma.websitePageVersion.create({
+      data: {
+        pageId: page.id,
+        version: nextVersion,
+        blocksJson: snapshot.blocksJson as Prisma.InputJsonValue,
+        changeNote: `Wiederhergestellt aus Snapshot (Ref v${snapshot.versionRef ?? "?"})`,
+        createdByUserId: actorUserId,
+      },
+    }),
+    prisma.websitePage.update({
+      where: { id: page.id },
+      data: { status: "DRAFT" },
+    }),
+  ]);
+
+  revalidatePath(`/dashboard/website/pages/${page.id}`);
+  revalidatePath("/dashboard/website");
+
+  return { ok: true, version: nextVersion };
+}
