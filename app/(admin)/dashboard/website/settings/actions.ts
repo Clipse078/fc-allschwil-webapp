@@ -31,6 +31,9 @@ export async function updateSiteSettings(formData: FormData): Promise<SettingsRe
   const logoUrl = String(formData.get("logoUrl") ?? "").trim() || null;
   const primaryColor = String(formData.get("primaryColor") ?? "").trim() || null;
   const footerText = String(formData.get("footerText") ?? "").trim() || null;
+  const websitePresetKey = String(formData.get("websitePresetKey") ?? "").trim() || null;
+  const infoboardPresetKey = String(formData.get("infoboardPresetKey") ?? "").trim() || null;
+  const infoboardMode = String(formData.get("infoboardMode") ?? "").trim() || null;
 
   if (!name) return { ok: false, error: "Name ist erforderlich." };
 
@@ -47,7 +50,7 @@ export async function updateSiteSettings(formData: FormData): Promise<SettingsRe
         locale,
         sport,
         domain,
-        settingsJson: { logoUrl, primaryColor, footerText },
+        settingsJson: { logoUrl, primaryColor, footerText, websitePresetKey, infoboardPresetKey, infoboardMode },
       },
     });
   } else {
@@ -58,7 +61,7 @@ export async function updateSiteSettings(formData: FormData): Promise<SettingsRe
         locale,
         sport,
         domain,
-        settingsJson: { logoUrl, primaryColor, footerText },
+        settingsJson: { logoUrl, primaryColor, footerText, websitePresetKey, infoboardPresetKey, infoboardMode },
       },
     });
   }

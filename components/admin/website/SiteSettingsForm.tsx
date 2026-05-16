@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Info, Lock } from "lucide-react";
+import { CheckCircle2, Info, Lightbulb, Lock } from "lucide-react";
 import { updateSiteSettings } from "@/app/(admin)/dashboard/website/settings/actions";
+import { WEBSITE_PRESETS } from "@/lib/website/website-preset-catalog";
+import { INFOBOARD_PRESETS, INFOBOARD_MODE_LABELS } from "@/lib/infoboard/infoboard-preset-catalog";
 
 const LOCALE_OPTIONS = [
   { value: "de", label: "Deutsch" },
@@ -32,11 +34,19 @@ type Props = {
     logoUrl: string;
     primaryColor: string;
     footerText: string;
+    websitePresetKey: string;
+    infoboardPresetKey: string;
+    infoboardMode: string;
   };
 };
 
 export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
-  const [values, setValues] = useState(initialValues);
+  const [values, setValues] = useState({
+    ...initialValues,
+    websitePresetKey: initialValues.websitePresetKey ?? "",
+    infoboardPresetKey: initialValues.infoboardPresetKey ?? "",
+    infoboardMode: initialValues.infoboardMode ?? "",
+  });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -165,6 +175,92 @@ export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
               placeholder="© 2025 FC Musterstadt"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Website Presets */}
+      <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_4px_12px_rgba(15,23,42,0.03)]">
+        <h2 className="text-[1rem] font-semibold text-slate-900">Website Preset</h2>
+        <div className="mt-1 flex items-start gap-2 rounded-[12px] border border-[#0b4aa2]/10 bg-[#0b4aa2]/5 px-3 py-2">
+          <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-[#0b4aa2]" />
+          <p className="text-[11px] text-slate-600">
+            Presets definieren Struktur und visuellen Rhythmus. Dein Club-Branding
+            (Logo, Farbe, Domain) wird immer angewandt.
+          </p>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {WEBSITE_PRESETS.map((p) => (
+            <label
+              key={p.key}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-[14px] border p-3 transition ${
+                values.websitePresetKey === p.key
+                  ? "border-[#0b4aa2] bg-[#0b4aa2]/5 ring-1 ring-[#0b4aa2]/20"
+                  : "border-slate-200 bg-slate-50 hover:border-slate-300"
+              }`}
+            >
+              <input
+                type="radio"
+                name="websitePresetKey"
+                value={p.key}
+                checked={values.websitePresetKey === p.key}
+                onChange={() => { set("websitePresetKey", p.key); setSaved(false); }}
+                className="mt-0.5 shrink-0 accent-[#0b4aa2]"
+              />
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold text-slate-900">{p.name}</p>
+                <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+                  {p.description}
+                </p>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  {p.visualTone}
+                </p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Infoboard Presets */}
+      <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_4px_12px_rgba(15,23,42,0.03)]">
+        <h2 className="text-[1rem] font-semibold text-slate-900">Infoboard Preset</h2>
+        <div className="mt-1 flex items-start gap-2 rounded-[12px] border border-amber-100 bg-amber-50/70 px-3 py-2">
+          <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+          <p className="text-[11px] text-amber-800">
+            Infoboard-Presets können später für Spielplan-, Sponsoren- und Spieltag-Screens
+            verwendet werden.
+          </p>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {INFOBOARD_PRESETS.map((p) => (
+            <label
+              key={p.key}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-[14px] border p-3 transition ${
+                values.infoboardPresetKey === p.key
+                  ? "border-[#0b4aa2] bg-[#0b4aa2]/5 ring-1 ring-[#0b4aa2]/20"
+                  : "border-slate-200 bg-slate-50 hover:border-slate-300"
+              }`}
+            >
+              <input
+                type="radio"
+                name="infoboardPresetKey"
+                value={p.key}
+                checked={values.infoboardPresetKey === p.key}
+                onChange={() => { set("infoboardPresetKey", p.key); set("infoboardMode", p.mode); setSaved(false); }}
+                className="mt-0.5 shrink-0 accent-[#0b4aa2]"
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[12px] font-semibold text-slate-900">{p.name}</p>
+                  <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
+                    {INFOBOARD_MODE_LABELS[p.mode]}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+                  {p.description}
+                </p>
+              </div>
+            </label>
+          ))}
         </div>
       </div>
 

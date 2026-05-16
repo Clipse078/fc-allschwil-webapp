@@ -11,6 +11,9 @@ type SettingsJson = {
   logoUrl?: string | null;
   primaryColor?: string | null;
   footerText?: string | null;
+  websitePresetKey?: string | null;
+  infoboardPresetKey?: string | null;
+  infoboardMode?: string | null;
 };
 
 export default async function WebsiteSettingsPage() {
@@ -54,6 +57,9 @@ export default async function WebsiteSettingsPage() {
           logoUrl: sj.logoUrl ?? "",
           primaryColor: sj.primaryColor ?? "",
           footerText: sj.footerText ?? "",
+          websitePresetKey: sj.websitePresetKey ?? "",
+          infoboardPresetKey: sj.infoboardPresetKey ?? "",
+          infoboardMode: sj.infoboardMode ?? "",
         }}
       />
     </div>
