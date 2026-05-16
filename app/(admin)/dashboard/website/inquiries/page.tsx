@@ -154,9 +154,16 @@ export default async function InquiriesPage({ searchParams }: InquiriesPageProps
                 </div>
 
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <Link
+                    href={`/dashboard/website/inquiries/${inquiry.id}`}
+                    className="fca-button-secondary"
+                  >
+                    Detail
+                  </Link>
                   {inquiry.status === "NEW" && (
                     <form action={markInProgressAction}>
                       <input type="hidden" name="inquiryId" value={inquiry.id} />
+                      <input type="hidden" name="returnPath" value="/dashboard/website/inquiries" />
                       <button type="submit" className="fca-button-secondary">
                         In Bearbeitung
                       </button>
@@ -165,6 +172,7 @@ export default async function InquiriesPage({ searchParams }: InquiriesPageProps
                   {(inquiry.status === "NEW" || inquiry.status === "IN_PROGRESS") && (
                     <form action={markResolvedAction}>
                       <input type="hidden" name="inquiryId" value={inquiry.id} />
+                      <input type="hidden" name="returnPath" value="/dashboard/website/inquiries" />
                       <button type="submit" className="fca-button-primary">
                         Erledigt
                       </button>
@@ -173,6 +181,7 @@ export default async function InquiriesPage({ searchParams }: InquiriesPageProps
                   {inquiry.status !== "ARCHIVED" && (
                     <form action={archiveInquiryAction}>
                       <input type="hidden" name="inquiryId" value={inquiry.id} />
+                      <input type="hidden" name="returnPath" value="/dashboard/website/inquiries" />
                       <button
                         type="submit"
                         className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100"

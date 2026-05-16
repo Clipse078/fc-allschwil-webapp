@@ -6,6 +6,7 @@ import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getDefaultSite } from "@/lib/news/queries";
+import { countNewInquiries } from "@/lib/website/inquiry-queries";
 
 const NUDGES = [
   {
@@ -90,6 +91,7 @@ export default async function WebsiteOverviewPage() {
   await requirePermission(PERMISSIONS.NEWS_MANAGE);
 
   const site = await getDefaultSite();
+  const newInquiryCount = site ? await countNewInquiries(site.id) : 0;
 
   return (
     <div className="space-y-6">
@@ -98,6 +100,29 @@ export default async function WebsiteOverviewPage() {
         title="Website & Content"
         description="Manage public-facing content for the club website. News, sponsors, pages and branding all live here."
       />
+
+      {newInquiryCount > 0 && (
+        <AdminSurfaceCard className="border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                {newInquiryCount}
+              </span>
+              <p className="text-sm font-semibold text-amber-900">
+                {newInquiryCount === 1
+                  ? "1 neue Anfrage wartet auf Antwort."
+                  : `${newInquiryCount} neue Anfragen warten auf Antwort.`}
+              </p>
+            </div>
+            <Link
+              href="/dashboard/website/inquiries?filter=NEW"
+              className="shrink-0 rounded-full bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-amber-700"
+            >
+              Inbox →
+            </Link>
+          </div>
+        </AdminSurfaceCard>
+      )}
 
       {!site && (
         <AdminSurfaceCard className="border-amber-200 bg-amber-50 p-5">

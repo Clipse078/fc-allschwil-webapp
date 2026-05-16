@@ -56,6 +56,33 @@ export async function getInquiryList(
   return rows as InquiryListItem[];
 }
 
+export type InquiryDetailData = InquiryListItem & {
+  handledByUserId: string | null;
+};
+
+export async function getInquiryDetail(
+  inquiryId: string,
+  siteId: string
+): Promise<InquiryDetailData | null> {
+  const row = await prisma.websiteInquiry.findFirst({
+    where: { id: inquiryId, siteId },
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      name: true,
+      email: true,
+      phone: true,
+      topic: true,
+      message: true,
+      sourcePath: true,
+      handledByUserId: true,
+      createdAt: true,
+    },
+  });
+  return row as InquiryDetailData | null;
+}
+
 export async function countNewInquiries(siteId: string): Promise<number> {
   return prisma.websiteInquiry.count({
     where: { siteId, status: "NEW" },

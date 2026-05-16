@@ -24,9 +24,15 @@ function str(fd: FormData, key: string): string {
   return ((fd.get(key) as string | null) ?? "").trim();
 }
 
+function returnPath(fd: FormData): string {
+  const ref = str(fd, "returnPath");
+  return ref || "/dashboard/website/inquiries";
+}
+
 async function updateStatus(
   inquiryId: string,
-  newStatus: "IN_PROGRESS" | "RESOLVED" | "ARCHIVED"
+  newStatus: "IN_PROGRESS" | "RESOLVED" | "ARCHIVED",
+  actorUserId: string | null
 ) {
   const site = await getDefaultSite();
   if (!site) return;
@@ -39,26 +45,35 @@ async function updateStatus(
 
   await prisma.websiteInquiry.update({
     where: { id: inquiryId },
-    data: { status: newStatus },
+    data: {
+      status: newStatus,
+      ...(actorUserId && newStatus !== "ARCHIVED"
+        ? { handledByUserId: actorUserId }
+        : {}),
+    },
   });
 
   revalidatePath("/dashboard/website/inquiries");
+  revalidatePath(`/dashboard/website/inquiries/${inquiryId}`);
 }
 
 export async function markInProgressAction(formData: FormData) {
-  await requireWebsite();
-  await updateStatus(str(formData, "inquiryId"), "IN_PROGRESS");
-  redirect("/dashboard/website/inquiries?status=updated");
+  const session = await requireWebsite();
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  await updateStatus(str(formData, "inquiryId"), "IN_PROGRESS", userId);
+  redirect(`${returnPath(formData)}?status=updated`);
 }
 
 export async function markResolvedAction(formData: FormData) {
-  await requireWebsite();
-  await updateStatus(str(formData, "inquiryId"), "RESOLVED");
-  redirect("/dashboard/website/inquiries?status=updated");
+  const session = await requireWebsite();
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  await updateStatus(str(formData, "inquiryId"), "RESOLVED", userId);
+  redirect(`${returnPath(formData)}?status=updated`);
 }
 
 export async function archiveInquiryAction(formData: FormData) {
-  await requireWebsite();
-  await updateStatus(str(formData, "inquiryId"), "ARCHIVED");
-  redirect("/dashboard/website/inquiries?status=updated");
+  const session = await requireWebsite();
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  await updateStatus(str(formData, "inquiryId"), "ARCHIVED", userId);
+  redirect(`${returnPath(formData)}?status=updated`);
 }
