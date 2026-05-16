@@ -102,6 +102,8 @@ export type PublicNewsItem = {
   slug: string;
   title: string;
   excerpt: string | null;
+  listingText: string | null;
+  body: string | null;
   coverImageUrl: string | null;
   publishedAt: Date | null;
   locale: string;
@@ -127,6 +129,8 @@ export async function getPublicNewsList(
       slug: true,
       title: true,
       excerpt: true,
+      listingText: true,
+      body: true,
       coverImageUrl: true,
       publishedAt: true,
       locale: true,

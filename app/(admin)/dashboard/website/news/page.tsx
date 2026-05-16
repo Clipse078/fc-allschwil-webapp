@@ -88,6 +88,7 @@ export default async function NewsAdminPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">{a.title}</p>
                   <p className="mt-0.5 text-xs text-slate-400">/{a.slug} · {a.locale.toUpperCase()}</p>
+                  <Link href={`/dashboard/website/news/${a.id}`} className="text-[11px] font-semibold text-[#0b4aa2] hover:underline">Bearbeiten →</Link>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[a.status as keyof typeof STATUS_STYLES] ?? STATUS_STYLES.DRAFT}`}>

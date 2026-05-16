@@ -7,6 +7,12 @@ type Props = {
   news: PublicNewsItem[];
 };
 
+function getTeaser(article: PublicNewsItem, maxLen = 120): string | null {
+  const text = article.listingText ?? article.excerpt ?? article.body ?? null;
+  if (!text) return null;
+  return text.length > maxLen ? text.slice(0, maxLen).trimEnd() + "…" : text;
+}
+
 function fmtDate(d: Date | null) {
   if (!d) return "";
   return new Intl.DateTimeFormat("de-CH", { day: "2-digit", month: "long", year: "numeric" }).format(d);
@@ -49,9 +55,9 @@ export default function NewsGridBlock({ props, theme, news }: Props) {
                   <p className="mt-1.5 text-base font-semibold leading-snug" style={{ color: theme.text }}>
                     {article.title}
                   </p>
-                  {article.excerpt && (
+                  {getTeaser(article) && (
                     <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed" style={{ color: theme.textMuted }}>
-                      {article.excerpt}
+                      {getTeaser(article)}
                     </p>
                   )}
                 </div>

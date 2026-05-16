@@ -3,7 +3,7 @@ import { ArrowLeft, Award, Lightbulb } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
-import { createSponsorEntry, toggleSponsorActive } from "./actions";
+import { createSponsorEntry, moveSponsor, toggleSponsorActive, updateSponsorVisibility } from "./actions";
 
 const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
 
@@ -13,7 +13,7 @@ async function getSponsorsData() {
   return prisma.sponsorEntry.findMany({
     where: { siteId: site.id },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, logoUrl: true, websiteUrl: true, tier: true, isActive: true, sortOrder: true },
+    select: { id: true, name: true, logoUrl: true, websiteUrl: true, tier: true, isActive: true, sortOrder: true, showOnWebsite: true, showOnInfoboard: true, showOnSponsorStrip: true },
   });
 }
 
@@ -81,28 +81,46 @@ export default async function SponsorsAdminPage() {
         ) : (
           <div className="space-y-2">
             {sponsors.map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-3 rounded-[14px] border border-slate-200/80 bg-slate-50 px-4 py-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  {s.logoUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.logoUrl} alt={s.name} className="h-8 w-12 object-contain" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
-                    {s.tier && <p className="text-xs text-slate-400">{s.tier}</p>}
+              <div key={s.id} className="rounded-[14px] border border-slate-200/80 bg-slate-50 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {s.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={s.logoUrl} alt={s.name} className="h-8 w-12 object-contain" />
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{s.name}</p>
+                      {s.tier && <p className="text-xs text-slate-400">{s.tier}</p>}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {/* Up/Down */}
+                    <form action={moveSponsor} className="flex gap-1">
+                      <input type="hidden" name="id" value={s.id} />
+                      <button name="direction" value="up" type="submit" className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-400 hover:text-slate-600">↑</button>
+                      <button name="direction" value="down" type="submit" className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-400 hover:text-slate-600">↓</button>
+                    </form>
+                    <form action={toggleSponsorActive}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="isActive" value={String(s.isActive)} />
+                      <button type="submit" className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${s.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
+                        {s.isActive ? "Aktiv" : "Inaktiv"}
+                      </button>
+                    </form>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${s.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
-                    {s.isActive ? "Aktiv" : "Inaktiv"}
-                  </span>
-                  <form action={toggleSponsorActive}>
-                    <input type="hidden" name="id" value={s.id} />
-                    <input type="hidden" name="isActive" value={String(s.isActive)} />
-                    <button type="submit" className="text-[11px] text-slate-400 hover:text-slate-600">
-                      {s.isActive ? "Deaktivieren" : "Aktivieren"}
-                    </button>
-                  </form>
+                {/* Visibility toggles */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {([["showOnWebsite", "Website", s.showOnWebsite], ["showOnInfoboard", "Infoboard", s.showOnInfoboard], ["showOnSponsorStrip", "Strip", s.showOnSponsorStrip]] as [string, string, boolean][]).map(([field, label, val]) => (
+                    <form key={field} action={updateSponsorVisibility}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="field" value={field} />
+                      <input type="hidden" name="current" value={String(val)} />
+                      <button type="submit" className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${val ? "border-[#0b4aa2]/20 bg-[#0b4aa2]/5 text-[#0b4aa2]" : "border-slate-200 bg-white text-slate-400"}`}>
+                        {label} {val ? "✓" : "✕"}
+                      </button>
+                    </form>
+                  ))}
                 </div>
               </div>
             ))}

@@ -48,3 +48,47 @@ export async function toggleSponsorActive(formData: FormData) {
   await prisma.sponsorEntry.update({ where: { id }, data: { isActive: !isActive } });
   revalidatePath("/dashboard/website/sponsors");
 }
+
+export async function updateSponsorVisibility(formData: FormData) {
+  await requireAccess();
+  const id = String(formData.get("id") ?? "").trim();
+  const field = String(formData.get("field") ?? "").trim();
+  const currentVal = formData.get("current") === "true";
+
+  const allowed = ["showOnWebsite", "showOnInfoboard", "showOnSponsorStrip"];
+  if (!id || !allowed.includes(field)) return;
+
+  await prisma.sponsorEntry.update({
+    where: { id },
+    data: { [field]: !currentVal },
+  });
+  revalidatePath("/dashboard/website/sponsors");
+}
+
+export async function moveSponsor(formData: FormData) {
+  await requireAccess();
+
+  const id = String(formData.get("id") ?? "").trim();
+  const direction = String(formData.get("direction") ?? "").trim() as "up" | "down";
+  if (!id || !["up", "down"].includes(direction)) return;
+
+  const site = await prisma.websiteSite.findUnique({ where: { tenantKey: SITE_TENANT_KEY }, select: { id: true } });
+  if (!site) return;
+
+  const all = await prisma.sponsorEntry.findMany({
+    where: { siteId: site.id },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, sortOrder: true },
+  });
+
+  const idx = all.findIndex((s) => s.id === id);
+  const newIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (newIdx < 0 || newIdx >= all.length) return;
+
+  await prisma.$transaction([
+    prisma.sponsorEntry.update({ where: { id: all[idx].id }, data: { sortOrder: all[newIdx].sortOrder } }),
+    prisma.sponsorEntry.update({ where: { id: all[newIdx].id }, data: { sortOrder: all[idx].sortOrder } }),
+  ]);
+
+  revalidatePath("/dashboard/website/sponsors");
+}

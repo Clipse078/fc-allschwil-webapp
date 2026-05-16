@@ -750,6 +750,7 @@ model NewsArticle {
   slug          String
   title         String
   excerpt       String?
+  listingText   String?
   body          String?
   coverImageUrl String?
   status        NewsArticleStatus @default(DRAFT)
