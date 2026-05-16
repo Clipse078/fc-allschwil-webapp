@@ -57,6 +57,15 @@ enum EventType {
   VACATION_PERIOD
 }
 
+enum TrainingFocus {
+  TECHNICAL
+  TACTICAL
+  PHYSICAL
+  MENTAL
+  GOALKEEPING
+  OTHER
+}
+
 enum EventSource {
   CLUBCORNER_FVNWS
   MANUAL
@@ -118,15 +127,15 @@ enum WorkflowAction {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   firstName    String
   lastName     String
-  isActive     Boolean  @default(true)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   userRoles UserRole[]
   auditLogs AuditLog[] @relation("AuditActor")
@@ -135,14 +144,14 @@ model User {
 }
 
 model Role {
-  id                               String   @id @default(cuid())
-  key                              String   @unique
-  name                             String
-  description                      String?
-  canAccessVereinsleitung          Boolean  @default(false)
-  canAttendVereinsleitungMeetings  Boolean  @default(false)
-  createdAt                        DateTime @default(now())
-  updatedAt                        DateTime @updatedAt
+  id                              String   @id @default(cuid())
+  key                             String   @unique
+  name                            String
+  description                     String?
+  canAccessVereinsleitung         Boolean  @default(false)
+  canAttendVereinsleitungMeetings Boolean  @default(false)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
 
   userRoles                 UserRole[]
   rolePermissions           RolePermission[]
@@ -226,7 +235,7 @@ model RoleWorkflowReviewAssignment {
   updatedAt      DateTime @updatedAt
 
   workflowRule RoleWorkflowRule @relation(fields: [workflowRuleId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "RoleWorkflowReviewAssignment_workflowRuleId_fkey")
-  reviewerRole Role @relation("WorkflowReviewerRole", fields: [reviewerRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewerRole Role             @relation("WorkflowReviewerRole", fields: [reviewerRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([workflowRuleId, reviewerRoleId])
   @@index([reviewerRoleId])
@@ -246,12 +255,13 @@ model Season {
   teamSeasons     TeamSeason[]
   events          Event[]
   eventImportRuns EventImportRun[]
+  strategyTargets StrategyTarget[]
 
   @@index([isActive])
 }
 
 model Person {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   firstName   String
   lastName    String
   displayName String?
@@ -259,11 +269,11 @@ model Person {
   phone       String?
   dateOfBirth DateTime?
   notes       String?
-  isActive    Boolean  @default(true)
-  isPlayer    Boolean  @default(false)
-  isTrainer   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean   @default(true)
+  isPlayer    Boolean   @default(false)
+  isTrainer   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   playerSquadMembers PlayerSquadMember[]
   trainerTeamMembers TrainerTeamMember[]
@@ -276,22 +286,23 @@ model Person {
 }
 
 model Team {
-  id               String   @id @default(cuid())
+  id               String       @id @default(cuid())
   name             String
-  slug             String   @unique
+  slug             String       @unique
   category         TeamCategory
   genderGroup      String?
   ageGroup         String?
-  sortOrder        Int      @default(0)
-  isActive         Boolean  @default(true)
-  websiteVisible   Boolean  @default(true)
-  infoboardVisible Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  sortOrder        Int          @default(0)
+  isActive         Boolean      @default(true)
+  websiteVisible   Boolean      @default(true)
+  infoboardVisible Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   teamSeasons     TeamSeason[]
   events          Event[]
   eventImportRuns EventImportRun[]
+  strategyTargets StrategyTarget[]
 
   @@index([category, sortOrder])
   @@index([isActive])
@@ -415,6 +426,8 @@ model Event {
   trainingsplanVisible Boolean @default(false)
   teamPageVisible      Boolean @default(false)
 
+  trainingFocus TrainingFocus?
+
   sortOrder Int     @default(0)
   remarks   String?
 
@@ -425,6 +438,7 @@ model Event {
   team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([seasonId, type])
+  @@index([seasonId, trainingFocus])
   @@index([teamId, type])
   @@index([startAt])
   @@index([status])
@@ -494,4 +508,22 @@ model AuditLog {
   @@index([moduleKey])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model StrategyTarget {
+  id        String        @id @default(cuid())
+  seasonId  String
+  teamId    String?
+  focus     TrainingFocus
+  targetPct Int
+  notes     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team   Team?  @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([seasonId, teamId, focus])
+  @@index([seasonId])
+  @@index([teamId])
 }
