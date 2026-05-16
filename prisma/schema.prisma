@@ -66,6 +66,20 @@ enum TrainingFocus {
   OTHER
 }
 
+enum GoalModule {
+  TRAINING_PLANNER
+  STRATEGY_TARGETS
+  TEAMS
+  REGISTRATIONS
+  COMMUNICATION
+  MEDIA_NEWS
+  SPONSORS_BUSINESS
+  EVENTS
+  VOLUNTEERS_OPERATIONS
+  FINANCE
+  WEBSITE_PUBLISHING
+}
+
 enum EventSource {
   CLUBCORNER_FVNWS
   MANUAL
@@ -256,6 +270,7 @@ model Season {
   events          Event[]
   eventImportRuns EventImportRun[]
   strategyTargets StrategyTarget[]
+  clubGoals       ClubGoal[]
 
   @@index([isActive])
 }
@@ -303,6 +318,7 @@ model Team {
   events          Event[]
   eventImportRuns EventImportRun[]
   strategyTargets StrategyTarget[]
+  clubGoals       ClubGoal[]
 
   @@index([category, sortOrder])
   @@index([isActive])
@@ -526,4 +542,26 @@ model StrategyTarget {
   @@unique([seasonId, teamId, focus])
   @@index([seasonId])
   @@index([teamId])
+}
+
+model ClubGoal {
+  id          String     @id @default(cuid())
+  seasonId    String
+  teamId      String?
+  templateId  String?
+  module      GoalModule
+  title       String
+  description String?
+  metricLabel String?
+  metricValue String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([seasonId, module])
+  @@index([teamId])
+  @@index([templateId])
 }

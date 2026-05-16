@@ -1,3 +1,4 @@
+import { Lightbulb } from "lucide-react";
 import { getTrainingBlocksVsTargets } from "@/lib/strategy/queries";
 
 type Props = {
@@ -35,11 +36,11 @@ export default async function TrainingSessionBlocksPanel({
 }: Props) {
   const data = await getTrainingBlocksVsTargets(seasonId, teamId);
 
-  const subtitle = teamName
-    ? teamName
-    : teamId
-      ? null
-      : "Alle Teams";
+  const subtitle = teamName ? teamName : teamId ? null : "Alle Teams";
+
+  const suggestions = data.rows.filter(
+    (r) => r.delta !== null && r.delta < -5,
+  );
 
   if (data.rows.length === 0) {
     return (
@@ -62,7 +63,7 @@ export default async function TrainingSessionBlocksPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-[1.05rem] font-semibold text-slate-900">
-            Trainingsblöcke
+            Trainingsblöcke vs. Strategie-Ziele
           </h3>
           {subtitle && (
             <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>
@@ -75,7 +76,11 @@ export default async function TrainingSessionBlocksPanel({
 
       {!data.hasTargets && (
         <p className="mt-3 text-xs text-slate-400">
-          Keine Strategie-Ziele hinterlegt – nur Ist-Werte.
+          Keine Strategie-Ziele hinterlegt – nur Ist-Werte. Ziele unter{" "}
+          <a href="/dashboard/strategy" className="underline hover:text-slate-600">
+            Strategie
+          </a>{" "}
+          erfassen.
         </p>
       )}
 
@@ -115,6 +120,24 @@ export default async function TrainingSessionBlocksPanel({
           </div>
         ))}
       </div>
+
+      {suggestions.length > 0 && (
+        <div className="mt-5 space-y-2">
+          {suggestions.map((row) => (
+            <div
+              key={row.focus}
+              className="flex items-start gap-2.5 rounded-[16px] border border-amber-100 bg-amber-50/60 px-4 py-3"
+            >
+              <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+              <p className="text-xs text-amber-800">
+                <span className="font-semibold">{row.focusLabel}</span> liegt{" "}
+                {Math.abs(row.delta!)}% unter dem Zielwert. Erwäge, beim nächsten
+                Training einen Block mit diesem Schwerpunkt einzuplanen.
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

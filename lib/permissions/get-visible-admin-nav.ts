@@ -19,6 +19,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/vereinsleitung",
   },
   {
+    label: "Strategie",
+    href: "/dashboard/strategy",
+    permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
+  },
+  {
     label: "Meetings",
     href: "/vereinsleitung/meetings",
   },

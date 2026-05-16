@@ -5,6 +5,7 @@ import {
   CalendarRange,
   ClipboardList,
   Shield,
+  Target,
   UserCircle2,
   UserRound,
   Users,
@@ -20,6 +21,14 @@ const DASHBOARD_MODULES = [
       "Strategische Steuerung des Vereins mit Meetings, Initiativen, KPIs und Entscheidungen.",
     href: "/vereinsleitung",
     icon: Briefcase,
+    carrySeason: false,
+  },
+  {
+    title: "Strategie",
+    description:
+      "Vereinsziele pro Modul definieren, empfohlene Ziele importieren und Trainingsblöcke gegen Ziele vergleichen.",
+    href: "/dashboard/strategy",
+    icon: Target,
     carrySeason: false,
   },
   {

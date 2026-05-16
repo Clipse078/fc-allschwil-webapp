@@ -16,6 +16,13 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     href: "/dashboard",
   },
   {
+    key: "strategy",
+    title: "Strategie",
+    description: "Vereinsziele pro Modul definieren, empfohlene Ziele importieren und Trainingsblöcke gegen Ziele vergleichen.",
+    href: "/dashboard/strategy",
+    requiredPermissions: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
+  },
+  {
     key: "seasons",
     title: "Saisons",
     description: "Saisons als führende Club-Entität verwalten und die nächste Saison planen.",
