@@ -19,6 +19,22 @@ import {
   getInfoboardPresetByKey,
   type InfoboardMode,
 } from "@/lib/infoboard/infoboard-preset-catalog";
+import { prisma } from "@/lib/db/prisma";
+
+const SITE_TENANT_KEY = process.env.SITE_TENANT_KEY ?? "default";
+
+type InfoboardDisplayOptions = {
+  showClubLogo?: boolean;
+  showClubName?: boolean;
+  showSponsorRotation?: boolean;
+  showDateTime?: boolean;
+  showDressingRooms?: boolean;
+  showPitchNames?: boolean;
+  showAnnouncementTicker?: boolean;
+  showEmergencyBanner?: boolean;
+  density?: string;
+  sponsorVisibility?: string;
+};
 
 type Props = { params: Promise<{ key: string }> };
 
@@ -162,7 +178,49 @@ export default async function InfoboardPresetPreviewPage({ params }: Props) {
   const preset = getInfoboardPresetByKey(key);
   if (!preset) notFound();
 
-  const blocks = parseRhythm(preset.layoutRhythm);
+  // Load club display options
+  const site = await prisma.websiteSite.findUnique({
+    where: { tenantKey: SITE_TENANT_KEY },
+    select: { settingsJson: true },
+  });
+  const sj = (site?.settingsJson ?? {}) as { infoboardDisplayOptions?: InfoboardDisplayOptions };
+  const opts: InfoboardDisplayOptions = {
+    showClubLogo: true, showClubName: true, showSponsorRotation: true,
+    showDateTime: true, showDressingRooms: false, showPitchNames: true,
+    showAnnouncementTicker: true, showEmergencyBanner: true,
+    density: "balanced", sponsorVisibility: "normal",
+    ...sj.infoboardDisplayOptions,
+  };
+
+  const BLOCK_TOGGLE: Record<string, keyof InfoboardDisplayOptions> = {
+    "logo-bar": "showClubLogo",
+    "sponsors-bar": "showSponsorRotation",
+    "sponsor-ticker": "showSponsorRotation",
+    "rotating-logos": "showSponsorRotation",
+    "fullscreen-sponsor": "showSponsorRotation",
+    "split-schedule-sponsor": "showSponsorRotation",
+    "large-clock": "showDateTime",
+    "date-header": "showDateTime",
+    "date-time-header": "showDateTime",
+    "news-ticker": "showAnnouncementTicker",
+    announcements: "showAnnouncementTicker",
+    "internal-announcements": "showAnnouncementTicker",
+    "fullscreen-alert": "showEmergencyBanner",
+    "message-body": "showEmergencyBanner",
+    "contact-strip": "showEmergencyBanner",
+    "pitch-grid": "showPitchNames",
+    "roles-strip": "showDressingRooms",
+    "roles-overview": "showDressingRooms",
+    "staff-notes": "showDressingRooms",
+  };
+
+  const densitySpacing = opts.density === "compact" ? "space-y-1" : opts.density === "spacious" ? "space-y-3" : "space-y-1.5";
+  const allBlocks = parseRhythm(preset.layoutRhythm);
+  const blocks = allBlocks.filter((b) => {
+    const tk = BLOCK_TOGGLE[b.toLowerCase()];
+    return !tk || opts[tk] !== false;
+  });
+
   const modeStyle = MODE_STYLE[preset.mode];
   const tokenBg = preset.previewTokens?.bg;
   const tokenAccent = preset.previewTokens?.accent;
@@ -211,7 +269,7 @@ export default async function InfoboardPresetPreviewPage({ params }: Props) {
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
             </div>
             {/* Content */}
-            <div className="space-y-1.5 p-3">
+            <div className={`${densitySpacing} p-3`}>
               {blocks.map((block, i) => {
                 const h = SCREEN_BLOCK_H[block.toLowerCase()] ?? "h-10";
                 const isHero = i === 0 || block.includes("fullscreen") || block.includes("hero") || block.includes("alert");
@@ -243,6 +301,41 @@ export default async function InfoboardPresetPreviewPage({ params }: Props) {
         {/* Metadata */}
         <div className="space-y-4">
           <p className="text-sm text-slate-600">{preset.description}</p>
+
+          {/* SmartSuggestion */}
+          <div className="flex items-start gap-2 rounded-[13px] border border-[#0b4aa2]/15 bg-[#0b4aa2]/5 px-3 py-2.5">
+            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#0b4aa2]" />
+            <p className="text-[11px] text-slate-600">
+              Vorschau nutzen um Lesbarkeit, Sponsorenpräsenz und operative Details
+              auszubalancieren bevor echte Bildschirme verbunden werden.
+            </p>
+          </div>
+
+          {/* Active options summary */}
+          {sj.infoboardDisplayOptions && (
+            <div className="rounded-[13px] border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <p className="text-[10px] font-semibold text-slate-400">Konfigurierte Optionen</p>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {[
+                  opts.showClubLogo !== false && "Logo",
+                  opts.showClubName !== false && "Name",
+                  opts.showSponsorRotation !== false && "Sponsoren",
+                  opts.showDateTime !== false && "Uhrzeit",
+                  opts.showAnnouncementTicker !== false && "Ticker",
+                  opts.showEmergencyBanner !== false && "Notfall",
+                  opts.showPitchNames && "Plätze",
+                  opts.showDressingRooms && "Garderoben",
+                ].filter(Boolean).map((label) => (
+                  <span key={String(label)} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] text-slate-400">
+                Dichte: {opts.density ?? "ausgewogen"} · Sponsor: {opts.sponsorVisibility ?? "normal"}
+              </p>
+            </div>
+          )}
 
           {/* Specs grid */}
           <div className="grid grid-cols-2 gap-2">

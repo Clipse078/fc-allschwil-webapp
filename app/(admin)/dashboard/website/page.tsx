@@ -85,14 +85,27 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
   const pages = site?.pages ?? [];
   const locale = site?.locale ?? "de";
 
+  type InfoboardDisplayOptions = {
+    showClubLogo?: boolean;
+    showSponsorRotation?: boolean;
+    showDateTime?: boolean;
+    showEmergencyBanner?: boolean;
+    density?: string;
+    sponsorVisibility?: string;
+  };
   type SiteSettings = {
     websitePresetKey?: string | null;
     infoboardPresetKey?: string | null;
     infoboardMode?: string | null;
+    infoboardDisplayOptions?: InfoboardDisplayOptions | null;
   };
   const sj = (site?.settingsJson ?? {}) as SiteSettings;
   const activeWebsitePreset = sj.websitePresetKey ? getWebsitePresetByKey(sj.websitePresetKey) : null;
   const activeInfoboardPreset = sj.infoboardPresetKey ? getInfoboardPresetByKey(sj.infoboardPresetKey) : null;
+  const ibOpts = sj.infoboardDisplayOptions ?? {};
+
+  const DENSITY_LABELS: Record<string, string> = { compact: "Kompakt", balanced: "Ausgewogen", spacious: "Grosszügig" };
+  const SPONSOR_LABELS: Record<string, string> = { hidden: "Versteckt", subtle: "Dezent", normal: "Normal", prominent: "Prominent" };
 
   const publishedCount = pages.filter((p) => p.status === "PUBLISHED").length;
   const draftCount = pages.filter((p) => p.status === "DRAFT").length;
@@ -217,9 +230,28 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
                   <p className="mt-1 text-[11px] text-slate-400">
                     {activeInfoboardPreset.bestUseCase}
                   </p>
+
+                  {/* Display option badges */}
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${ibOpts.showClubLogo !== false ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
+                      Logo {ibOpts.showClubLogo !== false ? "an" : "aus"}
+                    </span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                      {SPONSOR_LABELS[ibOpts.sponsorVisibility ?? "normal"] ?? "Normal"}
+                    </span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                      {DENSITY_LABELS[ibOpts.density ?? "balanced"] ?? "Ausgewogen"}
+                    </span>
+                    {ibOpts.showEmergencyBanner !== false && (
+                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                        Notfall aktiv
+                      </span>
+                    )}
+                  </div>
+
                   <Link
                     href={`/dashboard/website/infoboard-preset-preview/${activeInfoboardPreset.key}`}
-                    className="mt-1.5 inline-block text-[11px] font-semibold text-[#0b4aa2] hover:underline"
+                    className="mt-2 inline-block text-[11px] font-semibold text-[#0b4aa2] hover:underline"
                   >
                     Vorschau ansehen →
                   </Link>
@@ -227,7 +259,8 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
                 <div className="flex items-start gap-2 rounded-[12px] border border-[#0b4aa2]/10 bg-[#0b4aa2]/5 px-3 py-2">
                   <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-[#0b4aa2]" />
                   <p className="text-[11px] text-slate-600">
-                    Infoboard-Preset vor dem Einsatz auf Bildschirmen in der Vorschau prüfen.
+                    Vorschau nutzen um Lesbarkeit, Sponsorenpräsenz und operative Details
+                    auszubalancieren bevor echte Bildschirme verbunden werden.
                   </p>
                 </div>
               </div>
