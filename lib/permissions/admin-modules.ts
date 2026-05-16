@@ -86,6 +86,13 @@ export const ADMIN_MODULES: AdminModuleDefinition[] = [
     requiredPermissions: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
   {
+    key: "website",
+    title: "Website Builder",
+    description: "Block-basierter Website-Builder. Seiten erstellen, Inhalte verwalten und Snapshots publizieren.",
+    href: "/dashboard/website",
+    requiredPermissions: [PERMISSIONS.WEBSITE_MANAGE],
+  },
+  {
     key: "logs",
     title: "Admin Log",
     description: "Änderungen und wichtige Systemaktionen nachvollziehen.",

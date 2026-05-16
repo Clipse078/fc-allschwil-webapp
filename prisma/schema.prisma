@@ -86,6 +86,28 @@ enum ExerciseDifficulty {
   ADVANCED
 }
 
+enum WebsitePageStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum WebsitePageType {
+  HOMEPAGE
+  TEAMS_OVERVIEW
+  TEAM_DETAIL
+  CLUB_ABOUT
+  CONTACT
+  REGISTRATION
+  NEWS_OVERVIEW
+  NEWS_DETAIL
+  EVENTS_OVERVIEW
+  SPONSORS_PARTNERS
+  LEGAL
+  CUSTOM
+}
+
 enum ExerciseSport {
   FOOTBALL
   BASKETBALL
@@ -610,4 +632,100 @@ model ClubExercise {
   @@index([seasonId])
   @@index([teamId])
   @@index([templateId])
+}
+
+// ── Website Builder ──────────────────────────────────────────────────────────
+
+model WebsiteSite {
+  id           String   @id @default(cuid())
+  tenantKey    String   @unique
+  name         String
+  locale       String   @default("de")
+  sport        String   @default("football")
+  isActive     Boolean  @default(true)
+  settingsJson Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  pages     WebsitePage[]
+  snapshots WebsitePublishSnapshot[]
+
+  @@index([tenantKey])
+  @@index([isActive])
+}
+
+model WebsitePage {
+  id          String            @id @default(cuid())
+  siteId      String
+  slug        String
+  title       String
+  pageType    WebsitePageType
+  templateKey String?
+  locale      String            @default("de")
+  status      WebsitePageStatus @default(DRAFT)
+  sortOrder   Int               @default(0)
+  isVisible   Boolean           @default(true)
+
+  metaTitle       String?
+  metaDescription String?
+
+  createdByUserId   String?
+  reviewedByUserId  String?
+  publishedByUserId String?
+  reviewRequestedAt DateTime?
+  reviewedAt        DateTime?
+  publishedAt       DateTime?
+  reviewNotes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site      WebsiteSite              @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  versions  WebsitePageVersion[]
+  snapshots WebsitePublishSnapshot[]
+
+  @@unique([siteId, slug, locale])
+  @@index([siteId, status])
+  @@index([siteId, pageType])
+  @@index([siteId, isVisible])
+}
+
+model WebsitePageVersion {
+  id              String   @id @default(cuid())
+  pageId          String
+  version         Int
+  blocksJson      Json
+  changeNote      String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  page WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([pageId])
+  @@index([pageId, version])
+}
+
+model WebsitePublishSnapshot {
+  id                String   @id @default(cuid())
+  siteId            String
+  pageId            String
+  tenantKey         String
+  slug              String
+  locale            String
+  pageType          String
+  title             String
+  blocksJson        Json
+  metaTitle         String?
+  metaDescription   String?
+  versionRef        Int?
+  publishedByUserId String?
+  publishedAt       DateTime @default(now())
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  page WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantKey, slug, locale])
+  @@index([siteId])
+  @@index([pageId])
+  @@index([publishedAt])
 }

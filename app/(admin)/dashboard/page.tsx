@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardList,
+  Globe,
   Lightbulb,
   Shield,
   Tag,
@@ -89,6 +90,14 @@ const DASHBOARD_MODULES = [
       "Spieler- und Trainerbereiche strukturiert aufbauen und für saisongeführte Prozesse vorbereiten.",
     href: "/dashboard/players",
     icon: UserRound,
+    carrySeason: false,
+  },
+  {
+    title: "Website",
+    description:
+      "Block-basierter Website-Builder für Vereinswebsites. Seiten, Vorlagen und publizierte Snapshots verwalten.",
+    href: "/dashboard/website",
+    icon: Globe,
     carrySeason: false,
   },
   {
