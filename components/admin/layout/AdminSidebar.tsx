@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Cog,
   Flag,
   Globe,
   Handshake,
@@ -81,6 +82,8 @@ function getNavIcon(label: string) {
       return ImageIcon;
     case "Anfragen":
       return Inbox;
+    case "Einstellungen":
+      return Cog;
     default:
       return LayoutDashboard;
   }
@@ -99,7 +102,8 @@ function isWebsiteChild(label: string) {
     label === "News" ||
     label === "Sponsoren" ||
     label === "Medien" ||
-    label === "Anfragen"
+    label === "Anfragen" ||
+    label === "Einstellungen"
   );
 }
 

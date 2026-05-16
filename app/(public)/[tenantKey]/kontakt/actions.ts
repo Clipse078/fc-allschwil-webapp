@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
+import { notifyWebsiteInquiryCreated } from "@/lib/website/inquiry-notifications";
+import { getInquiryNotificationEmail } from "@/lib/website/website-settings";
 
 function str(fd: FormData, key: string): string {
   return ((fd.get(key) as string | null) ?? "").trim();
@@ -12,13 +14,12 @@ function nullable(fd: FormData, key: string): string | null {
   return v || null;
 }
 
-async function resolveSiteId(tenantKey: string): Promise<string | null> {
+async function resolveSite(tenantKey: string) {
   if (!tenantKey) return null;
-  const site = await prisma.websiteSite.findUnique({
+  return prisma.websiteSite.findUnique({
     where: { tenantKey, isActive: true },
-    select: { id: true },
+    select: { id: true, contactEmail: true, settingsJson: true },
   });
-  return site?.id ?? null;
 }
 
 export async function submitContactInquiryAction(formData: FormData) {
@@ -43,14 +44,14 @@ export async function submitContactInquiryAction(formData: FormData) {
     redirect(`/${tenantKey}/kontakt?status=error`);
   }
 
-  const siteId = await resolveSiteId(tenantKey);
-  if (!siteId) {
+  const site = await resolveSite(tenantKey);
+  if (!site) {
     redirect(`/${tenantKey}/kontakt?status=sent`);
   }
 
-  await prisma.websiteInquiry.create({
+  const inquiry = await prisma.websiteInquiry.create({
     data: {
-      siteId,
+      siteId: site.id,
       type: "CONTACT",
       status: "NEW",
       name,
@@ -61,6 +62,18 @@ export async function submitContactInquiryAction(formData: FormData) {
       sourcePath: `/${tenantKey}/kontakt`,
     },
   });
+
+  try {
+    const recipientEmail = getInquiryNotificationEmail(site.settingsJson, site.contactEmail);
+    await notifyWebsiteInquiryCreated(
+      { id: inquiry.id, type: inquiry.type, name, email,
+        phone: inquiry.phone, topic: inquiry.topic, message,
+        sourcePath: inquiry.sourcePath },
+      recipientEmail
+    );
+  } catch (err) {
+    console.error("[inquiry-notification] Contact notification failed:", err);
+  }
 
   redirect(`/${tenantKey}/kontakt?status=sent`);
 }

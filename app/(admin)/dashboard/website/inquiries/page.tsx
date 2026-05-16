@@ -5,12 +5,14 @@ import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { prisma } from "@/lib/db/prisma";
 import { getDefaultSite } from "@/lib/news/queries";
 import {
   getInquiryList,
   INQUIRY_TYPE_LABELS,
   INQUIRY_STATUS_LABELS,
 } from "@/lib/website/inquiry-queries";
+import { getInquiryNotificationEmail, parseWebsiteSettings } from "@/lib/website/website-settings";
 import {
   markInProgressAction,
   markResolvedAction,
@@ -57,9 +59,17 @@ export default async function InquiriesPage({ searchParams }: InquiriesPageProps
   const showUpdateMsg = params.status === "updated";
 
   const site = await getDefaultSite();
-  const inquiries = site
-    ? await getInquiryList(site.id, activeFilter === "ALL" ? null : activeFilter)
-    : [];
+  const [inquiries, fullSite] = await Promise.all([
+    site ? getInquiryList(site.id, activeFilter === "ALL" ? null : activeFilter) : Promise.resolve([]),
+    site ? prisma.websiteSite.findUnique({
+      where: { id: site.id },
+      select: { contactEmail: true, settingsJson: true },
+    }) : Promise.resolve(null),
+  ]);
+
+  const notificationEmail = fullSite
+    ? getInquiryNotificationEmail(fullSite.settingsJson, fullSite.contactEmail)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -88,6 +98,23 @@ export default async function InquiriesPage({ searchParams }: InquiriesPageProps
       {!site && (
         <AdminSurfaceCard className="border-amber-200 bg-amber-50 p-5">
           <p className="text-sm text-amber-800">Kein aktiver Website-Eintrag gefunden.</p>
+        </AdminSurfaceCard>
+      )}
+
+      {site && !notificationEmail && (
+        <AdminSurfaceCard className="border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-slate-600">
+              <span className="font-semibold">Keine Benachrichtigungs-E-Mail konfiguriert.</span>{" "}
+              Neue Anfragen werden nur hier gespeichert — keine automatische Benachrichtigung.
+            </p>
+            <Link
+              href="/dashboard/website/settings"
+              className="shrink-0 text-sm font-medium text-blue-600 hover:underline"
+            >
+              Einstellungen →
+            </Link>
+          </div>
         </AdminSurfaceCard>
       )}
 

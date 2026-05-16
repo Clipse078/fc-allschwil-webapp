@@ -533,7 +533,9 @@ model WebsiteSite {
   logoUrl       String?
   footerText    String?
   tagline       String?
+  contactEmail  String?
   navConfigJson Json?
+  settingsJson  Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

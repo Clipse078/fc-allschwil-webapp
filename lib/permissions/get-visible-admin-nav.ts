@@ -105,6 +105,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/dashboard/website/inquiries",
     permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
   },
+  {
+    label: "Einstellungen",
+    href: "/dashboard/website/settings",
+    permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+  },
 ];
 
 export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavItem[] {
