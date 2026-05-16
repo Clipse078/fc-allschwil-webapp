@@ -195,15 +195,39 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
                 </p>
                 <div className="rounded-[14px] border border-slate-200/80 bg-slate-50 p-3">
                   <div className="flex items-center gap-2">
+                    {activeInfoboardPreset.previewTokens?.bg && (
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full border border-slate-200"
+                        style={{ backgroundColor: activeInfoboardPreset.previewTokens.bg }}
+                      />
+                    )}
                     <p className="text-sm font-semibold text-slate-900">
                       {activeInfoboardPreset.name}
                     </p>
-                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                      activeInfoboardPreset.mode === "DARK"
+                        ? "border-slate-700 bg-slate-800 text-slate-300"
+                        : activeInfoboardPreset.mode === "LIGHT"
+                          ? "border-slate-200 bg-white text-slate-600"
+                          : "border-slate-200 bg-slate-100 text-slate-500"
+                    }`}>
                       {INFOBOARD_MODE_LABELS[activeInfoboardPreset.mode]}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-slate-400">
                     {activeInfoboardPreset.bestUseCase}
+                  </p>
+                  <Link
+                    href={`/dashboard/website/infoboard-preset-preview/${activeInfoboardPreset.key}`}
+                    className="mt-1.5 inline-block text-[11px] font-semibold text-[#0b4aa2] hover:underline"
+                  >
+                    Vorschau ansehen →
+                  </Link>
+                </div>
+                <div className="flex items-start gap-2 rounded-[12px] border border-[#0b4aa2]/10 bg-[#0b4aa2]/5 px-3 py-2">
+                  <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-[#0b4aa2]" />
+                  <p className="text-[11px] text-slate-600">
+                    Infoboard-Preset vor dem Einsatz auf Bildschirmen in der Vorschau prüfen.
                   </p>
                 </div>
               </div>
