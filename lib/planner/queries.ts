@@ -1,4 +1,4 @@
-﻿import { EventSource, EventType } from "@prisma/client";
+﻿import { EventSource, EventType, ImprovementArea } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getDayWindow, getWeekWindow } from "@/lib/planner/date-utils";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
@@ -15,9 +15,38 @@ export type PlannerEntry = {
   location: string | null;
   teamName: string | null;
   description: string | null;
+  improvementArea: ImprovementArea | null;
   websiteVisible: boolean;
   infoboardVisible: boolean;
   wochenplanVisible: boolean;
+};
+
+export type TrainingSessionBlocksPanelData = {
+  seasonName: string | null;
+  teams: Array<{
+    teamId: string;
+    teamName: string;
+    totalTrainingBlocks: number;
+    targets: Array<{
+      id: string;
+      title: string;
+      planTitle: string;
+      improvementArea: ImprovementArea;
+      improvementAreaLabel: string;
+      targetPercentage: number;
+      plannedPercentage: number;
+      plannedBlocks: number;
+      deltaPercentage: number;
+    }>;
+  }>;
+};
+
+export const IMPROVEMENT_AREA_LABELS: Record<ImprovementArea, string> = {
+  TECHNIK: "Technik",
+  TAKTIK: "Taktik",
+  ATHLETIK: "Athletik",
+  MENTAL: "Mental",
+  TEAMKULTUR: "Teamkultur",
 };
 
 function getPlannerTypeLabel(type: EventType): string {
@@ -115,6 +144,7 @@ async function getPlannerEntries(args: {
       endAt: true,
       location: true,
       description: true,
+      improvementArea: true,
       websiteVisible: true,
       infoboardVisible: true,
       wochenplanVisible: true,
@@ -138,10 +168,168 @@ async function getPlannerEntries(args: {
     location: entry.location,
     teamName: entry.team?.name ?? null,
     description: entry.description,
+    improvementArea: entry.improvementArea,
     websiteVisible: entry.websiteVisible,
     infoboardVisible: entry.infoboardVisible,
     wochenplanVisible: entry.wochenplanVisible,
   }));
+}
+
+function calculatePercentage(value: number, total: number) {
+  if (total === 0) {
+    return 0;
+  }
+
+  return Math.round((value / total) * 100);
+}
+
+async function getTrainingSessionBlocksPanelData(args: {
+  seasonId?: string | null;
+  seasonName?: string | null;
+}): Promise<TrainingSessionBlocksPanelData> {
+  if (!args.seasonId) {
+    return {
+      seasonName: null,
+      teams: [],
+    };
+  }
+
+  const teamSeasons = await prisma.teamSeason.findMany({
+    where: {
+      seasonId: args.seasonId,
+      status: "ACTIVE",
+    },
+    orderBy: [
+      { team: { category: "asc" } },
+      { team: { sortOrder: "asc" } },
+      { displayName: "asc" },
+    ],
+    select: {
+      team: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  const teamIds = teamSeasons.map((teamSeason) => teamSeason.team.id);
+
+  if (teamIds.length === 0) {
+    return {
+      seasonName: args.seasonName ?? null,
+      teams: [],
+    };
+  }
+
+  const [trainingBlocks, strategyPlans] = await Promise.all([
+    prisma.event.findMany({
+      where: {
+        seasonId: args.seasonId,
+        teamId: {
+          in: teamIds,
+        },
+        type: "TRAINING",
+      },
+      select: {
+        teamId: true,
+        improvementArea: true,
+      },
+    }),
+    prisma.strategyPlan.findMany({
+      where: {
+        seasonId: args.seasonId,
+        isActive: true,
+        OR: [
+          {
+            teamId: null,
+          },
+          {
+            teamId: {
+              in: teamIds,
+            },
+          },
+        ],
+      },
+      orderBy: [{ teamId: "asc" }, { title: "asc" }],
+      select: {
+        id: true,
+        teamId: true,
+        title: true,
+        targets: {
+          where: {
+            improvementArea: {
+              not: null,
+            },
+            targetPercentage: {
+              not: null,
+            },
+          },
+          orderBy: [{ improvementArea: "asc" }, { title: "asc" }],
+          select: {
+            id: true,
+            title: true,
+            improvementArea: true,
+            targetPercentage: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return {
+    seasonName: args.seasonName ?? null,
+    teams: teamSeasons
+      .map((teamSeason) => {
+        const teamBlocks = trainingBlocks.filter(
+          (block) => block.teamId === teamSeason.team.id,
+        );
+        const relevantPlans = strategyPlans.filter(
+          (plan) => plan.teamId === null || plan.teamId === teamSeason.team.id,
+        );
+        const totalTrainingBlocks = teamBlocks.length;
+        const targets = relevantPlans.flatMap((plan) =>
+          plan.targets.flatMap((target) => {
+            if (!target.improvementArea || target.targetPercentage === null) {
+              return [];
+            }
+
+            const plannedBlocks = teamBlocks.filter(
+              (block) => block.improvementArea === target.improvementArea,
+            ).length;
+            const plannedPercentage = calculatePercentage(
+              plannedBlocks,
+              totalTrainingBlocks,
+            );
+
+            return [
+              {
+                id: target.id,
+                title: target.title,
+                planTitle: plan.title,
+                improvementArea: target.improvementArea,
+                improvementAreaLabel: IMPROVEMENT_AREA_LABELS[target.improvementArea],
+                targetPercentage: target.targetPercentage,
+                plannedPercentage,
+                plannedBlocks,
+                deltaPercentage: plannedPercentage - target.targetPercentage,
+              },
+            ];
+          }),
+        );
+
+        return {
+          teamId: teamSeason.team.id,
+          teamName: teamSeason.team.name,
+          totalTrainingBlocks,
+          targets,
+        };
+      })
+      .filter(
+        (team) => team.totalTrainingBlocks > 0 || team.targets.length > 0,
+      ),
+  };
 }
 
 export async function getPlannerCreateFormData(args?: {
@@ -276,6 +464,10 @@ export async function getSeasonPlannerData(selectedSeasonKey?: string | null) {
   const entries = await getPlannerEntries({
     seasonKey: selectedSeason?.key,
   });
+  const trainingSessionBlocks = await getTrainingSessionBlocksPanelData({
+    seasonId: selectedSeason?.id,
+    seasonName: selectedSeason?.name,
+  });
 
   const counts = {
     trainings: entries.filter((entry) => entry.type === "TRAINING").length,
@@ -292,6 +484,7 @@ export async function getSeasonPlannerData(selectedSeasonKey?: string | null) {
     selectedSeason,
     entries,
     counts,
+    trainingSessionBlocks,
     latestEntries: [...entries]
       .sort((a, b) => b.startAt.getTime() - a.startAt.getTime())
       .slice(0, 8),

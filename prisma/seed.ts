@@ -5,6 +5,7 @@ import {
   EventSource,
   EventStatus,
   EventType,
+  ImprovementArea,
   PermissionModule,
   PrismaClient,
   TeamCategory,
@@ -421,6 +422,7 @@ async function main() {
         startAt: new Date("2026-04-21T15:30:00.000Z"),
         endAt: new Date("2026-04-21T17:00:00.000Z"),
         meetingTime: new Date("2026-04-21T15:15:00.000Z"),
+        improvementArea: ImprovementArea.TECHNIK,
         websiteVisible: true,
         infoboardVisible: true,
         homepageVisible: false,
@@ -428,6 +430,53 @@ async function main() {
         trainingsplanVisible: true,
         teamPageVisible: true,
         sortOrder: 30,
+      },
+    });
+  }
+
+  if (createdTeams["e4"]) {
+    const existingPlan = await prisma.strategyPlan.findFirst({
+      where: {
+        seasonId: activeSeason.id,
+        teamId: createdTeams["e4"].id,
+        title: "E4 Saisonstrategie 2025/2026",
+      },
+    });
+    const strategyPlan = existingPlan
+      ? await prisma.strategyPlan.update({
+          where: { id: existingPlan.id },
+          data: {
+            isActive: true,
+            description: "Demo-Ziele für den Training Planner KPI.",
+          },
+        })
+      : await prisma.strategyPlan.create({
+          data: {
+            seasonId: activeSeason.id,
+            teamId: createdTeams["e4"].id,
+            title: "E4 Saisonstrategie 2025/2026",
+            description: "Demo-Ziele für den Training Planner KPI.",
+          },
+        });
+
+    await prisma.strategyTarget.upsert({
+      where: {
+        strategyPlanId_title: {
+          strategyPlanId: strategyPlan.id,
+          title: "Technik-Anteil Trainingsblöcke",
+        },
+      },
+      update: {
+        improvementArea: ImprovementArea.TECHNIK,
+        targetPercentage: 50,
+        notes: "Soll-Anteil technikorientierter Trainingsblöcke.",
+      },
+      create: {
+        strategyPlanId: strategyPlan.id,
+        title: "Technik-Anteil Trainingsblöcke",
+        improvementArea: ImprovementArea.TECHNIK,
+        targetPercentage: 50,
+        notes: "Soll-Anteil technikorientierter Trainingsblöcke.",
       },
     });
   }
