@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import ClubGoalsPanel from "@/components/admin/strategy/ClubGoalsPanel";
+import TrendCardsPanel from "@/components/admin/strategy/TrendCardsPanel";
 import TrainingSessionBlocksPanel from "@/components/admin/training/TrainingSessionBlocksPanel";
 
 async function getActiveSeason() {
@@ -51,18 +52,22 @@ export default async function StrategyPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-7 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
-          <div className="space-y-7">
-            <ClubGoalsPanel
-              seasonId={activeSeason.id}
-              seasonName={activeSeason.name}
-            />
-          </div>
+        <>
+          <TrendCardsPanel seasonId={activeSeason.id} />
 
-          <div className="space-y-5">
-            <TrainingSessionBlocksPanel seasonId={activeSeason.id} />
+          <div className="grid gap-7 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
+            <div className="space-y-7">
+              <ClubGoalsPanel
+                seasonId={activeSeason.id}
+                seasonName={activeSeason.name}
+              />
+            </div>
+
+            <div className="space-y-5">
+              <TrainingSessionBlocksPanel seasonId={activeSeason.id} />
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
