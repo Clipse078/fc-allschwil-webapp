@@ -216,9 +216,16 @@ export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
                   )}
                   <p className="text-[12px] font-semibold text-slate-900">{p.name}</p>
                 </div>
-                <p className="mt-0.5 text-[10px] text-slate-500">{p.visualTone}</p>
-                <p className="mt-1 text-[10px] italic text-slate-400">{p.setupTip}</p>
-              </div>
+                  <p className="mt-0.5 text-[10px] text-slate-500">{p.visualTone}</p>
+                  <p className="mt-0.5 text-[10px] text-rose-500">✕ {p.notIdealWhen}</p>
+                  <a
+                    href={`/dashboard/website/preset-preview/${p.key}`}
+                    className="mt-1 inline-block text-[10px] font-semibold text-[#0b4aa2] hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Details →
+                  </a>
+                </div>
             </label>
           ))}
         </div>

@@ -177,6 +177,12 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
                     <p className="mt-1 text-[11px] text-slate-400">
                       {activeWebsitePreset.audienceClubType}
                     </p>
+                    <Link
+                      href={`/dashboard/website/preset-preview/${activeWebsitePreset.key}`}
+                      className="mt-1.5 inline-block text-[11px] font-semibold text-[#0b4aa2] hover:underline"
+                    >
+                      Details ansehen →
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -257,9 +263,13 @@ export default async function WebsiteDashboardPage({ searchParams }: PageProps) 
                         </span>
                       ))}
                     </div>
-                    <p className="text-[11px] text-slate-400">
-                      Erstelle diese Seiten zuerst um das Preset vollständig zu nutzen.
-                    </p>
+                    <div className="mt-2 flex items-start gap-2 rounded-[12px] border border-amber-100 bg-amber-50/70 px-3 py-2">
+                      <Lightbulb className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+                      <p className="text-[11px] text-amber-800">
+                        <span className="font-semibold">Erste Aktion:</span>{" "}
+                        {activeWebsitePreset.firstRecommendedAction}
+                      </p>
+                    </div>
                   </div>
                 )}
               </>
