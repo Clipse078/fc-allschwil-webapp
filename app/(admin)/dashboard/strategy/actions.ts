@@ -1,12 +1,20 @@
 "use server";
 
-import { GoalModule } from "@prisma/client";
+import { GoalModule, TrainingFocus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTemplateById } from "@/lib/strategy/goal-templates";
+
+// Maps TRAINING_PLANNER template IDs → TrainingFocus for auto-creating StrategyTarget rows.
+// Only templates whose metric is a percentage (metricLabel contains "%") are eligible.
+const TRAINING_PLANNER_FOCUS_MAP: Record<string, TrainingFocus> = {
+  "tp-technique-30": "TECHNICAL",
+  "tp-conditioning-20": "PHYSICAL",
+  "tp-tactical-25": "TACTICAL",
+};
 
 async function requireStrategyAccess() {
   const session = await auth();
@@ -55,7 +63,27 @@ export async function importGoalTemplate(formData: FormData) {
     },
   });
 
+  // Auto-create a linked StrategyTarget when importing a TRAINING_PLANNER % goal.
+  if (tpl.module === "TRAINING_PLANNER" && tpl.metricValue && tpl.metricLabel?.includes("%")) {
+    const focus = TRAINING_PLANNER_FOCUS_MAP[tpl.id];
+    const targetPct = parseInt(tpl.metricValue, 10);
+
+    if (focus && !isNaN(targetPct)) {
+      const existing = await prisma.strategyTarget.findFirst({
+        where: { seasonId, teamId: teamId ?? null, focus },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        await prisma.strategyTarget.create({
+          data: { seasonId, teamId, focus, targetPct },
+        });
+      }
+    }
+  }
+
   revalidatePath("/dashboard/strategy");
+  revalidatePath("/vereinsleitung/kpis");
 }
 
 export async function deleteClubGoal(formData: FormData) {

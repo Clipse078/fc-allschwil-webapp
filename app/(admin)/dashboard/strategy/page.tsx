@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, Target } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -21,6 +21,10 @@ async function getUntaggedTrainingCount(seasonId: string) {
   });
 }
 
+async function getStrategyTargetCount(seasonId: string) {
+  return prisma.strategyTarget.count({ where: { seasonId } });
+}
+
 export default async function StrategyPage() {
   await requireAnyPermission([
     PERMISSIONS.SEASONS_VIEW,
@@ -30,9 +34,12 @@ export default async function StrategyPage() {
   ]);
 
   const activeSeason = await getActiveSeason();
-  const untaggedCount = activeSeason
-    ? await getUntaggedTrainingCount(activeSeason.id)
-    : 0;
+  const [untaggedCount, targetCount] = activeSeason
+    ? await Promise.all([
+        getUntaggedTrainingCount(activeSeason.id),
+        getStrategyTargetCount(activeSeason.id),
+      ])
+    : [0, 0];
 
   return (
     <div className="space-y-7">
@@ -63,6 +70,26 @@ export default async function StrategyPage() {
         </div>
       ) : (
         <>
+          {targetCount === 0 && (
+            <div className="flex items-start gap-3 rounded-[20px] border border-[#0b4aa2]/20 bg-[#0b4aa2]/5 px-5 py-4">
+              <Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0b4aa2]" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#0b4aa2]">
+                  Strategie-Ziele aktivieren
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Noch keine Ziel-Prozentwerte für diese Saison hinterlegt. Importiere empfohlene Trainingsplanungsziele um das KPI-Tracking zu starten.
+                </p>
+                <a
+                  href="#katalog"
+                  className="mt-2 inline-block text-[12px] font-semibold text-[#0b4aa2] underline hover:text-[#08357a]"
+                >
+                  Empfohlene Ziele ansehen ↓
+                </a>
+              </div>
+            </div>
+          )}
+
           {untaggedCount > 0 && (
             <div className="flex items-start gap-3 rounded-[20px] border border-amber-200 bg-amber-50/80 px-5 py-4">
               <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />

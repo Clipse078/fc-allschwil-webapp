@@ -5,7 +5,9 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardList,
+  Lightbulb,
   Shield,
+  Tag,
   Target,
   UserCircle2,
   UserRound,
@@ -14,6 +16,7 @@ import {
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
+import { prisma } from "@/lib/db/prisma";
 
 const DASHBOARD_MODULES = [
   {
@@ -116,6 +119,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const selectedSeasonKey = selectedSeason?.key ?? "";
 
+  const untaggedTrainingCount = selectedSeason
+    ? await prisma.event.count({
+        where: { seasonId: selectedSeason.id, type: "TRAINING", trainingFocus: null },
+      })
+    : 0;
+
   return (
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
@@ -136,6 +145,27 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         selectedSeasonKey={selectedSeasonKey}
         basePath="/dashboard"
       />
+
+      {untaggedTrainingCount > 0 && (
+        <div className="flex items-start justify-between gap-4 rounded-[24px] border border-amber-200 bg-amber-50/80 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <p className="text-sm text-amber-900">
+              <span className="font-semibold">
+                {untaggedTrainingCount} Training{untaggedTrainingCount !== 1 ? "s" : ""} ohne Schwerpunkt
+              </span>{" "}
+              in dieser Saison – KPI-Tracking lückenhaft.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/training/bulk-tag"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-[12px] font-semibold text-amber-800 transition hover:bg-amber-50"
+          >
+            <Tag className="h-3 w-3" />
+            Jetzt taggen
+          </Link>
+        </div>
+      )}
 
       <AdminSurfaceCard className="p-6">
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
