@@ -10,6 +10,8 @@ import BlockEditor from "@/components/admin/website/BlockEditor";
 import PublishButton from "@/components/admin/website/PublishButton";
 import RestoreSnapshotButton from "@/components/admin/website/RestoreSnapshotButton";
 import ArchivePageButton from "@/components/admin/website/ArchivePageButton";
+import UnarchiveButton from "@/components/admin/website/UnarchiveButton";
+import LocaleSwitcherPanel from "@/components/admin/website/LocaleSwitcherPanel";
 import {
   ReviewApprovalPanel,
   SubmitForReviewButton,
@@ -80,7 +82,7 @@ export default async function PageEditRoute({ params }: Props) {
       isVisible: true,
       templateKey: true,
       publishedAt: true,
-      site: { select: { name: true, tenantKey: true } },
+      site: { select: { id: true, name: true, tenantKey: true } },
     },
   });
 
@@ -163,11 +165,13 @@ export default async function PageEditRoute({ params }: Props) {
             {page.locale.toUpperCase()} · Version {version}
           </p>
         </div>
-        {page.status !== "ARCHIVED" && (
+        {page.status !== "ARCHIVED" ? (
           <ArchivePageButton
             pageId={page.id}
             isPublished={page.status === "PUBLISHED"}
           />
+        ) : (
+          <UnarchiveButton pageId={page.id} />
         )}
       </div>
 
@@ -180,6 +184,14 @@ export default async function PageEditRoute({ params }: Props) {
           separat und schreibt den öffentlichen Snapshot.
         </p>
       </div>
+
+      {/* Locale switcher */}
+      <LocaleSwitcherPanel
+        pageId={page.id}
+        siteId={page.site.id}
+        slug={page.slug}
+        currentLocale={page.locale}
+      />
 
       {/* Newer draft warning */}
       {hasNewerDraft && (

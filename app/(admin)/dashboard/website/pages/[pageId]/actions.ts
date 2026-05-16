@@ -414,6 +414,104 @@ export async function rejectReview(formData: FormData): Promise<ReviewResult> {
   return { ok: true };
 }
 
+// ── Unarchive page ────────────────────────────────────────────────────────────
+
+export async function unarchivePage(formData: FormData): Promise<ReviewResult> {
+  await requireAccess();
+
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  if (!pageId) return { ok: false, error: "Keine Seiten-ID." };
+
+  const page = await prisma.websitePage.findFirst({
+    where: { id: pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: { id: true, status: true },
+  });
+
+  if (!page) return { ok: false, error: "Seite nicht gefunden." };
+  if (page.status !== "ARCHIVED") return { ok: true };
+
+  await prisma.websitePage.update({
+    where: { id: page.id },
+    data: { status: "DRAFT" },
+  });
+
+  revalidatePath(`/dashboard/website/pages/${pageId}`);
+  revalidatePath("/dashboard/website");
+  return { ok: true };
+}
+
+// ── Create locale variant ────────────────────────────────────────────────────
+
+export async function createLocaleVariant(formData: FormData): Promise<void> {
+  const session = await requireAccess();
+  const actorUserId = session.user.effectiveUserId ?? session.user.id ?? null;
+
+  const sourcePageId = String(formData.get("sourcePageId") ?? "").trim();
+  const targetLocale = String(formData.get("targetLocale") ?? "").trim();
+
+  if (!sourcePageId || !targetLocale) return;
+
+  const sourcePage = await prisma.websitePage.findFirst({
+    where: { id: sourcePageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: {
+      id: true, siteId: true, slug: true, title: true, locale: true,
+      pageType: true, templateKey: true, sortOrder: true,
+    },
+  });
+
+  if (!sourcePage) return;
+
+  // Duplicate guard
+  const existing = await prisma.websitePage.findUnique({
+    where: { siteId_slug_locale: { siteId: sourcePage.siteId, slug: sourcePage.slug, locale: targetLocale } },
+    select: { id: true },
+  });
+
+  if (existing) {
+    redirect(`/dashboard/website/pages/${existing.id}`);
+  }
+
+  const latestVersion = await prisma.websitePageVersion.findFirst({
+    where: { pageId: sourcePageId },
+    orderBy: { version: "desc" },
+    select: { blocksJson: true },
+  });
+
+  const newPage = await prisma.$transaction(async (tx) => {
+    const page = await tx.websitePage.create({
+      data: {
+        siteId: sourcePage.siteId,
+        slug: sourcePage.slug,
+        title: sourcePage.title,
+        pageType: sourcePage.pageType,
+        templateKey: sourcePage.templateKey,
+        locale: targetLocale,
+        status: "DRAFT",
+        sortOrder: sourcePage.sortOrder,
+        createdByUserId: actorUserId,
+      },
+      select: { id: true },
+    });
+
+    if (latestVersion) {
+      await tx.websitePageVersion.create({
+        data: {
+          pageId: page.id,
+          version: 1,
+          blocksJson: latestVersion.blocksJson as Prisma.InputJsonValue,
+          changeNote: `Sprachversion aus «${sourcePage.locale ?? ""}» kopiert`,
+          createdByUserId: actorUserId,
+        },
+      });
+    }
+
+    return page;
+  });
+
+  revalidatePath("/dashboard/website");
+  redirect(`/dashboard/website/pages/${newPage.id}`);
+}
+
 // ── Archive page ─────────────────────────────────────────────────────────────
 
 export async function archivePage(formData: FormData): Promise<ReviewResult> {
