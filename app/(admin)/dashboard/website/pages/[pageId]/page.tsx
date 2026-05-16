@@ -12,6 +12,7 @@ import RestoreSnapshotButton from "@/components/admin/website/RestoreSnapshotBut
 import ArchivePageButton from "@/components/admin/website/ArchivePageButton";
 import UnarchiveButton from "@/components/admin/website/UnarchiveButton";
 import LocaleSwitcherPanel from "@/components/admin/website/LocaleSwitcherPanel";
+import PageMetadataForm from "@/components/admin/website/PageMetadataForm";
 import {
   ReviewApprovalPanel,
   SubmitForReviewButton,
@@ -267,6 +268,20 @@ export default async function PageEditRoute({ params }: Props) {
           Diese Seite ist archiviert und kann nicht bearbeitet werden.
         </div>
       )}
+
+      {/* Page metadata */}
+      <div className="rounded-[22px] border border-slate-200/80 bg-white p-5 shadow-[0_4px_12px_rgba(15,23,42,0.03)]">
+        <h2 className="mb-3 text-[1rem] font-semibold text-slate-900">
+          Seiten-Metadaten
+        </h2>
+        <PageMetadataForm
+          pageId={page.id}
+          initialTitle={page.title}
+          initialSlug={page.slug}
+          initialPageType={page.pageType}
+          hasLiveSnapshot={page.publishedAt !== null}
+        />
+      </div>
 
       {/* Block editor */}
       {page.status !== "ARCHIVED" && (

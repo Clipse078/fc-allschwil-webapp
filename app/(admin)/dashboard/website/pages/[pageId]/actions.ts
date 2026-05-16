@@ -414,6 +414,59 @@ export async function rejectReview(formData: FormData): Promise<ReviewResult> {
   return { ok: true };
 }
 
+// ── Update page metadata ─────────────────────────────────────────────────────
+
+export type MetadataResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function updatePageMetadata(formData: FormData): Promise<MetadataResult> {
+  await requireAccess();
+
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const pageTypeRaw = String(formData.get("pageType") ?? "").trim();
+
+  if (!pageId || !title || !slug) return { ok: false, error: "Pflichtfelder fehlen." };
+
+  const page = await prisma.websitePage.findFirst({
+    where: { id: pageId, site: { tenantKey: SITE_TENANT_KEY } },
+    select: { id: true, siteId: true, slug: true, locale: true },
+  });
+
+  if (!page) return { ok: false, error: "Seite nicht gefunden." };
+
+  // Duplicate slug+locale check (only if slug changed)
+  if (slug !== page.slug) {
+    const existing = await prisma.websitePage.findUnique({
+      where: { siteId_slug_locale: { siteId: page.siteId, slug, locale: page.locale } },
+      select: { id: true },
+    });
+    if (existing && existing.id !== page.id) {
+      return { ok: false, error: `Slug «${slug}» existiert bereits für diese Sprache.` };
+    }
+  }
+
+  const validPageTypes = ["HOMEPAGE","TEAMS_OVERVIEW","TEAM_DETAIL","CLUB_ABOUT","CONTACT",
+    "REGISTRATION","NEWS_OVERVIEW","NEWS_DETAIL","EVENTS_OVERVIEW","SPONSORS_PARTNERS","LEGAL","CUSTOM"];
+
+  await prisma.websitePage.update({
+    where: { id: page.id },
+    data: {
+      title,
+      slug,
+      ...(pageTypeRaw && validPageTypes.includes(pageTypeRaw)
+        ? { pageType: pageTypeRaw as "HOMEPAGE" }
+        : {}),
+    },
+  });
+
+  revalidatePath(`/dashboard/website/pages/${pageId}`);
+  revalidatePath("/dashboard/website");
+  return { ok: true };
+}
+
 // ── Unarchive page ────────────────────────────────────────────────────────────
 
 export async function unarchivePage(formData: FormData): Promise<ReviewResult> {

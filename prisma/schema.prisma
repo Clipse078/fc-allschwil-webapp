@@ -642,6 +642,7 @@ model WebsiteSite {
   name         String
   locale       String   @default("de")
   sport        String   @default("football")
+  domain       String?
   isActive     Boolean  @default(true)
   settingsJson Json?
   createdAt    DateTime @default(now())
