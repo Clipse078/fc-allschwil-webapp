@@ -24,6 +24,20 @@ const NUDGES = [
   },
   {
     icon: Zap,
+    title: "Clubs with clear CTAs generally increase engagement.",
+    body: "Probetraining, Kontakt und Mitglied werden sind auf der Homepage und der Anmeldungsseite bereits integriert.",
+    href: null,
+    cta: null,
+  },
+  {
+    icon: Globe,
+    title: "Visible next actions help visitors navigate faster.",
+    body: "Die öffentliche Navigation enthält bereits Kontakt, Events, Teams, Sponsoren und einen Mitmachen-Button.",
+    href: null,
+    cta: null,
+  },
+  {
+    icon: Zap,
     title: "Consistent branding improves club recognition.",
     body: "Logo, Farbe und Tagline können pro Website-Eintrag (WebsiteSite) hinterlegt werden.",
     href: null,

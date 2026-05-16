@@ -9,6 +9,7 @@ export type PublicSiteData = {
   logoUrl: string | null;
   footerText: string | null;
   tagline: string | null;
+  navConfigJson: unknown;
 };
 
 export type PublicSponsor = {
@@ -34,6 +35,7 @@ export async function getPublicSiteData(
       logoUrl: true,
       footerText: true,
       tagline: true,
+      navConfigJson: true,
     },
   });
 }

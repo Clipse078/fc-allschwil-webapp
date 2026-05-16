@@ -5,10 +5,13 @@ export type NavItemConfig = {
   visible: boolean;
   sortOrder: number;
   isCta?: boolean;
+  openInNewTab?: boolean;
+  audienceKey?: string;
 };
 
 export type WebsiteNavConfig = {
   items: NavItemConfig[];
+  megaMenuEnabled?: boolean;
 };
 
 export const DEFAULT_NAV_CONFIG: WebsiteNavConfig = {
@@ -19,12 +22,19 @@ export const DEFAULT_NAV_CONFIG: WebsiteNavConfig = {
     { key: "teams", label: "Teams", slug: "teams", visible: true, sortOrder: 3 },
     { key: "sponsoren", label: "Sponsoren", slug: "sponsoren", visible: true, sortOrder: 4 },
     { key: "kontakt", label: "Kontakt", slug: "kontakt", visible: true, sortOrder: 5 },
+    {
+      key: "anmeldung",
+      label: "Mitmachen",
+      slug: "anmeldung",
+      visible: true,
+      sortOrder: 6,
+      isCta: true,
+    },
   ],
+  megaMenuEnabled: false,
 };
 
-export function resolveNavConfig(
-  navConfigJson: unknown
-): WebsiteNavConfig {
+export function resolveNavConfig(navConfigJson: unknown): WebsiteNavConfig {
   if (
     navConfigJson &&
     typeof navConfigJson === "object" &&
@@ -41,4 +51,12 @@ export function getVisibleNavItems(config: WebsiteNavConfig): NavItemConfig[] {
   return config.items
     .filter((item) => item.visible)
     .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export function getRegularNavItems(config: WebsiteNavConfig): NavItemConfig[] {
+  return getVisibleNavItems(config).filter((item) => !item.isCta);
+}
+
+export function getCtaNavItems(config: WebsiteNavConfig): NavItemConfig[] {
+  return getVisibleNavItems(config).filter((item) => item.isCta === true);
 }

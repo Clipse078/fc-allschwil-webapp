@@ -2,18 +2,21 @@ import Image from "next/image";
 import Link from "next/link";
 import PublicWebsiteNavigation from "./PublicWebsiteNavigation";
 import type { SiteTheme } from "@/lib/website/theme-engine";
+import type { WebsiteNavConfig } from "@/lib/website/navigation-config";
 
 type PublicWebsiteHeaderProps = {
   theme: SiteTheme;
   tenantKey: string;
+  navConfig: WebsiteNavConfig;
 };
 
 export default function PublicWebsiteHeader({
   theme,
   tenantKey,
+  navConfig,
 }: PublicWebsiteHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/95 backdrop-blur-xl shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/95 shadow-sm backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
         <Link
           href={`/${tenantKey}`}
@@ -39,7 +42,11 @@ export default function PublicWebsiteHeader({
           </span>
         </Link>
 
-        <PublicWebsiteNavigation theme={theme} tenantKey={tenantKey} />
+        <PublicWebsiteNavigation
+          theme={theme}
+          tenantKey={tenantKey}
+          navConfig={navConfig}
+        />
       </div>
     </header>
   );

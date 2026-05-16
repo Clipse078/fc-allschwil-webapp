@@ -2,7 +2,9 @@ import { getPublicSiteData, getPublicSponsors } from "@/lib/website/public-queri
 import { getPublicNewsList } from "@/lib/news/public-news-feed";
 import { getPublicEvents } from "@/lib/events/public-event-feed";
 import { getPublicTeamList } from "@/lib/website/team-queries";
+import { resolveHomepageCTAs } from "@/lib/website/cta-system";
 import type { PublicSiteData } from "@/lib/website/public-queries";
+import type { ResolvedCTA } from "@/lib/website/cta-system";
 
 export type HeroBlock = {
   type: "hero";
@@ -63,12 +65,18 @@ export type SponsorsBlock = {
   }>;
 };
 
+export type CTAStripBlock = {
+  type: "cta_strip";
+  ctas: ResolvedCTA[];
+};
+
 export type HomepageBlock =
   | HeroBlock
   | NewsBlock
   | EventsBlock
   | TeamsBlock
-  | SponsorsBlock;
+  | SponsorsBlock
+  | CTAStripBlock;
 
 export type HomepageData = {
   tenantKey: string;
@@ -100,6 +108,11 @@ export async function buildHomepageData(
     primaryColor: site?.primaryColor ?? "#0b4aa2",
     logoUrl: site?.logoUrl ?? null,
   });
+
+  const homepageCTAs = resolveHomepageCTAs(tenantKey);
+  if (homepageCTAs.length > 0) {
+    blocks.push({ type: "cta_strip", ctas: homepageCTAs });
+  }
 
   if (newsArticles.length > 0) {
     blocks.push({ type: "news", articles: newsArticles });

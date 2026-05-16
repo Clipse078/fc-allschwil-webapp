@@ -9,7 +9,9 @@ import type {
   EventsBlock,
   TeamsBlock,
   SponsorsBlock,
+  CTAStripBlock,
 } from "@/lib/website/homepage-builder";
+
 
 type HomePageProps = {
   params: Promise<{ tenantKey: string }>;
@@ -318,6 +320,44 @@ function TeamsSection({
   );
 }
 
+function CTAStripSection({
+  block,
+  tenantKey,
+}: {
+  block: CTAStripBlock;
+  tenantKey: string;
+}) {
+  return (
+    <section className="bg-neutral-50 py-10 sm:py-12">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {block.ctas.map((cta) => (
+            <Link
+              key={cta.key}
+              href={cta.href}
+              data-cta={cta.analyticsEvent}
+              className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+            >
+              <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-neutral-900">
+                  {cta.label}
+                </p>
+                <p className="truncate text-xs text-neutral-500">
+                  {cta.description}
+                </p>
+              </div>
+              <span className="ml-auto shrink-0 text-xs font-medium text-blue-600">
+                →
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SponsorsSection({ block }: { block: SponsorsBlock }) {
   return (
     <section className="border-t border-neutral-200 bg-white py-12">
@@ -371,6 +411,8 @@ export default async function HomePage({ params }: HomePageProps) {
         switch (block.type) {
           case "hero":
             return <HeroSection key={i} block={block} tenantKey={tenantKey} />;
+          case "cta_strip":
+            return <CTAStripSection key={i} block={block} tenantKey={tenantKey} />;
           case "news":
             return <NewsSection key={i} block={block} tenantKey={tenantKey} />;
           case "events":
