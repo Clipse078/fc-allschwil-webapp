@@ -272,9 +272,17 @@ export default function SiteSettingsForm({ tenantKey, initialValues }: Props) {
                     {INFOBOARD_MODE_LABELS[p.mode]}
                   </span>
                 </div>
-                <p className="mt-0.5 text-[10px] text-slate-500">{p.bestUseCase}</p>
-                <p className="mt-1 text-[10px] italic text-slate-400">{p.setupTip}</p>
-              </div>
+                  <p className="mt-0.5 text-[10px] text-slate-500">{p.bestUseCase}</p>
+                  <p className="mt-0.5 text-[10px] text-rose-500">✕ {p.notIdealWhen}</p>
+                  <p className="mt-1 text-[10px] italic text-slate-400">{p.setupTip}</p>
+                  <a
+                    href={`/dashboard/website/infoboard-preset-preview/${p.key}`}
+                    className="mt-1 inline-block text-[10px] font-semibold text-[#0b4aa2] hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Details →
+                  </a>
+                </div>
             </label>
           ))}
         </div>
