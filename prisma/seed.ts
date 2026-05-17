@@ -86,6 +86,7 @@ async function syncTenant(slug: string, defaults: TenantDefaults) {
 }
 
 async function syncSeason(tenantId: string, data: SeasonDefinition) {
+  const now = new Date();
   const existing = await prisma.season.findUnique({ where: { key: data.key } });
 
   if (existing) {
@@ -96,6 +97,7 @@ async function syncSeason(tenantId: string, data: SeasonDefinition) {
         startDate: data.startDate,
         endDate: data.endDate,
         isActive: data.isActive,
+        updatedAt: now,
         tenantId,
       },
     });
@@ -108,12 +110,44 @@ async function syncSeason(tenantId: string, data: SeasonDefinition) {
       startDate: data.startDate,
       endDate: data.endDate,
       isActive: data.isActive,
+      updatedAt: now,
       tenantId,
     },
   });
 }
 
+async function inspectTeamSchema() {
+  const rows = await prisma.$queryRaw<
+    Array<{ column_name: string; is_nullable: string; column_default: string | null }>
+  >`
+    SELECT column_name, is_nullable, column_default
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'Team'
+    ORDER BY ordinal_position
+  `;
+
+  console.log("\n[seed] DB Team schema (information_schema):");
+  for (const row of rows) {
+    const nullable = row.is_nullable === "YES" ? "NULL" : "NOT NULL";
+    const def = row.column_default ? ` DEFAULT ${row.column_default}` : "";
+    console.log(`  ${row.column_name.padEnd(20)} ${nullable}${def}`);
+  }
+
+  const notNullNoDefault = rows.filter(
+    (r) => r.is_nullable === "NO" && r.column_default === null,
+  );
+  if (notNullNoDefault.length) {
+    console.log("\n[seed] NOT NULL columns with NO default (must be supplied in create):");
+    for (const r of notNullNoDefault) {
+      console.log(`  → ${r.column_name}`);
+    }
+  }
+  console.log("");
+}
+
 async function syncTeam(tenantId: string, data: TeamDefinition) {
+  const now = new Date();
   const existing = await prisma.team.findUnique({ where: { slug: data.slug } });
 
   if (existing) {
@@ -128,6 +162,7 @@ async function syncTeam(tenantId: string, data: TeamDefinition) {
         isActive: true,
         websiteVisible: true,
         infoboardVisible: true,
+        updatedAt: now,
         tenantId,
       },
     });
@@ -143,12 +178,27 @@ async function syncTeam(tenantId: string, data: TeamDefinition) {
     isActive: true,
     websiteVisible: true,
     infoboardVisible: true,
+    updatedAt: now,
     tenantId,
   };
 
   console.log("[seed] Creating team payload:", JSON.stringify(createPayload, null, 2));
 
-  return prisma.team.create({ data: createPayload });
+  try {
+    return await prisma.team.create({ data: createPayload });
+  } catch (error) {
+    console.error("\n[seed] ✗ prisma.team.create() FAILED");
+    console.error("[seed] Payload that caused the error:");
+    console.error(JSON.stringify(createPayload, null, 2));
+    if (error !== null && typeof error === "object" && "meta" in error) {
+      console.error("[seed] Prisma error meta (exact failing constraint):");
+      console.error(JSON.stringify((error as Record<string, unknown>).meta, null, 2));
+    }
+    if (error instanceof Error) {
+      console.error("[seed] Error message:", error.message);
+    }
+    throw error;
+  }
 }
 
 async function syncTeamSeason(
@@ -420,6 +470,8 @@ async function main() {
   }
 
   // ── 5. Teams + TeamSeasons ─────────────────────────────────────────────────
+  await inspectTeamSchema();
+
   const teamDefinitions: TeamDefinition[] = [
     {
       name: "E4",

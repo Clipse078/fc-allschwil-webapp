@@ -14,6 +14,7 @@
     "db:status": "prisma migrate status",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:debug-team": "tsx scripts/debug-team-schema.ts",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
