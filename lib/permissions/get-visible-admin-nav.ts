@@ -50,10 +50,9 @@ const PLATFORM_ITEMS: AdminNavItem[] = [
   },
   {
     label: "Platform Settings",
-    href: "#",
+    href: "/dashboard/platform/settings",
     roleKeys: ["super_admin"],
     section: "platform",
-    disabled: true,
   },
 ];
 
