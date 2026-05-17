@@ -1,11 +1,15 @@
 /**
  * bootstrap-admin.ts
  *
- * Minimal, safe script to ensure a working Superadmin login exists.
+ * Minimal, safe script to ensure a working Superadmin login and the default
+ * FC Allschwil tenant record both exist.
+ *
  * Creates or updates ONLY:
  *   - super_admin Role
  *   - superadmin@sportclubevo.com User
- *   - UserRole relation linking the two
+ *   - UserRole relation (superadmin ↔ super_admin role)
+ *   - Tenant record for FC Allschwil (slug: fc-allschwil)
+ *   - UserTenant relation (superadmin ↔ fc-allschwil, isDefault: true)
  *
  * No teams, seasons, events or any other data is touched.
  * No prisma.*.upsert() calls — all operations use findFirst + update/create
@@ -35,10 +39,19 @@ const ROLE_KEY       = "super_admin";
 const ROLE_NAME      = "Super Admin";
 const ROLE_DESC      = "Full platform access";
 
+const FCA_TENANT = {
+  slug:           "fc-allschwil",
+  name:           "FC Allschwil",
+  displayName:    "FC Allschwil",
+  countryCode:    "CH",
+  sportType:      "football",
+  logoUrl:        "/images/logos/fc-allschwil.png",
+} as const;
+
 async function bootstrap() {
   console.log("\n── SportClubEvo bootstrap-admin ──────────────────────────");
 
-  // ── 1. Role ──────────────────────────────────────────────────────────────
+  // ── 1. Role ───────────────────────────────────────────────────────────────
   const existingRole = await prisma.role.findFirst({ where: { key: ROLE_KEY } });
 
   let roleId: string;
@@ -58,7 +71,7 @@ async function bootstrap() {
     console.log(`✓  Role created:          ${ROLE_KEY} (id: ${roleId})`);
   }
 
-  // ── 2. User ───────────────────────────────────────────────────────────────
+  // ── 2. Superadmin user ────────────────────────────────────────────────────
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
 
   const existingUser = await prisma.user.findFirst({ where: { email: ADMIN_EMAIL } });
@@ -68,12 +81,7 @@ async function bootstrap() {
   if (existingUser) {
     await prisma.user.update({
       where: { id: existingUser.id },
-      data: {
-        firstName:    "Platform",
-        lastName:     "Admin",
-        passwordHash,
-        isActive:     true,
-      },
+      data: { firstName: "Platform", lastName: "Admin", passwordHash, isActive: true },
     });
     userId = existingUser.id;
     console.log(`✓  User updated:          ${ADMIN_EMAIL} (id: ${userId})`);
@@ -92,17 +100,64 @@ async function bootstrap() {
   }
 
   // ── 3. UserRole relation ──────────────────────────────────────────────────
-  const existingUserRole = await prisma.userRole.findFirst({
-    where: { userId, roleId },
-  });
+  const existingUserRole = await prisma.userRole.findFirst({ where: { userId, roleId } });
 
   if (existingUserRole) {
     console.log(`✓  UserRole relation:     already exists (id: ${existingUserRole.id})`);
   } else {
-    const created = await prisma.userRole.create({
-      data: { userId, roleId },
-    });
+    const created = await prisma.userRole.create({ data: { userId, roleId } });
     console.log(`✓  UserRole relation:     created (id: ${created.id})`);
+  }
+
+  // ── 4. FC Allschwil Tenant ────────────────────────────────────────────────
+  const existingTenant = await prisma.tenant.findFirst({
+    where: { slug: FCA_TENANT.slug },
+  });
+
+  let tenantId: string;
+
+  if (existingTenant) {
+    await prisma.tenant.update({
+      where: { id: existingTenant.id },
+      data: {
+        name:        FCA_TENANT.name,
+        displayName: FCA_TENANT.displayName,
+        countryCode: FCA_TENANT.countryCode,
+        sportType:   FCA_TENANT.sportType,
+        logoUrl:     FCA_TENANT.logoUrl,
+        isActive:    true,
+      },
+    });
+    tenantId = existingTenant.id;
+    console.log(`✓  Tenant updated:        ${FCA_TENANT.slug} (id: ${tenantId})`);
+  } else {
+    const created = await prisma.tenant.create({
+      data: {
+        slug:        FCA_TENANT.slug,
+        name:        FCA_TENANT.name,
+        displayName: FCA_TENANT.displayName,
+        countryCode: FCA_TENANT.countryCode,
+        sportType:   FCA_TENANT.sportType,
+        logoUrl:     FCA_TENANT.logoUrl,
+        isActive:    true,
+      },
+    });
+    tenantId = created.id;
+    console.log(`✓  Tenant created:        ${FCA_TENANT.slug} (id: ${tenantId})`);
+  }
+
+  // ── 5. UserTenant relation ────────────────────────────────────────────────
+  const existingUserTenant = await prisma.userTenant.findFirst({
+    where: { userId, tenantId },
+  });
+
+  if (existingUserTenant) {
+    console.log(`✓  UserTenant relation:   already exists (id: ${existingUserTenant.id})`);
+  } else {
+    const created = await prisma.userTenant.create({
+      data: { userId, tenantId, isDefault: true },
+    });
+    console.log(`✓  UserTenant relation:   created (id: ${created.id})`);
   }
 
   // ── Summary ───────────────────────────────────────────────────────────────
@@ -110,6 +165,9 @@ async function bootstrap() {
   console.log(`   Email:    ${ADMIN_EMAIL}`);
   console.log(`   Password: ${ADMIN_PASSWORD}  ← change after first login`);
   console.log(`   Role:     ${ROLE_KEY}`);
+  console.log("\n── Tenant seeded ─────────────────────────────────────────");
+  console.log(`   Slug:     ${FCA_TENANT.slug}`);
+  console.log(`   Name:     ${FCA_TENANT.name}`);
   console.log("──────────────────────────────────────────────────────────\n");
 }
 
