@@ -7,6 +7,7 @@ import {
   BadgeIcon,
   BarChart3,
   Briefcase,
+  Building2,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
@@ -29,51 +30,22 @@ type AdminSidebarProps = {
   lastName: string;
   email: string;
   permissionKeys: string[];
+  isSuperAdmin?: boolean;
+  activeTenantName?: string;
+  activeTenantSlug?: string;
   collapsed?: boolean;
   onToggle?: () => void;
 };
 
-function getNavIcon(label: string) {
-  switch (label) {
-    case "Dashboard":
-      return LayoutDashboard;
-    case "Vereinsleitung":
-      return Briefcase;
-    case "Meetings":
-      return ScrollText;
-    case "Initiativen":
-      return Flag;
-    case "KPIs":
-      return BarChart3;
-    case "Saisons":
-      return CalendarRange;
-    case "Saisonplanner":
-      return ClipboardList;
-    case "Wochenplanner":
-      return CalendarDays;
-    case "Tagesplanner":
-      return CalendarDays;
-    case "Teams":
-      return Users;
-    case "Events":
-      return CalendarDays;
-    case "Personen":
-      return UserCircle2;
-    case "Spieler":
-      return UserRound;
-    case "Trainer":
-      return BadgeIcon;
-    case "Benutzer":
-      return Shield;
-    default:
-      return LayoutDashboard;
-  }
-}
+// Nav items that belong to the PLATFORM section
+const PLATFORM_NAV_LABELS = new Set(["Dashboard", "Benutzer"]);
 
+// Nav items that are children of Vereinsleitung
 function isVereinsleitungChild(label: string) {
   return label === "Meetings" || label === "Initiativen" || label === "KPIs";
 }
 
+// Nav items that are children of Saisonplanner
 function isPlannerChild(label: string) {
   return label === "Wochenplanner" || label === "Tagesplanner";
 }
@@ -88,11 +60,78 @@ function shouldCarrySeason(href: string) {
   );
 }
 
+function getNavIcon(label: string) {
+  switch (label) {
+    case "Dashboard":        return LayoutDashboard;
+    case "Vereinsleitung":   return Briefcase;
+    case "Meetings":         return ScrollText;
+    case "Initiativen":      return Flag;
+    case "KPIs":             return BarChart3;
+    case "Saisons":          return CalendarRange;
+    case "Saisonplanner":    return ClipboardList;
+    case "Wochenplanner":    return CalendarDays;
+    case "Tagesplanner":     return CalendarDays;
+    case "Teams":            return Users;
+    case "Events":           return CalendarDays;
+    case "Personen":         return UserCircle2;
+    case "Spieler":          return UserRound;
+    case "Trainer":          return BadgeIcon;
+    case "Benutzer":         return Shield;
+    default:                 return LayoutDashboard;
+  }
+}
+
+// Reusable nav link renderer
+function NavLink({
+  href,
+  label,
+  collapsed,
+  active,
+}: {
+  href: string;
+  label: string;
+  collapsed: boolean;
+  active: boolean;
+}) {
+  const Icon = getNavIcon(label);
+  return (
+    <Link
+      href={href}
+      title={collapsed ? label : undefined}
+      className={
+        active
+          ? collapsed
+            ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
+            : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
+          : collapsed
+            ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+            : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+      }
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {!collapsed ? <span>{label}</span> : null}
+    </Link>
+  );
+}
+
+// Section label separator
+function SectionLabel({ label, collapsed }: { label: string; collapsed: boolean }) {
+  if (collapsed) return <div className="mx-auto my-2 h-px w-8 bg-slate-200" />;
+  return (
+    <p className="mb-1 mt-3 px-4 text-[0.6rem] font-bold uppercase tracking-[0.25em] text-slate-400">
+      {label}
+    </p>
+  );
+}
+
 export default function AdminSidebar({
   firstName,
   lastName,
   email,
   permissionKeys,
+  isSuperAdmin = false,
+  activeTenantName = "FC Allschwil",
+  activeTenantSlug = "fc-allschwil",
   collapsed,
   onToggle,
 }: AdminSidebarProps) {
@@ -111,8 +150,18 @@ export default function AdminSidebar({
       ? onToggle
       : () => setInternalCollapsed((current) => !current);
 
-  const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+  // Split nav into platform and club sections
+  const platformItems = navItems.filter(
+    (item) =>
+      PLATFORM_NAV_LABELS.has(item.label) &&
+      !isVereinsleitungChild(item.label) &&
+      !isPlannerChild(item.label),
+  );
+  const clubItems = navItems.filter(
+    (item) =>
+      !PLATFORM_NAV_LABELS.has(item.label) &&
+      !isVereinsleitungChild(item.label) &&
+      !isPlannerChild(item.label),
   );
   const vereinsleitungChildren = navItems.filter((item) =>
     isVereinsleitungChild(item.label),
@@ -120,10 +169,7 @@ export default function AdminSidebar({
   const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
 
   function buildHref(baseHref: string) {
-    if (!selectedSeason || !shouldCarrySeason(baseHref)) {
-      return baseHref;
-    }
-
+    if (!selectedSeason || !shouldCarrySeason(baseHref)) return baseHref;
     return `${baseHref}?season=${encodeURIComponent(selectedSeason)}`;
   }
 
@@ -131,6 +177,7 @@ export default function AdminSidebar({
     <aside
       className={`${resolvedCollapsed ? "w-[96px]" : "w-[310px]"} flex min-h-screen shrink-0 flex-col border-r border-slate-200 bg-white/92 backdrop-blur-xl transition-[width] duration-200`}
     >
+      {/* ── Platform header ───────────────────────────────────────────────── */}
       <div className={resolvedCollapsed ? "px-4 py-5" : "px-5 py-5"}>
         <div className="flex items-start justify-between gap-3">
           <div
@@ -197,92 +244,141 @@ export default function AdminSidebar({
         ) : null}
       </div>
 
-      <nav className={resolvedCollapsed ? "flex-1 px-3 py-3" : "flex-1 px-4 py-3"}>
-        <ul className="space-y-2">
-          {mainItems.map((item) => {
-            const Icon = getNavIcon(item.label);
-            const resolvedHref = buildHref(item.href);
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+      {/* ── Active tenant block ───────────────────────────────────────────── */}
+      {!resolvedCollapsed ? (
+        <div className="mx-5 mb-1">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white px-3.5 py-2.5 shadow-sm">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white">
+              <Building2 className="h-4 w-4 text-slate-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[0.58rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+                Active club
+              </p>
+              <p className="truncate text-xs font-semibold text-slate-700">
+                {activeTenantName || activeTenantSlug}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex justify-center px-4 pb-1">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white"
+            title={activeTenantName || activeTenantSlug}
+          >
+            <Building2 className="h-4 w-4 text-slate-500" />
+          </div>
+        </div>
+      )}
 
-            return (
-              <li key={item.href}>
-                <Link
-                  href={resolvedHref}
-                  title={resolvedCollapsed ? item.label : undefined}
-                  className={
-                    isActive
-                      ? resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
-                        : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
-                      : resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                        : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                  }
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!resolvedCollapsed ? <span>{item.label}</span> : null}
-                </Link>
+      {/* ── Navigation ────────────────────────────────────────────────────── */}
+      <nav className={resolvedCollapsed ? "flex-1 px-3 py-2" : "flex-1 px-4 py-2"}>
 
-                {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
-                    {vereinsleitungChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+        {/* PLATFORM section */}
+        {platformItems.length > 0 ? (
+          <>
+            <SectionLabel label="Platform" collapsed={resolvedCollapsed} />
+            <ul className="space-y-1">
+              {platformItems.map((item) => {
+                const resolvedHref = buildHref(item.href);
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={child.href}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
-                          >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
+                return (
+                  <li key={item.href}>
+                    <NavLink
+                      href={resolvedHref}
+                      label={item.label}
+                      collapsed={resolvedCollapsed}
+                      active={isActive}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : null}
 
-                {!resolvedCollapsed && item.label === "Saisonplanner" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
-                    {plannerChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childHref = buildHref(child.href);
-                      const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+        {/* CLUB section */}
+        {clubItems.length > 0 ? (
+          <>
+            <SectionLabel
+              label={
+                resolvedCollapsed
+                  ? "Club"
+                  : `Club — ${activeTenantName || activeTenantSlug}`
+              }
+              collapsed={resolvedCollapsed}
+            />
+            <ul className="space-y-1">
+              {clubItems.map((item) => {
+                const resolvedHref = buildHref(item.href);
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={childHref}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
-                          >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+                return (
+                  <li key={item.href}>
+                    <NavLink
+                      href={resolvedHref}
+                      label={item.label}
+                      collapsed={resolvedCollapsed}
+                      active={isActive}
+                    />
+
+                    {/* Vereinsleitung children */}
+                    {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
+                      <ul className="mt-1 space-y-1 pl-7">
+                        {vereinsleitungChildren.map((child) => {
+                          const childActive =
+                            pathname === child.href ||
+                            pathname.startsWith(`${child.href}/`);
+                          return (
+                            <li key={child.href}>
+                              <NavLink
+                                href={child.href}
+                                label={child.label}
+                                collapsed={false}
+                                active={childActive}
+                              />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+
+                    {/* Saisonplanner children */}
+                    {!resolvedCollapsed && item.label === "Saisonplanner" ? (
+                      <ul className="mt-1 space-y-1 pl-7">
+                        {plannerChildren.map((child) => {
+                          const childHref = buildHref(child.href);
+                          const childActive =
+                            pathname === child.href ||
+                            pathname.startsWith(`${child.href}/`);
+                          return (
+                            <li key={child.href}>
+                              <NavLink
+                                href={childHref}
+                                label={child.label}
+                                collapsed={false}
+                                active={childActive}
+                              />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : null}
       </nav>
 
+      {/* ── User footer ───────────────────────────────────────────────────── */}
       <div
         className={
           resolvedCollapsed
@@ -296,6 +392,11 @@ export default function AdminSidebar({
               {firstName} {lastName}
             </p>
             <p className="mt-1 truncate text-xs text-slate-500">{email}</p>
+            {isSuperAdmin ? (
+              <span className="mt-2 inline-block rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.15em] text-green-700">
+                Superadmin
+              </span>
+            ) : null}
           </div>
         ) : null}
 

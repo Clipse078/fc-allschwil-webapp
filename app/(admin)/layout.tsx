@@ -37,6 +37,9 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
           lastName={session.user.lastName}
           email={session.user.email}
           permissionKeys={session.user.permissionKeys}
+          isSuperAdmin={session.user.roleKeys?.includes("super_admin") ?? false}
+          activeTenantName={session.user.activeTenantName || "FC Allschwil"}
+          activeTenantSlug={session.user.activeTenantSlug || "fc-allschwil"}
         />
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">

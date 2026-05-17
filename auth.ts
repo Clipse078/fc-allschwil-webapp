@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
+import type { SessionTenant } from "@/types/next-auth";
 
 type SessionUserShape = {
   id: string;
@@ -15,6 +16,10 @@ type SessionUserShape = {
   actorEmail?: string;
   actorName?: string;
   effectiveUserId?: string;
+  activeTenantId: string;
+  activeTenantSlug: string;
+  activeTenantName: string;
+  availableTenants: SessionTenant[];
 };
 
 function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUserShape {
@@ -33,7 +38,85 @@ function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUse
       typeof value.effectiveUserId === "string"
         ? value.effectiveUserId
         : String(value.id ?? ""),
+    activeTenantId: typeof value.activeTenantId === "string" ? value.activeTenantId : "",
+    activeTenantSlug: typeof value.activeTenantSlug === "string" ? value.activeTenantSlug : "",
+    activeTenantName: typeof value.activeTenantName === "string" ? value.activeTenantName : "",
+    availableTenants: Array.isArray(value.availableTenants) ? value.availableTenants : [],
   };
+}
+
+/**
+ * Resolves the active tenant for a user at login time.
+ * Priority: isDefault UserTenant → first UserTenant → fc-allschwil fallback.
+ * Wrapped in try/catch so login works even if migration hasn't been applied yet.
+ */
+async function resolveTenantContext(userId: string): Promise<{
+  activeTenantId: string;
+  activeTenantSlug: string;
+  activeTenantName: string;
+  availableTenants: SessionTenant[];
+}> {
+  const empty = {
+    activeTenantId: "",
+    activeTenantSlug: "",
+    activeTenantName: "",
+    availableTenants: [] as SessionTenant[],
+  };
+
+  try {
+    const userTenants = await prisma.userTenant.findMany({
+      where: { userId },
+      include: {
+        tenant: {
+          select: { id: true, slug: true, name: true, displayName: true },
+        },
+      },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+    });
+
+    if (userTenants.length > 0) {
+      const availableTenants: SessionTenant[] = userTenants.map((ut) => ({
+        id: ut.tenant.id,
+        slug: ut.tenant.slug ?? "",
+        name: ut.tenant.name ?? "",
+        displayName: ut.tenant.displayName ?? null,
+      }));
+
+      const active = userTenants[0].tenant;
+      return {
+        activeTenantId: active.id,
+        activeTenantSlug: active.slug ?? "",
+        activeTenantName: active.displayName ?? active.name ?? "",
+        availableTenants,
+      };
+    }
+
+    // No UserTenant rows — fall back to the default platform tenant
+    const fallback = await prisma.tenant.findFirst({
+      where: { slug: "fc-allschwil", isActive: true },
+      select: { id: true, slug: true, name: true, displayName: true },
+    });
+
+    if (fallback) {
+      const t: SessionTenant = {
+        id: fallback.id,
+        slug: fallback.slug ?? "",
+        name: fallback.name ?? "",
+        displayName: fallback.displayName ?? null,
+      };
+      return {
+        activeTenantId: t.id,
+        activeTenantSlug: t.slug,
+        activeTenantName: t.displayName ?? t.name,
+        availableTenants: [t],
+      };
+    }
+
+    return empty;
+  } catch {
+    // Migration not yet applied — return empty context so login still works
+    return empty;
+  }
 }
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
@@ -85,7 +168,6 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
             hasEmail: Boolean(email),
             hasPassword: Boolean(password),
           });
-
           return null;
         }
 
@@ -97,9 +179,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
                 role: {
                   include: {
                     rolePermissions: {
-                      include: {
-                        permission: true,
-                      },
+                      include: { permission: true },
                     },
                   },
                 },
@@ -125,10 +205,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         }
 
         if (!user.isActive) {
-          console.log("[auth-debug] authorize:user-inactive", {
-            email,
-            userId: user.id,
-          });
+          console.log("[auth-debug] authorize:user-inactive", { email, userId: user.id });
           return null;
         }
 
@@ -149,22 +226,26 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           data: { lastLoginAt: new Date() },
         });
 
-        const roleKeys = Array.from(new Set(user.userRoles.map((userRole) => userRole.role.key)));
+        const roleKeys = Array.from(
+          new Set(user.userRoles.map((ur) => ur.role.key)),
+        );
         const permissionKeys = Array.from(
           new Set(
-            user.userRoles.flatMap((userRole) =>
-              userRole.role.rolePermissions.map(
-                (rolePermission) => rolePermission.permission.key
-              )
-            )
-          )
+            user.userRoles.flatMap((ur) =>
+              ur.role.rolePermissions.map((rp) => rp.permission.key),
+            ),
+          ),
         );
+
+        const tenantCtx = await resolveTenantContext(user.id);
 
         console.log("[auth-debug] authorize:success", {
           email,
           userId: user.id,
           roleKeys,
           permissionKeys,
+          activeTenantSlug: tenantCtx.activeTenantSlug,
+          availableTenantCount: tenantCtx.availableTenants.length,
         });
 
         const authUser: SessionUserShape = {
@@ -176,6 +257,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           permissionKeys,
           isImpersonating: false,
           effectiveUserId: user.id,
+          ...tenantCtx,
         };
 
         return authUser;
@@ -198,11 +280,15 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = authUser.actorEmail;
         token.actorName = authUser.actorName;
         token.effectiveUserId = authUser.effectiveUserId;
+        token.activeTenantId = authUser.activeTenantId;
+        token.activeTenantSlug = authUser.activeTenantSlug;
+        token.activeTenantName = authUser.activeTenantName;
+        token.availableTenants = authUser.availableTenants;
       }
 
       if (trigger === "update" && session?.user) {
         const updatedUser = normalizeSessionUserShape(
-          session.user as Partial<SessionUserShape>
+          session.user as Partial<SessionUserShape>,
         );
 
         token.id = updatedUser.id;
@@ -216,17 +302,24 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = updatedUser.actorEmail;
         token.actorName = updatedUser.actorName;
         token.effectiveUserId = updatedUser.effectiveUserId;
+        token.activeTenantId = updatedUser.activeTenantId;
+        token.activeTenantSlug = updatedUser.activeTenantSlug;
+        token.activeTenantName = updatedUser.activeTenantName;
+        token.availableTenants = updatedUser.availableTenants;
       }
 
       return token;
     },
+
     session: async ({ session, token }) => {
       if (session.user) {
         session.user.id = String(token.id ?? "");
         session.user.email = String(token.email ?? "");
         session.user.firstName = String(token.firstName ?? "");
         session.user.lastName = String(token.lastName ?? "");
-        session.user.roleKeys = Array.isArray(token.roleKeys) ? token.roleKeys.map(String) : [];
+        session.user.roleKeys = Array.isArray(token.roleKeys)
+          ? token.roleKeys.map(String)
+          : [];
         session.user.permissionKeys = Array.isArray(token.permissionKeys)
           ? token.permissionKeys.map(String)
           : [];
@@ -241,6 +334,18 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           typeof token.effectiveUserId === "string"
             ? token.effectiveUserId
             : session.user.id;
+        session.user.activeTenantId = typeof token.activeTenantId === "string"
+          ? token.activeTenantId
+          : "";
+        session.user.activeTenantSlug = typeof token.activeTenantSlug === "string"
+          ? token.activeTenantSlug
+          : "";
+        session.user.activeTenantName = typeof token.activeTenantName === "string"
+          ? token.activeTenantName
+          : "";
+        session.user.availableTenants = Array.isArray(token.availableTenants)
+          ? token.availableTenants
+          : [];
       }
 
       return session;
