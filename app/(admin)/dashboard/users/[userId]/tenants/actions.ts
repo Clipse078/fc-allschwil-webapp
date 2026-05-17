@@ -111,8 +111,7 @@ export async function removeUserFromTenantAction(formData: FormData) {
     select: { slug: true },
   });
 
-  const isSuperAdminEmail = user?.email === "superadmin@sportclubevo.com"
-    || user?.email === "admin@fcallschwil.ch";
+  const isSuperAdminEmail = user?.email === "superadmin@sportclubevo.com";
   const isFcaTenant = tenant?.slug === "fc-allschwil";
 
   if (isSuperAdminEmail && isFcaTenant) {

@@ -165,7 +165,7 @@ function getHeaderContent(pathname: string): HeaderContent {
   }
 
   return {
-    eyebrow: "FC Allschwil WebApp",
+    eyebrow: "SportClubEvo Platform",
     title: "Dashboard",
     description:
       "Saisongeführte Einstiegsseite. Saisons sind führend; Teams, Events und Planner werden dynamisch pro Saison aufgebaut.",
