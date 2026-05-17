@@ -54,10 +54,16 @@ async function syncSeasonActiveFlagsWithLifecycle() {
   ]);
 }
 
-export async function getSeasonOptionsData() {
+export async function getSeasonOptionsData(tenantId?: string | null) {
   await syncSeasonActiveFlagsWithLifecycle();
 
+  const tenantFilter =
+    tenantId
+      ? { OR: [{ tenantId }, { tenantId: null }] }
+      : undefined;
+
   const seasons = await prisma.season.findMany({
+    where: tenantFilter,
     orderBy: [{ startDate: "desc" }],
     select: {
       id: true,

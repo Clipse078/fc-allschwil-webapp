@@ -15,6 +15,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "bootstrap:admin": "tsx prisma/bootstrap-admin.ts",
+    "backfill:tenant:fca": "tsx prisma/backfill-fc-allschwil-tenant.ts",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {

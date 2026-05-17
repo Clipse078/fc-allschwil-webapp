@@ -4,6 +4,7 @@ import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permi
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
+import { tenantWhere } from "@/lib/tenancy/tenant-query";
 import {
   getCurrentSwissFootballSeason,
   getNextSwissFootballSeason,
@@ -19,7 +20,10 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const activeTenantId = access.session?.user?.activeTenantId ?? "";
+
   const seasons = await prisma.season.findMany({
+    where: tenantWhere(activeTenantId),
     orderBy: {
       startDate: "desc",
     },

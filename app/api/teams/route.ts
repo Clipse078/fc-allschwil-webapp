@@ -6,6 +6,7 @@ import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import { logAction } from "@/lib/audit/log-action";
+import { tenantWhere } from "@/lib/tenancy/tenant-query";
 import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 import {
   buildTeamSeasonDisplayName,
@@ -31,6 +32,8 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const activeTenantId = access.session?.user?.activeTenantId ?? "";
+
   const currentSeason = getCurrentSwissFootballSeason();
   const currentSeasonWhere = currentSeason
     ? {
@@ -45,6 +48,7 @@ export async function GET() {
       };
 
   const teams = await prisma.team.findMany({
+    where: tenantWhere(activeTenantId),
     orderBy: [
       { category: "asc" },
       { sortOrder: "asc" },

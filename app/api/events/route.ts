@@ -7,6 +7,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import { logAction } from "@/lib/audit/log-action";
 import { resolveEventReviewDecision } from "@/lib/workflow/event-review-policy";
+import { tenantWhere } from "@/lib/tenancy/tenant-query";
 
 const ALLOWED_TYPES = ["MATCH", "TOURNAMENT", "TRAINING", "OTHER"] as const;
 const ALLOWED_SOURCES = ["CLUBCORNER_FVNWS", "MANUAL", "CSV_EXCEL_IMPORT"] as const;
@@ -63,7 +64,10 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const activeTenantId = access.session?.user?.activeTenantId ?? "";
+
   const events = await prisma.event.findMany({
+    where: tenantWhere(activeTenantId),
     orderBy: [
       { startAt: "asc" },
       { sortOrder: "asc" },

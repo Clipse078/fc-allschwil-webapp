@@ -145,11 +145,13 @@ type DashboardPageProps = {
 };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const [rawParams, session, seasonOptions] = await Promise.all([
+  const [rawParams, session] = await Promise.all([
     searchParams ?? Promise.resolve({}),
     auth(),
-    getSeasonOptionsData(),
   ]);
+
+  const activeTenantId = session?.user?.activeTenantId ?? "";
+  const seasonOptions = await getSeasonOptionsData(activeTenantId || undefined);
 
   const params = rawParams as { season?: string };
 
@@ -182,6 +184,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   You are logged in as Superadmin. Manage tenants, platform settings and
                   system health from this view. FC Allschwil operational modules are
                   available below.
+                </p>
+                <p className="mt-2 max-w-2xl text-xs text-green-700">
+                  Tenant scoping is active. Existing FC Allschwil data has been assigned to
+                  the FC Allschwil tenant. Run{" "}
+                  <code className="rounded bg-green-100 px-1 py-0.5 font-mono">
+                    npm run backfill:tenant:fca
+                  </code>{" "}
+                  once to backfill any legacy rows.
                 </p>
               </div>
 
