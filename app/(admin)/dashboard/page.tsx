@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import {
   Briefcase,
+  Building2,
   CalendarDays,
   CalendarRange,
   ClipboardList,
@@ -9,9 +10,11 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
+import { auth } from "@/auth";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
+import { getTenantsCount } from "@/lib/tenants/queries";
 
 const DASHBOARD_MODULES = [
   {
@@ -87,8 +90,15 @@ type DashboardPageProps = {
 };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const session = await auth();
   const params = (await searchParams) ?? {};
   const seasonOptions = await getSeasonOptionsData();
+
+  const isSuperAdmin = (session?.user?.roleKeys ?? []).includes("super_admin");
+
+  const [tenantsCount] = await Promise.all([
+    isSuperAdmin ? getTenantsCount().catch(() => null) : Promise.resolve(null),
+  ]);
 
   const selectedSeason =
     seasonOptions.find((season) => season.key === params.season) ??
@@ -154,6 +164,42 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           })}
         </div>
       </AdminSurfaceCard>
+
+      {isSuperAdmin ? (
+        <section>
+          <p className="mb-3 px-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            Platform
+          </p>
+          <AdminSurfaceCard className="p-6">
+            <Link
+              href="/dashboard/tenants"
+              className="group block rounded-[28px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm transition hover:-translate-y-[2px] hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+            >
+              <div className="flex items-start justify-between gap-6">
+                <div>
+                  <p className="fca-eyebrow">Platform</p>
+                  <h3 className="mt-2 font-[var(--font-display)] text-[1.7rem] font-bold uppercase tracking-[-0.03em] text-[#0b4aa2]">
+                    Tenants
+                  </h3>
+                  <p className="mt-3 text-sm text-slate-600">
+                    Tenants sind die Grundlage von SportClubEvo. Clubs, Module und Branding
+                    werden pro Tenant konfiguriert.
+                  </p>
+                  {tenantsCount !== null ? (
+                    <p className="mt-3 text-xs font-semibold text-slate-400">
+                      {tenantsCount} {tenantsCount === 1 ? "Tenant" : "Tenants"} registriert
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2] shadow-sm transition group-hover:scale-105">
+                  <Building2 className="h-6 w-6" />
+                </div>
+              </div>
+            </Link>
+          </AdminSurfaceCard>
+        </section>
+      ) : null}
     </div>
   );
 }

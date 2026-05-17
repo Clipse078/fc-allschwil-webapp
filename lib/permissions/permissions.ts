@@ -29,6 +29,8 @@ export const PERMISSIONS = {
   WEBSITE_MANAGE: "website.manage",
   INFOBOARD_MANAGE: "infoboard.manage",
   FUNCTIONS_MANAGE: "functions.manage",
+
+  TENANTS_MANAGE: "tenants.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

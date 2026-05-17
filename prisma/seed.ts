@@ -70,6 +70,8 @@ async function main() {
     { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE },
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
+
+    { key: "tenants.manage", name: "Manage tenants", module: PermissionModule.TENANTS },
   ] as const;
 
   for (const permission of permissions) {

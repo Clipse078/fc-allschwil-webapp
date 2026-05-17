@@ -8,6 +8,7 @@ import {
   BadgeIcon,
   BarChart3,
   Briefcase,
+  Building2,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
@@ -30,6 +31,7 @@ type AdminSidebarProps = {
   lastName: string;
   email: string;
   permissionKeys: string[];
+  roleKeys?: string[];
   collapsed?: boolean;
   onToggle?: () => void;
 };
@@ -66,6 +68,8 @@ function getNavIcon(label: string) {
       return BadgeIcon;
     case "Benutzer":
       return Shield;
+    case "Tenants / Clubs":
+      return Building2;
     default:
       return LayoutDashboard;
   }
@@ -94,13 +98,14 @@ export default function AdminSidebar({
   lastName,
   email,
   permissionKeys,
+  roleKeys = [],
   collapsed,
   onToggle,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedSeason = searchParams.get("season");
-  const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[]);
+  const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[], roleKeys);
 
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
@@ -113,12 +118,16 @@ export default function AdminSidebar({
       : () => setInternalCollapsed((current) => !current);
 
   const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+    (item) =>
+      item.section !== "platform" &&
+      !isVereinsleitungChild(item.label) &&
+      !isPlannerChild(item.label),
   );
   const vereinsleitungChildren = navItems.filter((item) =>
     isVereinsleitungChild(item.label),
   );
   const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
+  const platformItems = navItems.filter((item) => item.section === "platform");
 
   function buildHref(baseHref: string) {
     if (!selectedSeason || !shouldCarrySeason(baseHref)) {
@@ -126,6 +135,88 @@ export default function AdminSidebar({
     }
 
     return `${baseHref}?season=${encodeURIComponent(selectedSeason)}`;
+  }
+
+  function renderNavItem(item: (typeof navItems)[number]) {
+    const Icon = getNavIcon(item.label);
+    const resolvedHref = buildHref(item.href);
+    const isActive =
+      pathname === item.href ||
+      (item.href !== "/dashboard" && pathname.startsWith(item.href));
+
+    return (
+      <li key={item.href}>
+        <Link
+          href={resolvedHref}
+          title={resolvedCollapsed ? item.label : undefined}
+          className={
+            isActive
+              ? resolvedCollapsed
+                ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
+                : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
+              : resolvedCollapsed
+                ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+          }
+        >
+          <Icon className="h-4 w-4 shrink-0" />
+          {!resolvedCollapsed ? <span>{item.label}</span> : null}
+        </Link>
+
+        {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
+          <ul className="mt-2 space-y-2 pl-7">
+            {vereinsleitungChildren.map((child) => {
+              const ChildIcon = getNavIcon(child.label);
+              const childActive =
+                pathname === child.href || pathname.startsWith(`${child.href}/`);
+
+              return (
+                <li key={child.href}>
+                  <Link
+                    href={child.href}
+                    className={
+                      childActive
+                        ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                        : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                    }
+                  >
+                    <ChildIcon className="h-4 w-4 shrink-0" />
+                    <span>{child.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        {!resolvedCollapsed && item.label === "Saisonplanner" ? (
+          <ul className="mt-2 space-y-2 pl-7">
+            {plannerChildren.map((child) => {
+              const ChildIcon = getNavIcon(child.label);
+              const childHref = buildHref(child.href);
+              const childActive =
+                pathname === child.href || pathname.startsWith(`${child.href}/`);
+
+              return (
+                <li key={child.href}>
+                  <Link
+                    href={childHref}
+                    className={
+                      childActive
+                        ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                        : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                    }
+                  >
+                    <ChildIcon className="h-4 w-4 shrink-0" />
+                    <span>{child.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </li>
+    );
   }
 
   return (
@@ -196,88 +287,23 @@ export default function AdminSidebar({
 
       <nav className={resolvedCollapsed ? "flex-1 px-3 py-3" : "flex-1 px-4 py-3"}>
         <ul className="space-y-2">
-          {mainItems.map((item) => {
-            const Icon = getNavIcon(item.label);
-            const resolvedHref = buildHref(item.href);
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-
-            return (
-              <li key={item.href}>
-                <Link
-                  href={resolvedHref}
-                  title={resolvedCollapsed ? item.label : undefined}
-                  className={
-                    isActive
-                      ? resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
-                        : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
-                      : resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                        : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                  }
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!resolvedCollapsed ? <span>{item.label}</span> : null}
-                </Link>
-
-                {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
-                    {vereinsleitungChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
-
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={child.href}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
-                          >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-
-                {!resolvedCollapsed && item.label === "Saisonplanner" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
-                    {plannerChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childHref = buildHref(child.href);
-                      const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
-
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={childHref}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
-                          >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </li>
-            );
-          })}
+          {mainItems.map((item) => renderNavItem(item))}
         </ul>
+
+        {platformItems.length > 0 ? (
+          <div className="mt-6">
+            {!resolvedCollapsed ? (
+              <p className="mb-2 px-4 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                Platform
+              </p>
+            ) : (
+              <div className="mb-2 border-t border-slate-200" />
+            )}
+            <ul className="space-y-2">
+              {platformItems.map((item) => renderNavItem(item))}
+            </ul>
+          </div>
+        ) : null}
       </nav>
 
       <div
