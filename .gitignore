@@ -50,6 +50,8 @@ next-env.d.ts
 
 # local working artifacts
 /baseline-backups
+/tmp-db-cleanup-backups
+*-backups/
 /PROJECT-SCAN-WEBAPP.txt
 /SCAN-01-ADMIN-ROUTES.txt
 /SCAN-02-ADMIN-COMPONENTS.txt
