@@ -26,15 +26,36 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// ─── Sync helpers ──────────────────────────────────────────────────────────
+// ─── Explicit data-shape types ─────────────────────────────────────────────
 
-async function syncTenant(slug: string, defaults: {
+type TenantDefaults = {
   name: string;
-  displayName?: string;
+  displayName: string;
   countryCode: string;
   sportType: string;
-  primaryColor?: string;
-}) {
+  primaryColor: string;
+};
+
+type SeasonDefinition = {
+  key: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  isActive: boolean;
+};
+
+type TeamDefinition = {
+  name: string;
+  slug: string;
+  category: TeamCategory;
+  genderGroup: string;
+  ageGroup: string;
+  sortOrder: number;
+};
+
+// ─── Sync helpers ──────────────────────────────────────────────────────────
+
+async function syncTenant(slug: string, defaults: TenantDefaults) {
   const existing = await prisma.tenant.findUnique({ where: { slug } });
 
   if (existing) {
@@ -42,10 +63,10 @@ async function syncTenant(slug: string, defaults: {
       where: { slug },
       data: {
         name: defaults.name,
-        displayName: defaults.displayName ?? existing.displayName,
+        displayName: defaults.displayName,
         countryCode: defaults.countryCode,
         sportType: defaults.sportType,
-        primaryColor: defaults.primaryColor ?? existing.primaryColor,
+        primaryColor: defaults.primaryColor,
         isActive: true,
       },
     });
@@ -64,16 +85,7 @@ async function syncTenant(slug: string, defaults: {
   });
 }
 
-async function syncSeason(
-  tenantId: string,
-  data: {
-    key: string;
-    name: string;
-    startDate: Date;
-    endDate: Date;
-    isActive: boolean;
-  },
-) {
+async function syncSeason(tenantId: string, data: SeasonDefinition) {
   const existing = await prisma.season.findUnique({ where: { key: data.key } });
 
   if (existing) {
@@ -101,17 +113,7 @@ async function syncSeason(
   });
 }
 
-async function syncTeam(
-  tenantId: string,
-  data: {
-    name: string;
-    slug: string;
-    category: TeamCategory;
-    genderGroup?: string;
-    ageGroup?: string;
-    sortOrder: number;
-  },
-) {
+async function syncTeam(tenantId: string, data: TeamDefinition) {
   const existing = await prisma.team.findUnique({ where: { slug: data.slug } });
 
   if (existing) {
@@ -131,20 +133,22 @@ async function syncTeam(
     });
   }
 
-  return prisma.team.create({
-    data: {
-      name: data.name,
-      slug: data.slug,
-      category: data.category,
-      genderGroup: data.genderGroup,
-      ageGroup: data.ageGroup,
-      sortOrder: data.sortOrder,
-      isActive: true,
-      websiteVisible: true,
-      infoboardVisible: true,
-      tenantId,
-    },
-  });
+  const createPayload = {
+    name: data.name,
+    slug: data.slug,
+    category: data.category,
+    genderGroup: data.genderGroup,
+    ageGroup: data.ageGroup,
+    sortOrder: data.sortOrder,
+    isActive: true,
+    websiteVisible: true,
+    infoboardVisible: true,
+    tenantId,
+  };
+
+  console.log("[seed] Creating team payload:", JSON.stringify(createPayload, null, 2));
+
+  return prisma.team.create({ data: createPayload });
 }
 
 async function syncTeamSeason(
@@ -232,7 +236,7 @@ async function main() {
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
 
     { key: "tenants.manage", name: "Manage tenants", module: PermissionModule.TENANTS },
-  ] as const;
+  ];
 
   for (const permission of permissions) {
     await prisma.permission.upsert({
@@ -322,7 +326,7 @@ async function main() {
         "fixtures.view",
       ],
     },
-  ] as const;
+  ];
 
   for (const roleDefinition of roleDefinitions) {
     const role = await prisma.role.upsert({
@@ -379,7 +383,7 @@ async function main() {
     data: { isActive: false },
   });
 
-  const seasonDefinitions = [
+  const seasonDefinitions: SeasonDefinition[] = [
     {
       key: "2025-2026",
       name: "Saison 2025/2026",
@@ -401,7 +405,7 @@ async function main() {
       endDate: new Date("2028-07-14T23:59:59.999Z"),
       isActive: false,
     },
-  ] as const;
+  ];
 
   for (const seasonData of seasonDefinitions) {
     await syncSeason(tenant.id, seasonData);
@@ -416,7 +420,7 @@ async function main() {
   }
 
   // ── 5. Teams + TeamSeasons ─────────────────────────────────────────────────
-  const teamDefinitions = [
+  const teamDefinitions: TeamDefinition[] = [
     {
       name: "E4",
       slug: "e4",
@@ -441,7 +445,7 @@ async function main() {
       ageGroup: "30+",
       sortOrder: 200,
     },
-  ] as const;
+  ];
 
   const createdTeams: Record<string, { id: string; name: string; slug: string }> = {};
 
@@ -457,7 +461,7 @@ async function main() {
     await syncTeamSeason(
       activeSeason.id,
       team.id,
-      "FC Allschwil " + teamData.name,
+      `FC Allschwil ${teamData.name}`,
       teamData.name,
     );
   }
