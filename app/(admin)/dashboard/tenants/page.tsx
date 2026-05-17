@@ -92,7 +92,7 @@ export default async function TenantsPage({ searchParams }: TenantsPageProps) {
                 type="text"
                 name="name"
                 required
-                placeholder="FC Allschwil"
+                placeholder="Club Name"
                 className="w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#0b4aa2] focus:ring-2 focus:ring-[#0b4aa2]/10"
               />
               <p className="mt-1.5 text-xs text-slate-400">Slug wird automatisch generiert</p>

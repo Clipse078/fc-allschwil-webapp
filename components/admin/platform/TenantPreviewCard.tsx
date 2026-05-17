@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2 } from "lucide-react";
+import { Building2, CheckCircle2, Globe, LayoutDashboard, Smartphone, Monitor } from "lucide-react";
 
 type TenantPreviewCardProps = {
   displayName: string;
@@ -10,6 +10,13 @@ type TenantPreviewCardProps = {
   logoUrl?: string;
   isActive: boolean;
 };
+
+const ECOSYSTEM_MODULES = [
+  { id: "webapp",    label: "WebApp",    icon: Monitor,       active: true },
+  { id: "website",   label: "Website",   icon: Globe,         active: false },
+  { id: "infoboard", label: "InfoBoard", icon: LayoutDashboard, active: false },
+  { id: "mobile",    label: "Mobile App", icon: Smartphone,   active: false },
+] as const;
 
 export default function TenantPreviewCard({
   displayName,
@@ -30,7 +37,7 @@ export default function TenantPreviewCard({
         Club Preview
       </p>
 
-      {/* Platform chip preview */}
+      {/* Sidebar chip preview */}
       <div>
         <p className="mb-2 text-[10px] text-slate-400">Sidebar chip</p>
         <div
@@ -47,7 +54,7 @@ export default function TenantPreviewCard({
         className="overflow-hidden rounded-[20px] border shadow-md"
         style={{ borderColor: `${color}30` }}
       >
-        {/* Header band */}
+        {/* Header band with tenant branding */}
         <div
           className="flex items-center gap-3 px-5 py-4"
           style={{
@@ -65,8 +72,8 @@ export default function TenantPreviewCard({
               <Building2 className="h-5 w-5" />
             </div>
           )}
-          <div>
-            <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-white/60">
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-white/55">
               {sportType}
             </p>
             <p className="font-[var(--font-display)] text-lg font-black uppercase leading-tight tracking-tight text-white">
@@ -75,6 +82,15 @@ export default function TenantPreviewCard({
             {shortName ? (
               <p className="text-[0.72rem] font-semibold text-white/70">{shortName}</p>
             ) : null}
+          </div>
+          {/* SCE attribution */}
+          <div className="shrink-0 flex flex-col items-end gap-0.5">
+            <p className="text-[0.55rem] font-bold uppercase tracking-widest text-white/30">
+              powered by
+            </p>
+            <p className="text-[0.62rem] font-black uppercase tracking-wide text-white/50">
+              SCE
+            </p>
           </div>
         </div>
 
@@ -114,6 +130,34 @@ export default function TenantPreviewCard({
               />
             ) : null}
             <span className="text-[10px] text-slate-400">Brand colours</span>
+          </div>
+        </div>
+
+        {/* Ecosystem module strip */}
+        <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-3">
+          <p className="mb-2 text-[9.5px] font-bold uppercase tracking-[0.2em] text-slate-400">
+            SCE Ecosystem
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {ECOSYSTEM_MODULES.map((mod) => {
+              const Icon = mod.icon;
+              return (
+                <span
+                  key={mod.id}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    mod.active
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border border-slate-200 bg-white text-slate-400"
+                  }`}
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  {mod.label}
+                  {!mod.active ? (
+                    <span className="ml-0.5 text-[8px] font-bold uppercase text-slate-300">·soon</span>
+                  ) : null}
+                </span>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -92,6 +92,17 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         {session.user.firstName} {session.user.lastName}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">{session.user.email}</p>
+
+                      {/* Role context badge */}
+                      {session.user.roleKeys?.includes("super_admin") ? (
+                        <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/6 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0b4aa2]">
+                          Platform Admin
+                        </span>
+                      ) : session.user.activeTenantName ? (
+                        <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                          {session.user.activeTenantName} · Admin
+                        </span>
+                      ) : null}
                     </div>
 
                     {availableTenants.length > 0 ? (

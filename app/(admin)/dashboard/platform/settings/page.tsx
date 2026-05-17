@@ -163,7 +163,7 @@ export default async function PlatformSettingsPage({ searchParams }: PageProps) 
                         required
                         defaultValue={tenant.name}
                         className={inputCls}
-                        placeholder="FC Allschwil"
+                        placeholder="Club Name"
                       />
                     </SettingsField>
 

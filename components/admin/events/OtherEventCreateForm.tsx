@@ -212,7 +212,7 @@ export default function OtherEventCreateForm() {
               value={organizerName}
               onChange={(event) => setOrganizerName(event.target.value)}
               className="fca-input"
-              placeholder="z. B. FC Allschwil / Business Club"
+              placeholder="z. B. Musterclub / Business Club"
             />
           </label>
 

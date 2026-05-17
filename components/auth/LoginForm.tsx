@@ -31,32 +31,22 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#0a0f1e]">
-      {/* Background radial glows */}
+    <main className="sce-dark-shell">
+      {/* Background glows */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-[-200px] top-[-200px] h-[600px] w-[600px] rounded-full bg-[#22c55e]/6 blur-[120px]" />
-        <div className="absolute bottom-[-200px] right-[-200px] h-[600px] w-[600px] rounded-full bg-[#3b82f6]/6 blur-[120px]" />
-        <div className="absolute left-1/2 top-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#22c55e]/4 blur-[80px]" />
-
-        {/* Grid overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.025]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(148,163,184,1) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,1) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
-
-        {/* Top accent line */}
-        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#22c55e]/40 to-transparent" />
+        <div className="sce-dark-glow-green absolute -left-40 -top-40 h-[640px] w-[640px]" />
+        <div className="sce-dark-glow-blue absolute -bottom-40 -right-40 h-[640px] w-[640px]" />
+        <div className="sce-dark-glow-green absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 opacity-60" />
+        <div className="sce-dark-grid" />
+        <div className="sce-accent-line-top" />
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 py-16">
-        {/* Platform mark */}
-        <div className="mb-8 flex flex-col items-center">
-          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#22c55e]/20 bg-[#22c55e]/8 shadow-[0_0_32px_rgba(34,197,94,0.12)]">
-            <svg viewBox="0 0 32 32" className="h-8 w-8" fill="none">
+
+        {/* Platform identity mark */}
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#22c55e]/20 bg-[#22c55e]/8 shadow-[0_0_40px_rgba(34,197,94,0.14)]">
+            <svg viewBox="0 0 32 32" className="h-8 w-8" fill="none" aria-hidden="true">
               <circle cx="16" cy="16" r="13" stroke="#22c55e" strokeWidth="1.5" />
               <path
                 d="M10 16h12M16 10l6 6-6 6"
@@ -76,19 +66,27 @@ export default function LoginForm() {
             SportClubEvo
           </h1>
 
-          <p className="mt-3 max-w-[360px] text-center text-[0.95rem] leading-relaxed text-slate-400">
-            The operating system for modern sports clubs
+          <p className="mt-3 max-w-[400px] text-center text-[1rem] font-medium leading-relaxed text-slate-300">
+            The Operating System for Modern Sports Clubs
           </p>
+
+          {/* Ecosystem pills */}
+          <div className="sce-ecosystem-row mt-5 justify-center">
+            <span className="sce-ecosystem-pill sce-ecosystem-pill-active">WebApp</span>
+            <span className="text-[0.6rem] text-slate-600">·</span>
+            <span className="sce-ecosystem-pill">Website</span>
+            <span className="text-[0.6rem] text-slate-600">·</span>
+            <span className="sce-ecosystem-pill">InfoBoard</span>
+            <span className="text-[0.6rem] text-slate-600">·</span>
+            <span className="sce-ecosystem-pill">Mobile App</span>
+          </div>
         </div>
 
         {/* Login card */}
-        <div className="w-full max-w-[420px] rounded-[28px] border border-white/6 bg-white/4 p-7 shadow-[0_32px_80px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
+        <div className="sce-dark-card w-full max-w-[420px] p-7">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label
-                htmlFor="email"
-                className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-400"
-              >
+              <label htmlFor="email" className="sce-dark-label">
                 Email
               </label>
               <input
@@ -97,17 +95,14 @@ export default function LoginForm() {
                 autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-2xl border border-white/8 bg-white/6 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 transition focus:border-[#22c55e]/50 focus:ring-2 focus:ring-[#22c55e]/10"
+                className="sce-dark-input"
                 placeholder="superadmin@sportclubevo.com"
                 required
               />
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-400"
-              >
+              <label htmlFor="password" className="sce-dark-label">
                 Password
               </label>
               <input
@@ -116,7 +111,7 @@ export default function LoginForm() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-2xl border border-white/8 bg-white/6 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 transition focus:border-[#22c55e]/50 focus:ring-2 focus:ring-[#22c55e]/10"
+                className="sce-dark-input"
                 placeholder="••••••••••"
                 required
               />
@@ -131,15 +126,16 @@ export default function LoginForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-full bg-[#22c55e] px-5 py-3 text-sm font-semibold text-[#0a0f1e] shadow-[0_8px_24px_rgba(34,197,94,0.25)] transition hover:bg-[#16a34a] hover:shadow-[0_12px_32px_rgba(34,197,94,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="sce-button-green mt-1"
             >
               {isSubmitting ? "Signing in…" : "Sign in to platform"}
             </button>
           </form>
         </div>
 
-        <p className="mt-8 text-xs text-slate-600">
-          SportClubEvo &mdash; Club Management Platform
+        {/* Footer */}
+        <p className="mt-8 text-[11px] font-medium tracking-wide text-slate-600">
+          SportClubEvo &mdash; One operating system for sport and community
         </p>
       </div>
     </main>

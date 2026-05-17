@@ -1,15 +1,45 @@
 ﻿@import "tailwindcss";
 
+/* ── SportClubEvo Design Tokens ─────────────────────────────────────────── */
 :root {
+  /* Light surface defaults */
   --background: #f4f7fb;
   --foreground: #14213d;
   --muted: #64748b;
   --border: #d9e2ec;
   --card: rgba(255, 255, 255, 0.96);
+
+  /* Brand: legacy red (kept for backward compat) */
   --red: #c7332c;
   --red-dark: #ab241f;
+
+  /* Brand: SCE blue — platform accent */
   --blue: #3f63b5;
   --blue-dark: #284a97;
+  --sce-blue: #0b4aa2;
+  --sce-blue-mid: #1a5cbf;
+  --sce-blue-light: #4a6fd1;
+
+  /* Brand: SCE green — action accent */
+  --sce-green: #22c55e;
+  --sce-green-dark: #16a34a;
+  --sce-green-glow: rgba(34, 197, 94, 0.18);
+
+  /* Dark premium SaaS surfaces (login, hero dark sections) */
+  --sce-dark-bg: #0a0f1e;
+  --sce-dark-surface: rgba(255, 255, 255, 0.04);
+  --sce-dark-border: rgba(255, 255, 255, 0.06);
+  --sce-dark-text: #ffffff;
+  --sce-dark-text-muted: #94a3b8;
+  --sce-dark-text-dim: #475569;
+
+  /* Ecosystem modules */
+  --sce-module-webapp: var(--sce-blue);
+  --sce-module-website: #7c3aed;
+  --sce-module-infoboard: #0891b2;
+  --sce-module-mobile: var(--sce-green-dark);
+
+  /* Typography */
   --font-body: var(--font-inter), Arial, Helvetica, sans-serif;
   --font-display: var(--font-display), Arial, Helvetica, sans-serif;
 }
@@ -328,4 +358,188 @@ button {
   .fca-heading {
     font-size: 1.5rem;
   }
+}
+
+/* ── SCE Dark Premium SaaS ───────────────────────────────────────────────── */
+
+.sce-dark-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--sce-dark-bg);
+  color: var(--sce-dark-text);
+}
+
+.sce-dark-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.025;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 1) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+.sce-dark-glow-green {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(120px);
+  background: rgba(34, 197, 94, 0.07);
+  pointer-events: none;
+}
+
+.sce-dark-glow-blue {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(120px);
+  background: rgba(59, 130, 246, 0.06);
+  pointer-events: none;
+}
+
+.sce-dark-card {
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+}
+
+.sce-dark-input {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-size: 0.93rem;
+  outline: none;
+  padding: 0.82rem 1rem;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.sce-dark-input::placeholder {
+  color: #475569;
+}
+
+.sce-dark-input:focus {
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.sce-dark-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #94a3b8;
+}
+
+.sce-button-green {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: none;
+  border-radius: 9999px;
+  background: var(--sce-green);
+  color: var(--sce-dark-bg);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.78rem 1.4rem;
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.25);
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.sce-button-green:hover {
+  background: var(--sce-green-dark);
+  box-shadow: 0 12px 32px rgba(34, 197, 94, 0.35);
+  transform: translateY(-1px);
+}
+
+.sce-button-green:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── SCE Ecosystem Pill ──────────────────────────────────────────────────── */
+
+.sce-ecosystem-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sce-ecosystem-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.28rem 0.7rem;
+  white-space: nowrap;
+}
+
+.sce-ecosystem-pill-active {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+}
+
+/* ── SCE Hero (light surface) ────────────────────────────────────────────── */
+
+.sce-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #071f4d 0%, #0b4aa2 45%, #1a3d82 100%);
+}
+
+.sce-hero-tagline {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.55;
+  max-width: 480px;
+}
+
+/* ── SCE Module Badge (light cards) ─────────────────────────────────────── */
+
+.sce-module-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(11, 74, 162, 0.14);
+  background: rgba(11, 74, 162, 0.06);
+  color: var(--sce-blue);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.28rem 0.65rem;
+  white-space: nowrap;
+}
+
+/* ── Accent line ─────────────────────────────────────────────────────────── */
+
+.sce-accent-line-top {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.4), transparent);
+  pointer-events: none;
 }

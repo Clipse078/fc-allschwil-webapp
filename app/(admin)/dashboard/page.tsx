@@ -153,14 +153,23 @@ function SceHero({
     <section
       className="relative overflow-hidden rounded-[28px] p-6 lg:p-8"
       style={{
-        background: "linear-gradient(135deg, #0a3d8f 0%, #0b4aa2 40%, #1a3d82 100%)",
+        background: "linear-gradient(135deg, #071f4d 0%, #0b4aa2 45%, #1a3d82 100%)",
       }}
     >
-      {/* Subtle background accents */}
+      {/* Background accents */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/[0.04] blur-3xl" />
-        <div className="absolute -bottom-16 left-8 h-56 w-56 rounded-full bg-indigo-300/[0.06] blur-2xl" />
+        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/[0.03] blur-3xl" />
+        <div className="absolute -bottom-16 left-8 h-56 w-56 rounded-full bg-[#22c55e]/[0.06] blur-2xl" />
         <div className="absolute right-1/3 top-0 h-px w-2/3 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        {/* Soft grid overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.015]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(148,163,184,1) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,1) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
       </div>
 
       <div className="relative">
@@ -188,6 +197,30 @@ function SceHero({
           <span className="text-white/55">Dashboard</span>
         </h1>
 
+        {/* Tagline */}
+        <p className="mt-3 max-w-[480px] text-[0.82rem] font-medium leading-relaxed text-white/50">
+          One operating system. Less chaos. More focus on sport and community.
+        </p>
+
+        {/* Ecosystem modules row */}
+        <div className="mt-4 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center rounded-full border border-[#22c55e]/30 bg-[#22c55e]/10 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-[#86efac]">
+            WebApp
+          </span>
+          <span className="text-[0.6rem] text-white/20">·</span>
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white/40">
+            Website
+          </span>
+          <span className="text-[0.6rem] text-white/20">·</span>
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white/40">
+            InfoBoard
+          </span>
+          <span className="text-[0.6rem] text-white/20">·</span>
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white/40">
+            Mobile App
+          </span>
+        </div>
+
         {/* Status chips */}
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {activeTenantId ? (
@@ -207,7 +240,7 @@ function SceHero({
           {isSuperAdmin ? (
             <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/18 px-3 py-1.5 ring-1 ring-amber-300/22">
               <Zap className="h-3 w-3 text-amber-300" />
-              <span className="text-[0.75rem] font-semibold text-amber-200">Superadmin</span>
+              <span className="text-[0.75rem] font-semibold text-amber-200">Platform Admin</span>
             </div>
           ) : null}
 
@@ -415,10 +448,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const roleKeys = session?.user?.roleKeys ?? [];
 
   const displayRole = isSuperAdmin
-    ? "Superadmin"
-    : roleKeys.length > 0
-      ? roleKeys[0].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-      : "Member";
+    ? "Platform Admin"
+    : roleKeys.includes("club_admin")
+      ? `${activeTenantName ?? "Club"} Admin`
+      : roleKeys.length > 0
+        ? roleKeys[0].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : "Member";
 
   const [seasonOptions, tenantsCount] = await Promise.all([
     getSeasonOptionsData(),
@@ -534,14 +569,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
       </section>
 
-      {/* ── SaaS cue footer ─────────────────────────────────────────────── */}
+      {/* ── Platform footer ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between rounded-[18px] border border-slate-200/60 bg-white/50 px-5 py-3.5">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#0b4aa2]">
             <span className="font-[var(--font-display)] text-[0.6rem] font-black text-white">SCE</span>
           </div>
           <span className="text-[0.75rem] font-semibold text-slate-500">
-            SportClubEvo · Tenant-aware platform
+            SportClubEvo · WebApp · Website · InfoBoard · Mobile App
           </span>
         </div>
         <div className="flex items-center gap-1.5">
