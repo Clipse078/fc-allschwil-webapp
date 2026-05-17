@@ -48,6 +48,10 @@ next-env.d.ts
 /app/generated/prisma
 /generated
 
+# editor / agent working artifacts
+*.bak
+*.bak-*
+
 # local working artifacts
 /baseline-backups
 /PROJECT-SCAN-WEBAPP.txt
