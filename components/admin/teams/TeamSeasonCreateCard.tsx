@@ -97,7 +97,7 @@ export default function TeamSeasonCreateCard({
 
   useEffect(() => {
     setSeasonDisplayName((current) =>
-      current ? current : "FC Allschwil " + teamName
+      current ? current : teamName
     );
     setSeasonShortName((current) => (current ? current : teamName));
   }, [teamName]);
@@ -140,7 +140,7 @@ export default function TeamSeasonCreateCard({
       }
 
       setSeasonFormMessage(data?.message ?? "Team-Saison erfolgreich erstellt.");
-      setSeasonDisplayName("FC Allschwil " + teamName);
+      setSeasonDisplayName(teamName);
       setSeasonShortName(teamName);
       setSeasonStatus("ACTIVE");
       setSeasonWebsiteVisible(true);

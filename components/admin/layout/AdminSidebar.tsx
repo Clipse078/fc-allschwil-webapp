@@ -93,8 +93,8 @@ function SceWordmark({ collapsed }: { collapsed: boolean }) {
       </div>
       {!collapsed ? (
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-400">
-            Platform
+          <p className="text-[0.63rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
+            Operating System
           </p>
           <p className="font-[var(--font-display)] text-[1rem] font-black uppercase leading-tight tracking-[-0.02em] text-slate-900">
             SportClubEvo
@@ -125,13 +125,20 @@ function ClubBadge({
 }) {
   if (collapsed) return null;
   return (
-    <div className="mx-1 mb-2 flex items-center gap-2 rounded-[14px] border border-slate-200/70 bg-slate-50/80 px-3 py-2">
-      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#0b4aa2]">
-        <Building2 className="h-3 w-3 text-white" />
+    <div className="mx-1 mb-2 overflow-hidden rounded-[14px] border border-[#0b4aa2]/12 bg-[#0b4aa2]/4">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#0b4aa2]">
+          <Building2 className="h-3 w-3 text-white" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-[#0b4aa2]/50">
+            Active Club
+          </p>
+          <p className="truncate text-[0.78rem] font-bold text-[#0b4aa2]">
+            {tenantName ?? "No club selected"}
+          </p>
+        </div>
       </div>
-      <p className="min-w-0 truncate text-[0.75rem] font-semibold text-slate-700">
-        {tenantName ?? "No club selected"}
-      </p>
     </div>
   );
 }
@@ -356,7 +363,7 @@ export default function AdminSidebar({
 
         {!resolvedCollapsed ? (
           <p className="mt-3 text-center text-[9px] font-medium tracking-wider text-slate-300 uppercase">
-            SportClubEvo Platform
+            SportClubEvo · Operating System
           </p>
         ) : null}
       </div>
