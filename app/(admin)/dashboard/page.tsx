@@ -240,7 +240,7 @@ function SceHero({
           {isSuperAdmin ? (
             <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/18 px-3 py-1.5 ring-1 ring-amber-300/22">
               <Zap className="h-3 w-3 text-amber-300" />
-              <span className="text-[0.75rem] font-semibold text-amber-200">Superadmin</span>
+              <span className="text-[0.75rem] font-semibold text-amber-200">Platform Admin</span>
             </div>
           ) : null}
 
@@ -448,10 +448,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const roleKeys = session?.user?.roleKeys ?? [];
 
   const displayRole = isSuperAdmin
-    ? "Superadmin"
-    : roleKeys.length > 0
-      ? roleKeys[0].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-      : "Member";
+    ? "Platform Admin"
+    : roleKeys.includes("club_admin")
+      ? `${activeTenantName ?? "Club"} Admin`
+      : roleKeys.length > 0
+        ? roleKeys[0].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : "Member";
 
   const [seasonOptions, tenantsCount] = await Promise.all([
     getSeasonOptionsData(),
