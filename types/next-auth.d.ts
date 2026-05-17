@@ -15,6 +15,9 @@ declare module "next-auth" {
       actorEmail?: string;
       actorName?: string;
       effectiveUserId?: string;
+      activeTenantId?: string;
+      activeTenantSlug?: string;
+      activeTenantName?: string;
     };
   }
 
@@ -30,6 +33,9 @@ declare module "next-auth" {
     actorEmail?: string;
     actorName?: string;
     effectiveUserId?: string;
+    activeTenantId?: string;
+    activeTenantSlug?: string;
+    activeTenantName?: string;
   }
 }
 
@@ -46,5 +52,8 @@ declare module "next-auth/jwt" {
     actorEmail?: string;
     actorName?: string;
     effectiveUserId?: string;
+    activeTenantId?: string;
+    activeTenantSlug?: string;
+    activeTenantName?: string;
   }
 }

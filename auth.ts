@@ -15,6 +15,9 @@ type SessionUserShape = {
   actorEmail?: string;
   actorName?: string;
   effectiveUserId?: string;
+  activeTenantId?: string;
+  activeTenantSlug?: string;
+  activeTenantName?: string;
 };
 
 function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUserShape {
@@ -33,6 +36,11 @@ function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUse
       typeof value.effectiveUserId === "string"
         ? value.effectiveUserId
         : String(value.id ?? ""),
+    activeTenantId: typeof value.activeTenantId === "string" ? value.activeTenantId : undefined,
+    activeTenantSlug:
+      typeof value.activeTenantSlug === "string" ? value.activeTenantSlug : undefined,
+    activeTenantName:
+      typeof value.activeTenantName === "string" ? value.activeTenantName : undefined,
   };
 }
 
@@ -105,6 +113,15 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
                 },
               },
             },
+            userTenants: {
+              where: { isActive: true },
+              include: {
+                tenant: {
+                  select: { id: true, slug: true, name: true, displayName: true, isActive: true },
+                },
+              },
+              take: 1,
+            },
           },
         });
 
@@ -160,11 +177,16 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           )
         );
 
+        const defaultTenant = user.userTenants[0]?.tenant ?? null;
+        const activeTenant =
+          defaultTenant?.isActive === true ? defaultTenant : null;
+
         console.log("[auth-debug] authorize:success", {
           email,
           userId: user.id,
           roleKeys,
           permissionKeys,
+          activeTenantId: activeTenant?.id ?? null,
         });
 
         const authUser: SessionUserShape = {
@@ -176,6 +198,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           permissionKeys,
           isImpersonating: false,
           effectiveUserId: user.id,
+          activeTenantId: activeTenant?.id,
+          activeTenantSlug: activeTenant?.slug,
+          activeTenantName: activeTenant?.displayName ?? activeTenant?.name,
         };
 
         return authUser;
@@ -198,6 +223,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = authUser.actorEmail;
         token.actorName = authUser.actorName;
         token.effectiveUserId = authUser.effectiveUserId;
+        token.activeTenantId = authUser.activeTenantId;
+        token.activeTenantSlug = authUser.activeTenantSlug;
+        token.activeTenantName = authUser.activeTenantName;
       }
 
       if (trigger === "update" && session?.user) {
@@ -216,6 +244,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = updatedUser.actorEmail;
         token.actorName = updatedUser.actorName;
         token.effectiveUserId = updatedUser.effectiveUserId;
+        token.activeTenantId = updatedUser.activeTenantId;
+        token.activeTenantSlug = updatedUser.activeTenantSlug;
+        token.activeTenantName = updatedUser.activeTenantName;
       }
 
       return token;
@@ -241,6 +272,12 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           typeof token.effectiveUserId === "string"
             ? token.effectiveUserId
             : session.user.id;
+        session.user.activeTenantId =
+          typeof token.activeTenantId === "string" ? token.activeTenantId : undefined;
+        session.user.activeTenantSlug =
+          typeof token.activeTenantSlug === "string" ? token.activeTenantSlug : undefined;
+        session.user.activeTenantName =
+          typeof token.activeTenantName === "string" ? token.activeTenantName : undefined;
       }
 
       return session;

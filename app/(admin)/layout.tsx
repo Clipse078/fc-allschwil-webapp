@@ -7,7 +7,9 @@ import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 import AdminPageHeader from "@/components/admin/layout/AdminPageHeader";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
+import TenantSwitcher from "@/components/admin/layout/TenantSwitcher";
 import FcaBrandCrest from "@/components/shared/FcaBrandCrest";
+import { getAvailableTenantsForUser } from "@/lib/tenants/queries";
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -19,6 +21,11 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   if (!session?.user) {
     redirect("/login");
   }
+
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  const roleKeys = session.user.roleKeys ?? [];
+
+  const availableTenants = await getAvailableTenantsForUser(userId, roleKeys).catch(() => []);
 
   return (
     <div className="fca-admin-shell text-slate-900">
@@ -78,11 +85,21 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                     <AdminHeaderDateTime />
                   </div>
 
-                  <div className="text-left xl:text-right">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {session.user.firstName} {session.user.lastName}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">{session.user.email}</p>
+                  <div className="flex flex-col items-start gap-3 xl:items-end">
+                    <div className="text-left xl:text-right">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {session.user.firstName} {session.user.lastName}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">{session.user.email}</p>
+                    </div>
+
+                    {availableTenants.length > 0 ? (
+                      <TenantSwitcher
+                        availableTenants={availableTenants}
+                        activeTenantId={session.user.activeTenantId}
+                        activeTenantName={session.user.activeTenantName}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>

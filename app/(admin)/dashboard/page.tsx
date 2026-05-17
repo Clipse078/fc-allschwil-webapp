@@ -95,6 +95,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const seasonOptions = await getSeasonOptionsData();
 
   const isSuperAdmin = (session?.user?.roleKeys ?? []).includes("super_admin");
+  const activeTenantName = session?.user?.activeTenantName ?? null;
+  const activeTenantId = session?.user?.activeTenantId ?? null;
 
   const [tenantsCount] = await Promise.all([
     isSuperAdmin ? getTenantsCount().catch(() => null) : Promise.resolve(null),
@@ -119,6 +121,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           Saisons sind die führende Struktur dieser WebApp. Teams, Events und Planner
           werden dynamisch pro Saison verwaltet und darauf aufgebaut.
         </p>
+
+        {activeTenantId ? (
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2">
+            <Building2 className="h-4 w-4 text-[#0b4aa2]" />
+            <span className="text-sm font-semibold text-[#0b4aa2]">
+              Aktuell:{" "}
+              <span className="font-bold">{activeTenantName ?? activeTenantId}</span>
+            </span>
+          </div>
+        ) : null}
       </section>
 
       <SeasonContextSelector
@@ -190,6 +202,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       {tenantsCount} {tenantsCount === 1 ? "Tenant" : "Tenants"} registriert
                     </p>
                   ) : null}
+                  <p className="mt-2 text-xs italic text-slate-400">
+                    Weitere Clubs und Tenants werden hier erscheinen, sobald SportClubEvo
+                    wächst.
+                  </p>
                 </div>
 
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2] shadow-sm transition group-hover:scale-105">
