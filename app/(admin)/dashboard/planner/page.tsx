@@ -1,4 +1,5 @@
-﻿import SeasonPlannerPage from "@/components/admin/planner/SeasonPlannerPage";
+﻿import { auth } from "@/auth";
+import SeasonPlannerPage from "@/components/admin/planner/SeasonPlannerPage";
 
 type PlannerPageProps = {
   searchParams?: Promise<{
@@ -8,6 +9,18 @@ type PlannerPageProps = {
 };
 
 export default async function PlannerPage({ searchParams }: PlannerPageProps) {
-  const params = (await searchParams) ?? {};
-  return <SeasonPlannerPage seasonKey={params.season} status={params.status} />;
+  const [rawParams, session] = await Promise.all([
+    searchParams ?? Promise.resolve({}),
+    auth(),
+  ]);
+  const params = rawParams as { season?: string; status?: string };
+  const activeTenantId = session?.user?.activeTenantId ?? "";
+
+  return (
+    <SeasonPlannerPage
+      seasonKey={params.season}
+      status={params.status}
+      tenantId={activeTenantId || undefined}
+    />
+  );
 }

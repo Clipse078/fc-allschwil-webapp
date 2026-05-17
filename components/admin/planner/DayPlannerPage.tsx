@@ -14,6 +14,7 @@ import { getDayPlannerData } from "@/lib/planner/queries";
 type DayPlannerPageProps = {
   seasonKey?: string;
   day?: string;
+  tenantId?: string;
 };
 
 function formatDayLabel(value: string) {
@@ -56,10 +57,12 @@ function buildEditHref(eventId: string, seasonKey: string, type: string) {
 export default async function DayPlannerPage({
   seasonKey,
   day,
+  tenantId,
 }: DayPlannerPageProps) {
   const data = await getDayPlannerData({
     selectedSeasonKey: seasonKey,
     day,
+    tenantId,
   });
 
   const selectedSeasonKey = data.selectedSeason?.key ?? "";

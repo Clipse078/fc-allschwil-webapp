@@ -61,6 +61,7 @@ const MODULE_META = [
 type SeasonPlannerPageProps = {
   seasonKey?: string;
   status?: string;
+  tenantId?: string;
 };
 
 function formatSwissDateTime(value: Date) {
@@ -150,8 +151,9 @@ function getFeedback(status?: string) {
 export default async function SeasonPlannerPage({
   seasonKey,
   status,
+  tenantId,
 }: SeasonPlannerPageProps) {
-  const data = await getSeasonPlannerData(seasonKey);
+  const data = await getSeasonPlannerData(seasonKey, tenantId);
   const selectedSeasonKey = data.selectedSeason?.key ?? "";
   const feedback = getFeedback(status);
 

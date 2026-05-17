@@ -7,7 +7,6 @@ import {
   BadgeIcon,
   BarChart3,
   Briefcase,
-  Building2,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
@@ -22,8 +21,10 @@ import {
   Users,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
+import TenantSwitcher from "@/components/admin/layout/TenantSwitcher";
 import { getVisibleAdminNav } from "@/lib/permissions/get-visible-admin-nav";
 import type { PermissionKey } from "@/lib/permissions/permissions";
+import type { SessionTenant } from "@/types/next-auth";
 
 type AdminSidebarProps = {
   firstName: string;
@@ -33,6 +34,7 @@ type AdminSidebarProps = {
   isSuperAdmin?: boolean;
   activeTenantName?: string;
   activeTenantSlug?: string;
+  availableTenants?: SessionTenant[];
   collapsed?: boolean;
   onToggle?: () => void;
 };
@@ -132,6 +134,7 @@ export default function AdminSidebar({
   isSuperAdmin = false,
   activeTenantName = "FC Allschwil",
   activeTenantSlug = "fc-allschwil",
+  availableTenants = [],
   collapsed,
   onToggle,
 }: AdminSidebarProps) {
@@ -244,33 +247,13 @@ export default function AdminSidebar({
         ) : null}
       </div>
 
-      {/* ── Active tenant block ───────────────────────────────────────────── */}
-      {!resolvedCollapsed ? (
-        <div className="mx-5 mb-1">
-          <div className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white px-3.5 py-2.5 shadow-sm">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white">
-              <Building2 className="h-4 w-4 text-slate-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[0.58rem] font-bold uppercase tracking-[0.18em] text-slate-400">
-                Active club
-              </p>
-              <p className="truncate text-xs font-semibold text-slate-700">
-                {activeTenantName || activeTenantSlug}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex justify-center px-4 pb-1">
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white"
-            title={activeTenantName || activeTenantSlug}
-          >
-            <Building2 className="h-4 w-4 text-slate-500" />
-          </div>
-        </div>
-      )}
+      {/* ── Tenant switcher ───────────────────────────────────────────────── */}
+      <TenantSwitcher
+        availableTenants={availableTenants}
+        activeTenantName={activeTenantName}
+        activeTenantSlug={activeTenantSlug}
+        collapsed={resolvedCollapsed}
+      />
 
       {/* ── Navigation ────────────────────────────────────────────────────── */}
       <nav className={resolvedCollapsed ? "flex-1 px-3 py-2" : "flex-1 px-4 py-2"}>

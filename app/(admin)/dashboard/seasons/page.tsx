@@ -3,6 +3,7 @@ import {
   createNextSeasonAction,
   deletePlannedSeasonAction,
 } from "@/app/(admin)/dashboard/seasons/actions";
+import { auth } from "@/auth";
 import { getSeasonsOverviewData } from "@/lib/seasons/queries";
 import { getSeasonLifecycleStatusClasses } from "@/lib/seasons/status";
 
@@ -74,9 +75,14 @@ function getFeedbackBanner(status?: string) {
 }
 
 export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
-  const params = (await searchParams) ?? {};
-  const seasons = await getSeasonsOverviewData();
-  const feedback = getFeedbackBanner(params.status);
+  const [params, session] = await Promise.all([
+    searchParams ?? Promise.resolve({}),
+    auth(),
+  ]);
+  const activeTenantId = session?.user?.activeTenantId ?? "";
+  const seasons = await getSeasonsOverviewData(activeTenantId || undefined);
+  const resolvedParams = params as { status?: string };
+  const feedback = getFeedbackBanner(resolvedParams.status);
 
   return (
     <div className="space-y-5">

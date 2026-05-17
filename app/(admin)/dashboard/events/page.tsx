@@ -1,6 +1,7 @@
 ﻿import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import EventsModuleHub from "@/components/admin/events/EventsModuleHub";
+import { auth } from "@/auth";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons } from "@/lib/teams/queries";
@@ -61,8 +62,13 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
     PERMISSIONS.EVENTS_MANAGE,
   ]);
 
-  const params = (await searchParams) ?? {};
-  const availableSeasons = await getAvailableTeamSeasons();
+  const [rawParams, session] = await Promise.all([
+    searchParams ?? Promise.resolve({}),
+    auth(),
+  ]);
+  const params = rawParams as { season?: string; submitted?: string; count?: string };
+  const activeTenantId = session?.user?.activeTenantId ?? "";
+  const availableSeasons = await getAvailableTeamSeasons(activeTenantId || undefined);
 
   const fallbackSeason =
     availableSeasons.find((season) => season.isActive)?.key ??

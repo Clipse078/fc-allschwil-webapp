@@ -173,10 +173,16 @@ export async function getNextSeasonOptionData() {
   };
 }
 
-export async function getSeasonsOverviewData() {
+export async function getSeasonsOverviewData(tenantId?: string | null) {
   await syncSeasonActiveFlagsWithLifecycle();
 
+  const tenantFilter =
+    tenantId
+      ? { OR: [{ tenantId }, { tenantId: null as null }] }
+      : undefined;
+
   const seasons = await prisma.season.findMany({
+    where: tenantFilter,
     orderBy: [{ startDate: "desc" }],
     select: {
       id: true,

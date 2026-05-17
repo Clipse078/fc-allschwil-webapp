@@ -1,6 +1,7 @@
 ﻿import TeamsTable from "@/components/admin/teams/TeamsTable";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
+import { auth } from "@/auth";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons, getTeamsListData } from "@/lib/teams/queries";
@@ -56,8 +57,14 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
     PERMISSIONS.TEAMS_MANAGE,
   ]);
 
-  const params = (await searchParams) ?? {};
-  const availableSeasons = await getAvailableTeamSeasons();
+  const [rawParams, session] = await Promise.all([
+    searchParams ?? Promise.resolve({}),
+    auth(),
+  ]);
+  const params = rawParams as { season?: string };
+  const activeTenantId = session?.user?.activeTenantId ?? "";
+
+  const availableSeasons = await getAvailableTeamSeasons(activeTenantId || undefined);
 
   const fallbackSeason =
     availableSeasons.find((season) => season.isActive)?.key ??
@@ -72,7 +79,7 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
   const selectedSeason =
     availableSeasons.find((season) => season.key === selectedSeasonKey) ?? null;
 
-  const teams = await getTeamsListData(selectedSeasonKey);
+  const teams = await getTeamsListData(selectedSeasonKey, activeTenantId || undefined);
 
   return (
     <div className="space-y-8">

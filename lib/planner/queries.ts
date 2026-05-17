@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { getDayWindow, getWeekWindow } from "@/lib/planner/date-utils";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
+import { tenantWhere } from "@/lib/tenancy/tenant-query";
 
 export type PlannerEntry = {
   id: string;
@@ -67,8 +68,8 @@ function toDateTimeLocalValue(value: Date | null) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-async function resolveSelectedSeason(selectedSeasonKey?: string | null) {
-  const seasons = await getSeasonOptionsData();
+async function resolveSelectedSeason(selectedSeasonKey?: string | null, tenantId?: string | null) {
+  const seasons = await getSeasonOptionsData(tenantId);
 
   const selectedSeason =
     seasons.find((season) => season.key === selectedSeasonKey) ??
@@ -147,12 +148,15 @@ async function getPlannerEntries(args: {
 export async function getPlannerCreateFormData(args?: {
   selectedSeasonKey?: string | null;
   selectedType?: string | null;
+  tenantId?: string | null;
 }) {
   const { seasons, selectedSeason } = await resolveSelectedSeason(
     args?.selectedSeasonKey,
+    args?.tenantId,
   );
 
   const teams = await prisma.team.findMany({
+    where: tenantWhere(args?.tenantId),
     orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     select: {
       id: true,
@@ -195,6 +199,7 @@ export async function getPlannerEditFormData(
   eventId: string,
   args?: {
     selectedType?: string | null;
+    tenantId?: string | null;
   },
 ) {
   const event = await prisma.event.findUnique({
@@ -241,6 +246,7 @@ export async function getPlannerEditFormData(
   const base = await getPlannerCreateFormData({
     selectedSeasonKey: event.season.key,
     selectedType,
+    tenantId: args?.tenantId,
   });
 
   return {
@@ -271,8 +277,8 @@ export async function getPlannerEditFormData(
   };
 }
 
-export async function getSeasonPlannerData(selectedSeasonKey?: string | null) {
-  const { seasons, selectedSeason } = await resolveSelectedSeason(selectedSeasonKey);
+export async function getSeasonPlannerData(selectedSeasonKey?: string | null, tenantId?: string | null) {
+  const { seasons, selectedSeason } = await resolveSelectedSeason(selectedSeasonKey, tenantId);
   const entries = await getPlannerEntries({
     seasonKey: selectedSeason?.key,
   });
@@ -301,9 +307,11 @@ export async function getSeasonPlannerData(selectedSeasonKey?: string | null) {
 export async function getWeekPlannerData(args: {
   selectedSeasonKey?: string | null;
   weekId?: string | null;
+  tenantId?: string | null;
 }) {
   const { seasons, selectedSeason } = await resolveSelectedSeason(
     args.selectedSeasonKey,
+    args.tenantId,
   );
   const week = getWeekWindow(args.weekId);
   const entries = await getPlannerEntries({
@@ -323,9 +331,11 @@ export async function getWeekPlannerData(args: {
 export async function getDayPlannerData(args: {
   selectedSeasonKey?: string | null;
   day?: string | null;
+  tenantId?: string | null;
 }) {
   const { seasons, selectedSeason } = await resolveSelectedSeason(
     args.selectedSeasonKey,
+    args.tenantId,
   );
   const day = getDayWindow(args.day);
   const entries = await getPlannerEntries({

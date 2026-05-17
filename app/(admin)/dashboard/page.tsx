@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarDays,
   CalendarRange,
+  CheckCircle2,
   ClipboardList,
   Globe,
   InboxIcon,
@@ -156,6 +157,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const params = rawParams as { season?: string };
 
   const isSuperAdmin = session?.user?.roleKeys?.includes("super_admin") ?? false;
+  const availableTenants = session?.user?.availableTenants ?? [];
+  const activeTenantName = session?.user?.activeTenantName || "FC Allschwil";
 
   const selectedSeason =
     seasonOptions.find((season) => season.key === params.season) ??
@@ -243,6 +246,55 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               })}
             </div>
           </AdminSurfaceCard>
+
+          {/* Tenant status card */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                  <Building2 className="h-4 w-4 text-slate-500" />
+                </div>
+                <div>
+                  <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    Active tenant
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">{activeTenantName}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+                  <Users className="h-4 w-4 text-slate-500" />
+                </div>
+                <div>
+                  <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    Tenants available
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {availableTenants.length} tenant{availableTenants.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-green-100 bg-green-50 p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-green-200 bg-white">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-green-600">
+                    Data scoping
+                  </p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Tenant-aware filtering is active.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Divider between platform and tenant sections */}
           <div className="flex items-center gap-4">

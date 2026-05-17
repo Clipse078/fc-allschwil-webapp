@@ -1,4 +1,5 @@
-﻿import WeekPlannerPage from "@/components/admin/planner/WeekPlannerPage";
+﻿import { auth } from "@/auth";
+import WeekPlannerPage from "@/components/admin/planner/WeekPlannerPage";
 
 type PlannerWeekPageProps = {
   searchParams?: Promise<{
@@ -10,6 +11,18 @@ type PlannerWeekPageProps = {
 export default async function PlannerWeekPageRoute({
   searchParams,
 }: PlannerWeekPageProps) {
-  const params = (await searchParams) ?? {};
-  return <WeekPlannerPage seasonKey={params.season} week={params.week} />;
+  const [rawParams, session] = await Promise.all([
+    searchParams ?? Promise.resolve({}),
+    auth(),
+  ]);
+  const params = rawParams as { season?: string; week?: string };
+  const activeTenantId = session?.user?.activeTenantId ?? "";
+
+  return (
+    <WeekPlannerPage
+      seasonKey={params.season}
+      week={params.week}
+      tenantId={activeTenantId || undefined}
+    />
+  );
 }

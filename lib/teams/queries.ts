@@ -1,8 +1,14 @@
 ﻿import { prisma } from "@/lib/db/prisma";
 import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 
-export async function getAvailableTeamSeasons() {
+export async function getAvailableTeamSeasons(tenantId?: string | null) {
+  const tenantFilter =
+    tenantId
+      ? { OR: [{ tenantId }, { tenantId: null as null }] }
+      : undefined;
+
   const seasons = await prisma.season.findMany({
+    where: tenantFilter,
     orderBy: [{ startDate: "desc" }, { name: "desc" }],
     select: {
       id: true,
@@ -17,7 +23,7 @@ export async function getAvailableTeamSeasons() {
   return seasons;
 }
 
-export async function getTeamsListData(selectedSeasonKey?: string) {
+export async function getTeamsListData(selectedSeasonKey?: string, tenantId?: string | null) {
   const currentSeason = getCurrentSwissFootballSeason();
 
   const resolvedSeasonKey =
@@ -37,7 +43,13 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
         },
       };
 
+  const teamTenantFilter =
+    tenantId
+      ? { OR: [{ tenantId }, { tenantId: null as null }] }
+      : undefined;
+
   const teams = await prisma.team.findMany({
+    where: teamTenantFilter,
     orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     select: {
       id: true,

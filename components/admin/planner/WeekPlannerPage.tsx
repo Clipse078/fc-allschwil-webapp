@@ -15,6 +15,7 @@ import { getWeekPlannerData } from "@/lib/planner/queries";
 type WeekPlannerPageProps = {
   seasonKey?: string;
   week?: string;
+  tenantId?: string;
 };
 
 function formatWeekDate(value: Date) {
@@ -54,10 +55,12 @@ function buildEditHref(eventId: string, seasonKey: string, type: string) {
 export default async function WeekPlannerPage({
   seasonKey,
   week,
+  tenantId,
 }: WeekPlannerPageProps) {
   const data = await getWeekPlannerData({
     selectedSeasonKey: seasonKey,
     weekId: week,
+    tenantId,
   });
 
   const selectedSeasonKey = data.selectedSeason?.key ?? "";
