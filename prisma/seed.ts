@@ -467,14 +467,14 @@ async function main() {
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@fcallschwil.ch" },
     update: {
-      firstName: "FC",
+      firstName: "Platform",
       lastName: "Admin",
       passwordHash,
       isActive: true,
     },
     create: {
       email: "admin@fcallschwil.ch",
-      firstName: "FC",
+      firstName: "Platform",
       lastName: "Admin",
       passwordHash,
       isActive: true,
@@ -496,9 +496,10 @@ async function main() {
   });
 
   console.log("Seed finished successfully.");
-  console.log("Admin login:");
-  console.log("Email: admin@fcallschwil.ch");
-  console.log("Password: ChangeMe123! -> change immediately after first login.");
+  console.log("Superadmin login:");
+  console.log("  Email:    admin@fcallschwil.ch");
+  console.log("  Password: ChangeMe123!  (change immediately after first login)");
+  console.log("  Role:     super_admin");
 }
 
 main()

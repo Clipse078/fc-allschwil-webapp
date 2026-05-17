@@ -7,7 +7,7 @@ import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 import AdminPageHeader from "@/components/admin/layout/AdminPageHeader";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
-import FcaBrandCrest from "@/components/shared/FcaBrandCrest";
+import SportClubEvoMark from "@/components/shared/SportClubEvoMark";
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -26,8 +26,8 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
       <div className="fca-admin-glow fca-admin-glow-red bottom-[40px] right-[-120px] h-[320px] w-[320px]" />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-[140px] h-[900px] w-[900px] -translate-x-1/2 opacity-[0.07]">
-          <FcaBrandCrest className="h-full w-full" variant="watermark" />
+        <div className="absolute left-1/2 top-[140px] h-[900px] w-[900px] -translate-x-1/2 opacity-[0.06]">
+          <SportClubEvoMark className="h-full w-full" variant="watermark" />
         </div>
       </div>
 

@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -144,25 +143,29 @@ export default function AdminSidebar({
             <div
               className={
                 resolvedCollapsed
-                  ? "relative h-11 w-11 shrink-0"
-                  : "relative h-12 w-12 shrink-0"
+                  ? "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-green-200 bg-green-50"
+                  : "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-green-200 bg-green-50"
               }
             >
-              <Image
-                src="/images/logos/fc-allschwil.png"
-                alt="FC Allschwil"
-                fill
-                className="object-contain"
-                sizes="48px"
-                priority
-              />
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="#16a34a" strokeWidth="1.5" />
+                <path
+                  d="M8 12h8M12 8l4 4-4 4"
+                  stroke="#16a34a"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
 
             {!resolvedCollapsed ? (
               <div className="min-w-0">
-                <p className="fca-eyebrow">FC Allschwil</p>
-                <h2 className="mt-1 font-[var(--font-display)] text-[1.7rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[#0b4aa2]">
-                  Admin
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-green-600">
+                  Platform
+                </p>
+                <h2 className="mt-0.5 font-[var(--font-display)] text-[1.35rem] font-bold uppercase leading-[0.92] tracking-[-0.03em] text-slate-900">
+                  SportClubEvo
                 </h2>
               </div>
             ) : null}
