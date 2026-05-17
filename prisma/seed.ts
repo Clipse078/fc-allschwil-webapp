@@ -138,21 +138,46 @@ async function syncTeam(tenantId: string, data: TeamDefinition) {
     });
   }
 
-  return prisma.team.create({
-    data: {
-      name: data.name,
-      slug: data.slug,
-      category: data.category,
-      genderGroup: data.genderGroup,
-      ageGroup: data.ageGroup,
-      sortOrder: data.sortOrder,
-      isActive: true,
-      websiteVisible: true,
-      infoboardVisible: true,
-      updatedAt: now,
-      tenant: { connect: { id: tenantId } },
-    },
-  });
+  try {
+    return await prisma.team.create({
+      data: {
+        name: data.name,
+        slug: data.slug,
+        category: data.category,
+        genderGroup: data.genderGroup,
+        ageGroup: data.ageGroup,
+        sortOrder: data.sortOrder,
+        isActive: true,
+        websiteVisible: true,
+        infoboardVisible: true,
+        updatedAt: now,
+        tenant: { connect: { id: tenantId } },
+      },
+    });
+  } catch (error) {
+    const code =
+      error !== null && typeof error === "object" && "code" in error
+        ? String((error as Record<string, unknown>).code)
+        : null;
+
+    if (code === "P2011" || code === "P2009" || code === "P2002") {
+      console.warn(
+        `\n⚠️  Team seed skipped due to PrismaPg adapter null constraint issue (${code}): ${data.slug}`,
+      );
+
+      // Fallback: a concurrent insert or previous partial run may have created it
+      const fallback = await prisma.team.findUnique({ where: { slug: data.slug } });
+      if (fallback) {
+        console.warn(`   → Recovered existing team: ${fallback.name} (${fallback.id})`);
+        return fallback;
+      }
+
+      console.warn(`   → No fallback found for '${data.slug}' — skipping this team.`);
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 async function syncTeamSeason(
@@ -455,9 +480,17 @@ async function main() {
   ];
 
   const createdTeams: Record<string, { id: string; name: string; slug: string }> = {};
+  const seedWarnings: string[] = [];
 
   for (const teamData of teamDefinitions) {
     const team = await syncTeam(tenant.id, teamData);
+
+    if (!team) {
+      seedWarnings.push(
+        `Team '${teamData.slug}' (${teamData.name}) not seeded — prisma.team.create() hit null constraint`,
+      );
+      continue;
+    }
 
     createdTeams[team.slug] = {
       id: team.id,
@@ -654,10 +687,23 @@ async function main() {
   });
 
   console.log("✓ Admin user linked to tenant: FC Allschwil");
-  console.log("Seed finished successfully.");
+  console.log("");
   console.log("Admin login:");
   console.log("  Email:    admin@fcallschwil.ch");
   console.log("  Password: ChangeMe123! → change immediately after first login.");
+  console.log("");
+
+  if (seedWarnings.length > 0) {
+    console.warn(`⚠️  Seed completed with ${seedWarnings.length} warning(s):`);
+    for (const w of seedWarnings) {
+      console.warn(`   - ${w}`);
+    }
+    console.warn(
+      "   Run: npm run backfill:tenant:fca   to backfill tenant IDs on existing rows.",
+    );
+  } else {
+    console.log("✓ Seed completed successfully.");
+  }
 }
 
 main()
