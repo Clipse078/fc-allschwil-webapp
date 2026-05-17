@@ -86,6 +86,7 @@ async function syncTenant(slug: string, defaults: TenantDefaults) {
 }
 
 async function syncSeason(tenantId: string, data: SeasonDefinition) {
+  const now = new Date();
   const existing = await prisma.season.findUnique({ where: { key: data.key } });
 
   if (existing) {
@@ -96,6 +97,7 @@ async function syncSeason(tenantId: string, data: SeasonDefinition) {
         startDate: data.startDate,
         endDate: data.endDate,
         isActive: data.isActive,
+        updatedAt: now,
         tenant: { connect: { id: tenantId } },
       },
     });
@@ -108,12 +110,14 @@ async function syncSeason(tenantId: string, data: SeasonDefinition) {
       startDate: data.startDate,
       endDate: data.endDate,
       isActive: data.isActive,
+      updatedAt: now,
       tenant: { connect: { id: tenantId } },
     },
   });
 }
 
 async function syncTeam(tenantId: string, data: TeamDefinition) {
+  const now = new Date();
   const existing = await prisma.team.findUnique({ where: { slug: data.slug } });
 
   if (existing) {
@@ -128,6 +132,7 @@ async function syncTeam(tenantId: string, data: TeamDefinition) {
         isActive: true,
         websiteVisible: true,
         infoboardVisible: true,
+        updatedAt: now,
         tenant: { connect: { id: tenantId } },
       },
     });
@@ -144,6 +149,7 @@ async function syncTeam(tenantId: string, data: TeamDefinition) {
       isActive: true,
       websiteVisible: true,
       infoboardVisible: true,
+      updatedAt: now,
       tenant: { connect: { id: tenantId } },
     },
   });
@@ -155,6 +161,7 @@ async function syncTeamSeason(
   displayName: string,
   shortName: string,
 ) {
+  const now = new Date();
   const existing = await prisma.teamSeason.findUnique({
     where: { teamId_seasonId: { teamId, seasonId } },
   });
@@ -168,6 +175,7 @@ async function syncTeamSeason(
         status: TeamSeasonStatus.ACTIVE,
         websiteVisible: true,
         infoboardVisible: true,
+        updatedAt: now,
       },
     });
   }
@@ -181,6 +189,7 @@ async function syncTeamSeason(
       status: TeamSeasonStatus.ACTIVE,
       websiteVisible: true,
       infoboardVisible: true,
+      updatedAt: now,
     },
   });
 }
@@ -479,6 +488,8 @@ async function main() {
     },
   });
 
+  const eventNow = new Date();
+
   if (createdTeams["e4"]) {
     await prisma.event.create({
       data: {
@@ -488,6 +499,7 @@ async function main() {
         type: EventType.MATCH,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
+        updatedAt: eventNow,
         title: "FC Allschwil E4 vs FC Concordia Basel",
         description: "Demo Match für Spielplan, Wochenplan, Teamseite und Infoboard.",
         location: "Sportplatz im Brüel",
@@ -514,6 +526,7 @@ async function main() {
         type: EventType.TOURNAMENT,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
+        updatedAt: eventNow,
         title: "E4 Frühlingsturnier Aesch",
         description: "Demo Turnier für Website, Wochenplan, Teamseite und Infoboard.",
         location: "Sportanlage Aesch",
@@ -539,6 +552,7 @@ async function main() {
         type: EventType.TRAINING,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
+        updatedAt: eventNow,
         title: "E4 Training Dienstag",
         description: "Demo Training für Trainingsplan, Wochenplan, Teamseite und Infoboard.",
         location: "Sportplatz im Brüel",
@@ -563,6 +577,7 @@ async function main() {
       type: EventType.OTHER,
       source: EventSource.MANUAL,
       status: EventStatus.SCHEDULED,
+      updatedAt: eventNow,
       title: "Sponsor Apéro Frühling 2026",
       description: "Demo weiteres Event für die Website Events Seite.",
       location: "Clubhaus FC Allschwil",
