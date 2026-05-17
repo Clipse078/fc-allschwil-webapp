@@ -504,7 +504,7 @@ async function main() {
   const passwordHash = await bcrypt.hash("ChangeMe123!", 12);
 
   const adminUserId = await syncUser({
-    email: "admin@fcallschwil.ch",
+    email: "superadmin@sportclubevo.com",
     firstName: "Platform",
     lastName: "Admin",
     passwordHash,
@@ -515,7 +515,7 @@ async function main() {
 
   console.log("\nSeed finished successfully.");
   console.log("Superadmin login:");
-  console.log("  Email:    admin@fcallschwil.ch");
+  console.log("  Email:    superadmin@sportclubevo.com");
   console.log("  Password: ChangeMe123!  (change immediately after first login)");
   console.log("  Role:     super_admin\n");
 }

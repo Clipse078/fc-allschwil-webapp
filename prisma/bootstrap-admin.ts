@@ -4,7 +4,7 @@
  * Minimal, safe script to ensure a working Superadmin login exists.
  * Creates or updates ONLY:
  *   - super_admin Role
- *   - admin@fcallschwil.ch User
+ *   - superadmin@sportclubevo.com User
  *   - UserRole relation linking the two
  *
  * No teams, seasons, events or any other data is touched.
@@ -29,7 +29,7 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const ADMIN_EMAIL    = "admin@fcallschwil.ch";
+const ADMIN_EMAIL    = "superadmin@sportclubevo.com";
 const ADMIN_PASSWORD = "ChangeMe123!";
 const ROLE_KEY       = "super_admin";
 const ROLE_NAME      = "Super Admin";

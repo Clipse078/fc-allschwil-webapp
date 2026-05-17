@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("admin@fcallschwil.ch");
+  const [email, setEmail] = useState("superadmin@sportclubevo.com");
   const [password, setPassword] = useState("ChangeMe123!");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -98,7 +98,7 @@ export default function LoginForm() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-2xl border border-white/8 bg-white/6 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 transition focus:border-[#22c55e]/50 focus:ring-2 focus:ring-[#22c55e]/10"
-                placeholder="you@example.com"
+                placeholder="superadmin@sportclubevo.com"
                 required
               />
             </div>
