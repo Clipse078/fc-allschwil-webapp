@@ -26,7 +26,167 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// ─── Sync helpers ──────────────────────────────────────────────────────────
+
+async function syncTenant(slug: string, defaults: {
+  name: string;
+  displayName?: string;
+  countryCode: string;
+  sportType: string;
+  primaryColor?: string;
+}) {
+  const existing = await prisma.tenant.findUnique({ where: { slug } });
+
+  if (existing) {
+    return prisma.tenant.update({
+      where: { slug },
+      data: {
+        name: defaults.name,
+        displayName: defaults.displayName ?? existing.displayName,
+        countryCode: defaults.countryCode,
+        sportType: defaults.sportType,
+        primaryColor: defaults.primaryColor ?? existing.primaryColor,
+        isActive: true,
+      },
+    });
+  }
+
+  return prisma.tenant.create({
+    data: {
+      slug,
+      name: defaults.name,
+      displayName: defaults.displayName,
+      countryCode: defaults.countryCode,
+      sportType: defaults.sportType,
+      primaryColor: defaults.primaryColor,
+      isActive: true,
+    },
+  });
+}
+
+async function syncSeason(
+  tenantId: string,
+  data: {
+    key: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    isActive: boolean;
+  },
+) {
+  const existing = await prisma.season.findUnique({ where: { key: data.key } });
+
+  if (existing) {
+    return prisma.season.update({
+      where: { key: data.key },
+      data: {
+        name: data.name,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        isActive: data.isActive,
+        tenantId,
+      },
+    });
+  }
+
+  return prisma.season.create({
+    data: {
+      key: data.key,
+      name: data.name,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      isActive: data.isActive,
+      tenantId,
+    },
+  });
+}
+
+async function syncTeam(
+  tenantId: string,
+  data: {
+    name: string;
+    slug: string;
+    category: TeamCategory;
+    genderGroup?: string;
+    ageGroup?: string;
+    sortOrder: number;
+  },
+) {
+  const existing = await prisma.team.findUnique({ where: { slug: data.slug } });
+
+  if (existing) {
+    return prisma.team.update({
+      where: { slug: data.slug },
+      data: {
+        name: data.name,
+        category: data.category,
+        genderGroup: data.genderGroup,
+        ageGroup: data.ageGroup,
+        sortOrder: data.sortOrder,
+        isActive: true,
+        websiteVisible: true,
+        infoboardVisible: true,
+        tenantId,
+      },
+    });
+  }
+
+  return prisma.team.create({
+    data: {
+      name: data.name,
+      slug: data.slug,
+      category: data.category,
+      genderGroup: data.genderGroup,
+      ageGroup: data.ageGroup,
+      sortOrder: data.sortOrder,
+      isActive: true,
+      websiteVisible: true,
+      infoboardVisible: true,
+      tenantId,
+    },
+  });
+}
+
+async function syncTeamSeason(
+  seasonId: string,
+  teamId: string,
+  displayName: string,
+  shortName: string,
+) {
+  const existing = await prisma.teamSeason.findUnique({
+    where: { teamId_seasonId: { teamId, seasonId } },
+  });
+
+  if (existing) {
+    return prisma.teamSeason.update({
+      where: { teamId_seasonId: { teamId, seasonId } },
+      data: {
+        displayName,
+        shortName,
+        status: TeamSeasonStatus.ACTIVE,
+        websiteVisible: true,
+        infoboardVisible: true,
+      },
+    });
+  }
+
+  return prisma.teamSeason.create({
+    data: {
+      teamId,
+      seasonId,
+      displayName,
+      shortName,
+      status: TeamSeasonStatus.ACTIVE,
+      websiteVisible: true,
+      infoboardVisible: true,
+    },
+  });
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────
+
 async function main() {
+  // ── 1. Permissions ──────────────────────────────────────────────────────
   const permissions = [
     { key: "users.manage", name: "Manage users", module: PermissionModule.USERS },
     { key: "users.impersonate", name: "Impersonate users", module: PermissionModule.USERS },
@@ -89,6 +249,7 @@ async function main() {
     });
   }
 
+  // ── 2. Roles ─────────────────────────────────────────────────────────────
   const roleDefinitions = [
     {
       key: "super_admin",
@@ -202,11 +363,23 @@ async function main() {
     }
   }
 
+  // ── 3. Tenant ─────────────────────────────────────────────────────────────
+  const tenant = await syncTenant("fc-allschwil", {
+    name: "FC Allschwil",
+    displayName: "FC Allschwil",
+    countryCode: "CH",
+    sportType: "football",
+    primaryColor: "#0b4aa2",
+  });
+
+  console.log(`✓ Tenant resolved for seed: ${tenant.displayName ?? tenant.name}`);
+
+  // ── 4. Seasons ────────────────────────────────────────────────────────────
   await prisma.season.updateMany({
     data: { isActive: false },
   });
 
-  const seasons = [
+  const seasonDefinitions = [
     {
       key: "2025-2026",
       name: "Saison 2025/2026",
@@ -230,23 +403,8 @@ async function main() {
     },
   ] as const;
 
-  for (const seasonData of seasons) {
-    await prisma.season.upsert({
-      where: { key: seasonData.key },
-      update: {
-        name: seasonData.name,
-        startDate: seasonData.startDate,
-        endDate: seasonData.endDate,
-        isActive: seasonData.isActive,
-      },
-      create: {
-        key: seasonData.key,
-        name: seasonData.name,
-        startDate: seasonData.startDate,
-        endDate: seasonData.endDate,
-        isActive: seasonData.isActive,
-      },
-    });
+  for (const seasonData of seasonDefinitions) {
+    await syncSeason(tenant.id, seasonData);
   }
 
   const activeSeason = await prisma.season.findUnique({
@@ -257,7 +415,8 @@ async function main() {
     throw new Error("Active season 2025-2026 not found during seeding.");
   }
 
-  const teams = [
+  // ── 5. Teams + TeamSeasons ─────────────────────────────────────────────────
+  const teamDefinitions = [
     {
       name: "E4",
       slug: "e4",
@@ -286,31 +445,8 @@ async function main() {
 
   const createdTeams: Record<string, { id: string; name: string; slug: string }> = {};
 
-  for (const teamData of teams) {
-    const team = await prisma.team.upsert({
-      where: { slug: teamData.slug },
-      update: {
-        name: teamData.name,
-        category: teamData.category,
-        genderGroup: teamData.genderGroup,
-        ageGroup: teamData.ageGroup,
-        sortOrder: teamData.sortOrder,
-        isActive: true,
-        websiteVisible: true,
-        infoboardVisible: true,
-      },
-      create: {
-        name: teamData.name,
-        slug: teamData.slug,
-        category: teamData.category,
-        genderGroup: teamData.genderGroup,
-        ageGroup: teamData.ageGroup,
-        sortOrder: teamData.sortOrder,
-        isActive: true,
-        websiteVisible: true,
-        infoboardVisible: true,
-      },
-    });
+  for (const teamData of teamDefinitions) {
+    const team = await syncTeam(tenant.id, teamData);
 
     createdTeams[team.slug] = {
       id: team.id,
@@ -318,32 +454,15 @@ async function main() {
       slug: team.slug,
     };
 
-    await prisma.teamSeason.upsert({
-      where: {
-        teamId_seasonId: {
-          teamId: team.id,
-          seasonId: activeSeason.id,
-        },
-      },
-      update: {
-        displayName: "FC Allschwil " + teamData.name,
-        shortName: teamData.name,
-        status: TeamSeasonStatus.ACTIVE,
-        websiteVisible: true,
-        infoboardVisible: true,
-      },
-      create: {
-        teamId: team.id,
-        seasonId: activeSeason.id,
-        displayName: "FC Allschwil " + teamData.name,
-        shortName: teamData.name,
-        status: TeamSeasonStatus.ACTIVE,
-        websiteVisible: true,
-        infoboardVisible: true,
-      },
-    });
+    await syncTeamSeason(
+      activeSeason.id,
+      team.id,
+      "FC Allschwil " + teamData.name,
+      teamData.name,
+    );
   }
 
+  // ── 6. Demo Events ────────────────────────────────────────────────────────
   const demoTitles = [
     "FC Allschwil E4 vs FC Concordia Basel",
     "E4 Frühlingsturnier Aesch",
@@ -354,9 +473,7 @@ async function main() {
   await prisma.event.deleteMany({
     where: {
       seasonId: activeSeason.id,
-      title: {
-        in: demoTitles,
-      },
+      title: { in: demoTitles },
     },
   });
 
@@ -365,6 +482,7 @@ async function main() {
       data: {
         seasonId: activeSeason.id,
         teamId: createdTeams["e4"].id,
+        tenantId: tenant.id,
         type: EventType.MATCH,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
@@ -390,6 +508,7 @@ async function main() {
       data: {
         seasonId: activeSeason.id,
         teamId: createdTeams["e4"].id,
+        tenantId: tenant.id,
         type: EventType.TOURNAMENT,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
@@ -414,6 +533,7 @@ async function main() {
       data: {
         seasonId: activeSeason.id,
         teamId: createdTeams["e4"].id,
+        tenantId: tenant.id,
         type: EventType.TRAINING,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
@@ -437,6 +557,7 @@ async function main() {
   await prisma.event.create({
     data: {
       seasonId: activeSeason.id,
+      tenantId: tenant.id,
       type: EventType.OTHER,
       source: EventSource.MANUAL,
       status: EventStatus.SCHEDULED,
@@ -456,6 +577,7 @@ async function main() {
     },
   });
 
+  // ── 7. Admin user ─────────────────────────────────────────────────────────
   const superAdminRole = await prisma.role.findUnique({
     where: { key: "super_admin" },
   });
@@ -497,10 +619,28 @@ async function main() {
     },
   });
 
+  // ── 8. Admin → FC Allschwil UserTenant ────────────────────────────────────
+  await prisma.userTenant.upsert({
+    where: {
+      userId_tenantId: {
+        userId: adminUser.id,
+        tenantId: tenant.id,
+      },
+    },
+    update: { isActive: true, role: "super_admin" },
+    create: {
+      userId: adminUser.id,
+      tenantId: tenant.id,
+      role: "super_admin",
+      isActive: true,
+    },
+  });
+
+  console.log("✓ Admin user linked to tenant: FC Allschwil");
   console.log("Seed finished successfully.");
   console.log("Admin login:");
-  console.log("Email: admin@fcallschwil.ch");
-  console.log("Password: ChangeMe123! -> change immediately after first login.");
+  console.log("  Email:    admin@fcallschwil.ch");
+  console.log("  Password: ChangeMe123! → change immediately after first login.");
 }
 
 main()

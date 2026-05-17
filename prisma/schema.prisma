@@ -242,14 +242,17 @@ model Season {
   startDate DateTime
   endDate   DateTime
   isActive  Boolean  @default(false)
+  tenantId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tenant          Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   teamSeasons     TeamSeason[]
   events          Event[]
   eventImportRuns EventImportRun[]
 
   @@index([isActive])
+  @@index([tenantId])
 }
 
 model Person {
@@ -288,15 +291,18 @@ model Team {
   isActive         Boolean  @default(true)
   websiteVisible   Boolean  @default(true)
   infoboardVisible Boolean  @default(true)
+  tenantId         String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  tenant          Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   teamSeasons     TeamSeason[]
   events          Event[]
   eventImportRuns EventImportRun[]
 
   @@index([category, sortOrder])
   @@index([isActive])
+  @@index([tenantId])
 }
 
 model TeamSeason {
@@ -376,6 +382,7 @@ model Event {
   id       String      @id @default(cuid())
   seasonId String
   teamId   String?
+  tenantId String?
   type     EventType
   source   EventSource
   status   EventStatus @default(SCHEDULED)
@@ -423,8 +430,9 @@ model Event {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  season Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([seasonId, type])
   @@index([teamId, type])
@@ -441,6 +449,7 @@ model Event {
   @@index([teamPageVisible])
   @@index([externalSource, externalSourceId])
   @@index([importBatchKey])
+  @@index([tenantId])
 }
 
 model EventImportRun {
@@ -512,6 +521,9 @@ model Tenant {
   updatedAt    DateTime @updatedAt
 
   userTenants UserTenant[]
+  teams       Team[]
+  seasons     Season[]
+  events      Event[]
 
   @@index([slug])
   @@index([isActive])
