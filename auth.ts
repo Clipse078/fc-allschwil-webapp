@@ -120,6 +120,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
                   select: { id: true, slug: true, name: true, displayName: true, isActive: true },
                 },
               },
+              orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
               take: 1,
             },
           },

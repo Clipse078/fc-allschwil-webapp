@@ -535,6 +535,7 @@ model UserTenant {
   tenantId  String
   role      String   @default("member")
   isActive  Boolean  @default(true)
+  isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -545,4 +546,5 @@ model UserTenant {
   @@index([userId])
   @@index([tenantId])
   @@index([isActive])
+  @@index([isDefault])
 }
