@@ -1,4 +1,23 @@
-﻿import { Flag, MapPin, MoreHorizontal, TrendingUp } from "lucide-react";
+﻿/**
+ * TODO: Cross-Module Linking — Initiative ↔ Target integration
+ *
+ * When Initiative is promoted to a DB-backed model:
+ * 1. Each Initiative should have an optional targetId FK → shows which Target
+ *    it is operationalising.
+ * 2. Initiative completion events → trigger a Target metric contribution:
+ *    "Initiative X completed" can auto-post a TargetDataPoint if the Initiative
+ *    has a contributionMetricId and contributionValue set.
+ * 3. Show a "Parent Target" badge on Initiative cards that are linked.
+ * 4. Target detail page reverse-panel: "Operationalising Initiatives" with
+ *    progress bars mirroring each Initiative's progress toward the Target.
+ *
+ * TODO: Initiative contribution scoring
+ * When multiple Initiatives serve one Target, weight each by contribution
+ * percentage (stored on the Initiative-Target junction row). Aggregate into
+ * a "contribution signal" on the Target detail alongside direct metrics.
+ */
+
+import { Flag, MapPin, MoreHorizontal, TrendingUp } from "lucide-react";
 
 const INITIATIVES = [
   {

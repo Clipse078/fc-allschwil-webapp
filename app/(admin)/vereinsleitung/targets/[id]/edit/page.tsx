@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargetById } from "@/lib/targets/queries";
 import TargetForm from "@/components/admin/targets/TargetForm";
+import TargetLinkEditor from "@/components/admin/targets/TargetLinkEditor";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { parseEntityRefs } from "@/lib/linking/helpers";
 import { ArrowLeft } from "lucide-react";
 
 type PageProps = {
@@ -62,6 +64,12 @@ export default async function EditTargetPage({ params }: PageProps) {
       />
 
       <TargetForm mode="edit" targetId={id} defaultValues={defaultValues} />
+
+      <TargetLinkEditor
+        targetId={id}
+        initialInitiativeRefs={parseEntityRefs(target.linkedInitiativeRefs)}
+        initialMeetingRefs={parseEntityRefs(target.linkedMeetingRefs)}
+      />
     </div>
   );
 }

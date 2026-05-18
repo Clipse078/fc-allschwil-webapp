@@ -53,6 +53,8 @@ export async function getTargetById(id: string) {
       requiresFourEyeReview: true,
       reviewedByUserId: true,
       reviewedAt: true,
+      linkedInitiativeRefs: true,
+      linkedMeetingRefs: true,
       createdAt: true,
       updatedAt: true,
       metrics: {

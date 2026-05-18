@@ -6,6 +6,7 @@ import { getTargetById } from "@/lib/targets/queries";
 import TargetMetricProgress from "@/components/admin/targets/TargetMetricProgress";
 import TargetDataPointForm from "@/components/admin/targets/TargetDataPointForm";
 import TargetStageActions from "@/components/admin/targets/TargetStageActions";
+import TargetLinksPanel from "@/components/admin/targets/TargetLinksPanel";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { Edit, ArrowLeft, Calendar, Tag, ShieldCheck } from "lucide-react";
@@ -275,6 +276,12 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
               </div>
             </section>
           ) : null}
+
+          <TargetLinksPanel
+            targetId={id}
+            linkedInitiativeRefsRaw={target.linkedInitiativeRefs}
+            linkedMeetingRefsRaw={target.linkedMeetingRefs}
+          />
         </aside>
       </div>
     </div>

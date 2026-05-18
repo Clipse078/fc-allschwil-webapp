@@ -553,10 +553,15 @@ model Target {
   nudgeJson     Json?
 
   // Governance foundation — consistent with Event.reviewStage pattern
-  reviewStage          ReviewWorkflowStage @default(DRAFT)
-  requiresFourEyeReview Boolean            @default(false)
-  reviewedByUserId     String?
-  reviewedAt           DateTime?
+  reviewStage           ReviewWorkflowStage @default(DRAFT)
+  requiresFourEyeReview Boolean             @default(false)
+  reviewedByUserId      String?
+  reviewedAt            DateTime?
+
+  // Cross-module linking (phase 1: slug/title refs; phase 2: proper FK relations)
+  // Stored as [{slug, title, url?}][] — validated by lib/linking/helpers.ts
+  linkedInitiativeRefs Json?
+  linkedMeetingRefs     Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -1,4 +1,20 @@
-﻿import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
+﻿/**
+ * TODO: Cross-Module Linking — Meeting detail integration
+ *
+ * When Meeting is promoted to a DB-backed model:
+ * 1. Add a "Verknüpfte Ziele" section showing Targets that reference this Meeting
+ *    (reverse query: Target.linkedMeetingRefs contains this meeting's slug/id).
+ * 2. Surface action items from this meeting that are linked to Targets.
+ * 3. Decision records should optionally append to Target.nudgeJson as
+ *    "meeting outcome" nudges.
+ * 4. Use TargetLinksPanel in reverse: MeetingLinkedTargetsPanel.
+ *
+ * TODO: Operational traceability
+ * Meeting outcomes → Target progress notes (auto-append as TargetDataPoint
+ * when a meeting agenda item is closed with a numeric resolution).
+ */
+
+import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
 import VereinsleitungMeetingAgendaCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingAgendaCard";
 import VereinsleitungMeetingDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingDecisionsCard";
 import VereinsleitungMeetingInfoCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingInfoCard";
