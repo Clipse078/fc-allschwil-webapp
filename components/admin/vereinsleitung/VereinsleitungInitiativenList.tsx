@@ -24,9 +24,11 @@
  */
 
 import Link from "next/link";
-import { ChevronRight, Flag, Plus, Users } from "lucide-react";
+import { ChevronRight, Edit, Flag, Plus, Users } from "lucide-react";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
+import VisibilityScopeBadge from "@/components/admin/shared/VisibilityScopeBadge";
 import type { ReviewWorkflowStage } from "@prisma/client";
+import type { VisibilityScopeValue } from "@/components/admin/shared/VisibilityScopeSelect";
 
 export type InitiativeListItemShape = {
   id: string;
@@ -38,6 +40,7 @@ export type InitiativeListItemShape = {
   progress: number | null;
   dueDate: Date | null;
   reviewStage: ReviewWorkflowStage;
+  visibilityScope: VisibilityScopeValue;
 };
 
 const STATUS_LABELS: Record<InitiativeListItemShape["status"], string> = {
@@ -136,11 +139,24 @@ export default function VereinsleitungInitiativenList({
             </div>
 
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <ReviewStageBadge stage={initiative.reviewStage} size="sm" />
-              <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
-                Öffnen
-                <ChevronRight className="h-4 w-4" />
-              </span>
+              <div className="flex items-center gap-1.5">
+                <ReviewStageBadge stage={initiative.reviewStage} size="sm" />
+                <VisibilityScopeBadge scope={initiative.visibilityScope} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/vereinsleitung/initiativen/${initiative.slug}/edit`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-700"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                  Bearbeiten
+                </Link>
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
+                  Öffnen
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </div>
             </div>
           </div>
 

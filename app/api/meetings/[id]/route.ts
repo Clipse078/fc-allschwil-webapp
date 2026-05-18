@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
-import { MeetingStatus } from "@prisma/client";
+import { MeetingStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getMeetingById } from "@/lib/meetings/queries";
 
@@ -48,6 +48,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     const body = await request.json().catch(() => ({}));
     const validStatuses = Object.values(MeetingStatus);
+    const validScopes = Object.values(VisibilityScope);
 
     const updated = await prisma.meeting.update({
       where: { id },
@@ -59,6 +60,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         attendeeCount: body?.attendeeCount !== undefined ? Number(body.attendeeCount) || null : undefined,
         status: validStatuses.includes(body?.status as MeetingStatus)
           ? (body.status as MeetingStatus)
+          : undefined,
+        visibilityScope: validScopes.includes(body?.visibilityScope as VisibilityScope)
+          ? (body.visibilityScope as VisibilityScope)
           : undefined,
         requiresFourEyeReview:
           typeof body?.requiresFourEyeReview === "boolean"

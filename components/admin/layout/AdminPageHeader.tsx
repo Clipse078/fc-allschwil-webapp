@@ -68,6 +68,38 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/vereinsleitung/initiativen/new") {
+    return {
+      eyebrow: "Initiativen",
+      title: "Neue Initiative",
+      description: "Initiative mit Sichtbarkeitseinstellungen erfassen.",
+    };
+  }
+
+  if (pathname.endsWith("/edit") && pathname.startsWith("/vereinsleitung/initiativen/")) {
+    return {
+      eyebrow: "Initiativen",
+      title: "Initiative bearbeiten",
+      description: "Initiative und Sichtbarkeit anpassen.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/meetings/new") {
+    return {
+      eyebrow: "Meetings",
+      title: "Neues Meeting",
+      description: "Meeting mit Datum, Ort und Sichtbarkeitseinstellungen erfassen.",
+    };
+  }
+
+  if (pathname.endsWith("/edit") && pathname.startsWith("/vereinsleitung/meetings/")) {
+    return {
+      eyebrow: "Meetings",
+      title: "Meeting bearbeiten",
+      description: "Meeting und Sichtbarkeit anpassen.",
+    };
+  }
+
   if (pathname === "/vereinsleitung/initiativen/website-relaunch") {
     return {
       eyebrow: "Initiativen",

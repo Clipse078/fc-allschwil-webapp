@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
-import { InitiativeStatus } from "@prisma/client";
+import { InitiativeStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getInitiatives } from "@/lib/initiatives/queries";
 
@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
         progress,
         dueDate: body?.dueDate ? new Date(body.dueDate) : null,
         createdByUserId: check.session.user.id,
+        visibilityScope: Object.values(VisibilityScope).includes(body?.visibilityScope as VisibilityScope)
+          ? (body.visibilityScope as VisibilityScope)
+          : VisibilityScope.ORGANISATION,
       },
       select: { id: true, slug: true, title: true },
     });

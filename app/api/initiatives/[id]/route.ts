@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
-import { InitiativeStatus } from "@prisma/client";
+import { InitiativeStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getInitiativeById } from "@/lib/initiatives/queries";
 
@@ -73,6 +73,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
               ? new Date(body.dueDate)
               : null
             : undefined,
+        visibilityScope: Object.values(VisibilityScope).includes(body?.visibilityScope as VisibilityScope)
+          ? (body.visibilityScope as VisibilityScope)
+          : undefined,
         requiresFourEyeReview:
           typeof body?.requiresFourEyeReview === "boolean"
             ? body.requiresFourEyeReview

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
-import { MeetingStatus } from "@prisma/client";
+import { MeetingStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getMeetings } from "@/lib/meetings/queries";
 
@@ -61,6 +61,11 @@ export async function POST(request: NextRequest) {
       ? (body.status as MeetingStatus)
       : MeetingStatus.PLANNED;
 
+    const validScopes = Object.values(VisibilityScope);
+    const visibilityScope: VisibilityScope = validScopes.includes(body?.visibilityScope as VisibilityScope)
+      ? (body.visibilityScope as VisibilityScope)
+      : VisibilityScope.ORGANISATION;
+
     const created = await prisma.meeting.create({
       data: {
         slug,
@@ -70,6 +75,7 @@ export async function POST(request: NextRequest) {
         location: body?.location?.trim() || null,
         attendeeCount: body?.attendeeCount ? Number(body.attendeeCount) : null,
         status,
+        visibilityScope,
         createdByUserId: check.session.user.id,
       },
       select: { id: true, slug: true, title: true },

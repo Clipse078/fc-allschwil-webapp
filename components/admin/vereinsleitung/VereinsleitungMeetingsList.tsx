@@ -16,9 +16,11 @@
  */
 
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Plus, Users } from "lucide-react";
+import { CalendarDays, ChevronRight, Edit, Plus, Users } from "lucide-react";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
+import VisibilityScopeBadge from "@/components/admin/shared/VisibilityScopeBadge";
 import type { ReviewWorkflowStage } from "@prisma/client";
+import type { VisibilityScopeValue } from "@/components/admin/shared/VisibilityScopeSelect";
 
 export type MeetingListItemShape = {
   id: string;
@@ -29,6 +31,7 @@ export type MeetingListItemShape = {
   attendeeCount: number | null;
   status: "PLANNED" | "COMPLETED" | "CANCELLED";
   reviewStage: ReviewWorkflowStage;
+  visibilityScope: VisibilityScopeValue;
 };
 
 const STATUS_LABELS: Record<MeetingListItemShape["status"], string> = {
@@ -108,11 +111,24 @@ export default function VereinsleitungMeetingsList({
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
                 {STATUS_LABELS[meeting.status]}
               </span>
-              <ReviewStageBadge stage={meeting.reviewStage} size="sm" />
-              <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
-                Öffnen
-                <ChevronRight className="h-4 w-4" />
-              </span>
+              <div className="flex items-center gap-1.5">
+                <ReviewStageBadge stage={meeting.reviewStage} size="sm" />
+                <VisibilityScopeBadge scope={meeting.visibilityScope} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/vereinsleitung/meetings/${meeting.slug}/edit`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-700"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                  Bearbeiten
+                </Link>
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
+                  Öffnen
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </div>
             </div>
           </div>
         </Link>

@@ -1,4 +1,6 @@
-﻿import { auth } from "@/auth";
+﻿import Link from "next/link";
+import { Plus } from "lucide-react";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getInitiatives } from "@/lib/initiatives/queries";
 import { buildActorContext } from "@/lib/visibility/actor-context";
@@ -18,6 +20,15 @@ export default async function VereinsleitungInitiativenPage() {
         eyebrow="Initiativen"
         title="Initiativen"
         description="Übersicht aller Initiativen – absteigend vom neuesten zum ältesten Eintrag."
+        actions={
+          <Link
+            href="/vereinsleitung/initiativen/new"
+            className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          >
+            <Plus className="h-4 w-4" />
+            Neue Initiative
+          </Link>
+        }
       />
       <VereinsleitungInitiativenList initiatives={initiatives} />
     </div>
