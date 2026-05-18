@@ -73,9 +73,11 @@ export function canSeeEntity(entity: VisibilityCheckable, actor: ActorContext): 
   // const teamIds = parseStringArray(entity.visibleTeamRefs);
   // if (teamIds.some(id => actor.teamIds?.includes(id))) return true;
 
-  // TODO: orgUnit membership check — requires actor.orgUnitIds (not yet in session)
-  // const orgUnitIds = parseStringArray(entity.visibleOrgUnitRefs);
-  // if (orgUnitIds.some(id => actor.orgUnitIds?.includes(id))) return true;
+  // Org unit membership check — uses actor.orgUnitIds (loaded via loadOrgUnitIds)
+  const visibleOrgUnitIds = parseStringArray(entity.visibleOrgUnitRefs);
+  if (visibleOrgUnitIds.length > 0 && actor.orgUnitIds.length > 0) {
+    if (visibleOrgUnitIds.some((id) => actor.orgUnitIds.includes(id))) return true;
+  }
 
   // TODO: person ID check — requires actor.personId (not yet in session)
   // const personIds = parseStringArray(entity.visiblePersonRefs);

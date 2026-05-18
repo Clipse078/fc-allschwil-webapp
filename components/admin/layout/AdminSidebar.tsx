@@ -8,6 +8,7 @@ import {
   BadgeIcon,
   BarChart3,
   Briefcase,
+  Building2,
   CalendarDays,
   CalendarRange,
   ChevronLeft,
@@ -70,6 +71,8 @@ function getNavIcon(label: string) {
       return UserRound;
     case "Trainer":
       return BadgeIcon;
+    case "Organisation":
+      return Building2;
     case "Benutzer":
       return Shield;
     default:

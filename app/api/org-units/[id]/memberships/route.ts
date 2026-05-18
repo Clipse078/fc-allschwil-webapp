@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { OrgUnitMembershipStatus } from "@prisma/client";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: RouteContext) {
+  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
+
+  const { id } = await params;
+  const memberships = await prisma.orgUnitMembership.findMany({
+    where: { orgUnitId: id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, userId: true, personId: true, roleKey: true, status: true, isPrimary: true, startsAt: true, endsAt: true },
+  });
+  return NextResponse.json({ memberships });
+}
+
+export async function POST(req: NextRequest, { params }: RouteContext) {
+  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
+
+  const { id } = await params;
+  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true } });
+  if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+
+  const body = await req.json().catch(() => ({}));
+  const userId = body?.userId?.trim() || null;
+  const personId = body?.personId?.trim() || null;
+  if (!userId && !personId) return NextResponse.json({ error: "userId oder personId ist erforderlich." }, { status: 400 });
+
+  const validStatuses = Object.values(OrgUnitMembershipStatus);
+  const status: OrgUnitMembershipStatus = validStatuses.includes(body?.status) ? body.status : OrgUnitMembershipStatus.ACTIVE;
+
+  try {
+    const membership = await prisma.orgUnitMembership.create({
+      data: {
+        orgUnitId: id,
+        userId,
+        personId,
+        roleKey: body?.roleKey?.trim() || null,
+        status,
+        isPrimary: body?.isPrimary === true,
+        startsAt: body?.startsAt ? new Date(body.startsAt) : null,
+        endsAt: body?.endsAt ? new Date(body.endsAt) : null,
+      },
+      select: { id: true, userId: true, personId: true, roleKey: true, status: true },
+    });
+    return NextResponse.json({ membership }, { status: 201 });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Mitgliedschaft konnte nicht erstellt werden." }, { status: 500 });
+  }
+}

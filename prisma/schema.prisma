@@ -30,6 +30,29 @@ enum VisibilityScope {
   PRIVATE
 }
 
+enum OrgUnitType {
+  CLUB
+  DIVISION
+  DEPARTMENT
+  SUB_DEPARTMENT
+  TEAM
+  COMMITTEE
+  PROJECT_GROUP
+  CUSTOM
+}
+
+enum OrgUnitStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum OrgUnitMembershipStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
 enum CommunicationTemplateCategory {
   MATCH_INVITATION
   MEETING_FOLLOWUP
@@ -731,6 +754,66 @@ model Meeting {
   @@index([status])
   @@index([reviewStage])
   @@index([visibilityScope])
+}
+
+model OrgUnit {
+  id          String        @id @default(cuid())
+  tenantId    String?
+  parentId    String?
+  type        OrgUnitType   @default(DEPARTMENT)
+  status      OrgUnitStatus @default(ACTIVE)
+  key         String        @unique
+  name        String
+  description String?
+  sortOrder   Int           @default(0)
+  level       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  parent      OrgUnit?  @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children    OrgUnit[] @relation("OrgUnitHierarchy")
+  memberships OrgUnitMembership[]
+
+  @@index([tenantId])
+  @@index([parentId])
+  @@index([type, status])
+}
+
+model OrgUnitMembership {
+  id        String                  @id @default(cuid())
+  tenantId  String?
+  orgUnitId String
+  userId    String?
+  personId  String?
+  roleKey   String?
+  status    OrgUnitMembershipStatus @default(ACTIVE)
+  isPrimary Boolean                 @default(false)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  orgUnit OrgUnit @relation(fields: [orgUnitId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([orgUnitId])
+  @@index([userId])
+  @@index([tenantId, userId])
+  @@index([orgUnitId, status])
+}
+
+model TargetGroup {
+  id          String        @id @default(cuid())
+  tenantId    String?
+  key         String        @unique
+  name        String
+  description String?
+  status      OrgUnitStatus @default(ACTIVE)
+  ruleJson    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
 }
 
 model CommunicationTemplate {

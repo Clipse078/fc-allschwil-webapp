@@ -84,6 +84,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
   },
   {
+    label: "Organisation",
+    href: "/dashboard/org-units",
+    permissionKeys: [PERMISSIONS.USERS_MANAGE],
+  },
+  {
     label: "Benutzer",
     href: "/dashboard/users",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],

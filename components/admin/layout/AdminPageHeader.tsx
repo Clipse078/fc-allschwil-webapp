@@ -196,6 +196,14 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/dashboard/org-units" || pathname.startsWith("/dashboard/org-units/")) {
+    return {
+      eyebrow: "Organisation",
+      title: "Organisationseinheiten",
+      description: "Organigramm-Grundlage für Sichtbarkeit, Kommunikation und Workflow-Routing.",
+    };
+  }
+
   if (pathname === "/dashboard/users" || pathname.startsWith("/dashboard/users/")) {
     return {
       eyebrow: "Benutzer & Rechte",
