@@ -6,6 +6,9 @@ import {
   CommunicationTemplateStatus,
   VisibilityScope,
 } from "@prisma/client";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { requireTemplateAccess } from "@/lib/visibility/visibility-guards";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 async function requireSession() {
   const session = await auth();
@@ -19,8 +22,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
+  const guard = await requireTemplateAccess({ actor, id, access: "read" });
+  if (!guard.ok) return guard.response;
+
   const template = await prisma.communicationTemplate.findUnique({ where: { id } });
-  if (!template) return NextResponse.json({ error: "Vorlage nicht gefunden." }, { status: 404 });
   return NextResponse.json({ template });
 }
 
@@ -28,8 +34,9 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const existing = await prisma.communicationTemplate.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) return NextResponse.json({ error: "Vorlage nicht gefunden." }, { status: 404 });
+  const actor = buildActorContext(check.session.user);
+  const guard = await requireTemplateAccess({ actor, id, access: "write" });
+  if (!guard.ok) return guard.response;
 
   const body = await req.json().catch(() => ({}));
   const validCategories = Object.values(CommunicationTemplateCategory);
@@ -50,6 +57,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       },
       select: { id: true, slug: true, title: true },
     });
+    void logAuditEvent({ actorUserId: actor.userId, module: "targets", entityId: id, action: "UPDATE", after: { id: updated.id, title: updated.title } });
     return NextResponse.json({ template: updated });
   } catch (e) {
     console.error(e);
@@ -61,8 +69,16 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const existing = await prisma.communicationTemplate.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) return NextResponse.json({ error: "Vorlage nicht gefunden." }, { status: 404 });
-  await prisma.communicationTemplate.delete({ where: { id } });
-  return NextResponse.json({ message: "Vorlage gelöscht." });
+  const actor = buildActorContext(check.session.user);
+  const guard = await requireTemplateAccess({ actor, id, access: "delete" });
+  if (!guard.ok) return guard.response;
+
+  try {
+    await prisma.communicationTemplate.delete({ where: { id } });
+    void logAuditEvent({ actorUserId: actor.userId, module: "targets", entityId: id, action: "DELETE", before: { id, title: guard.entity.title } });
+    return NextResponse.json({ message: "Vorlage gelöscht." });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Vorlage konnte nicht gelöscht werden." }, { status: 500 });
+  }
 }

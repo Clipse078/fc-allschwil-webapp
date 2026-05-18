@@ -11,6 +11,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { renderTemplate, buildSampleContext, extractVariableKeys } from "@/lib/communication/variables";
+import { resolveContext } from "@/lib/communication/context-resolver";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { requireTemplateAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -25,16 +28,30 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
+  const guard = await requireTemplateAccess({ actor, id, access: "read" });
+  if (!guard.ok) return guard.response;
+
   const template = await prisma.communicationTemplate.findUnique({
     where: { id },
-    select: { id: true, subject: true, bodyMarkdown: true },
+    select: { id: true, subject: true, bodyMarkdown: true, moduleKey: true },
   });
   if (!template) return NextResponse.json({ error: "Vorlage nicht gefunden." }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+
+  // Build context: start with sample, optionally replace with real entity data
+  let entityContext: Record<string, string> = {};
+  const resolveModuleKey = body?.moduleKey ?? template.moduleKey;
+  const resolveEntityId = body?.entityId;
+  if (resolveModuleKey && resolveEntityId) {
+    entityContext = await resolveContext(resolveModuleKey, resolveEntityId);
+  }
+
   const context: Record<string, string> = {
-    ...buildSampleContext(),
-    ...(typeof body?.context === "object" ? body.context : {}),
+    ...buildSampleContext(),         // sample fallback for all vars
+    ...entityContext,                 // real entity data (overrides sample)
+    ...(typeof body?.context === "object" ? body.context : {}), // manual overrides
   };
 
   const renderedSubject = renderTemplate(template.subject, context);

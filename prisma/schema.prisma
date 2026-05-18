@@ -21,6 +21,7 @@ enum PermissionModule {
   TARGETS
   MEETINGS
   INITIATIVES
+  TEMPLATES
 }
 
 enum VisibilityScope {

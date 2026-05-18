@@ -7,6 +7,7 @@ import {
   VisibilityScope,
 } from "@prisma/client";
 import { getCommunicationTemplates } from "@/lib/communication/queries";
+import { buildActorContext } from "@/lib/visibility/actor-context";
 
 async function requireSession() {
   const session = await auth();
@@ -17,7 +18,16 @@ async function requireSession() {
 export async function GET() {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
-  const templates = await getCommunicationTemplates();
+
+  const actor = buildActorContext(check.session.user);
+
+  // Templates permission check for listing
+  if (!actor.permissionKeys.includes("templates.view") && !actor.permissionKeys.includes("templates.manage")) {
+    return NextResponse.json({ error: "templates.view Berechtigung erforderlich." }, { status: 403 });
+  }
+
+  // Visibility filter: ORGANISATION + own PRIVATE/RESTRICTED
+  const templates = await getCommunicationTemplates(actor.userId);
   return NextResponse.json({ templates });
 }
 

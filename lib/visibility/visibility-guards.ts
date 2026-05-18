@@ -56,6 +56,8 @@ const PERM = {
   INITIATIVES_MANAGE: "initiatives.manage",
   TARGETS_VIEW: "targets.view",
   TARGETS_MANAGE: "targets.manage",
+  TEMPLATES_VIEW: "templates.view",
+  TEMPLATES_MANAGE: "templates.manage",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -301,4 +303,73 @@ export async function requireTargetAccess(opts: {
   // TODO: Phase B — audit log emission
 
   return { ok: true, entity: target };
+}
+
+// ---------------------------------------------------------------------------
+// requireTemplateAccess
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_GUARD_SELECT = {
+  id: true,
+  slug: true,
+  title: true,
+  reviewStage: true,
+  visibilityScope: true,
+  createdByUserId: true,
+  // Note: CommunicationTemplate has no full allowlist fields (visibleRoleRefs etc.)
+  // Visibility is simplified: ORGANISATION = all, PRIVATE/RESTRICTED = creator only.
+} as const;
+
+type TemplateGuardEntity = {
+  id: string;
+  slug: string;
+  title: string;
+  reviewStage: string;
+  visibilityScope: string;
+  createdByUserId: string | null;
+};
+
+/**
+ * Guard for CommunicationTemplate read/write/delete operations.
+ *
+ * Simplified visibility (CommunicationTemplate has no full allowlist fields):
+ *   ORGANISATION → visible to all authenticated actors with permission
+ *   PRIVATE / RESTRICTED → creator only (no allowlist to check yet)
+ *
+ * Phase 2: add visibleRoleRefs/visibleUserRefs to CommunicationTemplate and
+ * switch to full canSeeEntity() check.
+ */
+export async function requireTemplateAccess(opts: {
+  actor: ActorContext;
+  id: string;
+  access: AccessMode;
+}): Promise<GuardResult<TemplateGuardEntity>> {
+  const template = await prisma.communicationTemplate.findUnique({
+    where: { id: opts.id },
+    select: TEMPLATE_GUARD_SELECT,
+  });
+
+  if (!template) return notFound("Vorlage nicht gefunden.");
+
+  // Simplified visibility check
+  const isVisible =
+    template.visibilityScope === "ORGANISATION" ||
+    (template.createdByUserId && template.createdByUserId === opts.actor.userId);
+
+  if (!isVisible) return notFound("Vorlage nicht gefunden.");
+
+  // Permission check
+  if (opts.access === "read") {
+    if (!hasPermission(opts.actor, PERM.TEMPLATES_VIEW, PERM.TEMPLATES_MANAGE)) {
+      return forbidden("templates.view Berechtigung erforderlich.");
+    }
+  } else {
+    if (!hasPermission(opts.actor, PERM.TEMPLATES_MANAGE)) {
+      return forbidden("templates.manage Berechtigung erforderlich.");
+    }
+  }
+
+  // TODO: Phase B — audit log emission
+
+  return { ok: true, entity: template };
 }

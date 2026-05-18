@@ -1,7 +1,13 @@
 import { prisma } from "@/lib/db/prisma";
 
-export async function getCommunicationTemplates() {
+export async function getCommunicationTemplates(actorUserId?: string) {
   return prisma.communicationTemplate.findMany({
+    where: {
+      OR: [
+        { visibilityScope: "ORGANISATION" },
+        ...(actorUserId ? [{ createdByUserId: actorUserId }] : []),
+      ],
+    },
     orderBy: [{ status: "asc" }, { category: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,

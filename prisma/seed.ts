@@ -87,6 +87,9 @@ async function main() {
 
     { key: "initiatives.view", name: "View initiatives", module: PermissionModule.INITIATIVES },
     { key: "initiatives.manage", name: "Manage initiatives", module: PermissionModule.INITIATIVES },
+
+    { key: "templates.view", name: "View templates", module: PermissionModule.TEMPLATES },
+    { key: "templates.manage", name: "Manage templates", module: PermissionModule.TEMPLATES },
   ] as const;
 
   for (const permission of permissions) {

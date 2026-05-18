@@ -6,6 +6,8 @@ import VereinsleitungMeetingsCard from "@/components/admin/vereinsleitung/Verein
 import VereinsleitungTasksCard from "@/components/admin/vereinsleitung/VereinsleitungTasksCard";
 import type { TargetListItem } from "@/lib/targets/queries";
 import type { MeetingListItem } from "@/lib/meetings/queries";
+import type { InitiativeListItem } from "@/lib/initiatives/queries";
+import type { KpiItem } from "@/components/admin/vereinsleitung/VereinsleitungKpiCard";
 
 /**
  * TODO: Cross-Module Linking — System Health Panel
@@ -13,28 +15,30 @@ import type { MeetingListItem } from "@/lib/meetings/queries";
  * - Meetings with open Actions linked to SUBMITTED Targets
  * - Smart nudges: stalled targets, overdue initiatives, unreviewed items
  * No AI — deterministic operational intelligence only.
- *
- * TODO: initiatives prop once VereinsleitungInitiativesCard is upgraded to accept DB data
  */
 
 type VereinsleitungDashboardProps = {
   targets?: TargetListItem[];
   meetings?: MeetingListItem[];
+  initiatives?: InitiativeListItem[];
+  kpis?: KpiItem[];
 };
 
 export default function VereinsleitungDashboard({
   targets = [],
   meetings = [],
+  initiatives = [],
+  kpis = [],
 }: VereinsleitungDashboardProps) {
   return (
     <div className="space-y-5">
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.9fr)]">
         <VereinsleitungGoalsCard targets={targets} />
-        <VereinsleitungKpiCard />
+        <VereinsleitungKpiCard items={kpis} />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.9fr)]">
-        <VereinsleitungInitiativesCard />
+        <VereinsleitungInitiativesCard initiatives={initiatives} />
         <VereinsleitungMeetingsCard meetings={meetings} />
       </section>
 
