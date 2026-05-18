@@ -157,6 +157,24 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
     ],
   },
 
+  // ── Initiatives (canonical standalone routes) ─────────────────────────────
+  {
+    pattern: "/initiatives/new",
+    match: "exact",
+    actions: [
+      { icon: CalendarPlus, labelKey: "backToInitiatives", labelNs: "pageActions", variant: "secondary", type: "link", href: "/initiatives" },
+    ],
+  },
+  {
+    pattern: "/initiatives",
+    match: "exact",
+    actions: [
+      { icon: Plus, labelKey: "initiativePlanNew", labelNs: "pageActions", variant: "primary", type: "link", href: "/initiatives/new" },
+    ],
+  },
+  // Note: /initiatives/[id] and /initiatives/[id]/edit are handled imperatively
+  // in AdminPageActions (dynamic ID in href requires regex matching).
+
   // ── Vereinsleitung / Meetings (legacy — redirects to /meetings) ────────────
   // TODO(decoupling): Patterns move to "/meetings" when Meetings module is decoupled.
   {

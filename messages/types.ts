@@ -102,6 +102,9 @@ export type Messages = {
     backToPlanner: string;
     backToMeetings: string;
     backToMeeting: string;
+    backToInitiative: string;
+    backToInitiatives: string;
+    initiativePlanNew: string;
     seasonSwitch: string;
     teamNew: string;
     eventNew: string;

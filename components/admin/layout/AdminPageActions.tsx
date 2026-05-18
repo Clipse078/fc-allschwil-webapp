@@ -58,6 +58,34 @@ export default function AdminPageActions() {
     );
   }
 
+  // ── Initiative detail pages: /initiatives/[id] ──────────────────────────
+  const initiativeDetailMatch = /^\/initiatives\/([^/]+)$/.exec(pathname);
+  if (initiativeDetailMatch && initiativeDetailMatch[1] !== "new") {
+    const initiativeId = initiativeDetailMatch[1];
+    return (
+      <div className={ACTION_ROW}>
+        <Link href={`/initiatives/${initiativeId}/edit`} className={SECONDARY_BTN}>
+          <Pencil className="h-4 w-4" />
+          {tActions("edit")}
+        </Link>
+      </div>
+    );
+  }
+
+  // ── Initiative edit pages: /initiatives/[id]/edit ────────────────────────
+  const initiativeEditMatch = /^\/initiatives\/([^/]+)\/edit$/.exec(pathname);
+  if (initiativeEditMatch) {
+    const initiativeId = initiativeEditMatch[1];
+    return (
+      <div className={ACTION_ROW}>
+        <Link href={`/initiatives/${initiativeId}`} className={SECONDARY_BTN}>
+          <CalendarPlus className="h-4 w-4" />
+          {tActions("backToInitiative")}
+        </Link>
+      </div>
+    );
+  }
+
   // ── Meeting detail pages: /meetings/[id] ────────────────────────────────
   // Handled before config because the href requires the dynamic [id] segment.
   const meetingDetailMatch = /^\/meetings\/([^/]+)$/.exec(pathname);

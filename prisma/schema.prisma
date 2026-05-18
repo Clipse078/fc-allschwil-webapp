@@ -19,6 +19,7 @@ enum PermissionModule {
   INFOBOARD
   FUNCTIONS
   MEETINGS
+  INITIATIVES
 }
 
 enum TeamCategory {

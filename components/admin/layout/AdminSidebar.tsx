@@ -49,8 +49,9 @@ const NAV_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> 
   "/vereinsleitung": Briefcase,
   // /vereinsleitung/meetings kept for icon fallback only — nav item now points to /meetings
   "/vereinsleitung/meetings": ScrollText,
-  "/meetings": ScrollText,           // canonical Meetings route
-  "/vereinsleitung/initiativen": Flag,
+  "/meetings": ScrollText,               // canonical Meetings route
+  "/vereinsleitung/initiativen": Flag,   // kept as icon fallback — nav item now points to /initiatives
+  "/initiatives": Flag,                  // canonical Initiatives route
   "/vereinsleitung/kpis": BarChart3,
   "/dashboard/seasons": CalendarRange,
   "/dashboard/planner": ClipboardList,
@@ -68,10 +69,9 @@ function getNavIcon(href: string): React.ComponentType<{ className?: string }> {
   return NAV_ICON_MAP[href] ?? LayoutDashboard;
 }
 
-// Meetings was removed from this set — it is now a standalone top-level nav item at /meetings.
-// Only Initiativen and KPIs remain as Vereinsleitung sub-navigation items.
+// Meetings and Initiativen are now standalone top-level nav items.
+// Only KPIs remains as a Vereinsleitung sub-navigation item.
 const VEREINSLEITUNG_CHILD_HREFS = new Set([
-  "/vereinsleitung/initiativen",
   "/vereinsleitung/kpis",
 ]);
 

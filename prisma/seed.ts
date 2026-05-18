@@ -5,6 +5,8 @@ import {
   EventSource,
   EventStatus,
   EventType,
+  InitiativeStatus,
+  InitiativePriority,
   MeetingStatus,
   PermissionModule,
   PrismaClient,
@@ -74,6 +76,9 @@ async function main() {
 
     { key: "meetings.view", name: "View meetings", module: PermissionModule.MEETINGS },
     { key: "meetings.manage", name: "Manage meetings", module: PermissionModule.MEETINGS },
+
+    { key: "initiatives.view", name: "View initiatives", module: PermissionModule.INITIATIVES },
+    { key: "initiatives.manage", name: "Manage initiatives", module: PermissionModule.INITIATIVES },
   ] as const;
 
   for (const permission of permissions) {
@@ -121,6 +126,8 @@ async function main() {
         "infoboard.manage",
         "meetings.view",
         "meetings.manage",
+        "initiatives.view",
+        "initiatives.manage",
       ],
     },
     {
@@ -506,6 +513,59 @@ async function main() {
           location: meetingData.location ?? null,
           orgUnitLabel: meetingData.orgUnitLabel,
           description: meetingData.description,
+        },
+      });
+    }
+  }
+
+  // ── Demo initiatives ────────────────────────────────────────────────────────
+  const DEMO_INITIATIVES = [
+    {
+      title: "Frauenfussball Offensive",
+      summary: "Ausbau und Stärkung der Frauenabteilung im Verein.",
+      status: InitiativeStatus.ACTIVE,
+      priority: InitiativePriority.HIGH,
+      orgUnitLabel: "Vereinsleitung",
+      dueDate: new Date("2026-12-31T23:59:59.000Z"),
+      ownerName: "Sarah Meier",
+    },
+    {
+      title: "Trainingskonzept 2026",
+      summary: "Modernisierung des Trainingskonzepts für alle Altersstufen.",
+      status: InitiativeStatus.DRAFT,
+      priority: InitiativePriority.MEDIUM,
+      orgUnitLabel: "Technische Leitung",
+      dueDate: new Date("2026-08-01T00:00:00.000Z"),
+      ownerName: "Thomas Schmid",
+    },
+    {
+      title: "Sponsorenabend Sommer 2026",
+      summary: "Organisation und Durchführung des jährlichen Sponsorenanerkennungsanlasses.",
+      status: InitiativeStatus.ACTIVE,
+      priority: InitiativePriority.MEDIUM,
+      orgUnitLabel: "Vereinsleitung",
+      dueDate: new Date("2026-06-28T00:00:00.000Z"),
+      ownerName: "Michael Weber",
+    },
+  ] as const;
+
+  for (const initiativeData of DEMO_INITIATIVES) {
+    const existing = await prisma.initiative.findFirst({
+      where: { title: initiativeData.title, tenantSlug: "fc-allschwil" },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      await prisma.initiative.create({
+        data: {
+          tenantSlug: "fc-allschwil",
+          title: initiativeData.title,
+          summary: initiativeData.summary,
+          status: initiativeData.status,
+          priority: initiativeData.priority,
+          orgUnitLabel: initiativeData.orgUnitLabel,
+          dueDate: initiativeData.dueDate,
+          ownerName: initiativeData.ownerName,
         },
       });
     }

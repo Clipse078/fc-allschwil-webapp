@@ -72,6 +72,36 @@ export const ADMIN_ROUTE_CONFIGS: AdminRouteConfig[] = [
     },
   },
 
+  // ── Initiatives (canonical standalone routes) ─────────────────────────────
+  {
+    pattern: "/initiatives/new",
+    match: "exact",
+    header: {
+      eyebrow: "Initiativen",
+      title: "Neue Initiative",
+      description: "Initiative planen und Aufgaben, Meilensteine und Verantwortliche festhalten.",
+    },
+  },
+  {
+    pattern: "/initiatives",
+    match: "exact",
+    header: {
+      eyebrow: "Initiativen",
+      title: "Initiativen",
+      description:
+        "Strategische Initiativen und Projekte zentral verwalten — unabhängig von Divisions, Teams oder Org-Einheiten.",
+    },
+  },
+  {
+    pattern: "/initiatives/",
+    match: "startsWith",
+    header: {
+      eyebrow: "Initiativen",
+      title: "Initiative Details",
+      description: "Aufgaben, Meilensteine und Fortschritt der Initiative.",
+    },
+  },
+
   // ── Meetings (canonical standalone routes) ────────────────────────────────
   {
     pattern: "/meetings",
@@ -313,8 +343,16 @@ export function getAdminRouteHeader(pathname: string): AdminRouteHeader {
     return {
       eyebrow: "Meetings",
       title: "Meeting bearbeiten",
-      description:
-        "Titel, Status, Datum und weitere Meeting-Felder anpassen.",
+      description: "Titel, Status, Datum und weitere Meeting-Felder anpassen.",
+    };
+  }
+
+  // Initiative edit pages: /initiatives/[id]/edit
+  if (/^\/initiatives\/[^/]+\/edit$/.test(pathname)) {
+    return {
+      eyebrow: "Initiativen",
+      title: "Initiative bearbeiten",
+      description: "Titel, Status, Priorität und weitere Felder anpassen.",
     };
   }
 

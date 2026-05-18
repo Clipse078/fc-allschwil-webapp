@@ -30,8 +30,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     translationKey: "meetings",
     permissionKeys: [PERMISSIONS.MEETINGS_VIEW, PERMISSIONS.MEETINGS_MANAGE],
   },
-  // TODO(decoupling): href should become INITIATIVES_ROUTE_BASE ("/initiatives") after route migration
-  { label: "Initiativen",    href: "/vereinsleitung/initiativen", translationKey: "initiativen"  },
+  // href updated to canonical /initiatives route (redirect from /vereinsleitung/initiativen is live)
+  {
+    label: "Initiativen",
+    href: "/initiatives",
+    translationKey: "initiativen",
+    permissionKeys: [PERMISSIONS.INITIATIVES_VIEW, PERMISSIONS.INITIATIVES_MANAGE],
+  },
   { label: "KPIs",           href: "/vereinsleitung/kpis",        translationKey: "kpis"         },
   {
     label: "Saisons",

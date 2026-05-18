@@ -32,6 +32,9 @@ export const PERMISSIONS = {
 
   MEETINGS_VIEW: "meetings.view",
   MEETINGS_MANAGE: "meetings.manage",
+
+  INITIATIVES_VIEW: "initiatives.view",
+  INITIATIVES_MANAGE: "initiatives.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

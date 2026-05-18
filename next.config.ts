@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
         destination: "/meetings",
         permanent: false, // 307 — temporary while migration is in progress
       },
+      // Initiatives module: canonical route is now /initiatives.
+      {
+        source: "/vereinsleitung/initiativen",
+        destination: "/initiatives",
+        permanent: false, // 307 — temporary while migration is in progress
+      },
     ];
   },
 };
