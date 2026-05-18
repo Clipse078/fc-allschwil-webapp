@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  FileText,
   Flag,
   LayoutDashboard,
   ScrollText,
@@ -49,6 +50,8 @@ function getNavIcon(label: string) {
       return BarChart3;
     case "Ziele":
       return Target;
+    case "Vorlagen":
+      return FileText;
     case "Saisons":
       return CalendarRange;
     case "Saisonplanner":
@@ -75,7 +78,7 @@ function getNavIcon(label: string) {
 }
 
 function isVereinsleitungChild(label: string) {
-  return label === "Meetings" || label === "Initiativen" || label === "KPIs" || label === "Ziele";
+  return label === "Meetings" || label === "Initiativen" || label === "KPIs" || label === "Ziele" || label === "Vorlagen";
 }
 
 function isPlannerChild(label: string) {

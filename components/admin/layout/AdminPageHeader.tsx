@@ -148,6 +148,18 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/vereinsleitung/templates") {
+    return { eyebrow: "Kommunikation", title: "Vorlagen", description: "Kontextbewusste Kommunikationsvorlagen mit Variablen." };
+  }
+
+  if (pathname === "/vereinsleitung/templates/new") {
+    return { eyebrow: "Kommunikation", title: "Neue Vorlage", description: "Vorlage mit Variablen und Kategorien erstellen." };
+  }
+
+  if (pathname.startsWith("/vereinsleitung/templates/")) {
+    return { eyebrow: "Kommunikation", title: "Vorlage", description: "Vorschau und Bearbeitung." };
+  }
+
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return {
       eyebrow: "Vereinsleitung",

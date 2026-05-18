@@ -29,6 +29,24 @@ enum VisibilityScope {
   PRIVATE
 }
 
+enum CommunicationTemplateCategory {
+  MATCH_INVITATION
+  MEETING_FOLLOWUP
+  INITIATIVE_UPDATE
+  TARGET_PROGRESS
+  TOURNAMENT_REMINDER
+  GOVERNANCE_FOLLOWUP
+  SPONSOR_OUTREACH
+  PARENT_COMMUNICATION
+  GENERAL
+}
+
+enum CommunicationTemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
 enum MeetingStatus {
   PLANNED
   COMPLETED
@@ -712,6 +730,36 @@ model Meeting {
   @@index([status])
   @@index([reviewStage])
   @@index([visibilityScope])
+}
+
+model CommunicationTemplate {
+  id            String                           @id @default(cuid())
+  slug          String                           @unique
+  title         String
+  category      CommunicationTemplateCategory    @default(GENERAL)
+  status        CommunicationTemplateStatus      @default(DRAFT)
+  subject       String
+  bodyMarkdown  String
+  moduleKey     String?
+  variableRefs  Json?
+
+  // Governance
+  reviewStage           ReviewWorkflowStage @default(DRAFT)
+  requiresFourEyeReview Boolean             @default(false)
+  reviewedByUserId      String?
+  reviewedAt            DateTime?
+
+  // Visibility
+  visibilityScope VisibilityScope @default(ORGANISATION)
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([moduleKey])
+  @@index([reviewStage])
 }
 
 model MeetingAgendaItem {
