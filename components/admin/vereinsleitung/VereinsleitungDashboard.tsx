@@ -1,4 +1,24 @@
-﻿import VereinsleitungDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungDecisionsCard";
+﻿/**
+ * Vereinsleitung overview dashboard.
+ *
+ * TODO(decoupling — Organisation Builder):
+ * This component renders a hardcoded dashboard for the "Vereinsleitung" org unit.
+ * Target: a generic OrgUnitDashboard component that accepts orgUnitId as a prop
+ * and renders the relevant cards (Goals, KPIs, Meetings, Initiatives, Tasks, Decisions)
+ * based on the org unit's configuration.
+ *
+ * All sub-components (VereinsleitungGoalsCard, VereinsleitungKpiCard, etc.) will be
+ * renamed to remove the Vereinsleitung prefix once they become reusable:
+ *   VereinsleitungGoalsCard         → GoalsCard
+ *   VereinsleitungKpiCard           → KpiCard
+ *   VereinsleitungInitiativesCard   → InitiativesCard (links to /initiatives)
+ *   VereinsleitungMeetingsCard      → MeetingsCard (links to /meetings)
+ *   VereinsleitungTasksCard         → TasksCard
+ *   VereinsleitungDecisionsCard     → DecisionsCard
+ *
+ * File move: components/admin/vereinsleitung/ → components/admin/org-unit/ (future)
+ */
+import VereinsleitungDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungDecisionsCard";
 import VereinsleitungGoalsCard from "@/components/admin/vereinsleitung/VereinsleitungGoalsCard";
 import VereinsleitungInitiativesCard from "@/components/admin/vereinsleitung/VereinsleitungInitiativesCard";
 import VereinsleitungKpiCard from "@/components/admin/vereinsleitung/VereinsleitungKpiCard";

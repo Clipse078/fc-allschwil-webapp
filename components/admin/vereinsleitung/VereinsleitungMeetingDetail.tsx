@@ -1,4 +1,21 @@
-﻿import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
+﻿/**
+ * Meeting detail view — currently scoped to Vereinsleitung meetings.
+ *
+ * TODO(decoupling — Meetings Module):
+ * This component and all its sub-cards will be decoupled:
+ *   VereinsleitungMeetingDetail          → MeetingDetail (props: meetingId, orgUnitId)
+ *   VereinsleitungMeetingAgendaCard      → MeetingAgendaCard
+ *   VereinsleitungMeetingDecisionsCard   → MeetingDecisionsCard
+ *   VereinsleitungMeetingActionsCard     → MeetingActionsCard
+ *   VereinsleitungMeetingInfoCard        → MeetingInfoCard
+ *   VereinsleitungMeetingParticipantsCard → MeetingParticipantsCard
+ *
+ * All will move to components/admin/meetings/.
+ * The [slug] prop will become [meetingId] once a real Meeting model exists.
+ *
+ * Blocker: Meeting data model not in Prisma schema.
+ */
+import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
 import VereinsleitungMeetingAgendaCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingAgendaCard";
 import VereinsleitungMeetingDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingDecisionsCard";
 import VereinsleitungMeetingInfoCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingInfoCard";

@@ -23,7 +23,9 @@ export type AdminNavItem = {
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { label: "Dashboard",      href: "/dashboard",                  translationKey: "dashboard"    },
   { label: "Vereinsleitung", href: "/vereinsleitung",             translationKey: "vereinsleitung" },
+  // TODO(decoupling): href should become MEETINGS_ROUTE_BASE ("/meetings") after route migration
   { label: "Meetings",       href: "/vereinsleitung/meetings",    translationKey: "meetings"     },
+  // TODO(decoupling): href should become INITIATIVES_ROUTE_BASE ("/initiatives") after route migration
   { label: "Initiativen",    href: "/vereinsleitung/initiativen", translationKey: "initiativen"  },
   { label: "KPIs",           href: "/vereinsleitung/kpis",        translationKey: "kpis"         },
   {

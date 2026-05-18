@@ -1,5 +1,13 @@
 ﻿import Link from "next/link";
 import { ChevronRight, Flag, Users } from "lucide-react";
+import { INITIATIVES_ROUTE_BASE } from "@/lib/platform/constants";
+
+// TODO(decoupling): This component hardcodes initiative data and routes.
+// When the Initiatives module is decoupled from Vereinsleitung:
+//   - Rename to InitiativesList (remove Vereinsleitung prefix)
+//   - Move to components/admin/initiatives/InitiativesList.tsx
+//   - Replace static INITIATIVEN array with a real data source / API call
+//   - orgUnitId should be injected as a prop; status should use StatusBadge
 
 const INITIATIVEN = [
   {
@@ -47,7 +55,7 @@ export default function VereinsleitungInitiativenList() {
       {INITIATIVEN.map((initiative) => (
         <Link
           key={initiative.slug}
-          href={`/vereinsleitung/initiativen/${initiative.slug}`}
+          href={`${INITIATIVES_ROUTE_BASE}/${initiative.slug}`}
           className="block rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
         >
           <div className="flex flex-wrap items-start justify-between gap-4">

@@ -73,6 +73,9 @@ export const ADMIN_ROUTE_CONFIGS: AdminRouteConfig[] = [
   },
 
   // ── Vereinsleitung / Meetings ───────────────────────────────────────────────
+  // TODO(decoupling): When Meetings module is decoupled, these patterns move to
+  // "/meetings" (exact) and "/meetings/" (startsWith). The MEETINGS_ROUTE_BASE
+  // constant in lib/platform/constants.ts centralises this change.
   {
     pattern: "/vereinsleitung/meetings",
     match: "exact",
@@ -102,6 +105,9 @@ export const ADMIN_ROUTE_CONFIGS: AdminRouteConfig[] = [
   },
 
   // ── Vereinsleitung / Initiativen ────────────────────────────────────────────
+  // TODO(decoupling): When Initiatives module is decoupled, these patterns move to
+  // "/initiatives" (exact) and "/initiatives/" (startsWith). The INITIATIVES_ROUTE_BASE
+  // constant in lib/platform/constants.ts centralises this change.
   {
     pattern: "/vereinsleitung/initiativen",
     match: "exact",

@@ -139,8 +139,21 @@ model Role {
   key                              String   @unique
   name                             String
   description                      String?
+
+  // TODO(decoupling — Organisation Builder):
+  // These two fields hardcode "Vereinsleitung" as a fixed permission concept.
+  // Target architecture: access and participation flags should reference org units
+  // dynamically (e.g. via a RoleOrgUnitAccess join table), not be baked into Role.
+  //
+  // Proposed future model:
+  //   canAccessVereinsleitung        → removed; replaced by OrgUnitAccess(orgUnitId, roleId)
+  //   canAttendVereinsleitungMeetings → removed; replaced by MeetingParticipantRule(orgUnitId, roleId)
+  //
+  // Migration required (DO NOT rename until Organisation Builder sprint):
+  //   prisma migrate dev --name decouple_vereinsleitung_from_role
   canAccessVereinsleitung          Boolean  @default(false)
   canAttendVereinsleitungMeetings  Boolean  @default(false)
+
   createdAt                        DateTime @default(now())
   updatedAt                        DateTime @updatedAt
 

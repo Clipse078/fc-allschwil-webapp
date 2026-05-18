@@ -1,5 +1,15 @@
 ﻿"use client";
 
+// TODO(decoupling — Organisation Builder):
+// This component manages Roles with two hardcoded Vereinsleitung-specific flags:
+//   canAccessVereinsleitung          — controls module-level access
+//   canAttendVereinsleitungMeetings  — controls meeting participation
+//
+// These will be replaced by a dynamic org-unit access system when the Organisation
+// Builder is built. The UI toggle labels and API field names will change.
+// The field names in the DB, API, and this component must be migrated together.
+// Do NOT rename these fields independently — the change must be atomic.
+
 import { useMemo, useState } from "react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 
@@ -8,6 +18,7 @@ type RoleItem = {
   key: string;
   name: string;
   description: string | null;
+  // TODO(decoupling): replace with dynamic OrgUnitAccess references
   canAccessVereinsleitung: boolean;
   canAttendVereinsleitungMeetings: boolean;
   updatedAt: string | Date;

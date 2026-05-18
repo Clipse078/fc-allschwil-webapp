@@ -1,5 +1,13 @@
 ﻿import Link from "next/link";
 import { CalendarDays, ChevronRight, Users } from "lucide-react";
+import { MEETINGS_ROUTE_BASE } from "@/lib/platform/constants";
+
+// TODO(decoupling): This component hardcodes meeting data and routes.
+// When the Meetings module is decoupled from Vereinsleitung:
+//   - Rename to MeetingsList (remove Vereinsleitung prefix)
+//   - Move to components/admin/meetings/MeetingsList.tsx
+//   - Replace static MEETINGS array with a real data source / API call
+//   - The orgUnitId should be injected as a prop (not inferred from route context)
 
 const MEETINGS = [
   {
@@ -34,7 +42,7 @@ export default function VereinsleitungMeetingsList() {
       {MEETINGS.map((meeting) => (
         <Link
           key={meeting.slug}
-          href={`/vereinsleitung/meetings/${meeting.slug}`}
+          href={`${MEETINGS_ROUTE_BASE}/${meeting.slug}`}
           className="block rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
         >
           <div className="flex flex-wrap items-start justify-between gap-4">

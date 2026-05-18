@@ -108,6 +108,7 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
   },
 
   // ── Vereinsleitung / Meetings ─────────────────────────────────────────────
+  // TODO(decoupling): Patterns move to "/meetings" when Meetings module is decoupled.
   {
     pattern: "/vereinsleitung/meetings",
     match: "exact",
@@ -125,6 +126,7 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
   },
 
   // ── Vereinsleitung / Initiativen ──────────────────────────────────────────
+  // TODO(decoupling): Patterns move to "/initiatives" when Initiatives module is decoupled.
   {
     pattern: "/vereinsleitung/initiativen",
     match: "exact",
@@ -142,6 +144,8 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
   },
 
   // ── Vereinsleitung fallback ───────────────────────────────────────────────
+  // TODO(decoupling): When /meetings and /initiatives have their own entries,
+  // this fallback should only cover the Vereinsleitung overview itself.
   {
     pattern: "/vereinsleitung",
     match: "prefix",
