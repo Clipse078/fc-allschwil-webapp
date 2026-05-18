@@ -27,6 +27,15 @@ enum MeetingStatus {
   CANCELLED
 }
 
+enum InitiativeStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_TRACK
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
 enum TargetCategory {
   SPORTLICHE_ENTWICKLUNG
   MITGLIEDERWACHSTUM
@@ -541,6 +550,31 @@ model AuditLog {
   @@index([moduleKey])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model Initiative {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  title       String
+  summary     String?
+  description String?
+  status      InitiativeStatus @default(PLANNED)
+  owner       String?
+  progress    Int?
+  dueDate     DateTime?
+
+  // Governance — consistent with Meeting and Target governance pattern
+  reviewStage           ReviewWorkflowStage @default(DRAFT)
+  requiresFourEyeReview Boolean             @default(false)
+  reviewedByUserId      String?
+  reviewedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([reviewStage])
+  @@index([dueDate])
 }
 
 model Meeting {

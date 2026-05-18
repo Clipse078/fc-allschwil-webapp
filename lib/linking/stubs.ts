@@ -22,8 +22,23 @@
  * server component) rather than importing the constant directly, so that
  * the query happens server-side and the client receives a serialised array.
  *
- * INITIATIVES: Still mocked — no Initiative Prisma model yet.
- * TODO: Same pattern once Initiative is promoted to DB-backed.
+ * INITIATIVES: The Initiative Prisma model now exists (migration 20260518160000).
+ * TODO: Replace INITIATIVE_STUBS with a real async query helper, e.g.:
+ *
+ *   export async function getInitiativeStubs(): Promise<EntityRef[]> {
+ *     const initiatives = await prisma.initiative.findMany({
+ *       orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+ *       select: { slug: true, title: true },
+ *     });
+ *     return initiatives.map(i => ({
+ *       slug: i.slug,
+ *       title: i.title,
+ *       url: `/vereinsleitung/initiativen/${i.slug}`,
+ *     }));
+ *   }
+ *
+ * As with getMeetingStubs(), pass the result as a prop from the server page
+ * to TargetLinkEditor rather than importing the constant directly.
  */
 
 import type { EntityRef } from "./types";
