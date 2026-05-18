@@ -24,6 +24,11 @@ import {
 import SignOutButton from "@/components/admin/layout/SignOutButton";
 import { getVisibleAdminNav } from "@/lib/permissions/get-visible-admin-nav";
 import type { PermissionKey } from "@/lib/permissions/permissions";
+import {
+  ACTIVE_TENANT_LOGO_SRC,
+  ACTIVE_TENANT_NAME,
+  PLATFORM_NAME,
+} from "@/lib/platform/constants";
 
 type AdminSidebarProps = {
   firstName: string;
@@ -149,8 +154,8 @@ export default function AdminSidebar({
               }
             >
               <Image
-                src="/images/logos/fc-allschwil.png"
-                alt="FC Allschwil"
+                src={ACTIVE_TENANT_LOGO_SRC}
+                alt={ACTIVE_TENANT_NAME}
                 fill
                 className="object-contain"
                 sizes="48px"
@@ -160,8 +165,11 @@ export default function AdminSidebar({
 
             {!resolvedCollapsed ? (
               <div className="min-w-0">
-                <p className="fca-eyebrow">FC Allschwil</p>
-                <h2 className="mt-1 font-[var(--font-display)] text-[1.7rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[#0b4aa2]">
+                <p className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  {PLATFORM_NAME}
+                </p>
+                <p className="fca-eyebrow leading-tight">{ACTIVE_TENANT_NAME}</p>
+                <h2 className="mt-0.5 font-[var(--font-display)] text-[1.45rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[#0b4aa2]">
                   Admin
                 </h2>
               </div>
