@@ -1,14 +1,29 @@
 /**
- * Static stubs for Meetings and Initiatives.
+ * Static stubs for Meetings and Initiatives used by the link editor.
  *
- * These replace the mocked arrays embedded in UI components so that:
- * 1. Link editors can reference available entities from a shared source.
- * 2. When Meeting/Initiative are promoted to DB-backed models, this file
- *    is replaced by real DB queries — all consumers update automatically.
+ * MEETINGS: The Meeting Prisma model now exists (migration 20260518150000).
+ * TODO: Replace MEETING_STUBS with a real async query helper, e.g.:
  *
- * TODO: Replace with DB queries once Meeting/Initiative models exist:
- *   const meetings = await prisma.meeting.findMany({ select: { slug, title } });
- *   const initiatives = await prisma.initiative.findMany({ select: { slug, title } });
+ *   // lib/linking/stubs.ts (future server-only version)
+ *   import { prisma } from "@/lib/db/prisma";
+ *   export async function getMeetingStubs(): Promise<EntityRef[]> {
+ *     const meetings = await prisma.meeting.findMany({
+ *       orderBy: { meetingDate: "desc" },
+ *       select: { slug: true, title: true },
+ *     });
+ *     return meetings.map(m => ({
+ *       slug: m.slug,
+ *       title: m.title,
+ *       url: `/vereinsleitung/meetings/${m.slug}`,
+ *     }));
+ *   }
+ *
+ * The TargetLinkEditor will need to accept this as a prop (from the page
+ * server component) rather than importing the constant directly, so that
+ * the query happens server-side and the client receives a serialised array.
+ *
+ * INITIATIVES: Still mocked — no Initiative Prisma model yet.
+ * TODO: Same pattern once Initiative is promoted to DB-backed.
  */
 
 import type { EntityRef } from "./types";

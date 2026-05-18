@@ -32,6 +32,9 @@ export const PERMISSIONS = {
 
   TARGETS_VIEW: "targets.view",
   TARGETS_MANAGE: "targets.manage",
+
+  MEETINGS_VIEW: "meetings.view",
+  MEETINGS_MANAGE: "meetings.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

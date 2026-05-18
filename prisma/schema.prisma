@@ -21,6 +21,12 @@ enum PermissionModule {
   TARGETS
 }
 
+enum MeetingStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
 enum TargetCategory {
   SPORTLICHE_ENTWICKLUNG
   MITGLIEDERWACHSTUM
@@ -535,6 +541,30 @@ model AuditLog {
   @@index([moduleKey])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model Meeting {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  title         String
+  description   String?
+  meetingDate   DateTime
+  location      String?
+  attendeeCount Int?
+  status        MeetingStatus @default(PLANNED)
+
+  // Governance — consistent with Target governance pattern
+  reviewStage           ReviewWorkflowStage @default(DRAFT)
+  requiresFourEyeReview Boolean             @default(false)
+  reviewedByUserId      String?
+  reviewedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([meetingDate])
+  @@index([status])
+  @@index([reviewStage])
 }
 
 model Target {

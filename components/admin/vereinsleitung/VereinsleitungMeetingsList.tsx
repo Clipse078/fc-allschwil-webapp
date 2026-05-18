@@ -1,59 +1,80 @@
 ﻿/**
- * TODO: Governance Foundation — Meeting model promotion
+ * DB-backed meetings list. Data is fetched server-side in meetings/page.tsx
+ * and passed as props. When the DB is empty an empty-state prompt is shown.
  *
- * Currently mocked. When Meeting is promoted to a DB-backed Prisma model,
- * add governance fields consistent with the Target pattern:
- *   - reviewStage    ReviewWorkflowStage @default(DRAFT)
- *   - requiresFourEyeReview Boolean @default(false)
- *   - reviewedByUserId String?
- *   - reviewedAt DateTime?
- *
- * WorkflowDomain.MEETINGS is already registered and ready.
- * Use lib/governance/review-stage.ts helpers for stage transitions.
- * Surface ReviewStageBadge on Meeting list and detail views.
+ * TODO: Cross-Module Linking — Meeting detail integration
+ * When this component is wired to real Meeting records, the detail page
+ * should surface linked Targets (reverse query on Target.linkedMeetingRefs).
+ * See lib/linking/stubs.ts for the migration path from static stubs to real
+ * DB queries, and VereinsleitungMeetingDetail.tsx for the traceability TODOs.
  */
 
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Users } from "lucide-react";
+import { CalendarDays, ChevronRight, Plus, Users } from "lucide-react";
+import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
+import type { ReviewWorkflowStage } from "@prisma/client";
 
-const MEETINGS = [
-  {
-    title: "Vorstandssitzung April",
-    slug: "vorstandssitzung-april",
-    date: "16. Apr 2024",
-    time: "20:00 Uhr",
-    participants: 5,
-    status: "Neueste",
-  },
-  {
-    title: "Trainer-Rapport Rückrunde",
-    slug: "trainer-rapport-rueckrunde",
-    date: "15. Apr 2024",
-    time: "18:30 Uhr",
-    participants: 3,
-    status: "Archiviert",
-  },
-  {
-    title: "Medienkoordination Saisonstart",
-    slug: "medienkoordination-saisonstart",
-    date: "10. Apr 2024",
-    time: "19:00 Uhr",
-    participants: 4,
-    status: "Archiviert",
-  },
-];
+export type MeetingListItemShape = {
+  id: string;
+  slug: string;
+  title: string;
+  meetingDate: Date;
+  location: string | null;
+  attendeeCount: number | null;
+  status: "PLANNED" | "COMPLETED" | "CANCELLED";
+  reviewStage: ReviewWorkflowStage;
+};
 
-export default function VereinsleitungMeetingsList() {
+const STATUS_LABELS: Record<MeetingListItemShape["status"], string> = {
+  PLANNED: "Geplant",
+  COMPLETED: "Abgeschlossen",
+  CANCELLED: "Abgesagt",
+};
+
+function formatSwissDate(date: Date) {
+  return new Intl.DateTimeFormat("de-CH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+type VereinsleitungMeetingsListProps = {
+  meetings: MeetingListItemShape[];
+};
+
+export default function VereinsleitungMeetingsList({
+  meetings,
+}: VereinsleitungMeetingsListProps) {
+  if (meetings.length === 0) {
+    return (
+      <div className="rounded-[28px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <CalendarDays className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+        <h3 className="text-[1.05rem] font-semibold text-slate-900">
+          Noch keine Meetings erfasst
+        </h3>
+        <p className="mt-2 text-sm text-slate-500">
+          Erstelle das erste Meeting via API oder Seed-Skript.
+        </p>
+        <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium text-slate-500">
+          <Plus className="h-3.5 w-3.5" />
+          POST /api/meetings
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {MEETINGS.map((meeting) => (
+      {meetings.map((meeting) => (
         <Link
           key={meeting.slug}
           href={`/vereinsleitung/meetings/${meeting.slug}`}
           className="block rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <h3 className="text-[1.05rem] font-semibold text-slate-900">
                 {meeting.title}
               </h3>
@@ -61,21 +82,27 @@ export default function VereinsleitungMeetingsList() {
               <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-500">
                 <span className="inline-flex items-center gap-2">
                   <CalendarDays className="h-4 w-4" />
-                  {meeting.date} • {meeting.time}
+                  {formatSwissDate(meeting.meetingDate)}
                 </span>
 
-                <span className="inline-flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  {meeting.participants} Teilnehmer
-                </span>
+                {meeting.attendeeCount ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    {meeting.attendeeCount} Teilnehmer
+                  </span>
+                ) : null}
+
+                {meeting.location ? (
+                  <span className="text-slate-400">{meeting.location}</span>
+                ) : null}
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {meeting.status}
+                {STATUS_LABELS[meeting.status]}
               </span>
-
+              <ReviewStageBadge stage={meeting.reviewStage} size="sm" />
               <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
                 Öffnen
                 <ChevronRight className="h-4 w-4" />
