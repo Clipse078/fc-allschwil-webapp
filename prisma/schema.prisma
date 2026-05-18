@@ -707,6 +707,15 @@ model Target {
   linkedInitiativeRefs Json?
   linkedMeetingRefs    Json?
 
+  // Visibility / access control — consistent with Meeting and Initiative pattern
+  visibilityScope    VisibilityScope @default(ORGANISATION)
+  createdByUserId    String?
+  visibleRoleRefs    Json?
+  visibleUserRefs    Json?
+  visibleTeamRefs    Json?
+  visibleOrgUnitRefs Json?
+  visiblePersonRefs  Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -716,6 +725,7 @@ model Target {
   @@index([status])
   @@index([period])
   @@index([reviewStage])
+  @@index([visibilityScope])
 }
 
 model TargetMetric {

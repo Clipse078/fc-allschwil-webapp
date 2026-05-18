@@ -3,6 +3,7 @@ import { Plus, Target, TrendingUp } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargets } from "@/lib/targets/queries";
+import { buildActorContext } from "@/lib/visibility/actor-context";
 import TargetMetricProgress from "@/components/admin/targets/TargetMetricProgress";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
@@ -33,7 +34,8 @@ export default async function TargetsPage({ searchParams }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const params = (await searchParams) ?? {};
-  const targets = await getTargets();
+  const actor = buildActorContext(session.user);
+  const targets = await getTargets(actor);
 
   return (
     <div className="space-y-6">

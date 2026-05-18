@@ -7,7 +7,10 @@ import {
   TargetPeriod,
   TargetMetricType,
   TargetDirection,
+  VisibilityScope,
 } from "@prisma/client";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getTargets } from "@/lib/targets/queries";
 
 async function requireSession() {
   const session = await auth();
@@ -23,34 +26,8 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  const targets = await prisma.target.findMany({
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      category: true,
-      status: true,
-      period: true,
-      periodLabel: true,
-      startsAt: true,
-      endsAt: true,
-      metrics: {
-        select: {
-          id: true,
-          label: true,
-          type: true,
-          direction: true,
-          targetValue: true,
-          currentValue: true,
-          unit: true,
-          sortOrder: true,
-        },
-        orderBy: { sortOrder: "asc" },
-      },
-    },
-  });
-
+  const actor = buildActorContext(check.session.user);
+  const targets = await getTargets(actor);
   return NextResponse.json({ targets });
 }
 
@@ -83,6 +60,11 @@ export async function POST(request: NextRequest) {
       ? (body.period as TargetPeriod)
       : TargetPeriod.SEASON;
 
+    const validScopes = Object.values(VisibilityScope);
+    const visibilityScope: VisibilityScope = validScopes.includes(body?.visibilityScope as VisibilityScope)
+      ? (body.visibilityScope as VisibilityScope)
+      : VisibilityScope.ORGANISATION;
+
     const validMetricTypes = Object.values(TargetMetricType);
     const validDirections = Object.values(TargetDirection);
 
@@ -111,6 +93,8 @@ export async function POST(request: NextRequest) {
         startsAt: body?.startsAt ? new Date(body.startsAt) : null,
         endsAt: body?.endsAt ? new Date(body.endsAt) : null,
         nudgeJson: body?.nudgeJson ?? null,
+        visibilityScope,
+        createdByUserId: check.session.user.id,
         metrics: {
           create: rawMetrics
             .filter((m) => m.label?.trim())

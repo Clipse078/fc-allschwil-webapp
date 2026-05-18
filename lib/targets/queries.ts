@@ -1,7 +1,32 @@
-import { prisma } from "@/lib/db/prisma";
+/**
+ * Target query helpers — server-only.
+ *
+ * All queries now accept an ActorContext and apply VisibilityScope filtering,
+ * consistent with Meeting and Initiative queries.
+ *
+ * 404-masking: getTargetById() returns null for records the actor cannot see.
+ *
+ * TODO: Phase 2 — push RESTRICTED filtering into the DB query using
+ *   PostgreSQL JSONB @> for role/user overlap checks (same as Meeting/Initiative).
+ */
 
-export async function getTargets() {
-  return prisma.target.findMany({
+import { prisma } from "@/lib/db/prisma";
+import type { ActorContext } from "@/lib/visibility/actor-context";
+import { buildVisibilityWhere, applyVisibilityFilter, canSeeEntity } from "@/lib/visibility/visibility-filter";
+
+const TARGET_VISIBILITY_SELECT = {
+  visibilityScope: true,
+  createdByUserId: true,
+  visibleRoleRefs: true,
+  visibleUserRefs: true,
+  visibleTeamRefs: true,
+  visibleOrgUnitRefs: true,
+  visiblePersonRefs: true,
+} as const;
+
+export async function getTargets(actor: ActorContext) {
+  const rows = await prisma.target.findMany({
+    where: buildVisibilityWhere(actor),
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,
@@ -15,6 +40,7 @@ export async function getTargets() {
       requiresFourEyeReview: true,
       startsAt: true,
       endsAt: true,
+      ...TARGET_VISIBILITY_SELECT,
       metrics: {
         select: {
           id: true,
@@ -30,10 +56,11 @@ export async function getTargets() {
       },
     },
   });
+  return applyVisibilityFilter(rows, actor);
 }
 
-export async function getTargetById(id: string) {
-  return prisma.target.findUnique({
+export async function getTargetById(id: string, actor: ActorContext) {
+  const target = await prisma.target.findUnique({
     where: { id },
     select: {
       id: true,
@@ -57,6 +84,7 @@ export async function getTargetById(id: string) {
       linkedMeetingRefs: true,
       createdAt: true,
       updatedAt: true,
+      ...TARGET_VISIBILITY_SELECT,
       metrics: {
         select: {
           id: true,
@@ -83,6 +111,11 @@ export async function getTargetById(id: string) {
       },
     },
   });
+
+  if (!target) return null;
+  // 404-mask: return null if actor cannot see this target
+  if (!canSeeEntity(target, actor)) return null;
+  return target;
 }
 
 export type TargetListItem = Awaited<ReturnType<typeof getTargets>>[number];

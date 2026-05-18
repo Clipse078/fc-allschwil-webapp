@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2 } from "lucide-react";
+import VisibilityScopeSelect, {
+  type VisibilityScopeValue,
+} from "@/components/admin/shared/VisibilityScopeSelect";
 
 type MetricDraft = {
   id?: string;
@@ -28,6 +31,7 @@ type TargetFormProps = {
     moduleKey?: string;
     sportCategory?: string;
     ageGroupHint?: string;
+    visibilityScope?: VisibilityScopeValue;
     startsAt?: string;
     endsAt?: string;
     metrics?: MetricDraft[];
@@ -93,6 +97,9 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
   const [period, setPeriod] = useState(defaultValues?.period ?? "SEASON");
   const [periodLabel, setPeriodLabel] = useState(defaultValues?.periodLabel ?? "");
   const moduleKey = defaultValues?.moduleKey ?? "";
+  const [visibilityScope, setVisibilityScope] = useState<VisibilityScopeValue>(
+    defaultValues?.visibilityScope ?? "ORGANISATION",
+  );
   const [sportCategory, setSportCategory] = useState(defaultValues?.sportCategory ?? "");
   const [ageGroupHint, setAgeGroupHint] = useState(defaultValues?.ageGroupHint ?? "");
   const [startsAt, setStartsAt] = useState(defaultValues?.startsAt ?? "");
@@ -142,6 +149,7 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
         ageGroupHint: ageGroupHint.trim() || null,
         startsAt: startsAt || null,
         endsAt: endsAt || null,
+        visibilityScope,
         metrics: metrics
           .filter((m) => m.label.trim())
           .map((m, idx) => ({
@@ -448,6 +456,15 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <h3 className="mb-2 text-[1.05rem] font-semibold text-slate-900">Sichtbarkeit</h3>
+        <p className="mb-5 text-[12px] text-slate-500">
+          Wer kann dieses Ziel sehen? Privat und Eingeschränkt verbergen den Eintrag
+          für nicht berechtigte Benutzer.
+        </p>
+        <VisibilityScopeSelect value={visibilityScope} onChange={setVisibilityScope} />
       </section>
 
       <div className="flex items-center justify-between gap-4">

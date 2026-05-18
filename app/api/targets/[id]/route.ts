@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
-import { TargetCategory, TargetStatus, TargetPeriod } from "@prisma/client";
+import { TargetCategory, TargetStatus, TargetPeriod, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
 
@@ -93,6 +93,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     const validCategories = Object.values(TargetCategory);
     const validStatuses = Object.values(TargetStatus);
     const validPeriods = Object.values(TargetPeriod);
+    const validScopes = Object.values(VisibilityScope);
 
     const updated = await prisma.target.update({
       where: { id },
@@ -115,6 +116,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         startsAt: body?.startsAt !== undefined ? (body.startsAt ? new Date(body.startsAt) : null) : undefined,
         endsAt: body?.endsAt !== undefined ? (body.endsAt ? new Date(body.endsAt) : null) : undefined,
         nudgeJson: body?.nudgeJson !== undefined ? body.nudgeJson : undefined,
+        visibilityScope: validScopes.includes(body?.visibilityScope as VisibilityScope)
+          ? (body.visibilityScope as VisibilityScope)
+          : undefined,
       },
       select: { id: true, title: true },
     });

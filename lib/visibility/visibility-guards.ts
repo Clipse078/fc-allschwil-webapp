@@ -86,7 +86,14 @@ const TARGET_GUARD_SELECT = {
   id: true,
   title: true,
   reviewStage: true,
-  // TODO: add visibilityScope/visibleRoleRefs/etc. once Target gains VisibilityScope
+  // Visibility fields — now present on Target
+  visibilityScope: true,
+  createdByUserId: true,
+  visibleRoleRefs: true,
+  visibleUserRefs: true,
+  visibleTeamRefs: true,
+  visibleOrgUnitRefs: true,
+  visiblePersonRefs: true,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -112,6 +119,13 @@ type TargetGuardEntity = {
   id: string;
   title: string;
   reviewStage: string;
+  visibilityScope: string;
+  createdByUserId: string | null;
+  visibleRoleRefs: unknown;
+  visibleUserRefs: unknown;
+  visibleTeamRefs: unknown;
+  visibleOrgUnitRefs: unknown;
+  visiblePersonRefs: unknown;
 };
 
 type GuardSuccess<T> = { ok: true; entity: T };
@@ -225,12 +239,15 @@ export async function requireTargetAccess(opts: {
 
   if (!target) return notFound("Ziel nicht gefunden.");
 
-  // Phase 1: canSeeTarget always returns true — see can-see-target.ts
+  // canSeeTarget now delegates to canSeeEntity() — full visibility enforcement
   if (!canSeeTarget(target, opts.actor)) {
     return notFound("Ziel nicht gefunden.");
   }
 
-  // TODO: Phase 2 — VisibilityScope on Target + access-mode-specific checks
+  // TODO: access-mode-specific checks (same pattern as Meeting/Initiative):
+  //   "write" / "delete": block if actor is not creator AND not in allowed role
+  //   "stage": enforce requiresFourEyeReview (block self-approval)
+  //   "write": enforce PermissionModule.TARGETS_MANAGE once seeded
 
   return { ok: true, entity: target };
 }

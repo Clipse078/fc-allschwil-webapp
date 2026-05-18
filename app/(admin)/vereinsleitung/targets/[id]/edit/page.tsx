@@ -22,9 +22,9 @@ export default async function EditTargetPage({ params }: PageProps) {
   const { id } = await params;
   const actor = buildActorContext(session.user);
 
-  // Fetch target and link options in parallel — link options respect VisibilityScope
+  // Fetch target and link options in parallel — all respect VisibilityScope
   const [target, availableMeetings, availableInitiatives] = await Promise.all([
-    getTargetById(id),
+    getTargetById(id, actor),
     getMeetingLinkOptions(actor),
     getInitiativeLinkOptions(actor),
   ]);
@@ -43,6 +43,7 @@ export default async function EditTargetPage({ params }: PageProps) {
     ageGroupHint: target.ageGroupHint ?? "",
     startsAt: target.startsAt ? new Date(target.startsAt).toISOString().substring(0, 10) : "",
     endsAt: target.endsAt ? new Date(target.endsAt).toISOString().substring(0, 10) : "",
+    visibilityScope: target.visibilityScope as "ORGANISATION" | "RESTRICTED" | "PRIVATE",
     metrics: target.metrics.map((m) => ({
       id: m.id,
       label: m.label,

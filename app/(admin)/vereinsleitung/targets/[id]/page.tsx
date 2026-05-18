@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargetById } from "@/lib/targets/queries";
+import { buildActorContext } from "@/lib/visibility/actor-context";
 import TargetMetricProgress from "@/components/admin/targets/TargetMetricProgress";
 import TargetDataPointForm from "@/components/admin/targets/TargetDataPointForm";
 import TargetStageActions from "@/components/admin/targets/TargetStageActions";
@@ -47,7 +48,8 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
 
   const { id } = await params;
   const qp = (await searchParams) ?? {};
-  const target = await getTargetById(id);
+  const actor = buildActorContext(session.user);
+  const target = await getTargetById(id, actor);
 
   if (!target) notFound();
 
