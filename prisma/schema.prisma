@@ -734,15 +734,15 @@ model Meeting {
 }
 
 model CommunicationTemplate {
-  id            String                           @id @default(cuid())
-  slug          String                           @unique
-  title         String
-  category      CommunicationTemplateCategory    @default(GENERAL)
-  status        CommunicationTemplateStatus      @default(DRAFT)
-  subject       String
-  bodyMarkdown  String
-  moduleKey     String?
-  variableRefs  Json?
+  id           String                        @id @default(cuid())
+  slug         String                        @unique
+  title        String
+  category     CommunicationTemplateCategory @default(GENERAL)
+  status       CommunicationTemplateStatus   @default(DRAFT)
+  subject      String
+  bodyMarkdown String
+  moduleKey    String?
+  variableRefs Json?
 
   // Governance
   reviewStage           ReviewWorkflowStage @default(DRAFT)
