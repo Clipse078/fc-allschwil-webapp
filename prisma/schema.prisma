@@ -19,6 +19,8 @@ enum PermissionModule {
   INFOBOARD
   FUNCTIONS
   TARGETS
+  MEETINGS
+  INITIATIVES
 }
 
 enum VisibilityScope {

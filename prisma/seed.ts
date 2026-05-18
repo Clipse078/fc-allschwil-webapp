@@ -78,10 +78,15 @@ async function main() {
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
 
-    // Strategic modules — TARGETS module registered in PermissionModule
-    // MEETINGS and INITIATIVES are session-gated only (no PermissionModule enum value yet)
+    // Strategic modules — now all three have PermissionModule values
     { key: "targets.view", name: "View targets", module: PermissionModule.TARGETS },
     { key: "targets.manage", name: "Manage targets", module: PermissionModule.TARGETS },
+
+    { key: "meetings.view", name: "View meetings", module: PermissionModule.MEETINGS },
+    { key: "meetings.manage", name: "Manage meetings", module: PermissionModule.MEETINGS },
+
+    { key: "initiatives.view", name: "View initiatives", module: PermissionModule.INITIATIVES },
+    { key: "initiatives.manage", name: "Manage initiatives", module: PermissionModule.INITIATIVES },
   ] as const;
 
   for (const permission of permissions) {

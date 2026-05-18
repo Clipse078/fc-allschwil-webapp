@@ -1,47 +1,40 @@
 /**
  * Centralized governance/visibility guards for protected write operations.
  *
- * These guards replace raw `prisma.<model>.findUnique()` calls inside route
- * handlers. They enforce the critical rule:
+ * Enforcement order (mandatory — do not reorder):
+ *   1. Visibility check   → 404-mask if actor cannot see the entity
+ *   2. Permission check   → 403 Forbidden if actor lacks the required key
+ *   3. Action logic       → proceed with write/delete/stage
  *
- *   VISIBILITY MUST BE CHECKED BEFORE ANY WRITE, DELETE, OR STAGE TRANSITION.
+ * This ordering is critical:
+ *   - 404-masking prevents information disclosure (existence of PRIVATE records)
+ *   - 403 only surfaces once the entity is confirmed visible — no leakage
  *
- * If an actor cannot see an entity, the entity effectively does not exist for
- * them — 404-masking applies (no 403, to prevent information disclosure).
+ * Access modes:
+ *   "read"   → requires view OR manage permission
+ *   "write"  → requires manage permission
+ *   "delete" → requires manage permission
+ *   "stage"  → requires manage permission
  *
- * Usage:
+ * Permission key mapping (matches PERMISSIONS constants + DB seed):
+ *   Meetings    → meetings.view / meetings.manage
+ *   Initiatives → initiatives.view / initiatives.manage
+ *   Targets     → targets.view / targets.manage
  *
- *   const guard = await requireMeetingAccess({ actor, id, access: "write" });
- *   if (!guard.ok) return guard.response;
- *   const { entity } = guard; // entity.reviewStage etc. available
+ * Future TODOs:
  *
- * Access modes (phase 1 — all enforce visibility; phase 2 will add role/ownership):
- *   "read"   — visibility check only
- *   "write"  — visibility check (phase 2: add ownership / creator-only guard)
- *   "delete" — visibility check (phase 2: add creator-only restriction)
- *   "stage"  — visibility check (phase 2: add four-eye enforcement)
+ * TODO: requiresFourEyeReview enforcement (Phase B)
+ *   When entity.requiresFourEyeReview is true and access is "stage" targeting
+ *   APPROVED/PUBLISHED, block if actor.userId === entity.createdByUserId.
+ *   This is the four-eye check: creator cannot self-approve.
  *
- * Future extensions (RBAC / Organisation Builder):
+ * TODO: Org-unit ownership restrictions (Phase B)
+ *   Add org-unit membership check after permission check for write/delete
+ *   to restrict edits to actors within the same org unit as the creator.
  *
- * TODO: requiresFourEyeReview enforcement
- *   When entity.requiresFourEyeReview is true and access is "stage" for APPROVE,
- *   block if actor.userId === entity.createdByUserId (self-approval).
- *   Add as a sub-check within these guards once the four-eye rule is activated.
- *
- * TODO: PermissionModule.MEETINGS / INITIATIVES / TARGETS gating
- *   Once permission keys are DB-seeded and enforced, add a permission check
- *   inside each guard before the visibility check:
- *     if (access !== "read" && !actor.permissionKeys.includes("meetings.manage"))
- *       return { ok: false, response: 403 response };
- *
- * TODO: Audit logging
- *   Each guard call is a natural instrumentation point for audit log emission.
- *   Add `logAction({ actor, entity, access, module: "meetings" })` once the
- *   AuditLog integration is wired to these modules.
- *
- * TODO: Org-unit ownership restrictions
- *   Phase 2: certain write operations may be restricted to actors within
- *   the same org unit as the creator. Add orgUnit check after visibility check.
+ * TODO: Audit logging (Phase A remaining)
+ *   Each guard call is a natural instrumentation point. Log { actor, entity,
+ *   access, module, timestamp } to AuditLog after successful access grant.
  */
 
 import { NextResponse } from "next/server";
@@ -53,7 +46,35 @@ import { canSeeTarget } from "./can-see-target";
 export type AccessMode = "read" | "write" | "delete" | "stage";
 
 // ---------------------------------------------------------------------------
-// Internal select shapes — include all fields needed by callers
+// Permission key constants (mirror lib/permissions/permissions.ts)
+// ---------------------------------------------------------------------------
+
+const PERM = {
+  MEETINGS_VIEW: "meetings.view",
+  MEETINGS_MANAGE: "meetings.manage",
+  INITIATIVES_VIEW: "initiatives.view",
+  INITIATIVES_MANAGE: "initiatives.manage",
+  TARGETS_VIEW: "targets.view",
+  TARGETS_MANAGE: "targets.manage",
+} as const;
+
+// ---------------------------------------------------------------------------
+// Internal permission check helpers
+// ---------------------------------------------------------------------------
+
+function hasPermission(actor: ActorContext, ...keys: string[]): boolean {
+  return keys.some((k) => actor.permissionKeys.includes(k));
+}
+
+function forbidden(message: string): GuardFailure {
+  return {
+    ok: false,
+    response: NextResponse.json({ error: message }, { status: 403 }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Internal select shapes
 // ---------------------------------------------------------------------------
 
 const MEETING_GUARD_SELECT = {
@@ -86,7 +107,6 @@ const TARGET_GUARD_SELECT = {
   id: true,
   title: true,
   reviewStage: true,
-  // Visibility fields — now present on Target
   visibilityScope: true,
   createdByUserId: true,
   visibleRoleRefs: true,
@@ -133,7 +153,7 @@ type GuardFailure = { ok: false; response: NextResponse };
 type GuardResult<T> = GuardSuccess<T> | GuardFailure;
 
 // ---------------------------------------------------------------------------
-// Internal helper: build 404-masked not-found response
+// Internal helpers
 // ---------------------------------------------------------------------------
 
 function notFound(message: string): GuardFailure {
@@ -148,13 +168,15 @@ function notFound(message: string): GuardFailure {
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch a Meeting by id and verify the actor has access.
+ * Guard for Meeting write/delete/stage operations.
  *
- * Returns the entity (with reviewStage and visibility fields) on success, or
- * a pre-built 404 NextResponse on failure (not-found or visibility-blocked).
+ * Enforcement order:
+ *   1. Visibility → 404-mask invisible records
+ *   2. Permission → 403 if actor lacks meetings.view (read) or meetings.manage (write/delete/stage)
  *
- * Callers MUST NOT call prisma.meeting.findUnique() inside write/delete/stage
- * handlers — use this guard instead.
+ * Note: read access via GET /api/meetings/[id] uses getMeetingById() directly
+ * (not this guard). Permission on reads is checked there via session auth only
+ * for now. Future: route all reads through this guard for full enforcement.
  */
 export async function requireMeetingAccess(opts: {
   actor: ActorContext;
@@ -166,17 +188,26 @@ export async function requireMeetingAccess(opts: {
     select: MEETING_GUARD_SELECT,
   });
 
+  // Step 1: 404-mask — invisible entities must not exist for the actor
   if (!meeting) return notFound("Meeting nicht gefunden.");
-
-  // Visibility check — must happen before any access decision
   if (!canSeeEntity(meeting, opts.actor)) {
     return notFound("Meeting nicht gefunden.");
   }
 
-  // TODO: Phase 2 — access-mode-specific checks:
-  //   "write" / "delete": block if actor is not creator AND not in an allowed role
-  //   "stage": enforce requiresFourEyeReview (block self-approval)
-  //   "write": enforce PermissionModule.MEETINGS_MANAGE once seeded
+  // Step 2: permission check — only after visibility is confirmed
+  if (opts.access === "read") {
+    if (!hasPermission(opts.actor, PERM.MEETINGS_VIEW, PERM.MEETINGS_MANAGE)) {
+      return forbidden("meetings.view Berechtigung erforderlich.");
+    }
+  } else {
+    // write / delete / stage
+    if (!hasPermission(opts.actor, PERM.MEETINGS_MANAGE)) {
+      return forbidden("meetings.manage Berechtigung erforderlich.");
+    }
+  }
+
+  // TODO: Phase B — requiresFourEyeReview: block self-approval on "stage"
+  // TODO: Phase B — audit log emission
 
   return { ok: true, entity: meeting };
 }
@@ -186,9 +217,8 @@ export async function requireMeetingAccess(opts: {
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch an Initiative by id and verify the actor has access.
- *
- * Mirrors requireMeetingAccess exactly — same 404-masking, same phase-1 logic.
+ * Guard for Initiative write/delete/stage operations.
+ * Mirrors requireMeetingAccess — same ordering and pattern.
  */
 export async function requireInitiativeAccess(opts: {
   actor: ActorContext;
@@ -201,12 +231,21 @@ export async function requireInitiativeAccess(opts: {
   });
 
   if (!initiative) return notFound("Initiative nicht gefunden.");
-
   if (!canSeeEntity(initiative, opts.actor)) {
     return notFound("Initiative nicht gefunden.");
   }
 
-  // TODO: Phase 2 — access-mode-specific checks (same pattern as Meeting)
+  if (opts.access === "read") {
+    if (!hasPermission(opts.actor, PERM.INITIATIVES_VIEW, PERM.INITIATIVES_MANAGE)) {
+      return forbidden("initiatives.view Berechtigung erforderlich.");
+    }
+  } else {
+    if (!hasPermission(opts.actor, PERM.INITIATIVES_MANAGE)) {
+      return forbidden("initiatives.manage Berechtigung erforderlich.");
+    }
+  }
+
+  // TODO: Phase B — requiresFourEyeReview + audit log
 
   return { ok: true, entity: initiative };
 }
@@ -216,16 +255,14 @@ export async function requireInitiativeAccess(opts: {
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch a Target by id and verify the actor has access.
+ * Guard for Target read/write/delete/stage/links/datapoints operations.
  *
- * Phase 1: Target has no VisibilityScope — canSeeTarget() always returns true
- * for authenticated actors. The guard still centralises the lookup so that
- * adding VisibilityScope to Target in Phase 2 requires only:
- *   1. Expand TARGET_GUARD_SELECT with visibility fields.
- *   2. Replace canSeeTarget() with canSeeEntity().
+ * Unlike Meeting/Initiative, the GET /api/targets/[id] also uses this guard
+ * (access: "read"), so read permission is enforced here too.
  *
- * All write/delete/stage/links/datapoint handlers on Targets MUST use this
- * guard instead of calling prisma.target.findUnique() directly.
+ * Enforcement order:
+ *   1. Visibility → 404-mask
+ *   2. Permission → 403 if actor lacks targets.view (read) or targets.manage (write+)
  */
 export async function requireTargetAccess(opts: {
   actor: ActorContext;
@@ -238,16 +275,22 @@ export async function requireTargetAccess(opts: {
   });
 
   if (!target) return notFound("Ziel nicht gefunden.");
-
-  // canSeeTarget now delegates to canSeeEntity() — full visibility enforcement
   if (!canSeeTarget(target, opts.actor)) {
     return notFound("Ziel nicht gefunden.");
   }
 
-  // TODO: access-mode-specific checks (same pattern as Meeting/Initiative):
-  //   "write" / "delete": block if actor is not creator AND not in allowed role
-  //   "stage": enforce requiresFourEyeReview (block self-approval)
-  //   "write": enforce PermissionModule.TARGETS_MANAGE once seeded
+  if (opts.access === "read") {
+    if (!hasPermission(opts.actor, PERM.TARGETS_VIEW, PERM.TARGETS_MANAGE)) {
+      return forbidden("targets.view Berechtigung erforderlich.");
+    }
+  } else {
+    // write / delete / stage — links and datapoints also route through "write"
+    if (!hasPermission(opts.actor, PERM.TARGETS_MANAGE)) {
+      return forbidden("targets.manage Berechtigung erforderlich.");
+    }
+  }
+
+  // TODO: Phase B — requiresFourEyeReview + audit log
 
   return { ok: true, entity: target };
 }

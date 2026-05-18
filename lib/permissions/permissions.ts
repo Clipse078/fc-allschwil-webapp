@@ -30,6 +30,7 @@ export const PERMISSIONS = {
   INFOBOARD_MANAGE: "infoboard.manage",
   FUNCTIONS_MANAGE: "functions.manage",
 
+  // Strategic modules — all three now DB-backed via PermissionModule enum
   TARGETS_VIEW: "targets.view",
   TARGETS_MANAGE: "targets.manage",
 
