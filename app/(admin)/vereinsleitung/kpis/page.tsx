@@ -13,8 +13,12 @@
  *   2. Create /app/api/kpis/ CRUD routes
  *   3. Create canonical app/(admin)/kpis/ pages
  *   4. Add KPIS_VIEW + KPIS_MANAGE permissions + seed
- *   5. Add 307 redirect: /vereinsleitung/kpis → /kpis
- *   6. Add nav item: href /kpis with permissionKeys guard
+ *   5. Add 307 redirect: /vereinsleitung/kpis → /targets
+ *   6. Add nav item: href /targets with TARGETS_VIEW/MANAGE permissionKeys guard
+ *
+ * Module name decision: canonical route = /targets (not /kpis)
+ *   A Target is broader than a KPI. KPI metrics are the measurements inside a Target.
+ *   Data model: Target → TargetMetric → TargetDataPoint (now in schema.prisma).
  *
  * Blocker: KpiMetric data model design required before any route/API work.
  */

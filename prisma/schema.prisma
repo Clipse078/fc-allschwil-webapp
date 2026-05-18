@@ -20,6 +20,7 @@ enum PermissionModule {
   FUNCTIONS
   MEETINGS
   INITIATIVES
+  TARGETS
 }
 
 enum TeamCategory {
@@ -168,6 +169,43 @@ enum InitiativeTaskStatus {
   CANCELLED
 }
 
+// ─── Targets Module ───────────────────────────────────────────────────────────
+
+enum TargetStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ACHIEVED
+  MISSED
+  CANCELLED
+}
+
+enum TargetMetricType {
+  NUMBER // absolute count    e.g. "3 women's teams"
+  PERCENTAGE // 0–100 %           e.g. "50% technique training time"
+  CURRENCY // monetary value    e.g. "CHF 25k sponsoring growth"
+  BOOLEAN // achieved or not   e.g. "Launch new website"
+  RATIO // rate per period   e.g. "2 news posts/month"
+  SCORE // qualitative 1–10  e.g. "Coach satisfaction score"
+}
+
+enum TargetPeriodType {
+  ONCE // single milestone (no recurrence)
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEASONAL // aligned to sports season
+  ANNUAL
+  MULTI_YEAR // e.g. "3 more women's teams in 4 years"
+}
+
+enum TargetDirection {
+  INCREASE // higher is better  e.g. attendance, members
+  DECREASE // lower is better   e.g. dropout rate
+  MAINTAIN // stay within range e.g. budget within 5%
+  ACHIEVE // binary: hit or miss (used with BOOLEAN metrics)
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
@@ -313,6 +351,7 @@ model Season {
   eventImportRuns EventImportRun[]
   meetings        Meeting[]
   initiatives     Initiative[]
+  targets         Target[]
 
   @@index([isActive])
 }
@@ -362,6 +401,7 @@ model Team {
   eventImportRuns EventImportRun[]
   meetings        Meeting[]
   initiatives     Initiative[]
+  targets         Target[]
 
   @@index([category, sortOrder])
   @@index([isActive])
@@ -874,4 +914,264 @@ model InitiativeMilestone {
 
   @@index([initiativeId, sortOrder])
   @@index([dueDate])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Targets Module
+//
+// Standalone, reusable strategic target / goal tracking for any org unit.
+// Replaces the legacy static KPI page at /vereinsleitung/kpis.
+//
+// A Target describes a measurable goal. It may have multiple TargetMetrics
+// (the actual measurements) and each metric accumulates TargetDataPoints
+// (the time-series readings).
+//
+// Ownership follows the same pattern as Meetings + Initiatives:
+//   tenantSlug placeholder, optional Season/Team/OrgUnit.
+//
+// ─── STRATEGY NUDGING ARCHITECTURE ──────────────────────────────────────────
+//
+// The Targets module is designed to become SportClubEvo's intelligent
+// "guidance engine" — helping clubs set meaningful, realistic goals based on
+// sport category, age group, module context, and platform benchmarks.
+//
+// Nudging system components (to be built in future sprints):
+//
+//   1. TARGET TEMPLATE CATALOG (TargetTemplate model, future sprint):
+//      Predefined target blueprints curated by SportClubEvo:
+//        - "E-Junioren: 40–60% technique training time per season"
+//        - "Media team: ≥ 2 news posts/month"
+//        - "Women's football: +1 team per 3-year cycle"
+//        - "Sponsor revenue: +5–15% YoY"
+//        - "Match attendance: +20% vs previous season"
+//        - "Volunteer roles: ≤ 3 open positions at any time"
+//        - "Trainer education: all A-licence within 2 seasons"
+//        Templates filtered by: sportCategory, ageGroupHint, targetCategory, moduleKey.
+//
+//   2. RANGE RECOMMENDATIONS:
+//      recommendedRangeMin / recommendedRangeMax on Target — system-suggested
+//      achievable range. Admin or AI sets these; shown in the UI as a guide.
+//      Example: "Swiss football avg attendance growth is 8–22% per season."
+//
+//   3. CONFIDENCE SCORING (recommendationConfidence 0.0–1.0):
+//      How confident the system is in its suggestion, based on:
+//        - historical data for similar clubs
+//        - benchmark source quality
+//        - amount of available club data
+//      Shown as an indicator: "High confidence" / "Estimate" / "Exploratory".
+//
+//   4. MODULE LINKAGE (moduleKey):
+//      Targets can be linked to platform modules:
+//        training_planner → technique %, drill frequency, session length
+//        events           → match count, attendance %, postponements
+//        media            → news posts, social reach, video content
+//        sponsoring       → CHF revenue, sponsor retention, new sponsors
+//        attendance       → match attendance, training attendance
+//        finance          → budget variance, cost per member
+//        volunteers       → open roles, average tenure
+//        facilities       → pitch utilisation %, room booking rate
+//      The moduleKey enables cross-module nudges:
+//        "Training attendance is below target → suggest reviewing event schedule"
+//
+//   5. ADMIN-CONTROLLED ENABLE/DISABLE:
+//      A future ModuleNudgeConfig model will let admins:
+//        - enable/disable nudge categories per tenant
+//        - override suggested ranges with club-specific values
+//        - mark certain templates as "irrelevant for our club"
+//
+//   6. COUNTRY / TENANT DIFFERENCES:
+//      benchmarkSource and future TenantConfig fields will allow:
+//        - Swiss football federation benchmarks
+//        - Regional league averages
+//        - Peer club comparisons (opt-in)
+//
+//   7. FUTURE AI INTEGRATION PATH:
+//      suggestedBySystem = true + recommendationConfidence set by an external
+//      inference service. The schema is AI-ready without requiring AI today.
+//      The platform starts with curated templates and static benchmarks,
+//      then progressively upgrades to ML-based suggestions.
+//
+//   Sport-category-specific nudge examples (not exhaustive):
+//     football / Kinderfussball:
+//       - Fun > results: match ratio ≤ 50%, emphasis on development
+//       - Minimum 2 trainers per team
+//     football / Junioren:
+//       - B-licence trainer within 1 season
+//       - 60%+ attendance at regional league games
+//     football / Frauen:
+//       - Growth targets tied to women's football expansion roadmap
+//       - Minimum 2 training sessions/week
+//     football / Aktive:
+//       - League promotion/maintenance goals
+//       - Average attendance benchmarks vs division averages
+//     football / Senioren:
+//       - Participation over performance; social KPIs important
+//
+// ─── GOVERNANCE TODO BLOCK ───────────────────────────────────────────────────
+//
+// TODO(governance — Module Admin Config sprint):
+//   reviewStage           ReviewWorkflowStage @default(DRAFT)
+//   reviewNotes           String?
+//   reviewedByUserId      String?
+//   approvedByUserId      String?
+//   requiresFourEyeReview Boolean @default(false)
+//   accessPolicyId        String?
+//   isPublicToTenant      Boolean @default(false)
+//   restrictToOrgUnitId   String?
+//   nudgeConfigId         String?  — FK to future TargetNudgeConfig
+//
+// TODO(decoupling): When OrgUnit model exists, add orgUnitId String? + @relation.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Target {
+  id String @id @default(cuid())
+
+  /// Single-tenant placeholder. Becomes a FK to Tenant when multi-tenancy is added.
+  tenantSlug String @default("fc-allschwil")
+
+  // Flexible ownership — all optional.
+  seasonId     String?
+  teamId       String?
+  /// Free-text org unit label until Organisation Builder provides a real OrgUnit FK.
+  orgUnitLabel String?
+
+  /// Links to a platform module (e.g. "training_planner", "media", "sponsoring").
+  /// Enables module-specific nudges and cross-module correlation.
+  moduleKey String?
+
+  title       String
+  description String?
+
+  status TargetStatus @default(DRAFT)
+
+  // What is being measured
+  metricType  TargetMetricType?
+  direction   TargetDirection?
+  /// The goal value (interpreted per metricType: count / % / CHF / score).
+  targetValue Float?
+  /// Human-readable unit label. Examples: "teams", "%", "CHF", "posts/month", "pts".
+  unit        String?
+
+  // Time frame
+  periodType TargetPeriodType?
+  startsAt   DateTime?
+  endsAt     DateTime?
+
+  // ── Category hints (for nudging engine) ───────────────────────────────────
+  // These fields enable the platform to filter template suggestions and
+  // apply sport/age-specific benchmarks without requiring a taxonomy model.
+
+  /// Broad goal category — drives template filtering and nudge routing.
+  /// Examples: "youth_development", "women_football", "media", "sponsoring",
+  ///   "attendance", "finance", "trainer_education", "volunteer_participation",
+  ///   "facility_usage", "operational_efficiency"
+  targetCategory String?
+
+  /// Sport type hint. Primarily "football" for FC Allschwil; future: "futsal", "general".
+  sportCategory String?
+
+  /// Age / team group hint for sport-specific benchmarks.
+  /// Mirrors TeamCategory values: "Kinderfussball" | "Junioren" | "Frauen" |
+  /// "Aktive" | "Senioren" | "Trainingsgruppe"
+  ageGroupHint String?
+
+  // ── Strategy nudging system fields ────────────────────────────────────────
+  // These lightweight fields make the Target schema AI/nudge-ready from day one.
+  // The recommendation engine can be wired in later without a schema migration.
+
+  /// Key of the TargetTemplate this was created from (future TargetTemplate catalog).
+  suggestedTemplateKey String?
+
+  /// true when this target was suggested by the system (template or AI), not manually created.
+  suggestedBySystem Boolean @default(false)
+
+  /// Lower bound of the system-suggested achievement range for this metric + context.
+  recommendedRangeMin Float?
+
+  /// Upper bound of the system-suggested achievement range.
+  recommendedRangeMax Float?
+
+  /// System confidence in the recommendation (0.0 = exploratory, 1.0 = high confidence).
+  /// Shown in UI as: "High confidence" / "Estimate" / "Exploratory".
+  recommendationConfidence Float?
+
+  /// Source of the benchmark behind the range suggestion.
+  /// Examples: "swiss_football_avg", "regional_league_b", "internal_historical", "peer_clubs"
+  benchmarkSource String?
+
+  // Audit — consistent with Meeting + Initiative pattern.
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  season Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  metrics TargetMetric[]
+
+  @@index([tenantSlug, status])
+  @@index([tenantSlug, moduleKey])
+  @@index([tenantSlug, endsAt])
+  @@index([tenantSlug, targetCategory])
+  @@index([seasonId])
+  @@index([teamId])
+  @@index([orgUnitLabel])
+  @@index([status])
+  @@index([moduleKey])
+  @@index([suggestedBySystem])
+}
+
+model TargetMetric {
+  id        String @id @default(cuid())
+  targetId  String
+  sortOrder Int    @default(0)
+
+  /// Human-readable measurement label.
+  /// Examples: "Number of women's teams", "Technique training %", "YoY CHF growth"
+  label String
+
+  metricType TargetMetricType
+  direction  TargetDirection  @default(INCREASE)
+
+  /// Goal value for this specific metric.
+  targetValue Float?
+
+  /// Most recent reading — denormalized for fast list rendering.
+  /// Updated whenever a new TargetDataPoint is recorded.
+  currentValue Float?
+
+  /// Human-readable unit (e.g. "teams", "%", "CHF", "posts/month").
+  unit String?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  target     Target            @relation(fields: [targetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  dataPoints TargetDataPoint[]
+
+  @@index([targetId, sortOrder])
+  @@index([targetId, metricType])
+}
+
+model TargetDataPoint {
+  id             String @id @default(cuid())
+  targetMetricId String
+
+  value      Float
+  measuredAt DateTime
+
+  notes String?
+
+  /// Who recorded this reading — string (no FK) consistent with Event/Meeting pattern.
+  recordedByUserId String?
+
+  createdAt DateTime @default(now())
+
+  targetMetric TargetMetric @relation(fields: [targetMetricId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([targetMetricId, measuredAt])
+  @@index([measuredAt])
 }
