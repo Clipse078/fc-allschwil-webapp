@@ -58,6 +58,34 @@ export default function AdminPageActions() {
     );
   }
 
+  // ── Target detail pages: /targets/[id] ──────────────────────────────────
+  const targetDetailMatch = /^\/targets\/([^/]+)$/.exec(pathname);
+  if (targetDetailMatch && targetDetailMatch[1] !== "new") {
+    const targetId = targetDetailMatch[1];
+    return (
+      <div className={ACTION_ROW}>
+        <Link href={`/targets/${targetId}/edit`} className={SECONDARY_BTN}>
+          <Pencil className="h-4 w-4" />
+          {tActions("edit")}
+        </Link>
+      </div>
+    );
+  }
+
+  // ── Target edit pages: /targets/[id]/edit ────────────────────────────────
+  const targetEditMatch = /^\/targets\/([^/]+)\/edit$/.exec(pathname);
+  if (targetEditMatch) {
+    const targetId = targetEditMatch[1];
+    return (
+      <div className={ACTION_ROW}>
+        <Link href={`/targets/${targetId}`} className={SECONDARY_BTN}>
+          <CalendarPlus className="h-4 w-4" />
+          {tActions("backToTarget")}
+        </Link>
+      </div>
+    );
+  }
+
   // ── Initiative detail pages: /initiatives/[id] ──────────────────────────
   const initiativeDetailMatch = /^\/initiatives\/([^/]+)$/.exec(pathname);
   if (initiativeDetailMatch && initiativeDetailMatch[1] !== "new") {

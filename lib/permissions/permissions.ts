@@ -35,6 +35,9 @@ export const PERMISSIONS = {
 
   INITIATIVES_VIEW: "initiatives.view",
   INITIATIVES_MANAGE: "initiatives.manage",
+
+  TARGETS_VIEW: "targets.view",
+  TARGETS_MANAGE: "targets.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

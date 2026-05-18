@@ -72,6 +72,23 @@ export const ADMIN_ROUTE_CONFIGS: AdminRouteConfig[] = [
     },
   },
 
+  // ── Targets (canonical standalone routes) ─────────────────────────────────
+  {
+    pattern: "/targets/new",
+    match: "exact",
+    header: { eyebrow: "Ziele", title: "Neues Ziel", description: "Strategisches Ziel definieren mit Zeitraum, Kategorie und messbaren Kennzahlen." },
+  },
+  {
+    pattern: "/targets",
+    match: "exact",
+    header: { eyebrow: "Ziele", title: "Strategische Ziele", description: "Messbare Vereinsziele verwalten — von Jugendentwicklung bis Mediateam, Finanzen und Vereinswachstum." },
+  },
+  {
+    pattern: "/targets/",
+    match: "startsWith",
+    header: { eyebrow: "Ziele", title: "Ziel Details", description: "Kennzahlen, Fortschritt und Zeitraum des strategischen Ziels." },
+  },
+
   // ── Initiatives (canonical standalone routes) ─────────────────────────────
   {
     pattern: "/initiatives/new",
@@ -347,6 +364,11 @@ export function getAdminRouteHeader(pathname: string): AdminRouteHeader {
       title: "Meeting bearbeiten",
       description: "Titel, Status, Datum und weitere Meeting-Felder anpassen.",
     };
+  }
+
+  // Target edit pages: /targets/[id]/edit
+  if (/^\/targets\/[^/]+\/edit$/.test(pathname)) {
+    return { eyebrow: "Ziele", title: "Ziel bearbeiten", description: "Titel, Status, Zeitraum und Kategorie des Ziels anpassen." };
   }
 
   // Initiative edit pages: /initiatives/[id]/edit

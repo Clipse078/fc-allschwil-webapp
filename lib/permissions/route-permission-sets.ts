@@ -34,4 +34,9 @@ export const ROUTE_PERMISSION_SETS = {
     PERMISSIONS.INITIATIVES_VIEW,
     PERMISSIONS.INITIATIVES_MANAGE,
   ] satisfies PermissionKey[],
+
+  TARGETS_READ: [
+    PERMISSIONS.TARGETS_VIEW,
+    PERMISSIONS.TARGETS_MANAGE,
+  ] satisfies PermissionKey[],
 } as const;

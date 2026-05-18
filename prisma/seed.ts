@@ -10,6 +10,10 @@ import {
   MeetingStatus,
   PermissionModule,
   PrismaClient,
+  TargetMetricType,
+  TargetDirection,
+  TargetPeriodType,
+  TargetStatus,
   TeamCategory,
   TeamSeasonStatus,
 } from "@prisma/client";
@@ -79,6 +83,9 @@ async function main() {
 
     { key: "initiatives.view", name: "View initiatives", module: PermissionModule.INITIATIVES },
     { key: "initiatives.manage", name: "Manage initiatives", module: PermissionModule.INITIATIVES },
+
+    { key: "targets.view", name: "View targets", module: PermissionModule.TARGETS },
+    { key: "targets.manage", name: "Manage targets", module: PermissionModule.TARGETS },
   ] as const;
 
   for (const permission of permissions) {
@@ -128,6 +135,8 @@ async function main() {
         "meetings.manage",
         "initiatives.view",
         "initiatives.manage",
+        "targets.view",
+        "targets.manage",
       ],
     },
     {
@@ -568,6 +577,69 @@ async function main() {
           ownerName: initiativeData.ownerName,
         },
       });
+    }
+  }
+
+  // ── Demo targets with metrics ────────────────────────────────────────────
+  const season2026 = await prisma.season.findUnique({ where: { key: "2026-2027" }, select: { id: true } });
+
+  const DEMO_TARGETS = [
+    {
+      title: "Frauenfussball Offensive: +3 Teams in 4 Jahren",
+      description: "Strategisches Ziel zum Ausbau der Frauenabteilung — von aktuell 4 auf 7 Teams bis 2030.",
+      status: TargetStatus.ACTIVE,
+      periodType: TargetPeriodType.MULTI_YEAR,
+      targetCategory: "women_football",
+      ageGroupHint: "Frauen",
+      orgUnitLabel: "Vereinsleitung",
+      endsAt: new Date("2030-06-30T00:00:00.000Z"),
+      suggestedBySystem: false,
+      metrics: [{ label: "Neue Frauenteams", metricType: TargetMetricType.NUMBER, direction: TargetDirection.INCREASE, targetValue: 3, unit: "Teams" }],
+    },
+    {
+      title: "Mediateam: Mindestens 2 News-Beiträge pro Monat",
+      description: "Ziel zur Steigerung der Medienpräsenz und Vereinskommunikation.",
+      status: TargetStatus.ACTIVE,
+      periodType: TargetPeriodType.MONTHLY,
+      targetCategory: "media",
+      moduleKey: "media",
+      orgUnitLabel: "Mediateam",
+      suggestedBySystem: true,
+      recommendedRangeMin: 1,
+      recommendedRangeMax: 4,
+      recommendationConfidence: 0.7,
+      benchmarkSource: "internal_historical",
+      metrics: [{ label: "News-Beiträge", metricType: TargetMetricType.RATIO, direction: TargetDirection.INCREASE, targetValue: 2, unit: "pro Monat" }],
+    },
+    {
+      title: "E-Junioren: 50% Technikfokus in Trainingseinheiten",
+      description: "Trainingsphilosophie-Ziel für Saison 2026/27: mindestens 50% der Trainingszeit für technische Grundlagen.",
+      status: TargetStatus.DRAFT,
+      periodType: TargetPeriodType.SEASONAL,
+      targetCategory: "youth_development",
+      ageGroupHint: "Kinderfussball",
+      moduleKey: "training_planner",
+      seasonId: season2026?.id,
+      suggestedBySystem: true,
+      recommendedRangeMin: 40,
+      recommendedRangeMax: 60,
+      recommendationConfidence: 0.85,
+      benchmarkSource: "swiss_football_avg",
+      metrics: [{ label: "Technikanteil im Training", metricType: TargetMetricType.PERCENTAGE, direction: TargetDirection.MAINTAIN, targetValue: 50, unit: "%" }],
+    },
+  ] as const;
+
+  for (const tData of DEMO_TARGETS) {
+    const existing = await prisma.target.findFirst({ where: { title: tData.title, tenantSlug: "fc-allschwil" }, select: { id: true } });
+    if (!existing) {
+      const { metrics: metricsDefs, ...targetFields } = tData;
+      const target = await prisma.target.create({
+        data: { tenantSlug: "fc-allschwil", ...targetFields },
+        select: { id: true },
+      });
+      for (let i = 0; i < metricsDefs.length; i++) {
+        await prisma.targetMetric.create({ data: { targetId: target.id, sortOrder: i, ...metricsDefs[i] } });
+      }
     }
   }
 

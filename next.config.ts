@@ -20,6 +20,12 @@ const nextConfig: NextConfig = {
         destination: "/initiatives",
         permanent: false, // 307 — temporary while migration is in progress
       },
+      // Targets module: /vereinsleitung/kpis → /targets (legacy KPI page)
+      {
+        source: "/vereinsleitung/kpis",
+        destination: "/targets",
+        permanent: false, // 307 — temporary while migration is in progress
+      },
     ];
   },
 };

@@ -16,6 +16,7 @@ export type Messages = {
     meetings: string;
     initiativen: string;
     kpis: string;
+    targets: string;
     saisons: string;
     saisonplanner: string;
     wochenplanner: string;
@@ -105,6 +106,9 @@ export type Messages = {
     backToInitiative: string;
     backToInitiatives: string;
     initiativePlanNew: string;
+    backToTarget: string;
+    backToTargets: string;
+    targetNew: string;
     seasonSwitch: string;
     teamNew: string;
     eventNew: string;

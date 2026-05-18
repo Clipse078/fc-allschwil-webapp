@@ -52,7 +52,8 @@ const NAV_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> 
   "/meetings": ScrollText,               // canonical Meetings route
   "/vereinsleitung/initiativen": Flag,   // kept as icon fallback — nav item now points to /initiatives
   "/initiatives": Flag,                  // canonical Initiatives route
-  "/vereinsleitung/kpis": BarChart3,
+  "/vereinsleitung/kpis": BarChart3,  // legacy fallback
+  "/targets": BarChart3,              // canonical Targets route ("Ziele")
   "/dashboard/seasons": CalendarRange,
   "/dashboard/planner": ClipboardList,
   "/dashboard/planner/week": CalendarDays,

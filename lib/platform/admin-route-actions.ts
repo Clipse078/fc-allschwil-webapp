@@ -157,6 +157,19 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
     ],
   },
 
+  // ── Targets (canonical standalone routes) ─────────────────────────────────
+  // /targets/[id] and /targets/[id]/edit are handled imperatively in AdminPageActions.
+  {
+    pattern: "/targets/new",
+    match: "exact",
+    actions: [{ icon: CalendarPlus, labelKey: "backToTargets", labelNs: "pageActions", variant: "secondary", type: "link", href: "/targets" }],
+  },
+  {
+    pattern: "/targets",
+    match: "exact",
+    actions: [{ icon: Plus, labelKey: "targetNew", labelNs: "pageActions", variant: "primary", type: "link", href: "/targets/new" }],
+  },
+
   // ── Initiatives (canonical standalone routes) ─────────────────────────────
   {
     pattern: "/initiatives/new",
