@@ -23,7 +23,7 @@ export default async function MeetingDetailPage({ params }: MeetingDetailPagePro
       {dbMeeting ? (
         <MeetingGovernanceBanner meeting={dbMeeting} />
       ) : null}
-      <VereinsleitungMeetingDetail slug={slug} />
+      <VereinsleitungMeetingDetail dbMeeting={dbMeeting} />
     </div>
   );
 }

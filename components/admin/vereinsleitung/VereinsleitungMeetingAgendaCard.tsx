@@ -1,10 +1,27 @@
-﻿import { Clock3, FileText } from "lucide-react";
+﻿/**
+ * TODO: MeetingAgendaItem model (Phase 2)
+ *   Add structured agenda items as a relation to Meeting:
+ *     model MeetingAgendaItem {
+ *       id         String  @id @default(cuid())
+ *       meetingId  String
+ *       number     Int
+ *       title      String
+ *       owner      String?
+ *       durationMin Int?
+ *       notes      String?
+ *       sortOrder  Int     @default(0)
+ *       meeting    Meeting @relation(...)
+ *     }
+ *   Surface items ordered by sortOrder; allow collapsible notes per item.
+ */
+
+import { Clock3, FileText } from "lucide-react";
 
 type VereinsleitungMeetingAgendaCardProps = {
-  slug: string;
+  isDbBacked?: boolean;
 };
 
-const ITEMS = [
+const MOCK_ITEMS = [
   {
     number: 1,
     title: "Genehmigung Protokoll letzte Sitzung",
@@ -35,19 +52,38 @@ const ITEMS = [
 ];
 
 export default function VereinsleitungMeetingAgendaCard({
-  slug,
+  isDbBacked,
 }: VereinsleitungMeetingAgendaCardProps) {
-  const title =
-    slug === "vorstandssitzung-april" ? "Traktanden & Protokoll" : "Traktanden & Protokoll";
+  if (isDbBacked) {
+    return (
+      <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-[#0b4aa2]" />
+          <h3 className="text-[1.08rem] font-semibold text-slate-900">
+            Traktanden & Protokoll
+          </h3>
+        </div>
 
+        <div className="mt-6 rounded-[20px] border border-slate-100 bg-slate-50 px-4 py-5 text-center">
+          <p className="text-sm text-slate-500">Traktanden noch nicht erfasst.</p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Wird in einer späteren Version als MeetingAgendaItem erfasst.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // Legacy mock fallback
   return (
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <FileText className="h-4.5 w-4.5 text-[#0b4aa2]" />
-          <h3 className="text-[1.08rem] font-semibold text-slate-900">{title}</h3>
+          <FileText className="h-4 w-4 text-[#0b4aa2]" />
+          <h3 className="text-[1.08rem] font-semibold text-slate-900">
+            Traktanden & Protokoll
+          </h3>
         </div>
-
         <button
           type="button"
           className="text-sm font-semibold text-[#0b4aa2] transition hover:text-[#08357a]"
@@ -57,7 +93,7 @@ export default function VereinsleitungMeetingAgendaCard({
       </div>
 
       <div className="mt-6 space-y-4">
-        {ITEMS.map((item) => (
+        {MOCK_ITEMS.map((item) => (
           <article
             key={item.number}
             className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.03)]"
@@ -73,7 +109,6 @@ export default function VereinsleitungMeetingAgendaCard({
                     <h4 className="text-[1rem] font-semibold text-slate-900">
                       {item.title}
                     </h4>
-
                     <div className="mt-2 flex items-center gap-2">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[10px] font-semibold text-[#0b4aa2]">
                         {item.ownerInitials}
@@ -81,7 +116,6 @@ export default function VereinsleitungMeetingAgendaCard({
                       <p className="text-xs text-slate-500">{item.owner}</p>
                     </div>
                   </div>
-
                   <div className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                     <Clock3 className="h-3.5 w-3.5" />
                     <span>{item.duration}</span>

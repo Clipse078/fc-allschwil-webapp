@@ -1,10 +1,27 @@
-﻿import { CheckCircle2 } from "lucide-react";
+﻿/**
+ * TODO: MeetingDecision model (Phase 2)
+ *   Add structured decisions as a relation to Meeting:
+ *     model MeetingDecision {
+ *       id          String  @id @default(cuid())
+ *       meetingId   String
+ *       title       String
+ *       description String?
+ *       status      DecisionStatus @default(ACCEPTED)
+ *       owner       String?
+ *       sortOrder   Int     @default(0)
+ *       meeting     Meeting @relation(...)
+ *     }
+ *   enum DecisionStatus { ACCEPTED REJECTED DEFERRED }
+ *   Link decisions to Targets via Target.nudgeJson for operational traceability.
+ */
+
+import { CheckCircle2 } from "lucide-react";
 
 type VereinsleitungMeetingDecisionsCardProps = {
-  slug: string;
+  isDbBacked?: boolean;
 };
 
-const DECISIONS = [
+const MOCK_DECISIONS = [
   {
     title: "Budgetfreigabe Website-Phase 2",
     status: "Angenommen",
@@ -24,19 +41,40 @@ const DECISIONS = [
 ];
 
 export default function VereinsleitungMeetingDecisionsCard({
-  slug,
+  isDbBacked,
 }: VereinsleitungMeetingDecisionsCardProps) {
-  const title = slug === "vorstandssitzung-april" ? "Gefasste Beschlüsse" : "Gefasste Beschlüsse";
+  if (isDbBacked) {
+    return (
+      <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-[#0b4aa2]" />
+          <h3 className="text-[1.08rem] font-semibold text-slate-900">
+            Gefasste Beschlüsse
+          </h3>
+        </div>
 
+        <div className="mt-6 rounded-[20px] border border-slate-100 bg-slate-50 px-4 py-5 text-center">
+          <p className="text-sm text-slate-500">Beschlüsse noch nicht erfasst.</p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Wird in einer späteren Version als MeetingDecision erfasst.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // Legacy mock fallback
   return (
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-4.5 w-4.5 text-[#0b4aa2]" />
-        <h3 className="text-[1.08rem] font-semibold text-slate-900">{title}</h3>
+        <CheckCircle2 className="h-4 w-4 text-[#0b4aa2]" />
+        <h3 className="text-[1.08rem] font-semibold text-slate-900">
+          Gefasste Beschlüsse
+        </h3>
       </div>
 
       <div className="mt-6 space-y-4">
-        {DECISIONS.map((decision) => (
+        {MOCK_DECISIONS.map((decision) => (
           <article
             key={decision.title}
             className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.03)]"
@@ -50,7 +88,6 @@ export default function VereinsleitungMeetingDecisionsCard({
                   {decision.description}
                 </p>
               </div>
-
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
                 {decision.status}
               </span>

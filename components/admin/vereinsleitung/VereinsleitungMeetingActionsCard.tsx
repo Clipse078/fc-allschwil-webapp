@@ -1,10 +1,29 @@
-﻿import { CalendarDays, Circle, PlusCircle } from "lucide-react";
+﻿/**
+ * TODO: MeetingAction model (Phase 2)
+ *   Add structured action items as a relation to Meeting:
+ *     model MeetingAction {
+ *       id          String   @id @default(cuid())
+ *       meetingId   String
+ *       title       String
+ *       owner       String?
+ *       dueDate     DateTime?
+ *       completed   Boolean  @default(false)
+ *       sortOrder   Int      @default(0)
+ *       targetId    String?  // optional link to a Target for traceability
+ *       meeting     Meeting  @relation(...)
+ *       target      Target?  @relation(...)
+ *     }
+ *   When targetId is set, surface this action on the linked Target's detail page
+ *   as an "open action" — bridging meeting outcomes to strategic targets.
+ */
+
+import { CalendarDays, Circle, PlusCircle } from "lucide-react";
 
 type VereinsleitungMeetingActionsCardProps = {
-  slug: string;
+  isDbBacked?: boolean;
 };
 
-const ACTIONS = [
+const MOCK_ACTIONS = [
   {
     title: "Feedback zu Website-Designs sammeln und an Agentur senden",
     ownerInitials: "MW",
@@ -26,16 +45,32 @@ const ACTIONS = [
 ];
 
 export default function VereinsleitungMeetingActionsCard({
-  slug,
+  isDbBacked,
 }: VereinsleitungMeetingActionsCardProps) {
-  const title = slug === "vorstandssitzung-april" ? "Neue Massnahmen" : "Neue Massnahmen";
+  if (isDbBacked) {
+    return (
+      <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <h3 className="text-[1.08rem] font-semibold text-slate-900">
+          Neue Massnahmen
+        </h3>
 
+        <div className="mt-6 rounded-[20px] border border-slate-100 bg-slate-50 px-4 py-5 text-center">
+          <p className="text-sm text-slate-500">Massnahmen noch nicht erfasst.</p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Wird in einer späteren Version als MeetingAction erfasst und kann mit Zielen verknüpft werden.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // Legacy mock fallback
   return (
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <h3 className="text-[1.08rem] font-semibold text-slate-900">{title}</h3>
+      <h3 className="text-[1.08rem] font-semibold text-slate-900">Neue Massnahmen</h3>
 
       <div className="mt-6 divide-y divide-slate-100 overflow-hidden rounded-[22px] border border-slate-200/80 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.03)]">
-        {ACTIONS.map((action) => (
+        {MOCK_ACTIONS.map((action) => (
           <div
             key={action.title}
             className="flex items-start gap-4 px-4 py-4 transition hover:bg-slate-50/70"
@@ -66,7 +101,6 @@ export default function VereinsleitungMeetingActionsCard({
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[10px] font-semibold text-[#0b4aa2]">
                 {action.ownerInitials}
               </span>
-
               <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
                 <CalendarDays className="h-3.5 w-3.5" />
                 {action.due}

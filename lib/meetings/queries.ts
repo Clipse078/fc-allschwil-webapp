@@ -62,3 +62,9 @@ export async function getMeetingById(id: string) {
 
 export type MeetingListItem = Awaited<ReturnType<typeof getMeetings>>[number];
 export type MeetingDetail = Awaited<ReturnType<typeof getMeetingBySlug>>;
+
+/**
+ * Non-null meeting from getMeetingBySlug — used as prop type across
+ * detail sub-cards so they can display live DB data when available.
+ */
+export type MeetingLiveData = NonNullable<MeetingDetail>;
