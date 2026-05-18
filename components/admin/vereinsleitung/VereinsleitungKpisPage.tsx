@@ -1,4 +1,15 @@
-﻿const KPI_GROUPS = [
+﻿/**
+ * TODO(decoupling — KPI Module):
+ * This component renders hardcoded KPI groups. All data is static/mock.
+ * When the KPI module is built:
+ *   - Rename to KpisPage (remove Vereinsleitung prefix)
+ *   - Move to components/admin/kpis/KpisPage.tsx
+ *   - Replace static KPI_GROUPS with real Prisma queries (KpiMetric model)
+ *   - KPI groups → derived from KpiMetric.category field
+ *   - orgUnitLabel should be injectable as a prop for multi-org-unit support
+ *   - Add trend arrows, sparklines, period selector if useful
+ */
+const KPI_GROUPS = [
   {
     title: "Mitglieder & Teams",
     items: [

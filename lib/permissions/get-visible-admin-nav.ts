@@ -37,6 +37,9 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     translationKey: "initiativen",
     permissionKeys: [PERMISSIONS.INITIATIVES_VIEW, PERMISSIONS.INITIATIVES_MANAGE],
   },
+  // TODO(decoupling — KPI Module): href will move to KPI_ROUTE_BASE ("/kpis") when
+  // the standalone KPI module is built with a real data model and canonical routes.
+  // Until then, no permissionKeys gate — access is implicitly via Vereinsleitung session.
   { label: "KPIs",           href: "/vereinsleitung/kpis",        translationKey: "kpis"         },
   {
     label: "Saisons",

@@ -197,6 +197,8 @@ export const ADMIN_ROUTE_CONFIGS: AdminRouteConfig[] = [
   },
 
   // ── Vereinsleitung / KPIs + overview ────────────────────────────────────────
+  // TODO(decoupling — KPI Module): When canonical /kpis route exists, add a new
+  // entry above for "/kpis" (exact + prefix) and this legacy entry can be removed.
   {
     pattern: "/vereinsleitung/kpis",
     match: "exact",

@@ -1,4 +1,14 @@
-﻿import { MoreHorizontal } from "lucide-react";
+﻿/**
+ * TODO(decoupling — KPI Module):
+ * KpiCard summary widget for org-unit dashboards.
+ * When the KPI module is built:
+ *   - Rename to KpiSummaryCard (remove Vereinsleitung prefix)
+ *   - Move to components/admin/kpis/KpiSummaryCard.tsx
+ *   - Replace static KPIS array with a server prop or API fetch
+ *   - Accept orgUnitLabel / seasonId as props for filtered queries
+ *   - Wire "Mehr Optionen" button to navigate to /kpis with orgUnit filter
+ */
+import { MoreHorizontal } from "lucide-react";
 
 const KPIS = [
   {

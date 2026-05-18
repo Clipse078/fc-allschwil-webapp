@@ -69,11 +69,11 @@ function getNavIcon(href: string): React.ComponentType<{ className?: string }> {
   return NAV_ICON_MAP[href] ?? LayoutDashboard;
 }
 
-// Meetings and Initiativen are now standalone top-level nav items.
-// Only KPIs remains as a Vereinsleitung sub-navigation item.
-const VEREINSLEITUNG_CHILD_HREFS = new Set([
-  "/vereinsleitung/kpis",
-]);
+// Meetings, Initiativen, and KPIs are all standalone top-level nav items.
+// Vereinsleitung has no sub-navigation children remaining.
+// TODO(decoupling): Once the KPI module is on its canonical /kpis route,
+// the KPIs nav item href will move there and this comment can be cleaned up.
+const VEREINSLEITUNG_CHILD_HREFS = new Set<string>([]);
 
 const PLANNER_CHILD_HREFS = new Set([
   "/dashboard/planner/week",

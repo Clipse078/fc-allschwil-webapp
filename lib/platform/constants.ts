@@ -59,6 +59,45 @@ export const MEETINGS_ROUTE_BASE = "/vereinsleitung/meetings" as const;
  */
 export const INITIATIVES_ROUTE_BASE = "/vereinsleitung/initiativen" as const;
 
+/**
+ * Current base path for the KPIs page.
+ * @deprecated Coupled to Vereinsleitung. Target: "/kpis" (or "/targets" — name TBD)
+ *
+ * TODO(decoupling — KPI Module):
+ * KPIs/Targets must become a standalone reusable module. It differs from Meetings
+ * and Initiatives: instead of CRUD records, it manages measurable metrics with
+ * time-series data, target values, and period tracking.
+ *
+ * Proposed canonical routes:
+ *   /kpis                KPI dashboard overview
+ *   /kpis/[id]           Individual metric detail + history
+ *   /kpis/new            Define new metric/target
+ *   /kpis/[id]/edit      Edit metric definition
+ *
+ * Proposed data model (Organisation Builder sprint):
+ *   KpiMetric:
+ *     tenantSlug, seasonId?, orgUnitLabel?
+ *     key String @unique   — machine-readable metric key (e.g. "active_members")
+ *     name, description?, unit? (count / % / CHF)
+ *     category?            — grouping label (e.g. "Mitglieder", "Finanzen")
+ *     periodType           — ANNUAL | QUARTERLY | MONTHLY
+ *     targetValue Float?, currentValue Float?, previousValue Float?
+ *     → KpiDataPoint[] (time-series readings)
+ *   KpiDataPoint:
+ *     metricId, value Float, period DateTime, notes?
+ *
+ *   Governance (same roadmap as Meeting + Initiative):
+ *     reviewStage, accessPolicy, requiresFourEyeReview
+ *
+ * Module ownership model:
+ *   KPIs are org-unit-agnostic — any division, team, or role can track its own metrics.
+ *   orgUnitLabel (free-text) → future orgUnitId FK when Organisation Builder is live.
+ *
+ * Blocker: no real data model exists — currently 100% static mock data.
+ * Migration sprint should design KpiMetric + KpiDataPoint before any route work.
+ */
+export const KPI_ROUTE_BASE = "/vereinsleitung/kpis" as const;
+
 /** Admin shell layout constraints */
 export const SHELL_WIDTH_EXPANDED = 310 as const;
 export const SHELL_WIDTH_COLLAPSED = 96 as const;
