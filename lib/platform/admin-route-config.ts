@@ -72,7 +72,28 @@ export const ADMIN_ROUTE_CONFIGS: AdminRouteConfig[] = [
     },
   },
 
-  // ── Vereinsleitung / Meetings ───────────────────────────────────────────────
+  // ── Meetings (canonical standalone routes) ────────────────────────────────
+  {
+    pattern: "/meetings",
+    match: "exact",
+    header: {
+      eyebrow: "Meetings",
+      title: "Sitzungen",
+      description:
+        "Sitzungen und Meetings zentral verwalten – unabhängig von Divisions, Teams oder Org-Einheiten.",
+    },
+  },
+  {
+    pattern: "/meetings/",
+    match: "startsWith",
+    header: {
+      eyebrow: "Meetings",
+      title: "Meeting Details",
+      description: "Traktanden, Teilnehmer, Beschlüsse und Massnahmen.",
+    },
+  },
+
+  // ── Vereinsleitung / Meetings (legacy — redirects to /meetings) ────────────
   // TODO(decoupling): When Meetings module is decoupled, these patterns move to
   // "/meetings" (exact) and "/meetings/" (startsWith). The MEETINGS_ROUTE_BASE
   // constant in lib/platform/constants.ts centralises this change.

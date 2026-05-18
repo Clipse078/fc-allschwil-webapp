@@ -18,6 +18,7 @@ enum PermissionModule {
   WEBSITE
   INFOBOARD
   FUNCTIONS
+  MEETINGS
 }
 
 enum TeamCategory {

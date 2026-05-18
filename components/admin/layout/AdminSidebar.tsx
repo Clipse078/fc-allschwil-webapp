@@ -47,7 +47,9 @@ type AdminSidebarProps = {
 const NAV_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   "/dashboard": LayoutDashboard,
   "/vereinsleitung": Briefcase,
+  // /vereinsleitung/meetings kept for icon fallback only — nav item now points to /meetings
   "/vereinsleitung/meetings": ScrollText,
+  "/meetings": ScrollText,           // canonical Meetings route
   "/vereinsleitung/initiativen": Flag,
   "/vereinsleitung/kpis": BarChart3,
   "/dashboard/seasons": CalendarRange,
@@ -66,8 +68,9 @@ function getNavIcon(href: string): React.ComponentType<{ className?: string }> {
   return NAV_ICON_MAP[href] ?? LayoutDashboard;
 }
 
+// Meetings was removed from this set — it is now a standalone top-level nav item at /meetings.
+// Only Initiativen and KPIs remain as Vereinsleitung sub-navigation items.
 const VEREINSLEITUNG_CHILD_HREFS = new Set([
-  "/vereinsleitung/meetings",
   "/vereinsleitung/initiativen",
   "/vereinsleitung/kpis",
 ]);

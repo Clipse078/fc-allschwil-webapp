@@ -107,7 +107,42 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
     ],
   },
 
-  // ── Vereinsleitung / Meetings ─────────────────────────────────────────────
+  // ── Meetings (canonical standalone routes) ────────────────────────────────
+  {
+    pattern: "/meetings",
+    match: "exact",
+    actions: [
+      {
+        icon: CalendarPlus,
+        labelKey: "meetingPlan",
+        labelNs: "pageActions",
+        variant: "primary",
+        type: "button",
+      },
+    ],
+  },
+  {
+    pattern: "/meetings/",
+    match: "startsWith",
+    actions: [
+      {
+        icon: Pencil,
+        labelKey: "edit",
+        labelNs: "pageActions",
+        variant: "secondary",
+        type: "button",
+      },
+      {
+        icon: CheckCircle2,
+        labelKey: "decisionMake",
+        labelNs: "pageActions",
+        variant: "primary",
+        type: "button",
+      },
+    ],
+  },
+
+  // ── Vereinsleitung / Meetings (legacy — redirects to /meetings) ────────────
   // TODO(decoupling): Patterns move to "/meetings" when Meetings module is decoupled.
   {
     pattern: "/vereinsleitung/meetings",
