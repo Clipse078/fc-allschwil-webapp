@@ -143,6 +143,30 @@ enum MeetingActionStatus {
   CANCELLED
 }
 
+// ─── Initiatives Module ───────────────────────────────────────────────────────
+
+enum InitiativeStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum InitiativePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InitiativeTaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
@@ -287,6 +311,7 @@ model Season {
   events          Event[]
   eventImportRuns EventImportRun[]
   meetings        Meeting[]
+  initiatives     Initiative[]
 
   @@index([isActive])
 }
@@ -335,6 +360,7 @@ model Team {
   events          Event[]
   eventImportRuns EventImportRun[]
   meetings        Meeting[]
+  initiatives     Initiative[]
 
   @@index([category, sortOrder])
   @@index([isActive])
@@ -555,6 +581,28 @@ model AuditLog {
 //   orgUnitId String?
 //   orgUnit   OrgUnit? @relation(...)
 // and migrate orgUnitLabel values to orgUnitId references.
+//
+// TODO(governance — Module Admin Config sprint):
+// The following governance capabilities are planned but not yet implemented.
+// They will be added when the Organisation Builder provides supporting models.
+//
+//   1. REVIEW / FOUR-EYE WORKFLOW:
+//      reviewStage         ReviewWorkflowStage @default(DRAFT)   -- reuse existing enum
+//      reviewNotes         String?
+//      reviewedByUserId    String?
+//      approvedByUserId    String?
+//      requiresFourEyeReview Boolean @default(false)            -- admin-configurable
+//
+//   2. ACCESS CONTROL:
+//      isPublicToTenant  Boolean @default(false)                 -- all roles can view
+//      accessPolicyId    String?                                 -- FK to AccessPolicy
+//      restrictToOrgUnitId String?                              -- per-org-unit gate
+//
+//   3. MODULE NUDGES:
+//      Computed in the UI layer (e.g. "Meeting has no agenda items").
+//      No schema fields needed — derived from _count of related records.
+//
+//   Pattern ref: RoleWorkflowRule model + lib/workflow/review-policy.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Meeting {
@@ -701,4 +749,128 @@ model MeetingAction {
   @@index([meetingId, status])
   @@index([assignedUserId])
   @@index([dueDate, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Initiatives Module
+//
+// Standalone, org-unit-agnostic initiative / project tracking.
+//
+// Mirrors the Meetings module ownership pattern: tenantSlug placeholder,
+// optional Season/Team/OrgUnit references, no Vereinsleitung coupling.
+//
+// TODO(decoupling): When OrgUnit model exists, add orgUnitId String? + @relation.
+// TODO(governance — Module Admin Config sprint):
+//   Same governance capabilities as Meetings (review workflow, access control,
+//   module nudges) — see Meetings module TODO block above for the full roadmap.
+//   Planned additions:
+//     reviewStage           ReviewWorkflowStage @default(DRAFT)
+//     requiresFourEyeReview Boolean @default(false)
+//     reviewedByUserId      String?
+//     approvedByUserId      String?
+//     accessPolicyId        String?
+//     isPublicToTenant      Boolean @default(false)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Initiative {
+  id String @id @default(cuid())
+
+  /// Single-tenant placeholder. Becomes a FK to Tenant when multi-tenancy is added.
+  tenantSlug String @default("fc-allschwil")
+
+  // Flexible ownership — all optional. An initiative exists independently of
+  // any season, team, or org unit.
+  seasonId     String?
+  teamId       String?
+  /// Free-text org unit label until Organisation Builder provides a real OrgUnit FK.
+  orgUnitLabel String?
+
+  title       String
+  /// One-liner for list views and cards.
+  summary     String?
+  description String?
+
+  status   InitiativeStatus   @default(DRAFT)
+  priority InitiativePriority @default(MEDIUM)
+
+  startsAt    DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  // Owner — free-text + optional FK references (same pattern as MeetingAction assignee).
+  // ownerUserId / ownerPersonId are intentionally NOT declared as @relation to avoid
+  // adding back-relations to User/Person. Promote to FK in a future migration if needed.
+  ownerName     String?
+  ownerUserId   String?
+  ownerPersonId String?
+
+  // Audit — string references (no FK) consistent with Event + Meeting pattern.
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  season Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  tasks      InitiativeTask[]
+  milestones InitiativeMilestone[]
+
+  @@index([tenantSlug, status])
+  @@index([tenantSlug, priority])
+  @@index([tenantSlug, dueDate])
+  @@index([tenantSlug, status, priority])
+  @@index([seasonId])
+  @@index([teamId])
+  @@index([orgUnitLabel])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+}
+
+model InitiativeTask {
+  id           String  @id @default(cuid())
+  initiativeId String
+  sortOrder    Int     @default(0)
+  title        String
+  description  String?
+
+  // Assignee — free text or optional FK references (same pattern as MeetingAction).
+  assignedTo       String?
+  assignedUserId   String?
+  assignedPersonId String?
+
+  dueDate     DateTime?
+  status      InitiativeTaskStatus @default(OPEN)
+  completedAt DateTime?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  initiative Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([initiativeId, sortOrder])
+  @@index([initiativeId, status])
+  @@index([dueDate, status])
+  @@index([assignedUserId])
+}
+
+model InitiativeMilestone {
+  id           String    @id @default(cuid())
+  initiativeId String
+  sortOrder    Int       @default(0)
+  title        String
+  description  String?
+  dueDate      DateTime?
+  completedAt  DateTime?
+  isCompleted  Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  initiative Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([initiativeId, sortOrder])
+  @@index([dueDate])
 }

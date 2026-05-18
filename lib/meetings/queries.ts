@@ -1,3 +1,13 @@
+/**
+ * Meeting module queries.
+ *
+ * TODO(governance — Module Admin Config sprint):
+ * When module-level access control is implemented, listMeetings() should
+ * accept a session/user context and filter by AccessPolicy or role-based
+ * visibility flags (isPublicToTenant, restrictToOrgUnitId).
+ * The four-eye review stage filter (reviewStage IN ['APPROVED','PUBLISHED'])
+ * will also gate which meetings are visible to non-managers.
+ */
 import { prisma } from "@/lib/db/prisma";
 import { MeetingStatus } from "@prisma/client";
 import { ACTIVE_TENANT_SLUG } from "@/lib/platform/constants";
