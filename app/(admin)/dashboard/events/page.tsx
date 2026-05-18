@@ -1,6 +1,7 @@
 ﻿import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import EventsModuleHub from "@/components/admin/events/EventsModuleHub";
+import PageShell from "@/components/shared/ui/PageShell";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons } from "@/lib/teams/queries";
@@ -80,7 +81,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   const submittedMessage = getSubmittedMessage(params.submitted, params.count);
 
   return (
-    <div className="space-y-8">
+    <PageShell>
       <AdminSectionHeader
         eyebrow="Events"
         title="Events pro Saison"
@@ -143,6 +144,6 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
 
         <EventsModuleHub selectedSeasonName={selectedSeason?.name} />
       </section>
-    </div>
+    </PageShell>
   );
 }

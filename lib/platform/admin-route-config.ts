@@ -24,7 +24,7 @@ export type AdminRouteConfig = {
   header: AdminRouteHeader;
 };
 
-function routeMatches(pathname: string, pattern: string, match: AdminRouteMatch): boolean {
+export function routeMatches(pathname: string, pattern: string, match: AdminRouteMatch): boolean {
   switch (match) {
     case "exact":
       return pathname === pattern;

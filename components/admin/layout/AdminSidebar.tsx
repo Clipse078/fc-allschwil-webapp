@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   BadgeIcon,
   BarChart3,
@@ -29,7 +30,6 @@ import {
   ACTIVE_TENANT_NAME,
   PLATFORM_NAME,
 } from "@/lib/platform/constants";
-import { deChMessages } from "@/messages";
 
 type AdminSidebarProps = {
   firstName: string;
@@ -41,8 +41,8 @@ type AdminSidebarProps = {
 };
 
 /**
- * Icon mapping keyed by route href.
- * Decoupled from nav label strings so labels can be localised independently.
+ * Icon mapping keyed by route href — decoupled from label strings
+ * so nav labels can be translated without affecting icon resolution.
  */
 const NAV_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   "/dashboard": LayoutDashboard,
@@ -77,14 +77,6 @@ const PLANNER_CHILD_HREFS = new Set([
   "/dashboard/planner/day",
 ]);
 
-function isVereinsleitungChild(href: string) {
-  return VEREINSLEITUNG_CHILD_HREFS.has(href);
-}
-
-function isPlannerChild(href: string) {
-  return PLANNER_CHILD_HREFS.has(href);
-}
-
 function shouldCarrySeason(href: string) {
   return (
     href === "/dashboard" ||
@@ -107,7 +99,7 @@ export default function AdminSidebar({
   const searchParams = useSearchParams();
   const selectedSeason = searchParams.get("season");
   const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[]);
-  const t = deChMessages.nav;
+  const t = useTranslations("nav");
 
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
@@ -120,18 +112,29 @@ export default function AdminSidebar({
       : () => setInternalCollapsed((current) => !current);
 
   const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.href) && !isPlannerChild(item.href),
+    (item) =>
+      !VEREINSLEITUNG_CHILD_HREFS.has(item.href) && !PLANNER_CHILD_HREFS.has(item.href),
   );
   const vereinsleitungChildren = navItems.filter((item) =>
-    isVereinsleitungChild(item.href),
+    VEREINSLEITUNG_CHILD_HREFS.has(item.href),
   );
-  const plannerChildren = navItems.filter((item) => isPlannerChild(item.href));
+  const plannerChildren = navItems.filter((item) => PLANNER_CHILD_HREFS.has(item.href));
 
   function buildHref(baseHref: string) {
-    if (!selectedSeason || !shouldCarrySeason(baseHref)) {
-      return baseHref;
-    }
+    if (!selectedSeason || !shouldCarrySeason(baseHref)) return baseHref;
     return `${baseHref}?season=${encodeURIComponent(selectedSeason)}`;
+  }
+
+  /** Resolve the display label: use translationKey if present, fall back to label. */
+  function getItemLabel(item: { label: string; translationKey?: string }): string {
+    if (item.translationKey) {
+      try {
+        return t(item.translationKey as Parameters<typeof t>[0]);
+      } catch {
+        return item.label;
+      }
+    }
+    return item.label;
   }
 
   return (
@@ -181,7 +184,7 @@ export default function AdminSidebar({
             <button
               type="button"
               onClick={handleToggle}
-              aria-label={t.menuEinklappen}
+              aria-label={t("menuEinklappen")}
               className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -194,7 +197,7 @@ export default function AdminSidebar({
             <button
               type="button"
               onClick={handleToggle}
-              aria-label={t.menuErweitern}
+              aria-label={t("menuErweitern")}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ChevronRight className="h-4 w-4" />
@@ -208,6 +211,7 @@ export default function AdminSidebar({
           {mainItems.map((item) => {
             const Icon = getNavIcon(item.href);
             const resolvedHref = buildHref(item.href);
+            const displayLabel = getItemLabel(item);
             const isActive =
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -216,7 +220,7 @@ export default function AdminSidebar({
               <li key={item.href}>
                 <Link
                   href={resolvedHref}
-                  title={resolvedCollapsed ? item.label : undefined}
+                  title={resolvedCollapsed ? displayLabel : undefined}
                   className={
                     isActive
                       ? resolvedCollapsed
@@ -228,13 +232,14 @@ export default function AdminSidebar({
                   }
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  {!resolvedCollapsed ? <span>{item.label}</span> : null}
+                  {!resolvedCollapsed ? <span>{displayLabel}</span> : null}
                 </Link>
 
                 {!resolvedCollapsed && item.href === "/vereinsleitung" ? (
                   <ul className="mt-2 space-y-2 pl-7">
                     {vereinsleitungChildren.map((child) => {
                       const ChildIcon = getNavIcon(child.href);
+                      const childLabel = getItemLabel(child);
                       const childActive =
                         pathname === child.href ||
                         pathname.startsWith(`${child.href}/`);
@@ -250,7 +255,7 @@ export default function AdminSidebar({
                             }
                           >
                             <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
+                            <span>{childLabel}</span>
                           </Link>
                         </li>
                       );
@@ -263,6 +268,7 @@ export default function AdminSidebar({
                     {plannerChildren.map((child) => {
                       const ChildIcon = getNavIcon(child.href);
                       const childHref = buildHref(child.href);
+                      const childLabel = getItemLabel(child);
                       const childActive =
                         pathname === child.href ||
                         pathname.startsWith(`${child.href}/`);
@@ -278,7 +284,7 @@ export default function AdminSidebar({
                             }
                           >
                             <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
+                            <span>{childLabel}</span>
                           </Link>
                         </li>
                       );

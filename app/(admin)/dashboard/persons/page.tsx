@@ -1,5 +1,6 @@
 ﻿import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import PersonsList from "@/components/admin/persons/PersonsList";
+import PageShell from "@/components/shared/ui/PageShell";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 
@@ -17,7 +18,7 @@ export default async function PersonsPage() {
   }[] = [];
 
   return (
-    <div className="space-y-8">
+    <PageShell>
       <AdminSectionHeader
         eyebrow="Personen"
         title="Personen"
@@ -25,6 +26,6 @@ export default async function PersonsPage() {
       />
 
       <PersonsList persons={persons} />
-    </div>
+    </PageShell>
   );
 }

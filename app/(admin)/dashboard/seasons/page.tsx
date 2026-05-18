@@ -4,8 +4,18 @@ import {
   deletePlannedSeasonAction,
 } from "@/app/(admin)/dashboard/seasons/actions";
 import { getSeasonsOverviewData } from "@/lib/seasons/queries";
-import { getSeasonLifecycleStatusClasses } from "@/lib/seasons/status";
+import type { SeasonLifecycleStatus } from "@/lib/seasons/status";
 import PageShell from "@/components/shared/ui/PageShell";
+import StatusBadge, { type StatusBadgeTone } from "@/components/shared/ui/StatusBadge";
+
+function lifecycleTone(status: SeasonLifecycleStatus): StatusBadgeTone {
+  switch (status) {
+    case "PLANNING":   return "warning";
+    case "ONGOING":    return "success";
+    case "COMPLETED":  return "muted";
+    default:           return "default";
+  }
+}
 
 function formatSwissDate(value: Date) {
   return new Intl.DateTimeFormat("de-CH", {
@@ -156,24 +166,17 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${getSeasonLifecycleStatusClasses(
-                    season.lifecycleStatus,
-                  )}`}
-                >
-                  {season.lifecycleStatusLabel}
-                </span>
+                <StatusBadge
+                  label={season.lifecycleStatusLabel}
+                  tone={lifecycleTone(season.lifecycleStatus)}
+                />
 
                 {season.shouldBeActive ? (
-                  <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0b4aa2]">
-                    Führende Saison
-                  </span>
+                  <StatusBadge label="Führende Saison" tone="default" />
                 ) : null}
 
                 {season.isActive !== season.shouldBeActive ? (
-                  <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700">
-                    DB-Status prüfen
-                  </span>
+                  <StatusBadge label="DB-Status prüfen" tone="danger" />
                 ) : null}
               </div>
             </div>
