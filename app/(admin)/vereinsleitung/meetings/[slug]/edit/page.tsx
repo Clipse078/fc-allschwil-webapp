@@ -19,6 +19,11 @@ export default async function EditMeetingPage({ params }: PageProps) {
 
   if (!meeting) notFound();
 
+  function parseStringArray(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((v): v is string => typeof v === "string");
+  }
+
   const defaultValues = {
     title: meeting.title,
     description: meeting.description ?? "",
@@ -27,6 +32,8 @@ export default async function EditMeetingPage({ params }: PageProps) {
     attendeeCount: meeting.attendeeCount != null ? String(meeting.attendeeCount) : "",
     status: meeting.status,
     visibilityScope: meeting.visibilityScope as VisibilityScopeValue,
+    visibleRoleRefs: parseStringArray(meeting.visibleRoleRefs),
+    visibleUserRefs: parseStringArray(meeting.visibleUserRefs),
   };
 
   return (

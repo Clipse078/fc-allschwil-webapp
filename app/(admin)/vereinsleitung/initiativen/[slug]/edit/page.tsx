@@ -19,6 +19,11 @@ export default async function EditInitiativePage({ params }: PageProps) {
 
   if (!initiative) notFound();
 
+  function parseStringArray(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((v): v is string => typeof v === "string");
+  }
+
   const defaultValues = {
     title: initiative.title,
     summary: initiative.summary ?? "",
@@ -28,6 +33,8 @@ export default async function EditInitiativePage({ params }: PageProps) {
     progress: initiative.progress != null ? String(initiative.progress) : "",
     dueDate: initiative.dueDate ? new Date(initiative.dueDate).toISOString().slice(0, 10) : "",
     visibilityScope: initiative.visibilityScope as VisibilityScopeValue,
+    visibleRoleRefs: parseStringArray(initiative.visibleRoleRefs),
+    visibleUserRefs: parseStringArray(initiative.visibleUserRefs),
   };
 
   return (

@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import VisibilityScopeSelect, {
   type VisibilityScopeValue,
 } from "@/components/admin/shared/VisibilityScopeSelect";
+import AllowlistPanel from "@/components/admin/shared/visibility/AllowlistPanel";
 
 type InitiativeFormProps = {
   mode: "create" | "edit";
@@ -19,6 +20,8 @@ type InitiativeFormProps = {
     progress?: string;
     dueDate?: string;
     visibilityScope?: VisibilityScopeValue;
+    visibleRoleRefs?: string[];
+    visibleUserRefs?: string[];
   };
 };
 
@@ -43,6 +46,12 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
   const [dueDate, setDueDate] = useState(defaultValues?.dueDate ?? "");
   const [visibilityScope, setVisibilityScope] = useState<VisibilityScopeValue>(
     defaultValues?.visibilityScope ?? "ORGANISATION",
+  );
+  const [visibleRoleRefs, setVisibleRoleRefs] = useState<string[]>(
+    defaultValues?.visibleRoleRefs ?? [],
+  );
+  const [visibleUserRefs, setVisibleUserRefs] = useState<string[]>(
+    defaultValues?.visibleUserRefs ?? [],
   );
 
   const [loading, setLoading] = useState(false);
@@ -69,6 +78,8 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
         progress: rawProgress !== null && rawProgress >= 0 && rawProgress <= 100 ? rawProgress : null,
         dueDate: dueDate || null,
         visibilityScope,
+        visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
+        visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
       };
 
       const url = mode === "edit" ? `/api/initiatives/${initiativeId}` : "/api/initiatives";
@@ -204,6 +215,13 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
           verbergen diesen Eintrag für nicht berechtigte Benutzer.
         </p>
         <VisibilityScopeSelect value={visibilityScope} onChange={setVisibilityScope} />
+        <AllowlistPanel
+          visibilityScope={visibilityScope}
+          visibleRoleRefs={visibleRoleRefs}
+          visibleUserRefs={visibleUserRefs}
+          onRolesChange={setVisibleRoleRefs}
+          onUsersChange={setVisibleUserRefs}
+        />
       </section>
 
       <div className="flex items-center justify-between gap-4">

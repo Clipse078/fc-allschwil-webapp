@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import VisibilityScopeSelect, {
   type VisibilityScopeValue,
 } from "@/components/admin/shared/VisibilityScopeSelect";
+import AllowlistPanel from "@/components/admin/shared/visibility/AllowlistPanel";
 
 type MeetingFormProps = {
   mode: "create" | "edit";
@@ -18,6 +19,8 @@ type MeetingFormProps = {
     attendeeCount?: string;
     status?: string;
     visibilityScope?: VisibilityScopeValue;
+    visibleRoleRefs?: string[];
+    visibleUserRefs?: string[];
   };
 };
 
@@ -38,6 +41,12 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
   const [status, setStatus] = useState(defaultValues?.status ?? "PLANNED");
   const [visibilityScope, setVisibilityScope] = useState<VisibilityScopeValue>(
     defaultValues?.visibilityScope ?? "ORGANISATION",
+  );
+  const [visibleRoleRefs, setVisibleRoleRefs] = useState<string[]>(
+    defaultValues?.visibleRoleRefs ?? [],
+  );
+  const [visibleUserRefs, setVisibleUserRefs] = useState<string[]>(
+    defaultValues?.visibleUserRefs ?? [],
   );
 
   const [loading, setLoading] = useState(false);
@@ -66,6 +75,8 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         attendeeCount: attendeeCount ? Number(attendeeCount) : null,
         status,
         visibilityScope,
+        visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
+        visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
       };
 
       const url = mode === "edit" ? `/api/meetings/${meetingId}` : "/api/meetings";
@@ -190,6 +201,13 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
           verbergen diesen Eintrag für nicht berechtigte Benutzer.
         </p>
         <VisibilityScopeSelect value={visibilityScope} onChange={setVisibilityScope} />
+        <AllowlistPanel
+          visibilityScope={visibilityScope}
+          visibleRoleRefs={visibleRoleRefs}
+          visibleUserRefs={visibleUserRefs}
+          onRolesChange={setVisibleRoleRefs}
+          onUsersChange={setVisibleUserRefs}
+        />
       </section>
 
       <div className="flex items-center justify-between gap-4">

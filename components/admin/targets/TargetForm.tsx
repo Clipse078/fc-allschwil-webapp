@@ -6,6 +6,7 @@ import { Plus, Trash2, Loader2 } from "lucide-react";
 import VisibilityScopeSelect, {
   type VisibilityScopeValue,
 } from "@/components/admin/shared/VisibilityScopeSelect";
+import AllowlistPanel from "@/components/admin/shared/visibility/AllowlistPanel";
 
 type MetricDraft = {
   id?: string;
@@ -32,6 +33,8 @@ type TargetFormProps = {
     sportCategory?: string;
     ageGroupHint?: string;
     visibilityScope?: VisibilityScopeValue;
+    visibleRoleRefs?: string[];
+    visibleUserRefs?: string[];
     startsAt?: string;
     endsAt?: string;
     metrics?: MetricDraft[];
@@ -100,6 +103,12 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
   const [visibilityScope, setVisibilityScope] = useState<VisibilityScopeValue>(
     defaultValues?.visibilityScope ?? "ORGANISATION",
   );
+  const [visibleRoleRefs, setVisibleRoleRefs] = useState<string[]>(
+    defaultValues?.visibleRoleRefs ?? [],
+  );
+  const [visibleUserRefs, setVisibleUserRefs] = useState<string[]>(
+    defaultValues?.visibleUserRefs ?? [],
+  );
   const [sportCategory, setSportCategory] = useState(defaultValues?.sportCategory ?? "");
   const [ageGroupHint, setAgeGroupHint] = useState(defaultValues?.ageGroupHint ?? "");
   const [startsAt, setStartsAt] = useState(defaultValues?.startsAt ?? "");
@@ -150,6 +159,8 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
         startsAt: startsAt || null,
         endsAt: endsAt || null,
         visibilityScope,
+        visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
+        visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
         metrics: metrics
           .filter((m) => m.label.trim())
           .map((m, idx) => ({
@@ -465,6 +476,13 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
           für nicht berechtigte Benutzer.
         </p>
         <VisibilityScopeSelect value={visibilityScope} onChange={setVisibilityScope} />
+        <AllowlistPanel
+          visibilityScope={visibilityScope}
+          visibleRoleRefs={visibleRoleRefs}
+          visibleUserRefs={visibleUserRefs}
+          onRolesChange={setVisibleRoleRefs}
+          onUsersChange={setVisibleUserRefs}
+        />
       </section>
 
       <div className="flex items-center justify-between gap-4">

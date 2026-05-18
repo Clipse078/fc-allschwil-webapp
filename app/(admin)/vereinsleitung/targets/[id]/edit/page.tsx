@@ -44,6 +44,12 @@ export default async function EditTargetPage({ params }: PageProps) {
     startsAt: target.startsAt ? new Date(target.startsAt).toISOString().substring(0, 10) : "",
     endsAt: target.endsAt ? new Date(target.endsAt).toISOString().substring(0, 10) : "",
     visibilityScope: target.visibilityScope as "ORGANISATION" | "RESTRICTED" | "PRIVATE",
+    visibleRoleRefs: Array.isArray(target.visibleRoleRefs)
+      ? (target.visibleRoleRefs as string[]).filter((v) => typeof v === "string")
+      : [],
+    visibleUserRefs: Array.isArray(target.visibleUserRefs)
+      ? (target.visibleUserRefs as string[]).filter((v) => typeof v === "string")
+      : [],
     metrics: target.metrics.map((m) => ({
       id: m.id,
       label: m.label,
