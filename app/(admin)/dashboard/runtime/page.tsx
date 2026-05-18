@@ -2,6 +2,9 @@
 import { getDeploymentMetadata } from "@/lib/server/deployment";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import PageShell from "@/components/shared/ui/PageShell";
+import SectionCard from "@/components/shared/ui/SectionCard";
+import StatusBadge from "@/components/shared/ui/StatusBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -12,54 +15,50 @@ export default async function DashboardRuntimePage() {
   const deployment = getDeploymentMetadata();
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
-        <p className="fca-eyebrow">Deployment Diagnostics</p>
-        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[#0b4aa2] lg:text-[2.35rem]">
-          Runtime & Deployment
-        </h2>
-      </section>
-
-      <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-          Deployment
+    <PageShell>
+      <SectionCard className="p-6 lg:p-8">
+        <div className="mb-1">
+          <p className="fca-eyebrow">Deployment</p>
         </div>
 
-        <dl className="space-y-3 text-sm text-slate-700">
-          <div className="flex justify-between">
-            <dt>Environment</dt>
-            <dd>{deployment.environment}</dd>
+        <dl className="mt-4 space-y-3 text-sm text-slate-700">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3">
+            <dt className="font-medium text-slate-500">Environment</dt>
+            <dd className="font-semibold text-slate-900">{deployment.environment}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt>Vercel Env</dt>
-            <dd>{deployment.vercelEnv ?? "not set"}</dd>
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3">
+            <dt className="font-medium text-slate-500">Vercel Env</dt>
+            <dd className="font-semibold text-slate-900">{deployment.vercelEnv ?? "not set"}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt>Commit</dt>
-            <dd>{deployment.commitSha ?? "not available"}</dd>
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3">
+            <dt className="font-medium text-slate-500">Commit</dt>
+            <dd className="font-mono text-xs text-slate-700">{deployment.commitSha ?? "not available"}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt>Deployment ID</dt>
-            <dd>{deployment.deploymentId ?? "not available"}</dd>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="font-medium text-slate-500">Deployment ID</dt>
+            <dd className="font-mono text-xs text-slate-700">{deployment.deploymentId ?? "not available"}</dd>
           </div>
         </dl>
-      </section>
+      </SectionCard>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-          Runtime Status
+      <SectionCard className="p-6 lg:p-8">
+        <div className="mb-4">
+          <p className="fca-eyebrow">Runtime Status</p>
         </div>
 
-        <div
-          className={
-            runtime.ok
-              ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700"
-              : "inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
-          }
-        >
-          {runtime.ok ? "Healthy" : "Action required"}
+        <div className="flex items-center gap-4">
+          <StatusBadge
+            label={runtime.ok ? "Healthy" : "Action required"}
+            tone={runtime.ok ? "success" : "danger"}
+          />
+
+          {!runtime.ok ? (
+            <p className="text-sm text-slate-600">
+              Runtime-Konfiguration ist unvollständig. Bitte Umgebungsvariablen prüfen.
+            </p>
+          ) : null}
         </div>
-      </section>
-    </div>
+      </SectionCard>
+    </PageShell>
   );
 }
