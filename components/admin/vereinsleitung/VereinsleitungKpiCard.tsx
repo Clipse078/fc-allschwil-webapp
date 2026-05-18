@@ -1,5 +1,7 @@
 ﻿import { MoreHorizontal } from "lucide-react";
 
+// TODO: Replace static KPIS with real data from Target model once TargetMetric
+// values are stable (query targets with category=MITGLIEDERWACHSTUM and aggregate currentValue).
 const KPIS = [
   {
     label: "Aktive Mitglieder",

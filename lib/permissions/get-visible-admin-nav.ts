@@ -31,6 +31,10 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/vereinsleitung/kpis",
   },
   {
+    label: "Ziele",
+    href: "/vereinsleitung/targets",
+  },
+  {
     label: "Saisons",
     href: "/dashboard/seasons",
     permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],

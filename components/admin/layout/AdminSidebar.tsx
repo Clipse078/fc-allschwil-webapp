@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   ScrollText,
   Shield,
+  Target,
   UserCircle2,
   UserRound,
   Users,
@@ -46,6 +47,8 @@ function getNavIcon(label: string) {
       return Flag;
     case "KPIs":
       return BarChart3;
+    case "Ziele":
+      return Target;
     case "Saisons":
       return CalendarRange;
     case "Saisonplanner":
@@ -72,7 +75,7 @@ function getNavIcon(label: string) {
 }
 
 function isVereinsleitungChild(label: string) {
-  return label === "Meetings" || label === "Initiativen" || label === "KPIs";
+  return label === "Meetings" || label === "Initiativen" || label === "KPIs" || label === "Ziele";
 }
 
 function isPlannerChild(label: string) {

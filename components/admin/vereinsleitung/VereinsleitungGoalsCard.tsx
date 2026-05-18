@@ -1,4 +1,6 @@
-﻿const GOALS = [
+﻿import Link from "next/link";
+
+const GOALS = [
   {
     title: "Aufstieg 1. Mannschaft (2. Liga Inter)",
     category: "Sportliche Entwicklung",
@@ -24,14 +26,20 @@ export default function VereinsleitungGoalsCard() {
           <h3 className="text-[1.08rem] font-semibold text-slate-900">
             Saisonziele 2025/26
           </h3>
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            Demo-Daten · echte Ziele unter{" "}
+            <Link href="/vereinsleitung/targets" className="text-[#0b4aa2] hover:underline">
+              Ziele
+            </Link>
+          </p>
         </div>
 
-        <button
-          type="button"
+        <Link
+          href="/vereinsleitung/targets"
           className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
         >
-          Details
-        </button>
+          Alle Ziele
+        </Link>
       </div>
 
       <div className="mt-7 space-y-6">

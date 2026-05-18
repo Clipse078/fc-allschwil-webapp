@@ -92,6 +92,30 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/vereinsleitung/targets") {
+    return {
+      eyebrow: "Ziele",
+      title: "Vereinsziele",
+      description: "Strategische Ziele und messbare Fortschrittskennzahlen für den Verein.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/targets/new") {
+    return {
+      eyebrow: "Ziele",
+      title: "Neues Ziel erstellen",
+      description: "Strategisches Ziel mit messbaren Metriken und Vorlagen erfassen.",
+    };
+  }
+
+  if (pathname.startsWith("/vereinsleitung/targets/")) {
+    return {
+      eyebrow: "Ziele",
+      title: "Ziel Details",
+      description: "Fortschritt, Metriken und Messwerte im Detail.",
+    };
+  }
+
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return {
       eyebrow: "Vereinsleitung",
