@@ -1,5 +1,42 @@
+/**
+ * Meeting query helpers — server-only.
+ *
+ * VISIBILITY WARNING: These queries currently return ALL meetings to every
+ * authenticated caller with no scope filtering. This is intentional for
+ * Phase 1 (small, known user base) but MUST be replaced before the system
+ * is used for sensitive board content.
+ *
+ * Phase 2 — visibility-aware queries:
+ *
+ *   getMeetings(actorContext: ActorContext): Promise<MeetingListItem[]>
+ *
+ *   where ActorContext = {
+ *     userId: string;
+ *     roleKeys: string[];
+ *     teamIds: string[];
+ *     orgUnitIds: string[];   // future OrgUnit model
+ *   }
+ *
+ *   The query must add a `where` clause that filters on visibilityScope:
+ *     ORGANISATION → no additional filter (return all)
+ *     RESTRICTED   → return only if actor matches any allowedOrgUnitIds /
+ *                    allowedRoleKeys / allowedTeamIds / allowedPersonIds
+ *     PRIVATE      → return only if actor.userId === createdByUserId
+ *                    or actor.userId is in allowedPersonIds
+ *
+ *   getMeetingBySlug() must enforce the same check and return null (not throw)
+ *   for meetings outside the actor's visibility — the page treats null as "not
+ *   found" and renders the fallback, preventing information leakage via 404 vs 403.
+ *
+ * TODO: add getMeetingLinkOptions(actorContext) variant used by TargetLinkEditor
+ *   so that cross-module links can only point to meetings the actor can see.
+ */
+
 import { prisma } from "@/lib/db/prisma";
 
+// TODO: replace with visibility-filtered version once VisibilityScope is in schema.
+// Until then, ALL meetings are returned regardless of sensitivity. Do not record
+// confidential content in the DB before Phase 2 access control is in place.
 export async function getMeetings() {
   return prisma.meeting.findMany({
     orderBy: { meetingDate: "desc" },
@@ -18,6 +55,8 @@ export async function getMeetings() {
   });
 }
 
+// TODO: enforce visibility check — return null if actor cannot see this record,
+// NOT a 403 (to avoid disclosing the existence of restricted meetings).
 export async function getMeetingBySlug(slug: string) {
   return prisma.meeting.findUnique({
     where: { slug },

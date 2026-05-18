@@ -8,6 +8,12 @@
  * Usage: call from a server component (page.tsx), then pass results as props
  * to the client component TargetLinkEditor — keeps DB access server-side.
  *
+ * TODO: Phase 2 — visibility-aware link options
+ *   getMeetingLinkOptions() and getInitiativeLinkOptions() must accept an
+ *   ActorContext and exclude records outside the actor's visibility scope.
+ *   Otherwise a user could create a cross-link to a RESTRICTED meeting they
+ *   cannot see, indirectly learning that it exists.
+ *
  * TODO: Phase 2 — FK promotion
  *   Replace Target.linkedInitiativeRefs / Target.linkedMeetingRefs JSONB with
  *   proper junction tables (TargetInitiative, TargetMeeting) once these link

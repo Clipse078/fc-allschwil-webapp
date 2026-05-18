@@ -1,6 +1,12 @@
 ﻿/**
  * DB-backed meetings list. Data is fetched server-side in meetings/page.tsx
- * and passed as props. When the DB is empty an empty-state prompt is shown.
+ * and passed as props. When the result set is empty an empty-state is shown.
+ *
+ * VISIBILITY NOTE: The meetings array passed here is currently UNFILTERED —
+ * every authenticated user sees every meeting. Once VisibilityScope is added
+ * to the Meeting model (Phase 2), the server page must pass a visibility-filtered
+ * list so that RESTRICTED and PRIVATE meetings are silently excluded.
+ * The empty state MUST NOT reveal whether hidden meetings exist.
  *
  * TODO: Cross-Module Linking — Meeting detail integration
  * When this component is wired to real Meeting records, the detail page
@@ -52,10 +58,10 @@ export default function VereinsleitungMeetingsList({
       <div className="rounded-[28px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <CalendarDays className="mx-auto mb-4 h-10 w-10 text-slate-300" />
         <h3 className="text-[1.05rem] font-semibold text-slate-900">
-          Noch keine Meetings erfasst
+          Keine zugänglichen Meetings
         </h3>
         <p className="mt-2 text-sm text-slate-500">
-          Erstelle das erste Meeting via API oder Seed-Skript.
+          Noch keine Meetings erfasst oder keine für dich sichtbaren Einträge.
         </p>
         <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium text-slate-500">
           <Plus className="h-3.5 w-3.5" />

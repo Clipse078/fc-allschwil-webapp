@@ -17,6 +17,13 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
+  // TODO: Access control — Phase 2
+  // Replace the unrestricted findMany below with a visibility-filtered query.
+  // The filter must use check.session.user (userId, roleKeys, teamIds, orgUnitIds)
+  // to exclude RESTRICTED meetings the actor cannot see and PRIVATE meetings
+  // not created by or explicitly shared with the actor.
+  // Until then, every authenticated user sees every meeting — do not store
+  // sensitive board content in the DB before Phase 2 is implemented.
   const meetings = await prisma.meeting.findMany({
     orderBy: { meetingDate: "desc" },
     select: {

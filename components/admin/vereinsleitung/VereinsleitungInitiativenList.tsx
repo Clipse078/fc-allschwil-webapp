@@ -2,6 +2,17 @@
  * DB-backed initiatives list. Data is fetched server-side in
  * initiativen/page.tsx and passed as props.
  *
+ * VISIBILITY NOTE: The initiatives array passed here is currently UNFILTERED —
+ * every authenticated user sees every initiative. Once VisibilityScope is added
+ * to the Initiative model (Phase 2), the server page must pass a
+ * visibility-filtered list so that RESTRICTED and PRIVATE initiatives are
+ * silently excluded. The empty state MUST NOT reveal whether hidden items exist
+ * (no "X hidden initiatives" counter).
+ *
+ * Example use case: the board chair and Kassier create a PRIVATE initiative for
+ * a confidential financial matter. Other roles must see an identical empty/normal
+ * list — they must not learn that a private entry exists.
+ *
  * TODO: Cross-Module Linking — Initiative ↔ Target FK promotion
  * When ready, replace Target.linkedInitiativeRefs JSONB with a proper
  * TargetInitiative junction table. The slug-based INITIATIVE_STUBS in
@@ -67,10 +78,10 @@ export default function VereinsleitungInitiativenList({
       <div className="rounded-[28px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <Flag className="mx-auto mb-4 h-10 w-10 text-slate-300" />
         <h3 className="text-[1.05rem] font-semibold text-slate-900">
-          Noch keine Initiativen erfasst
+          Keine zugänglichen Initiativen
         </h3>
         <p className="mt-2 text-sm text-slate-500">
-          Erstelle die erste Initiative via API oder Seed-Skript.
+          Noch keine Initiativen erfasst oder keine für dich sichtbaren Einträge.
         </p>
         <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium text-slate-500">
           <Plus className="h-3.5 w-3.5" />

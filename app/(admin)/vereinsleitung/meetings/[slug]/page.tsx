@@ -14,8 +14,16 @@ export default async function MeetingDetailPage({ params }: MeetingDetailPagePro
 
   const { slug } = await params;
 
-  // Try to find in DB. If not found (e.g. still using a legacy mock slug),
+  // Try to find in DB. If not found (legacy mock slug or slug not in DB),
   // the existing mock detail renders unchanged — zero regression.
+  //
+  // TODO: Phase 2 — visibility check
+  // getMeetingBySlug() must silently return null for meetings the actor cannot
+  // see (RESTRICTED/PRIVATE outside allowlist). Returning null here causes the
+  // page to show the mock fallback, which is the correct "not found" experience
+  // without leaking that a restricted record exists (no 403 vs 404 information
+  // disclosure). Pass session.user to getMeetingBySlug() once the actor context
+  // parameter is added.
   const dbMeeting = await getMeetingBySlug(slug);
 
   return (

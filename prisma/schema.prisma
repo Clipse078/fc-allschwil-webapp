@@ -552,6 +552,35 @@ model AuditLog {
   @@index([createdAt])
 }
 
+// ---------------------------------------------------------------------------
+// Visibility/Access Architecture TODO — Initiative
+//
+// CURRENT STATE: all Initiative records are visible to every authenticated user.
+// This is NOT safe for sensitive content (e.g. confidential restructuring plans,
+// personnel decisions, financial initiatives).
+//
+// PHASE 2 — add a VisibilityScope enum and granular allowlist fields:
+//
+//   enum VisibilityScope { ORGANISATION  RESTRICTED  PRIVATE }
+//     ORGANISATION: visible to all authenticated members (current default)
+//     RESTRICTED:   visible to users matching at least one of the allow-sets below
+//     PRIVATE:      visible only to the creator and explicitly listed persons
+//
+//   visibilityScope     VisibilityScope @default(ORGANISATION)
+//   createdByUserId     String?         // ownership; set at creation time
+//   allowedOrgUnitIds   Json?           // [String]  — future OrgUnit model
+//   allowedRoleKeys     Json?           // [String]  — Role.key values
+//   allowedTeamIds      Json?           // [String]  — Team.id values
+//   allowedPersonIds    Json?           // [String]  — Person/User id values
+//
+// API impact: getMeetings() / getInitiatives() and their PATCH endpoints must
+// filter by visibilityScope at query time, injecting the actor's orgUnit/role/team
+// context. Detail-page slug lookups must enforce the same check and return 403/404
+// for records outside the actor's visibility set.
+//
+// UX impact: list pages should NOT reveal the existence of PRIVATE or RESTRICTED
+// records (no "X hidden items" counter) to users outside the allowlist.
+// ---------------------------------------------------------------------------
 model Initiative {
   id          String           @id @default(cuid())
   slug        String           @unique
@@ -569,6 +598,9 @@ model Initiative {
   reviewedByUserId      String?
   reviewedAt            DateTime?
 
+  // TODO: add visibilityScope + allowedOrgUnitIds/allowedRoleKeys/allowedTeamIds/allowedPersonIds
+  // (see architecture comment above)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -577,6 +609,30 @@ model Initiative {
   @@index([dueDate])
 }
 
+// ---------------------------------------------------------------------------
+// Visibility/Access Architecture TODO — Meeting
+//
+// CURRENT STATE: all Meeting records are visible to every authenticated user.
+// Board meetings discussing personnel, financials, or disciplinary matters
+// MUST eventually support RESTRICTED or PRIVATE scopes so that e.g. the
+// president and Kassier can document a confidential topic without it appearing
+// in the meeting list of a trainer or website publisher.
+//
+// Intended design mirrors Confluence-style page restrictions:
+//   - Creator sets visibility at creation time (ORGANISATION / RESTRICTED / PRIVATE)
+//   - RESTRICTED: explicit allowlist of OrgUnit, Role, Team, or Person
+//   - PRIVATE: creator + explicitly named persons only
+//
+// Schema fields to add in Phase 2 (see Initiative model comment for full spec):
+//   visibilityScope     VisibilityScope @default(ORGANISATION)
+//   createdByUserId     String?
+//   allowedOrgUnitIds   Json?
+//   allowedRoleKeys     Json?
+//   allowedTeamIds      Json?
+//   allowedPersonIds    Json?
+//
+// Until Phase 2 is implemented: do NOT record sensitive meeting content in the DB.
+// ---------------------------------------------------------------------------
 model Meeting {
   id            String        @id @default(cuid())
   slug          String        @unique
@@ -592,6 +648,9 @@ model Meeting {
   requiresFourEyeReview Boolean             @default(false)
   reviewedByUserId      String?
   reviewedAt            DateTime?
+
+  // TODO: add visibilityScope + allowedOrgUnitIds/allowedRoleKeys/allowedTeamIds/allowedPersonIds
+  // (see architecture comment above)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

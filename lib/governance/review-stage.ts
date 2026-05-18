@@ -6,6 +6,16 @@
  *
  * --- Architecture TODOs (Governance Phase 2+) ---
  *
+ * TODO: visibility/access control (distinct from review governance)
+ *   - Meetings and Initiatives support RESTRICTED or PRIVATE visibility scopes.
+ *   - Visibility is separate from reviewStage: a PRIVATE meeting can still move
+ *     through DRAFT → SUBMITTED → APPROVED without being visible to all users.
+ *   - Access control must be checked BEFORE governance checks — a user who
+ *     cannot see a record must not be able to trigger stage transitions on it
+ *     even if they somehow obtain the record's id.
+ *   - Future: the stage transition endpoint (PATCH /api/[module]/[id]/stage)
+ *     must enforce visibility + role-based approval rights together.
+ *
  * TODO: org-unit governance
  *   - Add org-unit-level governance settings per module (e.g. "U16 trainers can
  *     self-approve targets in training domain, board always requires four-eye")

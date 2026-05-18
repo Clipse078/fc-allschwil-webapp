@@ -34,7 +34,15 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
 
   const { slug } = await params;
 
-  // Try DB first. If not found (legacy mock slug), show a graceful fallback.
+  // Try DB first. If not found (legacy mock slug or slug not in DB), show
+  // a graceful fallback card with seeding instructions.
+  //
+  // TODO: Phase 2 — visibility check
+  // getInitiativeBySlug() must silently return null for initiatives the actor
+  // cannot see (RESTRICTED/PRIVATE outside allowlist). The resulting fallback
+  // card correctly masks the existence of restricted entries — same response
+  // as "no DB record" to prevent information disclosure. Pass session.user to
+  // getInitiativeBySlug() once the actor context parameter is added.
   const dbInitiative = await getInitiativeBySlug(slug);
 
   return (
