@@ -117,28 +117,54 @@ enum WorkflowAction {
   IMPORT
 }
 
+// ─── Meetings Module ──────────────────────────────────────────────────────────
+
+enum MeetingStatus {
+  DRAFT
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MeetingParticipantRole {
+  CHAIR // Sitzungsleitung / Vorsitz
+  SECRETARY // Protokollführung
+  MEMBER // Regulärer Teilnehmer
+  GUEST // Gast
+  OBSERVER // Beobachter (ohne Stimmrecht)
+}
+
+enum MeetingActionStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   firstName    String
   lastName     String
-  isActive     Boolean  @default(true)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  userRoles UserRole[]
-  auditLogs AuditLog[] @relation("AuditActor")
+  userRoles           UserRole[]
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  meetingParticipants MeetingParticipant[]
 
   @@index([isActive])
 }
 
 model Role {
-  id                               String   @id @default(cuid())
-  key                              String   @unique
-  name                             String
-  description                      String?
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  description String?
 
   // TODO(decoupling — Organisation Builder):
   // These two fields hardcode "Vereinsleitung" as a fixed permission concept.
@@ -151,11 +177,11 @@ model Role {
   //
   // Migration required (DO NOT rename until Organisation Builder sprint):
   //   prisma migrate dev --name decouple_vereinsleitung_from_role
-  canAccessVereinsleitung          Boolean  @default(false)
-  canAttendVereinsleitungMeetings  Boolean  @default(false)
+  canAccessVereinsleitung         Boolean @default(false)
+  canAttendVereinsleitungMeetings Boolean @default(false)
 
-  createdAt                        DateTime @default(now())
-  updatedAt                        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   userRoles                 UserRole[]
   rolePermissions           RolePermission[]
@@ -239,7 +265,7 @@ model RoleWorkflowReviewAssignment {
   updatedAt      DateTime @updatedAt
 
   workflowRule RoleWorkflowRule @relation(fields: [workflowRuleId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "RoleWorkflowReviewAssignment_workflowRuleId_fkey")
-  reviewerRole Role @relation("WorkflowReviewerRole", fields: [reviewerRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewerRole Role             @relation("WorkflowReviewerRole", fields: [reviewerRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([workflowRuleId, reviewerRoleId])
   @@index([reviewerRoleId])
@@ -259,12 +285,13 @@ model Season {
   teamSeasons     TeamSeason[]
   events          Event[]
   eventImportRuns EventImportRun[]
+  meetings        Meeting[]
 
   @@index([isActive])
 }
 
 model Person {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   firstName   String
   lastName    String
   displayName String?
@@ -272,14 +299,15 @@ model Person {
   phone       String?
   dateOfBirth DateTime?
   notes       String?
-  isActive    Boolean  @default(true)
-  isPlayer    Boolean  @default(false)
-  isTrainer   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean   @default(true)
+  isPlayer    Boolean   @default(false)
+  isTrainer   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  playerSquadMembers PlayerSquadMember[]
-  trainerTeamMembers TrainerTeamMember[]
+  playerSquadMembers  PlayerSquadMember[]
+  trainerTeamMembers  TrainerTeamMember[]
+  meetingParticipants MeetingParticipant[]
 
   @@index([lastName, firstName])
   @@index([email])
@@ -289,22 +317,23 @@ model Person {
 }
 
 model Team {
-  id               String   @id @default(cuid())
+  id               String       @id @default(cuid())
   name             String
-  slug             String   @unique
+  slug             String       @unique
   category         TeamCategory
   genderGroup      String?
   ageGroup         String?
-  sortOrder        Int      @default(0)
-  isActive         Boolean  @default(true)
-  websiteVisible   Boolean  @default(true)
-  infoboardVisible Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  sortOrder        Int          @default(0)
+  isActive         Boolean      @default(true)
+  websiteVisible   Boolean      @default(true)
+  infoboardVisible Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   teamSeasons     TeamSeason[]
   events          Event[]
   eventImportRuns EventImportRun[]
+  meetings        Meeting[]
 
   @@index([category, sortOrder])
   @@index([isActive])
@@ -507,4 +536,168 @@ model AuditLog {
   @@index([moduleKey])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Meetings Module
+//
+// Standalone, org-unit-agnostic meeting management.
+//
+// A Meeting can belong to a Season, a Team, or an OrgUnit (described via
+// orgUnitLabel until the Organisation Builder adds a real OrgUnit model).
+// None of these ownership fields are required — meetings are self-contained.
+//
+// tenantSlug is a single-tenant placeholder. When multi-tenancy is added via
+// the Organisation Builder, this will become a proper FK to a Tenant model.
+//
+// TODO(decoupling): When OrgUnit model exists, add:
+//   orgUnitId String?
+//   orgUnit   OrgUnit? @relation(...)
+// and migrate orgUnitLabel values to orgUnitId references.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Meeting {
+  id String @id @default(cuid())
+
+  /// Single-tenant placeholder. Becomes a FK to Tenant when multi-tenancy is added.
+  tenantSlug String @default("fc-allschwil")
+
+  // Flexible ownership — all optional. A meeting exists independently of any
+  // season, team, or org unit.
+  seasonId     String?
+  teamId       String?
+  /// Free-text org unit label (e.g. "Vereinsleitung", "Vorstand") until
+  /// the Organisation Builder provides a real OrgUnit FK.
+  orgUnitLabel String?
+
+  title            String
+  description      String?
+  location         String?
+  onlineMeetingUrl String?
+
+  status      MeetingStatus @default(DRAFT)
+  scheduledAt DateTime
+  startedAt   DateTime?
+  endedAt     DateTime?
+
+  /// Free-text meeting minutes / protocol. Rich text support can be added later.
+  minutesBody String?
+
+  // Audit — string references (no FK) consistent with Event model pattern.
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  season Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  agendaItems  MeetingAgendaItem[]
+  participants MeetingParticipant[]
+  decisions    MeetingDecision[]
+  actions      MeetingAction[]
+
+  @@index([tenantSlug, scheduledAt])
+  @@index([tenantSlug, status])
+  @@index([seasonId])
+  @@index([teamId])
+  @@index([orgUnitLabel])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model MeetingAgendaItem {
+  id          String   @id @default(cuid())
+  meetingId   String
+  sortOrder   Int      @default(0)
+  title       String
+  body        String?
+  /// Estimated duration in minutes.
+  durationMin Int?
+  /// Free-text presenter name.
+  presenter   String?
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([meetingId, sortOrder])
+}
+
+model MeetingParticipant {
+  id        String @id @default(cuid())
+  meetingId String
+
+  // At least one of userId, personId, or displayName identifies the participant.
+  // userId and personId are optional — a participant may be an external guest with
+  // no platform account or Person profile.
+  userId      String?
+  personId    String?
+  /// Always populated (denormalized) so the meeting can be displayed without joins.
+  displayName String
+
+  role        MeetingParticipantRole @default(MEMBER)
+  /// null = attendance not recorded; true = attended; false = absent/excused.
+  attended    Boolean?
+  apologyNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  person  Person? @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([meetingId, role])
+  @@index([meetingId, attended])
+  @@index([userId])
+  @@index([personId])
+}
+
+model MeetingDecision {
+  id        String    @id @default(cuid())
+  meetingId String
+  sortOrder Int       @default(0)
+  title     String
+  body      String?
+  decidedAt DateTime?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([meetingId, sortOrder])
+}
+
+model MeetingAction {
+  id          String  @id @default(cuid())
+  meetingId   String
+  sortOrder   Int     @default(0)
+  title       String
+  description String?
+
+  // Assignee — free text or optional FK references.
+  // assignedUserId and assignedPersonId are intentionally NOT declared as @relation
+  // to avoid adding back-relations to User/Person for this secondary reference.
+  // They can be promoted to proper FK relations in a future migration if needed.
+  assignedTo       String?
+  assignedUserId   String?
+  assignedPersonId String?
+
+  dueDate     DateTime?
+  status      MeetingActionStatus @default(OPEN)
+  completedAt DateTime?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([meetingId, sortOrder])
+  @@index([meetingId, status])
+  @@index([assignedUserId])
+  @@index([dueDate, status])
 }
