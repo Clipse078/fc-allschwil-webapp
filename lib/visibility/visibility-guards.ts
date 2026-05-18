@@ -81,6 +81,7 @@ const MEETING_GUARD_SELECT = {
   id: true,
   slug: true,
   reviewStage: true,
+  requiresFourEyeReview: true,
   visibilityScope: true,
   createdByUserId: true,
   visibleRoleRefs: true,
@@ -94,6 +95,7 @@ const INITIATIVE_GUARD_SELECT = {
   id: true,
   slug: true,
   reviewStage: true,
+  requiresFourEyeReview: true,
   visibilityScope: true,
   createdByUserId: true,
   visibleRoleRefs: true,
@@ -107,6 +109,7 @@ const TARGET_GUARD_SELECT = {
   id: true,
   title: true,
   reviewStage: true,
+  requiresFourEyeReview: true,
   visibilityScope: true,
   createdByUserId: true,
   visibleRoleRefs: true,
@@ -124,6 +127,7 @@ type MeetingGuardEntity = {
   id: string;
   slug: string;
   reviewStage: string;
+  requiresFourEyeReview: boolean;
   visibilityScope: string;
   createdByUserId: string | null;
   visibleRoleRefs: unknown;
@@ -139,6 +143,7 @@ type TargetGuardEntity = {
   id: string;
   title: string;
   reviewStage: string;
+  requiresFourEyeReview: boolean;
   visibilityScope: string;
   createdByUserId: string | null;
   visibleRoleRefs: unknown;
@@ -206,7 +211,8 @@ export async function requireMeetingAccess(opts: {
     }
   }
 
-  // TODO: Phase B — requiresFourEyeReview: block self-approval on "stage"
+  // Four-eye enforcement is applied in the stage route handler (after this guard)
+  // using lib/governance/four-eye.ts — requiresFourEyeReview is in guard.entity.
   // TODO: Phase B — audit log emission
 
   return { ok: true, entity: meeting };
@@ -245,7 +251,8 @@ export async function requireInitiativeAccess(opts: {
     }
   }
 
-  // TODO: Phase B — requiresFourEyeReview + audit log
+  // Four-eye enforcement applied in the stage route handler via lib/governance/four-eye.ts.
+  // TODO: Phase B — audit log emission
 
   return { ok: true, entity: initiative };
 }
@@ -290,7 +297,8 @@ export async function requireTargetAccess(opts: {
     }
   }
 
-  // TODO: Phase B — requiresFourEyeReview + audit log
+  // Four-eye enforcement applied in the stage route handler via lib/governance/four-eye.ts.
+  // TODO: Phase B — audit log emission
 
   return { ok: true, entity: target };
 }

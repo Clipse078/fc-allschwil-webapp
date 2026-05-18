@@ -1,12 +1,14 @@
 /**
  * PATCH /api/meetings/[id]/stage
  *
- * Stage transition using centralized requireMeetingAccess() guard.
- * Visibility check runs inside the guard before governance — consistent with
- * the platform rule: visibility before governance.
+ * Enforcement order (mandatory):
+ *   1. Session auth
+ *   2. requireMeetingAccess() → visibility (404-mask) + permission (403)
+ *   3. Stage-machine validation (canTransitionTo) → 422
+ *   4. Four-eye check (assertFourEyeAllowed) → 403 self-approval blocked
+ *   5. DB update
  *
  * Phase 2 TODOs:
- * - Enforce requiresFourEyeReview inside requireMeetingAccess({ access: "stage" }).
  * - Gate on RoleWorkflowRule for WorkflowDomain.MEETINGS.
  * - Emit audit log entry.
  * - Fire nudge on SUBMITTED to linked Target owners.
@@ -21,6 +23,7 @@ import {
   requiresReviewerStamp,
   getReviewStageInfo,
 } from "@/lib/governance/review-stage";
+import { assertFourEyeAllowed } from "@/lib/governance/four-eye";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
 
@@ -43,7 +46,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const actor = buildActorContext(check.session.user);
 
-  // Visibility check runs before governance — 404-masks invisible records
+  // Step 1+2: visibility (404-mask) + permission (403)
   const guard = await requireMeetingAccess({ actor, id, access: "stage" });
   if (!guard.ok) return guard.response;
 
@@ -60,6 +63,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     const toStage = rawStage as ReviewWorkflowStage;
 
+    // Step 3: state-machine validation
     if (!canTransitionTo(fromStage, toStage)) {
       const fromInfo = getReviewStageInfo(fromStage);
       const toInfo = getReviewStageInfo(toStage);
@@ -69,14 +73,23 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       );
     }
 
+    // Step 4: four-eye enforcement
+    const fourEye = assertFourEyeAllowed({
+      actorUserId: actor.userId,
+      createdByUserId: guard.entity.createdByUserId,
+      requiresFourEyeReview: guard.entity.requiresFourEyeReview,
+      toStage,
+    });
+    if (!fourEye.ok) return fourEye.response;
+
+    // Step 5: DB update
     const needsStamp = requiresReviewerStamp(toStage);
-    const actorUserId = actor.userId;
 
     const updated = await prisma.meeting.update({
       where: { id },
       data: {
         reviewStage: toStage,
-        reviewedByUserId: needsStamp ? actorUserId : undefined,
+        reviewedByUserId: needsStamp ? actor.userId : undefined,
         reviewedAt: needsStamp ? new Date() : undefined,
       },
       select: { id: true, slug: true, reviewStage: true, reviewedByUserId: true, reviewedAt: true },
