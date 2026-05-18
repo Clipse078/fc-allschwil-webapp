@@ -84,6 +84,15 @@ export const ADMIN_ROUTE_CONFIGS: AdminRouteConfig[] = [
     },
   },
   {
+    pattern: "/meetings/new",
+    match: "exact",
+    header: {
+      eyebrow: "Meetings",
+      title: "Neues Meeting",
+      description: "Meeting planen und Traktanden, Teilnehmer und Beschlüsse erfassen.",
+    },
+  },
+  {
     pattern: "/meetings/",
     match: "startsWith",
     header: {

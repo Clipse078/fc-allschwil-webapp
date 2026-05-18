@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, Plus, Users } from "lucide-react";
-import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { listMeetings } from "@/lib/meetings/queries";
 import PageShell from "@/components/shared/ui/PageShell";
 import SectionCard from "@/components/shared/ui/SectionCard";
@@ -59,13 +59,13 @@ export default async function MeetingsPage() {
             description="Meetings werden hier als eigenständiges Modul verwaltet. Erstelle das erste Meeting, um loszulegen."
             size="lg"
             action={
-              <button
-                type="button"
+              <Link
+                href="/meetings/new"
                 className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
               >
                 <Plus className="h-4 w-4" />
                 Meeting planen
-              </button>
+              </Link>
             }
           />
         </SectionCard>

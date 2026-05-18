@@ -70,6 +70,9 @@ async function main() {
     { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE },
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
+
+    { key: "meetings.view", name: "View meetings", module: PermissionModule.MEETINGS },
+    { key: "meetings.manage", name: "Manage meetings", module: PermissionModule.MEETINGS },
   ] as const;
 
   for (const permission of permissions) {
@@ -115,6 +118,8 @@ async function main() {
         "fixtures.publish_infoboard",
         "wochenplan.manage",
         "infoboard.manage",
+        "meetings.view",
+        "meetings.manage",
       ],
     },
     {

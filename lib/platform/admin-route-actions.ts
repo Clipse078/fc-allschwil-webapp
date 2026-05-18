@@ -109,6 +109,20 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
 
   // ── Meetings (canonical standalone routes) ────────────────────────────────
   {
+    pattern: "/meetings/new",
+    match: "exact",
+    actions: [
+      {
+        icon: CalendarPlus,
+        labelKey: "backToMeetings",
+        labelNs: "pageActions",
+        variant: "secondary",
+        type: "link",
+        href: "/meetings",
+      },
+    ],
+  },
+  {
     pattern: "/meetings",
     match: "exact",
     actions: [
@@ -117,7 +131,8 @@ export const ADMIN_ROUTE_ACTIONS: RouteActionsEntry[] = [
         labelKey: "meetingPlan",
         labelNs: "pageActions",
         variant: "primary",
-        type: "button",
+        type: "link",    // link so it navigates to /meetings/new
+        href: "/meetings/new",
       },
     ],
   },

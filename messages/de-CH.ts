@@ -190,6 +190,7 @@ const messages: Messages = {
     seasonPlanNew: "Neue Saison planen",
     plannerEntryNew: "Neuer Eintrag",
     backToPlanner: "Zurück zum Planner",
+    backToMeetings: "Zurück zu Meetings",
     seasonSwitch: "Saison wechseln",
     teamNew: "Neues Team",
     eventNew: "Neues Event",

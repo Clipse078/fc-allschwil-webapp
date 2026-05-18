@@ -100,6 +100,7 @@ export type Messages = {
     seasonPlanNew: string;
     plannerEntryNew: string;
     backToPlanner: string;
+    backToMeetings: string;
     seasonSwitch: string;
     teamNew: string;
     eventNew: string;
