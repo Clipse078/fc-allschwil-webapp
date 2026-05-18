@@ -1,8 +1,18 @@
 /**
- * Static stubs for Meetings and Initiatives used by the link editor.
+ * Legacy static stubs — kept for reference and seed fallback only.
+ *
+ * MEETINGS and INITIATIVES are now DB-backed. The TargetLinkEditor and
+ * validateLinkPayload no longer import these constants. Link options are
+ * fetched server-side via lib/linking/queries.ts (getMeetingLinkOptions /
+ * getInitiativeLinkOptions) and passed as props to the editor.
+ *
+ * These stubs remain in place so that any external scripts or tests that
+ * reference the known legacy slugs still compile without change.
+ * They may be deleted once all callers are confirmed migrated.
  *
  * MEETINGS: The Meeting Prisma model now exists (migration 20260518150000).
- * TODO: Replace MEETING_STUBS with a real async query helper, e.g.:
+ * ✅ getMeetingLinkOptions() in lib/linking/queries.ts replaces this stub.
+ * Historical note — was replaced by a real async query helper, e.g.:
  *
  *   // lib/linking/stubs.ts (future server-only version)
  *   import { prisma } from "@/lib/db/prisma";
@@ -23,7 +33,8 @@
  * the query happens server-side and the client receives a serialised array.
  *
  * INITIATIVES: The Initiative Prisma model now exists (migration 20260518160000).
- * TODO: Replace INITIATIVE_STUBS with a real async query helper, e.g.:
+ * ✅ getInitiativeLinkOptions() in lib/linking/queries.ts replaces this stub.
+ * Historical note — was replaced by a real async query helper, e.g.:
  *
  *   export async function getInitiativeStubs(): Promise<EntityRef[]> {
  *     const initiatives = await prisma.initiative.findMany({

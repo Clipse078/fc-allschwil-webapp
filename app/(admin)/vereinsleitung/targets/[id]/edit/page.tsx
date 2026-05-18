@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargetById } from "@/lib/targets/queries";
+import { getMeetingLinkOptions, getInitiativeLinkOptions } from "@/lib/linking/queries";
 import TargetForm from "@/components/admin/targets/TargetForm";
 import TargetLinkEditor from "@/components/admin/targets/TargetLinkEditor";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
@@ -18,7 +19,13 @@ export default async function EditTargetPage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { id } = await params;
-  const target = await getTargetById(id);
+
+  // Fetch target and link options in parallel — keep DB queries server-side
+  const [target, availableMeetings, availableInitiatives] = await Promise.all([
+    getTargetById(id),
+    getMeetingLinkOptions(),
+    getInitiativeLinkOptions(),
+  ]);
 
   if (!target) notFound();
 
@@ -69,6 +76,8 @@ export default async function EditTargetPage({ params }: PageProps) {
         targetId={id}
         initialInitiativeRefs={parseEntityRefs(target.linkedInitiativeRefs)}
         initialMeetingRefs={parseEntityRefs(target.linkedMeetingRefs)}
+        availableInitiatives={availableInitiatives}
+        availableMeetings={availableMeetings}
       />
     </div>
   );

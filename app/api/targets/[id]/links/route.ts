@@ -4,13 +4,16 @@
  * Replaces the cross-module link sets on a Target.
  * Accepts { initiativeRefs: EntityRef[], meetingRefs: EntityRef[] }.
  *
- * Phase 1: validates slugs against known stubs (MEETING_STUBS / INITIATIVE_STUBS).
+ * Validation:
+ * 1. Shape: validateLinkPayload() checks each ref is a valid {slug, title}.
+ * 2. Existence: slugs are verified against real DB Meeting/Initiative records.
+ *    Unknown slugs are rejected with a 400.
  *
  * Phase 2 TODOs:
- * - Validate against real DB Meeting/Initiative records instead of stubs.
- * - Emit audit log entry per link change.
+ * - Emit audit log entry per link change (before/after diff).
  * - Support delta PATCH (add/remove individual refs) rather than full replace.
  * - Enforce permission check: only actors with TARGETS_MANAGE may modify links.
+ * - Migrate from JSONB refs to FK junction tables (TargetInitiative, TargetMeeting).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -46,10 +49,44 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const validation = validateLinkPayload(body);
 
+  // Phase 1: shape validation
+  const validation = validateLinkPayload(body);
   if (!validation.ok) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+
+  // Phase 2: DB-backed slug existence validation
+  if (validation.initiativeRefs.length > 0) {
+    const requestedSlugs = validation.initiativeRefs.map((r) => r.slug);
+    const found = await prisma.initiative.findMany({
+      where: { slug: { in: requestedSlugs } },
+      select: { slug: true },
+    });
+    const foundSlugs = new Set(found.map((r) => r.slug));
+    const unknown = requestedSlugs.find((s) => !foundSlugs.has(s));
+    if (unknown) {
+      return NextResponse.json(
+        { error: `Initiative nicht gefunden: ${unknown}` },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (validation.meetingRefs.length > 0) {
+    const requestedSlugs = validation.meetingRefs.map((r) => r.slug);
+    const found = await prisma.meeting.findMany({
+      where: { slug: { in: requestedSlugs } },
+      select: { slug: true },
+    });
+    const foundSlugs = new Set(found.map((r) => r.slug));
+    const unknown = requestedSlugs.find((s) => !foundSlugs.has(s));
+    if (unknown) {
+      return NextResponse.json(
+        { error: `Meeting nicht gefunden: ${unknown}` },
+        { status: 400 },
+      );
+    }
   }
 
   try {

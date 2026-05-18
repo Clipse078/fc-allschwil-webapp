@@ -1,5 +1,4 @@
 import type { EntityRef, TargetCrossLinks } from "./types";
-import { INITIATIVE_STUBS, MEETING_STUBS } from "./stubs";
 
 /** Type guard for a single EntityRef. */
 export function isEntityRef(value: unknown): value is EntityRef {
@@ -64,7 +63,16 @@ export function isLinked(refs: EntityRef[], slug: string): boolean {
   return refs.some((r) => r.slug === slug);
 }
 
-/** Validate a payload from an untrusted API body. */
+/**
+ * Validate the shape of a link payload from an untrusted API body.
+ *
+ * Shape validation only — slug existence is verified against the real DB
+ * inside the API route handler (PATCH /api/targets/[id]/links) to avoid
+ * coupling this helper to Prisma.
+ *
+ * TODO: Phase 2 — if a permissions layer is added, pass an authorised slug
+ * allowlist here so the helper can enforce it without a DB call.
+ */
 export function validateLinkPayload(body: unknown): {
   ok: true;
   initiativeRefs: EntityRef[];
@@ -78,20 +86,6 @@ export function validateLinkPayload(body: unknown): {
 
   const initiativeRefs = parseEntityRefs(b.initiativeRefs ?? []);
   const meetingRefs = parseEntityRefs(b.meetingRefs ?? []);
-
-  // Guard against linking to unknown stubs (phase 1 safety check)
-  const knownInitiativeSlugs = new Set(INITIATIVE_STUBS.map((s) => s.slug));
-  const knownMeetingSlugs = new Set(MEETING_STUBS.map((s) => s.slug));
-
-  const badInitiative = initiativeRefs.find((r) => !knownInitiativeSlugs.has(r.slug));
-  if (badInitiative) {
-    return { ok: false, error: `Unbekannte Initiative: ${badInitiative.slug}` };
-  }
-
-  const badMeeting = meetingRefs.find((r) => !knownMeetingSlugs.has(r.slug));
-  if (badMeeting) {
-    return { ok: false, error: `Unbekanntes Meeting: ${badMeeting.slug}` };
-  }
 
   return { ok: true, initiativeRefs, meetingRefs };
 }

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, Loader2, Check } from "lucide-react";
-import { INITIATIVE_STUBS, MEETING_STUBS } from "@/lib/linking/stubs";
 import { toggleEntityRef, isLinked } from "@/lib/linking/helpers";
 import type { EntityRef } from "@/lib/linking/types";
 
@@ -11,12 +10,18 @@ type TargetLinkEditorProps = {
   targetId: string;
   initialInitiativeRefs: EntityRef[];
   initialMeetingRefs: EntityRef[];
+  /** All DB-registered initiatives, fetched server-side by the edit page. */
+  availableInitiatives: EntityRef[];
+  /** All DB-registered meetings, fetched server-side by the edit page. */
+  availableMeetings: EntityRef[];
 };
 
 export default function TargetLinkEditor({
   targetId,
   initialInitiativeRefs,
   initialMeetingRefs,
+  availableInitiatives,
+  availableMeetings,
 }: TargetLinkEditorProps) {
   const router = useRouter();
   const [initiativeRefs, setInitiativeRefs] = useState<EntityRef[]>(initialInitiativeRefs);
@@ -25,14 +30,14 @@ export default function TargetLinkEditor({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function toggleInitiative(stub: EntityRef) {
+  function toggleInitiative(option: EntityRef) {
     setSaved(false);
-    setInitiativeRefs((prev) => toggleEntityRef(prev, stub));
+    setInitiativeRefs((prev) => toggleEntityRef(prev, option));
   }
 
-  function toggleMeeting(stub: EntityRef) {
+  function toggleMeeting(option: EntityRef) {
     setSaved(false);
-    setMeetingRefs((prev) => toggleEntityRef(prev, stub));
+    setMeetingRefs((prev) => toggleEntityRef(prev, option));
   }
 
   async function handleSave() {
@@ -64,8 +69,7 @@ export default function TargetLinkEditor({
 
   const chipBase =
     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition cursor-pointer select-none";
-  const chipActive =
-    "border-[#0b4aa2] bg-[#0b4aa2]/8 text-[#0b4aa2]";
+  const chipActive = "border-[#0b4aa2] bg-[#0b4aa2]/8 text-[#0b4aa2]";
   const chipInactive =
     "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50";
 
@@ -98,50 +102,66 @@ export default function TargetLinkEditor({
           <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500">
             Initiativen
           </p>
-          <p className="mb-3 text-[11px] text-slate-400">
-            Wähle Initiativen aus, die dieses Ziel operationalisieren.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {INITIATIVE_STUBS.map((stub) => {
-              const active = isLinked(initiativeRefs, stub.slug);
-              return (
-                <button
-                  key={stub.slug}
-                  type="button"
-                  onClick={() => toggleInitiative(stub)}
-                  className={`${chipBase} ${active ? chipActive : chipInactive}`}
-                >
-                  {active ? <Check className="h-3 w-3" /> : null}
-                  {stub.title}
-                </button>
-              );
-            })}
-          </div>
+          {availableInitiatives.length === 0 ? (
+            <p className="text-[11px] text-slate-400 italic">
+              Keine Initiativen in der Datenbank.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 text-[11px] text-slate-400">
+                Wähle Initiativen aus, die dieses Ziel operationalisieren.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {availableInitiatives.map((option) => {
+                  const active = isLinked(initiativeRefs, option.slug);
+                  return (
+                    <button
+                      key={option.slug}
+                      type="button"
+                      onClick={() => toggleInitiative(option)}
+                      className={`${chipBase} ${active ? chipActive : chipInactive}`}
+                    >
+                      {active ? <Check className="h-3 w-3" /> : null}
+                      {option.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         <div>
           <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500">
             Meetings
           </p>
-          <p className="mb-3 text-[11px] text-slate-400">
-            Verknüpfe relevante Meetings, in denen dieses Ziel besprochen wurde.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {MEETING_STUBS.map((stub) => {
-              const active = isLinked(meetingRefs, stub.slug);
-              return (
-                <button
-                  key={stub.slug}
-                  type="button"
-                  onClick={() => toggleMeeting(stub)}
-                  className={`${chipBase} ${active ? chipActive : chipInactive}`}
-                >
-                  {active ? <Check className="h-3 w-3" /> : null}
-                  {stub.title}
-                </button>
-              );
-            })}
-          </div>
+          {availableMeetings.length === 0 ? (
+            <p className="text-[11px] text-slate-400 italic">
+              Keine Meetings in der Datenbank.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 text-[11px] text-slate-400">
+                Verknüpfe relevante Meetings, in denen dieses Ziel besprochen wurde.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {availableMeetings.map((option) => {
+                  const active = isLinked(meetingRefs, option.slug);
+                  return (
+                    <button
+                      key={option.slug}
+                      type="button"
+                      onClick={() => toggleMeeting(option)}
+                      className={`${chipBase} ${active ? chipActive : chipInactive}`}
+                    >
+                      {active ? <Check className="h-3 w-3" /> : null}
+                      {option.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
