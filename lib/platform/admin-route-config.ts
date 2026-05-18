@@ -302,8 +302,22 @@ export const ADMIN_ROUTE_DEFAULT_HEADER: AdminRouteHeader = {
 /**
  * Returns the header config for a given pathname.
  * Falls back to ADMIN_ROUTE_DEFAULT_HEADER if no entry matches.
+ *
+ * Dynamic segment overrides (regex-matched) run before the static config loop.
+ * These cover paths like /meetings/[id]/edit where pattern-based matching can't
+ * distinguish the edit path from the detail path without per-segment logic.
  */
 export function getAdminRouteHeader(pathname: string): AdminRouteHeader {
+  // Meeting edit pages: /meetings/[id]/edit
+  if (/^\/meetings\/[^/]+\/edit$/.test(pathname)) {
+    return {
+      eyebrow: "Meetings",
+      title: "Meeting bearbeiten",
+      description:
+        "Titel, Status, Datum und weitere Meeting-Felder anpassen.",
+    };
+  }
+
   for (const entry of ADMIN_ROUTE_CONFIGS) {
     if (routeMatches(pathname, entry.pattern, entry.match)) {
       return entry.header;

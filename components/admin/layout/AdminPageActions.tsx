@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { CalendarPlus, Plus } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Pencil, Plus } from "lucide-react";
 import { makeSeasonUrl } from "@/lib/platform/season-url-helpers";
 import { getRouteActions, type ActionDef } from "@/lib/platform/admin-route-actions";
 
@@ -55,6 +55,39 @@ export default function AdminPageActions() {
         <Icon className="h-4 w-4" />
         {label}
       </button>
+    );
+  }
+
+  // ── Meeting detail pages: /meetings/[id] ────────────────────────────────
+  // Handled before config because the href requires the dynamic [id] segment.
+  const meetingDetailMatch = /^\/meetings\/([^/]+)$/.exec(pathname);
+  if (meetingDetailMatch && meetingDetailMatch[1] !== "new") {
+    const meetingId = meetingDetailMatch[1];
+    return (
+      <div className={ACTION_ROW}>
+        <Link href={`/meetings/${meetingId}/edit`} className={SECONDARY_BTN}>
+          <Pencil className="h-4 w-4" />
+          {tActions("edit")}
+        </Link>
+        <button type="button" className={PRIMARY_BTN}>
+          <CheckCircle2 className="h-4 w-4" />
+          {tActions("decisionMake")}
+        </button>
+      </div>
+    );
+  }
+
+  // ── Meeting edit pages: /meetings/[id]/edit ──────────────────────────────
+  const meetingEditMatch = /^\/meetings\/([^/]+)\/edit$/.exec(pathname);
+  if (meetingEditMatch) {
+    const meetingId = meetingEditMatch[1];
+    return (
+      <div className={ACTION_ROW}>
+        <Link href={`/meetings/${meetingId}`} className={SECONDARY_BTN}>
+          <CalendarPlus className="h-4 w-4" />
+          {tActions("backToMeeting")}
+        </Link>
+      </div>
     );
   }
 

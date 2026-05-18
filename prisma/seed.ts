@@ -5,6 +5,7 @@ import {
   EventSource,
   EventStatus,
   EventType,
+  MeetingStatus,
   PermissionModule,
   PrismaClient,
   TeamCategory,
@@ -458,6 +459,57 @@ async function main() {
       sortOrder: 40,
     },
   });
+
+  // ── Demo meetings ──────────────────────────────────────────────────────────
+  // Idempotent: only creates if a meeting with the same title+tenantSlug does not exist.
+  // Generic enough for future white-label cleanup (no club-specific details in titles).
+  const DEMO_MEETINGS = [
+    {
+      title: "Vorstandssitzung Mai 2026",
+      status: MeetingStatus.SCHEDULED,
+      scheduledAt: new Date("2026-05-28T20:00:00.000Z"),
+      location: "Clubhaus, Sitzungszimmer",
+      orgUnitLabel: "Vereinsleitung",
+      description: "Monatliche Vorstandssitzung mit Traktanden aus dem Vereinsalltag.",
+    },
+    {
+      title: "Trainer-Rapport Rückrunde 2025/26",
+      status: MeetingStatus.COMPLETED,
+      scheduledAt: new Date("2026-04-15T18:30:00.000Z"),
+      location: "Clubhaus",
+      orgUnitLabel: "Technische Leitung",
+      description: "Analyse der Rückrunde und Vorbereitung auf die kommende Saison.",
+    },
+    {
+      title: "Jahresplanung Saison 2026/27",
+      status: MeetingStatus.DRAFT,
+      scheduledAt: new Date("2026-06-10T19:00:00.000Z"),
+      location: null,
+      orgUnitLabel: "Vereinsleitung",
+      description: "Strategische Planung für die neue Saison.",
+    },
+  ] as const;
+
+  for (const meetingData of DEMO_MEETINGS) {
+    const existing = await prisma.meeting.findFirst({
+      where: { title: meetingData.title, tenantSlug: "fc-allschwil" },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      await prisma.meeting.create({
+        data: {
+          tenantSlug: "fc-allschwil",
+          title: meetingData.title,
+          status: meetingData.status,
+          scheduledAt: meetingData.scheduledAt,
+          location: meetingData.location ?? null,
+          orgUnitLabel: meetingData.orgUnitLabel,
+          description: meetingData.description,
+        },
+      });
+    }
+  }
 
   const superAdminRole = await prisma.role.findUnique({
     where: { key: "super_admin" },
