@@ -5,8 +5,10 @@ import { redirect } from "next/navigation";
 import { getTargetById } from "@/lib/targets/queries";
 import TargetMetricProgress from "@/components/admin/targets/TargetMetricProgress";
 import TargetDataPointForm from "@/components/admin/targets/TargetDataPointForm";
+import TargetStageActions from "@/components/admin/targets/TargetStageActions";
+import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import { Edit, ArrowLeft, Calendar, Tag } from "lucide-react";
+import { Edit, ArrowLeft, Calendar, Tag, ShieldCheck } from "lucide-react";
 
 const CATEGORY_LABELS: Record<string, string> = {
   SPORTLICHE_ENTWICKLUNG: "Sportliche Entwicklung",
@@ -92,6 +94,7 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
               >
                 {statusInfo.label}
               </span>
+              <ReviewStageBadge stage={target.reviewStage} />
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-600">
                 {categoryLabel}
               </span>
@@ -103,6 +106,12 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
               {target.ageGroupHint ? (
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-600">
                   {target.ageGroupHint}
+                </span>
+              ) : null}
+              {target.requiresFourEyeReview ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-700">
+                  <ShieldCheck className="h-3 w-3" />
+                  4-Augen
                 </span>
               ) : null}
             </div>
@@ -211,6 +220,39 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
                 </dd>
               </div>
             </dl>
+          </section>
+
+          <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+            <div className="mb-4 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-slate-400" />
+              <h3 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Governance
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-[11px] text-slate-400 mb-1.5">Prüfstatus</p>
+                <ReviewStageBadge stage={target.reviewStage} />
+              </div>
+
+              {target.reviewedAt ? (
+                <div>
+                  <p className="text-[11px] text-slate-400 mb-0.5">Geprüft am</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {formatSwissDate(target.reviewedAt)}
+                  </p>
+                </div>
+              ) : null}
+
+              <div>
+                <p className="text-[11px] text-slate-400 mb-2">Statuswechsel</p>
+                <TargetStageActions
+                  targetId={id}
+                  currentStage={target.reviewStage}
+                />
+              </div>
+            </div>
           </section>
 
           {target.metrics.length > 0 ? (

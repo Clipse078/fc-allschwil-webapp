@@ -11,6 +11,8 @@ export async function getTargets() {
       status: true,
       period: true,
       periodLabel: true,
+      reviewStage: true,
+      requiresFourEyeReview: true,
       startsAt: true,
       endsAt: true,
       metrics: {
@@ -47,6 +49,10 @@ export async function getTargetById(id: string) {
       startsAt: true,
       endsAt: true,
       nudgeJson: true,
+      reviewStage: true,
+      requiresFourEyeReview: true,
+      reviewedByUserId: true,
+      reviewedAt: true,
       createdAt: true,
       updatedAt: true,
       metrics: {

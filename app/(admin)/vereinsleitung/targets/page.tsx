@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargets } from "@/lib/targets/queries";
 import TargetMetricProgress from "@/components/admin/targets/TargetMetricProgress";
+import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -102,11 +103,14 @@ export default async function TargetsPage({ searchParams }: PageProps) {
                     ) : null}
                   </div>
 
-                  <span
-                    className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold ${statusInfo.classes}`}
-                  >
-                    {statusInfo.label}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span
+                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${statusInfo.classes}`}
+                    >
+                      {statusInfo.label}
+                    </span>
+                    <ReviewStageBadge stage={target.reviewStage} size="sm" />
+                  </div>
                 </div>
 
                 {firstMetrics.length > 0 ? (

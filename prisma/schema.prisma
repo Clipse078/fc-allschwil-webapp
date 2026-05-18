@@ -142,6 +142,9 @@ enum WorkflowDomain {
   FIXTURES
   FUNCTIONS
   SESSION_SECURITY
+  MEETINGS
+  INITIATIVES
+  TARGETS
 }
 
 enum WorkflowAction {
@@ -535,12 +538,12 @@ model AuditLog {
 }
 
 model Target {
-  id            String         @id @default(cuid())
+  id            String              @id @default(cuid())
   title         String
   description   String?
-  category      TargetCategory @default(SPORTLICHE_ENTWICKLUNG)
-  status        TargetStatus   @default(ACTIVE)
-  period        TargetPeriod   @default(SEASON)
+  category      TargetCategory      @default(SPORTLICHE_ENTWICKLUNG)
+  status        TargetStatus        @default(ACTIVE)
+  period        TargetPeriod        @default(SEASON)
   periodLabel   String?
   moduleKey     String?
   sportCategory String?
@@ -548,14 +551,22 @@ model Target {
   startsAt      DateTime?
   endsAt        DateTime?
   nudgeJson     Json?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+
+  // Governance foundation — consistent with Event.reviewStage pattern
+  reviewStage          ReviewWorkflowStage @default(DRAFT)
+  requiresFourEyeReview Boolean            @default(false)
+  reviewedByUserId     String?
+  reviewedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   metrics TargetMetric[]
 
   @@index([category])
   @@index([status])
   @@index([period])
+  @@index([reviewStage])
 }
 
 model TargetMetric {

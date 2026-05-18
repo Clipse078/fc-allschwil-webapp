@@ -10,7 +10,10 @@ export type ReviewTargetDomain =
   | "people"
   | "users"
   | "imports"
-  | "session_security";
+  | "session_security"
+  | "targets"
+  | "meetings"
+  | "initiatives";
 
 export type ReviewCapabilityKey =
   | "create"
@@ -88,6 +91,30 @@ export const REVIEW_POLICY = {
     mode: "REVIEW_REQUIRED",
     rationale:
       "User, role and password mutations are high-impact admin actions and should later support stricter dual control or equivalent privileged workflow.",
+  },
+
+  // --- Governance foundation: strategic modules ---
+  // TODO: Promote these to REVIEW_REQUIRED when full governance UI and
+  // RoleWorkflowRule seed data are in place. Phase 1 uses DIRECT_ALLOWED
+  // so Vereinsleitung members can self-manage strategic content.
+
+  TARGETS: {
+    domain: "targets",
+    mode: "DIRECT_ALLOWED_PHASE1",
+    rationale:
+      "Targets are internal strategic artefacts. In phase 1 Vereinsleitung members manage them directly. Four-eye review will be enforced when requiresFourEyeReview is set on a target.",
+  },
+  MEETINGS: {
+    domain: "meetings",
+    mode: "DIRECT_ALLOWED_PHASE1",
+    rationale:
+      "Meeting records are internal Vereinsleitung artefacts. Phase 1 allows direct management by authorised members.",
+  },
+  INITIATIVES: {
+    domain: "initiatives",
+    mode: "DIRECT_ALLOWED_PHASE1",
+    rationale:
+      "Initiative records are internal strategic artefacts. Phase 1 allows direct management by authorised members.",
   },
 } as const;
 

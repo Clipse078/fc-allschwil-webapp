@@ -1,4 +1,19 @@
-﻿import Link from "next/link";
+﻿/**
+ * TODO: Governance Foundation — Initiative model promotion
+ *
+ * Currently mocked. When Initiative is promoted to a DB-backed Prisma model,
+ * add governance fields consistent with the Target pattern:
+ *   - reviewStage    ReviewWorkflowStage @default(DRAFT)
+ *   - requiresFourEyeReview Boolean @default(false)
+ *   - reviewedByUserId String?
+ *   - reviewedAt DateTime?
+ *
+ * WorkflowDomain.INITIATIVES is already registered and ready.
+ * Use lib/governance/review-stage.ts helpers for stage transitions.
+ * Surface ReviewStageBadge on Initiative list and detail views.
+ */
+
+import Link from "next/link";
 import { ChevronRight, Flag, Users } from "lucide-react";
 
 const INITIATIVEN = [
