@@ -2,15 +2,10 @@
  * PATCH /api/targets/[id]/links
  *
  * Replaces the cross-module link sets on a Target.
- * Accepts { initiativeRefs: EntityRef[], meetingRefs: EntityRef[] }.
- *
- * Validation:
- * 1. Shape: validateLinkPayload() checks each ref is a valid {slug, title}.
- * 2. Existence: slugs are verified against real DB Meeting/Initiative records.
- *    Unknown slugs are rejected with a 400.
+ * Uses centralized requireTargetAccess() guard.
  *
  * Phase 2 TODOs:
- * - Emit audit log entry per link change (before/after diff).
+ * - Emit audit log entry per link change.
  * - Support delta PATCH (add/remove individual refs) rather than full replace.
  * - Enforce permission check: only actors with TARGETS_MANAGE may modify links.
  * - Migrate from JSONB refs to FK junction tables (TargetInitiative, TargetMeeting).
@@ -20,6 +15,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { validateLinkPayload } from "@/lib/linking/helpers";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -38,25 +35,20 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
 
-  const target = await prisma.target.findUnique({
-    where: { id },
-    select: { id: true },
-  });
-
-  if (!target) {
-    return NextResponse.json({ error: "Ziel nicht gefunden." }, { status: 404 });
-  }
+  const guard = await requireTargetAccess({ actor, id, access: "write" });
+  if (!guard.ok) return guard.response;
 
   const body = await request.json().catch(() => ({}));
 
-  // Phase 1: shape validation
+  // Shape validation
   const validation = validateLinkPayload(body);
   if (!validation.ok) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  // Phase 2: DB-backed slug existence validation
+  // DB-backed slug existence validation
   if (validation.initiativeRefs.length > 0) {
     const requestedSlugs = validation.initiativeRefs.map((r) => r.slug);
     const found = await prisma.initiative.findMany({

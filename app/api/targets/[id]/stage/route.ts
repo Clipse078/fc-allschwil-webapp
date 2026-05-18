@@ -1,15 +1,14 @@
 /**
  * PATCH /api/targets/[id]/stage
  *
- * Lightweight review-stage transition endpoint.
- * Validates the transition against the allowed state machine and records a
- * reviewer stamp when moving to APPROVED or REJECTED.
+ * Stage transition using centralized requireTargetAccess() guard.
+ * Phase 1: Target has no VisibilityScope — guard always succeeds for auth'd actors.
+ * Phase 2: guard will enforce VisibilityScope + requiresFourEyeReview.
  *
- * Governance Phase 2 TODOs:
- * - Enforce requiresFourEyeReview: block self-approval (actor ≠ creator).
- * - Check RoleWorkflowRule to gate who may approve/reject.
- * - Fire nudge/reminder hooks on SUBMITTED.
- * - Emit audit log entry (consistent with Event workflow audit pattern).
+ * Phase 2 TODOs:
+ * - Enforce requiresFourEyeReview in requireTargetAccess({ access: "stage" }).
+ * - Gate on RoleWorkflowRule for WorkflowDomain.TARGETS.
+ * - Emit audit log entry.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,6 +20,8 @@ import {
   requiresReviewerStamp,
   getReviewStageInfo,
 } from "@/lib/governance/review-stage";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -39,15 +40,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
 
-  const target = await prisma.target.findUnique({
-    where: { id },
-    select: { id: true, title: true, reviewStage: true, requiresFourEyeReview: true },
-  });
+  const guard = await requireTargetAccess({ actor, id, access: "stage" });
+  if (!guard.ok) return guard.response;
 
-  if (!target) {
-    return NextResponse.json({ error: "Ziel nicht gefunden." }, { status: 404 });
-  }
+  const fromStage = guard.entity.reviewStage as ReviewWorkflowStage;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -55,14 +53,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     const validStages = Object.values(ReviewWorkflowStage);
     if (!rawStage || !validStages.includes(rawStage as ReviewWorkflowStage)) {
-      return NextResponse.json(
-        { error: "Ungültiger Prüfstatus." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Ungültiger Prüfstatus." }, { status: 400 });
     }
 
     const toStage = rawStage as ReviewWorkflowStage;
-    const fromStage = target.reviewStage;
 
     if (!canTransitionTo(fromStage, toStage)) {
       const fromInfo = getReviewStageInfo(fromStage);
@@ -76,13 +70,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const needsStamp = requiresReviewerStamp(toStage);
-    const actorUserId = check.session.user.id;
 
     const updated = await prisma.target.update({
       where: { id },
       data: {
         reviewStage: toStage,
-        reviewedByUserId: needsStamp ? actorUserId : undefined,
+        reviewedByUserId: needsStamp ? actor.userId : undefined,
         reviewedAt: needsStamp ? new Date() : undefined,
       },
       select: {

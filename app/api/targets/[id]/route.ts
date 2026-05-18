@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { TargetCategory, TargetStatus, TargetPeriod } from "@prisma/client";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -20,7 +22,12 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
 
+  const guard = await requireTargetAccess({ actor, id, access: "read" });
+  if (!guard.ok) return guard.response;
+
+  // Fetch full target detail after access is confirmed
   const target = await prisma.target.findUnique({
     where: { id },
     select: {
@@ -75,11 +82,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
 
-  const existing = await prisma.target.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) {
-    return NextResponse.json({ error: "Ziel nicht gefunden." }, { status: 404 });
-  }
+  const guard = await requireTargetAccess({ actor, id, access: "write" });
+  if (!guard.ok) return guard.response;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -127,11 +133,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
 
-  const existing = await prisma.target.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) {
-    return NextResponse.json({ error: "Ziel nicht gefunden." }, { status: 404 });
-  }
+  const guard = await requireTargetAccess({ actor, id, access: "delete" });
+  if (!guard.ok) return guard.response;
 
   try {
     await prisma.target.delete({ where: { id } });

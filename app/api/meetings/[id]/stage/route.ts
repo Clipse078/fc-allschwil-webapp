@@ -1,13 +1,15 @@
 /**
  * PATCH /api/meetings/[id]/stage
  *
- * Mirror of /api/targets/[id]/stage — uses the same lib/governance/review-stage.ts
- * helpers for transition validation and reviewer stamping.
+ * Stage transition using centralized requireMeetingAccess() guard.
+ * Visibility check runs inside the guard before governance — consistent with
+ * the platform rule: visibility before governance.
  *
- * Phase 2 TODOs (same as Target stage endpoint):
- * - Enforce requiresFourEyeReview: block self-approval.
+ * Phase 2 TODOs:
+ * - Enforce requiresFourEyeReview inside requireMeetingAccess({ access: "stage" }).
  * - Gate on RoleWorkflowRule for WorkflowDomain.MEETINGS.
  * - Emit audit log entry.
+ * - Fire nudge on SUBMITTED to linked Target owners.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -20,7 +22,7 @@ import {
   getReviewStageInfo,
 } from "@/lib/governance/review-stage";
 import { buildActorContext } from "@/lib/visibility/actor-context";
-import { canSeeMeeting } from "@/lib/meetings/queries";
+import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -41,25 +43,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   const actor = buildActorContext(check.session.user);
 
-  const meeting = await prisma.meeting.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      reviewStage: true,
-      visibilityScope: true,
-      createdByUserId: true,
-      visibleRoleRefs: true,
-      visibleUserRefs: true,
-      visibleTeamRefs: true,
-      visibleOrgUnitRefs: true,
-      visiblePersonRefs: true,
-    },
-  });
+  // Visibility check runs before governance — 404-masks invisible records
+  const guard = await requireMeetingAccess({ actor, id, access: "stage" });
+  if (!guard.ok) return guard.response;
 
-  // Visibility check must happen before governance — 404-mask restricted records
-  if (!meeting || !canSeeMeeting(meeting, actor)) {
-    return NextResponse.json({ error: "Meeting nicht gefunden." }, { status: 404 });
-  }
+  const fromStage = guard.entity.reviewStage as ReviewWorkflowStage;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -71,7 +59,6 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const toStage = rawStage as ReviewWorkflowStage;
-    const fromStage = meeting.reviewStage;
 
     if (!canTransitionTo(fromStage, toStage)) {
       const fromInfo = getReviewStageInfo(fromStage);
@@ -83,7 +70,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     const needsStamp = requiresReviewerStamp(toStage);
-    const actorUserId = check.session.user.id;
+    const actorUserId = actor.userId;
 
     const updated = await prisma.meeting.update({
       where: { id },

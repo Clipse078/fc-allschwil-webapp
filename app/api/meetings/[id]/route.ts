@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { MeetingStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getMeetingById } from "@/lib/meetings/queries";
+import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -23,7 +24,6 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
   const actor = buildActorContext(check.session.user);
-  // getMeetingById returns null for restricted/private records the actor cannot see (404-masking)
   const meeting = await getMeetingById(id, actor);
 
   if (!meeting) {
@@ -40,10 +40,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const existing = await prisma.meeting.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) {
-    return NextResponse.json({ error: "Meeting nicht gefunden." }, { status: 404 });
-  }
+  const actor = buildActorContext(check.session.user);
+
+  const guard = await requireMeetingAccess({ actor, id, access: "write" });
+  if (!guard.ok) return guard.response;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -86,10 +86,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const existing = await prisma.meeting.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) {
-    return NextResponse.json({ error: "Meeting nicht gefunden." }, { status: 404 });
-  }
+  const actor = buildActorContext(check.session.user);
+
+  const guard = await requireMeetingAccess({ actor, id, access: "delete" });
+  if (!guard.ok) return guard.response;
 
   try {
     await prisma.meeting.delete({ where: { id } });

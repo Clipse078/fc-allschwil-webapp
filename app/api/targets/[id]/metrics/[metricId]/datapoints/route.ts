@@ -1,6 +1,15 @@
+/**
+ * POST /api/targets/[id]/metrics/[metricId]/datapoints
+ *
+ * Record a new data point for a metric and denormalize currentValue.
+ * Uses centralized requireTargetAccess() guard.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -19,6 +28,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id, metricId } = await params;
+  const actor = buildActorContext(check.session.user);
+
+  // Target access guard — also confirms Target exists
+  const guard = await requireTargetAccess({ actor, id, access: "write" });
+  if (!guard.ok) return guard.response;
 
   const metric = await prisma.targetMetric.findUnique({
     where: { id: metricId },

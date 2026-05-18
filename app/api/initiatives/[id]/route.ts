@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { InitiativeStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getInitiativeById } from "@/lib/initiatives/queries";
+import { requireInitiativeAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
   const session = await auth();
@@ -39,10 +40,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const existing = await prisma.initiative.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) {
-    return NextResponse.json({ error: "Initiative nicht gefunden." }, { status: 404 });
-  }
+  const actor = buildActorContext(check.session.user);
+
+  const guard = await requireInitiativeAccess({ actor, id, access: "write" });
+  if (!guard.ok) return guard.response;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -101,10 +102,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const existing = await prisma.initiative.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) {
-    return NextResponse.json({ error: "Initiative nicht gefunden." }, { status: 404 });
-  }
+  const actor = buildActorContext(check.session.user);
+
+  const guard = await requireInitiativeAccess({ actor, id, access: "delete" });
+  if (!guard.ok) return guard.response;
 
   try {
     await prisma.initiative.delete({ where: { id } });
