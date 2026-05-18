@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
         progress,
         dueDate: body?.dueDate ? new Date(body.dueDate) : null,
         createdByUserId: check.session.user.id,
+        visibleOrgUnitRefs: Array.isArray(body?.visibleOrgUnitRefs) ? body.visibleOrgUnitRefs : undefined,
+        visibleRoleRefs: Array.isArray(body?.visibleRoleRefs) ? body.visibleRoleRefs : undefined,
+        visibleUserRefs: Array.isArray(body?.visibleUserRefs) ? body.visibleUserRefs : undefined,
         visibilityScope: Object.values(VisibilityScope).includes(body?.visibilityScope as VisibilityScope)
           ? (body.visibilityScope as VisibilityScope)
           : VisibilityScope.ORGANISATION,

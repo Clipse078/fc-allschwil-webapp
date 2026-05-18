@@ -19,6 +19,7 @@ type MeetingFormProps = {
     attendeeCount?: string;
     status?: string;
     visibilityScope?: VisibilityScopeValue;
+    visibleOrgUnitRefs?: string[];
     visibleRoleRefs?: string[];
     visibleUserRefs?: string[];
   };
@@ -41,6 +42,9 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
   const [status, setStatus] = useState(defaultValues?.status ?? "PLANNED");
   const [visibilityScope, setVisibilityScope] = useState<VisibilityScopeValue>(
     defaultValues?.visibilityScope ?? "ORGANISATION",
+  );
+  const [visibleOrgUnitRefs, setVisibleOrgUnitRefs] = useState<string[]>(
+    defaultValues?.visibleOrgUnitRefs ?? [],
   );
   const [visibleRoleRefs, setVisibleRoleRefs] = useState<string[]>(
     defaultValues?.visibleRoleRefs ?? [],
@@ -75,6 +79,7 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         attendeeCount: attendeeCount ? Number(attendeeCount) : null,
         status,
         visibilityScope,
+        visibleOrgUnitRefs: visibilityScope === "RESTRICTED" ? visibleOrgUnitRefs : [],
         visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
         visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
       };
@@ -203,8 +208,10 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         <VisibilityScopeSelect value={visibilityScope} onChange={setVisibilityScope} />
         <AllowlistPanel
           visibilityScope={visibilityScope}
+          visibleOrgUnitRefs={visibleOrgUnitRefs}
           visibleRoleRefs={visibleRoleRefs}
           visibleUserRefs={visibleUserRefs}
+          onOrgUnitsChange={setVisibleOrgUnitRefs}
           onRolesChange={setVisibleRoleRefs}
           onUsersChange={setVisibleUserRefs}
         />

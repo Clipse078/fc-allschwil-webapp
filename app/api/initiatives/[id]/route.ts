@@ -82,6 +82,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
           typeof body?.requiresFourEyeReview === "boolean"
             ? body.requiresFourEyeReview
             : undefined,
+        visibleOrgUnitRefs: Array.isArray(body?.visibleOrgUnitRefs) ? body.visibleOrgUnitRefs : undefined,
         visibleRoleRefs: Array.isArray(body?.visibleRoleRefs) ? body.visibleRoleRefs : undefined,
         visibleUserRefs: Array.isArray(body?.visibleUserRefs) ? body.visibleUserRefs : undefined,
       },

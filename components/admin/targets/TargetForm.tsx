@@ -33,6 +33,7 @@ type TargetFormProps = {
     sportCategory?: string;
     ageGroupHint?: string;
     visibilityScope?: VisibilityScopeValue;
+    visibleOrgUnitRefs?: string[];
     visibleRoleRefs?: string[];
     visibleUserRefs?: string[];
     startsAt?: string;
@@ -103,6 +104,9 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
   const [visibilityScope, setVisibilityScope] = useState<VisibilityScopeValue>(
     defaultValues?.visibilityScope ?? "ORGANISATION",
   );
+  const [visibleOrgUnitRefs, setVisibleOrgUnitRefs] = useState<string[]>(
+    defaultValues?.visibleOrgUnitRefs ?? [],
+  );
   const [visibleRoleRefs, setVisibleRoleRefs] = useState<string[]>(
     defaultValues?.visibleRoleRefs ?? [],
   );
@@ -159,6 +163,7 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
         startsAt: startsAt || null,
         endsAt: endsAt || null,
         visibilityScope,
+        visibleOrgUnitRefs: visibilityScope === "RESTRICTED" ? visibleOrgUnitRefs : [],
         visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
         visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
         metrics: metrics
@@ -478,8 +483,10 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
         <VisibilityScopeSelect value={visibilityScope} onChange={setVisibilityScope} />
         <AllowlistPanel
           visibilityScope={visibilityScope}
+          visibleOrgUnitRefs={visibleOrgUnitRefs}
           visibleRoleRefs={visibleRoleRefs}
           visibleUserRefs={visibleUserRefs}
+          onOrgUnitsChange={setVisibleOrgUnitRefs}
           onRolesChange={setVisibleRoleRefs}
           onUsersChange={setVisibleUserRefs}
         />

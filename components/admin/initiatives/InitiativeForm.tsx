@@ -20,6 +20,7 @@ type InitiativeFormProps = {
     progress?: string;
     dueDate?: string;
     visibilityScope?: VisibilityScopeValue;
+    visibleOrgUnitRefs?: string[];
     visibleRoleRefs?: string[];
     visibleUserRefs?: string[];
   };
@@ -46,6 +47,9 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
   const [dueDate, setDueDate] = useState(defaultValues?.dueDate ?? "");
   const [visibilityScope, setVisibilityScope] = useState<VisibilityScopeValue>(
     defaultValues?.visibilityScope ?? "ORGANISATION",
+  );
+  const [visibleOrgUnitRefs, setVisibleOrgUnitRefs] = useState<string[]>(
+    defaultValues?.visibleOrgUnitRefs ?? [],
   );
   const [visibleRoleRefs, setVisibleRoleRefs] = useState<string[]>(
     defaultValues?.visibleRoleRefs ?? [],
@@ -78,6 +82,7 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
         progress: rawProgress !== null && rawProgress >= 0 && rawProgress <= 100 ? rawProgress : null,
         dueDate: dueDate || null,
         visibilityScope,
+        visibleOrgUnitRefs: visibilityScope === "RESTRICTED" ? visibleOrgUnitRefs : [],
         visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
         visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
       };
@@ -217,8 +222,10 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
         <VisibilityScopeSelect value={visibilityScope} onChange={setVisibilityScope} />
         <AllowlistPanel
           visibilityScope={visibilityScope}
+          visibleOrgUnitRefs={visibleOrgUnitRefs}
           visibleRoleRefs={visibleRoleRefs}
           visibleUserRefs={visibleUserRefs}
+          onOrgUnitsChange={setVisibleOrgUnitRefs}
           onRolesChange={setVisibleRoleRefs}
           onUsersChange={setVisibleUserRefs}
         />

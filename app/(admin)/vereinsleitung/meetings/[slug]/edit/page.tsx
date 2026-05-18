@@ -32,6 +32,7 @@ export default async function EditMeetingPage({ params }: PageProps) {
     attendeeCount: meeting.attendeeCount != null ? String(meeting.attendeeCount) : "",
     status: meeting.status,
     visibilityScope: meeting.visibilityScope as VisibilityScopeValue,
+    visibleOrgUnitRefs: parseStringArray(meeting.visibleOrgUnitRefs),
     visibleRoleRefs: parseStringArray(meeting.visibleRoleRefs),
     visibleUserRefs: parseStringArray(meeting.visibleUserRefs),
   };
