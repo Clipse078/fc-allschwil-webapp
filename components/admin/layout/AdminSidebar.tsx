@@ -29,6 +29,7 @@ import {
   ACTIVE_TENANT_NAME,
   PLATFORM_NAME,
 } from "@/lib/platform/constants";
+import { deChMessages } from "@/messages";
 
 type AdminSidebarProps = {
   firstName: string;
@@ -39,49 +40,49 @@ type AdminSidebarProps = {
   onToggle?: () => void;
 };
 
-function getNavIcon(label: string) {
-  switch (label) {
-    case "Dashboard":
-      return LayoutDashboard;
-    case "Vereinsleitung":
-      return Briefcase;
-    case "Meetings":
-      return ScrollText;
-    case "Initiativen":
-      return Flag;
-    case "KPIs":
-      return BarChart3;
-    case "Saisons":
-      return CalendarRange;
-    case "Saisonplanner":
-      return ClipboardList;
-    case "Wochenplanner":
-      return CalendarDays;
-    case "Tagesplanner":
-      return CalendarDays;
-    case "Teams":
-      return Users;
-    case "Events":
-      return CalendarDays;
-    case "Personen":
-      return UserCircle2;
-    case "Spieler":
-      return UserRound;
-    case "Trainer":
-      return BadgeIcon;
-    case "Benutzer":
-      return Shield;
-    default:
-      return LayoutDashboard;
-  }
+/**
+ * Icon mapping keyed by route href.
+ * Decoupled from nav label strings so labels can be localised independently.
+ */
+const NAV_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  "/dashboard": LayoutDashboard,
+  "/vereinsleitung": Briefcase,
+  "/vereinsleitung/meetings": ScrollText,
+  "/vereinsleitung/initiativen": Flag,
+  "/vereinsleitung/kpis": BarChart3,
+  "/dashboard/seasons": CalendarRange,
+  "/dashboard/planner": ClipboardList,
+  "/dashboard/planner/week": CalendarDays,
+  "/dashboard/planner/day": CalendarDays,
+  "/dashboard/teams": Users,
+  "/dashboard/events": CalendarDays,
+  "/dashboard/persons": UserCircle2,
+  "/dashboard/players": UserRound,
+  "/dashboard/trainers": BadgeIcon,
+  "/dashboard/users": Shield,
+};
+
+function getNavIcon(href: string): React.ComponentType<{ className?: string }> {
+  return NAV_ICON_MAP[href] ?? LayoutDashboard;
 }
 
-function isVereinsleitungChild(label: string) {
-  return label === "Meetings" || label === "Initiativen" || label === "KPIs";
+const VEREINSLEITUNG_CHILD_HREFS = new Set([
+  "/vereinsleitung/meetings",
+  "/vereinsleitung/initiativen",
+  "/vereinsleitung/kpis",
+]);
+
+const PLANNER_CHILD_HREFS = new Set([
+  "/dashboard/planner/week",
+  "/dashboard/planner/day",
+]);
+
+function isVereinsleitungChild(href: string) {
+  return VEREINSLEITUNG_CHILD_HREFS.has(href);
 }
 
-function isPlannerChild(label: string) {
-  return label === "Wochenplanner" || label === "Tagesplanner";
+function isPlannerChild(href: string) {
+  return PLANNER_CHILD_HREFS.has(href);
 }
 
 function shouldCarrySeason(href: string) {
@@ -106,6 +107,7 @@ export default function AdminSidebar({
   const searchParams = useSearchParams();
   const selectedSeason = searchParams.get("season");
   const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[]);
+  const t = deChMessages.nav;
 
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
@@ -118,18 +120,17 @@ export default function AdminSidebar({
       : () => setInternalCollapsed((current) => !current);
 
   const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+    (item) => !isVereinsleitungChild(item.href) && !isPlannerChild(item.href),
   );
   const vereinsleitungChildren = navItems.filter((item) =>
-    isVereinsleitungChild(item.label),
+    isVereinsleitungChild(item.href),
   );
-  const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
+  const plannerChildren = navItems.filter((item) => isPlannerChild(item.href));
 
   function buildHref(baseHref: string) {
     if (!selectedSeason || !shouldCarrySeason(baseHref)) {
       return baseHref;
     }
-
     return `${baseHref}?season=${encodeURIComponent(selectedSeason)}`;
   }
 
@@ -180,7 +181,7 @@ export default function AdminSidebar({
             <button
               type="button"
               onClick={handleToggle}
-              aria-label="Menü einklappen"
+              aria-label={t.menuEinklappen}
               className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -193,7 +194,7 @@ export default function AdminSidebar({
             <button
               type="button"
               onClick={handleToggle}
-              aria-label="Menü erweitern"
+              aria-label={t.menuErweitern}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ChevronRight className="h-4 w-4" />
@@ -205,7 +206,7 @@ export default function AdminSidebar({
       <nav className={resolvedCollapsed ? "flex-1 px-3 py-3" : "flex-1 px-4 py-3"}>
         <ul className="space-y-2">
           {mainItems.map((item) => {
-            const Icon = getNavIcon(item.label);
+            const Icon = getNavIcon(item.href);
             const resolvedHref = buildHref(item.href);
             const isActive =
               pathname === item.href ||
@@ -230,12 +231,13 @@ export default function AdminSidebar({
                   {!resolvedCollapsed ? <span>{item.label}</span> : null}
                 </Link>
 
-                {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
+                {!resolvedCollapsed && item.href === "/vereinsleitung" ? (
                   <ul className="mt-2 space-y-2 pl-7">
                     {vereinsleitungChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
+                      const ChildIcon = getNavIcon(child.href);
                       const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+                        pathname === child.href ||
+                        pathname.startsWith(`${child.href}/`);
 
                       return (
                         <li key={child.href}>
@@ -256,13 +258,14 @@ export default function AdminSidebar({
                   </ul>
                 ) : null}
 
-                {!resolvedCollapsed && item.label === "Saisonplanner" ? (
+                {!resolvedCollapsed && item.href === "/dashboard/planner" ? (
                   <ul className="mt-2 space-y-2 pl-7">
                     {plannerChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
+                      const ChildIcon = getNavIcon(child.href);
                       const childHref = buildHref(child.href);
                       const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+                        pathname === child.href ||
+                        pathname.startsWith(`${child.href}/`);
 
                       return (
                         <li key={child.href}>

@@ -182,6 +182,23 @@ const messages: Messages = {
     activeTenant: "Aktiver Verein",
     platform: "SportClubEvo",
   },
+
+  pageActions: {
+    plannerOpen: "Planner öffnen",
+    seasonsManage: "Saisons verwalten",
+    seasonDelete: "Saison löschen",
+    seasonPlanNew: "Neue Saison planen",
+    plannerEntryNew: "Neuer Eintrag",
+    backToPlanner: "Zurück zum Planner",
+    seasonSwitch: "Saison wechseln",
+    teamNew: "Neues Team",
+    eventNew: "Neues Event",
+    meetingPlan: "Meeting planen",
+    edit: "Bearbeiten",
+    decisionMake: "Beschluss fassen",
+    initiativeNew: "Neue Initiative",
+    taskNew: "Neue Aufgabe",
+  },
 };
 
 export default messages;

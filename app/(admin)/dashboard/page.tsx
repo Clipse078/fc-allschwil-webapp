@@ -9,9 +9,11 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
+import PageShell from "@/components/shared/ui/PageShell";
+import SectionCard from "@/components/shared/ui/SectionCard";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
+import { buildSeasonUrl } from "@/lib/platform/season-url-helpers";
 
 const DASHBOARD_MODULES = [
   {
@@ -99,8 +101,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedSeasonKey = selectedSeason?.key ?? "";
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
+    <PageShell>
+      <SectionCard className="p-6 lg:p-7">
         <p className="fca-eyebrow">Dashboard</p>
         <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[#0b4aa2] lg:text-[2.35rem]">
           Saisongeführte Modulübersicht
@@ -109,7 +111,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           Saisons sind die führende Struktur dieser WebApp. Teams, Events und Planner
           werden dynamisch pro Saison verwaltet und darauf aufgebaut.
         </p>
-      </section>
+      </SectionCard>
 
       <SeasonContextSelector
         title="Aktive Saison"
@@ -119,13 +121,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         basePath="/dashboard"
       />
 
-      <AdminSurfaceCard className="p-6">
+      <SectionCard className="p-6">
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {DASHBOARD_MODULES.map((module) => {
             const Icon = module.icon;
             const href =
               selectedSeasonKey && module.carrySeason
-                ? `${module.href}?season=${encodeURIComponent(selectedSeasonKey)}`
+                ? buildSeasonUrl(module.href, selectedSeasonKey)
                 : module.href;
 
             return (
@@ -153,7 +155,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             );
           })}
         </div>
-      </AdminSurfaceCard>
-    </div>
+      </SectionCard>
+    </PageShell>
   );
 }

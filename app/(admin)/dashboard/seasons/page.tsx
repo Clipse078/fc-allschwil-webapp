@@ -5,6 +5,7 @@ import {
 } from "@/app/(admin)/dashboard/seasons/actions";
 import { getSeasonsOverviewData } from "@/lib/seasons/queries";
 import { getSeasonLifecycleStatusClasses } from "@/lib/seasons/status";
+import PageShell from "@/components/shared/ui/PageShell";
 
 function formatSwissDate(value: Date) {
   return new Intl.DateTimeFormat("de-CH", {
@@ -79,7 +80,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
   const feedback = getFeedbackBanner(params.status);
 
   return (
-    <div className="space-y-5">
+    <PageShell className="gap-5 lg:gap-5">
       {feedback ? (
         <section className={`rounded-[24px] border px-5 py-4 text-sm font-medium ${feedback.className}`}>
           {feedback.text}
@@ -257,6 +258,6 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
           </section>
         );
       })}
-    </div>
+    </PageShell>
   );
 }

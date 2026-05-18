@@ -93,4 +93,20 @@ export type Messages = {
     activeTenant: string;
     platform: string;
   };
+  pageActions: {
+    plannerOpen: string;
+    seasonsManage: string;
+    seasonDelete: string;
+    seasonPlanNew: string;
+    plannerEntryNew: string;
+    backToPlanner: string;
+    seasonSwitch: string;
+    teamNew: string;
+    eventNew: string;
+    meetingPlan: string;
+    edit: string;
+    decisionMake: string;
+    initiativeNew: string;
+    taskNew: string;
+  };
 };

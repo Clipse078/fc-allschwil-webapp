@@ -1,6 +1,7 @@
 ﻿import TeamsTable from "@/components/admin/teams/TeamsTable";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
+import PageShell from "@/components/shared/ui/PageShell";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons, getTeamsListData } from "@/lib/teams/queries";
@@ -75,7 +76,7 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
   const teams = await getTeamsListData(selectedSeasonKey);
 
   return (
-    <div className="space-y-8">
+    <PageShell>
       <AdminSectionHeader
         eyebrow="Teams"
         title="Teams pro Saison"
@@ -132,6 +133,6 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
 
         <TeamsTable initialTeams={teams} />
       </section>
-    </div>
+    </PageShell>
   );
 }

@@ -12,49 +12,36 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import { makeSeasonUrl } from "@/lib/platform/season-url-helpers";
+import { deChMessages } from "@/messages";
+
+const SECONDARY_BTN =
+  "inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900";
+const PRIMARY_BTN =
+  "inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]";
+const DANGER_BTN =
+  "inline-flex h-11 items-center gap-2 rounded-full border border-rose-200 bg-white px-4 text-sm font-medium text-rose-600 shadow-sm transition hover:-translate-y-[1px] hover:bg-rose-50";
+const ACTION_ROW = "flex flex-wrap items-center gap-2.5";
 
 export default function AdminPageActions() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedSeason = searchParams.get("season");
-
-  const seasonsHref = selectedSeason
-    ? `/dashboard/seasons?season=${encodeURIComponent(selectedSeason)}`
-    : "/dashboard/seasons";
-
-  const plannerHref = selectedSeason
-    ? `/dashboard/planner?season=${encodeURIComponent(selectedSeason)}`
-    : "/dashboard/planner";
-
-  const weekHref = selectedSeason
-    ? `/dashboard/planner/week?season=${encodeURIComponent(selectedSeason)}`
-    : "/dashboard/planner/week";
-
-  const dayHref = selectedSeason
-    ? `/dashboard/planner/day?season=${encodeURIComponent(selectedSeason)}`
-    : "/dashboard/planner/day";
-
-  const plannerNewHref = selectedSeason
-    ? `/dashboard/planner/new?season=${encodeURIComponent(selectedSeason)}`
-    : "/dashboard/planner/new";
+  const seasonUrl = makeSeasonUrl(selectedSeason);
+  const t = deChMessages.pageActions;
+  const tNav = deChMessages.nav;
 
   if (pathname === "/dashboard") {
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Link
-          href={plannerHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
-        >
+      <div className={ACTION_ROW}>
+        <Link href={seasonUrl("/dashboard/planner")} className={SECONDARY_BTN}>
           <CalendarPlus className="h-4 w-4" />
-          Planner öffnen
+          {t.plannerOpen}
         </Link>
 
-        <Link
-          href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+        <Link href={seasonUrl("/dashboard/seasons")} className={PRIMARY_BTN}>
           <Settings2 className="h-4 w-4" />
-          Saisons verwalten
+          {t.seasonsManage}
         </Link>
       </div>
     );
@@ -62,64 +49,50 @@ export default function AdminPageActions() {
 
   if (pathname === "/dashboard/seasons" || pathname.startsWith("/dashboard/seasons/")) {
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-rose-200 bg-white px-4 text-sm font-medium text-rose-600 shadow-sm transition hover:-translate-y-[1px] hover:bg-rose-50"
-        >
+      <div className={ACTION_ROW}>
+        <button type="button" className={DANGER_BTN}>
           <Settings2 className="h-4 w-4" />
-          Saison löschen
+          {t.seasonDelete}
         </button>
 
-        <Link
-          href="/dashboard/seasons#create-season"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+        <Link href="/dashboard/seasons#create-season" className={PRIMARY_BTN}>
           <Plus className="h-4 w-4" />
-          Neue Saison planen
+          {t.seasonPlanNew}
         </Link>
       </div>
     );
   }
 
-  if (pathname === "/dashboard/planner" || pathname === "/dashboard/planner/week" || pathname === "/dashboard/planner/day") {
+  if (
+    pathname === "/dashboard/planner" ||
+    pathname === "/dashboard/planner/week" ||
+    pathname === "/dashboard/planner/day"
+  ) {
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Link
-          href={plannerNewHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+      <div className={ACTION_ROW}>
+        <Link href={seasonUrl("/dashboard/planner/new")} className={PRIMARY_BTN}>
           <Plus className="h-4 w-4" />
-          Neuer Eintrag
+          {t.plannerEntryNew}
         </Link>
 
         {pathname !== "/dashboard/planner" ? (
-          <Link
-            href={plannerHref}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
-          >
+          <Link href={seasonUrl("/dashboard/planner")} className={SECONDARY_BTN}>
             <CalendarPlus className="h-4 w-4" />
-            Saisonplanner
+            {tNav.saisonplanner}
           </Link>
         ) : null}
 
         {pathname !== "/dashboard/planner/week" ? (
-          <Link
-            href={weekHref}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
-          >
+          <Link href={seasonUrl("/dashboard/planner/week")} className={SECONDARY_BTN}>
             <CalendarPlus className="h-4 w-4" />
-            Wochenplanner
+            {tNav.wochenplanner}
           </Link>
         ) : null}
 
         {pathname !== "/dashboard/planner/day" ? (
-          <Link
-            href={dayHref}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
-          >
+          <Link href={seasonUrl("/dashboard/planner/day")} className={SECONDARY_BTN}>
             <CalendarPlus className="h-4 w-4" />
-            Tagesplanner
+            {tNav.tagesplanner}
           </Link>
         ) : null}
       </div>
@@ -128,13 +101,10 @@ export default function AdminPageActions() {
 
   if (pathname === "/dashboard/planner/new") {
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Link
-          href={plannerHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
-        >
+      <div className={ACTION_ROW}>
+        <Link href={seasonUrl("/dashboard/planner")} className={SECONDARY_BTN}>
           <CalendarPlus className="h-4 w-4" />
-          Zurück zum Planner
+          {t.backToPlanner}
         </Link>
       </div>
     );
@@ -142,21 +112,15 @@ export default function AdminPageActions() {
 
   if (pathname === "/dashboard/teams" || pathname.startsWith("/dashboard/teams/")) {
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Link
-          href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
-        >
+      <div className={ACTION_ROW}>
+        <Link href={seasonUrl("/dashboard/seasons")} className={SECONDARY_BTN}>
           <ShieldPlus className="h-4 w-4" />
-          Saison wechseln
+          {t.seasonSwitch}
         </Link>
 
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+        <button type="button" className={PRIMARY_BTN}>
           <Users className="h-4 w-4" />
-          Neues Team
+          {t.teamNew}
         </button>
       </div>
     );
@@ -164,93 +128,75 @@ export default function AdminPageActions() {
 
   if (pathname === "/dashboard/events" || pathname.startsWith("/dashboard/events/")) {
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Link
-          href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
-        >
+      <div className={ACTION_ROW}>
+        <Link href={seasonUrl("/dashboard/seasons")} className={SECONDARY_BTN}>
           <ShieldPlus className="h-4 w-4" />
-          Saison wechseln
+          {t.seasonSwitch}
         </Link>
 
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+        <button type="button" className={PRIMARY_BTN}>
           <Trophy className="h-4 w-4" />
-          Neues Event
+          {t.eventNew}
         </button>
       </div>
     );
   }
 
-  if (pathname === "/vereinsleitung/meetings" || pathname.startsWith("/vereinsleitung/meetings/")) {
+  if (
+    pathname === "/vereinsleitung/meetings" ||
+    pathname.startsWith("/vereinsleitung/meetings/")
+  ) {
     if (pathname === "/vereinsleitung/meetings") {
       return (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-          >
+        <div className={ACTION_ROW}>
+          <button type="button" className={PRIMARY_BTN}>
             <CalendarPlus className="h-4 w-4" />
-            Meeting planen
+            {t.meetingPlan}
           </button>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
-        >
+      <div className={ACTION_ROW}>
+        <button type="button" className={SECONDARY_BTN}>
           <Pencil className="h-4 w-4" />
-          Bearbeiten
+          {t.edit}
         </button>
 
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+        <button type="button" className={PRIMARY_BTN}>
           <CheckCircle2 className="h-4 w-4" />
-          Beschluss fassen
+          {t.decisionMake}
         </button>
       </div>
     );
   }
 
-  if (pathname === "/vereinsleitung/initiativen" || pathname.startsWith("/vereinsleitung/initiativen/")) {
+  if (
+    pathname === "/vereinsleitung/initiativen" ||
+    pathname.startsWith("/vereinsleitung/initiativen/")
+  ) {
     if (pathname === "/vereinsleitung/initiativen") {
       return (
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-          >
+        <div className={ACTION_ROW}>
+          <button type="button" className={PRIMARY_BTN}>
             <Plus className="h-4 w-4" />
-            Neue Initiative
+            {t.initiativeNew}
           </button>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
-        >
+      <div className={ACTION_ROW}>
+        <button type="button" className={SECONDARY_BTN}>
           <Pencil className="h-4 w-4" />
-          Bearbeiten
+          {t.edit}
         </button>
 
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+        <button type="button" className={PRIMARY_BTN}>
           <Plus className="h-4 w-4" />
-          Neue Aufgabe
+          {t.taskNew}
         </button>
       </div>
     );
@@ -258,21 +204,15 @@ export default function AdminPageActions() {
 
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
-        >
+      <div className={ACTION_ROW}>
+        <button type="button" className={SECONDARY_BTN}>
           <CalendarPlus className="h-4 w-4" />
-          Meeting planen
+          {t.meetingPlan}
         </button>
 
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
+        <button type="button" className={PRIMARY_BTN}>
           <Plus className="h-4 w-4" />
-          Neue Initiative
+          {t.initiativeNew}
         </button>
       </div>
     );

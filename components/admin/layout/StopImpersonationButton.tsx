@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { deChMessages } from "@/messages";
 
 export default function StopImpersonationButton() {
   const [submitting, setSubmitting] = useState(false);
+  const t = deChMessages.auth;
 
   async function handleStop() {
     setSubmitting(true);
@@ -22,7 +24,7 @@ export default function StopImpersonationButton() {
       window.location.href = "/dashboard/users";
     } catch (error) {
       window.alert(
-        error instanceof Error ? error.message : "Ein Fehler ist aufgetreten."
+        error instanceof Error ? error.message : "Ein Fehler ist aufgetreten.",
       );
       setSubmitting(false);
     }
@@ -35,7 +37,7 @@ export default function StopImpersonationButton() {
       disabled={submitting}
       className="rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {submitting ? "Beende..." : "Zurück zum Admin"}
+      {submitting ? t.stopImpersonationLoading : t.stopImpersonation}
     </button>
   );
 }
