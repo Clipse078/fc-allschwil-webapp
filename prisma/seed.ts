@@ -5,8 +5,15 @@ import {
   EventSource,
   EventStatus,
   EventType,
+  InitiativeStatus,
+  MeetingStatus,
   PermissionModule,
   PrismaClient,
+  TargetCategory,
+  TargetDirection,
+  TargetMetricType,
+  TargetPeriod,
+  TargetStatus,
   TeamCategory,
   TeamSeasonStatus,
 } from "@prisma/client";
@@ -70,6 +77,11 @@ async function main() {
     { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE },
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
+
+    // Strategic modules — TARGETS module registered in PermissionModule
+    // MEETINGS and INITIATIVES are session-gated only (no PermissionModule enum value yet)
+    { key: "targets.view", name: "View targets", module: PermissionModule.TARGETS },
+    { key: "targets.manage", name: "Manage targets", module: PermissionModule.TARGETS },
   ] as const;
 
   for (const permission of permissions) {
@@ -494,6 +506,204 @@ async function main() {
       roleId: superAdminRole.id,
     },
   });
+
+  // ─── Strategic Modules Seed ───────────────────────────────────────────────
+
+  // Targets: skip if any demo targets already exist (moduleKey = "demo" marks seed data)
+  const demoTargetCount = await prisma.target.count({ where: { moduleKey: "demo" } });
+
+  if (demoTargetCount === 0) {
+    await prisma.target.create({
+      data: {
+        title: "Frauenfussball ausbauen",
+        description: "Anzahl Spielerinnen und aktive Frauenteams gezielt steigern.",
+        category: TargetCategory.MITGLIEDERWACHSTUM,
+        status: TargetStatus.ACTIVE,
+        period: TargetPeriod.SEASON,
+        periodLabel: "Saison 2025/26",
+        moduleKey: "demo",
+        sportCategory: "Fussball",
+        ageGroupHint: "Frauen / Mädchen",
+        metrics: {
+          create: [
+            {
+              label: "Aktive Spielerinnen",
+              type: TargetMetricType.NUMERIC,
+              direction: TargetDirection.INCREASE,
+              targetValue: 30,
+              currentValue: 12,
+              unit: "Spielerinnen",
+              sortOrder: 0,
+            },
+            {
+              label: "Frauenteams",
+              type: TargetMetricType.NUMERIC,
+              direction: TargetDirection.INCREASE,
+              targetValue: 2,
+              currentValue: 0,
+              unit: "Teams",
+              sortOrder: 1,
+            },
+          ],
+        },
+      },
+    });
+
+    await prisma.target.create({
+      data: {
+        title: "Sponsoring-Einnahmen steigern",
+        description: "Gesamte Sponsoring-Einnahmen gegenüber Vorjahr erhöhen.",
+        category: TargetCategory.FINANZEN,
+        status: TargetStatus.ACTIVE,
+        period: TargetPeriod.YEAR,
+        periodLabel: "2026",
+        moduleKey: "demo",
+        metrics: {
+          create: [
+            {
+              label: "Sponsoring-Einnahmen",
+              type: TargetMetricType.CURRENCY,
+              direction: TargetDirection.INCREASE,
+              targetValue: 30000,
+              currentValue: 18500,
+              unit: "CHF",
+              sortOrder: 0,
+            },
+          ],
+        },
+      },
+    });
+
+    await prisma.target.create({
+      data: {
+        title: "Junioren Techniktraining steigern",
+        description: "Anteil technischer Trainingseinheiten bei Junioren erhöhen.",
+        category: TargetCategory.SPORTLICHE_ENTWICKLUNG,
+        status: TargetStatus.ACTIVE,
+        period: TargetPeriod.SEASON,
+        periodLabel: "Saison 2025/26",
+        moduleKey: "demo",
+        sportCategory: "Fussball",
+        ageGroupHint: "U10–U17",
+        metrics: {
+          create: [
+            {
+              label: "Anteil Techniktraining",
+              type: TargetMetricType.PERCENTAGE,
+              direction: TargetDirection.INCREASE,
+              targetValue: 40,
+              currentValue: 25,
+              unit: "%",
+              sortOrder: 0,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  // Meetings: upsert by slug (idempotent — safe to re-run at any time)
+  const meetingsData = [
+    {
+      slug: "vorstandssitzung-april",
+      title: "Vorstandssitzung April",
+      description: "Monatliche Vorstandssitzung mit Protokoll und Beschlüssen.",
+      meetingDate: new Date("2024-04-16T18:00:00.000Z"),
+      location: "Clubhaus, Sitzungszimmer 1",
+      attendeeCount: 5,
+      status: MeetingStatus.COMPLETED,
+    },
+    {
+      slug: "trainer-rapport-rueckrunde",
+      title: "Trainer-Rapport Rückrunde",
+      description: "Trainer-Rapport zur Saisonplanung und Teamentwicklung.",
+      meetingDate: new Date("2024-04-15T16:30:00.000Z"),
+      location: "Clubhaus",
+      attendeeCount: 3,
+      status: MeetingStatus.COMPLETED,
+    },
+    {
+      slug: "medienkoordination-saisonstart",
+      title: "Medienkoordination Saisonstart",
+      description: "Koordination der Medienkommunikation zum Saisonstart.",
+      meetingDate: new Date("2024-04-10T17:00:00.000Z"),
+      location: "Clubhaus",
+      attendeeCount: 4,
+      status: MeetingStatus.COMPLETED,
+    },
+  ] as const;
+
+  for (const meetingData of meetingsData) {
+    await prisma.meeting.upsert({
+      where: { slug: meetingData.slug },
+      update: {
+        title: meetingData.title,
+        description: meetingData.description,
+        meetingDate: meetingData.meetingDate,
+        location: meetingData.location,
+        attendeeCount: meetingData.attendeeCount,
+        status: meetingData.status,
+      },
+      create: {
+        slug: meetingData.slug,
+        title: meetingData.title,
+        description: meetingData.description,
+        meetingDate: meetingData.meetingDate,
+        location: meetingData.location,
+        attendeeCount: meetingData.attendeeCount,
+        status: meetingData.status,
+      },
+    });
+  }
+
+  // Initiatives: upsert by slug (idempotent — safe to re-run at any time)
+  const initiativesData = [
+    {
+      slug: "website-relaunch",
+      title: "Website Relaunch",
+      summary: "Vollständige Überarbeitung der Vereinswebsite.",
+      status: InitiativeStatus.IN_PROGRESS,
+      owner: "Michael Weber",
+      progress: 65,
+    },
+    {
+      slug: "neues-clubhaus-konzept",
+      title: "Neues Clubhaus Konzept",
+      summary: "Konzepterstellung für die Modernisierung des Clubhauses.",
+      status: InitiativeStatus.PLANNED,
+      owner: "Sarah Meier",
+      progress: 10,
+    },
+    {
+      slug: "sponsorenlauf-2025",
+      title: "Sponsorenlauf 2025",
+      summary: "Jährlicher Sponsorenlauf zur Vereinsfinanzierung.",
+      status: InitiativeStatus.ON_TRACK,
+      owner: "Thomas Schmid",
+      progress: 80,
+    },
+  ] as const;
+
+  for (const initiativeData of initiativesData) {
+    await prisma.initiative.upsert({
+      where: { slug: initiativeData.slug },
+      update: {
+        title: initiativeData.title,
+        summary: initiativeData.summary,
+        status: initiativeData.status,
+        owner: initiativeData.owner,
+        progress: initiativeData.progress,
+      },
+      create: {
+        slug: initiativeData.slug,
+        title: initiativeData.title,
+        summary: initiativeData.summary,
+        status: initiativeData.status,
+        owner: initiativeData.owner,
+        progress: initiativeData.progress,
+      },
+    });
+  }
 
   console.log("Seed finished successfully.");
   console.log("Admin login:");
