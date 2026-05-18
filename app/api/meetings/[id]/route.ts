@@ -5,6 +5,7 @@ import { MeetingStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getMeetingById } from "@/lib/meetings/queries";
 import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 async function requireSession() {
   const session = await auth();
@@ -72,6 +73,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       select: { id: true, slug: true, title: true },
     });
 
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "meetings",
+      entityId: id,
+      action: "UPDATE",
+      before: { id: guard.entity.id, slug: guard.entity.slug, reviewStage: guard.entity.reviewStage },
+      after: { id: updated.id, slug: updated.slug, title: updated.title },
+    });
+
     return NextResponse.json({ meeting: updated });
   } catch (error) {
     console.error("Update meeting failed:", error);
@@ -93,6 +103,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
   try {
     await prisma.meeting.delete({ where: { id } });
+
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "meetings",
+      entityId: id,
+      action: "DELETE",
+      before: { id: guard.entity.id, slug: guard.entity.slug, reviewStage: guard.entity.reviewStage },
+      after: null,
+    });
+
     return NextResponse.json({ message: "Meeting wurde gelöscht." });
   } catch (error) {
     console.error("Delete meeting failed:", error);

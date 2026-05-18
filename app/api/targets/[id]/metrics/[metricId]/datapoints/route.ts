@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 async function requireSession() {
   const session = await auth();
@@ -71,6 +72,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     await prisma.targetMetric.update({
       where: { id: metricId },
       data: { currentValue: value },
+    });
+
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "targets",
+      entityId: id,
+      action: "DATAPOINT_CREATE",
+      metadata: { metricId, value, note: body?.note?.trim() || null, measuredAt: measuredAt.toISOString() },
     });
 
     return NextResponse.json({ dataPoint }, { status: 201 });

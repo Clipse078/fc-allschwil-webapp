@@ -17,6 +17,7 @@ import { auth } from "@/auth";
 import { validateLinkPayload } from "@/lib/linking/helpers";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 async function requireSession() {
   const session = await auth();
@@ -39,6 +40,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const guard = await requireTargetAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
+
+  // Fetch current link state before mutation for audit trail
+  const beforeLinks = await prisma.target.findUnique({
+    where: { id },
+    select: { linkedInitiativeRefs: true, linkedMeetingRefs: true },
+  });
 
   const body = await request.json().catch(() => ({}));
 
@@ -93,6 +100,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         linkedInitiativeRefs: true,
         linkedMeetingRefs: true,
       },
+    });
+
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "targets",
+      entityId: id,
+      action: "LINKS_UPDATE",
+      before: beforeLinks ?? undefined,
+      after: { linkedInitiativeRefs: updated.linkedInitiativeRefs, linkedMeetingRefs: updated.linkedMeetingRefs },
     });
 
     return NextResponse.json({ target: updated });

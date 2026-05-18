@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { TargetCategory, TargetStatus, TargetPeriod, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 async function requireSession() {
   const session = await auth();
@@ -123,6 +124,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       select: { id: true, title: true },
     });
 
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "targets",
+      entityId: id,
+      action: "UPDATE",
+      before: { id: guard.entity.id, title: guard.entity.title, reviewStage: guard.entity.reviewStage },
+      after: { id: updated.id, title: updated.title },
+    });
+
     return NextResponse.json({ target: updated });
   } catch (error) {
     console.error("Update target failed:", error);
@@ -144,6 +154,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
   try {
     await prisma.target.delete({ where: { id } });
+
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "targets",
+      entityId: id,
+      action: "DELETE",
+      before: { id: guard.entity.id, title: guard.entity.title, reviewStage: guard.entity.reviewStage },
+      after: null,
+    });
+
     return NextResponse.json({ message: "Ziel wurde gelöscht." });
   } catch (error) {
     console.error("Delete target failed:", error);

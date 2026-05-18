@@ -5,6 +5,7 @@ import { InitiativeStatus, VisibilityScope } from "@prisma/client";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { getInitiativeById } from "@/lib/initiatives/queries";
 import { requireInitiativeAccess } from "@/lib/visibility/visibility-guards";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 async function requireSession() {
   const session = await auth();
@@ -85,6 +86,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       select: { id: true, slug: true, title: true },
     });
 
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "initiatives",
+      entityId: id,
+      action: "UPDATE",
+      before: { id: guard.entity.id, slug: guard.entity.slug, reviewStage: guard.entity.reviewStage },
+      after: { id: updated.id, slug: updated.slug, title: updated.title },
+    });
+
     return NextResponse.json({ initiative: updated });
   } catch (error) {
     console.error("Update initiative failed:", error);
@@ -109,6 +119,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
   try {
     await prisma.initiative.delete({ where: { id } });
+
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "initiatives",
+      entityId: id,
+      action: "DELETE",
+      before: { id: guard.entity.id, slug: guard.entity.slug, reviewStage: guard.entity.reviewStage },
+      after: null,
+    });
+
     return NextResponse.json({ message: "Initiative wurde gelöscht." });
   } catch (error) {
     console.error("Delete initiative failed:", error);

@@ -23,6 +23,7 @@ import {
 import { assertFourEyeAllowed } from "@/lib/governance/four-eye";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import { requireInitiativeAccess } from "@/lib/visibility/visibility-guards";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 async function requireSession() {
   const session = await auth();
@@ -92,6 +93,16 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         reviewedByUserId: true,
         reviewedAt: true,
       },
+    });
+
+    void logAuditEvent({
+      actorUserId: actor.userId,
+      module: "initiatives",
+      entityId: id,
+      action: "STAGE_CHANGE",
+      before: { reviewStage: fromStage },
+      after: { reviewStage: toStage },
+      metadata: { reviewedByUserId: needsStamp ? actor.userId : null },
     });
 
     return NextResponse.json({ initiative: updated });
