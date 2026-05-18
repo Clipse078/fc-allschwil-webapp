@@ -1,48 +1,36 @@
-﻿/**
- * TODO: Cross-Module Linking — Meeting detail integration
- *
- * 1. Add a "Verknüpfte Ziele" section showing Targets that reference this Meeting
- *    (reverse query: Target.linkedMeetingRefs contains this meeting's slug).
- * 2. When MeetingAction model exists, surface actions linked to Targets on
- *    the Target detail page as "open actions from meetings".
- * 3. Decision records should optionally append to Target.nudgeJson as
- *    "meeting outcome" nudges for operational traceability.
- * 4. Use TargetLinksPanel in reverse: MeetingLinkedTargetsPanel.
- */
-
-import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
+﻿import VereinsleitungMeetingActionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingActionsCard";
 import VereinsleitungMeetingAgendaCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingAgendaCard";
 import VereinsleitungMeetingDecisionsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingDecisionsCard";
 import VereinsleitungMeetingInfoCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingInfoCard";
 import VereinsleitungMeetingParticipantsCard from "@/components/admin/vereinsleitung/VereinsleitungMeetingParticipantsCard";
-import type { MeetingLiveData } from "@/lib/meetings/queries";
+import type { MeetingLiveData, MeetingSubEntities } from "@/lib/meetings/queries";
+
+/**
+ * TODO: Cross-Module Linking
+ * 1. Add "Verknüpfte Ziele" panel showing Targets that reference this Meeting.
+ * 2. Decision records → Target.nudgeJson as meeting outcome nudges.
+ * 3. Action items with targetId → surface on linked Target detail.
+ */
 
 type VereinsleitungMeetingDetailProps = {
-  /**
-   * slug is passed through from the page for future reverse-link queries
-   * (e.g. showing Targets that reference this meeting). Currently unused here;
-   * the caller (meetings/[slug]/page.tsx) still has it when that work starts.
-   */
   dbMeeting?: MeetingLiveData | null;
+  subEntities?: MeetingSubEntities | null;
 };
 
-export default function VereinsleitungMeetingDetail({
-  dbMeeting,
-}: VereinsleitungMeetingDetailProps) {
+export default function VereinsleitungMeetingDetail({ dbMeeting, subEntities }: VereinsleitungMeetingDetailProps) {
   const isDbBacked = Boolean(dbMeeting);
 
   return (
     <div className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.85fr)_360px]">
         <div className="space-y-5">
-          <VereinsleitungMeetingAgendaCard isDbBacked={isDbBacked} />
-          <VereinsleitungMeetingDecisionsCard isDbBacked={isDbBacked} />
-          <VereinsleitungMeetingActionsCard isDbBacked={isDbBacked} />
+          <VereinsleitungMeetingAgendaCard isDbBacked={isDbBacked} agendaItems={subEntities?.agendaItems} />
+          <VereinsleitungMeetingDecisionsCard isDbBacked={isDbBacked} decisions={subEntities?.decisions} />
+          <VereinsleitungMeetingActionsCard isDbBacked={isDbBacked} actions={subEntities?.actions} />
         </div>
-
         <div className="space-y-5">
           <VereinsleitungMeetingInfoCard dbMeeting={dbMeeting} />
-          <VereinsleitungMeetingParticipantsCard dbMeeting={dbMeeting} />
+          <VereinsleitungMeetingParticipantsCard dbMeeting={dbMeeting} participants={subEntities?.participants} />
         </div>
       </div>
     </div>

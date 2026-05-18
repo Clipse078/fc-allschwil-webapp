@@ -87,6 +87,33 @@ export function canSeeMeeting(
   return canSeeEntity(meeting as Parameters<typeof canSeeEntity>[0], actor);
 }
 
+export async function getMeetingSubEntities(meetingId: string) {
+  const [agendaItems, decisions, actions, participants] = await Promise.all([
+    prisma.meetingAgendaItem.findMany({
+      where: { meetingId },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
+      select: { id: true, title: true, notes: true, owner: true, durationMin: true, orderIndex: true, status: true },
+    }),
+    prisma.meetingDecision.findMany({
+      where: { meetingId },
+      orderBy: [{ orderIndex: "asc" }, { createdAt: "asc" }],
+      select: { id: true, title: true, description: true, status: true, owner: true, orderIndex: true },
+    }),
+    prisma.meetingAction.findMany({
+      where: { meetingId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, title: true, owner: true, dueDate: true, status: true },
+    }),
+    prisma.meetingParticipant.findMany({
+      where: { meetingId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, role: true, status: true, userId: true },
+    }),
+  ]);
+  return { agendaItems, decisions, actions, participants };
+}
+
+export type MeetingSubEntities = Awaited<ReturnType<typeof getMeetingSubEntities>>;
 export type MeetingListItem = Awaited<ReturnType<typeof getMeetings>>[number];
 export type MeetingDetail = Awaited<ReturnType<typeof getMeetingBySlug>>;
 

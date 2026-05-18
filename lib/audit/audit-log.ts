@@ -38,7 +38,20 @@ export type GovernanceAction =
   | "DELETE"
   | "STAGE_CHANGE"
   | "LINKS_UPDATE"
-  | "DATAPOINT_CREATE";
+  | "DATAPOINT_CREATE"
+  // Meeting sub-entity actions
+  | "AGENDA_CREATE"
+  | "AGENDA_UPDATE"
+  | "AGENDA_DELETE"
+  | "DECISION_CREATE"
+  | "DECISION_UPDATE"
+  | "DECISION_DELETE"
+  | "ACTION_CREATE"
+  | "ACTION_UPDATE"
+  | "ACTION_DELETE"
+  | "PARTICIPANT_CREATE"
+  | "PARTICIPANT_UPDATE"
+  | "PARTICIPANT_DELETE";
 
 export type GovernanceModule = "meetings" | "initiatives" | "targets";
 

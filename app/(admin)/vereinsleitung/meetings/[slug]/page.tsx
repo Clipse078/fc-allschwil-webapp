@@ -1,6 +1,6 @@
 ﻿import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { getMeetingBySlug } from "@/lib/meetings/queries";
+import { getMeetingBySlug, getMeetingSubEntities } from "@/lib/meetings/queries";
 import { buildActorContext } from "@/lib/visibility/actor-context";
 import VereinsleitungMeetingDetail from "@/components/admin/vereinsleitung/VereinsleitungMeetingDetail";
 import MeetingGovernanceBanner from "@/components/admin/meetings/MeetingGovernanceBanner";
@@ -16,16 +16,18 @@ export default async function MeetingDetailPage({ params }: MeetingDetailPagePro
   const { slug } = await params;
   const actor = buildActorContext(session.user);
 
-  // 404-masking: getMeetingBySlug returns null if actor cannot see this record.
-  // The mock fallback renders identically to "slug not in DB" — no 403 leakage.
+  // 404-masking: null if actor cannot see this meeting
   const dbMeeting = await getMeetingBySlug(slug, actor);
+
+  // Fetch sub-entities in parallel once meeting is confirmed visible
+  const subEntities = dbMeeting ? await getMeetingSubEntities(dbMeeting.id) : null;
 
   return (
     <div className="space-y-5">
       {dbMeeting ? (
         <MeetingGovernanceBanner meeting={dbMeeting} />
       ) : null}
-      <VereinsleitungMeetingDetail dbMeeting={dbMeeting} />
+      <VereinsleitungMeetingDetail dbMeeting={dbMeeting} subEntities={subEntities} />
     </div>
   );
 }
