@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getInitiativeBySlug } from "@/lib/initiatives/queries";
+import { buildActorContext } from "@/lib/visibility/actor-context";
 import InitiativeGovernanceBanner from "@/components/admin/initiatives/InitiativeGovernanceBanner";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
@@ -33,17 +34,11 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
+  const actor = buildActorContext(session.user);
 
-  // Try DB first. If not found (legacy mock slug or slug not in DB), show
-  // a graceful fallback card with seeding instructions.
-  //
-  // TODO: Phase 2 — visibility check
-  // getInitiativeBySlug() must silently return null for initiatives the actor
-  // cannot see (RESTRICTED/PRIVATE outside allowlist). The resulting fallback
-  // card correctly masks the existence of restricted entries — same response
-  // as "no DB record" to prevent information disclosure. Pass session.user to
-  // getInitiativeBySlug() once the actor context parameter is added.
-  const dbInitiative = await getInitiativeBySlug(slug);
+  // 404-masking: getInitiativeBySlug returns null if actor cannot see the record.
+  // The "not in DB" fallback card renders identically — no 403 leakage.
+  const dbInitiative = await getInitiativeBySlug(slug, actor);
 
   return (
     <div className="space-y-5">

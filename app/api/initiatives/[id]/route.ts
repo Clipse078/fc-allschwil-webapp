@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { InitiativeStatus } from "@prisma/client";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getInitiativeById } from "@/lib/initiatives/queries";
 
 async function requireSession() {
   const session = await auth();
@@ -20,26 +22,8 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const initiative = await prisma.initiative.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      summary: true,
-      description: true,
-      status: true,
-      owner: true,
-      progress: true,
-      dueDate: true,
-      reviewStage: true,
-      requiresFourEyeReview: true,
-      reviewedByUserId: true,
-      reviewedAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const actor = buildActorContext(check.session.user);
+  const initiative = await getInitiativeById(id, actor);
 
   if (!initiative) {
     return NextResponse.json({ error: "Initiative nicht gefunden." }, { status: 404 });

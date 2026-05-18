@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { MeetingStatus } from "@prisma/client";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getMeetings } from "@/lib/meetings/queries";
 
 async function requireSession() {
   const session = await auth();
@@ -17,28 +19,8 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  // TODO: Access control — Phase 2
-  // Replace the unrestricted findMany below with a visibility-filtered query.
-  // The filter must use check.session.user (userId, roleKeys, teamIds, orgUnitIds)
-  // to exclude RESTRICTED meetings the actor cannot see and PRIVATE meetings
-  // not created by or explicitly shared with the actor.
-  // Until then, every authenticated user sees every meeting — do not store
-  // sensitive board content in the DB before Phase 2 is implemented.
-  const meetings = await prisma.meeting.findMany({
-    orderBy: { meetingDate: "desc" },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      description: true,
-      meetingDate: true,
-      location: true,
-      attendeeCount: true,
-      status: true,
-      reviewStage: true,
-    },
-  });
-
+  const actor = buildActorContext(check.session.user);
+  const meetings = await getMeetings(actor);
   return NextResponse.json({ meetings });
 }
 
@@ -88,6 +70,7 @@ export async function POST(request: NextRequest) {
         location: body?.location?.trim() || null,
         attendeeCount: body?.attendeeCount ? Number(body.attendeeCount) : null,
         status,
+        createdByUserId: check.session.user.id,
       },
       select: { id: true, slug: true, title: true },
     });

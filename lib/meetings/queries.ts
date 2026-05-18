@@ -1,102 +1,90 @@
 /**
  * Meeting query helpers — server-only.
  *
- * VISIBILITY WARNING: These queries currently return ALL meetings to every
- * authenticated caller with no scope filtering. This is intentional for
- * Phase 1 (small, known user base) but MUST be replaced before the system
- * is used for sensitive board content.
+ * All queries now accept an ActorContext and apply VisibilityScope filtering.
+ * RESTRICTED records are pre-fetched and filtered in-app via canSeeEntity().
+ * PRIVATE records are filtered at DB level (only creator's rows fetched).
  *
- * Phase 2 — visibility-aware queries:
+ * 404-masking: getMeetingBySlug() and getMeetingById() return null (not 403)
+ * for records the actor cannot see, preventing information disclosure.
  *
- *   getMeetings(actorContext: ActorContext): Promise<MeetingListItem[]>
+ * TODO: Phase 2 — push RESTRICTED filtering into the DB query using
+ *   PostgreSQL JSONB @> (array contains) for role/user/team overlap checks.
+ *   This eliminates the need to fetch-then-discard RESTRICTED records.
  *
- *   where ActorContext = {
- *     userId: string;
- *     roleKeys: string[];
- *     teamIds: string[];
- *     orgUnitIds: string[];   // future OrgUnit model
- *   }
- *
- *   The query must add a `where` clause that filters on visibilityScope:
- *     ORGANISATION → no additional filter (return all)
- *     RESTRICTED   → return only if actor matches any allowedOrgUnitIds /
- *                    allowedRoleKeys / allowedTeamIds / allowedPersonIds
- *     PRIVATE      → return only if actor.userId === createdByUserId
- *                    or actor.userId is in allowedPersonIds
- *
- *   getMeetingBySlug() must enforce the same check and return null (not throw)
- *   for meetings outside the actor's visibility — the page treats null as "not
- *   found" and renders the fallback, preventing information leakage via 404 vs 403.
- *
- * TODO: add getMeetingLinkOptions(actorContext) variant used by TargetLinkEditor
- *   so that cross-module links can only point to meetings the actor can see.
+ * TODO: Actor context will expand with personId, teamIds, orgUnitIds once
+ *   those associations are established on the session/JWT.
  */
 
 import { prisma } from "@/lib/db/prisma";
+import type { ActorContext } from "@/lib/visibility/actor-context";
+import { buildVisibilityWhere, applyVisibilityFilter } from "@/lib/visibility/visibility-filter";
 
-// TODO: replace with visibility-filtered version once VisibilityScope is in schema.
-// Until then, ALL meetings are returned regardless of sensitivity. Do not record
-// confidential content in the DB before Phase 2 access control is in place.
-export async function getMeetings() {
-  return prisma.meeting.findMany({
+const MEETING_LIST_SELECT = {
+  id: true,
+  slug: true,
+  title: true,
+  description: true,
+  meetingDate: true,
+  location: true,
+  attendeeCount: true,
+  status: true,
+  reviewStage: true,
+  requiresFourEyeReview: true,
+  visibilityScope: true,
+  createdByUserId: true,
+  visibleRoleRefs: true,
+  visibleUserRefs: true,
+  visibleTeamRefs: true,
+  visibleOrgUnitRefs: true,
+  visiblePersonRefs: true,
+} as const;
+
+export async function getMeetings(actor: ActorContext) {
+  const rows = await prisma.meeting.findMany({
+    where: buildVisibilityWhere(actor),
     orderBy: { meetingDate: "desc" },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      description: true,
-      meetingDate: true,
-      location: true,
-      attendeeCount: true,
-      status: true,
-      reviewStage: true,
-      requiresFourEyeReview: true,
-    },
+    select: MEETING_LIST_SELECT,
   });
+  return applyVisibilityFilter(rows, actor);
 }
 
-// TODO: enforce visibility check — return null if actor cannot see this record,
-// NOT a 403 (to avoid disclosing the existence of restricted meetings).
-export async function getMeetingBySlug(slug: string) {
-  return prisma.meeting.findUnique({
+const MEETING_DETAIL_SELECT = {
+  ...MEETING_LIST_SELECT,
+  reviewedByUserId: true,
+  reviewedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+export async function getMeetingBySlug(slug: string, actor: ActorContext) {
+  const meeting = await prisma.meeting.findUnique({
     where: { slug },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      description: true,
-      meetingDate: true,
-      location: true,
-      attendeeCount: true,
-      status: true,
-      reviewStage: true,
-      requiresFourEyeReview: true,
-      reviewedByUserId: true,
-      reviewedAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: MEETING_DETAIL_SELECT,
   });
+  if (!meeting) return null;
+  // 404-mask: return null if actor cannot see this record
+  if (!canSeeMeeting(meeting, actor)) return null;
+  return meeting;
 }
 
-export async function getMeetingById(id: string) {
-  return prisma.meeting.findUnique({
+export async function getMeetingById(id: string, actor: ActorContext) {
+  const meeting = await prisma.meeting.findUnique({
     where: { id },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      description: true,
-      meetingDate: true,
-      location: true,
-      attendeeCount: true,
-      status: true,
-      reviewStage: true,
-      requiresFourEyeReview: true,
-      reviewedByUserId: true,
-      reviewedAt: true,
-    },
+    select: MEETING_DETAIL_SELECT,
   });
+  if (!meeting) return null;
+  if (!canSeeMeeting(meeting, actor)) return null;
+  return meeting;
+}
+
+// Re-export the check so API route handlers can call it without re-fetching
+import { canSeeEntity } from "@/lib/visibility/visibility-filter";
+export function canSeeMeeting(
+  meeting: { visibilityScope: string; createdByUserId: string | null; visibleRoleRefs: unknown; visibleUserRefs: unknown; visibleTeamRefs: unknown; visibleOrgUnitRefs: unknown; visiblePersonRefs: unknown },
+  actor: ActorContext,
+) {
+  return canSeeEntity(meeting as Parameters<typeof canSeeEntity>[0], actor);
 }
 
 export type MeetingListItem = Awaited<ReturnType<typeof getMeetings>>[number];

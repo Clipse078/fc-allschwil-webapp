@@ -1,6 +1,7 @@
 ﻿import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getMeetingBySlug } from "@/lib/meetings/queries";
+import { buildActorContext } from "@/lib/visibility/actor-context";
 import VereinsleitungMeetingDetail from "@/components/admin/vereinsleitung/VereinsleitungMeetingDetail";
 import MeetingGovernanceBanner from "@/components/admin/meetings/MeetingGovernanceBanner";
 
@@ -13,18 +14,11 @@ export default async function MeetingDetailPage({ params }: MeetingDetailPagePro
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
+  const actor = buildActorContext(session.user);
 
-  // Try to find in DB. If not found (legacy mock slug or slug not in DB),
-  // the existing mock detail renders unchanged — zero regression.
-  //
-  // TODO: Phase 2 — visibility check
-  // getMeetingBySlug() must silently return null for meetings the actor cannot
-  // see (RESTRICTED/PRIVATE outside allowlist). Returning null here causes the
-  // page to show the mock fallback, which is the correct "not found" experience
-  // without leaking that a restricted record exists (no 403 vs 404 information
-  // disclosure). Pass session.user to getMeetingBySlug() once the actor context
-  // parameter is added.
-  const dbMeeting = await getMeetingBySlug(slug);
+  // 404-masking: getMeetingBySlug returns null if actor cannot see this record.
+  // The mock fallback renders identically to "slug not in DB" — no 403 leakage.
+  const dbMeeting = await getMeetingBySlug(slug, actor);
 
   return (
     <div className="space-y-5">

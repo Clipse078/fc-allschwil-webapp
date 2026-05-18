@@ -31,27 +31,47 @@
 
 import { prisma } from "@/lib/db/prisma";
 import type { EntityRef } from "./types";
+import type { ActorContext } from "@/lib/visibility/actor-context";
+import { buildVisibilityWhere, applyVisibilityFilter } from "@/lib/visibility/visibility-filter";
 
-/** All DB-registered meetings as link options, newest first. */
-export async function getMeetingLinkOptions(): Promise<EntityRef[]> {
-  const meetings = await prisma.meeting.findMany({
+const LINK_OPTION_VISIBILITY_SELECT = {
+  visibilityScope: true,
+  createdByUserId: true,
+  visibleRoleRefs: true,
+  visibleUserRefs: true,
+  visibleTeamRefs: true,
+  visibleOrgUnitRefs: true,
+  visiblePersonRefs: true,
+} as const;
+
+/**
+ * Visible meetings for the link editor — respects VisibilityScope.
+ * Only meetings the actor can see are returned, preventing cross-link
+ * disclosure of restricted/private records.
+ */
+export async function getMeetingLinkOptions(actor: ActorContext): Promise<EntityRef[]> {
+  const rows = await prisma.meeting.findMany({
+    where: buildVisibilityWhere(actor),
     orderBy: { meetingDate: "desc" },
-    select: { slug: true, title: true },
+    select: { slug: true, title: true, ...LINK_OPTION_VISIBILITY_SELECT },
   });
-  return meetings.map((m) => ({
+  return applyVisibilityFilter(rows, actor).map((m) => ({
     slug: m.slug,
     title: m.title,
     url: `/vereinsleitung/meetings/${m.slug}`,
   }));
 }
 
-/** All DB-registered initiatives as link options, alphabetical by title. */
-export async function getInitiativeLinkOptions(): Promise<EntityRef[]> {
-  const initiatives = await prisma.initiative.findMany({
+/**
+ * Visible initiatives for the link editor — respects VisibilityScope.
+ */
+export async function getInitiativeLinkOptions(actor: ActorContext): Promise<EntityRef[]> {
+  const rows = await prisma.initiative.findMany({
+    where: buildVisibilityWhere(actor),
     orderBy: { title: "asc" },
-    select: { slug: true, title: true },
+    select: { slug: true, title: true, ...LINK_OPTION_VISIBILITY_SELECT },
   });
-  return initiatives.map((i) => ({
+  return applyVisibilityFilter(rows, actor).map((i) => ({
     slug: i.slug,
     title: i.title,
     url: `/vereinsleitung/initiativen/${i.slug}`,

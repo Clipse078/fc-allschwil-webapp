@@ -21,6 +21,12 @@ enum PermissionModule {
   TARGETS
 }
 
+enum VisibilityScope {
+  ORGANISATION
+  RESTRICTED
+  PRIVATE
+}
+
 enum MeetingStatus {
   PLANNED
   COMPLETED
@@ -174,15 +180,15 @@ enum WorkflowAction {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   firstName    String
   lastName     String
-  isActive     Boolean  @default(true)
+  isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   userRoles UserRole[]
   auditLogs AuditLog[] @relation("AuditActor")
@@ -191,14 +197,14 @@ model User {
 }
 
 model Role {
-  id                               String   @id @default(cuid())
-  key                              String   @unique
-  name                             String
-  description                      String?
-  canAccessVereinsleitung          Boolean  @default(false)
-  canAttendVereinsleitungMeetings  Boolean  @default(false)
-  createdAt                        DateTime @default(now())
-  updatedAt                        DateTime @updatedAt
+  id                              String   @id @default(cuid())
+  key                             String   @unique
+  name                            String
+  description                     String?
+  canAccessVereinsleitung         Boolean  @default(false)
+  canAttendVereinsleitungMeetings Boolean  @default(false)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
 
   userRoles                 UserRole[]
   rolePermissions           RolePermission[]
@@ -282,7 +288,7 @@ model RoleWorkflowReviewAssignment {
   updatedAt      DateTime @updatedAt
 
   workflowRule RoleWorkflowRule @relation(fields: [workflowRuleId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "RoleWorkflowReviewAssignment_workflowRuleId_fkey")
-  reviewerRole Role @relation("WorkflowReviewerRole", fields: [reviewerRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewerRole Role             @relation("WorkflowReviewerRole", fields: [reviewerRoleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([workflowRuleId, reviewerRoleId])
   @@index([reviewerRoleId])
@@ -307,7 +313,7 @@ model Season {
 }
 
 model Person {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   firstName   String
   lastName    String
   displayName String?
@@ -315,11 +321,11 @@ model Person {
   phone       String?
   dateOfBirth DateTime?
   notes       String?
-  isActive    Boolean  @default(true)
-  isPlayer    Boolean  @default(false)
-  isTrainer   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean   @default(true)
+  isPlayer    Boolean   @default(false)
+  isTrainer   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   playerSquadMembers PlayerSquadMember[]
   trainerTeamMembers TrainerTeamMember[]
@@ -332,18 +338,18 @@ model Person {
 }
 
 model Team {
-  id               String   @id @default(cuid())
+  id               String       @id @default(cuid())
   name             String
-  slug             String   @unique
+  slug             String       @unique
   category         TeamCategory
   genderGroup      String?
   ageGroup         String?
-  sortOrder        Int      @default(0)
-  isActive         Boolean  @default(true)
-  websiteVisible   Boolean  @default(true)
-  infoboardVisible Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  sortOrder        Int          @default(0)
+  isActive         Boolean      @default(true)
+  websiteVisible   Boolean      @default(true)
+  infoboardVisible Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   teamSeasons     TeamSeason[]
   events          Event[]
@@ -598,8 +604,14 @@ model Initiative {
   reviewedByUserId      String?
   reviewedAt            DateTime?
 
-  // TODO: add visibilityScope + allowedOrgUnitIds/allowedRoleKeys/allowedTeamIds/allowedPersonIds
-  // (see architecture comment above)
+  // Visibility / access control
+  visibilityScope    VisibilityScope @default(ORGANISATION)
+  createdByUserId    String?
+  visibleRoleRefs    Json?
+  visibleUserRefs    Json?
+  visibleTeamRefs    Json?
+  visibleOrgUnitRefs Json?
+  visiblePersonRefs  Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -607,6 +619,7 @@ model Initiative {
   @@index([status])
   @@index([reviewStage])
   @@index([dueDate])
+  @@index([visibilityScope])
 }
 
 // ---------------------------------------------------------------------------
@@ -649,8 +662,15 @@ model Meeting {
   reviewedByUserId      String?
   reviewedAt            DateTime?
 
-  // TODO: add visibilityScope + allowedOrgUnitIds/allowedRoleKeys/allowedTeamIds/allowedPersonIds
-  // (see architecture comment above)
+  // Visibility / access control
+  visibilityScope    VisibilityScope @default(ORGANISATION)
+  createdByUserId    String?
+  // String[] stored as JSON — role keys, user IDs, team IDs, org unit IDs, person IDs
+  visibleRoleRefs    Json?
+  visibleUserRefs    Json?
+  visibleTeamRefs    Json?
+  visibleOrgUnitRefs Json?
+  visiblePersonRefs  Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -658,15 +678,16 @@ model Meeting {
   @@index([meetingDate])
   @@index([status])
   @@index([reviewStage])
+  @@index([visibilityScope])
 }
 
 model Target {
-  id            String              @id @default(cuid())
+  id            String         @id @default(cuid())
   title         String
   description   String?
-  category      TargetCategory      @default(SPORTLICHE_ENTWICKLUNG)
-  status        TargetStatus        @default(ACTIVE)
-  period        TargetPeriod        @default(SEASON)
+  category      TargetCategory @default(SPORTLICHE_ENTWICKLUNG)
+  status        TargetStatus   @default(ACTIVE)
+  period        TargetPeriod   @default(SEASON)
   periodLabel   String?
   moduleKey     String?
   sportCategory String?
@@ -684,7 +705,7 @@ model Target {
   // Cross-module linking (phase 1: slug/title refs; phase 2: proper FK relations)
   // Stored as [{slug, title, url?}][] — validated by lib/linking/helpers.ts
   linkedInitiativeRefs Json?
-  linkedMeetingRefs     Json?
+  linkedMeetingRefs    Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -719,12 +740,12 @@ model TargetMetric {
 }
 
 model TargetDataPoint {
-  id         String       @id @default(cuid())
+  id         String   @id @default(cuid())
   metricId   String
   value      Float
   note       String?
-  measuredAt DateTime     @default(now())
-  createdAt  DateTime     @default(now())
+  measuredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   metric TargetMetric @relation(fields: [metricId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 

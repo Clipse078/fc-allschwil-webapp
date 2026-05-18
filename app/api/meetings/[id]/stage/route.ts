@@ -19,6 +19,8 @@ import {
   requiresReviewerStamp,
   getReviewStageInfo,
 } from "@/lib/governance/review-stage";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { canSeeMeeting } from "@/lib/meetings/queries";
 
 async function requireSession() {
   const session = await auth();
@@ -37,13 +39,25 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
+  const actor = buildActorContext(check.session.user);
 
   const meeting = await prisma.meeting.findUnique({
     where: { id },
-    select: { id: true, reviewStage: true },
+    select: {
+      id: true,
+      reviewStage: true,
+      visibilityScope: true,
+      createdByUserId: true,
+      visibleRoleRefs: true,
+      visibleUserRefs: true,
+      visibleTeamRefs: true,
+      visibleOrgUnitRefs: true,
+      visiblePersonRefs: true,
+    },
   });
 
-  if (!meeting) {
+  // Visibility check must happen before governance — 404-mask restricted records
+  if (!meeting || !canSeeMeeting(meeting, actor)) {
     return NextResponse.json({ error: "Meeting nicht gefunden." }, { status: 404 });
   }
 

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargetById } from "@/lib/targets/queries";
 import { getMeetingLinkOptions, getInitiativeLinkOptions } from "@/lib/linking/queries";
+import { buildActorContext } from "@/lib/visibility/actor-context";
 import TargetForm from "@/components/admin/targets/TargetForm";
 import TargetLinkEditor from "@/components/admin/targets/TargetLinkEditor";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
@@ -19,12 +20,13 @@ export default async function EditTargetPage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { id } = await params;
+  const actor = buildActorContext(session.user);
 
-  // Fetch target and link options in parallel — keep DB queries server-side
+  // Fetch target and link options in parallel — link options respect VisibilityScope
   const [target, availableMeetings, availableInitiatives] = await Promise.all([
     getTargetById(id),
-    getMeetingLinkOptions(),
-    getInitiativeLinkOptions(),
+    getMeetingLinkOptions(actor),
+    getInitiativeLinkOptions(actor),
   ]);
 
   if (!target) notFound();

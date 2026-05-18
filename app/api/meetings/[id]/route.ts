@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { MeetingStatus } from "@prisma/client";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getMeetingById } from "@/lib/meetings/queries";
 
 async function requireSession() {
   const session = await auth();
@@ -20,25 +22,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const meeting = await prisma.meeting.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      description: true,
-      meetingDate: true,
-      location: true,
-      attendeeCount: true,
-      status: true,
-      reviewStage: true,
-      requiresFourEyeReview: true,
-      reviewedByUserId: true,
-      reviewedAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const actor = buildActorContext(check.session.user);
+  // getMeetingById returns null for restricted/private records the actor cannot see (404-masking)
+  const meeting = await getMeetingById(id, actor);
 
   if (!meeting) {
     return NextResponse.json({ error: "Meeting nicht gefunden." }, { status: 404 });

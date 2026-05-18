@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { InitiativeStatus } from "@prisma/client";
+import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getInitiatives } from "@/lib/initiatives/queries";
 
 async function requireSession() {
   const session = await auth();
@@ -17,26 +19,8 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  // TODO: Access control — Phase 2
-  // Replace the unrestricted findMany below with a visibility-filtered query.
-  // Same pattern as /api/meetings — filter by visibilityScope using actor context
-  // from check.session.user. Sensitive initiatives (confidential restructuring,
-  // personnel decisions) must not be visible to all authenticated users.
-  const initiatives = await prisma.initiative.findMany({
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      summary: true,
-      status: true,
-      owner: true,
-      progress: true,
-      dueDate: true,
-      reviewStage: true,
-    },
-  });
-
+  const actor = buildActorContext(check.session.user);
+  const initiatives = await getInitiatives(actor);
   return NextResponse.json({ initiatives });
 }
 
@@ -91,6 +75,7 @@ export async function POST(request: NextRequest) {
         owner: body?.owner?.trim() || null,
         progress,
         dueDate: body?.dueDate ? new Date(body.dueDate) : null,
+        createdByUserId: check.session.user.id,
       },
       select: { id: true, slug: true, title: true },
     });

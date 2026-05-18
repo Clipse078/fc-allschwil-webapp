@@ -1,6 +1,7 @@
 ﻿import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getMeetings } from "@/lib/meetings/queries";
+import { buildActorContext } from "@/lib/visibility/actor-context";
 import VereinsleitungMeetingsList from "@/components/admin/vereinsleitung/VereinsleitungMeetingsList";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
@@ -8,7 +9,8 @@ export default async function VereinsleitungMeetingsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const meetings = await getMeetings();
+  const actor = buildActorContext(session.user);
+  const meetings = await getMeetings(actor);
 
   return (
     <div className="space-y-6">
