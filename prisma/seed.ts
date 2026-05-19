@@ -2,11 +2,15 @@ import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
+  CommunicationTemplateCategory,
+  CommunicationTemplateStatus,
   EventSource,
   EventStatus,
   EventType,
   InitiativeStatus,
   MeetingStatus,
+  OrgUnitStatus,
+  OrgUnitType,
   PermissionModule,
   PrismaClient,
   TargetCategory,
@@ -709,6 +713,101 @@ async function main() {
         status: initiativeData.status,
         owner: initiativeData.owner,
         progress: initiativeData.progress,
+      },
+    });
+  }
+
+  // OrgUnits: upsert by key (idempotent — safe to re-run at any time)
+  const orgUnitsData = [
+    {
+      key: "vorstand",
+      name: "Vorstand",
+      type: OrgUnitType.COMMITTEE,
+      status: OrgUnitStatus.ACTIVE,
+      level: 0,
+      sortOrder: 0,
+      description: "Vorstand des Vereins — oberstes Führungsorgan.",
+    },
+    {
+      key: "sportkommission",
+      name: "Sportkommission",
+      type: OrgUnitType.COMMITTEE,
+      status: OrgUnitStatus.ACTIVE,
+      level: 1,
+      sortOrder: 10,
+      description: "Koordination und Entwicklung des Sportbetriebs.",
+    },
+  ] as const;
+
+  for (const ou of orgUnitsData) {
+    await prisma.orgUnit.upsert({
+      where: { key: ou.key },
+      update: { name: ou.name, description: ou.description },
+      create: {
+        key: ou.key,
+        name: ou.name,
+        type: ou.type,
+        status: ou.status,
+        level: ou.level,
+        sortOrder: ou.sortOrder,
+        description: ou.description,
+      },
+    });
+  }
+
+  // CommunicationTemplates: upsert by slug (idempotent — safe to re-run)
+  const templatesData = [
+    {
+      slug: "einladung-vorstandssitzung",
+      title: "Einladung Vorstandssitzung",
+      category: CommunicationTemplateCategory.MEETING_FOLLOWUP,
+      status: CommunicationTemplateStatus.ACTIVE,
+      subject: "Einladung zur Vorstandssitzung — {{meetingDate}}",
+      bodyMarkdown: `Liebe Vorstandsmitglieder,
+
+wir laden euch herzlich zur nächsten Vorstandssitzung ein.
+
+**Datum:** {{meetingDate}}
+**Ort:** {{location}}
+**Traktanden:** {{agendaItems}}
+
+Bitte bestätigt eure Teilnahme bis {{rsvpDeadline}}.
+
+Sportliche Grüsse
+{{senderName}}`,
+    },
+    {
+      slug: "update-initiative",
+      title: "Initiative Update",
+      category: CommunicationTemplateCategory.INITIATIVE_UPDATE,
+      status: CommunicationTemplateStatus.ACTIVE,
+      subject: "Statusupdate: {{initiativeTitle}}",
+      bodyMarkdown: `Liebe Mitglieder,
+
+hier ein kurzes Update zur Initiative **{{initiativeTitle}}**.
+
+**Aktueller Stand:** {{progress}}%
+**Status:** {{status}}
+**Nächste Schritte:** {{nextSteps}}
+
+Bei Fragen meldet euch bei {{ownerName}}.
+
+Sportliche Grüsse
+{{senderName}}`,
+    },
+  ] as const;
+
+  for (const tpl of templatesData) {
+    await prisma.communicationTemplate.upsert({
+      where: { slug: tpl.slug },
+      update: { title: tpl.title, subject: tpl.subject, bodyMarkdown: tpl.bodyMarkdown },
+      create: {
+        slug: tpl.slug,
+        title: tpl.title,
+        category: tpl.category,
+        status: tpl.status,
+        subject: tpl.subject,
+        bodyMarkdown: tpl.bodyMarkdown,
       },
     });
   }

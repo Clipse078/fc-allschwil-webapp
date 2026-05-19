@@ -1,7 +1,7 @@
 # DB Migration & Seed Readiness
 
-> Sprint: DB Migration + Seed Readiness  
-> Date: 2026-05-18  
+> Sprint: Governance Hardening
+> Date: 2026-05-19
 > Environment target: **Stage / Local dev only. Do NOT run against Production without a verified backup.**
 
 ---
@@ -17,34 +17,44 @@ Before running any migration:
 - [ ] Confirm `DATABASE_URL` points to the **correct stage/local** database.
 - [ ] Confirm `npx prisma migrate status` shows all prior migrations as applied.
 - [ ] Confirm no active long-running transactions are blocking schema changes.
-- [ ] Confirm PostgreSQL version ≥ 12 (for `ALTER TYPE … ADD VALUE` in transactions — see caveat below).
+- [ ] Confirm PostgreSQL version ≥ 13.
 
 ---
 
-## Migration Order
+## Migration Order — All Sprint Migrations
 
-All 5 sprint migrations must be applied in strict ascending timestamp order.
-They build on each other — applying out of order will fail.
+All migrations must be applied in strict ascending timestamp order.
 
-| # | Timestamp | Name | Key operations |
-|---|-----------|------|----------------|
-| 1 | `20260518120000` | `add_targets_module` | `ALTER TYPE PermissionModule ADD VALUE 'TARGETS'` ⚠️; `CREATE TYPE` ×5; `CREATE TABLE Target/TargetMetric/TargetDataPoint` |
-| 2 | `20260518130000` | `add_governance_foundation` | `ALTER TYPE WorkflowDomain ADD VALUE` ×3 ⚠️; `ALTER TABLE Target ADD COLUMN` ×4 |
-| 3 | `20260518140000` | `add_cross_module_links` | `ALTER TABLE Target ADD COLUMN` ×2 (JSONB) |
-| 4 | `20260518150000` | `add_meeting_model` | `CREATE TYPE MeetingStatus`; `CREATE TABLE Meeting` |
-| 5 | `20260518160000` | `add_initiative_model` | `CREATE TYPE InitiativeStatus`; `CREATE TABLE Initiative` |
+### Pre-existing (must already be applied before sprint migrations)
 
-**Pre-existing migrations that must already be applied:**
+| Timestamp | Name | Notes |
+|-----------|------|-------|
+| `20260410225355` | `init` | Base schema — User, Role, Permission, Season, Person, Team, TeamSeason |
+| `20260411142054` | `add_team_audit_and_trainingsgruppe` | `ALTER TYPE TeamCategory ADD VALUE 'TRAININGSGRUPPE'` ⚠️; AuditLog table |
+| `20260411191906` | `add_player_squad_model` | PlayerSquadMember table |
+| `20260413100139` | `add_seasons_permission_module` | `ALTER TYPE PermissionModule ADD VALUE 'SEASONS'` ⚠️; TrainerTeamMember |
+| `20260413101943` | `add_events_foundation` | `ALTER TYPE PermissionModule ADD VALUE 'EVENTS'` ⚠️; **defines ReviewWorkflowStage enum** |
+| `20260413134413` | `add_event_import_runs` | EventImportRun table |
+| `20260418-194927` | `deployment_catchup` | WorkflowDomain / WorkflowAction enums; RoleWorkflowRule / RoleWorkflowReviewAssignment |
 
-```
-20260410225355_init
-20260411142054_add_team_audit_and_trainingsgruppe
-20260411191906_add_player_squad_model
-20260413100139_add_seasons_permission_module
-20260413101943_add_events_foundation          ← defines ReviewWorkflowStage enum (required by sprints 1–5)
-20260413134413_add_event_import_runs
-20260418-194927_deployment_catchup
-```
+### Sprint migrations (apply in this exact order)
+
+| # | Timestamp | Name | Key operations | Transaction-safe? |
+|---|-----------|------|----------------|-------------------|
+| 1 | `20260518120000` | `add_targets_module` | `ALTER TYPE PermissionModule ADD VALUE 'TARGETS'` ⚠️; 5 CREATE TYPE; Target / TargetMetric / TargetDataPoint tables | ⚠️ No — ALTER TYPE |
+| 2 | `20260518130000` | `add_governance_foundation` | `ALTER TYPE WorkflowDomain ADD VALUE 'MEETINGS'/'INITIATIVES'/'TARGETS'` ⚠️; ADD COLUMN governance fields to Target | ⚠️ No — ALTER TYPE |
+| 3 | `20260518140000` | `add_cross_module_links` | ADD COLUMN linkedInitiativeRefs / linkedMeetingRefs (JSONB) to Target | ✅ Yes |
+| 4 | `20260518150000` | `add_meeting_model` | CREATE TYPE MeetingStatus; CREATE TABLE Meeting | ✅ Yes |
+| 5 | `20260518160000` | `add_initiative_model` | CREATE TYPE InitiativeStatus; CREATE TABLE Initiative | ✅ Yes |
+| 6 | `20260518170000` | `add_visibility_scope` | CREATE TYPE VisibilityScope; ADD COLUMN visibility fields to Meeting + Initiative | ✅ Yes |
+| 7 | `20260518180000` | `add_target_visibility_scope` | ADD COLUMN visibility fields to Target | ✅ Yes |
+| 8 | `20260518190000` | `add_meeting_initiative_permission_modules` | `ALTER TYPE PermissionModule ADD VALUE IF NOT EXISTS 'MEETINGS'/'INITIATIVES'` ⚠️ | ⚠️ No — ALTER TYPE |
+| 9 | `20260518200000` | `add_meeting_sub_entities` | 4 CREATE TYPE; MeetingAgendaItem / MeetingDecision / MeetingAction / MeetingParticipant tables | ✅ Yes |
+| 10 | `20260518210000` | `add_communication_template` | 2 CREATE TYPE; CommunicationTemplate table | ✅ Yes |
+| 11 | `20260518220000` | `add_templates_permission_module` | `ALTER TYPE PermissionModule ADD VALUE IF NOT EXISTS 'TEMPLATES'` ⚠️ | ⚠️ No — ALTER TYPE |
+| 12 | `20260518230000` | `add_org_builder_foundation` | 3 CREATE TYPE; OrgUnit / OrgUnitMembership / TargetGroup tables | ✅ Yes |
+
+**All operations are additive. No DROP, no destructive transforms, no renames.**
 
 ---
 
@@ -54,223 +64,245 @@ They build on each other — applying out of order will fail.
 DATABASE_URL="<your-stage-db-url>" npx prisma migrate deploy
 ```
 
-This attempts to apply all pending migrations in order.
+This applies all pending migrations in order. If it fails on an ALTER TYPE migration, use the manual workaround below.
 
 ---
 
-## ⚠️ ALTER TYPE … ADD VALUE Caveat
+## ⚠️ ALTER TYPE … ADD VALUE — Manual Workaround
 
-Migrations **`20260518120000`** and **`20260518130000`** contain `ALTER TYPE … ADD VALUE` statements. In PostgreSQL, this DDL cannot run inside a transaction block. Prisma's `migrate deploy` wraps each migration file in a transaction by default.
+PostgreSQL cannot execute `ALTER TYPE ... ADD VALUE` inside a transaction block. Prisma wraps each migration in a transaction, so these will fail. There are **5 affected migrations** across the full sprint chain.
 
-**Affected statements (4 total across 2 files):**
-
-```sql
--- 20260518120000
-ALTER TYPE "PermissionModule" ADD VALUE 'TARGETS';
-
--- 20260518130000
-ALTER TYPE "WorkflowDomain" ADD VALUE 'MEETINGS';
-ALTER TYPE "WorkflowDomain" ADD VALUE 'INITIATIVES';
-ALTER TYPE "WorkflowDomain" ADD VALUE 'TARGETS';
-```
-
-**Behaviour by PostgreSQL version:**
-
-| PG Version | Behaviour |
-|-----------|-----------|
-| < 12 | Fails inside a transaction — always use manual workaround |
-| ≥ 12 | May succeed if the enum value is not referenced in the same transaction. In practice, `migrate deploy` may still fail depending on driver behaviour. **Test first.** |
-
-### Workaround: Apply ALTER TYPE manually
-
-If `prisma migrate deploy` fails on either of these two migrations, apply the enum additions manually and mark the migration as applied:
-
-**Step 1 — Apply enum values manually (outside a transaction):**
+### If `prisma migrate deploy` fails on `20260518120000`
 
 ```bash
-psql $DATABASE_URL <<'SQL'
-ALTER TYPE "PermissionModule" ADD VALUE IF NOT EXISTS 'TARGETS';
-SQL
-
-psql $DATABASE_URL <<'SQL'
-ALTER TYPE "WorkflowDomain" ADD VALUE IF NOT EXISTS 'MEETINGS';
-ALTER TYPE "WorkflowDomain" ADD VALUE IF NOT EXISTS 'INITIATIVES';
-ALTER TYPE "WorkflowDomain" ADD VALUE IF NOT EXISTS 'TARGETS';
-SQL
+psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE 'TARGETS';"
+npx prisma migrate resolve --applied 20260518120000_add_targets_module
 ```
 
-> Note: `IF NOT EXISTS` is supported from PostgreSQL 9.3+ and makes these statements idempotent.
-
-**Step 2 — Apply the remaining SQL from each file** (skip the `ALTER TYPE` lines already run):
-
-For `20260518120000`, the non-`ALTER TYPE` SQL is the `CREATE TYPE` + `CREATE TABLE` + `CREATE INDEX` + `ALTER TABLE … ADD CONSTRAINT` statements. You can paste the migration file contents minus the `ALTER TYPE` line.
-
-For `20260518130000`, the remaining SQL is the `ALTER TABLE "Target" ADD COLUMN …` and `CREATE INDEX` statements.
-
-**Step 3 — Mark migrations as applied in Prisma:**
+### If it fails on `20260518130000`
 
 ```bash
-DATABASE_URL="<stage-url>" npx prisma migrate resolve --applied 20260518120000_add_targets_module
-DATABASE_URL="<stage-url>" npx prisma migrate resolve --applied 20260518130000_add_governance_foundation
+psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE 'MEETINGS';"
+psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE 'INITIATIVES';"
+psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE 'TARGETS';"
+npx prisma migrate resolve --applied 20260518130000_add_governance_foundation
 ```
 
-**Step 4 — Resume normal deploy for remaining migrations:**
+### If it fails on `20260518190000`
 
 ```bash
-DATABASE_URL="<stage-url>" npx prisma migrate deploy
+psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
+psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
+npx prisma migrate resolve --applied 20260518190000_add_meeting_initiative_permission_modules
 ```
 
-This will apply migrations `20260518140000`, `20260518150000`, `20260518160000` normally (none contain `ALTER TYPE … ADD VALUE`).
+### If it fails on `20260518220000`
+
+```bash
+psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TEMPLATES';"
+npx prisma migrate resolve --applied 20260518220000_add_templates_permission_module
+```
+
+After each manual step, resume with `npx prisma migrate deploy` to continue with the remaining files.
 
 ---
 
-## Migration Safety Assessment
-
-| Check | Result |
-|-------|--------|
-| Destructive operations (`DROP TABLE`, `DROP COLUMN`) | ✅ None |
-| `ALTER COLUMN … SET NOT NULL` without default | ✅ None |
-| New `NOT NULL` columns on populated tables | ✅ All have safe defaults (`DEFAULT 'DRAFT'`, `DEFAULT false`, `DEFAULT 0`) |
-| Foreign keys | ✅ All `ON DELETE CASCADE` — no orphan risk |
-| New models with no FKs to User | ⚠️ `reviewedByUserId` on Target/Meeting/Initiative is plain `TEXT`, not FK. Deleted user IDs may persist as dead references. Acceptable for phase 1. |
-| Duplicate enum/model risk | ✅ None — all enums and models are genuinely new |
-| JSONB columns | ✅ Nullable — no impact on existing rows |
-| Migration order dependency | ✅ Migrations `20260518130000`–`20260518160000` depend on `ReviewWorkflowStage` (defined in `20260413101943_add_events_foundation`). Must already be applied. |
-
----
-
-## Seed Command
-
-Run after all migrations are applied:
+## Seed
 
 ```bash
-DATABASE_URL="<stage-url>" npx tsx prisma/seed.ts
+# Standard (uses DATABASE_URL from .env):
+npx prisma db seed
+
+# Or directly:
+npx tsx prisma/seed.ts
 ```
 
-Or via the Prisma config seed command:
+The seed is idempotent and safe to re-run at any time.
 
-```bash
-DATABASE_URL="<stage-url>" npx prisma db seed
-```
+### Seed coverage
 
-### Seed Idempotency
+| Entity | Strategy | Re-run safe |
+|--------|----------|-------------|
+| Permissions | `upsert` by `key` | ✅ |
+| Roles | `upsert` by `key` | ✅ |
+| Role permissions | `upsert` by composite key | ✅ |
+| Seasons | `upsert` by `key` | ✅ |
+| Teams | `upsert` by `slug` | ✅ |
+| Team seasons | `upsert` by composite key | ✅ |
+| Demo events | `deleteMany` matching titles + `create` | ✅ |
+| Admin user | `upsert` by `email` | ✅ |
+| Targets (3 demo) | Skip if `moduleKey = "demo"` count > 0 | ✅ |
+| Meetings (3 demo) | `upsert` by `slug` | ✅ |
+| Initiatives (3 demo) | `upsert` by `slug` | ✅ |
+| OrgUnits (2 demo) | `upsert` by `key` | ✅ |
+| CommunicationTemplates (2 demo) | `upsert` by `slug` | ✅ |
 
-The seed is safe to re-run multiple times:
+### What gets seeded (strategic modules)
 
-| Entity | Strategy | Safe to re-run |
-|--------|----------|----------------|
-| Permissions | `upsert` by `key` | ✅ Yes |
-| Roles | `upsert` by `key` | ✅ Yes |
-| Role permissions | `upsert` by composite key | ✅ Yes |
-| Seasons | `upsert` by `key` | ✅ Yes |
-| Teams | `upsert` by `slug` | ✅ Yes |
-| Team seasons | `upsert` by composite key | ✅ Yes |
-| Demo events | `deleteMany` titles + `create` | ✅ Yes (demo events only) |
-| Admin user | `upsert` by `email` | ✅ Yes |
-| **Targets** (demo) | Skip if `moduleKey = "demo"` count > 0 | ✅ Yes |
-| **Meetings** | `upsert` by `slug` | ✅ Yes |
-| **Initiatives** | `upsert` by `slug` | ✅ Yes |
+**Targets** (seeded only once — skipped on re-run if demo targets exist):
 
-### What gets seeded
+| Title | Category | Status |
+|-------|----------|--------|
+| Frauenfussball ausbauen | MITGLIEDERWACHSTUM | ACTIVE |
+| Sponsoring-Einnahmen steigern | FINANZEN | ACTIVE |
+| Junioren Techniktraining steigern | SPORTLICHE_ENTWICKLUNG | ACTIVE |
 
-**Targets (3, seeded only once — skipped on re-run if demo targets exist):**
+**Meetings** (upserted by slug):
 
-| Title | Category | Status | Metrics |
-|-------|----------|--------|---------|
-| Frauenfussball ausbauen | MITGLIEDERWACHSTUM | ACTIVE | 2 (Spielerinnen: 12/30, Teams: 0/2) |
-| Sponsoring-Einnahmen steigern | FINANZEN | ACTIVE | 1 (CHF 18 500 / 30 000) |
-| Junioren Techniktraining steigern | SPORTLICHE_ENTWICKLUNG | ACTIVE | 1 (25% / 40%) |
+| Slug | Title | Status |
+|------|-------|--------|
+| `vorstandssitzung-april` | Vorstandssitzung April | COMPLETED |
+| `trainer-rapport-rueckrunde` | Trainer-Rapport Rückrunde | COMPLETED |
+| `medienkoordination-saisonstart` | Medienkoordination Saisonstart | COMPLETED |
 
-**Meetings (3, upserted by slug):**
+**Initiatives** (upserted by slug):
 
-| Slug | Title | Status | Date |
-|------|-------|--------|------|
-| `vorstandssitzung-april` | Vorstandssitzung April | COMPLETED | 16.04.2024 |
-| `trainer-rapport-rueckrunde` | Trainer-Rapport Rückrunde | COMPLETED | 15.04.2024 |
-| `medienkoordination-saisonstart` | Medienkoordination Saisonstart | COMPLETED | 10.04.2024 |
+| Slug | Title | Status |
+|------|-------|--------|
+| `website-relaunch` | Website Relaunch | IN_PROGRESS |
+| `neues-clubhaus-konzept` | Neues Clubhaus Konzept | PLANNED |
+| `sponsorenlauf-2025` | Sponsorenlauf 2025 | ON_TRACK |
 
-**Initiatives (3, upserted by slug):**
+**OrgUnits** (upserted by key):
 
-| Slug | Title | Status | Progress |
-|------|-------|--------|----------|
-| `website-relaunch` | Website Relaunch | IN_PROGRESS | 65% |
-| `neues-clubhaus-konzept` | Neues Clubhaus Konzept | PLANNED | 10% |
-| `sponsorenlauf-2025` | Sponsorenlauf 2025 | ON_TRACK | 80% |
+| Key | Name | Type |
+|-----|------|------|
+| `vorstand` | Vorstand | COMMITTEE |
+| `sportkommission` | Sportkommission | COMMITTEE |
+
+**CommunicationTemplates** (upserted by slug):
+
+| Slug | Title | Category |
+|------|-------|----------|
+| `einladung-vorstandssitzung` | Einladung Vorstandssitzung | MEETING_FOLLOWUP |
+| `update-initiative` | Initiative Update | INITIATIVE_UPDATE |
 
 ---
 
 ## Routes to Verify After Migration + Seed
 
-Log in as `admin@fcallschwil.ch` and verify these routes:
+Log in as `admin@fcallschwil.ch` and verify:
+
+### Strategic modules
 
 | Route | Expected |
 |-------|----------|
-| `/vereinsleitung` | Dashboard loads; VereinsleitungGoalsCard shows link to Ziele |
-| `/vereinsleitung/targets` | 3 demo targets listed with progress bars and review stage badges |
-| `/vereinsleitung/targets/[id]` | Detail page with governance sidebar, metrics, data point form |
-| `/vereinsleitung/targets/new` | New target form + collapsible template catalog |
-| `/vereinsleitung/meetings` | 3 meetings listed with date, attendee count, ReviewStageBadge |
-| `/vereinsleitung/meetings/vorstandssitzung-april` | Detail page shows `MeetingGovernanceBanner` (DRAFT stage) + mock detail cards |
-| `/vereinsleitung/initiativen` | 3 initiatives listed with progress bars and ReviewStageBadge |
-| `/vereinsleitung/initiativen/website-relaunch` | Detail page shows `InitiativeGovernanceBanner` (DRAFT stage) + description + progress |
+| `/vereinsleitung` | Dashboard loads; KPI cards show counts |
+| `/vereinsleitung/targets` | 3 demo targets with progress bars + ReviewStageBadge |
+| `/vereinsleitung/targets/[id]` | Detail with governance sidebar + metrics + data point form |
+| `/vereinsleitung/targets/new` | New target form + template catalog |
+| `/vereinsleitung/meetings` | 3 demo meetings with date + ReviewStageBadge |
+| `/vereinsleitung/meetings/vorstandssitzung-april` | Detail with MeetingGovernanceBanner |
+| `/vereinsleitung/initiativen` | 3 demo initiatives with progress + ReviewStageBadge |
+| `/vereinsleitung/initiativen/website-relaunch` | Detail with InitiativeGovernanceBanner |
+| `/vereinsleitung/templates` | 2 demo templates listed |
+| `/vereinsleitung/templates/new` | New template form |
 
-**API smoke tests (can use browser DevTools or curl):**
+### Org Builder
+
+| Route | Expected |
+|-------|----------|
+| `/dashboard/org-units` | 2 demo org units listed (Vorstand, Sportkommission) |
+| `/dashboard/org-units/new` | New org unit form |
+
+### API smoke tests
 
 ```bash
-# List targets
-curl -b <session-cookie> https://<stage-url>/api/targets
+# Requires a valid session cookie from browser DevTools
 
-# List meetings
-curl -b <session-cookie> https://<stage-url>/api/meetings
+# Strategic modules (GET = session only, visibility-filtered)
+curl -b "<session>" https://<stage>/api/targets
+curl -b "<session>" https://<stage>/api/meetings
+curl -b "<session>" https://<stage>/api/initiatives
+curl -b "<session>" https://<stage>/api/templates
 
-# List initiatives
-curl -b <session-cookie> https://<stage-url>/api/initiatives
+# Org units
+curl -b "<session>" https://<stage>/api/org-units
+
+# Permission guard on create — expect 403 from a session without *.manage
+curl -b "<session>" -X POST https://<stage>/api/meetings \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Test","meetingDate":"2026-06-01"}'
 ```
+
+### Visibility smoke test
+
+1. Create a second test user without `meetings.manage` permission.
+2. Create a meeting with `visibilityScope = RESTRICTED` + the admin user's role in `visibleRoleRefs`.
+3. Log in as the second user — the restricted meeting should NOT appear in the list.
+4. Add the second user's userId to `visibleUserRefs` — it SHOULD now appear.
+
+### Governance stage transition smoke test
+
+1. Create a target with `requiresFourEyeReview = true`.
+2. Submit it to `SUBMITTED` stage (POST as creator).
+3. Try to advance to `APPROVED` as the same creator — expect 403.
+4. Advance to `APPROVED` as a different admin user — expect 200.
 
 ---
 
 ## Rollback Plan
 
-> ⚠️ Rollback of applied migrations is not supported by Prisma and must be done manually.
+> ⚠️ Prisma does not support rollback of applied migrations. Always restore from backup.
 
 **If a migration fails mid-way:**
 
-1. Do NOT run `prisma migrate deploy` again without understanding the failure.
+1. Do NOT re-run `prisma migrate deploy` without understanding the failure.
 2. Check `prisma migrate status` to see which migrations applied.
 3. Restore from the backup taken in the pre-migration checklist.
-4. Investigate the failure, fix the migration or workaround (ALTER TYPE issue), then retry.
+4. Apply the ALTER TYPE manually if needed, then mark resolved.
 
-**If seed fails:**
-
-The seed is idempotent — simply fix the error and re-run. No manual DB cleanup required unless the error left a partially-created record.
-
-**Partial rollback of new tables only (if no backup):**
+**Emergency drop of sprint tables only (last resort — data loss):**
 
 ```sql
--- Emergency drop of new sprint tables (loses all data in these tables)
+-- Sub-entities first (FK dependents)
+DROP TABLE IF EXISTS "MeetingParticipant";
+DROP TABLE IF EXISTS "MeetingAction";
+DROP TABLE IF EXISTS "MeetingDecision";
+DROP TABLE IF EXISTS "MeetingAgendaItem";
+DROP TABLE IF EXISTS "OrgUnitMembership";
+DROP TABLE IF EXISTS "OrgUnit";
+DROP TABLE IF EXISTS "TargetGroup";
 DROP TABLE IF EXISTS "TargetDataPoint";
 DROP TABLE IF EXISTS "TargetMetric";
 DROP TABLE IF EXISTS "Target";
 DROP TABLE IF EXISTS "Meeting";
 DROP TABLE IF EXISTS "Initiative";
-DROP TYPE IF EXISTS "TargetCategory";
-DROP TYPE IF EXISTS "TargetStatus";
-DROP TYPE IF EXISTS "TargetPeriod";
-DROP TYPE IF EXISTS "TargetMetricType";
+DROP TABLE IF EXISTS "CommunicationTemplate";
+
+-- Enums (safe — not referenced once tables are gone)
+DROP TYPE IF EXISTS "MeetingParticipantStatus";
+DROP TYPE IF EXISTS "MeetingActionStatus";
+DROP TYPE IF EXISTS "MeetingDecisionStatus";
+DROP TYPE IF EXISTS "MeetingAgendaItemStatus";
+DROP TYPE IF EXISTS "OrgUnitMembershipStatus";
+DROP TYPE IF EXISTS "OrgUnitStatus";
+DROP TYPE IF EXISTS "OrgUnitType";
+DROP TYPE IF EXISTS "CommunicationTemplateStatus";
+DROP TYPE IF EXISTS "CommunicationTemplateCategory";
 DROP TYPE IF EXISTS "TargetDirection";
+DROP TYPE IF EXISTS "TargetMetricType";
+DROP TYPE IF EXISTS "TargetPeriod";
+DROP TYPE IF EXISTS "TargetStatus";
+DROP TYPE IF EXISTS "TargetCategory";
 DROP TYPE IF EXISTS "MeetingStatus";
 DROP TYPE IF EXISTS "InitiativeStatus";
--- Note: cannot easily reverse ALTER TYPE ADD VALUE in PostgreSQL
--- The PermissionModule and WorkflowDomain enum values TARGETS/MEETINGS/INITIATIVES
--- will remain; they are inert without the associated tables.
+DROP TYPE IF EXISTS "VisibilityScope";
+
+-- Note: PermissionModule / WorkflowDomain enum values (TARGETS, MEETINGS,
+-- INITIATIVES, TEMPLATES) cannot be removed in PostgreSQL. They are inert
+-- without the associated tables.
 ```
 
 ---
 
 ## Summary
 
-1. Run `npx prisma migrate deploy` with the stage `DATABASE_URL`.
-2. If it fails on `ALTER TYPE … ADD VALUE`, use the manual psql workaround above.
-3. Resume with `npx prisma migrate deploy` for the remaining files.
-4. Run `npx prisma db seed` (or `npx tsx prisma/seed.ts`).
-5. Verify the 8 routes listed above.
+```
+1.  Take a database backup.
+2.  Run:  DATABASE_URL="..." npx prisma migrate deploy
+3.  On ALTER TYPE failure: apply manually via psql, then prisma migrate resolve --applied <name>
+4.  Resume:  npx prisma migrate deploy
+5.  Seed:  npx prisma db seed
+6.  Verify routes in the checklist above.
+```

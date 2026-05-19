@@ -21,21 +21,12 @@
  *   SUBMITTED — creator submits for review
  *   REJECTED  — reviewer rejects (or admin sends back)
  *
- * Phase 2 TODOs:
- *
- * TODO: reviewer role validation
- *   In addition to blocking self-approval, verify that the approving actor
- *   holds a role listed in RoleWorkflowReviewAssignment for this entity's
- *   WorkflowDomain. Requires loading review assignments from DB at transition time.
- *
- * TODO: partial approval chains
- *   When multiple required reviewers exist (sortOrder on RoleWorkflowReviewAssignment),
- *   track partial approval state and only allow final APPROVED when all required
- *   reviewers have signed off. Requires a MeetingReviewSignoff / junction model.
- *
- * TODO: audit log on blocked attempt
- *   When self-approval is blocked, emit an AuditLog entry recording who attempted
- *   to self-approve and when, for compliance traceability.
+ * Roadmap:
+ *   - Reviewer role validation: verify approving actor holds a role in
+ *     RoleWorkflowReviewAssignment for this entity's WorkflowDomain.
+ *   - Partial approval chains: multi-step APPROVED via ordered
+ *     RoleWorkflowReviewAssignment.sortOrder with a signoff junction model.
+ *   - Audit log on blocked attempt: emit AuditLog when self-approval is blocked.
  */
 
 import { NextResponse } from "next/server";

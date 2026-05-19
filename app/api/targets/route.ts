@@ -37,6 +37,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
+  const actor = await getActorContext(check.session.user);
+  if (!actor.permissionKeys.includes("targets.manage")) {
+    return NextResponse.json({ error: "targets.manage Berechtigung erforderlich." }, { status: 403 });
+  }
+
   try {
     const body = await request.json().catch(() => ({}));
 
@@ -94,7 +99,7 @@ export async function POST(request: NextRequest) {
         endsAt: body?.endsAt ? new Date(body.endsAt) : null,
         nudgeJson: body?.nudgeJson ?? null,
         visibilityScope,
-        createdByUserId: check.session.user.id,
+        createdByUserId: actor.userId,
         visibleOrgUnitRefs: Array.isArray(body?.visibleOrgUnitRefs) ? body.visibleOrgUnitRefs : undefined,
         visibleRoleRefs: Array.isArray(body?.visibleRoleRefs) ? body.visibleRoleRefs : undefined,
         visibleUserRefs: Array.isArray(body?.visibleUserRefs) ? body.visibleUserRefs : undefined,

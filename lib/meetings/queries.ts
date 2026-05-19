@@ -1,19 +1,17 @@
 /**
  * Meeting query helpers — server-only.
  *
- * All queries now accept an ActorContext and apply VisibilityScope filtering.
+ * All queries accept an ActorContext and apply VisibilityScope filtering.
  * RESTRICTED records are pre-fetched and filtered in-app via canSeeEntity().
  * PRIVATE records are filtered at DB level (only creator's rows fetched).
  *
  * 404-masking: getMeetingBySlug() and getMeetingById() return null (not 403)
  * for records the actor cannot see, preventing information disclosure.
  *
- * TODO: Phase 2 — push RESTRICTED filtering into the DB query using
- *   PostgreSQL JSONB @> (array contains) for role/user/team overlap checks.
- *   This eliminates the need to fetch-then-discard RESTRICTED records.
- *
- * TODO: Actor context will expand with personId, teamIds, orgUnitIds once
- *   those associations are established on the session/JWT.
+ * Roadmap:
+ *   - Push RESTRICTED filtering into DB using JSONB @> queries (Phase 2).
+ *   - actor.teamIds / actor.personId for visibleTeamRefs / visiblePersonRefs.
+ *   - Cache actor.orgUnitIds in JWT to eliminate per-request DB query.
  */
 
 import { prisma } from "@/lib/db/prisma";

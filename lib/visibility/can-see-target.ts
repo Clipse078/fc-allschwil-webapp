@@ -1,22 +1,13 @@
 /**
  * canSeeTarget — visibility predicate for Target entities.
  *
- * Now that Target carries VisibilityScope, this delegates directly to
- * canSeeEntity() — the same logic used by Meeting and Initiative.
+ * Delegates to canSeeEntity() — the same logic used by Meeting and Initiative.
+ * Target supports PRIVATE / RESTRICTED / ORGANISATION scoping through
+ * requireTargetAccess() in visibility-guards.ts.
  *
- * Phase 1 placeholder replaced: Target now supports PRIVATE / RESTRICTED /
- * ORGANISATION scoping on both reads and writes through the centralized
- * requireTargetAccess() guard in visibility-guards.ts.
- *
- * TODO: Four-eye enforcement
- *   When requiresFourEyeReview is true on a Target, APPROVED stage transitions
- *   must require a different actor than the creator. Enforce inside
- *   requireTargetAccess({ access: "stage" }) in visibility-guards.ts.
- *
- * TODO: PermissionModule.TARGETS gating
- *   Once PermissionModule.TARGETS is DB-seeded and permission enforcement is
- *   active, add a permission check inside requireTargetAccess() for write/delete
- *   access modes before the visibility check.
+ * Roadmap:
+ *   - visibleTeamRefs: requires actor.teamIds (not yet in session)
+ *   - visiblePersonRefs: requires actor.personId (not yet in session)
  */
 
 import type { ActorContext } from "./actor-context";

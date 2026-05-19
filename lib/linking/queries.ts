@@ -1,32 +1,20 @@
 /**
  * Server-side query helpers for cross-module link options.
  *
- * These replace the static MEETING_STUBS / INITIATIVE_STUBS arrays with
- * real DB queries, giving the TargetLinkEditor access to all DB-registered
- * entities rather than a hardcoded 3-item list.
+ * Both getMeetingLinkOptions() and getInitiativeLinkOptions() accept an
+ * ActorContext and apply visibility filtering — RESTRICTED/PRIVATE records
+ * outside the actor's scope are excluded from link option lists.
  *
  * Usage: call from a server component (page.tsx), then pass results as props
  * to the client component TargetLinkEditor — keeps DB access server-side.
  *
- * TODO: Phase 2 — visibility-aware link options
- *   getMeetingLinkOptions() and getInitiativeLinkOptions() must accept an
- *   ActorContext and exclude records outside the actor's visibility scope.
- *   Otherwise a user could create a cross-link to a RESTRICTED meeting they
- *   cannot see, indirectly learning that it exists.
- *
- * TODO: Phase 2 — FK promotion
- *   Replace Target.linkedInitiativeRefs / Target.linkedMeetingRefs JSONB with
- *   proper junction tables (TargetInitiative, TargetMeeting) once these link
- *   sets stabilise and require query-side filtering/joins.
- *
- * TODO: Future — automatic contribution scoring
- *   When Initiative.progress contributes to a linked Target's secondary signal,
- *   add a contributionWeight field to the junction table and aggregate here.
- *
- * TODO: Future — polymorphic relation table
- *   If the same linking pattern is needed across many module pairs, evaluate a
- *   generic EntityLink model { sourceType, sourceId, targetType, targetId } to
- *   avoid per-pair migration proliferation.
+ * Roadmap:
+ *   - FK promotion: replace linkedInitiativeRefs / linkedMeetingRefs JSONB with
+ *     proper junction tables (TargetInitiative, TargetMeeting) once link sets
+ *     stabilise and require query-side filtering/joins.
+ *   - Contribution scoring: contributionWeight on junction table when
+ *     Initiative.progress feeds a linked Target's secondary signal.
+ *   - Polymorphic relation table if same pattern needed across many module pairs.
  */
 
 import { prisma } from "@/lib/db/prisma";

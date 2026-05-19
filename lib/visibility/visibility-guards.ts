@@ -21,20 +21,10 @@
  *   Initiatives → initiatives.view / initiatives.manage
  *   Targets     → targets.view / targets.manage
  *
- * Future TODOs:
- *
- * TODO: requiresFourEyeReview enforcement (Phase B)
- *   When entity.requiresFourEyeReview is true and access is "stage" targeting
- *   APPROVED/PUBLISHED, block if actor.userId === entity.createdByUserId.
- *   This is the four-eye check: creator cannot self-approve.
- *
- * TODO: Org-unit ownership restrictions (Phase B)
- *   Add org-unit membership check after permission check for write/delete
- *   to restrict edits to actors within the same org unit as the creator.
- *
- * TODO: Audit logging (Phase A remaining)
- *   Each guard call is a natural instrumentation point. Log { actor, entity,
- *   access, module, timestamp } to AuditLog after successful access grant.
+ * Roadmap:
+ *   - Reviewer role validation via RoleWorkflowReviewAssignment (Phase 2)
+ *   - Org-unit ownership restrictions on write/delete (Phase 2)
+ *   - Add visibleRoleRefs / visibleUserRefs to CommunicationTemplate (Phase 2)
  */
 
 import { NextResponse } from "next/server";
@@ -215,7 +205,6 @@ export async function requireMeetingAccess(opts: {
 
   // Four-eye enforcement is applied in the stage route handler (after this guard)
   // using lib/governance/four-eye.ts — requiresFourEyeReview is in guard.entity.
-  // TODO: Phase B — audit log emission
 
   return { ok: true, entity: meeting };
 }
@@ -254,7 +243,6 @@ export async function requireInitiativeAccess(opts: {
   }
 
   // Four-eye enforcement applied in the stage route handler via lib/governance/four-eye.ts.
-  // TODO: Phase B — audit log emission
 
   return { ok: true, entity: initiative };
 }
@@ -300,7 +288,6 @@ export async function requireTargetAccess(opts: {
   }
 
   // Four-eye enforcement applied in the stage route handler via lib/governance/four-eye.ts.
-  // TODO: Phase B — audit log emission
 
   return { ok: true, entity: target };
 }
@@ -369,7 +356,6 @@ export async function requireTemplateAccess(opts: {
     }
   }
 
-  // TODO: Phase B — audit log emission
 
   return { ok: true, entity: template };
 }
