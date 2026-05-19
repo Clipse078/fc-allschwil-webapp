@@ -7,7 +7,6 @@ import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 import AdminPageHeader from "@/components/admin/layout/AdminPageHeader";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
-import FcaBrandCrest from "@/components/shared/FcaBrandCrest";
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -21,14 +20,12 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="fca-admin-shell text-slate-900">
-      <div className="fca-admin-glow fca-admin-glow-blue left-[-120px] top-[140px] h-[320px] w-[320px]" />
-      <div className="fca-admin-glow fca-admin-glow-red bottom-[40px] right-[-120px] h-[320px] w-[320px]" />
+    <div className="sce-admin-shell">
+      <div className="sce-admin-glow sce-admin-glow-primary left-[-120px] top-[140px] h-[320px] w-[320px]" />
+      <div className="sce-admin-glow sce-admin-glow-accent bottom-[40px] right-[-120px] h-[320px] w-[320px]" />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-[140px] h-[900px] w-[900px] -translate-x-1/2 opacity-[0.07]">
-          <FcaBrandCrest className="h-full w-full" variant="watermark" />
-        </div>
+        <div className="sce-platform-watermark" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-screen max-w-[1800px]">
@@ -64,7 +61,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           ) : null}
 
-          <header className="border-b border-slate-200 bg-white/78 backdrop-blur-xl">
+          <header className="sce-shell-header">
             <div className="px-6 py-6 lg:px-8 2xl:px-10">
               <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 flex-1">
@@ -78,10 +75,10 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                   </div>
 
                   <div className="text-left xl:text-right">
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-[var(--sce-heading)]">
                       {session.user.firstName} {session.user.lastName}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">{session.user.email}</p>
+                    <p className="mt-1 text-sm text-[var(--sce-muted)]">{session.user.email}</p>
                   </div>
                 </div>
               </div>

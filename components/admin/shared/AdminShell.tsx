@@ -23,7 +23,7 @@ export default function AdminShell({
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="sce-admin-shell flex min-h-screen">
       <div
         className={
           collapsed
@@ -42,7 +42,7 @@ export default function AdminShell({
       </div>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end border-b border-slate-200 bg-white px-6 py-4">
+        <header className="sce-shell-header flex items-center justify-end px-6 py-4">
           <AdminHeaderDateTime />
         </header>
 

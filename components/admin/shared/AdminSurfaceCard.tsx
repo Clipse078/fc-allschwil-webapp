@@ -9,5 +9,5 @@ export default function AdminSurfaceCard({
   children,
   className = "",
 }: AdminSurfaceCardProps) {
-  return <div className={`fca-card ${className}`.trim()}>{children}</div>;
+  return <div className={`sce-card ${className}`.trim()}>{children}</div>;
 }

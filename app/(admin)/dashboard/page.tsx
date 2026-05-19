@@ -100,14 +100,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
-        <p className="fca-eyebrow">Dashboard</p>
-        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[#0b4aa2] lg:text-[2.35rem]">
-          Saisongeführte Modulübersicht
+      <section className="sce-card p-6 backdrop-blur-xl lg:p-7">
+        <p className="sce-eyebrow">Dashboard</p>
+        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[var(--sce-heading)] lg:text-[2.35rem]">
+          Operations Cockpit
         </h2>
-        <p className="mt-3 max-w-3xl text-sm text-slate-600">
-          Saisons sind die führende Struktur dieser WebApp. Teams, Events und Planner
-          werden dynamisch pro Saison verwaltet und darauf aufgebaut.
+        <p className="mt-3 max-w-3xl text-sm text-[var(--sce-muted)]">
+          Saisons sind die führende Struktur des Workspaces. Teams, Events und Planner
+          werden dynamisch pro Saison verwaltet und für die operative Steuerung verbunden.
         </p>
       </section>
 
@@ -132,20 +132,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <Link
                 key={module.href}
                 href={href}
-                className="group block rounded-[28px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm transition hover:-translate-y-[2px] hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+                className="group block rounded-[28px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] p-6 shadow-sm transition hover:-translate-y-[2px] hover:shadow-[var(--sce-shadow-soft)]"
               >
                 <div className="flex items-start justify-between gap-6">
                   <div>
-                    <p className="fca-eyebrow">Modul</p>
-                    <h3 className="mt-2 font-[var(--font-display)] text-[1.7rem] font-bold uppercase tracking-[-0.03em] text-[#0b4aa2]">
+                    <p className="sce-eyebrow">Modul</p>
+                    <h3 className="mt-2 font-[var(--font-display)] text-[1.7rem] font-bold uppercase tracking-[-0.03em] text-[var(--sce-heading)]">
                       {module.title}
                     </h3>
-                    <p className="mt-3 text-sm text-slate-600">
+                    <p className="mt-3 text-sm text-[var(--sce-muted)]">
                       {module.description}
                     </p>
                   </div>
 
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2] shadow-sm transition group-hover:scale-105">
+                  <div className="sce-module-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-sm transition group-hover:scale-105">
                     <Icon className="h-6 w-6" />
                   </div>
                 </div>

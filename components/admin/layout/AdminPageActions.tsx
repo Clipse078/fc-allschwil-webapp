@@ -13,6 +13,13 @@ import {
   Users,
 } from "lucide-react";
 
+const primaryActionClass =
+  "sce-action-primary h-11 px-4 text-sm";
+const secondaryActionClass =
+  "sce-action-secondary h-11 px-4 text-sm font-medium";
+const dangerActionClass =
+  "sce-action-danger h-11 px-4 text-sm font-medium";
+
 export default function AdminPageActions() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -43,7 +50,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <Link
           href={plannerHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
+          className={secondaryActionClass}
         >
           <CalendarPlus className="h-4 w-4" />
           Planner öffnen
@@ -51,7 +58,7 @@ export default function AdminPageActions() {
 
         <Link
           href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <Settings2 className="h-4 w-4" />
           Saisons verwalten
@@ -65,7 +72,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-rose-200 bg-white px-4 text-sm font-medium text-rose-600 shadow-sm transition hover:-translate-y-[1px] hover:bg-rose-50"
+          className={dangerActionClass}
         >
           <Settings2 className="h-4 w-4" />
           Saison löschen
@@ -73,7 +80,7 @@ export default function AdminPageActions() {
 
         <Link
           href="/dashboard/seasons#create-season"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <Plus className="h-4 w-4" />
           Neue Saison planen
@@ -87,7 +94,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <Link
           href={plannerNewHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <Plus className="h-4 w-4" />
           Neuer Eintrag
@@ -96,7 +103,7 @@ export default function AdminPageActions() {
         {pathname !== "/dashboard/planner" ? (
           <Link
             href={plannerHref}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
+            className={secondaryActionClass}
           >
             <CalendarPlus className="h-4 w-4" />
             Saisonplanner
@@ -106,7 +113,7 @@ export default function AdminPageActions() {
         {pathname !== "/dashboard/planner/week" ? (
           <Link
             href={weekHref}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
+            className={secondaryActionClass}
           >
             <CalendarPlus className="h-4 w-4" />
             Wochenplanner
@@ -116,7 +123,7 @@ export default function AdminPageActions() {
         {pathname !== "/dashboard/planner/day" ? (
           <Link
             href={dayHref}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
+            className={secondaryActionClass}
           >
             <CalendarPlus className="h-4 w-4" />
             Tagesplanner
@@ -131,7 +138,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <Link
           href={plannerHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
+          className={secondaryActionClass}
         >
           <CalendarPlus className="h-4 w-4" />
           Zurück zum Planner
@@ -145,7 +152,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <Link
           href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
+          className={secondaryActionClass}
         >
           <ShieldPlus className="h-4 w-4" />
           Saison wechseln
@@ -153,7 +160,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <Users className="h-4 w-4" />
           Neues Team
@@ -167,7 +174,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <Link
           href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
+          className={secondaryActionClass}
         >
           <ShieldPlus className="h-4 w-4" />
           Saison wechseln
@@ -175,7 +182,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <Trophy className="h-4 w-4" />
           Neues Event
@@ -190,7 +197,7 @@ export default function AdminPageActions() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+            className={primaryActionClass}
           >
             <CalendarPlus className="h-4 w-4" />
             Meeting planen
@@ -203,7 +210,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
+          className={secondaryActionClass}
         >
           <Pencil className="h-4 w-4" />
           Bearbeiten
@@ -211,7 +218,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <CheckCircle2 className="h-4 w-4" />
           Beschluss fassen
@@ -226,7 +233,7 @@ export default function AdminPageActions() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+            className={primaryActionClass}
           >
             <Plus className="h-4 w-4" />
             Neue Initiative
@@ -239,7 +246,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
+          className={secondaryActionClass}
         >
           <Pencil className="h-4 w-4" />
           Bearbeiten
@@ -247,7 +254,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <Plus className="h-4 w-4" />
           Neue Aufgabe
@@ -261,7 +268,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-900"
+          className={secondaryActionClass}
         >
           <CalendarPlus className="h-4 w-4" />
           Meeting planen
@@ -269,7 +276,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className={primaryActionClass}
         >
           <Plus className="h-4 w-4" />
           Neue Initiative
