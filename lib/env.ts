@@ -9,10 +9,15 @@ export type RuntimeEnvironment = {
   hasDatabaseUrl: boolean;
   hasDirectUrl: boolean;
   hasNextAuthSecret: boolean;
+  hasAuthSecret: boolean;
+  // True if EITHER AUTH_SECRET or NEXTAUTH_SECRET is present. NextAuth v5
+  // accepts both names, so we treat them as interchangeable for health.
+  hasAuthOrNextAuthSecret: boolean;
   isLocal: boolean;
   isStage: boolean;
   isProd: boolean;
   isVercel: boolean;
+  isVercelPreview: boolean;
 };
 
 const APP_ENV_VALUES = new Set<AppEnv>(["local", "stage", "prod"]);
@@ -83,6 +88,11 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     "NEXTAUTH_URL",
   );
 
+  const hasNextAuthSecret = Boolean(
+    readOptionalString(process.env.NEXTAUTH_SECRET),
+  );
+  const hasAuthSecret = Boolean(readOptionalString(process.env.AUTH_SECRET));
+
   return {
     nodeEnv,
     appEnv,
@@ -91,11 +101,14 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     nextAuthUrl,
     hasDatabaseUrl: Boolean(readOptionalString(process.env.DATABASE_URL)),
     hasDirectUrl: Boolean(readOptionalString(process.env.DIRECT_URL)),
-    hasNextAuthSecret: Boolean(readOptionalString(process.env.NEXTAUTH_SECRET)),
+    hasNextAuthSecret,
+    hasAuthSecret,
+    hasAuthOrNextAuthSecret: hasNextAuthSecret || hasAuthSecret,
     isLocal: appEnv === "local",
     isStage: appEnv === "stage",
     isProd: appEnv === "prod",
     isVercel: Boolean(readOptionalString(process.env.VERCEL)),
+    isVercelPreview: vercelEnv === "preview",
   };
 }
 
@@ -128,8 +141,19 @@ export function getEnvironmentWarnings(env: RuntimeEnvironment): string[] {
     warnings.push("DATABASE_URL is not configured.");
   }
 
-  if (!env.hasNextAuthSecret) {
-    warnings.push("NEXTAUTH_SECRET is not configured.");
+  if (!env.hasAuthOrNextAuthSecret) {
+    warnings.push(
+      "Neither AUTH_SECRET nor NEXTAUTH_SECRET is configured. " +
+        "Set one of them in Vercel for all environments (Production, Preview, Development).",
+    );
+  }
+
+  if (env.isVercelPreview) {
+    warnings.push(
+      "Running on a Vercel Preview deployment. " +
+        "Preview deployments are disposable and may have missing env vars. " +
+        "Treat sportclubevo-webapp-stage (Production Branch = STAGE) as canonical.",
+    );
   }
 
   if (env.isStage && env.vercelEnv === "production") {

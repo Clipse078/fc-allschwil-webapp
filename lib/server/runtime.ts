@@ -49,8 +49,8 @@ function validateStage(env: RuntimeEnvironment): string[] {
     errors.push("STAGE requires DATABASE_URL.");
   }
 
-  if (!env.hasNextAuthSecret) {
-    errors.push("STAGE requires NEXTAUTH_SECRET.");
+  if (!env.hasAuthOrNextAuthSecret) {
+    errors.push("STAGE requires AUTH_SECRET or NEXTAUTH_SECRET.");
   }
 
   if (env.appBaseUrl && env.appBaseUrl.includes("localhost")) {
@@ -83,8 +83,8 @@ function validateProd(env: RuntimeEnvironment): string[] {
     errors.push("PROD requires DATABASE_URL.");
   }
 
-  if (!env.hasNextAuthSecret) {
-    errors.push("PROD requires NEXTAUTH_SECRET.");
+  if (!env.hasAuthOrNextAuthSecret) {
+    errors.push("PROD requires AUTH_SECRET or NEXTAUTH_SECRET.");
   }
 
   if (env.appBaseUrl && env.appBaseUrl.includes("localhost")) {
