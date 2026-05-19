@@ -20,11 +20,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
   {
     label: "Meetings",
-    href: "/vereinsleitung/meetings",
+    href: "/meetings",
   },
   {
     label: "Initiativen",
-    href: "/vereinsleitung/initiativen",
+    href: "/initiatives",
   },
   {
     label: "KPIs",
@@ -32,11 +32,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
   {
     label: "Ziele",
-    href: "/vereinsleitung/targets",
+    href: "/targets",
   },
   {
     label: "Vorlagen",
-    href: "/vereinsleitung/templates",
+    href: "/templates",
   },
   {
     label: "Saisons",

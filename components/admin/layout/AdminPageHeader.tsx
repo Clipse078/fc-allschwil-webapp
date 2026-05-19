@@ -36,7 +36,7 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/vereinsleitung/meetings") {
+  if (pathname === "/meetings") {
     return {
       eyebrow: "Meetings",
       title: "Meetings",
@@ -44,47 +44,7 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/vereinsleitung/meetings/vorstandssitzung-april") {
-    return {
-      eyebrow: "Meetings",
-      title: "Vorstandssitzung April",
-      description: "Protokoll & Beschlüsse",
-    };
-  }
-
-  if (pathname.startsWith("/vereinsleitung/meetings/")) {
-    return {
-      eyebrow: "Meetings",
-      title: "Meeting Details",
-      description: "Protokoll, Teilnehmer, Beschlüsse und Massnahmen.",
-    };
-  }
-
-  if (pathname === "/vereinsleitung/initiativen") {
-    return {
-      eyebrow: "Initiativen",
-      title: "Initiativen",
-      description: "Übersicht aller Initiativen – absteigend vom neuesten zum ältesten Eintrag.",
-    };
-  }
-
-  if (pathname === "/vereinsleitung/initiativen/new") {
-    return {
-      eyebrow: "Initiativen",
-      title: "Neue Initiative",
-      description: "Initiative mit Sichtbarkeitseinstellungen erfassen.",
-    };
-  }
-
-  if (pathname.endsWith("/edit") && pathname.startsWith("/vereinsleitung/initiativen/")) {
-    return {
-      eyebrow: "Initiativen",
-      title: "Initiative bearbeiten",
-      description: "Initiative und Sichtbarkeit anpassen.",
-    };
-  }
-
-  if (pathname === "/vereinsleitung/meetings/new") {
+  if (pathname === "/meetings/new") {
     return {
       eyebrow: "Meetings",
       title: "Neues Meeting",
@@ -92,7 +52,7 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname.endsWith("/edit") && pathname.startsWith("/vereinsleitung/meetings/")) {
+  if (pathname.endsWith("/edit") && pathname.startsWith("/meetings/")) {
     return {
       eyebrow: "Meetings",
       title: "Meeting bearbeiten",
@@ -100,20 +60,80 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/vereinsleitung/initiativen/website-relaunch") {
+  if (pathname.startsWith("/meetings/")) {
     return {
-      eyebrow: "Initiativen",
-      title: "Website Relaunch",
-      description: "Initiativen Details",
+      eyebrow: "Meetings",
+      title: "Meeting Details",
+      description: "Protokoll, Teilnehmer, Beschlüsse und Massnahmen.",
     };
   }
 
-  if (pathname.startsWith("/vereinsleitung/initiativen/")) {
+  if (pathname === "/initiatives") {
+    return {
+      eyebrow: "Initiativen",
+      title: "Initiativen",
+      description: "Übersicht aller Initiativen – absteigend vom neuesten zum ältesten Eintrag.",
+    };
+  }
+
+  if (pathname === "/initiatives/new") {
+    return {
+      eyebrow: "Initiativen",
+      title: "Neue Initiative",
+      description: "Initiative mit Sichtbarkeitseinstellungen erfassen.",
+    };
+  }
+
+  if (pathname.endsWith("/edit") && pathname.startsWith("/initiatives/")) {
+    return {
+      eyebrow: "Initiativen",
+      title: "Initiative bearbeiten",
+      description: "Initiative und Sichtbarkeit anpassen.",
+    };
+  }
+
+  if (pathname.startsWith("/initiatives/")) {
     return {
       eyebrow: "Initiativen",
       title: "Initiative Details",
       description: "Fortschritt, Aufgaben, Meetings und Entscheidungen.",
     };
+  }
+
+  if (pathname === "/targets") {
+    return {
+      eyebrow: "Ziele",
+      title: "Vereinsziele",
+      description: "Strategische Ziele und messbare Fortschrittskennzahlen für den Verein.",
+    };
+  }
+
+  if (pathname === "/targets/new") {
+    return {
+      eyebrow: "Ziele",
+      title: "Neues Ziel erstellen",
+      description: "Strategisches Ziel mit messbaren Metriken und Vorlagen erfassen.",
+    };
+  }
+
+  if (pathname.startsWith("/targets/")) {
+    return {
+      eyebrow: "Ziele",
+      title: "Ziel Details",
+      description: "Fortschritt, Metriken und Messwerte im Detail.",
+    };
+  }
+
+  if (pathname === "/templates") {
+    return { eyebrow: "Kommunikation", title: "Vorlagen", description: "Kontextbewusste Kommunikationsvorlagen mit Variablen." };
+  }
+
+  if (pathname === "/templates/new") {
+    return { eyebrow: "Kommunikation", title: "Neue Vorlage", description: "Vorlage mit Variablen und Kategorien erstellen." };
+  }
+
+  if (pathname.startsWith("/templates/")) {
+    return { eyebrow: "Kommunikation", title: "Vorlage", description: "Vorschau und Bearbeitung." };
   }
 
   if (pathname === "/vereinsleitung/kpis") {
@@ -122,42 +142,6 @@ function getHeaderContent(pathname: string): HeaderContent {
       title: "KPIs",
       description: "Kennzahlen und Trends für die strategische Steuerung des Vereins.",
     };
-  }
-
-  if (pathname === "/vereinsleitung/targets") {
-    return {
-      eyebrow: "Ziele",
-      title: "Vereinsziele",
-      description: "Strategische Ziele und messbare Fortschrittskennzahlen für den Verein.",
-    };
-  }
-
-  if (pathname === "/vereinsleitung/targets/new") {
-    return {
-      eyebrow: "Ziele",
-      title: "Neues Ziel erstellen",
-      description: "Strategisches Ziel mit messbaren Metriken und Vorlagen erfassen.",
-    };
-  }
-
-  if (pathname.startsWith("/vereinsleitung/targets/")) {
-    return {
-      eyebrow: "Ziele",
-      title: "Ziel Details",
-      description: "Fortschritt, Metriken und Messwerte im Detail.",
-    };
-  }
-
-  if (pathname === "/vereinsleitung/templates") {
-    return { eyebrow: "Kommunikation", title: "Vorlagen", description: "Kontextbewusste Kommunikationsvorlagen mit Variablen." };
-  }
-
-  if (pathname === "/vereinsleitung/templates/new") {
-    return { eyebrow: "Kommunikation", title: "Neue Vorlage", description: "Vorlage mit Variablen und Kategorien erstellen." };
-  }
-
-  if (pathname.startsWith("/vereinsleitung/templates/")) {
-    return { eyebrow: "Kommunikation", title: "Vorlage", description: "Vorschau und Bearbeitung." };
   }
 
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {

@@ -24,7 +24,7 @@
  *     return meetings.map(m => ({
  *       slug: m.slug,
  *       title: m.title,
- *       url: `/vereinsleitung/meetings/${m.slug}`,
+ *       url: `/meetings/${m.slug}`,
  *     }));
  *   }
  *
@@ -44,7 +44,7 @@
  *     return initiatives.map(i => ({
  *       slug: i.slug,
  *       title: i.title,
- *       url: `/vereinsleitung/initiativen/${i.slug}`,
+ *       url: `/initiatives/${i.slug}`,
  *     }));
  *   }
  *
@@ -58,17 +58,17 @@ export const MEETING_STUBS: EntityRef[] = [
   {
     slug: "vorstandssitzung-april",
     title: "Vorstandssitzung April",
-    url: "/vereinsleitung/meetings/vorstandssitzung-april",
+    url: "/meetings/vorstandssitzung-april",
   },
   {
     slug: "trainer-rapport-rueckrunde",
     title: "Trainer-Rapport Rückrunde",
-    url: "/vereinsleitung/meetings/trainer-rapport-rueckrunde",
+    url: "/meetings/trainer-rapport-rueckrunde",
   },
   {
     slug: "medienkoordination-saisonstart",
     title: "Medienkoordination Saisonstart",
-    url: "/vereinsleitung/meetings/medienkoordination-saisonstart",
+    url: "/meetings/medienkoordination-saisonstart",
   },
 ];
 
@@ -76,16 +76,16 @@ export const INITIATIVE_STUBS: EntityRef[] = [
   {
     slug: "website-relaunch",
     title: "Website Relaunch",
-    url: "/vereinsleitung/initiativen/website-relaunch",
+    url: "/initiatives/website-relaunch",
   },
   {
     slug: "neues-clubhaus-konzept",
     title: "Neues Clubhaus Konzept",
-    url: "/vereinsleitung/initiativen/neues-clubhaus-konzept",
+    url: "/initiatives/neues-clubhaus-konzept",
   },
   {
     slug: "sponsorenlauf-2025",
     title: "Sponsorenlauf 2025",
-    url: "/vereinsleitung/initiativen/sponsorenlauf-2025",
+    url: "/initiatives/sponsorenlauf-2025",
   },
 ];

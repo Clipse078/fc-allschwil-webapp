@@ -80,10 +80,6 @@ function getNavIcon(label: string) {
   }
 }
 
-function isVereinsleitungChild(label: string) {
-  return label === "Meetings" || label === "Initiativen" || label === "KPIs" || label === "Ziele" || label === "Vorlagen";
-}
-
 function isPlannerChild(label: string) {
   return label === "Wochenplanner" || label === "Tagesplanner";
 }
@@ -121,12 +117,7 @@ export default function AdminSidebar({
       ? onToggle
       : () => setInternalCollapsed((current) => !current);
 
-  const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
-  );
-  const vereinsleitungChildren = navItems.filter((item) =>
-    isVereinsleitungChild(item.label),
-  );
+  const mainItems = navItems.filter((item) => !isPlannerChild(item.label));
   const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
 
   function buildHref(baseHref: string) {
@@ -218,32 +209,6 @@ export default function AdminSidebar({
                   <Icon className="h-4 w-4 shrink-0" />
                   {!resolvedCollapsed ? <span>{item.label}</span> : null}
                 </Link>
-
-                {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
-                    {vereinsleitungChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
-
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={child.href}
-                            className={
-                              childActive
-                                ? "sce-sidebar-link-child-active flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-semibold"
-                                : "sce-sidebar-link flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium transition"
-                            }
-                          >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
 
                 {!resolvedCollapsed && item.label === "Saisonplanner" ? (
                   <ul className="mt-2 space-y-2 pl-7">
