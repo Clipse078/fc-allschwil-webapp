@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<NextResponse> {
   const runtime = evaluateRuntimeConfiguration();
   const deployment = getDeploymentMetadata();
+  const isPreview = runtime.env.vercelEnv === "preview";
 
   const database = runtime.env.hasDatabaseUrl
     ? await checkDatabaseHealth()
@@ -20,25 +21,38 @@ export async function GET(): Promise<NextResponse> {
 
   const ok = runtime.ok && database.ok;
   const status = ok ? 200 : 503;
+  const appStatus = ok ? "healthy" : "degraded";
 
   return NextResponse.json(
     {
       ok,
+      app: {
+        name: "sportclubevo-webapp",
+        status: appStatus,
+      },
       deployment,
       environment: {
-        appEnv: runtime.env.appEnv,
-        nodeEnv: runtime.env.nodeEnv,
-        vercelEnv: runtime.env.vercelEnv,
-        isLocal: runtime.env.isLocal,
-        isStage: runtime.env.isStage,
-        isProd: runtime.env.isProd,
+        APP_ENV: runtime.env.appEnv,
+        NODE_ENV: runtime.env.nodeEnv,
+        VERCEL_ENV: runtime.env.vercelEnv,
+        isLocalRuntime: runtime.env.isLocal,
+        isStageRuntime: runtime.env.isStage,
+        isProdRuntime: runtime.env.isProd,
       },
       checks: {
-        hasDatabaseUrl: runtime.env.hasDatabaseUrl,
-        hasDirectUrl: runtime.env.hasDirectUrl,
-        hasNextAuthSecret: runtime.env.hasNextAuthSecret,
-        hasAppBaseUrl: Boolean(runtime.env.appBaseUrl),
-        hasNextAuthUrl: Boolean(runtime.env.nextAuthUrl),
+        databaseUrl: runtime.env.hasDatabaseUrl ? "present" : "missing",
+        directUrl: runtime.env.hasDirectUrl ? "present" : "missing",
+        authSecret: runtime.env.hasAuthSecret ? "present" : "missing",
+        nextAuthSecret: runtime.env.hasNextAuthSecret ? "present" : "missing",
+        authSecretEffective: runtime.env.hasAnyAuthSecret ? "present" : "missing",
+        appBaseUrl: runtime.env.appBaseUrl ? "present" : "missing",
+        nextAuthUrl: runtime.env.nextAuthUrl ? "present" : "missing",
+      },
+      canonical: {
+        isPreview,
+        warning: isPreview
+          ? "Preview deployment detected. Use the STAGE production deployment as canonical truth."
+          : null,
       },
       database,
       warnings: runtime.warnings,

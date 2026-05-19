@@ -1,45 +1,41 @@
 ﻿# Runtime Diagnostics
 
-## Purpose
+## Canonical deployment rule
 
-This step adds two safe deployment diagnostics pieces without touching existing UX flows:
+- Canonical WebApp deployment: `sportclubevo-webapp-stage`
+- Canonical branch: `STAGE`
+- Review runtime health only on the STAGE production deployment
+- Treat random preview URLs as disposable diagnostics targets, not operational truth
 
-- a reusable STAGE environment banner component
-- an internal runtime diagnostics page at `/admin/runtime`
+## First debug route
 
----
+- Always start with `/api/health`
+- `/api/health` is designed to respond even when `DATABASE_URL` is missing
+- It reports presence/missing states only (no secret values are exposed)
 
-## Added
+## `/api/health` response contract
 
-### `components/admin/deployment/StageEnvironmentBanner.tsx`
-Reusable component that only renders in STAGE.
+The endpoint returns runtime diagnostics for:
 
-### `app/admin/runtime/page.tsx`
-Internal page that shows:
-- current environment
-- URL wiring
-- secret/database presence checks
-- warnings
-- blocking errors
+- app status (`healthy` / `degraded`)
+- environment (`APP_ENV`, `NODE_ENV`, `VERCEL_ENV`)
+- env presence checks:
+  - `DATABASE_URL`
+  - `AUTH_SECRET`
+  - `NEXTAUTH_SECRET`
+  - `NEXTAUTH_URL`
+- deployment metadata (branch/commit/deployment id if available)
+- preview warning when running on `VERCEL_ENV=preview`
 
----
+## Required Vercel env wiring
 
-## Notes
+Before assuming route or app-level regressions, verify Vercel env variable scopes:
 
-This page is intentionally read-only and does not mutate anything.
+- `DATABASE_URL` enabled for **Production**, **Preview**, **Development**
+- `AUTH_SECRET` or `NEXTAUTH_SECRET` enabled for **Production**, **Preview**, **Development**
+- `NEXTAUTH_URL` set correctly for the canonical STAGE URL
 
-It is safe because:
-- no existing layout is replaced
-- no auth flow is changed
-- no middleware is changed
-- no current pages are broken
+## Related runtime surfaces
 
----
-
-## Next step
-
-Recommended next:
-1. add DB connectivity ping to `/api/health`
-2. protect `/admin/runtime` behind existing admin permissions
-3. inject `StageEnvironmentBanner` into the safe admin shell area
-4. then wire selective fail-fast runtime assertions
+- `components/admin/deployment/StageEnvironmentBanner.tsx` (STAGE marker)
+- `app/(admin)/dashboard/runtime/page.tsx` (admin runtime diagnostics page)

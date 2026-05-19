@@ -1,6 +1,7 @@
 ﻿export type DeploymentMetadata = {
   environment: "LOCAL" | "STAGE" | "PROD";
   vercelEnv: string | null;
+  gitBranch: string | null;
   commitSha: string | null;
   deploymentId: string | null;
   buildTime: string;
@@ -22,6 +23,7 @@ export function getDeploymentMetadata(): DeploymentMetadata {
   return {
     environment,
     vercelEnv: process.env.VERCEL_ENV ?? null,
+    gitBranch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID ?? null,
     buildTime: new Date().toISOString(),

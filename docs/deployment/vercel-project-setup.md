@@ -4,7 +4,7 @@
 
 Create 2 separate Vercel projects:
 
-1. `fc-allschwil-webapp-stage`
+1. `sportclubevo-webapp-stage` (canonical)
 2. `fc-allschwil-webapp-prod`
 
 Do not combine STAGE and PROD into one shared project.
@@ -16,7 +16,7 @@ Do not combine STAGE and PROD into one shared project.
 - STAGE project -> branch `STAGE`
 - PROD project -> branch `main`
 
-Feature branches remain preview deployments only.
+Feature branches remain preview deployments only and are not canonical runtime truth.
 
 ---
 
@@ -28,7 +28,7 @@ Set these in both Vercel projects with project-specific values:
 - `APP_ENV`
 - `APP_BASE_URL`
 - `NEXTAUTH_URL`
-- `NEXTAUTH_SECRET`
+- `AUTH_SECRET` or `NEXTAUTH_SECRET`
 - `DATABASE_URL`
 - `DIRECT_URL`
 
@@ -102,10 +102,18 @@ are provided by Vercel automatically and should not be manually overridden unles
 2. Confirm:
    - `appEnv`
    - `vercelEnv`
-   - DB status
+   - DB/auth env presence states
    - warnings/errors
 3. Open `/dashboard/runtime`
 4. Confirm:
    - deployment metadata visible
    - protected access works
    - stage banner only appears in STAGE
+
+## Manual check reminder
+
+On Vercel, make sure these variables are enabled for all scopes (**Production**, **Preview**, **Development**):
+
+- `DATABASE_URL`
+- `AUTH_SECRET` or `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`

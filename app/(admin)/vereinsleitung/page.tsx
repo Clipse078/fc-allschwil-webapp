@@ -43,14 +43,14 @@ async function getOperativeKpis(actorUserId: string): Promise<KpiItem[]> {
       value: activeTargetCount,
       note: "Ziele mit Status Aktiv",
       trend: "neutral",
-      href: "/vereinsleitung/targets",
+      href: "/targets",
     },
     {
       label: "Geplante Meetings",
       value: plannedMeetingCount,
       note: "Meetings mit Status Geplant",
       trend: "neutral",
-      href: "/vereinsleitung/meetings",
+      href: "/meetings",
     },
     {
       label: "Überfällige Massnahmen",
@@ -58,7 +58,7 @@ async function getOperativeKpis(actorUserId: string): Promise<KpiItem[]> {
       delta: overdueActionCount > 0 ? `${overdueActionCount} offen` : null,
       note: "Meeting-Aktionen mit abgelaufenem Datum",
       trend: overdueActionCount > 0 ? "alert" : "neutral",
-      href: "/vereinsleitung/meetings",
+      href: "/meetings",
     },
   ];
 }
