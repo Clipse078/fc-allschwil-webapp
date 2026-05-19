@@ -8,7 +8,9 @@ export type RuntimeEnvironment = {
   nextAuthUrl: string | null;
   hasDatabaseUrl: boolean;
   hasDirectUrl: boolean;
+  hasAuthSecret: boolean;
   hasNextAuthSecret: boolean;
+  hasAnyAuthSecret: boolean;
   isLocal: boolean;
   isStage: boolean;
   isProd: boolean;
@@ -83,6 +85,9 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     "NEXTAUTH_URL",
   );
 
+  const hasAuthSecret = Boolean(readOptionalString(process.env.AUTH_SECRET));
+  const hasNextAuthSecret = Boolean(readOptionalString(process.env.NEXTAUTH_SECRET));
+
   return {
     nodeEnv,
     appEnv,
@@ -91,7 +96,9 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     nextAuthUrl,
     hasDatabaseUrl: Boolean(readOptionalString(process.env.DATABASE_URL)),
     hasDirectUrl: Boolean(readOptionalString(process.env.DIRECT_URL)),
-    hasNextAuthSecret: Boolean(readOptionalString(process.env.NEXTAUTH_SECRET)),
+    hasAuthSecret,
+    hasNextAuthSecret,
+    hasAnyAuthSecret: hasAuthSecret || hasNextAuthSecret,
     isLocal: appEnv === "local",
     isStage: appEnv === "stage",
     isProd: appEnv === "prod",
@@ -128,8 +135,14 @@ export function getEnvironmentWarnings(env: RuntimeEnvironment): string[] {
     warnings.push("DATABASE_URL is not configured.");
   }
 
-  if (!env.hasNextAuthSecret) {
-    warnings.push("NEXTAUTH_SECRET is not configured.");
+  if (!env.hasAnyAuthSecret) {
+    warnings.push("AUTH_SECRET or NEXTAUTH_SECRET is not configured.");
+  }
+
+  if (env.vercelEnv === "preview") {
+    warnings.push(
+      "Running on a Vercel Preview deployment. Treat this as disposable and use the STAGE production deployment as canonical.",
+    );
   }
 
   if (env.isStage && env.vercelEnv === "production") {

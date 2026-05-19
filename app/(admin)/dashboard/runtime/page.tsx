@@ -39,8 +39,16 @@ export default async function DashboardRuntimePage() {
             <dd>{deployment.commitSha ?? "not available"}</dd>
           </div>
           <div className="flex justify-between">
+            <dt>Branch</dt>
+            <dd>{deployment.branch ?? "not available"}</dd>
+          </div>
+          <div className="flex justify-between">
             <dt>Deployment ID</dt>
             <dd>{deployment.deploymentId ?? "not available"}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt>Project URL</dt>
+            <dd>{deployment.projectName ?? "not available"}</dd>
           </div>
         </dl>
       </section>
