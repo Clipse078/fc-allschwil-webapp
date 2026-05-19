@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { validateLinkPayload } from "@/lib/linking/helpers";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 
@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
 
   const guard = await requireTargetAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;

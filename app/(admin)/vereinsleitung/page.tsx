@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import VereinsleitungDashboard from "@/components/admin/vereinsleitung/VereinsleitungDashboard";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getTargets } from "@/lib/targets/queries";
 import { getMeetings } from "@/lib/meetings/queries";
 import { getInitiatives } from "@/lib/initiatives/queries";
@@ -60,7 +60,7 @@ export default async function VereinsleitungPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const actor = buildActorContext(session.user);
+  const actor = await getActorContext(session.user);
 
   const [targets, meetings, initiatives, kpis] = await Promise.all([
     getTargets(actor),

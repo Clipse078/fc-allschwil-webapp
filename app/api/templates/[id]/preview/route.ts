@@ -12,7 +12,7 @@ import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { renderTemplate, buildSampleContext, extractVariableKeys } from "@/lib/communication/variables";
 import { resolveContext } from "@/lib/communication/context-resolver";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { requireTemplateAccess } from "@/lib/visibility/visibility-guards";
 
 async function requireSession() {
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const { id } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const guard = await requireTemplateAccess({ actor, id, access: "read" });
   if (!guard.ok) return guard.response;
 

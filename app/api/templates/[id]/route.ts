@@ -6,7 +6,7 @@ import {
   CommunicationTemplateStatus,
   VisibilityScope,
 } from "@prisma/client";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { requireTemplateAccess } from "@/lib/visibility/visibility-guards";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const guard = await requireTemplateAccess({ actor, id, access: "read" });
   if (!guard.ok) return guard.response;
 
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const guard = await requireTemplateAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
 
@@ -69,7 +69,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const guard = await requireTemplateAccess({ actor, id, access: "delete" });
   if (!guard.ok) return guard.response;
 

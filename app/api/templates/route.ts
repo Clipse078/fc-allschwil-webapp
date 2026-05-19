@@ -7,7 +7,7 @@ import {
   VisibilityScope,
 } from "@prisma/client";
 import { getCommunicationTemplates } from "@/lib/communication/queries";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 
 async function requireSession() {
   const session = await auth();
@@ -19,7 +19,7 @@ export async function GET() {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
 
   // Templates permission check for listing
   if (!actor.permissionKeys.includes("templates.view") && !actor.permissionKeys.includes("templates.manage")) {

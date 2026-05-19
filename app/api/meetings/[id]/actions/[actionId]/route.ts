@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { MeetingActionStatus } from "@prisma/client";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 
@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id, actionId } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
   const existing = await prisma.meetingAction.findUnique({ where: { id: actionId, meetingId: id }, select: { id: true } });
@@ -40,7 +40,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id, actionId } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
   const existing = await prisma.meetingAction.findUnique({ where: { id: actionId, meetingId: id }, select: { id: true } });

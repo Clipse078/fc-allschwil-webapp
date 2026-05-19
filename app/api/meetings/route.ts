@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { auth } from "@/auth";
 import { MeetingStatus, VisibilityScope } from "@prisma/client";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getMeetings } from "@/lib/meetings/queries";
 
 async function requireSession() {
@@ -19,7 +19,7 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const meetings = await getMeetings(actor);
   return NextResponse.json({ meetings });
 }

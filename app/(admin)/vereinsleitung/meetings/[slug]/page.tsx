@@ -1,7 +1,7 @@
 ﻿import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getMeetingBySlug, getMeetingSubEntities } from "@/lib/meetings/queries";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import VereinsleitungMeetingDetail from "@/components/admin/vereinsleitung/VereinsleitungMeetingDetail";
 import MeetingGovernanceBanner from "@/components/admin/meetings/MeetingGovernanceBanner";
 
@@ -14,7 +14,7 @@ export default async function MeetingDetailPage({ params }: MeetingDetailPagePro
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
-  const actor = buildActorContext(session.user);
+  const actor = await getActorContext(session.user);
 
   // 404-masking: null if actor cannot see this meeting
   const dbMeeting = await getMeetingBySlug(slug, actor);

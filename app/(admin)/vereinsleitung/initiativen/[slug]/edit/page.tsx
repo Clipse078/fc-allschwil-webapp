@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getInitiativeBySlug } from "@/lib/initiatives/queries";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import InitiativeForm from "@/components/admin/initiatives/InitiativeForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import type { VisibilityScopeValue } from "@/components/admin/shared/VisibilityScopeSelect";
@@ -14,7 +14,7 @@ export default async function EditInitiativePage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
-  const actor = buildActorContext(session.user);
+  const actor = await getActorContext(session.user);
   const initiative = await getInitiativeBySlug(slug, actor);
 
   if (!initiative) notFound();

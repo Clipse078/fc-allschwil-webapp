@@ -9,7 +9,7 @@ import {
   TargetDirection,
   VisibilityScope,
 } from "@prisma/client";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getTargets } from "@/lib/targets/queries";
 
 async function requireSession() {
@@ -26,7 +26,7 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
   const targets = await getTargets(actor);
   return NextResponse.json({ targets });
 }

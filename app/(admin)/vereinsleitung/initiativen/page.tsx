@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getInitiatives } from "@/lib/initiatives/queries";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import VereinsleitungInitiativenList from "@/components/admin/vereinsleitung/VereinsleitungInitiativenList";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
@@ -11,7 +11,7 @@ export default async function VereinsleitungInitiativenPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const actor = buildActorContext(session.user);
+  const actor = await getActorContext(session.user);
   const initiatives = await getInitiatives(actor);
 
   return (

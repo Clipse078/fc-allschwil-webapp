@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getInitiativeBySlug } from "@/lib/initiatives/queries";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import InitiativeGovernanceBanner from "@/components/admin/initiatives/InitiativeGovernanceBanner";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
@@ -34,7 +34,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
-  const actor = buildActorContext(session.user);
+  const actor = await getActorContext(session.user);
 
   // 404-masking: getInitiativeBySlug returns null if actor cannot see the record.
   // The "not in DB" fallback card renders identically — no 403 leakage.

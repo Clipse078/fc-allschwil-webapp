@@ -24,7 +24,7 @@ import {
   getReviewStageInfo,
 } from "@/lib/governance/review-stage";
 import { assertFourEyeAllowed } from "@/lib/governance/four-eye";
-import { buildActorContext } from "@/lib/visibility/actor-context";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 
@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const actor = buildActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user);
 
   // Step 1+2: visibility (404-mask) + permission (403)
   const guard = await requireMeetingAccess({ actor, id, access: "stage" });
