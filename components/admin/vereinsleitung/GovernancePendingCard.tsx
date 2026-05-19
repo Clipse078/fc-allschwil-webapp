@@ -140,7 +140,7 @@ export default function GovernancePendingCard({ pendingApprovals, overdueActions
           overdueActions.slice(0, 5).map((action) => (
             <Link
               key={action.id}
-              href={`/vereinsleitung/meetings/${action.meetingSlug}`}
+              href={`/meetings/${action.meetingSlug}`}
               className="flex items-center justify-between gap-3 rounded-[18px] border border-slate-200/80 bg-white px-4 py-3 shadow-[0_4px_12px_rgba(15,23,42,0.03)] transition hover:-translate-y-[1px] hover:shadow-md"
             >
               <div className="min-w-0">

@@ -191,8 +191,8 @@ export default function AdminPageActions() {
     );
   }
 
-  if (pathname === "/vereinsleitung/meetings" || pathname.startsWith("/vereinsleitung/meetings/")) {
-    if (pathname === "/vereinsleitung/meetings") {
+  if (pathname === "/meetings" || pathname.startsWith("/meetings/")) {
+    if (pathname === "/meetings") {
       return (
         <div className="flex flex-wrap items-center gap-2.5">
           <button
@@ -227,8 +227,8 @@ export default function AdminPageActions() {
     );
   }
 
-  if (pathname === "/vereinsleitung/initiativen" || pathname.startsWith("/vereinsleitung/initiativen/")) {
-    if (pathname === "/vereinsleitung/initiativen") {
+  if (pathname === "/initiatives" || pathname.startsWith("/initiatives/")) {
+    if (pathname === "/initiatives") {
       return (
         <div className="flex flex-wrap items-center gap-2.5">
           <button
