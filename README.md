@@ -1,5 +1,16 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Canonical deployment
+
+- The canonical Vercel project is **`sportclubevo-webapp-stage`**.
+- Its Production Branch is **`STAGE`** (review only this deployment).
+- Preview deployments are disposable and may be missing env vars
+  (`DATABASE_URL`, `AUTH_SECRET` / `NEXTAUTH_SECRET`, `NEXTAUTH_URL`).
+  Ignore preview URLs like `*-lv26aclog-*` as operational truth.
+- See [`docs/deployment/canonical-deployment.md`](docs/deployment/canonical-deployment.md).
+- First debug route: **`GET /api/health`** — safe to call even when
+  env vars are missing, never exposes secret values.
+
 ## Getting Started
 
 First, run the development server:

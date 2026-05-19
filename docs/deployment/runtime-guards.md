@@ -50,7 +50,7 @@ Requires:
 - `APP_BASE_URL`
 - `NEXTAUTH_URL`
 - `DATABASE_URL`
-- `NEXTAUTH_SECRET`
+- `AUTH_SECRET` or `NEXTAUTH_SECRET` (either is accepted; NextAuth v5 honors both)
 
 ### PROD
 Requires:
@@ -58,7 +58,7 @@ Requires:
 - `APP_BASE_URL`
 - `NEXTAUTH_URL`
 - `DATABASE_URL`
-- `NEXTAUTH_SECRET`
+- `AUTH_SECRET` or `NEXTAUTH_SECRET` (either is accepted)
 - no localhost URLs
 
 ---
