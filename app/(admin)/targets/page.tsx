@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Target, TrendingUp } from "lucide-react";
+import { AlertTriangle, Plus, Target, TrendingUp } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargets } from "@/lib/targets/queries";
@@ -7,6 +7,7 @@ import { getActorContext } from "@/lib/visibility/get-actor-context";
 import TargetMetricProgress from "@/components/admin/targets/TargetMetricProgress";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import type { TargetListItem } from "@/lib/targets/queries";
 
 const CATEGORY_LABELS: Record<string, string> = {
   SPORTLICHE_ENTWICKLUNG: "Sportliche Entwicklung",
@@ -34,8 +35,17 @@ export default async function TargetsPage({ searchParams }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const params = (await searchParams) ?? {};
-  const actor = await getActorContext(session.user);
-  const targets = await getTargets(actor);
+  let targets: TargetListItem[] = [];
+  let dbError: string | null = null;
+
+  try {
+    const actor = await getActorContext(session.user);
+    targets = await getTargets(actor);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error.";
+    console.error("[targets/page] DB query failed:", message);
+    dbError = message;
+  }
 
   return (
     <div className="space-y-6">
@@ -60,7 +70,26 @@ export default async function TargetsPage({ searchParams }: PageProps) {
         </div>
       ) : null}
 
-      {targets.length === 0 ? (
+      {dbError ? (
+        <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-8 shadow-sm">
+          <div className="flex items-start gap-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                Daten konnten nicht geladen werden
+              </p>
+              <p className="mt-1 text-sm text-amber-700">
+                Die Datenbankverbindung ist nicht verfügbar. Bitte prüfe die Serverkonfiguration.
+              </p>
+              {process.env.NODE_ENV !== "production" ? (
+                <pre className="mt-3 rounded-lg bg-amber-100 p-3 text-xs text-amber-800 whitespace-pre-wrap break-all">
+                  {dbError}
+                </pre>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : targets.length === 0 ? (
         <section className="rounded-[30px] border border-slate-200/80 bg-white p-10 shadow-[0_10px_30px_rgba(15,23,42,0.04)] text-center">
           <Target className="mx-auto mb-4 h-10 w-10 text-slate-300" />
           <h3 className="text-[1.05rem] font-semibold text-slate-900">
