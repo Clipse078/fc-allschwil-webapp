@@ -241,10 +241,10 @@ function getHeaderContent(pathname: string): HeaderContent {
   }
 
   return {
-    eyebrow: "FC Allschwil WebApp",
+    eyebrow: "SportClubEvo Platform",
     title: "Dashboard",
     description:
-      "Saisongeführte Einstiegsseite. Saisons sind führend; Teams, Events und Planner werden dynamisch pro Saison aufgebaut.",
+      "Saisongeführtes Operations-Cockpit. Saisons, Teams, Events und Planner werden dynamisch pro Workspace aufgebaut.",
   };
 }
 
@@ -256,7 +256,7 @@ export default function AdminPageHeader() {
     <div>
       <p className="fca-eyebrow">{headerContent.eyebrow}</p>
       <h1 className="fca-heading mt-2">{headerContent.title}</h1>
-      <p className="mt-3 max-w-2xl text-sm text-slate-500">
+      <p className="mt-3 max-w-2xl text-sm text-[var(--sce-muted)]">
         {headerContent.description}
       </p>
     </div>
