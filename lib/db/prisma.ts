@@ -3,22 +3,15 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient;
-  prismaPool?: Pool;
+  __sportclubevo_prisma?: PrismaClient;
+  __sportclubevo_pool?: Pool;
 };
 
-/**
- * Lazily initialise the Prisma client so that modules which import this file
- * (e.g. auth.ts) do not crash at import time when DATABASE_URL is absent.
- * The error is thrown only when an actual database operation is attempted,
- * producing a clearer stack trace and allowing non-DB pages to render.
- *
- * If DATABASE_URL is missing on Vercel:
- *   1. Go to Vercel → Settings → Environment Variables
- *   2. Ensure DATABASE_URL is enabled for Production AND Preview environments
- *   3. Redeploy STAGE from the Vercel dashboard
- */
-function buildPrismaClient(): PrismaClient {
+function getOrCreateClient(): PrismaClient {
+  if (globalForPrisma.__sportclubevo_prisma) {
+    return globalForPrisma.__sportclubevo_prisma;
+  }
+
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
@@ -31,31 +24,26 @@ function buildPrismaClient(): PrismaClient {
   }
 
   const pool =
-    globalForPrisma.prismaPool ??
-    new Pool({
-      connectionString,
-    });
+    globalForPrisma.__sportclubevo_pool ??
+    new Pool({ connectionString });
 
   const adapter = new PrismaPg(pool);
+  const client = new PrismaClient({ adapter });
 
-  const client =
-    globalForPrisma.prisma ??
-    new PrismaClient({
-      adapter,
-    });
-
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prismaPool = pool;
-    globalForPrisma.prisma = client;
-  }
+  globalForPrisma.__sportclubevo_pool = pool;
+  globalForPrisma.__sportclubevo_prisma = client;
 
   return client;
 }
 
-// Export a lazy proxy so that importing this module does not throw.
-// The error surfaces only when a DB method is actually called.
+/**
+ * Lazy proxy — importing this module never throws.
+ * The real PrismaClient is created (and cached globally) on first use.
+ * In dev, the global cache survives HMR reloads.
+ * In production, a single instance is reused for the process lifetime.
+ */
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
   get(_target, prop: string | symbol) {
-    return buildPrismaClient()[prop as keyof PrismaClient];
+    return getOrCreateClient()[prop as keyof PrismaClient];
   },
 });

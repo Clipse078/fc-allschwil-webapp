@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, AlertTriangle } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getInitiatives } from "@/lib/initiatives/queries";
@@ -11,8 +11,31 @@ export default async function InitiativesPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const actor = await getActorContext(session.user);
-  const initiatives = await getInitiatives(actor);
+  let initiatives;
+  try {
+    const actor = await getActorContext(session.user);
+    initiatives = await getInitiatives(actor);
+  } catch (error) {
+    console.error("[initiatives] Failed to load initiatives:", error);
+    return (
+      <div className="space-y-6">
+        <AdminSectionHeader
+          eyebrow="Initiativen"
+          title="Initiativen"
+          description="Übersicht aller Initiativen – absteigend vom neuesten zum ältesten Eintrag."
+        />
+        <section className="rounded-[30px] border border-amber-200/80 bg-amber-50/60 p-10 shadow-[0_10px_30px_rgba(15,23,42,0.04)] text-center">
+          <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-amber-400" />
+          <h3 className="text-[1.05rem] font-semibold text-slate-900">
+            Initiativen konnten nicht geladen werden
+          </h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Die Datenbankverbindung ist momentan nicht verfügbar. Bitte versuche es später erneut.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

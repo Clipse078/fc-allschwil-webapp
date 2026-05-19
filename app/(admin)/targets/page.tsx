@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Target, TrendingUp } from "lucide-react";
+import { Plus, Target, TrendingUp, AlertTriangle } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargets } from "@/lib/targets/queries";
@@ -34,8 +34,32 @@ export default async function TargetsPage({ searchParams }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const params = (await searchParams) ?? {};
-  const actor = await getActorContext(session.user);
-  const targets = await getTargets(actor);
+
+  let targets;
+  try {
+    const actor = await getActorContext(session.user);
+    targets = await getTargets(actor);
+  } catch (error) {
+    console.error("[targets] Failed to load targets:", error);
+    return (
+      <div className="space-y-6">
+        <AdminSectionHeader
+          eyebrow="Ziele"
+          title="Vereinsziele"
+          description="Strategische Ziele und messbare Fortschrittskennzahlen für den Verein."
+        />
+        <section className="rounded-[30px] border border-amber-200/80 bg-amber-50/60 p-10 shadow-[0_10px_30px_rgba(15,23,42,0.04)] text-center">
+          <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-amber-400" />
+          <h3 className="text-[1.05rem] font-semibold text-slate-900">
+            Ziele konnten nicht geladen werden
+          </h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Die Datenbankverbindung ist momentan nicht verfügbar. Bitte versuche es später erneut.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

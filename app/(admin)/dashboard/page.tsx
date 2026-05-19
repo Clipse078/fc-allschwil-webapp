@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import {
+  AlertTriangle,
   Briefcase,
   CalendarDays,
   CalendarRange,
@@ -88,7 +89,32 @@ type DashboardPageProps = {
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = (await searchParams) ?? {};
-  const seasonOptions = await getSeasonOptionsData();
+
+  let seasonOptions;
+  try {
+    seasonOptions = await getSeasonOptionsData();
+  } catch (error) {
+    console.error("[dashboard] Failed to load season data:", error);
+    return (
+      <div className="space-y-6">
+        <section className="sce-card p-6 backdrop-blur-xl lg:p-7">
+          <p className="sce-eyebrow">Dashboard</p>
+          <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[var(--sce-heading)] lg:text-[2.35rem]">
+            Operations Cockpit
+          </h2>
+        </section>
+        <section className="rounded-[30px] border border-amber-200/80 bg-amber-50/60 p-10 shadow-[0_10px_30px_rgba(15,23,42,0.04)] text-center">
+          <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-amber-400" />
+          <h3 className="text-[1.05rem] font-semibold text-slate-900">
+            Dashboard konnte nicht geladen werden
+          </h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Die Datenbankverbindung ist momentan nicht verfügbar. Bitte versuche es später erneut.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   const selectedSeason =
     seasonOptions.find((season) => season.key === params.season) ??

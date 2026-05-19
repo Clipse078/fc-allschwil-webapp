@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, FileText, Sparkles } from "lucide-react";
+import { Plus, FileText, Sparkles, AlertTriangle } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getCommunicationTemplates } from "@/lib/communication/queries";
@@ -29,7 +29,31 @@ export default async function TemplatesPage({ searchParams }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const params = (await searchParams) ?? {};
-  const templates = await getCommunicationTemplates();
+
+  let templates;
+  try {
+    templates = await getCommunicationTemplates();
+  } catch (error) {
+    console.error("[templates] Failed to load templates:", error);
+    return (
+      <div className="space-y-6">
+        <AdminSectionHeader
+          eyebrow="Kommunikation"
+          title="Vorlagen"
+          description="Deterministische Kommunikationsvorlagen mit Variablen für kontextbewusste Clubkommunikation."
+        />
+        <section className="rounded-[30px] border border-amber-200/80 bg-amber-50/60 p-10 shadow-[0_10px_30px_rgba(15,23,42,0.04)] text-center">
+          <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-amber-400" />
+          <h3 className="text-[1.05rem] font-semibold text-slate-900">
+            Vorlagen konnten nicht geladen werden
+          </h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Die Datenbankverbindung ist momentan nicht verfügbar. Bitte versuche es später erneut.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
