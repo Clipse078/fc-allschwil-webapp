@@ -41,7 +41,7 @@ export default async function TemplateDetailPage({ params }: PageProps) {
             <Link href="/vereinsleitung/templates" className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
               <ArrowLeft className="h-4 w-4" />Zurück
             </Link>
-            <Link href={`/vereinsleitung/templates/${id}/edit`} className="inline-flex items-center gap-1.5 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#08357a]">
+            <Link href={`/vereinsleitung/templates/${id}/edit`} className="inline-flex items-center gap-1.5 rounded-full bg-[#3f63b5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#08357a]">
               <Edit className="h-4 w-4" />Bearbeiten
             </Link>
           </div>
@@ -56,7 +56,7 @@ export default async function TemplateDetailPage({ params }: PageProps) {
         <div className="space-y-5">
           <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
             <div className="mb-4 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[#0b4aa2]" />
+              <Sparkles className="h-4 w-4 text-[#3f63b5]" />
               <h3 className="text-[1.05rem] font-semibold text-slate-900">Vorschau (Beispieldaten)</h3>
             </div>
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">Betreff</p>
@@ -80,7 +80,7 @@ export default async function TemplateDetailPage({ params }: PageProps) {
                   const def = TEMPLATE_VARIABLES.find((v) => v.key === k);
                   return (
                     <div key={k} className="rounded-[12px] border border-slate-100 bg-slate-50 px-3 py-2">
-                      <p className="font-mono text-[11px] text-[#0b4aa2]">{`{{${k}}}`}</p>
+                      <p className="font-mono text-[11px] text-[#3f63b5]">{`{{${k}}}`}</p>
                       {def ? <p className="mt-0.5 text-[10px] text-slate-500">{def.label} · Bsp: {def.example}</p> : <p className="mt-0.5 text-[10px] text-amber-600">Unbekannte Variable</p>}
                     </div>
                   );

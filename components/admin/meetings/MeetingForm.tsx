@@ -109,7 +109,7 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
   }
 
   const fieldClass =
-    "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30";
+    "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30";
   const labelClass =
     "block text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1.5";
 
@@ -228,7 +228,7 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60 hover:bg-[#08357a]"
+          className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60 hover:bg-[#08357a]"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {mode === "create" ? "Meeting erstellen" : "Änderungen speichern"}

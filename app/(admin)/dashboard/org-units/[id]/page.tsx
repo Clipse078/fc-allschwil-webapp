@@ -56,7 +56,7 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
           <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-[#0b4aa2]" />
+                <Users className="h-4 w-4 text-[#3f63b5]" />
                 <h3 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">Mitglieder</h3>
               </div>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">

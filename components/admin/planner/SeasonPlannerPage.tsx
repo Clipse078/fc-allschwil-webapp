@@ -224,7 +224,7 @@ export default async function SeasonPlannerPage({
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href={newEntryHref}
-              className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#08357a]"
+              className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#08357a]"
             >
               <Plus className="h-4 w-4" />
               Planner-Eintrag erstellen
@@ -261,7 +261,7 @@ export default async function SeasonPlannerPage({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[#0b4aa2]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[#3f63b5]">
                     <Icon className="h-5 w-5" />
                   </div>
 

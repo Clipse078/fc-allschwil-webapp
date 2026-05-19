@@ -45,7 +45,7 @@ function formatValue(
 
 function getProgressColor(percent: number): string {
   if (percent >= 90) return "bg-emerald-500";
-  if (percent >= 60) return "bg-[#0b4aa2]";
+  if (percent >= 60) return "bg-[#3f63b5]";
   if (percent >= 30) return "bg-amber-500";
   return "bg-rose-400";
 }
@@ -85,7 +85,7 @@ export default function TargetMetricProgress({
             percent >= 90
               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
               : percent >= 60
-                ? "bg-blue-50 text-[#0b4aa2] border border-blue-200"
+                ? "bg-blue-50 text-[#3f63b5] border border-blue-200"
                 : percent >= 30
                   ? "bg-amber-50 text-amber-700 border border-amber-200"
                   : "bg-rose-50 text-rose-700 border border-rose-200"

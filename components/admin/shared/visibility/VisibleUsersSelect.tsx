@@ -67,7 +67,7 @@ export default function VisibleUsersSelect({
               key={user.id}
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-800 shadow-sm"
             >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[9px] font-semibold text-[#0b4aa2]">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#3f63b5]/10 text-[9px] font-semibold text-[#3f63b5]">
                 {initials(user.name)}
               </span>
               {user.name}
@@ -103,7 +103,7 @@ export default function VisibleUsersSelect({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Name oder E-Mail…"
                 autoFocus
-                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30"
               />
             </div>
             <ul className="max-h-52 overflow-y-auto pb-2">
@@ -119,7 +119,7 @@ export default function VisibleUsersSelect({
                       onClick={() => { addUser(user.id); setOpen(false); }}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
                     >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[10px] font-semibold text-[#0b4aa2]">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#3f63b5]/10 text-[10px] font-semibold text-[#3f63b5]">
                         {initials(user.name)}
                       </span>
                       <div className="min-w-0">

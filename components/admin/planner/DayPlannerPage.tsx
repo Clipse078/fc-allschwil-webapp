@@ -114,7 +114,7 @@ export default async function DayPlannerPage({
               {data.day.previousDay}
             </Link>
 
-            <span className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#0b4aa2]">
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#3f63b5]">
               {data.day.day}
             </span>
 
@@ -138,7 +138,7 @@ export default async function DayPlannerPage({
             <h3 className="text-[1.05rem] font-semibold text-slate-900">
               Tagesablauf
             </h3>
-            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b4aa2]">
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-[#3f63b5]">
               Infoboard live
             </span>
           </div>
@@ -202,12 +202,12 @@ export default async function DayPlannerPage({
 
             <div className="mt-4 space-y-3">
               <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <MonitorSmartphone className="h-4 w-4 text-[#0b4aa2]" />
+                <MonitorSmartphone className="h-4 w-4 text-[#3f63b5]" />
                 <p className="text-sm text-slate-700">Infoboard Tagesfeed live</p>
               </div>
 
               <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <CalendarDays className="h-4 w-4 text-[#0b4aa2]" />
+                <CalendarDays className="h-4 w-4 text-[#3f63b5]" />
                 <p className="text-sm text-slate-700">Kurzfristige Tagesänderungen sichtbar</p>
               </div>
             </div>
@@ -221,7 +221,7 @@ export default async function DayPlannerPage({
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href={newEntryHref}
-                className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#08357a]"
+                className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#08357a]"
               >
                 <Plus className="h-4 w-4" />
                 Neuer Eintrag

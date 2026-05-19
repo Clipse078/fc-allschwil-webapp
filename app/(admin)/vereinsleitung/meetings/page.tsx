@@ -23,7 +23,7 @@ export default async function VereinsleitungMeetingsPage() {
         actions={
           <Link
             href="/vereinsleitung/meetings/new"
-            className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+            className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
           >
             <Plus className="h-4 w-4" />
             Neues Meeting

@@ -79,7 +79,7 @@ export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defau
     } catch { setError("Netzwerkfehler."); } finally { setLoading(false); }
   }
 
-  const fieldClass = "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30";
+  const fieldClass = "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30";
   const labelClass = "block text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1.5";
 
   // Filter eligible parents (exclude self, max depth 2 for parents)
@@ -132,7 +132,7 @@ export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defau
 
       <div className="flex items-center justify-between gap-4">
         <button type="button" onClick={() => router.back()} className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Abbrechen</button>
-        <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60 hover:bg-[#08357a]">
+        <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60 hover:bg-[#08357a]">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {mode === "create" ? "Einheit erstellen" : "Änderungen speichern"}
         </button>

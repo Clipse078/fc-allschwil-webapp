@@ -152,7 +152,7 @@ export default function VereinsleitungInitiativenList({
                   <Edit className="h-3.5 w-3.5" />
                   Bearbeiten
                 </Link>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#3f63b5]">
                   Öffnen
                   <ChevronRight className="h-4 w-4" />
                 </span>
@@ -163,7 +163,7 @@ export default function VereinsleitungInitiativenList({
           {initiative.progress !== null ? (
             <div className="mt-4 h-1.5 rounded-full bg-slate-100">
               <div
-                className="h-1.5 rounded-full bg-[#0b4aa2]"
+                className="h-1.5 rounded-full bg-[#3f63b5]"
                 style={{ width: `${Math.min(100, initiative.progress)}%` }}
               />
             </div>

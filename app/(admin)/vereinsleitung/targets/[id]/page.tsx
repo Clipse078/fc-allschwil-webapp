@@ -73,7 +73,7 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
             </Link>
             <Link
               href={`/vereinsleitung/targets/${id}/edit`}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#08357a]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#3f63b5] px-4 py-2 text-sm font-semibold text-white hover:bg-[#08357a]"
             >
               <Edit className="h-4 w-4" />
               Bearbeiten

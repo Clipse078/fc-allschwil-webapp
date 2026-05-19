@@ -50,7 +50,7 @@ export default function SeasonContextSelector({
                 href={`${basePath}?season=${encodeURIComponent(season.key)}`}
                 className={
                   isSelected
-                    ? "rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#0b4aa2]"
+                    ? "rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#3f63b5]"
                     : "rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                 }
               >

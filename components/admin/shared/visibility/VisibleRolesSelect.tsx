@@ -54,14 +54,14 @@ export default function VisibleRolesSelect({
           {selectedRoles.map((role) => (
             <span
               key={role.key}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#0b4aa2]/8 border border-[#0b4aa2]/20 px-3 py-1 text-[12px] font-medium text-[#0b4aa2]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#3f63b5]/8 border border-[#3f63b5]/20 px-3 py-1 text-[12px] font-medium text-[#3f63b5]"
             >
               {role.name}
               <button
                 type="button"
                 onClick={() => removeRole(role.key)}
                 aria-label={`${role.name} entfernen`}
-                className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#0b4aa2]/15"
+                className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#3f63b5]/15"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -89,7 +89,7 @@ export default function VisibleRolesSelect({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Suchen…"
                 autoFocus
-                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30"
               />
             </div>
             <ul className="max-h-48 overflow-y-auto pb-2">

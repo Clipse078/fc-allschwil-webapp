@@ -18,7 +18,7 @@ export default function FcaBrandCrest({
     >
       <path
         d="M25 20h170v92c0 62-35 104-85 128-50-24-85-66-85-128V20Z"
-        fill="#0b5db3"
+        fill="#3f63b5"
         opacity={isWatermark ? "0.05" : "1"}
       />
       <path
@@ -33,7 +33,7 @@ export default function FcaBrandCrest({
         textAnchor="middle"
         fontSize="28"
         fontWeight="700"
-        fill={isWatermark ? "#0b5db3" : "#ffffff"}
+        fill={isWatermark ? "#3f63b5" : "#ffffff"}
         opacity={isWatermark ? "0.08" : "1"}
         style={{ letterSpacing: "0.04em" }}
       >
@@ -45,7 +45,7 @@ export default function FcaBrandCrest({
         textAnchor="middle"
         fontSize="102"
         fontWeight="300"
-        fill={isWatermark ? "#0b5db3" : "#ffffff"}
+        fill={isWatermark ? "#3f63b5" : "#ffffff"}
         opacity={isWatermark ? "0.05" : "1"}
         style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
       >
@@ -57,7 +57,7 @@ export default function FcaBrandCrest({
         textAnchor="middle"
         fontSize="24"
         fontWeight="700"
-        fill={isWatermark ? "#0b5db3" : "#ffffff"}
+        fill={isWatermark ? "#3f63b5" : "#ffffff"}
         opacity={isWatermark ? "0.05" : "1"}
       >
         1907

@@ -53,7 +53,7 @@ export default function InitiativeStageActions({
       case ReviewWorkflowStage.REJECTED:
         return "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100";
       case ReviewWorkflowStage.PUBLISHED:
-        return "border-blue-200 bg-blue-50 text-[#0b4aa2] hover:bg-blue-100";
+        return "border-blue-200 bg-blue-50 text-[#3f63b5] hover:bg-blue-100";
       default:
         return "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100";
     }

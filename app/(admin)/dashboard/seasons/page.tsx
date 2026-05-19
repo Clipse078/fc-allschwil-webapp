@@ -105,7 +105,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
           <form action={createNextSeasonAction}>
             <button
               type="submit"
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
             >
               <Plus className="h-4 w-4" />
               Neue Saison planen
@@ -164,7 +164,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                 </span>
 
                 {season.shouldBeActive ? (
-                  <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0b4aa2]">
+                  <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#3f63b5]">
                     Führende Saison
                   </span>
                 ) : null}
@@ -183,7 +183,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                   Zeitraum
                 </p>
                 <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <CalendarDays className="h-4 w-4 text-[#0b4aa2]" />
+                  <CalendarDays className="h-4 w-4 text-[#3f63b5]" />
                   {formatSwissDate(season.startDate)} – {formatSwissDate(season.endDate)}
                 </div>
               </div>
@@ -193,7 +193,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                   Teams
                 </p>
                 <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <Layers3 className="h-4 w-4 text-[#0b4aa2]" />
+                  <Layers3 className="h-4 w-4 text-[#3f63b5]" />
                   {season.teamSeasonCount} Team-Saisons
                 </div>
               </div>
@@ -203,7 +203,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                   Events
                 </p>
                 <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <Flag className="h-4 w-4 text-[#0b4aa2]" />
+                  <Flag className="h-4 w-4 text-[#3f63b5]" />
                   {season.eventCount} Events
                 </div>
               </div>
@@ -213,7 +213,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                   Aktiver DB-Flag
                 </p>
                 <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <CheckCircle2 className="h-4 w-4 text-[#0b4aa2]" />
+                  <CheckCircle2 className="h-4 w-4 text-[#3f63b5]" />
                   {season.isActive ? "true" : "false"}
                 </div>
               </div>

@@ -134,7 +134,7 @@ export default function TargetDataPointForm({
             <select
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30"
               required
             >
               <option value="">Wählen…</option>
@@ -148,7 +148,7 @@ export default function TargetDataPointForm({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="0"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30"
               required
             />
           )}
@@ -162,7 +162,7 @@ export default function TargetDataPointForm({
             type="date"
             value={measuredAt}
             onChange={(e) => setMeasuredAt(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30"
           />
         </div>
 
@@ -175,7 +175,7 @@ export default function TargetDataPointForm({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Kurze Notiz…"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30"
           />
         </div>
       </div>
@@ -191,7 +191,7 @@ export default function TargetDataPointForm({
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-full bg-[#0b4aa2] px-4 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60 hover:bg-[#08357a]"
+          className="inline-flex items-center gap-1.5 rounded-full bg-[#3f63b5] px-4 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60 hover:bg-[#08357a]"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Speichern

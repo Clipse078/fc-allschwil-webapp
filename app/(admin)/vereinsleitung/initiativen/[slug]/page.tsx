@@ -94,13 +94,13 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
                     <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                       Fortschritt
                     </p>
-                    <span className="text-sm font-semibold text-[#0b4aa2]">
+                    <span className="text-sm font-semibold text-[#3f63b5]">
                       {dbInitiative.progress}%
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-100">
                     <div
-                      className="h-2 rounded-full bg-[#0b4aa2]"
+                      className="h-2 rounded-full bg-[#3f63b5]"
                       style={{ width: `${Math.min(100, dbInitiative.progress)}%` }}
                     />
                   </div>

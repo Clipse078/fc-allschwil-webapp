@@ -28,7 +28,7 @@ export default async function OrgUnitsPage() {
         title="Organisationseinheiten"
         description="Organigramm-Grundlage für Sichtbarkeit, Kommunikation und Workflow-Routing."
         actions={
-          <Link href="/dashboard/org-units/new" className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]">
+          <Link href="/dashboard/org-units/new" className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]">
             <Plus className="h-4 w-4" />Neue Einheit
           </Link>
         }
@@ -39,7 +39,7 @@ export default async function OrgUnitsPage() {
           <Building2 className="mx-auto mb-4 h-10 w-10 text-slate-300" />
           <h3 className="text-[1.05rem] font-semibold text-slate-900">Noch keine Organisationseinheiten</h3>
           <p className="mt-2 text-sm text-slate-500">Erstelle die erste Einheit — z.B. Verein, Abteilung oder Ausschuss.</p>
-          <Link href="/dashboard/org-units/new" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#08357a]">
+          <Link href="/dashboard/org-units/new" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#08357a]">
             <Plus className="h-4 w-4" />Erste Einheit erstellen
           </Link>
         </section>

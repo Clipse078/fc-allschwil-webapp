@@ -36,7 +36,7 @@ export default function VereinsleitungTasksCard() {
 
         <button
           type="button"
-          className="text-sm font-semibold text-[#0b4aa2] transition hover:text-[#08357a]"
+          className="text-sm font-semibold text-[#3f63b5] transition hover:text-[#08357a]"
         >
           Alle Tasks
         </button>
@@ -65,7 +65,7 @@ export default function VereinsleitungTasksCard() {
 
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500">
                 <span className="inline-flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[10px] font-semibold text-[#0b4aa2]">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#3f63b5]/10 text-[10px] font-semibold text-[#3f63b5]">
                     {task.ownerInitials}
                   </span>
                   {task.owner}

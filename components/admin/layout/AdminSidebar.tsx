@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -142,55 +141,14 @@ export default function AdminSidebar({
       className={`${resolvedCollapsed ? "w-[96px]" : "w-[310px]"} flex min-h-screen shrink-0 flex-col border-r border-slate-200 bg-white/92 backdrop-blur-xl transition-[width] duration-200`}
     >
       <div className={resolvedCollapsed ? "px-4 py-5" : "px-5 py-5"}>
-        <div className="flex items-start justify-between gap-3">
-          <div
-            className={
-              resolvedCollapsed
-                ? "flex w-full justify-center"
-                : "flex min-w-0 items-center gap-3"
-            }
-          >
-            <div
-              className={
-                resolvedCollapsed
-                  ? "relative h-11 w-11 shrink-0"
-                  : "relative h-12 w-12 shrink-0"
-              }
-            >
-              <Image
-                src="/images/logos/fc-allschwil.png"
-                alt="FC Allschwil"
-                fill
-                className="object-contain"
-                sizes="48px"
-                priority
-              />
-            </div>
-
-            {!resolvedCollapsed ? (
-              <div className="min-w-0">
-                <p className="fca-eyebrow">FC Allschwil</p>
-                <h2 className="mt-1 font-[var(--font-display)] text-[1.7rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[#0b4aa2]">
-                  Admin
-                </h2>
-              </div>
-            ) : null}
-          </div>
-
-          {!resolvedCollapsed ? (
-            <button
-              type="button"
-              onClick={handleToggle}
-              aria-label="Menü einklappen"
-              className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
-
         {resolvedCollapsed ? (
-          <div className="mt-4 flex justify-center">
+          <div className="flex flex-col items-center gap-4">
+            {/* Collapsed: platform monogram */}
+            <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#3f63b5] shadow-sm">
+              <span className="font-[var(--font-display)] text-[13px] font-black uppercase tracking-tight text-white">
+                SCE
+              </span>
+            </div>
             <button
               type="button"
               onClick={handleToggle}
@@ -200,7 +158,40 @@ export default function AdminSidebar({
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              {/* Platform wordmark */}
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-[#3f63b5] shadow-sm">
+                  <span className="font-[var(--font-display)] text-[9px] font-black uppercase tracking-tight text-white">
+                    SCE
+                  </span>
+                </div>
+                <span className="font-[var(--font-display)] text-[1.05rem] font-black uppercase tracking-[-0.03em] text-slate-900">
+                  SportClubEvo
+                </span>
+              </div>
+
+              {/* Active tenant chip */}
+              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 shadow-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span className="text-[11px] font-semibold text-slate-500">
+                  FC Allschwil
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleToggle}
+              aria-label="Menü einklappen"
+              className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <nav className={resolvedCollapsed ? "flex-1 px-3 py-3" : "flex-1 px-4 py-3"}>
@@ -220,8 +211,8 @@ export default function AdminSidebar({
                   className={
                     isActive
                       ? resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
-                        : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
+                        ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#3f63b5] shadow-sm"
+                        : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#3f63b5] shadow-sm"
                       : resolvedCollapsed
                         ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                         : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
@@ -244,7 +235,7 @@ export default function AdminSidebar({
                             href={child.href}
                             className={
                               childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                                ? "flex items-center gap-3 rounded-[16px] border border-blue-100 bg-blue-50/60 px-4 py-2.5 text-sm font-semibold text-[#3f63b5]"
                                 : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                             }
                           >
@@ -271,7 +262,7 @@ export default function AdminSidebar({
                             href={childHref}
                             className={
                               childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                                ? "flex items-center gap-3 rounded-[16px] border border-blue-100 bg-blue-50/60 px-4 py-2.5 text-sm font-semibold text-[#3f63b5]"
                                 : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                             }
                           >

@@ -63,8 +63,8 @@ export default function VereinsleitungInitiativesCard({ initiatives }: Vereinsle
               <Link key={ini.id} href={`/vereinsleitung/initiativen/${ini.slug}`} className="block space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-[#0b4aa2]/10">
-                      <TrendingUp className="h-4 w-4 text-[#0b4aa2]" />
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-[#3f63b5]/10">
+                      <TrendingUp className="h-4 w-4 text-[#3f63b5]" />
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-[14px] font-semibold text-slate-900">{ini.title}</p>
@@ -79,7 +79,7 @@ export default function VereinsleitungInitiativesCard({ initiatives }: Vereinsle
                   <div className="pl-11">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <div className="h-1.5 flex-1 rounded-full bg-slate-100">
-                        <div className="h-1.5 rounded-full bg-[#0b4aa2]" style={{ width: `${Math.min(100, ini.progress)}%` }} />
+                        <div className="h-1.5 rounded-full bg-[#3f63b5]" style={{ width: `${Math.min(100, ini.progress)}%` }} />
                       </div>
                       <span className="shrink-0 text-[11px] font-semibold text-slate-500">{ini.progress}%</span>
                     </div>
@@ -91,8 +91,8 @@ export default function VereinsleitungInitiativesCard({ initiatives }: Vereinsle
               <div key={ini.title} className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-[#0b4aa2]/10">
-                      <Flag className="h-4 w-4 text-[#0b4aa2]" />
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-[#3f63b5]/10">
+                      <Flag className="h-4 w-4 text-[#3f63b5]" />
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-[14px] font-semibold text-slate-900">{ini.title}</p>
@@ -108,7 +108,7 @@ export default function VereinsleitungInitiativesCard({ initiatives }: Vereinsle
                 <div className="pl-11">
                   <div className="flex items-center gap-2">
                     <div className="h-1.5 flex-1 rounded-full bg-slate-100">
-                      <div className="h-1.5 rounded-full bg-[#0b4aa2]" style={{ width: `${ini.progress}%` }} />
+                      <div className="h-1.5 rounded-full bg-[#3f63b5]" style={{ width: `${ini.progress}%` }} />
                     </div>
                     <span className="shrink-0 text-[11px] font-semibold text-slate-500">{ini.progress}%</span>
                   </div>

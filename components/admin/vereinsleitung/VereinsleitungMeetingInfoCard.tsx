@@ -34,7 +34,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[#0b4aa2]">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#3f63b5]/10 text-[#3f63b5]">
         <Icon className="h-4 w-4" />
       </div>
       <div>
@@ -102,7 +102,7 @@ export default function VereinsleitungMeetingInfoCard({
         <InfoRow icon={Clock3} label="Zeit" value="20:00 - 21:00 Uhr" />
         <InfoRow icon={MapPin} label="Ort" value="Clubhaus, Sitzungszimmer 1" />
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[#0b4aa2]">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#3f63b5]/10 text-[#3f63b5]">
             <Users className="h-4 w-4" />
           </div>
           <div>
@@ -111,7 +111,7 @@ export default function VereinsleitungMeetingInfoCard({
             </p>
             <button
               type="button"
-              className="mt-1 text-sm font-semibold text-[#0b4aa2] transition hover:text-[#08357a]"
+              className="mt-1 text-sm font-semibold text-[#3f63b5] transition hover:text-[#08357a]"
             >
               Microsoft Teams Link öffnen
             </button>

@@ -98,7 +98,7 @@ export default function GovernanceStaleCard({ staleTargets, templateDrafts }: Pr
                     <div className="flex items-center gap-1.5">
                       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
                         <div
-                          className={`h-1.5 rounded-full ${t.progress >= 80 ? "bg-emerald-500" : t.progress >= 50 ? "bg-[#0b4aa2]" : "bg-amber-400"}`}
+                          className={`h-1.5 rounded-full ${t.progress >= 80 ? "bg-emerald-500" : t.progress >= 50 ? "bg-[#3f63b5]" : "bg-amber-400"}`}
                           style={{ width: `${t.progress}%` }}
                         />
                       </div>
@@ -115,7 +115,7 @@ export default function GovernanceStaleCard({ staleTargets, templateDrafts }: Pr
         {staleTargets.length > 4 && (
           <Link
             href="/vereinsleitung/targets"
-            className="block pt-1 text-center text-[11px] text-[#0b4aa2] hover:underline"
+            className="block pt-1 text-center text-[11px] text-[#3f63b5] hover:underline"
           >
             + {staleTargets.length - 4} weitere anzeigen
           </Link>
@@ -161,7 +161,7 @@ export default function GovernanceStaleCard({ staleTargets, templateDrafts }: Pr
         {templateDrafts.length > 3 && (
           <Link
             href="/vereinsleitung/templates"
-            className="block pt-1 text-center text-[11px] text-[#0b4aa2] hover:underline"
+            className="block pt-1 text-center text-[11px] text-[#3f63b5] hover:underline"
           >
             + {templateDrafts.length - 3} weitere anzeigen
           </Link>

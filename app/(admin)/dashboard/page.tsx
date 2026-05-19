@@ -101,13 +101,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   return (
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
-        <p className="fca-eyebrow">Dashboard</p>
-        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[#0b4aa2] lg:text-[2.35rem]">
-          Saisongeführte Modulübersicht
+        <p className="fca-eyebrow">Übersicht</p>
+        <h2 className="fca-heading mt-2">
+          Modulübersicht
         </h2>
         <p className="mt-3 max-w-3xl text-sm text-slate-600">
-          Saisons sind die führende Struktur dieser WebApp. Teams, Events und Planner
-          werden dynamisch pro Saison verwaltet und darauf aufgebaut.
+          Saisons sind die führende Struktur. Teams, Events und Planner werden dynamisch pro Saison verwaltet und darauf aufgebaut.
         </p>
       </section>
 
@@ -137,7 +136,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <div className="flex items-start justify-between gap-6">
                   <div>
                     <p className="fca-eyebrow">Modul</p>
-                    <h3 className="mt-2 font-[var(--font-display)] text-[1.7rem] font-bold uppercase tracking-[-0.03em] text-[#0b4aa2]">
+                    <h3 className="mt-2 font-[var(--font-display)] text-[1.55rem] font-bold uppercase tracking-[-0.03em] text-[#14213d]">
                       {module.title}
                     </h3>
                     <p className="mt-3 text-sm text-slate-600">
@@ -145,8 +144,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </p>
                   </div>
 
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0b4aa2] shadow-sm transition group-hover:scale-105">
-                    <Icon className="h-6 w-6" />
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[#3f63b5] shadow-sm transition group-hover:scale-105">
+                    <Icon className="h-5 w-5" />
                   </div>
                 </div>
               </Link>

@@ -50,7 +50,7 @@ export default function DashboardModuleCards({
                       </h4>
                     </div>
 
-                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[#0b4aa2]">
+                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[#3f63b5]">
                       Live
                     </span>
                   </div>

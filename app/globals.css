@@ -6,6 +6,11 @@
   --muted: #64748b;
   --border: #d9e2ec;
   --card: rgba(255, 255, 255, 0.96);
+  /* Platform accent — neutral slate-blue, not club-specific */
+  --accent: #3f63b5;
+  --accent-dark: #284a97;
+  --accent-muted: rgba(63, 99, 181, 0.08);
+  /* Legacy aliases — kept for existing component references */
   --red: #c7332c;
   --red-dark: #ab241f;
   --blue: #3f63b5;
@@ -21,8 +26,8 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(63, 99, 181, 0.05), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(199, 51, 44, 0.05), transparent 24%),
+    radial-gradient(circle at top left, rgba(63, 99, 181, 0.04), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(63, 99, 181, 0.025), transparent 24%),
     var(--background);
   color: var(--foreground);
   font-family: var(--font-body);
@@ -48,7 +53,7 @@ button {
 }
 
 .fca-eyebrow {
-  color: var(--red);
+  color: var(--accent);
   font-family: var(--font-display);
   font-size: 0.76rem;
   font-weight: 700;
@@ -57,7 +62,7 @@ button {
 }
 
 .fca-heading {
-  color: #0b4aa2;
+  color: var(--foreground);
   font-family: var(--font-display);
   font-size: clamp(1.8rem, 1.3rem + 1vw, 2.6rem);
   font-weight: 700;
@@ -96,8 +101,8 @@ button {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 4px;
-  background: linear-gradient(90deg, #0b4aa2 0%, #4a6fd1 42%, #c7332c 100%);
+  height: 3px;
+  background: linear-gradient(90deg, rgba(63, 99, 181, 0.9) 0%, rgba(99, 132, 220, 0.6) 60%, rgba(63, 99, 181, 0.15) 100%);
 }
 
 .fca-section-card {
@@ -112,8 +117,8 @@ button {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, rgba(11, 74, 162, 0.95) 0%, rgba(76, 110, 245, 0.72) 50%, rgba(199, 51, 44, 0.92) 100%);
+  height: 2px;
+  background: linear-gradient(90deg, rgba(63, 99, 181, 0.8) 0%, rgba(99, 132, 220, 0.4) 60%, transparent 100%);
 }
 
 .fca-input,
@@ -158,15 +163,15 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  border: 1px solid rgba(199, 51, 44, 0.18);
+  border: 1px solid rgba(63, 99, 181, 0.22);
   border-radius: 9999px;
   background: #ffffff;
-  color: var(--red);
+  color: var(--accent);
   font-size: 0.9rem;
   font-weight: 700;
   padding: 0.72rem 1.08rem;
   box-shadow:
-    0 12px 26px rgba(199, 51, 44, 0.08),
+    0 12px 26px rgba(63, 99, 181, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
   transition:
     background-color 0.18s ease,
@@ -177,8 +182,8 @@ button {
 }
 
 .fca-button-primary:hover {
-  background: rgba(199, 51, 44, 0.05);
-  color: var(--red-dark);
+  background: rgba(63, 99, 181, 0.05);
+  color: var(--accent-dark);
   transform: translateY(-1px);
 }
 
@@ -291,7 +296,7 @@ button {
 .fca-toggle-checkbox {
   height: 1.1rem;
   width: 1.1rem;
-  accent-color: var(--red);
+  accent-color: var(--accent);
 }
 
 .fca-admin-shell {
@@ -299,8 +304,8 @@ button {
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(63, 99, 181, 0.06), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(199, 51, 44, 0.06), transparent 22%),
+    radial-gradient(circle at top left, rgba(63, 99, 181, 0.05), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(63, 99, 181, 0.025), transparent 22%),
     linear-gradient(180deg, #f8fbff 0%, #f4f7fb 100%);
 }
 
@@ -313,11 +318,11 @@ button {
 }
 
 .fca-admin-glow-blue {
-  background: rgba(63, 99, 181, 0.2);
+  background: rgba(63, 99, 181, 0.14);
 }
 
 .fca-admin-glow-red {
-  background: rgba(199, 51, 44, 0.18);
+  background: rgba(63, 99, 181, 0.07);
 }
 
 @media (max-width: 768px) {
@@ -327,5 +332,6 @@ button {
 
   .fca-heading {
     font-size: 1.5rem;
+    color: var(--foreground);
   }
 }

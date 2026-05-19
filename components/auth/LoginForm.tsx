@@ -1,13 +1,11 @@
 ﻿"use client";
 
-import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import FcaBrandCrest from "@/components/shared/FcaBrandCrest";
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("admin@fcallschwil.ch");
-  const [password, setPassword] = useState("ChangeMe123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [now, setNow] = useState<Date>(new Date());
@@ -62,122 +60,122 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden text-[#111827]">
-      <div className="absolute inset-0">
-        <Image
-          src="/images/branding/fca-bg.jpg"
-          alt="FC Allschwil Background"
-          fill
-          priority
-          className="object-cover opacity-[0.6]"
-        />
+    <main className="relative min-h-screen overflow-hidden bg-[#070c18] text-white">
+      {/* Ambient glow — platform blue only */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-[-10%] top-[-8%] h-[600px] w-[600px] rounded-full bg-[#3f63b5]/10 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-8%] h-[500px] w-[500px] rounded-full bg-[#3f63b5]/08 blur-[100px]" />
+        <div className="absolute left-1/2 top-1/2 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1a2d5a]/30 blur-[140px]" />
       </div>
 
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(255,255,255,0.68)_38%,rgba(248,250,252,0.80)_100%)]" />
+      {/* Subtle dot-grid texture */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.06]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, rgba(255,255,255,0.7) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+        }}
+      />
 
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-[-120px] top-[-120px] h-[420px] w-[420px] rounded-full bg-[#0b5db3]/10 blur-3xl" />
-        <div className="absolute bottom-[-140px] right-[-120px] h-[420px] w-[420px] rounded-full bg-[#cf2027]/10 blur-3xl" />
+      {/* Top edge line */}
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#3f63b5]/40 to-transparent" />
 
-        <div className="absolute left-1/2 top-1/2 h-[920px] w-[920px] -translate-x-1/2 -translate-y-1/2 opacity-[0.05]">
-          <FcaBrandCrest className="h-full w-full" variant="watermark" />
+      {/* Date / time — top right */}
+      <div className="relative z-10 flex justify-end px-8 pt-6 lg:px-14">
+        <div className="text-right">
+          <p className="text-[13px] font-medium tracking-wide text-white/40">
+            {formattedDate}
+          </p>
+          <p className="mt-0.5 text-[36px] font-black leading-none tracking-tight text-white/70 lg:text-[44px]">
+            {formattedTime}
+          </p>
         </div>
-
-        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#0b5db3]/35 to-[#cf2027]/35" />
       </div>
 
-      <div className="relative z-10 min-h-screen">
-        <div className="flex justify-end px-8 pt-5 lg:px-14">
-          <div className="text-right">
-            <p className="text-[18px] font-medium tracking-tight text-slate-700 lg:text-[22px]">
-              {formattedDate}
-            </p>
-            <p className="mt-1 text-[44px] font-black leading-none tracking-tight text-[#111827] lg:text-[58px]">
-              {formattedTime}
-            </p>
+      {/* Main centered content */}
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-110px)] max-w-[1400px] flex-col items-center justify-center px-6 pb-16 pt-6 lg:px-10">
+        <div className="w-full max-w-[460px] text-center">
+          {/* Platform wordmark */}
+          <div className="mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#3f63b5]/80">
+              Platform
+            </span>
           </div>
-        </div>
+          <h1 className="font-[var(--font-display)] text-[3.2rem] font-black uppercase leading-[0.9] tracking-[-0.04em] text-white lg:text-[3.8rem]">
+            SportClubEvo
+          </h1>
+          <p className="mt-3 text-[13px] font-medium tracking-[0.04em] text-white/40">
+            The Operating System for Modern Sports Clubs
+          </p>
 
-        <div className="mx-auto flex min-h-[calc(100vh-110px)] max-w-[1600px] flex-col items-center justify-center px-6 pb-16 pt-10 lg:px-10 lg:pb-20 lg:pt-6">
-          <div className="w-full max-w-[980px] text-center">
-            <div className="mx-auto mb-6 w-[88px] lg:mb-8 lg:w-[120px]">
-              <Image
-                src="/images/logos/fc-allschwil.png"
-                alt="FC Allschwil"
-                width={120}
-                height={120}
-                priority
-                className="h-auto w-full object-contain drop-shadow-[0_8px_20px_rgba(15,23,42,0.15)]"
-              />
-            </div>
+          {/* Login card */}
+          <div className="mx-auto mt-10 w-full rounded-[28px] border border-white/10 bg-white/[0.05] p-7 text-left shadow-[0_32px_80px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
+            <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/35">
+              Anmeldung
+            </p>
 
-            <h1 className="text-[72px] font-black uppercase leading-[0.9] tracking-[-0.04em] text-[#111827] lg:text-[104px]">
-              Willkommen
-            </h1>
-
-            <h2 className="text-[64px] font-black uppercase leading-[0.9] tracking-[-0.05em] text-[#0b5db3] lg:text-[96px]">
-              beim FC Allschwil
-            </h2>
-
-            <h3 className="text-[56px] font-black uppercase leading-[0.9] tracking-[-0.05em] text-[#cf2027] lg:text-[88px]">
-              Clubmanager
-            </h3>
-
-            <div className="mx-auto mt-10 w-full max-w-[520px] rounded-[32px] border border-white/70 bg-white/86 p-6 text-left shadow-[0_20px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="mb-2 block text-sm font-medium text-slate-700"
-                  >
-                    E-Mail
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#0b5db3] focus:ring-2 focus:ring-blue-100"
-                    placeholder="admin@fcallschwil.ch"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="password"
-                    className="mb-2 block text-sm font-medium text-slate-700"
-                  >
-                    Passwort
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#cf2027] focus:ring-2 focus:ring-red-100"
-                    placeholder="Passwort"
-                    required
-                  />
-                </div>
-
-                {errorMessage ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessage}
-                  </div>
-                ) : null}
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full rounded-full bg-[#cf2027] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-200 transition hover:bg-[#b51b22] disabled:cursor-not-allowed disabled:opacity-60"
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.14em] text-white/50"
                 >
-                  {isSubmitting ? "Anmeldung läuft..." : "Einloggen"}
-                </button>
-              </form>
-            </div>
+                  E-Mail
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#3f63b5]/60 focus:bg-white/[0.09] focus:ring-2 focus:ring-[#3f63b5]/20"
+                  placeholder="deine@email.ch"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.14em] text-white/50"
+                >
+                  Passwort
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#3f63b5]/60 focus:bg-white/[0.09] focus:ring-2 focus:ring-[#3f63b5]/20"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              {errorMessage ? (
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  {errorMessage}
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="mt-1 w-full rounded-full bg-[#3f63b5] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-[#3f63b5]/20 transition hover:bg-[#4a70c8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmitting ? "Anmeldung läuft…" : "Einloggen"}
+              </button>
+            </form>
+          </div>
+
+          {/* Tenant context — bottom */}
+          <div className="mt-6 flex items-center justify-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/70" />
+            <span className="text-[11px] font-medium text-white/30">
+              FC Allschwil Workspace
+            </span>
           </div>
         </div>
       </div>

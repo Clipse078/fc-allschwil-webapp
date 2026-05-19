@@ -131,7 +131,7 @@ export default async function WeekPlannerPage({
               {data.week.previousWeekId}
             </Link>
 
-            <span className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#0b4aa2]">
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#3f63b5]">
               {data.week.weekId}
             </span>
 
@@ -226,12 +226,12 @@ export default async function WeekPlannerPage({
 
             <div className="mt-4 space-y-3">
               <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <Globe className="h-4 w-4 text-[#0b4aa2]" />
+                <Globe className="h-4 w-4 text-[#3f63b5]" />
                 <p className="text-sm text-slate-700">Website Wochenansicht live</p>
               </div>
 
               <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                <Smartphone className="h-4 w-4 text-[#0b4aa2]" />
+                <Smartphone className="h-4 w-4 text-[#3f63b5]" />
                 <p className="text-sm text-slate-700">Später Mobile App Wochenansicht</p>
               </div>
             </div>
@@ -245,7 +245,7 @@ export default async function WeekPlannerPage({
             <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 href={newEntryHref}
-                className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#08357a]"
+                className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#08357a]"
               >
                 <Plus className="h-4 w-4" />
                 Neuer Eintrag

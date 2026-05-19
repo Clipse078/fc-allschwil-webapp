@@ -45,7 +45,7 @@ export default function AdminAvatar({
 
   return (
     <div
-      className={`flex ${sizeClass} items-center justify-center rounded-full border border-slate-200 bg-gradient-to-br from-white to-slate-100 font-[var(--font-display)] text-sm font-bold uppercase tracking-[0.08em] text-[#0b4aa2] shadow-sm`}
+      className={`flex ${sizeClass} items-center justify-center rounded-full border border-slate-200 bg-gradient-to-br from-white to-slate-100 font-[var(--font-display)] text-sm font-bold uppercase tracking-[0.08em] text-[#3f63b5] shadow-sm`}
     >
       {getInitials(name) || "FA"}
     </div>

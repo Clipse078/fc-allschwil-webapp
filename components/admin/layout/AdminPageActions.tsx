@@ -51,7 +51,7 @@ export default function AdminPageActions() {
 
         <Link
           href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Settings2 className="h-4 w-4" />
           Saisons verwalten
@@ -73,7 +73,7 @@ export default function AdminPageActions() {
 
         <Link
           href="/dashboard/seasons#create-season"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Plus className="h-4 w-4" />
           Neue Saison planen
@@ -87,7 +87,7 @@ export default function AdminPageActions() {
       <div className="flex flex-wrap items-center gap-2.5">
         <Link
           href={plannerNewHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Plus className="h-4 w-4" />
           Neuer Eintrag
@@ -153,7 +153,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Users className="h-4 w-4" />
           Neues Team
@@ -175,7 +175,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Trophy className="h-4 w-4" />
           Neues Event
@@ -190,7 +190,7 @@ export default function AdminPageActions() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
           >
             <CalendarPlus className="h-4 w-4" />
             Meeting planen
@@ -211,7 +211,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <CheckCircle2 className="h-4 w-4" />
           Beschluss fassen
@@ -226,7 +226,7 @@ export default function AdminPageActions() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
           >
             <Plus className="h-4 w-4" />
             Neue Initiative
@@ -247,7 +247,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Plus className="h-4 w-4" />
           Neue Aufgabe
@@ -269,7 +269,7 @@ export default function AdminPageActions() {
 
         <button
           type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#3f63b5] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Plus className="h-4 w-4" />
           Neue Initiative

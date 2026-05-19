@@ -28,7 +28,7 @@ export default function VereinsleitungMeetingParticipantsCard({ dbMeeting, parti
       <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#0b4aa2]" />
+            <Users className="h-4 w-4 text-[#3f63b5]" />
             <h3 className="text-[1.08rem] font-semibold text-slate-900">Teilnehmer</h3>
           </div>
           {participants && participants.length > 0 ? (
@@ -45,7 +45,7 @@ export default function VereinsleitungMeetingParticipantsCard({ dbMeeting, parti
             {participants.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[11px] font-semibold text-[#0b4aa2]">{initials(p.name)}</div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3f63b5]/10 text-[11px] font-semibold text-[#3f63b5]">{initials(p.name)}</div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
                     {p.role ? <p className="truncate text-xs text-slate-500">{p.role}</p> : null}
@@ -69,7 +69,7 @@ export default function VereinsleitungMeetingParticipantsCard({ dbMeeting, parti
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-[#0b4aa2]" />
+          <Users className="h-4 w-4 text-[#3f63b5]" />
           <h3 className="text-[1.08rem] font-semibold text-slate-900">Teilnehmer</h3>
         </div>
         <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">4 / 5</span>
@@ -78,7 +78,7 @@ export default function VereinsleitungMeetingParticipantsCard({ dbMeeting, parti
         {MOCK_PARTICIPANTS.map((p) => (
           <div key={p.name} className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[11px] font-semibold text-[#0b4aa2]">{p.initials}</div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#3f63b5]/10 text-[11px] font-semibold text-[#3f63b5]">{p.initials}</div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
                 <p className="truncate text-xs text-slate-500">{p.role}</p>

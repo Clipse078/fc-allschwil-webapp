@@ -36,7 +36,7 @@ export default function TargetTemplateSuggestions({ onSelect }: TargetTemplateSu
         className="flex w-full items-center justify-between gap-4 p-6 text-left"
       >
         <div className="flex items-center gap-3">
-          <Sparkles className="h-5 w-5 text-[#0b4aa2]" />
+          <Sparkles className="h-5 w-5 text-[#3f63b5]" />
           <div>
             <p className="text-[1.02rem] font-semibold text-slate-900">
               Vorlagen-Katalog
@@ -59,7 +59,7 @@ export default function TargetTemplateSuggestions({ onSelect }: TargetTemplateSu
               onClick={() => setSelectedCategory("ALL")}
               className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
                 selectedCategory === "ALL"
-                  ? "border-[#0b4aa2] bg-[#0b4aa2] text-white"
+                  ? "border-[#3f63b5] bg-[#3f63b5] text-white"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
@@ -74,7 +74,7 @@ export default function TargetTemplateSuggestions({ onSelect }: TargetTemplateSu
                   onClick={() => setSelectedCategory(cat)}
                   className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
                     selectedCategory === cat
-                      ? "border-[#0b4aa2] bg-[#0b4aa2] text-white"
+                      ? "border-[#3f63b5] bg-[#3f63b5] text-white"
                       : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
                 >
@@ -124,7 +124,7 @@ export default function TargetTemplateSuggestions({ onSelect }: TargetTemplateSu
                 <button
                   type="button"
                   onClick={() => onSelect(template)}
-                  className="mt-4 w-full rounded-[14px] border border-[#0b4aa2]/20 bg-[#0b4aa2]/5 py-2 text-[12px] font-semibold text-[#0b4aa2] transition hover:bg-[#0b4aa2]/10"
+                  className="mt-4 w-full rounded-[14px] border border-[#3f63b5]/20 bg-[#3f63b5]/5 py-2 text-[12px] font-semibold text-[#3f63b5] transition hover:bg-[#3f63b5]/10"
                 >
                   Vorlage verwenden
                 </button>

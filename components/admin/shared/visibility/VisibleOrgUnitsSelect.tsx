@@ -68,7 +68,7 @@ export default function VisibleOrgUnitsSelect({
           {selectedUnits.map((unit) => (
             <span
               key={unit.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/8 px-3 py-1 text-[12px] font-medium text-[#0b4aa2]"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#3f63b5]/20 bg-[#3f63b5]/8 px-3 py-1 text-[12px] font-medium text-[#3f63b5]"
             >
               <Building2 className="h-3 w-3 shrink-0" />
               {unit.name}
@@ -76,7 +76,7 @@ export default function VisibleOrgUnitsSelect({
                 type="button"
                 onClick={() => removeUnit(unit.id)}
                 aria-label={`${unit.name} entfernen`}
-                className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#0b4aa2]/15"
+                className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#3f63b5]/15"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -104,7 +104,7 @@ export default function VisibleOrgUnitsSelect({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Suchen…"
                 autoFocus
-                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3f63b5]/30"
               />
             </div>
             <ul className="max-h-52 overflow-y-auto pb-2">

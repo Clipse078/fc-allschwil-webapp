@@ -36,7 +36,7 @@ export default async function TemplatesPage({ searchParams }: PageProps) {
         title="Vorlagen"
         description="Deterministische Kommunikationsvorlagen mit Variablen für kontextbewusste Clubkommunikation."
         actions={
-          <Link href="/vereinsleitung/templates/new" className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]">
+          <Link href="/vereinsleitung/templates/new" className="inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]">
             <Plus className="h-4 w-4" />Neue Vorlage
           </Link>
         }
@@ -51,7 +51,7 @@ export default async function TemplatesPage({ searchParams }: PageProps) {
           <Sparkles className="mx-auto mb-4 h-10 w-10 text-slate-300" />
           <h3 className="text-[1.05rem] font-semibold text-slate-900">Noch keine Vorlagen</h3>
           <p className="mt-2 text-sm text-slate-500">Erstelle die erste kontextbewusste Kommunikationsvorlage.</p>
-          <Link href="/vereinsleitung/templates/new" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#08357a]">
+          <Link href="/vereinsleitung/templates/new" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#3f63b5] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#08357a]">
             <Plus className="h-4 w-4" />Erste Vorlage erstellen
           </Link>
         </section>
@@ -63,7 +63,7 @@ export default async function TemplatesPage({ searchParams }: PageProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 shrink-0 text-[#0b4aa2]" />
+                    <FileText className="h-4 w-4 shrink-0 text-[#3f63b5]" />
                     <p className="truncate text-[1.02rem] font-semibold text-slate-900">{t.title}</p>
                   </div>
                   <p className="mt-1.5 truncate text-sm text-slate-500">{t.subject}</p>
