@@ -5,6 +5,13 @@ import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getTargets } from "@/lib/targets/queries";
 import { getMeetings } from "@/lib/meetings/queries";
 import { getInitiatives } from "@/lib/initiatives/queries";
+import {
+  getPendingApprovals,
+  getStaleTargets,
+  getTemplateDrafts,
+  getOverdueActions,
+  type GovernanceOverviewData,
+} from "@/lib/dashboard/governance-overview";
 import { prisma } from "@/lib/db/prisma";
 import type { KpiItem } from "@/components/admin/vereinsleitung/VereinsleitungKpiCard";
 
@@ -62,11 +69,24 @@ export default async function VereinsleitungPage() {
 
   const actor = await getActorContext(session.user);
 
-  const [targets, meetings, initiatives, kpis] = await Promise.all([
+  const [targets, meetings, initiatives, kpis, governance] = await Promise.all([
     getTargets(actor),
     getMeetings(actor),
     getInitiatives(actor),
     getOperativeKpis(actor.userId),
+    Promise.all([
+      getPendingApprovals(actor),
+      getStaleTargets(actor),
+      getTemplateDrafts(actor),
+      getOverdueActions(actor),
+    ]).then(
+      ([pendingApprovals, staleTargets, templateDrafts, overdueActions]): GovernanceOverviewData => ({
+        pendingApprovals,
+        staleTargets,
+        templateDrafts,
+        overdueActions,
+      }),
+    ),
   ]);
 
   return (
@@ -75,6 +95,7 @@ export default async function VereinsleitungPage() {
       meetings={meetings.slice(0, 3)}
       initiatives={initiatives.slice(0, 3)}
       kpis={kpis}
+      governance={governance}
     />
   );
 }
