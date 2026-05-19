@@ -3,32 +3,23 @@
 export type RuntimeEnvironment = {
   nodeEnv: string;
   appEnv: AppEnv;
+  rawAppEnv: string | null;
   vercelEnv: string | null;
   appBaseUrl: string | null;
   nextAuthUrl: string | null;
   hasDatabaseUrl: boolean;
   hasDirectUrl: boolean;
+  hasAuthSecret: boolean;
   hasNextAuthSecret: boolean;
+  hasAnyAuthSecret: boolean;
   isLocal: boolean;
   isStage: boolean;
   isProd: boolean;
   isVercel: boolean;
+  parseErrors: string[];
 };
 
 const APP_ENV_VALUES = new Set<AppEnv>(["local", "stage", "prod"]);
-
-function readRequiredString(
-  value: string | undefined,
-  variableName: string,
-): string {
-  const trimmed = value?.trim();
-
-  if (!trimmed) {
-    throw new Error("Missing required environment variable: " + variableName);
-  }
-
-  return trimmed;
-}
 
 function readOptionalString(value: string | undefined): string | null {
   const trimmed = value?.trim();
@@ -36,66 +27,79 @@ function readOptionalString(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function parseAppEnv(rawValue: string | undefined): AppEnv {
-  const trimmed = rawValue?.trim();
-
-  if (!trimmed) {
-    return "local";
-  }
-
-  if (!APP_ENV_VALUES.has(trimmed as AppEnv)) {
-    throw new Error(
-      "Invalid APP_ENV value: " +
-        trimmed +
-        ". Allowed values: local, stage, prod.",
-    );
-  }
-
-  return trimmed as AppEnv;
-}
-
-function normalizeUrl(url: string | null, variableName: string): string | null {
+function normalizeUrl(url: string | null): string | null {
   if (!url) {
     return null;
   }
 
-  try {
-    const parsed = new URL(url);
+  const parsed = new URL(url);
 
-    return parsed.toString().replace(/\/$/, "");
-  } catch {
-    throw new Error(
-      "Invalid URL in environment variable " + variableName + ": " + url,
-    );
-  }
+  return parsed.toString().replace(/\/$/, "");
 }
 
 export function getRuntimeEnvironment(): RuntimeEnvironment {
-  const nodeEnv = readRequiredString(process.env.NODE_ENV, "NODE_ENV");
-  const appEnv = parseAppEnv(process.env.APP_ENV);
+  const parseErrors: string[] = [];
+  const nodeEnv = readOptionalString(process.env.NODE_ENV) ?? "missing";
+  const rawAppEnv = readOptionalString(process.env.APP_ENV);
+  let appEnv: AppEnv = "local";
+
+  if (rawAppEnv) {
+    if (APP_ENV_VALUES.has(rawAppEnv as AppEnv)) {
+      appEnv = rawAppEnv as AppEnv;
+    } else {
+      parseErrors.push(
+        "Invalid APP_ENV value: " +
+          rawAppEnv +
+          ". Allowed values: local, stage, prod.",
+      );
+    }
+  }
+
   const vercelEnv = readOptionalString(process.env.VERCEL_ENV);
-  const appBaseUrl = normalizeUrl(
-    readOptionalString(process.env.APP_BASE_URL),
-    "APP_BASE_URL",
-  );
-  const nextAuthUrl = normalizeUrl(
-    readOptionalString(process.env.NEXTAUTH_URL),
-    "NEXTAUTH_URL",
-  );
+  const authSecret = readOptionalString(process.env.AUTH_SECRET);
+  const nextAuthSecret = readOptionalString(process.env.NEXTAUTH_SECRET);
+  let appBaseUrl: string | null = null;
+  let nextAuthUrl: string | null = null;
+
+  try {
+    appBaseUrl = normalizeUrl(
+      readOptionalString(process.env.APP_BASE_URL),
+    );
+  } catch {
+    parseErrors.push(
+      "Invalid URL in environment variable APP_BASE_URL: " +
+        String(process.env.APP_BASE_URL),
+    );
+  }
+
+  try {
+    nextAuthUrl = normalizeUrl(
+      readOptionalString(process.env.NEXTAUTH_URL),
+    );
+  } catch {
+    parseErrors.push(
+      "Invalid URL in environment variable NEXTAUTH_URL: " +
+        String(process.env.NEXTAUTH_URL),
+    );
+  }
 
   return {
     nodeEnv,
     appEnv,
+    rawAppEnv,
     vercelEnv,
     appBaseUrl,
     nextAuthUrl,
     hasDatabaseUrl: Boolean(readOptionalString(process.env.DATABASE_URL)),
     hasDirectUrl: Boolean(readOptionalString(process.env.DIRECT_URL)),
-    hasNextAuthSecret: Boolean(readOptionalString(process.env.NEXTAUTH_SECRET)),
+    hasAuthSecret: Boolean(authSecret),
+    hasNextAuthSecret: Boolean(nextAuthSecret),
+    hasAnyAuthSecret: Boolean(authSecret || nextAuthSecret),
     isLocal: appEnv === "local",
     isStage: appEnv === "stage",
     isProd: appEnv === "prod",
     isVercel: Boolean(readOptionalString(process.env.VERCEL)),
+    parseErrors,
   };
 }
 
@@ -128,8 +132,14 @@ export function getEnvironmentWarnings(env: RuntimeEnvironment): string[] {
     warnings.push("DATABASE_URL is not configured.");
   }
 
-  if (!env.hasNextAuthSecret) {
-    warnings.push("NEXTAUTH_SECRET is not configured.");
+  if (!env.hasAnyAuthSecret) {
+    warnings.push("AUTH_SECRET or NEXTAUTH_SECRET is not configured.");
+  }
+
+  if (env.vercelEnv === "preview") {
+    warnings.push(
+      "Preview deployment detected. Preview URLs are disposable and are not the canonical operational truth. Validate the dedicated STAGE production deployment before assuming an app bug.",
+    );
   }
 
   if (env.isStage && env.vercelEnv === "production") {

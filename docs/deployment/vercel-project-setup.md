@@ -2,12 +2,13 @@
 
 ## Target projects
 
-Create 2 separate Vercel projects:
+Canonical WebApp deployment setup:
 
-1. `fc-allschwil-webapp-stage`
-2. `fc-allschwil-webapp-prod`
+1. `sportclubevo-webapp-stage`
+2. `sportclubevo-webapp-prod`
 
 Do not combine STAGE and PROD into one shared project.
+Do not treat random preview URLs as operational truth.
 
 ---
 
@@ -17,20 +18,28 @@ Do not combine STAGE and PROD into one shared project.
 - PROD project -> branch `main`
 
 Feature branches remain preview deployments only.
+The dedicated STAGE project is the canonical review target for route/runtime validation.
 
 ---
 
 ## Required environment variables
 
-Set these in both Vercel projects with project-specific values:
+Set these in both Vercel projects with project-specific values.
+For each key, enable the environments that need it in Vercel:
 
 - `NODE_ENV`
 - `APP_ENV`
 - `APP_BASE_URL`
 - `NEXTAUTH_URL`
-- `NEXTAUTH_SECRET`
+- `AUTH_SECRET` or `NEXTAUTH_SECRET`
 - `DATABASE_URL`
 - `DIRECT_URL`
+
+Minimum enablement matrix:
+
+- Production: all required keys enabled
+- Preview: `DATABASE_URL`, `AUTH_SECRET`/`NEXTAUTH_SECRET`, and `NEXTAUTH_URL` must also be enabled
+- Development: mirror the same auth/database basics so local and Vercel dev runs match expectations
 
 Optional now, likely needed later:
 
@@ -98,10 +107,16 @@ are provided by Vercel automatically and should not be manually overridden unles
 
 ## Verification after Vercel setup
 
-1. Open `/api/health`
+1. Open `/api/health` first
 2. Confirm:
-   - `appEnv`
-   - `vercelEnv`
+   - app status
+   - `APP_ENV`
+   - `NODE_ENV`
+   - `DATABASE_URL` present/missing
+   - `AUTH_SECRET` / `NEXTAUTH_SECRET` present/missing
+   - `NEXTAUTH_URL` present/missing
+   - deployment branch / commit metadata
+   - preview warning if applicable
    - DB status
    - warnings/errors
 3. Open `/dashboard/runtime`
@@ -109,3 +124,5 @@ are provided by Vercel automatically and should not be manually overridden unles
    - deployment metadata visible
    - protected access works
    - stage banner only appears in STAGE
+
+If `/api/health` shows a Preview warning, stop debugging the preview URL and switch back to the `sportclubevo-webapp-stage` production deployment before assuming a route or app-shell regression.

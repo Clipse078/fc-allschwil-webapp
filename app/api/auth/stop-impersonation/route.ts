@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth, unstable_update } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 
-export async function POST(_: NextRequest) {
+export async function POST() {
   const session = await auth();
 
   if (!session?.user || !session.user.isImpersonating || !session.user.actorUserId) {

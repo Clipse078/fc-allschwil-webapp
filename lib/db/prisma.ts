@@ -15,7 +15,7 @@ const globalForPrisma = globalThis as unknown as {
  *
  * If DATABASE_URL is missing on Vercel:
  *   1. Go to Vercel → Settings → Environment Variables
- *   2. Ensure DATABASE_URL is enabled for Production AND Preview environments
+ *   2. Ensure DATABASE_URL is enabled for Production, Preview, and Development
  *   3. Redeploy STAGE from the Vercel dashboard
  */
 function buildPrismaClient(): PrismaClient {
@@ -25,7 +25,7 @@ function buildPrismaClient(): PrismaClient {
     const message =
       "DATABASE_URL is not set. " +
       "Open Vercel → Settings → Environment Variables, " +
-      "enable DATABASE_URL for Production and Preview, then redeploy.";
+      "enable DATABASE_URL for Production, Preview, and Development, then redeploy.";
     console.error("[sportclubevo] FATAL:", message);
     throw new Error(message);
   }

@@ -15,13 +15,13 @@
 - Suggested domain later: `www.fcallschwil.ch`
 
 ### 3) FC Allschwil WebApp — STAGE
-- Project name: `fc-allschwil-webapp-stage`
+- Project name: `sportclubevo-webapp-stage`
 - Git branch: `STAGE`
 - Purpose: internal QA, operations testing, release validation
 - Suggested domain later: `stage-webapp.fcallschwil.ch`
 
 ### 4) FC Allschwil WebApp — PROD
-- Project name: `fc-allschwil-webapp-prod`
+- Project name: `sportclubevo-webapp-prod`
 - Git branch: `main`
 - Purpose: live internal operations system
 - Suggested domain later: `webapp.fcallschwil.ch`
