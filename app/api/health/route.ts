@@ -18,6 +18,27 @@ export async function GET(): Promise<NextResponse> {
         message: "DATABASE_URL is not configured.",
       };
 
+  const warnings = [...runtime.warnings];
+
+  if (deployment.isPreview) {
+    warnings.push(
+      "Running on a Vercel Preview deployment. " +
+        "Preview deployments may lack DATABASE_URL or AUTH_SECRET. " +
+        "Use the canonical STAGE/Production deployment for operational truth.",
+    );
+  }
+
+  const hasAuthSecret = Boolean(
+    process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  );
+
+  if (!hasAuthSecret) {
+    warnings.push(
+      "Neither AUTH_SECRET nor NEXTAUTH_SECRET is configured. " +
+        "Authentication will not work.",
+    );
+  }
+
   const ok = runtime.ok && database.ok;
   const status = ok ? 200 : 503;
 
@@ -36,12 +57,13 @@ export async function GET(): Promise<NextResponse> {
       checks: {
         hasDatabaseUrl: runtime.env.hasDatabaseUrl,
         hasDirectUrl: runtime.env.hasDirectUrl,
+        hasAuthSecret,
         hasNextAuthSecret: runtime.env.hasNextAuthSecret,
         hasAppBaseUrl: Boolean(runtime.env.appBaseUrl),
         hasNextAuthUrl: Boolean(runtime.env.nextAuthUrl),
       },
       database,
-      warnings: runtime.warnings,
+      warnings,
       errors: runtime.errors,
       timestamp: new Date().toISOString(),
     },
