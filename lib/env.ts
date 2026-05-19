@@ -8,11 +8,16 @@ export type RuntimeEnvironment = {
   nextAuthUrl: string | null;
   hasDatabaseUrl: boolean;
   hasDirectUrl: boolean;
+  /** True when AUTH_SECRET or NEXTAUTH_SECRET is present (Auth.js v5 uses AUTH_SECRET). */
   hasNextAuthSecret: boolean;
+  /** True when AUTH_SECRET is present (preferred for Auth.js v5). */
+  hasAuthSecret: boolean;
   isLocal: boolean;
   isStage: boolean;
   isProd: boolean;
   isVercel: boolean;
+  /** True when VERCEL_ENV === "preview". Preview deployments may lack required env vars. */
+  isPreviewDeployment: boolean;
 };
 
 const APP_ENV_VALUES = new Set<AppEnv>(["local", "stage", "prod"]);
@@ -83,6 +88,12 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     "NEXTAUTH_URL",
   );
 
+  // Auth.js v5 reads AUTH_SECRET; NEXTAUTH_SECRET is the v4 name (still supported).
+  const hasAuthSecret = Boolean(readOptionalString(process.env.AUTH_SECRET));
+  const hasNextAuthSecretLegacy = Boolean(
+    readOptionalString(process.env.NEXTAUTH_SECRET),
+  );
+
   return {
     nodeEnv,
     appEnv,
@@ -91,11 +102,13 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     nextAuthUrl,
     hasDatabaseUrl: Boolean(readOptionalString(process.env.DATABASE_URL)),
     hasDirectUrl: Boolean(readOptionalString(process.env.DIRECT_URL)),
-    hasNextAuthSecret: Boolean(readOptionalString(process.env.NEXTAUTH_SECRET)),
+    hasNextAuthSecret: hasAuthSecret || hasNextAuthSecretLegacy,
+    hasAuthSecret,
     isLocal: appEnv === "local",
     isStage: appEnv === "stage",
     isProd: appEnv === "prod",
     isVercel: Boolean(readOptionalString(process.env.VERCEL)),
+    isPreviewDeployment: vercelEnv === "preview",
   };
 }
 
@@ -116,6 +129,15 @@ export function getPublicEnvironmentLabel(
 export function getEnvironmentWarnings(env: RuntimeEnvironment): string[] {
   const warnings: string[] = [];
 
+  if (env.isPreviewDeployment) {
+    warnings.push(
+      "This is a Vercel Preview deployment. " +
+        "Preview deployments may not have DATABASE_URL, AUTH_SECRET/NEXTAUTH_SECRET, or other required env vars configured. " +
+        "Verify env vars in Vercel → Settings → Environment Variables and ensure they are enabled for Preview environments. " +
+        "Preview deployments are NOT canonical — use the STAGE Production deployment for testing.",
+    );
+  }
+
   if (!env.appBaseUrl) {
     warnings.push("APP_BASE_URL is not configured.");
   }
@@ -129,7 +151,14 @@ export function getEnvironmentWarnings(env: RuntimeEnvironment): string[] {
   }
 
   if (!env.hasNextAuthSecret) {
-    warnings.push("NEXTAUTH_SECRET is not configured.");
+    warnings.push(
+      "Neither AUTH_SECRET nor NEXTAUTH_SECRET is configured. Auth.js v5 requires AUTH_SECRET.",
+    );
+  } else if (!env.hasAuthSecret) {
+    warnings.push(
+      "NEXTAUTH_SECRET is set but AUTH_SECRET is not. Auth.js v5 prefers AUTH_SECRET. " +
+        "Consider adding AUTH_SECRET to align with Auth.js v5 conventions.",
+    );
   }
 
   if (env.isStage && env.vercelEnv === "production") {

@@ -28,7 +28,7 @@ Set these in both Vercel projects with project-specific values:
 - `APP_ENV`
 - `APP_BASE_URL`
 - `NEXTAUTH_URL`
-- `NEXTAUTH_SECRET`
+- `AUTH_SECRET` (preferred — Auth.js v5) or `NEXTAUTH_SECRET` (legacy alias, still accepted)
 - `DATABASE_URL`
 - `DIRECT_URL`
 
@@ -60,7 +60,7 @@ are provided by Vercel automatically and should not be manually overridden unles
 - `APP_ENV=stage`
 - `APP_BASE_URL=https://your-stage-url.example.com`
 - `NEXTAUTH_URL=https://your-stage-url.example.com`
-- `NEXTAUTH_SECRET=<unique-stage-secret>`
+- `AUTH_SECRET=<unique-stage-secret>`
 - `DATABASE_URL=<stage-db-url>`
 - `DIRECT_URL=<stage-direct-db-url>`
 
@@ -72,7 +72,7 @@ are provided by Vercel automatically and should not be manually overridden unles
 - `APP_ENV=prod`
 - `APP_BASE_URL=https://your-prod-url.example.com`
 - `NEXTAUTH_URL=https://your-prod-url.example.com`
-- `NEXTAUTH_SECRET=<unique-prod-secret>`
+- `AUTH_SECRET=<unique-prod-secret>`
 - `DATABASE_URL=<prod-db-url>`
 - `DIRECT_URL=<prod-direct-db-url>`
 
@@ -84,6 +84,7 @@ are provided by Vercel automatically and should not be manually overridden unles
 - never reuse the same database between STAGE and PROD
 - never point STAGE to PROD URLs
 - never point PROD to localhost
+- use `AUTH_SECRET` (not `NEXTAUTH_SECRET`) for new setups — Auth.js v5 prefers `AUTH_SECRET`
 - run migrations in STAGE first
 - verify `/api/health` in STAGE before promoting to PROD
 

@@ -24,7 +24,16 @@ export async function GET(): Promise<NextResponse> {
   return NextResponse.json(
     {
       ok,
-      deployment,
+      deployment: {
+        environment: deployment.environment,
+        vercelEnv: deployment.vercelEnv,
+        isPreview: deployment.isPreview,
+        branch: deployment.branch,
+        commitSha: deployment.commitSha,
+        deploymentId: deployment.deploymentId,
+        deploymentUrl: deployment.deploymentUrl,
+        buildTime: deployment.buildTime,
+      },
       environment: {
         appEnv: runtime.env.appEnv,
         nodeEnv: runtime.env.nodeEnv,
@@ -32,10 +41,14 @@ export async function GET(): Promise<NextResponse> {
         isLocal: runtime.env.isLocal,
         isStage: runtime.env.isStage,
         isProd: runtime.env.isProd,
+        isPreviewDeployment: runtime.env.isPreviewDeployment,
       },
       checks: {
         hasDatabaseUrl: runtime.env.hasDatabaseUrl,
         hasDirectUrl: runtime.env.hasDirectUrl,
+        /** AUTH_SECRET (Auth.js v5 preferred) present */
+        hasAuthSecret: runtime.env.hasAuthSecret,
+        /** AUTH_SECRET or NEXTAUTH_SECRET present */
         hasNextAuthSecret: runtime.env.hasNextAuthSecret,
         hasAppBaseUrl: Boolean(runtime.env.appBaseUrl),
         hasNextAuthUrl: Boolean(runtime.env.nextAuthUrl),
