@@ -92,7 +92,7 @@ export default function TeamRosterOverviewCard({
         <h3 className="fca-heading mt-2">Spielerkader und Trainerteam</h3>
         <p className="fca-body-muted mt-3 max-w-3xl">
           Saisonbasierte Grundlage für Kaderverwaltung mit getrennten Bereichen
-          für Spieler und Trainer – im selben FCA Premium UX Stil wie die Website.
+          für Spieler und Trainer – im selben SportClubEvo Premium UX Stil wie die Website.
         </p>
       </div>
 

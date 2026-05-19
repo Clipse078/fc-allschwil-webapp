@@ -69,18 +69,18 @@ export default function TargetLinkEditor({
 
   const chipBase =
     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition cursor-pointer select-none";
-  const chipActive = "border-[#0b4aa2] bg-[#0b4aa2]/8 text-[#0b4aa2]";
+  const chipActive = "sce-chip-primary";
   const chipInactive =
-    "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50";
+    "border-[var(--sce-border)] bg-[var(--sce-surface-strong)] text-[var(--sce-muted)] hover:border-[var(--sce-border-strong)] hover:bg-[var(--sce-surface-muted)]";
 
   return (
     <section
       id="links"
-      className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
+      className="sce-page-card p-6"
     >
       <div className="mb-5 flex items-center gap-2">
-        <Link2 className="h-5 w-5 text-[#0b4aa2]" />
-        <h3 className="text-[1.05rem] font-semibold text-slate-900">
+        <Link2 className="h-5 w-5 text-[var(--sce-primary-strong)]" />
+        <h3 className="sce-section-title">
           Verknüpfungen
         </h3>
       </div>
@@ -174,7 +174,7 @@ export default function TargetLinkEditor({
           type="button"
           onClick={handleSave}
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-5 py-2 text-[12px] font-semibold text-white disabled:opacity-60 hover:bg-[#08357a]"
+          className="sce-action-primary px-5 py-2 text-[12px] disabled:opacity-60"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           Speichern

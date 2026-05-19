@@ -12,9 +12,9 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_CLASSES: Record<string, string> = {
-  ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  INACTIVE: "border-amber-200 bg-amber-50 text-amber-700",
-  ARCHIVED: "border-slate-200 bg-slate-50 text-slate-400",
+  ACTIVE: "sce-chip-success",
+  INACTIVE: "sce-chip-warning",
+  ARCHIVED: "sce-chip",
 };
 
 export default async function OrgUnitsPage() {
@@ -28,18 +28,18 @@ export default async function OrgUnitsPage() {
         title="Organisationseinheiten"
         description="Organigramm-Grundlage für Sichtbarkeit, Kommunikation und Workflow-Routing."
         actions={
-          <Link href="/dashboard/org-units/new" className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]">
+          <Link href="/dashboard/org-units/new" className="sce-action-primary px-4 py-2.5 text-sm">
             <Plus className="h-4 w-4" />Neue Einheit
           </Link>
         }
       />
 
       {orgUnits.length === 0 ? (
-        <section className="rounded-[30px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-          <Building2 className="mx-auto mb-4 h-10 w-10 text-slate-300" />
-          <h3 className="text-[1.05rem] font-semibold text-slate-900">Noch keine Organisationseinheiten</h3>
-          <p className="mt-2 text-sm text-slate-500">Erstelle die erste Einheit — z.B. Verein, Abteilung oder Ausschuss.</p>
-          <Link href="/dashboard/org-units/new" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#08357a]">
+        <section className="sce-empty-state p-10">
+          <Building2 className="mx-auto mb-4 h-10 w-10 text-[var(--sce-subtle)]" />
+          <h3 className="sce-section-title">Noch keine Organisationseinheiten</h3>
+          <p className="mt-2 text-sm text-[var(--sce-muted)]">Erstelle die erste Einheit — z.B. Verein, Abteilung oder Ausschuss.</p>
+          <Link href="/dashboard/org-units/new" className="sce-action-primary mt-5 px-5 py-2.5 text-sm">
             <Plus className="h-4 w-4" />Erste Einheit erstellen
           </Link>
         </section>
@@ -47,12 +47,12 @@ export default async function OrgUnitsPage() {
         <div className="space-y-2">
           {orgUnits.map((unit) => (
             <Link key={unit.id} href={`/dashboard/org-units/${unit.id}`}
-              className="flex items-center justify-between gap-4 rounded-[22px] border border-slate-200/80 bg-white px-5 py-4 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-md"
+              className="sce-list-card flex items-center justify-between gap-4 px-5 py-4"
               style={{ paddingLeft: `${20 + unit.level * 28}px` }}>
               <div className="flex min-w-0 items-center gap-3">
                 <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">{unit.name}</p>
+                  <p className="truncate text-sm font-semibold text-[var(--sce-heading)]">{unit.name}</p>
                   <p className="truncate text-[11px] text-slate-500">
                     {TYPE_LABELS[unit.type] ?? unit.type}
                     {" · "}

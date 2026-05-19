@@ -21,7 +21,7 @@ export default async function PlayersPage() {
       <AdminSectionHeader
         eyebrow="Spieler"
         title="Spieler"
-        description="Foto-first Spielerübersicht im FCA Premium UX Stil – vorbereitet für spätere Kader-, Team- und Website-Publikationslogik."
+        description="Foto-first Spielerübersicht im SportClubEvo Premium UX Stil – vorbereitet für spätere Kader-, Team- und Website-Publikationslogik."
       />
 
       <PlayersList players={players} />

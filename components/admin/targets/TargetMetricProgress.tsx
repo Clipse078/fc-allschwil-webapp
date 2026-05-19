@@ -45,7 +45,7 @@ function formatValue(
 
 function getProgressColor(percent: number): string {
   if (percent >= 90) return "bg-emerald-500";
-  if (percent >= 60) return "bg-[#0b4aa2]";
+  if (percent >= 60) return "bg-[var(--sce-primary)]";
   if (percent >= 30) return "bg-amber-500";
   return "bg-rose-400";
 }
@@ -71,31 +71,31 @@ export default function TargetMetricProgress({
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-slate-900 leading-5">
+          <p className="text-[13px] font-medium leading-5 text-[var(--sce-heading)]">
             {directionLabel} {label}
           </p>
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            Aktuell: <span className="font-semibold text-slate-700">{currentFormatted}</span>
+          <p className="mt-0.5 text-[11px] text-[var(--sce-muted)]">
+            Aktuell: <span className="font-semibold text-[var(--sce-foreground)]">{currentFormatted}</span>
             {" · "}
-            Ziel: <span className="font-semibold text-slate-700">{targetFormatted}</span>
+            Ziel: <span className="font-semibold text-[var(--sce-foreground)]">{targetFormatted}</span>
           </p>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+          className={`sce-chip shrink-0 px-2.5 py-0.5 text-[11px] ${
             percent >= 90
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              ? "sce-chip-success"
               : percent >= 60
-                ? "bg-blue-50 text-[#0b4aa2] border border-blue-200"
+                ? "sce-chip-primary"
                 : percent >= 30
-                  ? "bg-amber-50 text-amber-700 border border-amber-200"
-                  : "bg-rose-50 text-rose-700 border border-rose-200"
+                  ? "sce-chip-warning"
+                  : "sce-chip-danger"
           }`}
         >
           {percent}%
         </span>
       </div>
 
-      <div className="h-2 rounded-full bg-slate-100">
+      <div className="h-2 rounded-full bg-[var(--sce-surface-muted)]">
         <div
           className={`h-2 rounded-full transition-all ${progressColor}`}
           style={{ width: `${percent}%` }}

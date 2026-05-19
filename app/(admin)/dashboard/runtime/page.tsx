@@ -13,19 +13,19 @@ export default async function DashboardRuntimePage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
+      <section className="sce-page-card p-6 backdrop-blur-xl lg:p-7">
         <p className="fca-eyebrow">Deployment Diagnostics</p>
-        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[#0b4aa2] lg:text-[2.35rem]">
+        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[var(--sce-heading)] lg:text-[2.35rem]">
           Runtime & Deployment
         </h2>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+      <section className="sce-page-card p-8">
+        <div className="sce-kicker mb-3">
           Deployment
         </div>
 
-        <dl className="space-y-3 text-sm text-slate-700">
+        <dl className="space-y-3 text-sm text-[var(--sce-muted)]">
           <div className="flex justify-between">
             <dt>Environment</dt>
             <dd>{deployment.environment}</dd>
@@ -45,16 +45,16 @@ export default async function DashboardRuntimePage() {
         </dl>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
+      <section className="sce-page-card p-8">
+        <div className="sce-kicker mb-3">
           Runtime Status
         </div>
 
         <div
           className={
             runtime.ok
-              ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700"
-              : "inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-semibold text-red-700"
+              ? "sce-chip sce-chip-success px-3 py-1 text-sm"
+              : "sce-chip sce-chip-danger px-3 py-1 text-sm"
           }
         >
           {runtime.ok ? "Healthy" : "Action required"}

@@ -140,7 +140,7 @@ export default function PlannerEntryCreateForm({
                 )}
                 className={
                   isSelected
-                    ? "rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#0b4aa2]"
+                    ? "rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[var(--sce-primary)]"
                     : "rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
                 }
               >
@@ -387,7 +387,7 @@ export default function PlannerEntryCreateForm({
               <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   type="submit"
-                  className="inline-flex h-11 items-center rounded-full bg-[#0b4aa2] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#08357a]"
+                  className="inline-flex h-11 items-center rounded-full bg-[var(--sce-primary)] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--sce-primary-strong)]"
                 >
                   {mode === "edit"
                     ? "Änderungen speichern"

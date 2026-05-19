@@ -74,7 +74,7 @@ export default async function EditTargetPage({ params }: PageProps) {
         actions={
           <Link
             href={`/vereinsleitung/targets/${id}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="sce-action-secondary px-4 py-2 text-sm font-medium"
           >
             <ArrowLeft className="h-4 w-4" />
             Zurück

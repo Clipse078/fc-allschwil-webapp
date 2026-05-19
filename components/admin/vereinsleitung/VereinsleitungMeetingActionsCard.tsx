@@ -24,7 +24,7 @@ export default function VereinsleitungMeetingActionsCard({ isDbBacked, actions }
           <div className="mt-6 divide-y divide-slate-100 overflow-hidden rounded-[22px] border border-slate-200/80 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.03)]">
             {actions.map((a) => (
               <div key={a.id} className="flex items-start gap-4 px-4 py-4">
-                <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${a.status === "DONE" ? "border-[#0b4aa2] bg-[#0b4aa2] text-white" : "border-slate-300 bg-white text-slate-400"}`}>
+                <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${a.status === "DONE" ? "border-[var(--sce-primary)] bg-[var(--sce-primary)] text-white" : "border-slate-300 bg-white text-slate-400"}`}>
                   <Circle className="h-3.5 w-3.5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -55,14 +55,14 @@ export default function VereinsleitungMeetingActionsCard({ isDbBacked, actions }
       <div className="mt-6 divide-y divide-slate-100 overflow-hidden rounded-[22px] border border-slate-200/80 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.03)]">
         {MOCK_ACTIONS.map((a) => (
           <div key={a.title} className="flex items-start gap-4 px-4 py-4 transition hover:bg-slate-50/70">
-            <button type="button" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${a.completed ? "border-[#0b4aa2] bg-[#0b4aa2] text-white" : "border-slate-300 bg-white text-slate-400"}`}>
+            <button type="button" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${a.completed ? "border-[var(--sce-primary)] bg-[var(--sce-primary)] text-white" : "border-slate-300 bg-white text-slate-400"}`}>
               <Circle className="h-3.5 w-3.5" />
             </button>
             <div className="min-w-0 flex-1">
               <p className={`text-sm font-semibold leading-5 ${a.completed ? "text-slate-400 line-through" : "text-slate-900"}`}>{a.title}</p>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0b4aa2]/10 text-[10px] font-semibold text-[#0b4aa2]">{a.ownerInitials}</span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--sce-primary-soft)] text-[10px] font-semibold text-[var(--sce-primary)]">{a.ownerInitials}</span>
               <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600"><CalendarDays className="h-3.5 w-3.5" />{a.due}</span>
             </div>
           </div>

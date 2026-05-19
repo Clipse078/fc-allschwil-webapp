@@ -26,7 +26,7 @@ export default function DashboardModuleCards({
           <p className="fca-eyebrow">Module</p>
           <h3 className="fca-heading mt-2">Verfügbare Bereiche</h3>
           <p className="fca-body-muted mt-3 max-w-2xl">
-            Einstieg in die freigeschalteten FCA WebApp Bereiche mit derselben
+            Einstieg in die freigeschalteten SportClubEvo WebApp Bereiche mit derselben
             Premium-UX wie auf der Website.
           </p>
         </div>
@@ -50,7 +50,7 @@ export default function DashboardModuleCards({
                       </h4>
                     </div>
 
-                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[#0b4aa2]">
+                    <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--sce-primary)]">
                       Live
                     </span>
                   </div>

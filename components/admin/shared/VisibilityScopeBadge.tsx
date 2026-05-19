@@ -16,17 +16,17 @@ export default function VisibilityScopeBadge({
   const config = {
     ORGANISATION: {
       label: "Organisation",
-      classes: "border-slate-200 bg-slate-50 text-slate-500",
+      classes: "sce-chip",
       Icon: Eye,
     },
     RESTRICTED: {
       label: "Eingeschränkt",
-      classes: "border-amber-200 bg-amber-50 text-amber-700",
+      classes: "sce-chip-warning",
       Icon: EyeOff,
     },
     PRIVATE: {
       label: "Privat",
-      classes: "border-rose-200 bg-rose-50 text-rose-700",
+      classes: "sce-chip-danger",
       Icon: Lock,
     },
   }[scope];

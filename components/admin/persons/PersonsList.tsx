@@ -26,7 +26,7 @@ export default function PersonsList({ persons }: PersonsListProps) {
         <div className="space-y-3">
           <p className="fca-subheading">Noch keine Personen</p>
           <p className="text-sm leading-6 text-slate-600">
-            Dieser Bereich ist nun im FCA Premium UX Stil vorbereitet. Als Nächstes
+            Dieser Bereich ist nun im SportClubEvo Premium UX Stil vorbereitet. Als Nächstes
             können wir hier echte Personendaten, Fotos und Filter anbinden.
           </p>
         </div>

@@ -124,7 +124,7 @@ export default function VereinsleitungMeetingsList({
                   <Edit className="h-3.5 w-3.5" />
                   Bearbeiten
                 </Link>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--sce-primary)]">
                   Öffnen
                   <ChevronRight className="h-4 w-4" />
                 </span>

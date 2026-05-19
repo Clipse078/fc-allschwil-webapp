@@ -63,7 +63,7 @@ export default function VereinsleitungKpiCard({ items }: VereinsleitungKpiCardPr
             <div className="mt-3 flex items-center justify-between gap-2">
               <p className="text-[11px] text-slate-400">{kpi.note}</p>
               {kpi.href ? (
-                <Link href={kpi.href} className="text-[11px] font-medium text-[#0b4aa2] hover:underline">Details →</Link>
+                <Link href={kpi.href} className="text-[11px] font-medium text-[var(--sce-primary)] hover:underline">Details →</Link>
               ) : null}
             </div>
           </div>

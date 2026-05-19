@@ -497,7 +497,7 @@ export default function WochenplanRoomDayPlannerDialog({
                   className={[
                     "grid grid-cols-[220px_minmax(0,1fr)] overflow-hidden rounded-[26px] border transition",
                     isActiveDropZone
-                      ? "border-[#0b4aa2] bg-blue-50/40 shadow-[0_0_0_4px_rgba(11,74,162,0.08)]"
+                      ? "border-[var(--sce-primary)] bg-blue-50/40 shadow-[0_0_0_4px_var(--sce-primary-soft)]"
                       : roomTone.rowBorderClass + " bg-white",
                   ].join(" ")}
                 >
@@ -519,7 +519,7 @@ export default function WochenplanRoomDayPlannerDialog({
                     </p>
 
                     {isActiveDropZone ? (
-                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#0b4aa2]">
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--sce-primary)]">
                         Hier ablegen
                       </p>
                     ) : null}
@@ -564,7 +564,7 @@ export default function WochenplanRoomDayPlannerDialog({
                                 "min-h-[84px] max-h-[92px]",
                                 item.toneClassName,
                                 item.glowClassName,
-                                isDraggingThisItem ? "opacity-45 ring-2 ring-[#0b4aa2]/20" : "",
+                                isDraggingThisItem ? "opacity-45 ring-2 ring-[var(--sce-primary)]" : "",
                               ].join(" ")}
                               style={{
                                 left: item.leftPercent + "%",
@@ -664,7 +664,7 @@ export default function WochenplanRoomDayPlannerDialog({
                           selectEvent.target.value === "" ? null : selectEvent.target.value,
                         )
                       }
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[#0b4aa2]"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[var(--sce-primary)]"
                     >
                       <option value="">Keine</option>
                       {DRESSING_ROOMS.map((roomCode) => (
@@ -688,7 +688,7 @@ export default function WochenplanRoomDayPlannerDialog({
                           selectEvent.target.value === "" ? null : selectEvent.target.value,
                         )
                       }
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[#0b4aa2]"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[var(--sce-primary)]"
                     >
                       <option value="">Keine</option>
                       {DRESSING_ROOMS.map((roomCode) => (

@@ -34,7 +34,7 @@ function getAccentClasses(accent: EventModuleCardProps["accent"]) {
     default:
       return {
         glow: "shadow-[0_18px_40px_rgba(59,130,246,0.10)]",
-        icon: "text-[#0b4aa2] border-blue-100 bg-blue-50",
+        icon: "text-[var(--sce-primary)] border-blue-100 bg-blue-50",
       };
   }
 }

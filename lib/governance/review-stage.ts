@@ -62,23 +62,23 @@ export type ReviewStageInfo = {
 const STAGE_META: Record<ReviewWorkflowStage, Omit<ReviewStageInfo, "stage" | "isDraft" | "isSubmitted" | "isApproved" | "isRejected" | "isPublished">> = {
   [ReviewWorkflowStage.DRAFT]: {
     label: "Entwurf",
-    badgeClasses: "border-slate-200 bg-slate-50 text-slate-600",
+    badgeClasses: "sce-chip",
   },
   [ReviewWorkflowStage.SUBMITTED]: {
     label: "Zur Prüfung",
-    badgeClasses: "border-amber-200 bg-amber-50 text-amber-700",
+    badgeClasses: "sce-chip-warning",
   },
   [ReviewWorkflowStage.APPROVED]: {
     label: "Genehmigt",
-    badgeClasses: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    badgeClasses: "sce-chip-success",
   },
   [ReviewWorkflowStage.REJECTED]: {
     label: "Abgelehnt",
-    badgeClasses: "border-rose-200 bg-rose-50 text-rose-700",
+    badgeClasses: "sce-chip-danger",
   },
   [ReviewWorkflowStage.PUBLISHED]: {
     label: "Veröffentlicht",
-    badgeClasses: "border-blue-200 bg-blue-50 text-[#0b4aa2]",
+    badgeClasses: "sce-chip-primary",
   },
 };
 

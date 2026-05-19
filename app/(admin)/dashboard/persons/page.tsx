@@ -21,7 +21,7 @@ export default async function PersonsPage() {
       <AdminSectionHeader
         eyebrow="Personen"
         title="Personen"
-        description="Zentrale Übersicht für Personenprofile im FCA WebApp Stil – mit Foto, Rollenhinweisen und klarer Premium-Darstellung."
+        description="Zentrale Übersicht für Personenprofile im SportClubEvo WebApp Stil – mit Foto, Rollenhinweisen und klarer Premium-Darstellung."
       />
 
       <PersonsList persons={persons} />

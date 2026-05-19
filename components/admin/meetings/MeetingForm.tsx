@@ -109,20 +109,20 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
   }
 
   const fieldClass =
-    "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30";
+    "sce-form-field";
   const labelClass =
-    "block text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1.5";
+    "sce-kicker mb-1.5 block";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error ? (
-        <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
+        <div className="fca-status-box fca-status-box-error px-5 py-4 font-medium">
           {error}
         </div>
       ) : null}
 
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-5 text-[1.05rem] font-semibold text-slate-900">Grunddaten</h3>
+      <section className="sce-page-card p-6">
+        <h3 className="sce-section-title mb-5">Grunddaten</h3>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
@@ -199,9 +199,9 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-2 text-[1.05rem] font-semibold text-slate-900">Sichtbarkeit</h3>
-        <p className="mb-5 text-[12px] text-slate-500">
+      <section className="sce-page-card p-6">
+        <h3 className="sce-section-title mb-2">Sichtbarkeit</h3>
+        <p className="mb-5 text-[12px] text-[var(--sce-muted)]">
           Wer kann dieses Meeting sehen? Wähle sorgfältig — Privat und Eingeschränkt
           verbergen diesen Eintrag für nicht berechtigte Benutzer.
         </p>
@@ -221,14 +221,14 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          className="sce-action-secondary px-5 py-2.5 text-sm font-medium"
         >
           Abbrechen
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60 hover:bg-[#08357a]"
+          className="sce-action-primary px-6 py-2.5 text-sm disabled:opacity-60"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {mode === "create" ? "Meeting erstellen" : "Änderungen speichern"}

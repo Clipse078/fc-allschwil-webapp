@@ -88,14 +88,14 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
 
       <section
         id="create-season"
-        className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
+        className="sce-page-card p-6"
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="text-[1.15rem] font-semibold text-slate-900">
+            <h3 className="sce-section-title">
               Neue Saison planen
             </h3>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
+            <p className="mt-2 max-w-3xl text-sm text-[var(--sce-muted)]">
               Beim Erstellen einer neuen Saison bleibt die aktuelle Saison laufend.
               Die neue zukünftige Saison wird automatisch als <span className="font-semibold text-amber-700">In Planung</span> angelegt.
               Sobald der Saisonzeitraum beginnt, wird sie automatisch zur <span className="font-semibold text-emerald-700">laufenden</span> Saison.
@@ -105,7 +105,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
           <form action={createNextSeasonAction}>
             <button
               type="submit"
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
+              className="sce-action-primary h-11 px-4 text-sm"
             >
               <Plus className="h-4 w-4" />
               Neue Saison planen
@@ -114,20 +114,20 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
         </div>
       </section>
 
-      <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+      <section className="sce-page-card p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="text-[1.15rem] font-semibold text-slate-900">
+            <h3 className="sce-section-title">
               Saison-Lifecycle
             </h3>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
+            <p className="mt-2 max-w-3xl text-sm text-[var(--sce-muted)]">
               Neue zukünftige Saisons sind <span className="font-semibold text-amber-700">In Planung</span>.
               Die aktuelle Saison ist <span className="font-semibold text-emerald-700">Laufend</span>.
               Vergangene Saisons werden automatisch als <span className="font-semibold text-slate-700">Abgeschlossen</span> behandelt.
             </p>
           </div>
 
-          <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-[var(--sce-muted)]">
             Löschen ist nur für <span className="font-semibold text-amber-700">In Planung</span> erlaubt und nur solange keine Abhängigkeiten existieren.
           </div>
         </div>
@@ -142,14 +142,14 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
         return (
           <section
             key={season.id}
-            className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
+            className="sce-page-card p-6"
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h3 className="text-[1.15rem] font-semibold text-slate-900">
+                <h3 className="sce-section-title">
                   {season.name}
                 </h3>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-[var(--sce-muted)]">
                   Führende Saisonstruktur für Teams und Events.
                 </p>
               </div>
@@ -164,13 +164,13 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                 </span>
 
                 {season.shouldBeActive ? (
-                  <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0b4aa2]">
+                  <span className="sce-chip sce-chip-primary px-3 py-1.5 text-xs">
                     Führende Saison
                   </span>
                 ) : null}
 
                 {season.isActive !== season.shouldBeActive ? (
-                  <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700">
+                  <span className="sce-chip sce-chip-danger px-3 py-1.5 text-xs">
                     DB-Status prüfen
                   </span>
                 ) : null}
@@ -178,49 +178,49 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+              <div className="rounded-[22px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] p-4">
+                <p className="sce-kicker">
                   Zeitraum
                 </p>
-                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <CalendarDays className="h-4 w-4 text-[#0b4aa2]" />
+                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[var(--sce-foreground)]">
+                  <CalendarDays className="h-4 w-4 text-[var(--sce-primary-strong)]" />
                   {formatSwissDate(season.startDate)} – {formatSwissDate(season.endDate)}
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+              <div className="rounded-[22px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] p-4">
+                <p className="sce-kicker">
                   Teams
                 </p>
-                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <Layers3 className="h-4 w-4 text-[#0b4aa2]" />
+                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[var(--sce-foreground)]">
+                  <Layers3 className="h-4 w-4 text-[var(--sce-primary-strong)]" />
                   {season.teamSeasonCount} Team-Saisons
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+              <div className="rounded-[22px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] p-4">
+                <p className="sce-kicker">
                   Events
                 </p>
-                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <Flag className="h-4 w-4 text-[#0b4aa2]" />
+                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[var(--sce-foreground)]">
+                  <Flag className="h-4 w-4 text-[var(--sce-primary-strong)]" />
                   {season.eventCount} Events
                 </div>
               </div>
 
-              <div className="rounded-[22px] border border-slate-200/80 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+              <div className="rounded-[22px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] p-4">
+                <p className="sce-kicker">
                   Aktiver DB-Flag
                 </p>
-                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-                  <CheckCircle2 className="h-4 w-4 text-[#0b4aa2]" />
+                <div className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[var(--sce-foreground)]">
+                  <CheckCircle2 className="h-4 w-4 text-[var(--sce-primary-strong)]" />
                   {season.isActive ? "true" : "false"}
                 </div>
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-slate-200/80 bg-slate-50 px-4 py-4">
-              <div className="text-sm text-slate-600">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] px-4 py-4">
+              <div className="text-sm text-[var(--sce-muted)]">
                 {canDelete ? (
                   <span>
                     Diese Saison kann gelöscht werden, da sie <span className="font-semibold text-amber-700">In Planung</span> ist und noch keine Abhängigkeiten hat.
@@ -237,7 +237,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                   <input type="hidden" name="seasonId" value={season.id} />
                   <button
                     type="submit"
-                    className="inline-flex h-11 items-center gap-2 rounded-full border border-rose-200 bg-white px-4 text-sm font-medium text-rose-600 shadow-sm transition hover:-translate-y-[1px] hover:bg-rose-50"
+                    className="sce-action-danger h-11 px-4 text-sm font-medium"
                   >
                     <Trash2 className="h-4 w-4" />
                     Saison löschen
@@ -247,7 +247,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
                 <button
                   type="button"
                   disabled
-                  className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-4 text-sm font-medium text-slate-400"
+                  className="sce-action-secondary h-11 px-4 text-sm font-medium opacity-60"
                 >
                   <Trash2 className="h-4 w-4" />
                   Saison löschen

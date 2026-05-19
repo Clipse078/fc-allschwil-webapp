@@ -54,22 +54,22 @@ export default function TargetStageActions({
   function getButtonStyle(stage: ReviewWorkflowStage): string {
     switch (stage) {
       case ReviewWorkflowStage.SUBMITTED:
-        return "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100";
+        return "sce-chip-warning hover:opacity-85";
       case ReviewWorkflowStage.APPROVED:
-        return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+        return "sce-chip-success hover:opacity-85";
       case ReviewWorkflowStage.REJECTED:
-        return "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100";
+        return "sce-chip-danger hover:opacity-85";
       case ReviewWorkflowStage.PUBLISHED:
-        return "border-blue-200 bg-blue-50 text-[#0b4aa2] hover:bg-blue-100";
+        return "sce-chip-primary hover:opacity-85";
       default:
-        return "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100";
+        return "sce-chip hover:opacity-85";
     }
   }
 
   return (
     <div className="space-y-2">
       {error ? (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">
+        <p className="fca-status-box fca-status-box-error px-3 py-2 text-[11px] font-medium">
           {error}
         </p>
       ) : null}

@@ -49,7 +49,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
         actions={
           <Link
             href="/vereinsleitung/initiativen"
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="sce-action-secondary px-4 py-2 text-sm font-medium"
           >
             <ArrowLeft className="h-4 w-4" />
             Zurück
@@ -62,10 +62,10 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
           <InitiativeGovernanceBanner initiative={dbInitiative} />
 
           <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-            <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+            <section className="sce-page-card p-6">
               <div className="mb-5 flex flex-wrap items-center gap-2">
                 {dbInitiative.status ? (
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+                  <span className="sce-chip px-3 py-1.5 text-[11px]">
                     {STATUS_LABELS[dbInitiative.status] ?? dbInitiative.status}
                   </span>
                 ) : null}
@@ -94,13 +94,13 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
                     <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                       Fortschritt
                     </p>
-                    <span className="text-sm font-semibold text-[#0b4aa2]">
+                    <span className="text-sm font-semibold text-[var(--sce-primary-strong)]">
                       {dbInitiative.progress}%
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-100">
                     <div
-                      className="h-2 rounded-full bg-[#0b4aa2]"
+                      className="h-2 rounded-full bg-[var(--sce-primary)]"
                       style={{ width: `${Math.min(100, dbInitiative.progress)}%` }}
                     />
                   </div>
@@ -109,7 +109,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
             </section>
 
             <aside className="space-y-5">
-              <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+              <section className="sce-page-card p-5">
                 <h3 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Details
                 </h3>
@@ -119,7 +119,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
                       <Users className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                       <div>
                         <dt className="text-[11px] text-slate-400">Verantwortlich</dt>
-                        <dd className="text-sm font-medium text-slate-900">
+                        <dd className="text-sm font-medium text-[var(--sce-heading)]">
                           {dbInitiative.owner}
                         </dd>
                       </div>
@@ -131,7 +131,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
                       <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                       <div>
                         <dt className="text-[11px] text-slate-400">Fällig bis</dt>
-                        <dd className="text-sm font-medium text-slate-900">
+                        <dd className="text-sm font-medium text-[var(--sce-heading)]">
                           {formatSwissDate(dbInitiative.dueDate)}
                         </dd>
                       </div>
@@ -142,7 +142,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
                     <Flag className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                     <div>
                       <dt className="text-[11px] text-slate-400">Status</dt>
-                      <dd className="text-sm font-medium text-slate-900">
+                      <dd className="text-sm font-medium text-[var(--sce-heading)]">
                         {STATUS_LABELS[dbInitiative.status] ?? dbInitiative.status}
                       </dd>
                     </div>
@@ -150,7 +150,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
 
                   <div>
                     <dt className="text-[11px] text-slate-400 mb-1">Erstellt</dt>
-                    <dd className="text-sm font-medium text-slate-900">
+                    <dd className="text-sm font-medium text-[var(--sce-heading)]">
                       {formatSwissDate(dbInitiative.createdAt)}
                     </dd>
                   </div>
@@ -161,7 +161,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
         </>
       ) : (
         // Graceful fallback for slugs not yet in DB (legacy mock links still work)
-        <section className="rounded-[28px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <section className="sce-page-card p-8">
           <p className="text-sm font-medium text-slate-500">
             Diese Initiative ist noch nicht in der Datenbank erfasst.
           </p>

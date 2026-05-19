@@ -56,7 +56,7 @@ export default function VereinsleitungGoalsCard({ targets = [] }: Vereinsleitung
           {!hasRealData ? (
             <p className="mt-0.5 text-[11px] text-slate-400">
               Demo-Daten ·{" "}
-              <Link href="/vereinsleitung/targets" className="text-[#0b4aa2] hover:underline">
+              <Link href="/vereinsleitung/targets" className="text-[var(--sce-primary)] hover:underline">
                 echte Ziele erfassen
               </Link>
             </p>
@@ -82,11 +82,11 @@ export default function VereinsleitungGoalsCard({ targets = [] }: Vereinsleitung
                 <p className="text-[15px] font-semibold leading-6 text-slate-900">{item.title}</p>
                 <p className="mt-0.5 text-xs text-slate-500">{item.category}</p>
               </div>
-              <span className="shrink-0 text-sm font-semibold text-[#0b4aa2]">{item.progress}%</span>
+              <span className="shrink-0 text-sm font-semibold text-[var(--sce-primary)]">{item.progress}%</span>
             </div>
             <div className="h-2 rounded-full bg-slate-100">
               <div
-                className={`h-2 rounded-full transition-all ${item.progress >= 90 ? "bg-emerald-500" : item.progress >= 60 ? "bg-[#0b4aa2]" : item.progress >= 30 ? "bg-amber-500" : "bg-rose-400"}`}
+                className={`h-2 rounded-full transition-all ${item.progress >= 90 ? "bg-emerald-500" : item.progress >= 60 ? "bg-[var(--sce-primary)]" : item.progress >= 30 ? "bg-amber-500" : "bg-rose-400"}`}
                 style={{ width: `${item.progress}%` }}
               />
             </div>

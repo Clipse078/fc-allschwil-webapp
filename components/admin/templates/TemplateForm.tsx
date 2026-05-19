@@ -95,15 +95,15 @@ export default function TemplateForm({ mode, templateId, defaultValues }: Templa
     }
   }
 
-  const fieldClass = "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30";
-  const labelClass = "block text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1.5";
+  const fieldClass = "sce-form-field";
+  const labelClass = "sce-kicker mb-1.5 block";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error ? <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">{error}</div> : null}
+      {error ? <div className="fca-status-box fca-status-box-error px-5 py-4 font-medium">{error}</div> : null}
 
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-5 text-[1.05rem] font-semibold text-slate-900">Vorlage</h3>
+      <section className="sce-page-card p-6">
+        <h3 className="sce-section-title mb-5">Vorlage</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <label className={labelClass}>Titel *</label>
@@ -128,10 +128,10 @@ export default function TemplateForm({ mode, templateId, defaultValues }: Templa
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+      <section className="sce-page-card p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-[1.05rem] font-semibold text-slate-900">Inhalt (Markdown)</h3>
-          <button type="button" onClick={handlePreview} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50">
+          <h3 className="sce-section-title">Inhalt (Markdown)</h3>
+          <button type="button" onClick={handlePreview} className="sce-action-secondary px-3 py-1.5 text-[12px] font-medium">
             <Sparkles className="h-3.5 w-3.5" />Vorschau
           </button>
         </div>
@@ -142,7 +142,7 @@ export default function TemplateForm({ mode, templateId, defaultValues }: Templa
           <div className="flex flex-wrap gap-1.5">
             {availableVars.slice(0, 16).map((v) => (
               <button key={v.key} type="button" onClick={() => insertVariable(v.key)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-mono text-slate-600 hover:border-[#0b4aa2]/30 hover:bg-[#0b4aa2]/5 hover:text-[#0b4aa2]"
+                className="sce-chip sce-chip-primary px-2.5 py-1 font-mono text-[11px]"
                 title={v.label}>
                 {`{{${v.key}}}`}
               </button>
@@ -152,18 +152,18 @@ export default function TemplateForm({ mode, templateId, defaultValues }: Templa
       </section>
 
       {preview ? (
-        <section className="rounded-[28px] border border-emerald-200 bg-emerald-50/50 p-6">
-          <h3 className="mb-4 text-[1.05rem] font-semibold text-emerald-800">Vorschau (Beispieldaten)</h3>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Betreff</p>
-          <p className="mb-5 rounded-[14px] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900">{preview.subject}</p>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Inhalt</p>
-          <pre className="whitespace-pre-wrap rounded-[14px] border border-slate-200 bg-white p-4 font-sans text-sm leading-7 text-slate-800">{preview.body}</pre>
+        <section className="sce-page-card p-6">
+          <h3 className="sce-section-title mb-4">Vorschau (Beispieldaten)</h3>
+          <p className="sce-kicker mb-2">Betreff</p>
+          <p className="mb-5 rounded-[14px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] px-4 py-3 text-sm font-medium text-[var(--sce-heading)]">{preview.subject}</p>
+          <p className="sce-kicker mb-2">Inhalt</p>
+          <pre className="whitespace-pre-wrap rounded-[14px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] p-4 font-sans text-sm leading-7 text-[var(--sce-foreground)]">{preview.body}</pre>
         </section>
       ) : null}
 
       <div className="flex items-center justify-between gap-4">
-        <button type="button" onClick={() => router.back()} className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Abbrechen</button>
-        <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60 hover:bg-[#08357a]">
+        <button type="button" onClick={() => router.back()} className="sce-action-secondary px-5 py-2.5 text-sm font-medium">Abbrechen</button>
+        <button type="submit" disabled={loading} className="sce-action-primary px-6 py-2.5 text-sm disabled:opacity-60">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {mode === "create" ? "Vorlage erstellen" : "Änderungen speichern"}
         </button>

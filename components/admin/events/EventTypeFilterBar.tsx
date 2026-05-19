@@ -37,7 +37,7 @@ export default function EventTypeFilterBar({
             href={href}
             className={
               isActive
-                ? "inline-flex items-center rounded-full border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-2 text-sm font-semibold text-[#0b4aa2] shadow-sm"
+                ? "inline-flex items-center rounded-full border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-2 text-sm font-semibold text-[var(--sce-primary)] shadow-sm"
                 : "inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
             }
           >

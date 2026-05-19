@@ -553,6 +553,92 @@ button {
   color: var(--sce-primary-strong);
 }
 
+.sce-page-card,
+.sce-empty-state,
+.sce-list-card {
+  border: 1px solid var(--sce-border);
+  background: var(--sce-surface-strong);
+  color: var(--sce-foreground);
+  box-shadow: var(--sce-shadow-card);
+}
+
+.sce-page-card {
+  border-radius: 28px;
+}
+
+.sce-empty-state {
+  border-radius: 30px;
+  text-align: center;
+}
+
+.sce-list-card {
+  border-radius: 26px;
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.sce-list-card:hover {
+  border-color: var(--sce-border-strong);
+  box-shadow: var(--sce-shadow-soft);
+  transform: translateY(-1px);
+}
+
+.sce-section-title {
+  color: var(--sce-heading);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.sce-kicker {
+  color: var(--sce-subtle);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sce-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--sce-border);
+  border-radius: 9999px;
+  background: var(--sce-surface-muted);
+  color: var(--sce-muted);
+  font-weight: 650;
+}
+
+.sce-chip-primary {
+  border-color: color-mix(in srgb, var(--sce-primary) 22%, transparent);
+  background: var(--sce-primary-soft);
+  color: var(--sce-primary-strong);
+}
+
+.sce-chip-success {
+  border-color: color-mix(in srgb, var(--sce-success) 28%, transparent);
+  background: var(--sce-success-soft);
+  color: var(--sce-success);
+}
+
+.sce-chip-warning {
+  border-color: color-mix(in srgb, var(--sce-warning) 28%, transparent);
+  background: var(--sce-warning-soft);
+  color: var(--sce-warning);
+}
+
+.sce-chip-danger {
+  border-color: color-mix(in srgb, var(--sce-danger) 28%, transparent);
+  background: var(--sce-danger-soft);
+  color: var(--sce-danger);
+}
+
+.sce-warning-panel {
+  border: 1px solid color-mix(in srgb, var(--sce-warning) 28%, transparent);
+  background: var(--sce-warning-soft);
+  color: var(--sce-warning);
+}
+
 .sce-form-field {
   width: 100%;
   border: 1px solid var(--sce-border);

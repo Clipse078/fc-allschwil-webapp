@@ -56,10 +56,10 @@ export default function VisibleOrgUnitsSelect({
 
   return (
     <div>
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--sce-muted)]">
         Organisationseinheiten
       </p>
-      <p className="mb-3 text-[11px] text-slate-400">
+      <p className="mb-3 text-[11px] text-[var(--sce-subtle)]">
         Alle aktiven Mitglieder dieser Einheiten können diesen Eintrag sehen.
       </p>
 
@@ -68,7 +68,7 @@ export default function VisibleOrgUnitsSelect({
           {selectedUnits.map((unit) => (
             <span
               key={unit.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#0b4aa2]/20 bg-[#0b4aa2]/8 px-3 py-1 text-[12px] font-medium text-[#0b4aa2]"
+              className="sce-chip sce-chip-primary gap-1.5 px-3 py-1 text-[12px]"
             >
               <Building2 className="h-3 w-3 shrink-0" />
               {unit.name}
@@ -76,7 +76,7 @@ export default function VisibleOrgUnitsSelect({
                 type="button"
                 onClick={() => removeUnit(unit.id)}
                 aria-label={`${unit.name} entfernen`}
-                className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#0b4aa2]/15"
+                className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-[var(--sce-primary-soft)]"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -89,14 +89,14 @@ export default function VisibleOrgUnitsSelect({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-500 hover:border-slate-300"
+          className="flex w-full items-center justify-between rounded-[14px] border border-[var(--sce-border)] bg-[var(--sce-surface-strong)] px-4 py-2.5 text-sm text-[var(--sce-muted)] hover:border-[var(--sce-border-strong)]"
         >
           <span>Organisationseinheit hinzufügen…</span>
           <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
         {open ? (
-          <div className="absolute z-20 mt-1 w-full rounded-[16px] border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.1)]">
+          <div className="absolute z-20 mt-1 w-full rounded-[16px] border border-[var(--sce-border)] bg-[var(--sce-surface-strong)] shadow-[var(--sce-shadow-soft)]">
             <div className="p-2">
               <input
                 type="text"
@@ -104,12 +104,12 @@ export default function VisibleOrgUnitsSelect({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Suchen…"
                 autoFocus
-                className="w-full rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30"
+                className="sce-form-field rounded-[10px] px-3 py-2"
               />
             </div>
             <ul className="max-h-52 overflow-y-auto pb-2">
               {available.length === 0 ? (
-                <li className="px-4 py-3 text-[12px] text-slate-400 italic">
+                <li className="px-4 py-3 text-[12px] text-[var(--sce-subtle)] italic">
                   Keine weiteren Einheiten verfügbar
                 </li>
               ) : (
@@ -120,10 +120,10 @@ export default function VisibleOrgUnitsSelect({
                       onClick={() => { addUnit(unit.id); setOpen(false); }}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
                     >
-                      <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
+                      <Building2 className="h-4 w-4 shrink-0 text-[var(--sce-subtle)]" />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-900">{unit.name}</p>
-                        <p className="truncate text-[10px] text-slate-500">
+                        <p className="truncate text-sm font-medium text-[var(--sce-heading)]">{unit.name}</p>
+                        <p className="truncate text-[10px] text-[var(--sce-muted)]">
                           {TYPE_LABELS[unit.type] ?? unit.type}
                           {unit.level > 0 ? ` · Ebene ${unit.level}` : ""}
                           {" · "}

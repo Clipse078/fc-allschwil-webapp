@@ -30,7 +30,7 @@ export default function AdminAvatar({
   if (imageSrc) {
     return (
       <div
-        className={`relative ${sizeClass} overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm`}
+        className={`relative ${sizeClass} overflow-hidden rounded-full border border-[var(--sce-border)] bg-[var(--sce-surface-strong)] shadow-sm`}
       >
         <Image
           src={imageSrc}
@@ -45,7 +45,7 @@ export default function AdminAvatar({
 
   return (
     <div
-      className={`flex ${sizeClass} items-center justify-center rounded-full border border-slate-200 bg-gradient-to-br from-white to-slate-100 font-[var(--font-display)] text-sm font-bold uppercase tracking-[0.08em] text-[#0b4aa2] shadow-sm`}
+      className={`sce-module-icon flex ${sizeClass} items-center justify-center rounded-full font-[var(--font-display)] text-sm font-bold uppercase tracking-[0.08em] shadow-sm`}
     >
       {getInitials(name) || "FA"}
     </div>
