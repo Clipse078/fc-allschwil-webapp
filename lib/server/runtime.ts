@@ -3,7 +3,6 @@
   getRuntimeEnvironment,
   type RuntimeEnvironment,
 } from "@/lib/env";
-import { prisma } from "@/lib/db/prisma";
 
 export type RuntimeCheckResult = {
   env: RuntimeEnvironment;
@@ -140,6 +139,7 @@ export function assertRuntimeConfiguration(): RuntimeEnvironment {
 
 export async function checkDatabaseHealth(): Promise<DatabaseHealthCheckResult> {
   try {
+    const { prisma } = await import("@/lib/db/prisma");
     await prisma.$queryRaw`SELECT 1`;
 
     return {
