@@ -15,7 +15,10 @@ export async function GET(): Promise<NextResponse> {
     ? await checkDatabaseHealth()
     : {
         ok: false,
-        message: "DATABASE_URL is not configured.",
+        message:
+          "DATABASE_URL is not configured. " +
+          "Open Vercel → Settings → Environment Variables, " +
+          "enable DATABASE_URL for Production, Preview, and Development, then redeploy.",
       };
 
   const ok = runtime.ok && database.ok;
@@ -32,10 +35,12 @@ export async function GET(): Promise<NextResponse> {
         isLocal: runtime.env.isLocal,
         isStage: runtime.env.isStage,
         isProd: runtime.env.isProd,
+        isPreview: runtime.env.isPreview,
       },
       checks: {
         hasDatabaseUrl: runtime.env.hasDatabaseUrl,
         hasDirectUrl: runtime.env.hasDirectUrl,
+        hasAuthSecret: runtime.env.hasAuthSecret,
         hasNextAuthSecret: runtime.env.hasNextAuthSecret,
         hasAppBaseUrl: Boolean(runtime.env.appBaseUrl),
         hasNextAuthUrl: Boolean(runtime.env.nextAuthUrl),

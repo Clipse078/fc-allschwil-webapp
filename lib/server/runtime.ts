@@ -33,6 +33,10 @@ function validateLocal(env: RuntimeEnvironment): string[] {
 function validateStage(env: RuntimeEnvironment): string[] {
   const errors: string[] = [];
 
+  if (env.isPreview) {
+    return errors;
+  }
+
   if (env.nodeEnv !== "production") {
     errors.push("STAGE must run with NODE_ENV=production.");
   }
@@ -49,8 +53,8 @@ function validateStage(env: RuntimeEnvironment): string[] {
     errors.push("STAGE requires DATABASE_URL.");
   }
 
-  if (!env.hasNextAuthSecret) {
-    errors.push("STAGE requires NEXTAUTH_SECRET.");
+  if (!env.hasAuthSecret && !env.hasNextAuthSecret) {
+    errors.push("STAGE requires AUTH_SECRET or NEXTAUTH_SECRET.");
   }
 
   if (env.appBaseUrl && env.appBaseUrl.includes("localhost")) {
@@ -83,8 +87,8 @@ function validateProd(env: RuntimeEnvironment): string[] {
     errors.push("PROD requires DATABASE_URL.");
   }
 
-  if (!env.hasNextAuthSecret) {
-    errors.push("PROD requires NEXTAUTH_SECRET.");
+  if (!env.hasAuthSecret && !env.hasNextAuthSecret) {
+    errors.push("PROD requires AUTH_SECRET or NEXTAUTH_SECRET.");
   }
 
   if (env.appBaseUrl && env.appBaseUrl.includes("localhost")) {

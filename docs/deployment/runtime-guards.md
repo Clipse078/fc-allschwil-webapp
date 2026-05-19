@@ -77,13 +77,13 @@ After:
 
 ---
 
-## Next safe step
+## Completed
 
-Recommended next:
-1. add `StageEnvironmentBanner` component
-2. add protected admin-only runtime diagnostics page
-3. wire `assertRuntimeConfiguration()` into selected server entry points
-4. add DB connectivity check to health endpoint
-5. add auth callback URL consistency check
+1. `StageEnvironmentBanner` component — integrated into admin layout
+2. Protected admin-only runtime diagnostics page — available at `/admin/runtime`
+3. DB connectivity check in `/api/health` — reports connection status
+4. Preview deployment detection — relaxed validation, clear warnings
+5. `AUTH_SECRET` + `NEXTAUTH_SECRET` dual-check — either satisfies the requirement
+6. Lazy Prisma client — import-time crash prevention via Proxy pattern
 
-Do not add boot-time hard assertions to the root app shell yet unless we first verify current auth/bootstrap paths.
+See also: `docs/deployment/canonical-deployment-rules.md` for the full deployment operations guide.
