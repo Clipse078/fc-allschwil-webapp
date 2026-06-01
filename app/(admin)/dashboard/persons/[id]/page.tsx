@@ -1,35 +1,46 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Pencil, Calendar, FileText, Shield, UserCheck } from "lucide-react";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getPersonById } from "@/lib/people/queries";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
+import PersonRoleBadge from "@/components/admin/shared/PersonRoleBadge";
 
 type PageProps = { params: Promise<{ id: string }> };
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("de-CH", {
     day: "2-digit",
-    month: "2-digit",
+    month: "long",
     year: "numeric",
   });
 }
 
-function DetailRow({
+function getInitials(firstName: string, lastName: string): string {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+}
+
+function DataField({
   label,
   value,
+  icon,
 }: {
   label: string;
   value: string | null | undefined;
+  icon?: React.ReactNode;
 }) {
   return (
-    <div>
-      <dt className="text-[11px] text-slate-400">{label}</dt>
-      <dd className="mt-0.5 font-medium text-slate-900">
-        {value ?? <span className="font-normal italic text-slate-400">—</span>}
-      </dd>
+    <div className="sce-data-field">
+      <span className="sce-data-label">{label}</span>
+      {value ? (
+        <span className="sce-data-value flex items-center gap-2">
+          {icon ? <span className="text-[var(--muted)]">{icon}</span> : null}
+          {value}
+        </span>
+      ) : (
+        <span className="sce-data-value-empty">—</span>
+      )}
     </div>
   );
 }
@@ -43,106 +54,233 @@ export default async function PersonDetailPage({ params }: PageProps) {
 
   const fullName =
     person.displayName || `${person.firstName} ${person.lastName}`;
+  const initials = getInitials(person.firstName, person.lastName);
+  const hasRoles = person.isPlayer || person.isTrainer;
 
   return (
     <div className="space-y-6">
-      <AdminSectionHeader
-        eyebrow="Personen"
-        title={fullName}
-        actions={
+      {/* Hero */}
+      <div className="sce-entity-hero">
+        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-5">
+            {/* Avatar */}
+            <div className="sce-avatar-xl">
+              {initials}
+            </div>
+
+            {/* Identity */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
+                Personenprofil
+              </p>
+              <h1 className="mt-1 text-2xl font-bold text-white" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.01em" }}>
+                {fullName}
+              </h1>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <AdminStatusPill
+                  label={person.isActive ? "Aktiv" : "Inaktiv"}
+                  tone={person.isActive ? "success" : "muted"}
+                />
+                {hasRoles ? (
+                  <PersonRoleBadge
+                    isPlayer={person.isPlayer}
+                    isTrainer={person.isTrainer}
+                  />
+                ) : (
+                  <span className="sce-role-badge sce-role-badge-member">
+                    Mitglied
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/persons/${person.id}/edit`}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/25"
             >
-              <Pencil className="h-4 w-4" />
+              <Pencil className="h-3.5 w-3.5" />
               Bearbeiten
             </Link>
             <Link
               href="/dashboard/persons"
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
               Zurück
             </Link>
           </div>
-        }
-      />
+        </div>
+      </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_280px]">
+      {/* Content grid */}
+      <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
         {/* Main column */}
         <div className="space-y-5">
           {/* Stammdaten */}
-          <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <h3 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Stammdaten
-            </h3>
-            <dl className="space-y-4 text-sm">
-              <DetailRow label="Vorname" value={person.firstName} />
-              <DetailRow label="Nachname" value={person.lastName} />
-              <DetailRow
-                label="Anzeigename"
-                value={person.displayName ?? null}
-              />
-              <DetailRow
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                Stammdaten
+              </p>
+            </div>
+            <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
+              <DataField label="Vorname" value={person.firstName} />
+              <DataField label="Nachname" value={person.lastName} />
+              {person.displayName ? (
+                <DataField label="Anzeigename" value={person.displayName} />
+              ) : null}
+              <DataField
                 label="Geburtsdatum"
-                value={
-                  person.dateOfBirth ? formatDate(person.dateOfBirth) : null
-                }
+                value={person.dateOfBirth ? formatDate(person.dateOfBirth) : null}
+                icon={<Calendar className="h-3.5 w-3.5" />}
               />
-            </dl>
-          </section>
+            </div>
+          </div>
 
           {/* Notizen */}
-          <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <h3 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Notizen
-            </h3>
-            {person.notes ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-                {person.notes}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                Notizen
               </p>
-            ) : (
-              <p className="text-[12px] italic text-slate-400">
-                Keine Notizen hinterlegt.
-              </p>
-            )}
-          </section>
+              <FileText className="h-4 w-4 text-[var(--muted)]" />
+            </div>
+            <div className="sce-detail-section-body">
+              {person.notes ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-2)]">
+                  {person.notes}
+                </p>
+              ) : (
+                <p className="text-sm italic text-[var(--muted)]">
+                  Keine Notizen hinterlegt.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Aside */}
+        {/* Sidebar */}
         <div className="space-y-5">
           {/* Kontakt */}
-          <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <h3 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Kontakt
-            </h3>
-            <dl className="space-y-4 text-sm">
-              <DetailRow label="E-Mail" value={person.email ?? null} />
-              <DetailRow label="Telefon" value={person.phone ?? null} />
-            </dl>
-          </section>
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                Kontakt
+              </p>
+            </div>
+            <div className="sce-detail-section-body space-y-4">
+              {person.email ? (
+                <div className="sce-data-field">
+                  <span className="sce-data-label">E-Mail</span>
+                  <a
+                    href={`mailto:${person.email}`}
+                    className="sce-data-value flex items-center gap-2 text-[var(--blue)] hover:underline"
+                  >
+                    <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                    {person.email}
+                  </a>
+                </div>
+              ) : (
+                <DataField label="E-Mail" value={null} />
+              )}
+              {person.phone ? (
+                <div className="sce-data-field">
+                  <span className="sce-data-label">Telefon</span>
+                  <a
+                    href={`tel:${person.phone}`}
+                    className="sce-data-value flex items-center gap-2 text-[var(--blue)] hover:underline"
+                  >
+                    <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                    {person.phone}
+                  </a>
+                </div>
+              ) : (
+                <DataField label="Telefon" value={null} />
+              )}
+            </div>
+          </div>
 
           {/* Rollen & Status */}
-          <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <h3 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Rollen & Status
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <AdminStatusPill
-                label={person.isActive ? "Aktiv" : "Inaktiv"}
-                tone={person.isActive ? "success" : "muted"}
-              />
-              {person.isPlayer ? (
-                <AdminStatusPill label="Spieler" tone="default" />
-              ) : null}
-              {person.isTrainer ? (
-                <AdminStatusPill label="Trainer" tone="default" />
-              ) : null}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                Rollen & Status
+              </p>
             </div>
-          </section>
+            <div className="sce-detail-section-body space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <AdminStatusPill
+                  label={person.isActive ? "Aktiv" : "Inaktiv"}
+                  tone={person.isActive ? "success" : "muted"}
+                />
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <RoleIndicator
+                  label="Spieler"
+                  active={person.isPlayer}
+                  icon={<Shield className="h-4 w-4" />}
+                />
+                <RoleIndicator
+                  label="Trainer"
+                  active={person.isTrainer}
+                  icon={<UserCheck className="h-4 w-4" />}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Metadaten */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                Systemdaten
+              </p>
+            </div>
+            <div className="sce-detail-section-body space-y-3">
+              <DataField
+                label="Erstellt"
+                value={formatDate(person.createdAt)}
+              />
+              <DataField
+                label="Zuletzt geändert"
+                value={formatDate(person.updatedAt)}
+              />
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function RoleIndicator({
+  label,
+  active,
+  icon,
+}: {
+  label: string;
+  active: boolean;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+        active
+          ? "border-[var(--blue)] bg-[var(--blue-light)] text-[var(--blue)]"
+          : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)]"
+      }`}
+    >
+      {icon}
+      <span className="flex-1">{label}</span>
+      <span
+        className={`text-xs font-semibold ${active ? "text-[var(--blue)]" : "text-[var(--muted)]"}`}
+      >
+        {active ? "Ja" : "Nein"}
+      </span>
     </div>
   );
 }
