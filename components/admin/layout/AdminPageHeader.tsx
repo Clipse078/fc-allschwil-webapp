@@ -169,6 +169,22 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/dashboard/logs") {
+    return {
+      eyebrow: "Admin",
+      title: "Audit Logs",
+      description: "Protokollierte Änderungen und administrative Aktionen im System.",
+    };
+  }
+
+  if (pathname === "/dashboard/runtime") {
+    return {
+      eyebrow: "Admin",
+      title: "Runtime & Deployment",
+      description: "Laufzeit- und Deployment-Diagnose für die aktuelle Umgebung.",
+    };
+  }
+
   if (pathname === "/dashboard/seasons" || pathname.startsWith("/dashboard/seasons/")) {
     return {
       eyebrow: "Saisons",

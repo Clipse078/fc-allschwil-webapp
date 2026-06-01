@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  Activity,
   BadgeIcon,
   BarChart3,
   Briefcase,
@@ -18,6 +19,7 @@ import {
   Flag,
   LayoutDashboard,
   ScrollText,
+  Settings,
   Shield,
   Target,
   UserCircle2,
@@ -75,6 +77,12 @@ function getNavIcon(label: string) {
       return Building2;
     case "Benutzer":
       return Shield;
+    case "Admin":
+      return Settings;
+    case "Protokoll":
+      return ClipboardList;
+    case "System":
+      return Activity;
     default:
       return LayoutDashboard;
   }
@@ -86,6 +94,10 @@ function isVereinsleitungChild(label: string) {
 
 function isPlannerChild(label: string) {
   return label === "Wochenplanner" || label === "Tagesplanner";
+}
+
+function isAdminChild(label: string) {
+  return label === "Protokoll" || label === "System";
 }
 
 function shouldCarrySeason(href: string) {
@@ -122,12 +134,16 @@ export default function AdminSidebar({
       : () => setInternalCollapsed((current) => !current);
 
   const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+    (item) =>
+      !isVereinsleitungChild(item.label) &&
+      !isPlannerChild(item.label) &&
+      !isAdminChild(item.label),
   );
   const vereinsleitungChildren = navItems.filter((item) =>
     isVereinsleitungChild(item.label),
   );
   const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
+  const adminChildren = navItems.filter((item) => isAdminChild(item.label));
 
   function buildHref(baseHref: string) {
     if (!selectedSeason || !shouldCarrySeason(baseHref)) {
@@ -269,6 +285,32 @@ export default function AdminSidebar({
                         <li key={child.href}>
                           <Link
                             href={childHref}
+                            className={
+                              childActive
+                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                            }
+                          >
+                            <ChildIcon className="h-4 w-4 shrink-0" />
+                            <span>{child.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+
+                {!resolvedCollapsed && item.label === "Admin" ? (
+                  <ul className="mt-2 space-y-2 pl-7">
+                    {adminChildren.map((child) => {
+                      const ChildIcon = getNavIcon(child.label);
+                      const childActive =
+                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+
+                      return (
+                        <li key={child.href}>
+                          <Link
+                            href={child.href}
                             className={
                               childActive
                                 ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"

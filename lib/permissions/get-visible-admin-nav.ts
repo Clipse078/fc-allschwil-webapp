@@ -93,6 +93,21 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/dashboard/users",
     permissionKeys: [PERMISSIONS.USERS_MANAGE],
   },
+  {
+    label: "Admin",
+    href: "/dashboard/users",
+    permissionKeys: [PERMISSIONS.USERS_MANAGE],
+  },
+  {
+    label: "Protokoll",
+    href: "/dashboard/logs",
+    permissionKeys: [PERMISSIONS.USERS_MANAGE],
+  },
+  {
+    label: "System",
+    href: "/dashboard/runtime",
+    permissionKeys: [PERMISSIONS.USERS_MANAGE],
+  },
 ];
 
 export function getVisibleAdminNav(permissionKeys: PermissionKey[]): AdminNavItem[] {
