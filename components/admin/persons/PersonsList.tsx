@@ -62,10 +62,10 @@ export default function PersonsList({ persons }: PersonsListProps) {
           }
           actions={
             <Link
-              href={`/dashboard/persons/${person.id}/edit`}
+              href={`/dashboard/persons/${person.id}`}
               className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
             >
-              Bearbeiten
+              Öffnen
             </Link>
           }
         />
