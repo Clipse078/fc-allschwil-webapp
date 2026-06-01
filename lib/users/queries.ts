@@ -39,6 +39,9 @@ export async function getUserDetailData(userId: string) {
       lastName: true,
       email: true,
       isActive: true,
+      lastLoginAt: true,
+      createdAt: true,
+      updatedAt: true,
       userRoles: {
         select: {
           role: {

@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
-import UsersTable from "@/components/admin/users/UsersTable";
+import { UserPlus } from "lucide-react";
+import UsersSearchableList from "@/components/admin/users/UsersSearchableList";
 import RoleManagementCard from "@/components/admin/users/RoleManagementCard";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { requirePermission } from "@/lib/permissions/require-permission";
@@ -16,16 +17,17 @@ export default async function UsersPage() {
     <div className="space-y-8">
       <AdminSectionHeader
         eyebrow="Benutzer & Rollen"
-        title="Benutzer und Rollen"
-        description="Admin verwaltet hier Benutzer, Rollen, Rollenbeschreibungen sowie zusätzliche Zugriffe wie Vereinsleitungs-Modul und Meeting-Teilnahme."
+        title="Benutzer"
+        description="Alle Benutzerkonten im System — Rollen, Status und Zugriffe auf einen Blick."
         actions={
           <Link href="/dashboard/users/new" className="fca-button-primary">
+            <UserPlus className="h-4 w-4" />
             Neuer Benutzer
           </Link>
         }
       />
 
-      <UsersTable currentUserId={currentUserId} initialUsers={users} />
+      <UsersSearchableList currentUserId={currentUserId} initialUsers={users} />
 
       <RoleManagementCard initialRoles={roles} />
     </div>

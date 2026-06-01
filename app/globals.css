@@ -725,6 +725,18 @@ button {
   border: 1px solid rgba(99, 102, 241, 0.20);
 }
 
+.sce-role-badge-admin {
+  background: rgba(199, 51, 44, 0.09);
+  color: #a62520;
+  border: 1px solid rgba(199, 51, 44, 0.20);
+}
+
+.sce-role-badge-staff {
+  background: rgba(161, 99, 0, 0.09);
+  color: #7c4d00;
+  border: 1px solid rgba(161, 99, 0, 0.20);
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    SEARCH BAR — Inline page-level search
 ───────────────────────────────────────────────────────────────────────── */

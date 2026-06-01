@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 
 type UserFormProps = {
   mode: "create" | "edit";
@@ -68,91 +67,89 @@ export default function UserForm({
   }
 
   return (
-    <AdminSurfaceCard className="p-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="space-y-2">
-            <span className="fca-label">Vorname</span>
-            <input
-              className="fca-input"
-              value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
-              required
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="fca-label">Nachname</span>
-            <input
-              className="fca-input"
-              value={lastName}
-              onChange={(event) => setLastName(event.target.value)}
-              required
-            />
-          </label>
-        </div>
-
-        <label className="block space-y-2">
-          <span className="fca-label">E-Mail</span>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="space-y-2">
+          <span className="fca-label">Vorname</span>
           <input
-            type="email"
             className="fca-input"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            value={firstName}
+            onChange={(event) => setFirstName(event.target.value)}
             required
           />
         </label>
 
-        {mode === "create" ? (
-          <label className="block space-y-2">
-            <span className="fca-label">Temporäres Passwort</span>
-            <input
-              type="password"
-              className="fca-input"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength={8}
-            />
-          </label>
-        ) : (
-          <label className="fca-toggle-row">
-            <span className="text-sm text-slate-700">Benutzer ist aktiv</span>
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(event) => setIsActive(event.target.checked)}
-              className="fca-toggle-checkbox"
-            />
-          </label>
-        )}
+        <label className="space-y-2">
+          <span className="fca-label">Nachname</span>
+          <input
+            className="fca-input"
+            value={lastName}
+            onChange={(event) => setLastName(event.target.value)}
+            required
+          />
+        </label>
+      </div>
 
-        {error ? (
-          <div className="fca-status-box fca-status-box-error">{error}</div>
-        ) : null}
+      <label className="block space-y-2">
+        <span className="fca-label">E-Mail</span>
+        <input
+          type="email"
+          className="fca-input"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          required
+        />
+      </label>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="fca-button-primary"
-          >
-            {submitting
-              ? "Speichern..."
-              : mode === "create"
-                ? "Benutzer erstellen"
-                : "Benutzer speichern"}
-          </button>
+      {mode === "create" ? (
+        <label className="block space-y-2">
+          <span className="fca-label">Temporäres Passwort</span>
+          <input
+            type="password"
+            className="fca-input"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+            minLength={8}
+          />
+        </label>
+      ) : (
+        <label className="fca-toggle-row">
+          <span className="text-sm text-slate-700">Benutzer ist aktiv</span>
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={(event) => setIsActive(event.target.checked)}
+            className="fca-toggle-checkbox"
+          />
+        </label>
+      )}
 
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/users")}
-            className="fca-button-secondary"
-          >
-            Abbrechen
-          </button>
-        </div>
-      </form>
-    </AdminSurfaceCard>
+      {error ? (
+        <div className="fca-status-box fca-status-box-error">{error}</div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="fca-button-primary"
+        >
+          {submitting
+            ? "Speichern..."
+            : mode === "create"
+              ? "Benutzer erstellen"
+              : "Benutzer speichern"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/users")}
+          className="fca-button-secondary"
+        >
+          Abbrechen
+        </button>
+      </div>
+    </form>
   );
 }
