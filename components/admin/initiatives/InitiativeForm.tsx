@@ -102,7 +102,7 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
         return;
       }
 
-      router.push("/initiatives?status=saved");
+      router.push("/vereinsleitung/initiativen?status=saved");
       router.refresh();
     } catch {
       setError("Netzwerkfehler. Bitte erneut versuchen.");

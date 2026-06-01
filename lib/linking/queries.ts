@@ -46,7 +46,7 @@ export async function getMeetingLinkOptions(actor: ActorContext): Promise<Entity
   return applyVisibilityFilter(rows, actor).map((m) => ({
     slug: m.slug,
     title: m.title,
-    url: `/meetings/${m.slug}`,
+    url: `/vereinsleitung/meetings/${m.slug}`,
   }));
 }
 
@@ -62,6 +62,6 @@ export async function getInitiativeLinkOptions(actor: ActorContext): Promise<Ent
   return applyVisibilityFilter(rows, actor).map((i) => ({
     slug: i.slug,
     title: i.title,
-    url: `/initiatives/${i.slug}`,
+    url: `/vereinsleitung/initiativen/${i.slug}`,
   }));
 }

@@ -50,7 +50,7 @@ export default function TargetLinksPanel({
               {initiativeRefs.map((ref) => (
                 <li key={ref.slug}>
                   <Link
-                    href={ref.url ?? `/initiatives/${ref.slug}`}
+                    href={ref.url ?? `/vereinsleitung/initiativen/${ref.slug}`}
                     className="flex items-center gap-2 rounded-[12px] border border-slate-100 bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-800 transition hover:border-slate-200 hover:bg-white hover:text-[#0b4aa2]"
                   >
                     <span className="min-w-0 flex-1 truncate">{ref.title}</span>
@@ -75,7 +75,7 @@ export default function TargetLinksPanel({
               {meetingRefs.map((ref) => (
                 <li key={ref.slug}>
                   <Link
-                    href={ref.url ?? `/meetings/${ref.slug}`}
+                    href={ref.url ?? `/vereinsleitung/meetings/${ref.slug}`}
                     className="flex items-center gap-2 rounded-[12px] border border-slate-100 bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-800 transition hover:border-slate-200 hover:bg-white hover:text-[#0b4aa2]"
                   >
                     <span className="min-w-0 flex-1 truncate">{ref.title}</span>
@@ -90,7 +90,7 @@ export default function TargetLinksPanel({
 
       <div className="mt-4 border-t border-slate-100 pt-3">
         <Link
-          href={`/targets/${targetId}/edit#links`}
+          href={`/vereinsleitung/targets/${targetId}/edit#links`}
           className="text-[11px] font-medium text-[#0b4aa2] hover:underline"
         >
           Verknüpfungen bearbeiten →

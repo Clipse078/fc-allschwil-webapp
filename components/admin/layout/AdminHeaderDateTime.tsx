@@ -32,11 +32,11 @@ export default function AdminHeaderDateTime() {
   }, [now]);
 
   return (
-    <div className="sce-mini-panel rounded-[24px] px-5 py-3 backdrop-blur-sm">
-      <p className="text-[0.9rem] font-medium tracking-tight text-[var(--sce-muted)]">
+    <div className="rounded-[24px] border border-slate-200 bg-white/90 px-5 py-3 shadow-sm backdrop-blur-sm">
+      <p className="text-[0.9rem] font-medium tracking-tight text-slate-500">
         {formattedDate}
       </p>
-      <p className="mt-1 font-[var(--font-display)] text-[2.1rem] font-bold uppercase leading-none tracking-[-0.04em] text-[var(--sce-heading)]">
+      <p className="mt-1 font-[var(--font-display)] text-[2.1rem] font-bold uppercase leading-none tracking-[-0.04em] text-slate-900">
         {formattedTime}
       </p>
     </div>

@@ -99,7 +99,7 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         return;
       }
 
-      router.push("/meetings?status=saved");
+      router.push("/vereinsleitung/meetings?status=saved");
       router.refresh();
     } catch {
       setError("Netzwerkfehler. Bitte erneut versuchen.");

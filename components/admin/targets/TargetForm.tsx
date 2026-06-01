@@ -197,7 +197,7 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
 
       const data = await res.json();
       const id = data?.target?.id ?? targetId;
-      router.push(`/targets/${id}?status=saved`);
+      router.push(`/vereinsleitung/targets/${id}?status=saved`);
       router.refresh();
     } catch {
       setError("Netzwerkfehler. Bitte erneut versuchen.");

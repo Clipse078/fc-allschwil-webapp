@@ -36,7 +36,7 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/meetings") {
+  if (pathname === "/vereinsleitung/meetings") {
     return {
       eyebrow: "Meetings",
       title: "Meetings",
@@ -44,23 +44,15 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/meetings/new") {
+  if (pathname === "/vereinsleitung/meetings/vorstandssitzung-april") {
     return {
       eyebrow: "Meetings",
-      title: "Neues Meeting",
-      description: "Meeting mit Datum, Ort und Sichtbarkeitseinstellungen erfassen.",
+      title: "Vorstandssitzung April",
+      description: "Protokoll & Beschlüsse",
     };
   }
 
-  if (pathname.endsWith("/edit") && pathname.startsWith("/meetings/")) {
-    return {
-      eyebrow: "Meetings",
-      title: "Meeting bearbeiten",
-      description: "Meeting und Sichtbarkeit anpassen.",
-    };
-  }
-
-  if (pathname.startsWith("/meetings/")) {
+  if (pathname.startsWith("/vereinsleitung/meetings/")) {
     return {
       eyebrow: "Meetings",
       title: "Meeting Details",
@@ -68,7 +60,7 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/initiatives") {
+  if (pathname === "/vereinsleitung/initiativen") {
     return {
       eyebrow: "Initiativen",
       title: "Initiativen",
@@ -76,7 +68,7 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname === "/initiatives/new") {
+  if (pathname === "/vereinsleitung/initiativen/new") {
     return {
       eyebrow: "Initiativen",
       title: "Neue Initiative",
@@ -84,7 +76,7 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname.endsWith("/edit") && pathname.startsWith("/initiatives/")) {
+  if (pathname.endsWith("/edit") && pathname.startsWith("/vereinsleitung/initiativen/")) {
     return {
       eyebrow: "Initiativen",
       title: "Initiative bearbeiten",
@@ -92,48 +84,36 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
-  if (pathname.startsWith("/initiatives/")) {
+  if (pathname === "/vereinsleitung/meetings/new") {
+    return {
+      eyebrow: "Meetings",
+      title: "Neues Meeting",
+      description: "Meeting mit Datum, Ort und Sichtbarkeitseinstellungen erfassen.",
+    };
+  }
+
+  if (pathname.endsWith("/edit") && pathname.startsWith("/vereinsleitung/meetings/")) {
+    return {
+      eyebrow: "Meetings",
+      title: "Meeting bearbeiten",
+      description: "Meeting und Sichtbarkeit anpassen.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/initiativen/website-relaunch") {
+    return {
+      eyebrow: "Initiativen",
+      title: "Website Relaunch",
+      description: "Initiativen Details",
+    };
+  }
+
+  if (pathname.startsWith("/vereinsleitung/initiativen/")) {
     return {
       eyebrow: "Initiativen",
       title: "Initiative Details",
       description: "Fortschritt, Aufgaben, Meetings und Entscheidungen.",
     };
-  }
-
-  if (pathname === "/targets") {
-    return {
-      eyebrow: "Ziele",
-      title: "Vereinsziele",
-      description: "Strategische Ziele und messbare Fortschrittskennzahlen für den Verein.",
-    };
-  }
-
-  if (pathname === "/targets/new") {
-    return {
-      eyebrow: "Ziele",
-      title: "Neues Ziel erstellen",
-      description: "Strategisches Ziel mit messbaren Metriken und Vorlagen erfassen.",
-    };
-  }
-
-  if (pathname.startsWith("/targets/")) {
-    return {
-      eyebrow: "Ziele",
-      title: "Ziel Details",
-      description: "Fortschritt, Metriken und Messwerte im Detail.",
-    };
-  }
-
-  if (pathname === "/templates") {
-    return { eyebrow: "Kommunikation", title: "Vorlagen", description: "Kontextbewusste Kommunikationsvorlagen mit Variablen." };
-  }
-
-  if (pathname === "/templates/new") {
-    return { eyebrow: "Kommunikation", title: "Neue Vorlage", description: "Vorlage mit Variablen und Kategorien erstellen." };
-  }
-
-  if (pathname.startsWith("/templates/")) {
-    return { eyebrow: "Kommunikation", title: "Vorlage", description: "Vorschau und Bearbeitung." };
   }
 
   if (pathname === "/vereinsleitung/kpis") {
@@ -142,6 +122,42 @@ function getHeaderContent(pathname: string): HeaderContent {
       title: "KPIs",
       description: "Kennzahlen und Trends für die strategische Steuerung des Vereins.",
     };
+  }
+
+  if (pathname === "/vereinsleitung/targets") {
+    return {
+      eyebrow: "Ziele",
+      title: "Vereinsziele",
+      description: "Strategische Ziele und messbare Fortschrittskennzahlen für den Verein.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/targets/new") {
+    return {
+      eyebrow: "Ziele",
+      title: "Neues Ziel erstellen",
+      description: "Strategisches Ziel mit messbaren Metriken und Vorlagen erfassen.",
+    };
+  }
+
+  if (pathname.startsWith("/vereinsleitung/targets/")) {
+    return {
+      eyebrow: "Ziele",
+      title: "Ziel Details",
+      description: "Fortschritt, Metriken und Messwerte im Detail.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/templates") {
+    return { eyebrow: "Kommunikation", title: "Vorlagen", description: "Kontextbewusste Kommunikationsvorlagen mit Variablen." };
+  }
+
+  if (pathname === "/vereinsleitung/templates/new") {
+    return { eyebrow: "Kommunikation", title: "Neue Vorlage", description: "Vorlage mit Variablen und Kategorien erstellen." };
+  }
+
+  if (pathname.startsWith("/vereinsleitung/templates/")) {
+    return { eyebrow: "Kommunikation", title: "Vorlage", description: "Vorschau und Bearbeitung." };
   }
 
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
@@ -225,10 +241,10 @@ function getHeaderContent(pathname: string): HeaderContent {
   }
 
   return {
-    eyebrow: "SportClubEvo Platform",
+    eyebrow: "FC Allschwil WebApp",
     title: "Dashboard",
     description:
-      "Saisongeführtes Operations-Cockpit. Saisons, Teams, Events und Planner werden dynamisch pro Workspace aufgebaut.",
+      "Saisongeführte Einstiegsseite. Saisons sind führend; Teams, Events und Planner werden dynamisch pro Saison aufgebaut.",
   };
 }
 
@@ -240,7 +256,7 @@ export default function AdminPageHeader() {
     <div>
       <p className="fca-eyebrow">{headerContent.eyebrow}</p>
       <h1 className="fca-heading mt-2">{headerContent.title}</h1>
-      <p className="mt-3 max-w-2xl text-sm text-[var(--sce-muted)]">
+      <p className="mt-3 max-w-2xl text-sm text-slate-500">
         {headerContent.description}
       </p>
     </div>

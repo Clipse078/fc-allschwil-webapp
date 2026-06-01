@@ -1,6 +1,5 @@
 ﻿import type { Metadata } from "next";
 import { Inter, Barlow_Condensed } from "next/font/google";
-import ThemeProvider from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,8 +16,8 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "SportClubEvo WebApp",
-  description: "Premium Operations-Plattform für moderne Sportclubs",
+  title: "FC Allschwil WebApp",
+  description: "Management WebApp für FC Allschwil",
 };
 
 type RootLayoutProps = {
@@ -27,9 +26,9 @@ type RootLayoutProps = {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="de" suppressHydrationWarning>
+    <html lang="de">
       <body className={`${inter.variable} ${barlowCondensed.variable}`}>
-        <ThemeProvider>{children}</ThemeProvider>
+        {children}
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -24,7 +25,6 @@ import {
   Users,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
-import PlatformBrandMark from "@/components/shared/PlatformBrandMark";
 import { getVisibleAdminNav } from "@/lib/permissions/get-visible-admin-nav";
 import type { PermissionKey } from "@/lib/permissions/permissions";
 
@@ -80,6 +80,10 @@ function getNavIcon(label: string) {
   }
 }
 
+function isVereinsleitungChild(label: string) {
+  return label === "Meetings" || label === "Initiativen" || label === "KPIs" || label === "Ziele" || label === "Vorlagen";
+}
+
 function isPlannerChild(label: string) {
   return label === "Wochenplanner" || label === "Tagesplanner";
 }
@@ -117,7 +121,12 @@ export default function AdminSidebar({
       ? onToggle
       : () => setInternalCollapsed((current) => !current);
 
-  const mainItems = navItems.filter((item) => !isPlannerChild(item.label));
+  const mainItems = navItems.filter(
+    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+  );
+  const vereinsleitungChildren = navItems.filter((item) =>
+    isVereinsleitungChild(item.label),
+  );
   const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
 
   function buildHref(baseHref: string) {
@@ -130,7 +139,7 @@ export default function AdminSidebar({
 
   return (
     <aside
-      className={`${resolvedCollapsed ? "w-[96px]" : "w-[310px]"} sce-sidebar flex min-h-screen shrink-0 flex-col transition-[width] duration-200`}
+      className={`${resolvedCollapsed ? "w-[96px]" : "w-[310px]"} flex min-h-screen shrink-0 flex-col border-r border-slate-200 bg-white/92 backdrop-blur-xl transition-[width] duration-200`}
     >
       <div className={resolvedCollapsed ? "px-4 py-5" : "px-5 py-5"}>
         <div className="flex items-start justify-between gap-3">
@@ -141,17 +150,29 @@ export default function AdminSidebar({
                 : "flex min-w-0 items-center gap-3"
             }
           >
-            <PlatformBrandMark size={resolvedCollapsed ? "sm" : "md"} />
+            <div
+              className={
+                resolvedCollapsed
+                  ? "relative h-11 w-11 shrink-0"
+                  : "relative h-12 w-12 shrink-0"
+              }
+            >
+              <Image
+                src="/images/logos/fc-allschwil.png"
+                alt="FC Allschwil"
+                fill
+                className="object-contain"
+                sizes="48px"
+                priority
+              />
+            </div>
 
             {!resolvedCollapsed ? (
               <div className="min-w-0">
-                <p className="sce-eyebrow">SportClubEvo</p>
-                <h2 className="mt-1 font-[var(--font-display)] text-[1.7rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[var(--sce-heading)]">
-                  Operations
+                <p className="fca-eyebrow">FC Allschwil</p>
+                <h2 className="mt-1 font-[var(--font-display)] text-[1.7rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[#0b4aa2]">
+                  Admin
                 </h2>
-                <div className="mt-2">
-                  <span className="sce-tenant-chip">Workspace: FC Allschwil</span>
-                </div>
               </div>
             ) : null}
           </div>
@@ -161,7 +182,7 @@ export default function AdminSidebar({
               type="button"
               onClick={handleToggle}
               aria-label="Menü einklappen"
-              className="sce-sidebar-control mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition"
+              className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -174,7 +195,7 @@ export default function AdminSidebar({
               type="button"
               onClick={handleToggle}
               aria-label="Menü erweitern"
-              className="sce-sidebar-control flex h-9 w-9 items-center justify-center rounded-full transition"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -199,16 +220,42 @@ export default function AdminSidebar({
                   className={
                     isActive
                       ? resolvedCollapsed
-                        ? "sce-sidebar-link-active flex h-12 items-center justify-center rounded-[20px]"
-                        : "sce-sidebar-link-active flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-semibold"
+                        ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
+                        : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
                       : resolvedCollapsed
-                        ? "sce-sidebar-link flex h-12 items-center justify-center rounded-[20px] transition"
-                        : "sce-sidebar-link flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium transition"
+                        ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                        : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                   }
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   {!resolvedCollapsed ? <span>{item.label}</span> : null}
                 </Link>
+
+                {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
+                  <ul className="mt-2 space-y-2 pl-7">
+                    {vereinsleitungChildren.map((child) => {
+                      const ChildIcon = getNavIcon(child.label);
+                      const childActive =
+                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+
+                      return (
+                        <li key={child.href}>
+                          <Link
+                            href={child.href}
+                            className={
+                              childActive
+                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                            }
+                          >
+                            <ChildIcon className="h-4 w-4 shrink-0" />
+                            <span>{child.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
 
                 {!resolvedCollapsed && item.label === "Saisonplanner" ? (
                   <ul className="mt-2 space-y-2 pl-7">
@@ -224,8 +271,8 @@ export default function AdminSidebar({
                             href={childHref}
                             className={
                               childActive
-                                ? "sce-sidebar-link-child-active flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-semibold"
-                                : "sce-sidebar-link flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium transition"
+                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
+                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                             }
                           >
                             <ChildIcon className="h-4 w-4 shrink-0" />
@@ -245,16 +292,16 @@ export default function AdminSidebar({
       <div
         className={
           resolvedCollapsed
-            ? "border-t border-[var(--sce-border)] px-3 py-4"
-            : "border-t border-[var(--sce-border)] px-5 py-5"
+            ? "border-t border-slate-200 px-3 py-4"
+            : "border-t border-slate-200 px-5 py-5"
         }
       >
         {!resolvedCollapsed ? (
-          <div className="mb-4 rounded-[24px] border border-[var(--sce-border)] bg-[var(--sce-surface-muted)] p-4 shadow-sm">
-            <p className="text-sm font-semibold text-[var(--sce-heading)]">
+          <div className="mb-4 rounded-[24px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
+            <p className="text-sm font-semibold text-slate-900">
               {firstName} {lastName}
             </p>
-            <p className="mt-1 truncate text-xs text-[var(--sce-muted)]">{email}</p>
+            <p className="mt-1 truncate text-xs text-slate-500">{email}</p>
           </div>
         ) : null}
 

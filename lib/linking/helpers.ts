@@ -32,12 +32,12 @@ export function resolveTargetCrossLinks(
 ): TargetCrossLinks {
   const initiativeRefs = parseEntityRefs(linkedInitiativeRefsRaw).map((ref) => ({
     ...ref,
-    url: ref.url ?? `/initiatives/${ref.slug}`,
+    url: ref.url ?? `/vereinsleitung/initiativen/${ref.slug}`,
   }));
 
   const meetingRefs = parseEntityRefs(linkedMeetingRefsRaw).map((ref) => ({
     ...ref,
-    url: ref.url ?? `/meetings/${ref.slug}`,
+    url: ref.url ?? `/vereinsleitung/meetings/${ref.slug}`,
   }));
 
   return { initiativeRefs, meetingRefs };

@@ -50,7 +50,7 @@ export default function VereinsleitungInitiativesCard({ initiatives }: Vereinsle
           {!hasRealData ? <p className="mt-0.5 text-[11px] text-slate-400">Demo-Daten</p> : null}
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/initiatives" className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700">Alle</Link>
+          <Link href="/vereinsleitung/initiativen" className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700">Alle</Link>
           <button type="button" className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50">
             <MoreHorizontal className="h-4 w-4" />
           </button>
@@ -60,7 +60,7 @@ export default function VereinsleitungInitiativesCard({ initiatives }: Vereinsle
       <div className="mt-6 space-y-5">
         {hasRealData
           ? initiatives.map((ini) => (
-              <Link key={ini.id} href={`/initiatives/${ini.slug}`} className="block space-y-3">
+              <Link key={ini.id} href={`/vereinsleitung/initiativen/${ini.slug}`} className="block space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
                     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-[#0b4aa2]/10">

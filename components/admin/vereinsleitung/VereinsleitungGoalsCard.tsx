@@ -42,9 +42,9 @@ export default function VereinsleitungGoalsCard({ targets = [] }: Vereinsleitung
         title: t.title,
         category: CATEGORY_LABELS[t.category] ?? t.category,
         progress: computeProgress(t.metrics),
-        href: `/targets/${t.id}`,
+        href: `/vereinsleitung/targets/${t.id}`,
       }))
-    : MOCK_GOALS.map((g, i) => ({ id: String(i), title: g.title, category: g.category, progress: g.progress, href: "/targets" }));
+    : MOCK_GOALS.map((g, i) => ({ id: String(i), title: g.title, category: g.category, progress: g.progress, href: "/vereinsleitung/targets" }));
 
   return (
     <section className="rounded-[30px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
@@ -56,7 +56,7 @@ export default function VereinsleitungGoalsCard({ targets = [] }: Vereinsleitung
           {!hasRealData ? (
             <p className="mt-0.5 text-[11px] text-slate-400">
               Demo-Daten ·{" "}
-              <Link href="/targets" className="text-[#3f63b5] hover:underline">
+              <Link href="/vereinsleitung/targets" className="text-[#0b4aa2] hover:underline">
                 echte Ziele erfassen
               </Link>
             </p>
@@ -64,7 +64,7 @@ export default function VereinsleitungGoalsCard({ targets = [] }: Vereinsleitung
         </div>
 
         <Link
-          href="/targets"
+          href="/vereinsleitung/targets"
           className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
         >
           <span className="inline-flex items-center gap-1.5">
@@ -82,7 +82,7 @@ export default function VereinsleitungGoalsCard({ targets = [] }: Vereinsleitung
                 <p className="text-[15px] font-semibold leading-6 text-slate-900">{item.title}</p>
                 <p className="mt-0.5 text-xs text-slate-500">{item.category}</p>
               </div>
-              <span className="shrink-0 text-sm font-semibold text-[#3f63b5]">{item.progress}%</span>
+              <span className="shrink-0 text-sm font-semibold text-[#0b4aa2]">{item.progress}%</span>
             </div>
             <div className="h-2 rounded-full bg-slate-100">
               <div

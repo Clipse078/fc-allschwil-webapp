@@ -79,7 +79,7 @@ export default function GovernanceStaleCard({ staleTargets, templateDrafts }: Pr
             return (
               <Link
                 key={t.id}
-                href={`/targets/${t.id}`}
+                href={`/vereinsleitung/targets/${t.id}`}
                 className="block rounded-[18px] border border-slate-200/80 bg-white px-4 py-3 shadow-[0_4px_12px_rgba(15,23,42,0.03)] transition hover:-translate-y-[1px] hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -114,7 +114,7 @@ export default function GovernanceStaleCard({ staleTargets, templateDrafts }: Pr
         )}
         {staleTargets.length > 4 && (
           <Link
-            href="/targets"
+            href="/vereinsleitung/targets"
             className="block pt-1 text-center text-[11px] text-[#0b4aa2] hover:underline"
           >
             + {staleTargets.length - 4} weitere anzeigen
@@ -148,7 +148,7 @@ export default function GovernanceStaleCard({ staleTargets, templateDrafts }: Pr
           templateDrafts.slice(0, 3).map((t) => (
             <Link
               key={t.id}
-              href={`/templates/${t.id}`}
+              href={`/vereinsleitung/templates/${t.id}`}
               className="flex items-center justify-between gap-3 rounded-[18px] border border-slate-200/80 bg-white px-4 py-3 shadow-[0_4px_12px_rgba(15,23,42,0.03)] transition hover:-translate-y-[1px] hover:shadow-md"
             >
               <p className="min-w-0 truncate text-sm font-medium text-slate-800">{t.title}</p>
@@ -160,7 +160,7 @@ export default function GovernanceStaleCard({ staleTargets, templateDrafts }: Pr
         )}
         {templateDrafts.length > 3 && (
           <Link
-            href="/templates"
+            href="/vereinsleitung/templates"
             className="block pt-1 text-center text-[11px] text-[#0b4aa2] hover:underline"
           >
             + {templateDrafts.length - 3} weitere anzeigen

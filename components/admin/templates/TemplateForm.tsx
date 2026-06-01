@@ -86,7 +86,7 @@ export default function TemplateForm({ mode, templateId, defaultValues }: Templa
         setError(data?.error ?? "Fehler beim Speichern.");
         return;
       }
-      router.push("/templates?status=saved");
+      router.push("/vereinsleitung/templates?status=saved");
       router.refresh();
     } catch {
       setError("Netzwerkfehler.");

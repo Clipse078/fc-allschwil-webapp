@@ -118,7 +118,7 @@ export async function getPendingApprovals(
       moduleLabel: "Meeting",
       id: m.id,
       title: m.title,
-      href: `/meetings/${m.slug}`,
+      href: `/vereinsleitung/meetings/${m.slug}`,
       updatedAt: m.updatedAt.toISOString(),
     });
   }
@@ -129,7 +129,7 @@ export async function getPendingApprovals(
       moduleLabel: "Initiative",
       id: i.id,
       title: i.title,
-      href: `/initiatives/${i.slug}`,
+      href: `/vereinsleitung/initiativen/${i.slug}`,
       updatedAt: i.updatedAt.toISOString(),
     });
   }
@@ -140,7 +140,7 @@ export async function getPendingApprovals(
       moduleLabel: "Ziel",
       id: t.id,
       title: t.title,
-      href: `/targets/${t.id}`,
+      href: `/vereinsleitung/targets/${t.id}`,
       updatedAt: t.updatedAt.toISOString(),
     });
   }
@@ -156,7 +156,7 @@ export async function getPendingApprovals(
         moduleLabel: "Vorlage",
         id: tpl.id,
         title: tpl.title,
-        href: `/templates/${tpl.id}`,
+        href: `/vereinsleitung/templates/${tpl.id}`,
         updatedAt: tpl.updatedAt.toISOString(),
       });
     }

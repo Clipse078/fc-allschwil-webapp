@@ -79,7 +79,7 @@ export default function VereinsleitungMeetingsList({
       {meetings.map((meeting) => (
         <Link
           key={meeting.slug}
-          href={`/meetings/${meeting.slug}`}
+          href={`/vereinsleitung/meetings/${meeting.slug}`}
           className="block rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -117,7 +117,7 @@ export default function VereinsleitungMeetingsList({
               </div>
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/meetings/${meeting.slug}/edit`}
+                  href={`/vereinsleitung/meetings/${meeting.slug}/edit`}
                   onClick={(e) => e.stopPropagation()}
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-700"
                 >
