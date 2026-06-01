@@ -1,7 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 function validateDateOfBirth(raw: string): { date: Date } | { error: string } {
@@ -73,7 +72,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireApiPermission(PERMISSIONS.PEOPLE_MANAGE);
+  const access = await requireApiAnyPermission([
+    PERMISSIONS.PEOPLE_MANAGE,
+    PERMISSIONS.TEAMS_MANAGE,
+  ]);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
