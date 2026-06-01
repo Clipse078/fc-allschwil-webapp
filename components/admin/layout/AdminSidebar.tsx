@@ -16,6 +16,7 @@ import {
   ClipboardList,
   FileText,
   Flag,
+  Inbox,
   LayoutDashboard,
   ScrollText,
   Shield,
@@ -65,6 +66,8 @@ function getNavIcon(label: string) {
       return Users;
     case "Events":
       return CalendarDays;
+    case "Anmeldungen":
+      return Inbox;
     case "Personen":
       return UserCircle2;
     case "Spieler":

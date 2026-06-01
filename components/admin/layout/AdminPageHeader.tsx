@@ -213,6 +213,22 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname.startsWith("/tenant/") && pathname.includes("/cockpit/registrations")) {
+    const isDetail = /\/cockpit\/registrations\/[^/]+/.test(pathname);
+    if (isDetail) {
+      return {
+        eyebrow: "Anmeldungen",
+        title: "Anmeldung Details",
+        description: "Details, Status und Bearbeitung der eingegangenen Anmeldung.",
+      };
+    }
+    return {
+      eyebrow: "Anmeldungen",
+      title: "Anmeldungs-Eingang",
+      description: "Eingehende Probetrainings-, Spieler- und Kontaktanfragen verwalten.",
+    };
+  }
+
   if (pathname === "/dashboard/persons" || pathname.startsWith("/dashboard/persons/")) {
     return {
       eyebrow: "Personen",

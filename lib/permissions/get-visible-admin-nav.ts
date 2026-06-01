@@ -69,6 +69,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
   },
   {
+    label: "Anmeldungen",
+    href: "/tenant/fc-allschwil/cockpit/registrations",
+    permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+  },
+  {
     label: "Personen",
     href: "/dashboard/persons",
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
