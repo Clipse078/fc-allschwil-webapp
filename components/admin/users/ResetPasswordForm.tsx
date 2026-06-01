@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useState } from "react";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 
 type ResetPasswordFormProps = {
   userId: string;
@@ -43,16 +42,12 @@ export default function ResetPasswordForm({ userId }: ResetPasswordFormProps) {
   }
 
   return (
-    <AdminSurfaceCard className="p-6">
-      <div className="space-y-4">
-        <div>
-          <h3 className="fca-subheading">Passwort zurücksetzen</h3>
-          <p className="mt-3 text-sm text-slate-600">
-            Setze ein neues temporäres Passwort für diesen Benutzer.
-          </p>
-        </div>
+    <div className="space-y-4">
+      <p className="text-sm text-[var(--text-2)]">
+        Setze ein neues temporäres Passwort für diesen Benutzer. Mindestens 8 Zeichen.
+      </p>
 
-        <input
+      <input
           type="password"
           minLength={8}
           value={password}
@@ -69,15 +64,14 @@ export default function ResetPasswordForm({ userId }: ResetPasswordFormProps) {
           <div className="fca-status-box fca-status-box-error">{error}</div>
         ) : null}
 
-        <button
-          type="button"
-          onClick={handleReset}
-          disabled={submitting || password.length < 8}
-          className="fca-button-primary"
-        >
-          {submitting ? "Speichern..." : "Passwort zurücksetzen"}
-        </button>
-      </div>
-    </AdminSurfaceCard>
+      <button
+        type="button"
+        onClick={handleReset}
+        disabled={submitting || password.length < 8}
+        className="fca-button-primary"
+      >
+        {submitting ? "Speichern..." : "Passwort zurücksetzen"}
+      </button>
+    </div>
   );
 }

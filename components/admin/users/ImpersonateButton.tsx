@@ -1,12 +1,17 @@
 ﻿"use client";
 
 import { useState } from "react";
+import { LogIn } from "lucide-react";
 
 type ImpersonateButtonProps = {
   userId: string;
+  variant?: "hero" | "default";
 };
 
-export default function ImpersonateButton({ userId }: ImpersonateButtonProps) {
+export default function ImpersonateButton({
+  userId,
+  variant = "default",
+}: ImpersonateButtonProps) {
   const [submitting, setSubmitting] = useState(false);
 
   async function handleImpersonate() {
@@ -38,6 +43,20 @@ export default function ImpersonateButton({ userId }: ImpersonateButtonProps) {
       );
       setSubmitting(false);
     }
+  }
+
+  if (variant === "hero") {
+    return (
+      <button
+        type="button"
+        onClick={handleImpersonate}
+        disabled={submitting}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <LogIn className="h-3.5 w-3.5" />
+        {submitting ? "Starte..." : "Impersonieren"}
+      </button>
+    );
   }
 
   return (
