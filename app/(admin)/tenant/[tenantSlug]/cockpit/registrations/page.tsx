@@ -23,9 +23,9 @@ export default async function TenantRegistrationsPage({ params }: Props) {
   return (
     <div className="space-y-8">
       <AdminSectionHeader
-        eyebrow="Tenant Cockpit"
+        eyebrow="Cockpit"
         title="Registration Inbox"
-        description="Erster tenant-scoped Eingang für Probetrainings, Spieleranmeldungen und Kontaktanfragen."
+        description="Eingehende Anmeldungen, Anfragen und Probetrainings — nach Status gefiltert und mit automatischer Routing-Vorschau."
       />
 
       <RegistrationsInboxTable
