@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import {
   BadgeIcon,
   BarChart3,
@@ -27,6 +27,7 @@ import {
 import SignOutButton from "@/components/admin/layout/SignOutButton";
 import { getVisibleAdminNav } from "@/lib/permissions/get-visible-admin-nav";
 import type { PermissionKey } from "@/lib/permissions/permissions";
+import { cn } from "@/lib/cn";
 
 type AdminSidebarProps = {
   firstName: string;
@@ -39,53 +40,34 @@ type AdminSidebarProps = {
 
 function getNavIcon(label: string) {
   switch (label) {
-    case "Dashboard":
-      return LayoutDashboard;
-    case "Vereinsleitung":
-      return Briefcase;
-    case "Meetings":
-      return ScrollText;
-    case "Initiativen":
-      return Flag;
-    case "KPIs":
-      return BarChart3;
-    case "Ziele":
-      return Target;
-    case "Vorlagen":
-      return FileText;
-    case "Saisons":
-      return CalendarRange;
-    case "Saisonplanner":
-      return ClipboardList;
-    case "Wochenplanner":
-      return CalendarDays;
-    case "Tagesplanner":
-      return CalendarDays;
-    case "Teams":
-      return Users;
-    case "Events":
-      return CalendarDays;
-    case "Personen":
-      return UserCircle2;
-    case "Spieler":
-      return UserRound;
-    case "Trainer":
-      return BadgeIcon;
-    case "Organisation":
-      return Building2;
-    case "Benutzer":
-      return Shield;
-    default:
-      return LayoutDashboard;
+    case "Dashboard":       return LayoutDashboard;
+    case "Vereinsleitung":  return Briefcase;
+    case "Meetings":        return ScrollText;
+    case "Initiativen":     return Flag;
+    case "KPIs":            return BarChart3;
+    case "Ziele":           return Target;
+    case "Vorlagen":        return FileText;
+    case "Saisons":         return CalendarRange;
+    case "Saisonplanner":   return ClipboardList;
+    case "Wochenplanner":   return CalendarDays;
+    case "Tagesplanner":    return CalendarDays;
+    case "Teams":           return Users;
+    case "Events":          return CalendarDays;
+    case "Personen":        return UserCircle2;
+    case "Spieler":         return UserRound;
+    case "Trainer":         return BadgeIcon;
+    case "Organisation":    return Building2;
+    case "Benutzer":        return Shield;
+    default:                return LayoutDashboard;
   }
 }
 
 function isVereinsleitungChild(label: string) {
-  return label === "Meetings" || label === "Initiativen" || label === "KPIs" || label === "Ziele" || label === "Vorlagen";
+  return ["Meetings", "Initiativen", "KPIs", "Ziele", "Vorlagen"].includes(label);
 }
 
 function isPlannerChild(label: string) {
-  return label === "Wochenplanner" || label === "Tagesplanner";
+  return ["Wochenplanner", "Tagesplanner"].includes(label);
 }
 
 function shouldCarrySeason(href: string) {
@@ -96,6 +78,10 @@ function shouldCarrySeason(href: string) {
     href.startsWith("/dashboard/teams") ||
     href.startsWith("/dashboard/events")
   );
+}
+
+function getInitials(firstName: string, lastName: string): string {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
 export default function AdminSidebar({
@@ -113,98 +99,72 @@ export default function AdminSidebar({
 
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
-  const resolvedCollapsed =
+  const isCollapsed =
     typeof collapsed === "boolean" ? collapsed : internalCollapsed;
 
   const handleToggle =
     typeof onToggle === "function"
       ? onToggle
-      : () => setInternalCollapsed((current) => !current);
+      : () => setInternalCollapsed((c) => !c);
 
   const mainItems = navItems.filter(
     (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
   );
-  const vereinsleitungChildren = navItems.filter((item) =>
-    isVereinsleitungChild(item.label),
-  );
+  const vereinsleitungChildren = navItems.filter((item) => isVereinsleitungChild(item.label));
   const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
 
   function buildHref(baseHref: string) {
-    if (!selectedSeason || !shouldCarrySeason(baseHref)) {
-      return baseHref;
-    }
-
+    if (!selectedSeason || !shouldCarrySeason(baseHref)) return baseHref;
     return `${baseHref}?season=${encodeURIComponent(selectedSeason)}`;
   }
 
   return (
     <aside
-      className={`${resolvedCollapsed ? "w-[96px]" : "w-[310px]"} flex min-h-screen shrink-0 flex-col border-r border-slate-200 bg-white/92 backdrop-blur-xl transition-[width] duration-200`}
+      className={cn(
+        "sce-sidebar flex-shrink-0",
+        isCollapsed && "collapsed",
+      )}
     >
-      <div className={resolvedCollapsed ? "px-4 py-5" : "px-5 py-5"}>
-        <div className="flex items-start justify-between gap-3">
-          <div
-            className={
-              resolvedCollapsed
-                ? "flex w-full justify-center"
-                : "flex min-w-0 items-center gap-3"
-            }
-          >
-            <div
-              className={
-                resolvedCollapsed
-                  ? "relative h-11 w-11 shrink-0"
-                  : "relative h-12 w-12 shrink-0"
-              }
-            >
-              <Image
-                src="/images/logos/fc-allschwil.png"
-                alt="FC Allschwil"
-                fill
-                className="object-contain"
-                sizes="48px"
-                priority
-              />
-            </div>
-
-            {!resolvedCollapsed ? (
-              <div className="min-w-0">
-                <p className="fca-eyebrow">FC Allschwil</p>
-                <h2 className="mt-1 font-[var(--font-display)] text-[1.7rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[#0b4aa2]">
-                  Admin
-                </h2>
-              </div>
-            ) : null}
-          </div>
-
-          {!resolvedCollapsed ? (
-            <button
-              type="button"
-              onClick={handleToggle}
-              aria-label="Menü einklappen"
-              className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          ) : null}
+      {/* Brand header */}
+      <div className="sce-sidebar-brand">
+        <div className="relative shrink-0" style={{ width: isCollapsed ? 28 : 32, height: isCollapsed ? 28 : 32 }}>
+          <Image
+            src="/images/logos/fc-allschwil.png"
+            alt="FC Allschwil"
+            fill
+            className="object-contain"
+            sizes="32px"
+            priority
+          />
         </div>
 
-        {resolvedCollapsed ? (
-          <div className="mt-4 flex justify-center">
-            <button
-              type="button"
-              onClick={handleToggle}
-              aria-label="Menü erweitern"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+        {!isCollapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+              SportClubEvo
+            </p>
+            <p className="truncate text-[0.9rem] font-700 leading-tight tracking-tight text-[var(--blue)] font-bold">
+              FC Allschwil
+            </p>
           </div>
-        ) : null}
+        )}
+
+        <button
+          type="button"
+          onClick={handleToggle}
+          aria-label={isCollapsed ? "Menü erweitern" : "Menü einklappen"}
+          className="sce-icon-button shrink-0 ml-auto"
+        >
+          {isCollapsed
+            ? <ChevronRight className="h-3.5 w-3.5" />
+            : <ChevronLeft className="h-3.5 w-3.5" />
+          }
+        </button>
       </div>
 
-      <nav className={resolvedCollapsed ? "flex-1 px-3 py-3" : "flex-1 px-4 py-3"}>
-        <ul className="space-y-2">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
+        <ul className="space-y-0.5">
           {mainItems.map((item) => {
             const Icon = getNavIcon(item.label);
             const resolvedHref = buildHref(item.href);
@@ -216,96 +176,100 @@ export default function AdminSidebar({
               <li key={item.href}>
                 <Link
                   href={resolvedHref}
-                  title={resolvedCollapsed ? item.label : undefined}
-                  className={
-                    isActive
-                      ? resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
-                        : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
-                      : resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                        : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                  }
+                  title={isCollapsed ? item.label : undefined}
+                  className={cn(
+                    "sce-nav-item",
+                    isActive && "active",
+                    isCollapsed && "justify-center px-2",
+                  )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  {!resolvedCollapsed ? <span>{item.label}</span> : null}
+                  {!isCollapsed && <span>{item.label}</span>}
                 </Link>
 
-                {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
+                {/* Vereinsleitung children */}
+                {!isCollapsed && item.label === "Vereinsleitung" && vereinsleitungChildren.length > 0 && (
+                  <ul className="mt-0.5 space-y-0.5">
                     {vereinsleitungChildren.map((child) => {
                       const ChildIcon = getNavIcon(child.label);
-                      const childActive =
+                      const isChildActive =
                         pathname === child.href || pathname.startsWith(`${child.href}/`);
-
                       return (
                         <li key={child.href}>
                           <Link
                             href={child.href}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
+                            className={cn("sce-nav-child", isChildActive && "active")}
                           >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
+                            <ChildIcon className="h-3.5 w-3.5 shrink-0" />
                             <span>{child.label}</span>
                           </Link>
                         </li>
                       );
                     })}
                   </ul>
-                ) : null}
+                )}
 
-                {!resolvedCollapsed && item.label === "Saisonplanner" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
+                {/* Planner children */}
+                {!isCollapsed && item.label === "Saisonplanner" && plannerChildren.length > 0 && (
+                  <ul className="mt-0.5 space-y-0.5">
                     {plannerChildren.map((child) => {
                       const ChildIcon = getNavIcon(child.label);
                       const childHref = buildHref(child.href);
-                      const childActive =
+                      const isChildActive =
                         pathname === child.href || pathname.startsWith(`${child.href}/`);
-
                       return (
                         <li key={child.href}>
                           <Link
                             href={childHref}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
+                            className={cn("sce-nav-child", isChildActive && "active")}
                           >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
+                            <ChildIcon className="h-3.5 w-3.5 shrink-0" />
                             <span>{child.label}</span>
                           </Link>
                         </li>
                       );
                     })}
                   </ul>
-                ) : null}
+                )}
               </li>
             );
           })}
         </ul>
       </nav>
 
-      <div
-        className={
-          resolvedCollapsed
-            ? "border-t border-slate-200 px-3 py-4"
-            : "border-t border-slate-200 px-5 py-5"
-        }
-      >
-        {!resolvedCollapsed ? (
-          <div className="mb-4 rounded-[24px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
-            <p className="text-sm font-semibold text-slate-900">
-              {firstName} {lastName}
-            </p>
-            <p className="mt-1 truncate text-xs text-slate-500">{email}</p>
+      {/* Footer */}
+      <div className="border-t border-[var(--border)] px-2 py-3 space-y-2">
+        {!isCollapsed && (
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
+              style={{ background: "var(--blue)" }}
+              aria-hidden="true"
+            >
+              {getInitials(firstName, lastName)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-[var(--foreground)]">
+                {firstName} {lastName}
+              </p>
+              <p className="truncate text-[0.7rem] text-[var(--muted)]">{email}</p>
+            </div>
           </div>
-        ) : null}
+        )}
 
-        <SignOutButton collapsed={resolvedCollapsed} />
+        {isCollapsed && (
+          <div className="flex justify-center">
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
+              style={{ background: "var(--blue)" }}
+              title={`${firstName} ${lastName}`}
+            >
+              {getInitials(firstName, lastName)}
+            </div>
+          </div>
+        )}
+
+        <SignOutButton collapsed={isCollapsed} />
       </div>
     </aside>
   );
