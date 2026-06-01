@@ -257,7 +257,7 @@ enum WorkflowAction {
 
 model Tenant {
   id        String       @id @default(cuid())
-  key       String       @unique
+  slug      String       @unique
   name      String
   status    TenantStatus @default(ACTIVE)
   createdAt DateTime     @default(now())

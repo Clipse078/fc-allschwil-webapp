@@ -1,11 +1,11 @@
 import { TenantStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 
-export const DEFAULT_TENANT_KEY = "fc-allschwil";
+export const DEFAULT_TENANT_SLUG = "fc-allschwil";
 
 const tenantSelect = {
   id: true,
-  key: true,
+  slug: true,
   name: true,
   status: true,
   createdAt: true,
@@ -24,17 +24,17 @@ export async function getTenants() {
   });
 }
 
-export async function getTenantByKey(key: string) {
+export async function getTenantBySlug(slug: string) {
   return prisma.tenant.findUnique({
-    where: { key },
+    where: { slug },
     select: tenantSelect,
   });
 }
 
-export async function getActiveTenantByKey(key: string) {
+export async function getActiveTenantBySlug(slug: string) {
   return prisma.tenant.findFirst({
     where: {
-      key,
+      slug,
       status: TenantStatus.ACTIVE,
     },
     select: tenantSelect,
@@ -42,8 +42,8 @@ export async function getActiveTenantByKey(key: string) {
 }
 
 export async function getDefaultTenant() {
-  return getActiveTenantByKey(DEFAULT_TENANT_KEY);
+  return getActiveTenantBySlug(DEFAULT_TENANT_SLUG);
 }
 
 export type TenantListItem = Awaited<ReturnType<typeof getTenants>>[number];
-export type TenantDetail = Awaited<ReturnType<typeof getTenantByKey>>;
+export type TenantDetail = Awaited<ReturnType<typeof getTenantBySlug>>;

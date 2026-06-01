@@ -40,13 +40,13 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   await prisma.tenant.upsert({
-    where: { key: "fc-allschwil" },
+    where: { slug: "fc-allschwil" },
     update: {
       name: "FC Allschwil",
       status: TenantStatus.ACTIVE,
     },
     create: {
-      key: "fc-allschwil",
+      slug: "fc-allschwil",
       name: "FC Allschwil",
       status: TenantStatus.ACTIVE,
     },

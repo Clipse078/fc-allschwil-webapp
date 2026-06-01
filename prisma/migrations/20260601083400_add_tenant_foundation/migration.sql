@@ -7,7 +7,7 @@ CREATE TYPE "TenantStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'ARCHIVED');
 -- CreateTable: Tenant
 CREATE TABLE "Tenant" (
     "id"        TEXT NOT NULL,
-    "key"       TEXT NOT NULL,
+    "slug"      TEXT NOT NULL,
     "name"      TEXT NOT NULL,
     "status"    "TenantStatus" NOT NULL DEFAULT 'ACTIVE',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -16,6 +16,6 @@ CREATE TABLE "Tenant" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Tenant_key_key" ON "Tenant"("key");
+CREATE UNIQUE INDEX "Tenant_slug_key" ON "Tenant"("slug");
 CREATE INDEX "Tenant_status_idx" ON "Tenant"("status");
 CREATE INDEX "Tenant_name_idx" ON "Tenant"("name");
