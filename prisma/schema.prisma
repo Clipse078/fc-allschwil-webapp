@@ -6,6 +6,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
 enum PermissionModule {
   USERS
   SEASONS
@@ -247,6 +253,18 @@ enum WorkflowAction {
   REJECT
   PUBLISH
   IMPORT
+}
+
+model Tenant {
+  id        String       @id @default(cuid())
+  key       String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([status])
+  @@index([name])
 }
 
 model User {
@@ -741,8 +759,8 @@ model OrgUnit {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  parent      OrgUnit?  @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  children    OrgUnit[] @relation("OrgUnitHierarchy")
+  parent      OrgUnit?            @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children    OrgUnit[]           @relation("OrgUnitHierarchy")
   memberships OrgUnitMembership[]
 
   @@index([tenantId])

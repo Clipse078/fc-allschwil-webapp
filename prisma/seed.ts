@@ -18,6 +18,7 @@ import {
   TargetMetricType,
   TargetPeriod,
   TargetStatus,
+  TenantStatus,
   TeamCategory,
   TeamSeasonStatus,
 } from "@prisma/client";
@@ -38,6 +39,19 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  await prisma.tenant.upsert({
+    where: { key: "fc-allschwil" },
+    update: {
+      name: "FC Allschwil",
+      status: TenantStatus.ACTIVE,
+    },
+    create: {
+      key: "fc-allschwil",
+      name: "FC Allschwil",
+      status: TenantStatus.ACTIVE,
+    },
+  });
+
   const permissions = [
     { key: "users.manage", name: "Manage users", module: PermissionModule.USERS },
     { key: "users.impersonate", name: "Impersonate users", module: PermissionModule.USERS },
