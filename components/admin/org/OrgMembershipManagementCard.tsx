@@ -57,6 +57,16 @@ function getMemberSubtitle(m: Membership): string | undefined {
   return undefined;
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Aktiv",
+  INACTIVE: "Inaktiv",
+  PENDING: "Ausstehend",
+};
+
+function getStatusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
 function getStatusTone(
   status: string
 ): "success" | "warning" | "muted" | "default" {
@@ -186,7 +196,7 @@ export default function OrgMembershipManagementCard({
                 meta={
                   <>
                     <AdminStatusPill
-                      label={m.status}
+                      label={getStatusLabel(m.status)}
                       tone={getStatusTone(m.status)}
                     />
                     {m.roleKey ? (
@@ -206,7 +216,7 @@ export default function OrgMembershipManagementCard({
                     type="button"
                     onClick={() => handleRemove(m)}
                     disabled={removingId === m.id}
-                    className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                    className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {removingId === m.id ? "Entfernen…" : "Entfernen"}
                   </button>
