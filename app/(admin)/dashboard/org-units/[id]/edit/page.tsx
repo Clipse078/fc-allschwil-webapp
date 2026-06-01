@@ -27,8 +27,9 @@ export default async function EditOrgUnitPage({ params }: PageProps) {
         title={`${unit.name} bearbeiten`}
         description="Passe Stammdaten der Organisationseinheit an. Der Key bleibt unveränderlich."
         actions={
-          <Link href={`/dashboard/org-units/${unit.id}`} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            <ArrowLeft className="h-4 w-4" />Zurück
+          <Link href={`/dashboard/org-units/${unit.id}`} className="fca-button-secondary">
+            <ArrowLeft className="h-4 w-4" />
+            Zurück
           </Link>
         }
       />
