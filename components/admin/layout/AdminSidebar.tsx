@@ -1,6 +1,5 @@
 ﻿"use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -20,12 +19,14 @@ import {
   ScrollText,
   Shield,
   Target,
+  Trophy,
   UserCircle2,
   UserRound,
   Users,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
-import { getVisibleAdminNav } from "@/lib/permissions/get-visible-admin-nav";
+import { getVisibleNavSections } from "@/lib/nav/nav-config";
+import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
 import { cn } from "@/lib/cn";
 
@@ -34,6 +35,8 @@ type AdminSidebarProps = {
   lastName: string;
   email: string;
   permissionKeys: string[];
+  /** Tenant display name. Falls back to "SportClubEvo" when not provided. */
+  clubName?: string;
   collapsed?: boolean;
   onToggle?: () => void;
 };
@@ -62,22 +65,16 @@ function getNavIcon(label: string) {
   }
 }
 
-function isVereinsleitungChild(label: string) {
-  return ["Meetings", "Initiativen", "KPIs", "Ziele", "Vorlagen"].includes(label);
-}
-
-function isPlannerChild(label: string) {
-  return ["Wochenplanner", "Tagesplanner"].includes(label);
-}
+const SEASON_CARRY_PREFIXES = [
+  "/dashboard",
+  "/dashboard/seasons",
+  "/dashboard/planner",
+  "/dashboard/teams",
+  "/dashboard/events",
+];
 
 function shouldCarrySeason(href: string) {
-  return (
-    href === "/dashboard" ||
-    href.startsWith("/dashboard/seasons") ||
-    href.startsWith("/dashboard/planner") ||
-    href.startsWith("/dashboard/teams") ||
-    href.startsWith("/dashboard/events")
-  );
+  return SEASON_CARRY_PREFIXES.some((prefix) => href === prefix || href.startsWith(prefix + "/") || href.startsWith(prefix + "?"));
 }
 
 function getInitials(firstName: string, lastName: string): string {
@@ -89,13 +86,13 @@ export default function AdminSidebar({
   lastName,
   email,
   permissionKeys,
+  clubName,
   collapsed,
   onToggle,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedSeason = searchParams.get("season");
-  const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[]);
 
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
@@ -107,15 +104,19 @@ export default function AdminSidebar({
       ? onToggle
       : () => setInternalCollapsed((c) => !c);
 
-  const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+  const sections: NavSection[] = getVisibleNavSections(
+    permissionKeys as PermissionKey[],
   );
-  const vereinsleitungChildren = navItems.filter((item) => isVereinsleitungChild(item.label));
-  const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
+
+  const displayClubName = clubName ?? "SportClubEvo";
 
   function buildHref(baseHref: string) {
     if (!selectedSeason || !shouldCarrySeason(baseHref)) return baseHref;
     return `${baseHref}?season=${encodeURIComponent(selectedSeason)}`;
+  }
+
+  function isItemActive(href: string): boolean {
+    return pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
   }
 
   return (
@@ -127,15 +128,13 @@ export default function AdminSidebar({
     >
       {/* Brand header */}
       <div className="sce-sidebar-brand">
-        <div className="relative shrink-0" style={{ width: isCollapsed ? 28 : 32, height: isCollapsed ? 28 : 32 }}>
-          <Image
-            src="/images/logos/fc-allschwil.png"
-            alt="FC Allschwil"
-            fill
-            className="object-contain"
-            sizes="32px"
-            priority
-          />
+        {/* Generic platform icon — replaces tenant-specific logo */}
+        <div
+          className="flex shrink-0 items-center justify-center rounded-[6px] bg-[var(--blue)] text-white"
+          style={{ width: isCollapsed ? 28 : 32, height: isCollapsed ? 28 : 32 }}
+          aria-hidden="true"
+        >
+          <Trophy style={{ width: 14, height: 14 }} />
         </div>
 
         {!isCollapsed && (
@@ -144,7 +143,7 @@ export default function AdminSidebar({
               SportClubEvo
             </p>
             <p className="truncate text-[0.9rem] font-700 leading-tight tracking-tight text-[var(--blue)] font-bold">
-              FC Allschwil
+              {displayClubName}
             </p>
           </div>
         )}
@@ -164,77 +163,72 @@ export default function AdminSidebar({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
-        <ul className="space-y-0.5">
-          {mainItems.map((item) => {
-            const Icon = getNavIcon(item.label);
-            const resolvedHref = buildHref(item.href);
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-
-            return (
-              <li key={item.href}>
-                <Link
-                  href={resolvedHref}
-                  title={isCollapsed ? item.label : undefined}
-                  className={cn(
-                    "sce-nav-item",
-                    isActive && "active",
-                    isCollapsed && "justify-center px-2",
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!isCollapsed && <span>{item.label}</span>}
-                </Link>
-
-                {/* Vereinsleitung children */}
-                {!isCollapsed && item.label === "Vereinsleitung" && vereinsleitungChildren.length > 0 && (
-                  <ul className="mt-0.5 space-y-0.5">
-                    {vereinsleitungChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const isChildActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={child.href}
-                            className={cn("sce-nav-child", isChildActive && "active")}
-                          >
-                            <ChildIcon className="h-3.5 w-3.5 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
+        {sections.map((section, sectionIdx) => (
+          <div key={section.sectionLabel ?? "__top__"}>
+            {/* Section divider */}
+            {section.sectionLabel && !isCollapsed && (
+              <p
+                className={cn(
+                  "px-2 pb-1 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]",
+                  sectionIdx > 0 && "mt-4",
                 )}
+              >
+                {section.sectionLabel}
+              </p>
+            )}
+            {section.sectionLabel && isCollapsed && sectionIdx > 0 && (
+              <div className="my-2 mx-2 border-t border-[var(--border)]" />
+            )}
 
-                {/* Planner children */}
-                {!isCollapsed && item.label === "Saisonplanner" && plannerChildren.length > 0 && (
-                  <ul className="mt-0.5 space-y-0.5">
-                    {plannerChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childHref = buildHref(child.href);
-                      const isChildActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={childHref}
-                            className={cn("sce-nav-child", isChildActive && "active")}
-                          >
-                            <ChildIcon className="h-3.5 w-3.5 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+            <ul className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = getNavIcon(item.label);
+                const resolvedHref = buildHref(item.href);
+                const childActive = item.children?.some((c) => isItemActive(c.href)) ?? false;
+                const isActive = isItemActive(item.href) || childActive;
+
+                return (
+                  <li key={item.key}>
+                    <Link
+                      href={resolvedHref}
+                      title={isCollapsed ? item.label : undefined}
+                      className={cn(
+                        "sce-nav-item",
+                        isActive && "active",
+                        isCollapsed && "justify-center px-2",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {!isCollapsed && <span>{item.label}</span>}
+                    </Link>
+
+                    {/* Children (always expanded when sidebar is open) */}
+                    {!isCollapsed && item.children && item.children.length > 0 && (
+                      <ul className="mt-0.5 space-y-0.5">
+                        {item.children.map((child) => {
+                          const ChildIcon = getNavIcon(child.label);
+                          const childHref = buildHref(child.href);
+                          const isChildActive = isItemActive(child.href);
+                          return (
+                            <li key={child.key}>
+                              <Link
+                                href={childHref}
+                                className={cn("sce-nav-child", isChildActive && "active")}
+                              >
+                                <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span>{child.label}</span>
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}

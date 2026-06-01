@@ -1,13 +1,13 @@
 ﻿"use client";
 
-import Image from "next/image";
+import { Trophy } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("admin@fcallschwil.ch");
-  const [password, setPassword] = useState("ChangeMe123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -46,7 +46,7 @@ export default function LoginForm() {
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 20% 80%, rgba(199,51,44,0.15) 0%, transparent 50%), " +
+              "radial-gradient(circle at 20% 80%, rgba(255,255,255,0.06) 0%, transparent 50%), " +
               "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06) 0%, transparent 50%)",
           }}
           aria-hidden="true"
@@ -54,29 +54,25 @@ export default function LoginForm() {
 
         {/* Top: Logo + product name */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="relative h-9 w-9">
-            <Image
-              src="/images/logos/fc-allschwil.png"
-              alt="FC Allschwil"
-              fill
-              className="object-contain drop-shadow-sm"
-              sizes="36px"
-              priority
-            />
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-white/15"
+            aria-hidden="true"
+          >
+            <Trophy className="h-5 w-5 text-white" />
           </div>
           <div>
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-blue-200">
               SportClubEvo
             </p>
             <p className="text-sm font-semibold text-white leading-tight">
-              FC Allschwil
+              Club Management
             </p>
           </div>
         </div>
 
         {/* Center: headline copy */}
         <div className="relative z-10">
-          <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#c7332c]">
+          <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-blue-300">
             Club Management
           </p>
           <h1
@@ -87,7 +83,7 @@ export default function LoginForm() {
             <span className="text-blue-200">zurück.</span>
           </h1>
           <p className="mt-5 max-w-[280px] text-sm leading-relaxed text-blue-100/80">
-            Der zentrale Arbeitsbereich für die Vereinsführung, Teams, Events und Planung von FC Allschwil.
+            Der zentrale Arbeitsbereich für die Vereinsführung, Teams, Events und Planung.
           </p>
         </div>
 
@@ -104,21 +100,17 @@ export default function LoginForm() {
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-12">
         {/* Mobile header */}
         <div className="mb-8 flex flex-col items-center gap-3 lg:hidden">
-          <div className="relative h-14 w-14">
-            <Image
-              src="/images/logos/fc-allschwil.png"
-              alt="FC Allschwil"
-              fill
-              className="object-contain"
-              sizes="56px"
-              priority
-            />
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-[12px] bg-[var(--blue)] text-white"
+            aria-hidden="true"
+          >
+            <Trophy className="h-7 w-7" />
           </div>
           <div className="text-center">
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
               SportClubEvo
             </p>
-            <p className="text-lg font-bold text-[var(--foreground)]">FC Allschwil</p>
+            <p className="text-lg font-bold text-[var(--foreground)]">Club Management</p>
           </div>
         </div>
 

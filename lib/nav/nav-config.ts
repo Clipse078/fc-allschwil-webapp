@@ -1,0 +1,269 @@
+/**
+ * Single source of truth for navigation, module definitions, and permission mapping.
+ *
+ * All other nav/module files derive from this config.
+ * Do not hardcode routes, permissions, or module descriptions elsewhere.
+ */
+
+import { PERMISSIONS, type PermissionKey } from "@/lib/permissions/permissions";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export type NavItemChild = {
+  key: string;
+  label: string;
+  href: string;
+  permissionKeys?: PermissionKey[];
+};
+
+export type NavItem = {
+  key: string;
+  label: string;
+  href: string;
+  permissionKeys?: PermissionKey[];
+  /** Whether the active season query param should propagate to this href. */
+  carrySeason?: boolean;
+  /** Sub-items rendered as indented children in the sidebar. */
+  children?: NavItemChild[];
+};
+
+export type NavSection = {
+  /**
+   * Label shown as a sidebar section divider.
+   * Undefined = no divider (top-level item such as Dashboard).
+   */
+  sectionLabel?: string;
+  items: NavItem[];
+};
+
+export type ModuleDefinition = {
+  key: string;
+  label: string;
+  description: string;
+  href: string;
+  permissionKeys?: PermissionKey[];
+  carrySeason?: boolean;
+};
+
+// ── Navigation sections ───────────────────────────────────────────────────────
+
+export const NAV_SECTIONS: NavSection[] = [
+  {
+    // No section label — Dashboard sits at the top without a divider.
+    items: [
+      {
+        key: "dashboard",
+        label: "Dashboard",
+        href: "/dashboard",
+        carrySeason: true,
+      },
+    ],
+  },
+  {
+    sectionLabel: "Vereinsführung",
+    items: [
+      {
+        key: "vereinsleitung",
+        label: "Vereinsleitung",
+        href: "/vereinsleitung",
+        children: [
+          { key: "meetings", label: "Meetings", href: "/vereinsleitung/meetings" },
+          { key: "initiativen", label: "Initiativen", href: "/vereinsleitung/initiativen" },
+          { key: "kpis", label: "KPIs", href: "/vereinsleitung/kpis" },
+          { key: "ziele", label: "Ziele", href: "/vereinsleitung/targets" },
+          { key: "vorlagen", label: "Vorlagen", href: "/vereinsleitung/templates" },
+        ],
+      },
+      {
+        key: "seasons",
+        label: "Saisons",
+        href: "/dashboard/seasons",
+        permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
+        carrySeason: true,
+      },
+      {
+        key: "saisonplanner",
+        label: "Saisonplanner",
+        href: "/dashboard/planner",
+        permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+        carrySeason: true,
+        children: [
+          {
+            key: "wochenplanner",
+            label: "Wochenplanner",
+            href: "/dashboard/planner/week",
+            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+          },
+          {
+            key: "tagesplanner",
+            label: "Tagesplanner",
+            href: "/dashboard/planner/day",
+            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    sectionLabel: "Spielbetrieb",
+    items: [
+      {
+        key: "teams",
+        label: "Teams",
+        href: "/dashboard/teams",
+        permissionKeys: [PERMISSIONS.TEAMS_VIEW, PERMISSIONS.TEAMS_MANAGE],
+        carrySeason: true,
+      },
+      {
+        key: "events",
+        label: "Events",
+        href: "/dashboard/events",
+        permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
+        carrySeason: true,
+      },
+      {
+        key: "personen",
+        label: "Personen",
+        href: "/dashboard/persons",
+        permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
+        children: [
+          {
+            key: "spieler",
+            label: "Spieler",
+            href: "/dashboard/players",
+            permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
+          },
+          {
+            key: "trainer",
+            label: "Trainer",
+            href: "/dashboard/trainers",
+            permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    sectionLabel: "Verwaltung",
+    items: [
+      {
+        key: "org-units",
+        label: "Organisation",
+        href: "/dashboard/org-units",
+        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+      },
+      {
+        key: "users",
+        label: "Benutzer",
+        href: "/dashboard/users",
+        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+      },
+    ],
+  },
+];
+
+// ── Module definitions (dashboard cards) ─────────────────────────────────────
+
+export const MODULE_DEFINITIONS: ModuleDefinition[] = [
+  {
+    key: "vereinsleitung",
+    label: "Vereinsleitung",
+    description: "Meetings, Initiativen, KPIs und Entscheidungen.",
+    href: "/vereinsleitung",
+    carrySeason: false,
+  },
+  {
+    key: "seasons",
+    label: "Saisons",
+    description: "Führende Struktur für Teams, Events und Planner.",
+    href: "/dashboard/seasons",
+    permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
+    carrySeason: true,
+  },
+  {
+    key: "saisonplanner",
+    label: "Saisonplanner",
+    description: "Trainings, Matches, Turniere und Ferienperioden.",
+    href: "/dashboard/planner",
+    permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+    carrySeason: true,
+  },
+  {
+    key: "teams",
+    label: "Teams",
+    description: "Teams saisongeführt verwalten und aufbauen.",
+    href: "/dashboard/teams",
+    permissionKeys: [PERMISSIONS.TEAMS_VIEW, PERMISSIONS.TEAMS_MANAGE],
+    carrySeason: true,
+  },
+  {
+    key: "events",
+    label: "Events",
+    description: "Matches, Turniere, Trainings und Vereinsereignisse.",
+    href: "/dashboard/events",
+    permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
+    carrySeason: true,
+  },
+  {
+    key: "personen",
+    label: "Personen",
+    description: "Stammdaten für Spieler, Trainer und weitere Rollen.",
+    href: "/dashboard/persons",
+    permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
+    carrySeason: false,
+  },
+  {
+    key: "users",
+    label: "Benutzer",
+    description: "Benutzer, Rollen und Berechtigungen verwalten.",
+    href: "/dashboard/users",
+    permissionKeys: [PERMISSIONS.USERS_MANAGE],
+    carrySeason: false,
+  },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function hasAccess(userKeys: PermissionKey[], required?: PermissionKey[]): boolean {
+  if (!required || required.length === 0) return true;
+  return required.some((p) => userKeys.includes(p));
+}
+
+/** Returns nav sections filtered to the given permission keys. */
+export function getVisibleNavSections(permissionKeys: PermissionKey[]): NavSection[] {
+  return NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items
+      .filter((item) => hasAccess(permissionKeys, item.permissionKeys))
+      .map((item) => ({
+        ...item,
+        children: item.children?.filter((child) =>
+          hasAccess(permissionKeys, child.permissionKeys),
+        ),
+      })),
+  })).filter((section) => section.items.length > 0);
+}
+
+/** Returns module definitions visible to the given permission keys. */
+export function getVisibleModules(permissionKeys: PermissionKey[]): ModuleDefinition[] {
+  return MODULE_DEFINITIONS.filter((m) => hasAccess(permissionKeys, m.permissionKeys));
+}
+
+/**
+ * Flattens nav sections to a flat list (parent + children interleaved).
+ * Used by legacy adapters in lib/permissions/.
+ */
+export function flattenNavSections(
+  sections: NavSection[],
+): Array<{ label: string; href: string; permissionKeys?: PermissionKey[] }> {
+  return sections.flatMap((section) =>
+    section.items.flatMap((item) => [
+      { label: item.label, href: item.href, permissionKeys: item.permissionKeys },
+      ...(item.children ?? []).map((c) => ({
+        label: c.label,
+        href: c.href,
+        permissionKeys: c.permissionKeys,
+      })),
+    ]),
+  );
+}

@@ -7,82 +7,27 @@ import {
   ClipboardList,
   Shield,
   UserCircle2,
-  UserRound,
   Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { KpiCard } from "@/components/admin/dashboard/KpiCard";
 import DashboardTodayAgenda from "@/components/admin/dashboard/DashboardTodayAgenda";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { prisma } from "@/lib/db/prisma";
 import { cn } from "@/lib/cn";
+import { MODULE_DEFINITIONS, type ModuleDefinition } from "@/lib/nav/nav-config";
 
-const DASHBOARD_MODULES = [
-  {
-    title: "Vereinsleitung",
-    description: "Meetings, Initiativen, KPIs und Entscheidungen.",
-    href: "/vereinsleitung",
-    icon: Briefcase,
-    carrySeason: false,
-    accent: "blue",
-  },
-  {
-    title: "Saisons",
-    description: "Führende Struktur für Teams, Events und Planner.",
-    href: "/dashboard/seasons",
-    icon: CalendarRange,
-    carrySeason: true,
-    accent: "blue",
-  },
-  {
-    title: "Saisonplanner",
-    description: "Trainings, Matches, Turniere und Ferienperioden.",
-    href: "/dashboard/planner",
-    icon: ClipboardList,
-    carrySeason: true,
-    accent: "blue",
-  },
-  {
-    title: "Teams",
-    description: "Teams saisongeführt verwalten und aufbauen.",
-    href: "/dashboard/teams",
-    icon: Users,
-    carrySeason: true,
-    accent: "blue",
-  },
-  {
-    title: "Events",
-    description: "Matches, Turniere, Trainings und Vereinsereignisse.",
-    href: "/dashboard/events",
-    icon: CalendarDays,
-    carrySeason: true,
-    accent: "blue",
-  },
-  {
-    title: "Personen",
-    description: "Stammdaten für Spieler, Trainer und weitere Rollen.",
-    href: "/dashboard/persons",
-    icon: UserCircle2,
-    carrySeason: false,
-    accent: "blue",
-  },
-  {
-    title: "Spieler & Trainer",
-    description: "Spieler- und Trainerbereiche strukturiert verwalten.",
-    href: "/dashboard/players",
-    icon: UserRound,
-    carrySeason: false,
-    accent: "blue",
-  },
-  {
-    title: "Benutzer",
-    description: "Benutzer, Rollen und Berechtigungen verwalten.",
-    href: "/dashboard/users",
-    icon: Shield,
-    carrySeason: false,
-    accent: "blue",
-  },
-] as const;
+// Icon map for dashboard module cards — keyed on ModuleDefinition.key
+const MODULE_ICONS: Record<string, LucideIcon> = {
+  vereinsleitung: Briefcase,
+  seasons:        CalendarRange,
+  saisonplanner:  ClipboardList,
+  teams:          Users,
+  events:         CalendarDays,
+  personen:       UserCircle2,
+  users:          Shield,
+};
 
 type DashboardPageProps = {
   searchParams?: Promise<{ season?: string }>;
@@ -138,6 +83,45 @@ function mapEventType(type: string): "training" | "match" | "meeting" | "other" 
   return "other";
 }
 
+function ModuleCard({
+  module,
+  href,
+}: {
+  module: ModuleDefinition;
+  href: string;
+}) {
+  const Icon = MODULE_ICONS[module.key] ?? Briefcase;
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group flex flex-col gap-3 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)]",
+        "p-5 shadow-[var(--shadow-xs)] transition-all duration-150",
+        "hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)] hover:-translate-y-[1px]",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--blue-light)] text-[var(--blue)] transition-transform duration-150 group-hover:scale-105"
+        >
+          <Icon style={{ width: 18, height: 18 }} />
+        </div>
+        <ArrowRight
+          className="h-4 w-4 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 mt-1"
+        />
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">
+          {module.label}
+        </h3>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--text-2)]">
+          {module.description}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = (await searchParams) ?? {};
   const [seasonOptions, kpiData] = await Promise.all([
@@ -187,7 +171,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           label="Heute"
           value={String(kpiData.todayEvents.length)}
           subtext={kpiData.todayEvents.length === 1 ? "Event heute" : "Events heute"}
-          trend={kpiData.todayEvents.length > 0 ? "neutral" : "neutral"}
+          trend="neutral"
         />
       </div>
 
@@ -225,42 +209,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {DASHBOARD_MODULES.map((module) => {
-            const Icon = module.icon;
+          {MODULE_DEFINITIONS.map((module) => {
             const href =
               selectedSeasonKey && module.carrySeason
                 ? `${module.href}?season=${encodeURIComponent(selectedSeasonKey)}`
                 : module.href;
 
             return (
-              <Link
-                key={module.href}
-                href={href}
-                className={cn(
-                  "group flex flex-col gap-3 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)]",
-                  "p-5 shadow-[var(--shadow-xs)] transition-all duration-150",
-                  "hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)] hover:-translate-y-[1px]",
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--blue-light)] text-[var(--blue)] transition-transform duration-150 group-hover:scale-105"
-                  >
-                    <Icon className="h-4.5 w-4.5" style={{ width: "18px", height: "18px" }} />
-                  </div>
-                  <ArrowRight
-                    className="h-4 w-4 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 mt-1"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-[var(--foreground)]">
-                    {module.title}
-                  </h3>
-                  <p className="mt-1 text-xs leading-relaxed text-[var(--text-2)]">
-                    {module.description}
-                  </p>
-                </div>
-              </Link>
+              <ModuleCard key={module.key} module={module} href={href} />
             );
           })}
         </div>

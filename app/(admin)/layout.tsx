@@ -5,6 +5,7 @@ import StageEnvironmentBanner from "@/components/admin/deployment/StageEnvironme
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import AppTopNav from "@/components/admin/layout/AppTopNav";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -17,6 +18,8 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
     redirect("/login");
   }
 
+  const tenant = await getDefaultTenant();
+
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
       {/* Fixed sidebar */}
@@ -25,6 +28,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
         lastName={session.user.lastName}
         email={session.user.email}
         permissionKeys={session.user.permissionKeys}
+        clubName={tenant?.name}
       />
 
       {/* Main content area — flex-1, no margin needed since sidebar is in flow */}

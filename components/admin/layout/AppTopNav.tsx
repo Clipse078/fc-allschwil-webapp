@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell, Search } from "lucide-react";
+import { Bell } from "lucide-react";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 
 type AppTopNavProps = {
@@ -18,17 +18,17 @@ function getPageMeta(pathname: string): { eyebrow: string; title: string } {
   if (pathname.startsWith("/dashboard/teams")) return { eyebrow: "Teams", title: "Teams" };
   if (pathname.startsWith("/dashboard/events")) return { eyebrow: "Events", title: "Events" };
   if (pathname.startsWith("/dashboard/persons")) return { eyebrow: "Personen", title: "Personen" };
-  if (pathname.startsWith("/dashboard/players")) return { eyebrow: "Spieler", title: "Spieler" };
-  if (pathname.startsWith("/dashboard/trainers")) return { eyebrow: "Trainer", title: "Trainer" };
-  if (pathname.startsWith("/dashboard/users")) return { eyebrow: "Benutzer", title: "Benutzerverwaltung" };
-  if (pathname.startsWith("/dashboard/org-units")) return { eyebrow: "Organisation", title: "Org-Einheiten" };
+  if (pathname.startsWith("/dashboard/players")) return { eyebrow: "Personen", title: "Spieler" };
+  if (pathname.startsWith("/dashboard/trainers")) return { eyebrow: "Personen", title: "Trainer" };
+  if (pathname.startsWith("/dashboard/users")) return { eyebrow: "Verwaltung", title: "Benutzerverwaltung" };
+  if (pathname.startsWith("/dashboard/org-units")) return { eyebrow: "Verwaltung", title: "Org-Einheiten" };
   if (pathname.startsWith("/vereinsleitung/meetings")) return { eyebrow: "Vereinsleitung", title: "Meetings" };
   if (pathname.startsWith("/vereinsleitung/initiativen")) return { eyebrow: "Vereinsleitung", title: "Initiativen" };
   if (pathname.startsWith("/vereinsleitung/kpis")) return { eyebrow: "Vereinsleitung", title: "KPIs" };
   if (pathname.startsWith("/vereinsleitung/targets")) return { eyebrow: "Vereinsleitung", title: "Ziele" };
   if (pathname.startsWith("/vereinsleitung/templates")) return { eyebrow: "Vereinsleitung", title: "Vorlagen" };
   if (pathname.startsWith("/vereinsleitung")) return { eyebrow: "Vereinsleitung", title: "Übersicht" };
-  return { eyebrow: "FC Allschwil", title: "WebApp" };
+  return { eyebrow: "SportClubEvo", title: "WebApp" };
 }
 
 export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
@@ -46,40 +46,21 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
         </div>
       </div>
 
-      {/* Center: search slot */}
-      <div className="hidden md:flex flex-1 justify-center">
-        <button
-          type="button"
-          className="sce-search-slot w-full"
-          aria-label="Suche öffnen"
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1 text-left text-[0.8rem]">Suchen…</span>
-          <kbd className="hidden lg:inline-block text-[0.65rem] font-mono opacity-60 border border-[var(--border-strong)] rounded px-1">
-            ⌘K
-          </kbd>
-        </button>
-      </div>
-
-      {/* Right: actions + notifications + user */}
+      {/* Right: actions + user */}
       <div className="flex shrink-0 items-center gap-1.5">
         {/* Page-level actions */}
         <div className="hidden xl:flex items-center gap-1.5">
           <AdminPageActions />
         </div>
 
-        {/* Notification bell */}
+        {/* Notification bell — placeholder, no dot until notifications are implemented */}
         <button
           type="button"
-          className="sce-icon-button relative"
+          className="sce-icon-button"
           aria-label="Benachrichtigungen"
+          disabled
         >
           <Bell className="h-4 w-4" />
-          {/* notification dot */}
-          <span
-            className="absolute right-[7px] top-[7px] h-1.5 w-1.5 rounded-full bg-[var(--red)]"
-            aria-hidden="true"
-          />
         </button>
 
         {/* User avatar */}
