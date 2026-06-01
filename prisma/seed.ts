@@ -12,6 +12,8 @@ import {
   OrgUnitStatus,
   OrgUnitType,
   PermissionModule,
+  RegistrationStatus,
+  RegistrationType,
   PrismaClient,
   TargetCategory,
   TargetDirection,
@@ -38,8 +40,20 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+type RegistrationSeedRecord = {
+  id: string;
+  type: RegistrationType;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  birthYear: number;
+  contactName?: string;
+  message?: string;
+};
+
 async function main() {
-  await prisma.tenant.upsert({
+  const fcAllschwilTenant = await prisma.tenant.upsert({
     where: { key: "fc-allschwil" },
     update: {
       name: "FC Allschwil",
@@ -108,6 +122,9 @@ async function main() {
 
     { key: "templates.view", name: "View templates", module: PermissionModule.TEMPLATES },
     { key: "templates.manage", name: "Manage templates", module: PermissionModule.TEMPLATES },
+
+    { key: "registrations.view", name: "View registrations", module: PermissionModule.REGISTRATIONS },
+    { key: "registrations.edit", name: "Edit registrations", module: PermissionModule.REGISTRATIONS },
   ] as const;
 
   for (const permission of permissions) {
@@ -236,6 +253,219 @@ async function main() {
         },
       });
     }
+  }
+
+  const registrationSeedData: RegistrationSeedRecord[] = [
+    {
+      id: "seed-fca-registration-adam-mallisho",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Adam",
+      lastName: "Mallisho",
+      email: "amjadm82@gmail.com",
+      phone: "+41 78 710 50 57",
+      birthYear: 2020,
+      contactName: "Dr. Amjad Mallisho",
+      message: "Anmeldung gemeinsam mit Bruder Ryan.",
+    },
+    {
+      id: "seed-fca-registration-ryan-mallisho",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Ryan",
+      lastName: "Mallisho",
+      email: "amjadm82@gmail.com",
+      phone: "+41 78 710 50 57",
+      birthYear: 2019,
+      contactName: "Dr. Amjad Mallisho",
+      message: "Anmeldung gemeinsam mit Bruder Adam.",
+    },
+    {
+      id: "seed-fca-registration-emma-bartoszek",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Emma",
+      lastName: "Bartoszek",
+      email: "sarnowskao@gmail.com",
+      phone: "+41 79 696 57 69",
+      birthYear: 2019,
+      contactName: "Olga Sarnowska",
+      message: "Anfrage für Probetraining und Trainingszeiten.",
+    },
+    {
+      id: "seed-fca-registration-noah-roughton",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Noah",
+      lastName: "Roughton",
+      email: "rahesond@yahoo.com",
+      phone: "+41 76 436 59 56",
+      birthYear: 2017,
+      contactName: "Rahel Roughton",
+    },
+    {
+      id: "seed-fca-registration-lars-sowa",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Lars",
+      lastName: "Sowa",
+      email: "regina.sowa@gmx.ch",
+      phone: "+41 79 737 73 15",
+      birthYear: 2016,
+      contactName: "Regina Sowa",
+      message: "Bereits auf der Warteliste.",
+    },
+    {
+      id: "seed-fca-registration-jagash-thayaparan",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Jagash",
+      lastName: "Thayaparan",
+      email: "rthayaa@yahoo.con",
+      phone: "078 609 02 71",
+      birthYear: 2016,
+      contactName: "Thayaparan Ratnam",
+    },
+    {
+      id: "seed-fca-registration-elisa-margot-vaccariello",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Elisa Margot",
+      lastName: "Vaccariello",
+      email: "a.vaccariello@ymail.com",
+      phone: "+41 78 880 25 74",
+      birthYear: 2016,
+      contactName: "Alessandro Vaccariello",
+    },
+    {
+      id: "seed-fca-registration-gaia-eleonora-piretto",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Gaia Eleonora",
+      lastName: "Piretto",
+      email: "a.vaccariello@ymail.com",
+      phone: "+41 78 880 25 74",
+      birthYear: 2016,
+      contactName: "Claudio Piretto",
+    },
+    {
+      id: "seed-fca-registration-noel-marino",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Noel",
+      lastName: "Marino",
+      email: "aidaraffi1003bih@hotmail.com",
+      phone: "+41 79 382 28 23",
+      birthYear: 2020,
+      contactName: "Raffaele Marino",
+    },
+    {
+      id: "seed-fca-registration-arsenije-macasic",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Arsenije",
+      lastName: "Macasic",
+      email: "bettina.macasic92@gmail.com",
+      phone: "+41 76 306 95 51",
+      birthYear: 2013,
+      contactName: "Bettina Macasic",
+    },
+    {
+      id: "seed-fca-registration-isaiah-hagi-ahmed",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Isaiah Hagi",
+      lastName: "Ahmed",
+      email: "bahzainoul7@hotmail.com",
+      phone: "+41 76 510 52 92",
+      birthYear: 2014,
+      contactName: "Bah Zainoul",
+      message: "Bruder spielt bereits im C1.",
+    },
+    {
+      id: "seed-fca-registration-leonidas-matentzoglu",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Leonidas",
+      lastName: "Matentzoglu",
+      email: "nadinekupka@gmx.de",
+      phone: "+49 172 280 09 29",
+      birthYear: 2013,
+      contactName: "Nadine Kupka",
+      message: "Aktuell D9 Promotion beim FC Kickers Basel.",
+    },
+    {
+      id: "seed-fca-registration-marie-grupe-rande",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Marie",
+      lastName: "Grupe Rande",
+      email: "rima.gr2.0@icloud.com",
+      phone: "652298194",
+      birthYear: 2011,
+      contactName: "Arne Grupe Rande",
+    },
+    {
+      id: "seed-fca-registration-ecrin-celepci",
+      type: RegistrationType.PROBETRAINING,
+      firstName: "Ecrin",
+      lastName: "Celepci Anfrage",
+      email: "Aymar_422@hotmail.com",
+      phone: "+41 78 324 13 69",
+      birthYear: 2013,
+      message: "Interesse an einem Probetraining bei den D- oder C-Junioren.",
+    },
+    {
+      id: "seed-fca-registration-txapua-hasler",
+      type: RegistrationType.SPIELERANMELDUNG,
+      firstName: "Txapua",
+      lastName: "Hasler",
+      email: "txapua.hasler@gmail.com",
+      phone: "+41 77 534 76 04",
+      birthYear: 2003,
+      message: `FC Aarau U13-U14
+FC Basel Nachwuchs
+SC Zofingen
+FC Aarau U18
+BSC Old Boys II
+BSC Old Boys
+AC Rossoneri
+SV Muttenz II`,
+    },
+    {
+      id: "seed-fca-registration-claudio-calabrese",
+      type: RegistrationType.SPIELERANMELDUNG,
+      firstName: "Claudio",
+      lastName: "Calabrese",
+      email: "claudiocalabrese88@gmail.com",
+      phone: "+41 78 205 26 33",
+      birthYear: 1990,
+      message: "Ehemaliger Leistungsfussballer in Italien mit Interesse an einem ambitionierten Team.",
+    },
+  ];
+
+  for (const registration of registrationSeedData) {
+    await prisma.registration.upsert({
+      where: { id: registration.id },
+      update: {
+        tenantId: fcAllschwilTenant.id,
+        type: registration.type,
+        status: RegistrationStatus.NEW,
+        firstName: registration.firstName,
+        lastName: registration.lastName,
+        email: registration.email,
+        phone: registration.phone,
+        birthYear: registration.birthYear,
+        message: registration.message ?? null,
+        payloadJson: registration.contactName
+          ? { contactName: registration.contactName }
+          : undefined,
+        source: "WEBSITE",
+      },
+      create: {
+        id: registration.id,
+        tenantId: fcAllschwilTenant.id,
+        type: registration.type,
+        status: RegistrationStatus.NEW,
+        firstName: registration.firstName,
+        lastName: registration.lastName,
+        email: registration.email,
+        phone: registration.phone,
+        birthYear: registration.birthYear,
+        message: registration.message ?? null,
+        payloadJson: registration.contactName
+          ? { contactName: registration.contactName }
+          : undefined,
+        source: "WEBSITE",
+      },
+    });
   }
 
   await prisma.season.updateMany({
