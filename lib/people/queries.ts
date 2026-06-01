@@ -15,6 +15,8 @@ export async function getPersons() {
       email: true,
       phone: true,
       isActive: true,
+      isPlayer: true,
+      isTrainer: true,
     },
   });
 
@@ -24,6 +26,8 @@ export async function getPersons() {
     email: p.email,
     phone: p.phone,
     isActive: p.isActive,
+    isPlayer: p.isPlayer,
+    isTrainer: p.isTrainer,
   }));
 }
 
