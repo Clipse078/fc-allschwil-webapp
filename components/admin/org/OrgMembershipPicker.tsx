@@ -211,9 +211,10 @@ export default function OrgMembershipPicker({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Mode toggle */}
-      <div className="flex gap-2">
+      <div role="group" aria-label="Mitgliedertyp auswählen" className="flex gap-2">
         <button
           type="button"
+          aria-pressed={mode === "user"}
           onClick={() => switchMode("user")}
           className={`rounded-full px-4 py-1.5 text-[12px] font-semibold transition ${
             mode === "user"
@@ -225,6 +226,7 @@ export default function OrgMembershipPicker({
         </button>
         <button
           type="button"
+          aria-pressed={mode === "person"}
           onClick={() => switchMode("person")}
           className={`rounded-full px-4 py-1.5 text-[12px] font-semibold transition ${
             mode === "person"
@@ -284,6 +286,10 @@ export default function OrgMembershipPicker({
                 <p className="text-[12px] italic text-slate-400">
                   Keine Benutzer gefunden.
                 </p>
+              ) : allUsers.length > 0 ? (
+                <p className="text-[12px] italic text-slate-400">
+                  Alle verfügbaren Benutzer sind bereits Mitglied dieser Einheit.
+                </p>
               ) : null}
             </>
           )}
@@ -300,7 +306,12 @@ export default function OrgMembershipPicker({
                 type="text"
                 value={personQuery}
                 onChange={(e) => setPersonQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handlePersonSearch())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handlePersonSearch();
+                  }
+                }}
                 placeholder="Name, E-Mail oder Telefon…"
                 className={inputClass}
               />
@@ -388,7 +399,7 @@ export default function OrgMembershipPicker({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-[#08357a]"
+          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50 hover:bg-[#08357a]"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {submitting ? "Hinzufügen…" : "Mitglied hinzufügen"}
