@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminListItem from "@/components/admin/shared/AdminListItem";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
@@ -26,8 +27,7 @@ export default function PlayersList({ players }: PlayersListProps) {
         <div className="space-y-3">
           <p className="fca-subheading">Noch keine Spieler</p>
           <p className="text-sm leading-6 text-slate-600">
-            Die Premium Spielerliste ist vorbereitet. Als Nächstes können wir
-            echte Kaderdaten, Teamzuordnung, Fotos und Website-Toggles anbinden.
+            Noch keine Spieler erfasst. Personen können im Bereich Personen als Spieler markiert werden.
           </p>
         </div>
       </AdminSurfaceCard>
@@ -63,7 +63,14 @@ export default function PlayersList({ players }: PlayersListProps) {
               />
             </>
           }
-          actions={<span className="text-sm text-slate-400">Spielerprofil folgt</span>}
+          actions={
+            <Link
+              href={`/dashboard/persons/${player.id}`}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Öffnen
+            </Link>
+          }
         />
       ))}
     </div>
