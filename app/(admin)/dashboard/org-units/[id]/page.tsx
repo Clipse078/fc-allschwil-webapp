@@ -4,7 +4,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import { ArrowLeft, Building2, Users } from "lucide-react";
+import { ArrowLeft, Building2, Pencil, Users } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
   CLUB: "Verein", DIVISION: "Abteilung", DEPARTMENT: "Ressort",
@@ -13,6 +13,31 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 type PageProps = { params: Promise<{ id: string }> };
+
+function membershipDisplayName(
+  membership: NonNullable<Awaited<ReturnType<typeof getOrgUnitById>>>["memberships"][number]
+) {
+  if (membership.user) {
+    return `${membership.user.firstName} ${membership.user.lastName}`;
+  }
+
+  if (membership.person) {
+    return (
+      membership.person.displayName ||
+      `${membership.person.firstName} ${membership.person.lastName}`
+    );
+  }
+
+  if (membership.userId) {
+    return `User: ${membership.userId.substring(0, 8)}...`;
+  }
+
+  if (membership.personId) {
+    return `Person: ${membership.personId.substring(0, 8)}...`;
+  }
+
+  return "Nicht zugewiesen";
+}
 
 export default async function OrgUnitDetailPage({ params }: PageProps) {
   await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
@@ -27,9 +52,14 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
         title={unit.name}
         description={`${TYPE_LABELS[unit.type] ?? unit.type} · ${unit.key}`}
         actions={
-          <Link href="/dashboard/org-units" className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            <ArrowLeft className="h-4 w-4" />Zurück
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={`/dashboard/org-units/${unit.id}/edit`} className="inline-flex items-center gap-1.5 rounded-full bg-[#0b4aa2] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]">
+              <Pencil className="h-4 w-4" />Bearbeiten
+            </Link>
+            <Link href="/dashboard/org-units" className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+              <ArrowLeft className="h-4 w-4" />Zurück
+            </Link>
+          </div>
         }
       />
 
@@ -71,7 +101,7 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
                   <div key={m.id} className="flex items-center justify-between rounded-[14px] border border-slate-100 bg-slate-50 px-3 py-2.5">
                     <div>
                       <p className="text-[12px] font-medium text-slate-800">
-                        {m.userId ? `User: ${m.userId.substring(0, 8)}…` : m.personId ? `Person: ${m.personId.substring(0, 8)}…` : "—"}
+                        {membershipDisplayName(m)}
                       </p>
                       {m.roleKey ? <p className="mt-0.5 text-[10px] text-slate-500">{m.roleKey}</p> : null}
                     </div>

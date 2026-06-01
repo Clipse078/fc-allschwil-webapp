@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { OrgUnitMembershipStatus } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,33 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const memberships = await prisma.orgUnitMembership.findMany({
     where: { orgUnitId: id },
     orderBy: { createdAt: "asc" },
-    select: { id: true, userId: true, personId: true, roleKey: true, status: true, isPrimary: true, startsAt: true, endsAt: true },
+    select: {
+      id: true,
+      userId: true,
+      personId: true,
+      roleKey: true,
+      status: true,
+      isPrimary: true,
+      startsAt: true,
+      endsAt: true,
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      person: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          displayName: true,
+          email: true,
+        },
+      },
+    },
   });
   return NextResponse.json({ memberships });
 }
@@ -24,8 +51,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id } = await params;
-  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true } });
+  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, tenantId: true } });
   if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+
+  const tenant = await getDefaultTenant();
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const body = await req.json().catch(() => ({}));
   const userId = body?.userId?.trim() || null;
@@ -38,6 +68,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     const membership = await prisma.orgUnitMembership.create({
       data: {
+        tenantId: orgUnit.tenantId ?? tenant.id,
         orgUnitId: id,
         userId,
         personId,

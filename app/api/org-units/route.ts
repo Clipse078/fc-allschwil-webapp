@@ -4,6 +4,7 @@ import { OrgUnitType } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits } from "@/lib/org/queries";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
@@ -30,6 +31,9 @@ export async function POST(req: NextRequest) {
   const validTypes = Object.values(OrgUnitType);
   const type: OrgUnitType = validTypes.includes(body?.type) ? body.type : OrgUnitType.DEPARTMENT;
 
+  const tenant = await getDefaultTenant();
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
   // Max depth 3 enforcement
   let level = 0;
   if (body?.parentId) {
@@ -42,6 +46,7 @@ export async function POST(req: NextRequest) {
   try {
     const orgUnit = await prisma.orgUnit.create({
       data: {
+        tenantId: tenant.id,
         key, name, type, level,
         description: body?.description?.trim() || null,
         parentId: body?.parentId?.trim() || null,

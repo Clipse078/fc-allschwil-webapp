@@ -302,6 +302,7 @@ model User {
   userRoles             UserRole[]
   auditLogs             AuditLog[]      @relation("AuditActor")
   assignedRegistrations Registration[]  @relation("RegistrationAssignedUser")
+  orgUnitMemberships    OrgUnitMembership[]
 
   @@index([isActive])
 }
@@ -473,6 +474,7 @@ model Person {
 
   playerSquadMembers PlayerSquadMember[]
   trainerTeamMembers TrainerTeamMember[]
+  orgUnitMemberships OrgUnitMembership[]
 
   @@index([lastName, firstName])
   @@index([email])
@@ -839,9 +841,12 @@ model OrgUnitMembership {
   updatedAt DateTime                @updatedAt
 
   orgUnit OrgUnit @relation(fields: [orgUnitId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  person  Person? @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([orgUnitId])
   @@index([userId])
+  @@index([personId])
   @@index([tenantId, userId])
   @@index([orgUnitId, status])
 }
