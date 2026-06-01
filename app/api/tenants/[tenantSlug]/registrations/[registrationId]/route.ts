@@ -67,10 +67,16 @@ export async function PATCH(request: NextRequest, context: Context) {
   try {
     const { tenantSlug, registrationId } = await context.params;
     const body = await request.json();
-    const data: {
-      status?: RegistrationStatus;
-      assignedToUserId?: string | null;
-    } = {};
+
+    // Phase 1: assignment changes are deferred to Phase 2 — reject any attempt here.
+    if ("assignedToUserId" in body) {
+      return NextResponse.json(
+        { error: "Zuweisung kann in Phase 1 nicht geaendert werden." },
+        { status: 400 }
+      );
+    }
+
+    const data: { status?: RegistrationStatus } = {};
 
     if ("status" in body) {
       if (!isRegistrationStatus(body.status)) {
@@ -80,14 +86,7 @@ export async function PATCH(request: NextRequest, context: Context) {
       data.status = body.status;
     }
 
-    if ("assignedToUserId" in body) {
-      data.assignedToUserId =
-        body.assignedToUserId === null || body.assignedToUserId === ""
-          ? null
-          : String(body.assignedToUserId);
-    }
-
-    if (!("status" in data) && !("assignedToUserId" in data)) {
+    if (!("status" in data)) {
       return NextResponse.json(
         { error: "Keine unterstuetzte Aenderung uebergeben." },
         { status: 400 }
@@ -120,19 +119,6 @@ export async function PATCH(request: NextRequest, context: Context) {
       });
     }
 
-    if (before.assignedToUserId !== registration.assignedToUserId) {
-      void logAction({
-        actorUserId: actorId,
-        moduleKey: "registrations",
-        entityType: "Registration",
-        entityId: registration.id,
-        action: "ASSIGNMENT_CHANGE",
-        beforeJson: { assignedToUserId: before.assignedToUserId },
-        afterJson: { assignedToUserId: registration.assignedToUserId },
-        metadataJson: { tenantSlug },
-      });
-    }
-
     revalidatePath(`/tenant/${tenantSlug}/cockpit/registrations`);
     revalidatePath(`/tenant/${tenantSlug}/cockpit/registrations/${registration.id}`);
 
@@ -145,10 +131,6 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     if (error instanceof Error && error.message.startsWith("Active tenant not found")) {
       return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
-    }
-
-    if (error instanceof Error && error.message === "Assigned user not found.") {
-      return NextResponse.json({ error: "Zugewiesener Benutzer nicht gefunden." }, { status: 400 });
     }
 
     return NextResponse.json(
