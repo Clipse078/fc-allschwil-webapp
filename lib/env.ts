@@ -37,21 +37,22 @@ function readOptionalString(value: string | undefined): string | null {
 }
 
 function parseAppEnv(rawValue: string | undefined): AppEnv {
-  const trimmed = rawValue?.trim();
+  const trimmed = rawValue?.trim()?.toLowerCase();
 
   if (!trimmed) {
     return "local";
   }
 
-  if (!APP_ENV_VALUES.has(trimmed as AppEnv)) {
-    throw new Error(
-      "Invalid APP_ENV value: " +
-        trimmed +
-        ". Allowed values: local, stage, prod.",
-    );
+  if (APP_ENV_VALUES.has(trimmed as AppEnv)) {
+    return trimmed as AppEnv;
   }
 
-  return trimmed as AppEnv;
+  // Map common aliases that Vercel or operators might accidentally set
+  if (trimmed === "production") return "prod";
+  if (trimmed === "development") return "local";
+
+  // Unknown value — degrade safely to "local" rather than crashing the render
+  return "local";
 }
 
 function normalizeUrl(url: string | null, variableName: string): string | null {
@@ -59,14 +60,22 @@ function normalizeUrl(url: string | null, variableName: string): string | null {
     return null;
   }
 
+  // Try as-is first (must include a protocol like https://)
   try {
     const parsed = new URL(url);
-
     return parsed.toString().replace(/\/$/, "");
   } catch {
-    throw new Error(
-      "Invalid URL in environment variable " + variableName + ": " + url,
-    );
+    // Fall back to adding https:// in case the operator omitted the protocol
+    try {
+      const parsed = new URL("https://" + url);
+      return parsed.toString().replace(/\/$/, "");
+    } catch {
+      // URL is unparseable in any form — return null and log via warnings
+      console.warn(
+        "[env] Invalid URL in environment variable " + variableName + ": " + url,
+      );
+      return null;
+    }
   }
 }
 
