@@ -60,6 +60,31 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    sectionLabel: "Platform",
+    items: [
+      {
+        key: "admin",
+        label: "Admin",
+        href: "/admin",
+        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+        children: [
+          {
+            key: "admin-org-units",
+            label: "Organisation",
+            href: "/dashboard/org-units",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+          {
+            key: "admin-users",
+            label: "Benutzer",
+            href: "/dashboard/users",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+  {
     sectionLabel: "Vereinsführung",
     items: [
       {
@@ -143,28 +168,19 @@ export const NAV_SECTIONS: NavSection[] = [
       },
     ],
   },
-  {
-    sectionLabel: "Verwaltung",
-    items: [
-      {
-        key: "org-units",
-        label: "Organisation",
-        href: "/dashboard/org-units",
-        permissionKeys: [PERMISSIONS.USERS_MANAGE],
-      },
-      {
-        key: "users",
-        label: "Benutzer",
-        href: "/dashboard/users",
-        permissionKeys: [PERMISSIONS.USERS_MANAGE],
-      },
-    ],
-  },
 ];
 
 // ── Module definitions (dashboard cards) ─────────────────────────────────────
 
 export const MODULE_DEFINITIONS: ModuleDefinition[] = [
+  {
+    key: "admin",
+    label: "Admin",
+    description: "Tenant-Setup, Organisation, Benutzer und Plattform-Governance.",
+    href: "/admin",
+    permissionKeys: [PERMISSIONS.USERS_MANAGE],
+    carrySeason: false,
+  },
   {
     key: "vereinsleitung",
     label: "Vereinsleitung",
@@ -210,14 +226,6 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: "Stammdaten für Spieler, Trainer und weitere Rollen.",
     href: "/dashboard/persons",
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-    carrySeason: false,
-  },
-  {
-    key: "users",
-    label: "Benutzer",
-    description: "Benutzer, Rollen und Berechtigungen verwalten.",
-    href: "/dashboard/users",
-    permissionKeys: [PERMISSIONS.USERS_MANAGE],
     carrySeason: false,
   },
 ];

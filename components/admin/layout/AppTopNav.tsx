@@ -11,6 +11,7 @@ type AppTopNavProps = {
 
 function getPageMeta(pathname: string): { eyebrow: string; title: string } {
   if (pathname === "/dashboard") return { eyebrow: "Home", title: "Dashboard" };
+  if (pathname.startsWith("/admin")) return { eyebrow: "Platform", title: "Admin" };
   if (pathname.startsWith("/dashboard/planner/week")) return { eyebrow: "Planner", title: "Wochenplanner" };
   if (pathname.startsWith("/dashboard/planner/day")) return { eyebrow: "Planner", title: "Tagesplanner" };
   if (pathname.startsWith("/dashboard/planner")) return { eyebrow: "Planner", title: "Saisonplanner" };
@@ -20,8 +21,8 @@ function getPageMeta(pathname: string): { eyebrow: string; title: string } {
   if (pathname.startsWith("/dashboard/persons")) return { eyebrow: "Personen", title: "Personen" };
   if (pathname.startsWith("/dashboard/players")) return { eyebrow: "Personen", title: "Spieler" };
   if (pathname.startsWith("/dashboard/trainers")) return { eyebrow: "Personen", title: "Trainer" };
-  if (pathname.startsWith("/dashboard/users")) return { eyebrow: "Verwaltung", title: "Benutzerverwaltung" };
-  if (pathname.startsWith("/dashboard/org-units")) return { eyebrow: "Verwaltung", title: "Org-Einheiten" };
+  if (pathname.startsWith("/dashboard/users")) return { eyebrow: "Admin", title: "Benutzerverwaltung" };
+  if (pathname.startsWith("/dashboard/org-units")) return { eyebrow: "Admin", title: "Org-Einheiten" };
   if (pathname.startsWith("/vereinsleitung/meetings")) return { eyebrow: "Vereinsleitung", title: "Meetings" };
   if (pathname.startsWith("/vereinsleitung/initiativen")) return { eyebrow: "Vereinsleitung", title: "Initiativen" };
   if (pathname.startsWith("/vereinsleitung/kpis")) return { eyebrow: "Vereinsleitung", title: "KPIs" };
