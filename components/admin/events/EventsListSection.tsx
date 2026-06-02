@@ -1,6 +1,6 @@
+import { CalendarDays } from "lucide-react";
 import EventListCard from "@/components/admin/events/EventListCard";
 import EventTypeFilterBar from "@/components/admin/events/EventTypeFilterBar";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 
 type EventTypeFilter = "ALL" | "MATCH" | "TOURNAMENT" | "TRAINING" | "OTHER";
 
@@ -42,52 +42,49 @@ type EventsListSectionProps = {
   }>;
 };
 
-function getHeadline(filter: EventTypeFilter) {
-  switch (filter) {
-    case "MATCH":
-      return "Matches";
-    case "TOURNAMENT":
-      return "Turniere";
-    case "TRAINING":
-      return "Trainings";
-    case "OTHER":
-      return "Weitere Events";
-    case "ALL":
-    default:
-      return "Alle Events";
-  }
-}
+const FILTER_LABEL: Record<EventTypeFilter, string> = {
+  ALL: "Alle Events",
+  MATCH: "Matches",
+  TOURNAMENT: "Turniere",
+  TRAINING: "Trainings",
+  OTHER: "Weitere Events",
+};
 
 export default function EventsListSection({
   activeFilter,
   events,
 }: EventsListSectionProps) {
   return (
-    <div className="space-y-6">
-      <AdminSurfaceCard className="p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="fca-eyebrow">Filter</p>
-            <h2 className="fca-heading mt-2">{getHeadline(activeFilter)}</h2>
-            <p className="mt-3 text-sm text-slate-600">
-              Erste Live-Datenansicht aus der Event-Datenbank als Grundlage für spätere Detailflows.
-            </p>
-          </div>
+    <div className="space-y-4">
+      {/* Filter + header */}
+      <div className="sce-detail-section">
+        <div className="sce-detail-section-header">
+          <span className="text-sm font-semibold text-[var(--foreground)]">
+            {FILTER_LABEL[activeFilter]}
+          </span>
+          <span className="sce-count-badge">{events.length}</span>
+        </div>
 
+        <div className="sce-detail-section-body">
           <EventTypeFilterBar activeFilter={activeFilter} />
         </div>
-      </AdminSurfaceCard>
+      </div>
 
+      {/* Event list */}
       {events.length === 0 ? (
-        <AdminSurfaceCard className="p-6">
-          <div className="space-y-3">
-            <p className="fca-subheading">Noch keine Events gefunden</p>
-            <p className="text-sm leading-6 text-slate-600">
+        <div className="sce-detail-section">
+          <div className="sce-detail-section-body flex flex-col items-center justify-center gap-3 py-14 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-2)]">
+              <CalendarDays className="h-5 w-5 text-[var(--muted)]" />
+            </div>
+            <p className="font-semibold text-[var(--foreground)]">
+              Noch keine Events gefunden
+            </p>
+            <p className="text-sm text-[var(--muted)]">
               Für den aktuellen Filter liegen noch keine Event-Datensätze vor.
-              Als Nächstes bauen wir Create-Flows für Matches, Turniere, Trainings und weitere Events.
             </p>
           </div>
-        </AdminSurfaceCard>
+        </div>
       ) : (
         <div className="grid gap-4">
           {events.map((event) => (
