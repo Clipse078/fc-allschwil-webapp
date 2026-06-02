@@ -1,4 +1,3 @@
-import { TenantStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 
 export const DEFAULT_TENANT_KEY = "fc-allschwil";
@@ -16,7 +15,7 @@ export async function getTenants() {
   return prisma.tenant.findMany({
     where: {
       status: {
-        not: TenantStatus.ARCHIVED,
+        not: "ARCHIVED",
       },
     },
     orderBy: [{ name: "asc" }],
@@ -35,7 +34,7 @@ export async function getActiveTenantByKey(key: string) {
   return prisma.tenant.findFirst({
     where: {
       key,
-      status: TenantStatus.ACTIVE,
+      status: "ACTIVE",
     },
     select: tenantSelect,
   });
