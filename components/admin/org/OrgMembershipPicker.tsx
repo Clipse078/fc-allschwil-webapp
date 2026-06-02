@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
 
@@ -41,6 +41,13 @@ export default function OrgMembershipPicker({
   // Submit state
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Load users on mount (initial mode is "user")
+  useEffect(() => {
+    loadUsers();
+    // loadUsers guards against double-loading via allUsers.length / usersLoading checks
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load users when entering user mode
   function loadUsers() {

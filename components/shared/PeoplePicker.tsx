@@ -15,7 +15,7 @@
  * - SCE design tokens only
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 
 export type PersonPickerResult = {
@@ -87,6 +87,9 @@ export function PeoplePicker({
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
+
+  const uid = useId();
+  const listboxId = `people-picker-listbox-${uid}`;
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -239,7 +242,7 @@ export function PeoplePicker({
             aria-expanded={open}
             aria-haspopup="listbox"
             aria-autocomplete="list"
-            aria-controls="people-picker-listbox"
+            aria-controls={listboxId}
             role="combobox"
           />
           {query.length > 0 ? (
@@ -283,7 +286,7 @@ export function PeoplePicker({
       {/* Results dropdown */}
       {open && results.length > 0 ? (
         <ul
-          id="people-picker-listbox"
+          id={listboxId}
           role="listbox"
           className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-strong)] bg-[var(--surface)] py-1 shadow-[var(--shadow-lg)]"
         >

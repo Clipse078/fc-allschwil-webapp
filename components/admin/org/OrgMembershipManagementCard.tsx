@@ -280,7 +280,7 @@ export default function OrgMembershipManagementCard({
                   type="button"
                   onClick={() => handleRemove(m)}
                   disabled={removingId === m.id}
-                  className="mt-0.5 flex-shrink-0 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="fca-button-danger mt-0.5 flex-shrink-0"
                 >
                   {removingId === m.id ? "Entfernen…" : "Entfernen"}
                 </button>

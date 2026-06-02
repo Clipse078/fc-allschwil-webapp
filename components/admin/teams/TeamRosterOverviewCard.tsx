@@ -68,6 +68,12 @@ type Props = {
   teamSeasons: TeamSeasonItem[];
 };
 
+const SEASON_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Aktiv",
+  INACTIVE: "Inaktiv",
+  ARCHIVED: "Archiviert",
+};
+
 function sortTeamSeasonsDesc(entries: TeamSeasonItem[]) {
   return [...entries].sort((a, b) => {
     const aTime = new Date(a.season.startDate).getTime();
@@ -120,7 +126,7 @@ export default function TeamRosterOverviewCard({
                     Trainer Website: {entry.trainerTeamWebsiteVisible ? "An" : "Aus"}
                   </span>
                   <span className="fca-pill">
-                    Status: {entry.status}
+                    {SEASON_STATUS_LABELS[entry.status] ?? entry.status}
                   </span>
                 </div>
               </div>

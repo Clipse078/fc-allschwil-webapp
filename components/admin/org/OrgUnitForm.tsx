@@ -38,6 +38,9 @@ const STATUS_OPTIONS = [
   { value: "ARCHIVED", label: "Archiviert" },
 ] as const;
 
+const labelClass =
+  "block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] mb-1.5";
+
 export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defaultValues }: OrgUnitFormProps) {
   const router = useRouter();
   const [name, setName] = useState(defaultValues?.name ?? "");
@@ -49,7 +52,6 @@ export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defau
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-generate key from name
   function handleNameChange(v: string) {
     setName(v);
     if (mode === "create" && !defaultValues?.key) {
@@ -86,68 +88,114 @@ export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defau
     } catch { setError("Netzwerkfehler."); } finally { setLoading(false); }
   }
 
-  const fieldClass = "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30";
-  const labelClass = "block text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1.5";
-
-  // Filter eligible parents (exclude self, max depth 2 for parents)
   const eligibleParents = parentOptions.filter((p) => p.id !== orgUnitId && p.level <= 1);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error ? <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">{error}</div> : null}
+      {error ? (
+        <div className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
+          {error}
+        </div>
+      ) : null}
 
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-5 text-[1.05rem] font-semibold text-slate-900">Einheit</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <label className={labelClass}>Name *</label>
-            <input type="text" value={name} onChange={(e) => handleNameChange(e.target.value)} placeholder="z.B. Vorstand" className={fieldClass} required />
-          </div>
-          <div>
-            <label className={labelClass}>{mode === "edit" ? "Key (unveränderlich)" : "Key (automatisch)"}</label>
-            <input
-              type="text"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder="z.B. vorstand"
-              readOnly={mode === "edit"}
-              aria-readonly={mode === "edit"}
-              className={`${fieldClass} font-mono text-[13px] ${mode === "edit" ? "cursor-not-allowed bg-slate-50 text-slate-500" : ""}`}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Typ</label>
-            <select value={type} onChange={(e) => setType(e.target.value)} className={fieldClass}>
-              {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Übergeordnete Einheit</label>
-            <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={fieldClass}>
-              <option value="">— Keine (Haupteinheit) —</option>
-              {eligibleParents.map((p) => (
-                <option key={p.id} value={p.id}>{" ".repeat(p.level * 2)}{p.name} ({p.key})</option>
-              ))}
-            </select>
-          </div>
-          {mode === "edit" ? (
+      <div className="sce-detail-section">
+        <div className="sce-detail-section-header">
+          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+            Einheit
+          </p>
+        </div>
+        <div className="sce-detail-section-body">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className={labelClass}>Name *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="z.B. Vorstand"
+                className="fca-input"
+                required
+              />
+            </div>
+
             <div>
-              <label className={labelClass}>Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className={fieldClass}>
-                {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              <label className={labelClass}>
+                {mode === "edit" ? "Key (unveränderlich)" : "Key (automatisch)"}
+              </label>
+              <input
+                type="text"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="z.B. vorstand"
+                readOnly={mode === "edit"}
+                aria-readonly={mode === "edit"}
+                className={`fca-input font-mono text-[13px]${mode === "edit" ? " cursor-not-allowed" : ""}`}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Typ</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="fca-select"
+              >
+                {TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
-          ) : null}
-          <div className="md:col-span-2">
-            <label className={labelClass}>Beschreibung</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Optionale Beschreibung…" className={fieldClass} />
+
+            <div>
+              <label className={labelClass}>Übergeordnete Einheit</label>
+              <select
+                value={parentId}
+                onChange={(e) => setParentId(e.target.value)}
+                className="fca-select"
+              >
+                <option value="">— Keine (Haupteinheit) —</option>
+                {eligibleParents.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {"\u00A0".repeat(p.level * 4)}{p.name} ({p.key})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {mode === "edit" ? (
+              <div>
+                <label className={labelClass}>Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="fca-select"
+                >
+                  {STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            <div className="md:col-span-2">
+              <label className={labelClass}>Beschreibung</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                placeholder="Optionale Beschreibung der Organisationseinheit…"
+                className="fca-textarea"
+              />
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
       <div className="flex items-center justify-between gap-4">
-        <button type="button" onClick={() => router.back()} className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Abbrechen</button>
-        <button type="submit" disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:opacity-60 hover:bg-[#08357a]">
+        <button type="button" onClick={() => router.back()} className="fca-button-secondary">
+          Abbrechen
+        </button>
+        <button type="submit" disabled={loading} className="fca-button-primary">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {mode === "create" ? "Einheit erstellen" : "Änderungen speichern"}
         </button>
