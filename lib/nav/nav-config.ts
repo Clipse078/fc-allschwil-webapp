@@ -80,6 +80,18 @@ export const NAV_SECTIONS: NavSection[] = [
             href: "/dashboard/users",
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
+          {
+            key: "admin-roles",
+            label: "Rollen",
+            href: "/dashboard/roles",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+          {
+            key: "admin-permissions",
+            label: "Berechtigungen",
+            href: "/dashboard/permissions",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
         ],
       },
     ],
