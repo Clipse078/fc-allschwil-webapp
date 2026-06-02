@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminListItem from "@/components/admin/shared/AdminListItem";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
+import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
 import {
   getAllowedBirthYearsForSeason,
   getCanonicalSeasonLabel,
@@ -31,15 +32,6 @@ type SquadMember = {
   };
 };
 
-type PersonSearchResult = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  displayName: string | null;
-  email: string | null;
-  phone: string | null;
-  dateOfBirth?: string | null;
-};
 
 type Props = {
   teamId: string;
@@ -128,12 +120,7 @@ export default function TeamSquadManagementCard({
     );
   }, [teamSeason.teamAgeGroup, teamSeason.season.startDate]);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<PersonSearchResult[]>([]);
-
-  const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [selectedPerson, setSelectedPerson] = useState<PersonPickerResult | null>(null);
   const [assignStatus, setAssignStatus] = useState("ACTIVE");
   const [shirtNumber, setShirtNumber] = useState("");
   const [positionLabel, setPositionLabel] = useState("");
@@ -151,59 +138,17 @@ export default function TeamSquadManagementCard({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [removeMessage, setRemoveMessage] = useState<string | null>(null);
 
-  const selectedPerson = useMemo(() => {
-    return searchResults.find((item) => item.id === selectedPersonId) ?? null;
-  }, [searchResults, selectedPersonId]);
-
-  async function handleSearch() {
-    if (searchQuery.trim().length < 2) {
-      setSearchError("Bitte mindestens 2 Zeichen eingeben.");
-      setSearchResults([]);
-      setSelectedPersonId("");
-      return;
-    }
-
-    setSearchLoading(true);
-    setSearchError(null);
-
-    try {
-      const response = await fetch(
-        "/api/people/search?q=" +
-          encodeURIComponent(searchQuery.trim()) +
-          "&mode=player&teamSeasonId=" +
-          encodeURIComponent(teamSeason.id),
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Spielersuche konnte nicht geladen werden.");
-      }
-
-      const results = Array.isArray(data) ? (data as PersonSearchResult[]) : [];
-      setSearchResults(results);
-      setSelectedPersonId(results[0]?.id ?? "");
-    } catch (err) {
-      setSearchError(
-        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten."
-      );
-      setSearchResults([]);
-      setSelectedPersonId("");
-    } finally {
-      setSearchLoading(false);
-    }
-  }
+  const existingSquadPersonIds = useMemo(
+    () => teamSeason.playerSquadMembers.map((m) => m.person.id),
+    [teamSeason.playerSquadMembers]
+  );
 
   async function handleAssign() {
     if (!canManage) {
       return;
     }
 
-    if (!selectedPersonId) {
+    if (!selectedPerson) {
       setAssignError("Bitte zuerst eine Person auswählen.");
       setAssignMessage(null);
       return;
@@ -224,7 +169,7 @@ export default function TeamSquadManagementCard({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            personId: selectedPersonId,
+            personId: selectedPerson.id,
             status: assignStatus,
             shirtNumber: shirtNumber.trim(),
             positionLabel,
@@ -248,9 +193,7 @@ export default function TeamSquadManagementCard({
       setAssignMessage(
         data?.message ?? "Spieler erfolgreich dem Team-Saison-Kader hinzugefügt."
       );
-      setSelectedPersonId("");
-      setSearchQuery("");
-      setSearchResults([]);
+      setSelectedPerson(null);
       setShirtNumber("");
       setPositionLabel("");
       setIsCaptain(false);
@@ -369,79 +312,42 @@ export default function TeamSquadManagementCard({
             </p>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Aktiven Spieler suchen nach Name, E-Mail oder Telefon"
-              className="fca-input"
+          <div className="mt-4">
+            <label className="fca-label mb-2 block">Spieler suchen</label>
+            <PeoplePicker
+              mode="player"
+              teamSeasonId={teamSeason.id}
+              excludeIds={existingSquadPersonIds}
+              selected={selectedPerson}
+              onSelect={setSelectedPerson}
+              onClearSelected={() => setSelectedPerson(null)}
+              placeholder="Aktiven Spieler suchen nach Name, E-Mail…"
             />
-            <button
-              type="button"
-              onClick={handleSearch}
-              disabled={searchLoading}
-              className="fca-button-primary"
-            >
-              {searchLoading ? "Suche..." : "Suchen"}
-            </button>
           </div>
 
-          {searchError ? (
-            <div className="fca-status-box fca-status-box-error mt-4">
-              {searchError}
-            </div>
-          ) : null}
-
-          {searchResults.length === 0 ? (
-            <div className="fca-status-box fca-status-box-muted mt-4">
-              Keine passenden aktiven Spieler gefunden. Neue Personen bitte im People-Modul anlegen.
-            </div>
-          ) : null}
-
-          {searchResults.length > 0 ? (
+          {selectedPerson ? (
             <div className="mt-4 grid gap-4">
-              <label className="block space-y-2">
-                <span className="fca-label">Spieler</span>
-                <select
-                  value={selectedPersonId}
-                  onChange={(event) => setSelectedPersonId(event.target.value)}
-                  className="fca-select"
-                >
-                  {searchResults.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {getPersonName(person)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {selectedPerson ? (
-                <div className="fca-card p-4">
-                  <div className="flex items-center gap-4">
-                    <AdminAvatar
-                      name={getPersonName(selectedPerson)}
-                      size="md"
-                    />
-                    <div>
-                      <div className="font-semibold text-slate-900">
-                        {getPersonName(selectedPerson)}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-500">
-                        {[selectedPerson.email, selectedPerson.phone]
-                          .filter(Boolean)
-                          .join(" • ") || "Keine Kontaktdaten"}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-500">
-                        Geburtsdatum: {formatBirthDate(selectedPerson.dateOfBirth) ?? "nicht gesetzt"}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-500">
-                        Geburtsjahr: {getBirthYear(selectedPerson.dateOfBirth) ?? "-"}
-                      </div>
+              <div className="fca-card p-4">
+                <div className="flex items-center gap-4">
+                  <AdminAvatar name={getPersonName(selectedPerson)} size="md" />
+                  <div>
+                    <div className="font-semibold text-slate-900">
+                      {getPersonName(selectedPerson)}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      {[selectedPerson.email, selectedPerson.phone]
+                        .filter(Boolean)
+                        .join(" • ") || "Keine Kontaktdaten"}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      Geburtsdatum: {formatBirthDate(selectedPerson.dateOfBirth) ?? "nicht gesetzt"}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      Geburtsjahr: {getBirthYear(selectedPerson.dateOfBirth) ?? "-"}
                     </div>
                   </div>
                 </div>
-              ) : null}
+              </div>
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <label className="block space-y-2">
@@ -522,7 +428,7 @@ export default function TeamSquadManagementCard({
                 <button
                   type="button"
                   onClick={handleAssign}
-                  disabled={assignLoading || !selectedPersonId}
+                  disabled={assignLoading || !selectedPerson}
                   className="fca-button-primary"
                 >
                   {assignLoading ? "Hinzufügen..." : "Spieler hinzufügen"}
