@@ -58,6 +58,8 @@ export async function getOrgUnitById(id: string) {
           roleKey: true,
           isPrimary: true,
           status: true,
+          startsAt: true,
+          endsAt: true,
           user: {
             select: {
               id: true,
