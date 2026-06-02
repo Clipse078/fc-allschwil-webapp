@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminListItem from "@/components/admin/shared/AdminListItem";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
@@ -26,8 +27,7 @@ export default function PersonsList({ persons }: PersonsListProps) {
         <div className="space-y-3">
           <p className="fca-subheading">Noch keine Personen</p>
           <p className="text-sm leading-6 text-slate-600">
-            Dieser Bereich ist nun im FCA Premium UX Stil vorbereitet. Als Nächstes
-            können wir hier echte Personendaten, Fotos und Filter anbinden.
+            Noch keine Personen erfasst. Über die Schaltfläche oben rechts den ersten Datensatz anlegen.
           </p>
         </div>
       </AdminSurfaceCard>
@@ -61,11 +61,12 @@ export default function PersonsList({ persons }: PersonsListProps) {
             </>
           }
           actions={
-            person.phone ? (
-              <span className="text-sm text-slate-500">{person.phone}</span>
-            ) : (
-              <span className="text-sm text-slate-400">Profil folgt</span>
-            )
+            <Link
+              href={`/dashboard/persons/${person.id}`}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Öffnen
+            </Link>
           }
         />
       ))}

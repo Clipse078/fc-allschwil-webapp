@@ -9,8 +9,12 @@ export default async function NewOrgUnitPage() {
   const parentOptions = await getOrgUnits();
 
   return (
-    <div className="space-y-6">
-      <AdminSectionHeader eyebrow="Organisation" title="Neue Organisationseinheit" description="Erstelle eine Einheit im Organigramm." />
+    <div className="space-y-8">
+      <AdminSectionHeader
+        eyebrow="Organisation"
+        title="Neue Organisationseinheit"
+        description="Erstelle eine Einheit im Organigramm des Vereins."
+      />
       <OrgUnitForm mode="create" parentOptions={parentOptions} />
     </div>
   );

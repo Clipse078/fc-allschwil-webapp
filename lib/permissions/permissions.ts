@@ -42,6 +42,9 @@ export const PERMISSIONS = {
 
   TEMPLATES_VIEW: "templates.view",
   TEMPLATES_MANAGE: "templates.manage",
+
+  REGISTRATIONS_VIEW: "registrations.view",
+  REGISTRATIONS_EDIT: "registrations.edit",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

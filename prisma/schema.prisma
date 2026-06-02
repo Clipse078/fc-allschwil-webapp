@@ -6,6 +6,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
 enum PermissionModule {
   USERS
   SEASONS
@@ -22,6 +28,26 @@ enum PermissionModule {
   MEETINGS
   INITIATIVES
   TEMPLATES
+  REGISTRATIONS
+  TENANTS
+}
+
+enum RegistrationType {
+  PROBETRAINING
+  SPIELERANMELDUNG
+  TRAINERANMELDUNG
+  SPONSORANFRAGE
+  KONTAKTANFRAGE
+  OTHER
+}
+
+enum RegistrationStatus {
+  NEW
+  REVIEWING
+  CONTACTED
+  ACCEPTED
+  REJECTED
+  ARCHIVED
 }
 
 enum VisibilityScope {
@@ -249,6 +275,20 @@ enum WorkflowAction {
   IMPORT
 }
 
+model Tenant {
+  id        String       @id @default(cuid())
+  key       String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  registrations Registration[]
+
+  @@index([status])
+  @@index([name])
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
@@ -260,10 +300,46 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  userRoles UserRole[]
-  auditLogs AuditLog[] @relation("AuditActor")
+  userRoles             UserRole[]
+  auditLogs             AuditLog[]      @relation("AuditActor")
+  assignedRegistrations Registration[]  @relation("RegistrationAssignedUser")
+  orgUnitMemberships    OrgUnitMembership[]
 
   @@index([isActive])
+}
+
+model Registration {
+  id String @id @default(cuid())
+
+  tenantId String
+
+  type   RegistrationType
+  status RegistrationStatus @default(NEW)
+
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  birthDate DateTime?
+  birthYear Int?
+
+  message     String?
+  payloadJson Json?
+  source      String?
+
+  assignedToUserId String?
+
+  submittedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assignedToUser User?  @relation("RegistrationAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([tenantId, createdAt])
+  @@index([assignedToUserId])
 }
 
 model Role {
@@ -399,6 +475,7 @@ model Person {
 
   playerSquadMembers PlayerSquadMember[]
   trainerTeamMembers TrainerTeamMember[]
+  orgUnitMemberships OrgUnitMembership[]
 
   @@index([lastName, firstName])
   @@index([email])
@@ -741,8 +818,8 @@ model OrgUnit {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  parent      OrgUnit?  @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  children    OrgUnit[] @relation("OrgUnitHierarchy")
+  parent      OrgUnit?            @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children    OrgUnit[]           @relation("OrgUnitHierarchy")
   memberships OrgUnitMembership[]
 
   @@index([tenantId])
@@ -765,9 +842,12 @@ model OrgUnitMembership {
   updatedAt DateTime                @updatedAt
 
   orgUnit OrgUnit @relation(fields: [orgUnitId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  person  Person? @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([orgUnitId])
   @@index([userId])
+  @@index([personId])
   @@index([tenantId, userId])
   @@index([orgUnitId, status])
 }

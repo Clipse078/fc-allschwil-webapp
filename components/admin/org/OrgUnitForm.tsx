@@ -52,7 +52,7 @@ export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defau
   // Auto-generate key from name
   function handleNameChange(v: string) {
     setName(v);
-    if (!defaultValues?.key) {
+    if (mode === "create" && !defaultValues?.key) {
       setKey(v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
     }
   }
@@ -67,14 +67,21 @@ export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defau
       const method = mode === "edit" ? "PUT" : "POST";
       const res = await fetch(url, {
         method, headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, key: key || undefined, type, parentId: parentId || null, description: description || null, status }),
+        body: JSON.stringify({
+          name,
+          ...(mode === "create" ? { key: key || undefined } : {}),
+          type,
+          parentId: parentId || null,
+          description: description || null,
+          status,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data?.error ?? "Fehler beim Speichern.");
         return;
       }
-      router.push("/dashboard/org-units");
+      router.push(mode === "edit" && orgUnitId ? `/dashboard/org-units/${orgUnitId}` : "/dashboard/org-units");
       router.refresh();
     } catch { setError("Netzwerkfehler."); } finally { setLoading(false); }
   }
@@ -97,8 +104,16 @@ export default function OrgUnitForm({ mode, orgUnitId, parentOptions = [], defau
             <input type="text" value={name} onChange={(e) => handleNameChange(e.target.value)} placeholder="z.B. Vorstand" className={fieldClass} required />
           </div>
           <div>
-            <label className={labelClass}>Key (automatisch)</label>
-            <input type="text" value={key} onChange={(e) => setKey(e.target.value)} placeholder="z.B. vorstand" className={`${fieldClass} font-mono text-[13px]`} />
+            <label className={labelClass}>{mode === "edit" ? "Key (unveränderlich)" : "Key (automatisch)"}</label>
+            <input
+              type="text"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="z.B. vorstand"
+              readOnly={mode === "edit"}
+              aria-readonly={mode === "edit"}
+              className={`${fieldClass} font-mono text-[13px] ${mode === "edit" ? "cursor-not-allowed bg-slate-50 text-slate-500" : ""}`}
+            />
           </div>
           <div>
             <label className={labelClass}>Typ</label>

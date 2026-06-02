@@ -1,48 +1,45 @@
-﻿import TeamsTable from "@/components/admin/teams/TeamsTable";
+﻿import Link from "next/link";
+import { Plus } from "lucide-react";
+import TeamsOverviewGrid from "@/components/admin/teams/TeamsOverviewGrid";
+import TeamsCategorySummary from "@/components/admin/teams/TeamsCategorySummary";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons, getTeamsListData } from "@/lib/teams/queries";
 
-const TEAM_GROUPS = [
-  {
-    title: "Kinderfussball",
-    description: "G-, F- und E-Teams",
-    teams: ["G", "F2a", "F2b", "F3", "E1", "E2", "E3", "E4"],
-    accent: "bg-amber-50 border-amber-200 text-amber-700",
+const CATEGORY_DISPLAY: Record<string, { label: string; accentClass: string; dotClass: string }> = {
+  KINDERFUSSBALL: {
+    label: "Kinderfussball",
+    accentClass: "bg-amber-50 border-amber-200",
+    dotClass: "bg-amber-400",
   },
-  {
-    title: "Junioren",
-    description: "D-, C-, B- und A-Teams",
-    teams: ["D9 D1", "D9 D2", "D9 D3", "D7 D1", "D7 D2", "C1", "C2", "B1", "B2", "A"],
-    accent: "bg-blue-50 border-blue-200 text-blue-700",
+  JUNIOREN: {
+    label: "Junioren",
+    accentClass: "bg-blue-50 border-blue-200",
+    dotClass: "bg-blue-500",
   },
-  {
-    title: "Frauen",
-    description: "Frauen-Teams",
-    teams: ["Frauen 1", "Frauen 2", "FF-17", "FF-14"],
-    accent: "bg-rose-50 border-rose-200 text-rose-700",
+  FRAUEN: {
+    label: "Frauen",
+    accentClass: "bg-rose-50 border-rose-200",
+    dotClass: "bg-rose-500",
   },
-  {
-    title: "Aktive",
-    description: "Aktive Mannschaften",
-    teams: ["1. Mannschaft", "2. Mannschaft"],
-    accent: "bg-orange-50 border-orange-200 text-orange-700",
+  AKTIVE: {
+    label: "Aktive",
+    accentClass: "bg-orange-50 border-orange-200",
+    dotClass: "bg-orange-500",
   },
-  {
-    title: "Senioren",
-    description: "Senioren-Teams",
-    teams: ["30+", "40+", "50+"],
-    accent: "bg-slate-100 border-slate-200 text-slate-700",
+  SENIOREN: {
+    label: "Senioren",
+    accentClass: "bg-slate-100 border-slate-200",
+    dotClass: "bg-slate-500",
   },
-  {
-    title: "Trainingsgruppe",
-    description: "Saisonabhängige Trainingsgruppe",
-    teams: ["Trainingsgruppe"],
-    accent: "bg-slate-100 border-slate-200 text-slate-700",
+  TRAININGSGRUPPE: {
+    label: "Trainingsgruppe",
+    accentClass: "bg-purple-50 border-purple-200",
+    dotClass: "bg-purple-500",
   },
-];
+};
 
 type TeamsPageProps = {
   searchParams?: Promise<{
@@ -74,12 +71,33 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
 
   const teams = await getTeamsListData(selectedSeasonKey);
 
+  // Build category stats from real team data
+  const categoryMap = new Map<string, number>();
+  for (const team of teams) {
+    categoryMap.set(team.category, (categoryMap.get(team.category) ?? 0) + 1);
+  }
+
+  const categoryStats = Array.from(categoryMap.entries()).map(([key, count]) => ({
+    label: CATEGORY_DISPLAY[key]?.label ?? key,
+    count,
+    accentClass: CATEGORY_DISPLAY[key]?.accentClass ?? "bg-slate-100 border-slate-200",
+    dotClass: CATEGORY_DISPLAY[key]?.dotClass ?? "bg-slate-400",
+  }));
+
+  const activeTeams = teams.filter((t) => t.isActive).length;
+
   return (
     <div className="space-y-8">
       <AdminSectionHeader
         eyebrow="Teams"
         title="Teams pro Saison"
-        description="Saisongeführte Teamverwaltung. Die gewählte Saison ist führend; darunter werden die Teamkategorien dynamisch aufgebaut."
+        description="Saisongeführte Teamverwaltung. Die gewählte Saison ist führend; darunter werden alle Teams nach Kategorie gelistet."
+        actions={
+          <Link href="/dashboard/teams/new" className="fca-button-primary">
+            <Plus className="h-4 w-4" />
+            Neues Team
+          </Link>
+        }
       />
 
       <SeasonContextSelector
@@ -90,47 +108,30 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
         basePath="/dashboard/teams"
       />
 
-      <section className="grid gap-5 xl:grid-cols-3">
-        {TEAM_GROUPS.map((group) => (
-          <article
-            key={group.title}
-            className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-[1.05rem] font-semibold text-slate-900">
-                  {group.title}
-                </h3>
-                <p className="mt-2 text-sm text-slate-500">{group.description}</p>
-              </div>
-
-              <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${group.accent}`}>
-                {group.teams.length} Teams
-              </span>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {group.teams.map((team) => (
-                <span
-                  key={team}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700"
-                >
-                  {team}
-                </span>
-              ))}
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="space-y-6">
-        <AdminSectionHeader
-          eyebrow="Detaildaten"
-          title={`Teamdaten ${selectedSeason?.name ?? ""}`.trim()}
-          description="Bestehende Teamdaten bleiben erhalten und werden nun im saisongeführten Kontext dargestellt."
+      {/* Category summary */}
+      {teams.length > 0 ? (
+        <TeamsCategorySummary
+          categories={categoryStats}
+          totalTeams={teams.length}
+          activeTeams={activeTeams}
         />
+      ) : null}
 
-        <TeamsTable initialTeams={teams} />
+      {/* Teams grouped by category */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="fca-eyebrow">Teamdaten</p>
+            <h2 className="fca-heading mt-1">
+              {selectedSeason?.name ? `Teams ${selectedSeason.name}` : "Alle Teams"}
+            </h2>
+          </div>
+        </div>
+
+        <TeamsOverviewGrid
+          teams={teams}
+          selectedSeasonName={selectedSeason?.name}
+        />
       </section>
     </div>
   );

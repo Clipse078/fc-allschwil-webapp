@@ -1,9 +1,8 @@
 ﻿"use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import {
   BadgeIcon,
   BarChart3,
@@ -18,84 +17,70 @@ import {
   Flag,
   LayoutDashboard,
   ScrollText,
+  Settings2,
   Shield,
   Target,
+  Trophy,
   UserCircle2,
   UserRound,
   Users,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
-import { getVisibleAdminNav } from "@/lib/permissions/get-visible-admin-nav";
+import { getVisibleNavSections } from "@/lib/nav/nav-config";
+import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
+import { cn } from "@/lib/cn";
 
 type AdminSidebarProps = {
   firstName: string;
   lastName: string;
   email: string;
   permissionKeys: string[];
+  /** Tenant display name. Falls back to "SportClubEvo" when not provided. */
+  clubName?: string;
   collapsed?: boolean;
   onToggle?: () => void;
 };
 
 function getNavIcon(label: string) {
   switch (label) {
-    case "Dashboard":
-      return LayoutDashboard;
-    case "Vereinsleitung":
-      return Briefcase;
-    case "Meetings":
-      return ScrollText;
-    case "Initiativen":
-      return Flag;
-    case "KPIs":
-      return BarChart3;
-    case "Ziele":
-      return Target;
-    case "Vorlagen":
-      return FileText;
-    case "Saisons":
-      return CalendarRange;
-    case "Saisonplanner":
-      return ClipboardList;
-    case "Wochenplanner":
-      return CalendarDays;
-    case "Tagesplanner":
-      return CalendarDays;
-    case "Teams":
-      return Users;
-    case "Events":
-      return CalendarDays;
-    case "Personen":
-      return UserCircle2;
-    case "Spieler":
-      return UserRound;
-    case "Trainer":
-      return BadgeIcon;
-    case "Organisation":
-      return Building2;
-    case "Benutzer":
-      return Shield;
-    default:
-      return LayoutDashboard;
+    case "Dashboard":       return LayoutDashboard;
+    case "Admin":           return Settings2;
+    case "Vereinsleitung":  return Briefcase;
+    case "Meetings":        return ScrollText;
+    case "Initiativen":     return Flag;
+    case "KPIs":            return BarChart3;
+    case "Ziele":           return Target;
+    case "Vorlagen":        return FileText;
+    case "Saisons":         return CalendarRange;
+    case "Saisonplanner":   return ClipboardList;
+    case "Wochenplanner":   return CalendarDays;
+    case "Tagesplanner":    return CalendarDays;
+    case "Teams":           return Users;
+    case "Events":          return CalendarDays;
+    case "Personen":        return UserCircle2;
+    case "Spieler":         return UserRound;
+    case "Trainer":         return BadgeIcon;
+    case "Organisation":    return Building2;
+    case "Benutzer":        return Shield;
+    default:                return LayoutDashboard;
   }
 }
 
-function isVereinsleitungChild(label: string) {
-  return label === "Meetings" || label === "Initiativen" || label === "KPIs" || label === "Ziele" || label === "Vorlagen";
-}
-
-function isPlannerChild(label: string) {
-  return label === "Wochenplanner" || label === "Tagesplanner";
-}
+const SEASON_CARRY_PREFIXES = [
+  "/dashboard",
+  "/dashboard/seasons",
+  "/dashboard/planner",
+  "/dashboard/teams",
+  "/dashboard/events",
+];
 
 function shouldCarrySeason(href: string) {
-  return (
-    href === "/dashboard" ||
-    href.startsWith("/dashboard/seasons") ||
-    href.startsWith("/dashboard/planner") ||
-    href.startsWith("/dashboard/teams") ||
-    href.startsWith("/dashboard/events")
-  );
+  return SEASON_CARRY_PREFIXES.some((prefix) => href === prefix || href.startsWith(prefix + "/") || href.startsWith(prefix + "?"));
+}
+
+function getInitials(firstName: string, lastName: string): string {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
 export default function AdminSidebar({
@@ -103,209 +88,184 @@ export default function AdminSidebar({
   lastName,
   email,
   permissionKeys,
+  clubName,
   collapsed,
   onToggle,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedSeason = searchParams.get("season");
-  const navItems = getVisibleAdminNav(permissionKeys as PermissionKey[]);
 
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
-  const resolvedCollapsed =
+  const isCollapsed =
     typeof collapsed === "boolean" ? collapsed : internalCollapsed;
 
   const handleToggle =
     typeof onToggle === "function"
       ? onToggle
-      : () => setInternalCollapsed((current) => !current);
+      : () => setInternalCollapsed((c) => !c);
 
-  const mainItems = navItems.filter(
-    (item) => !isVereinsleitungChild(item.label) && !isPlannerChild(item.label),
+  const sections: NavSection[] = getVisibleNavSections(
+    permissionKeys as PermissionKey[],
   );
-  const vereinsleitungChildren = navItems.filter((item) =>
-    isVereinsleitungChild(item.label),
-  );
-  const plannerChildren = navItems.filter((item) => isPlannerChild(item.label));
+
+  const displayClubName = clubName ?? "SportClubEvo";
 
   function buildHref(baseHref: string) {
-    if (!selectedSeason || !shouldCarrySeason(baseHref)) {
-      return baseHref;
-    }
-
+    if (!selectedSeason || !shouldCarrySeason(baseHref)) return baseHref;
     return `${baseHref}?season=${encodeURIComponent(selectedSeason)}`;
+  }
+
+  function isItemActive(href: string): boolean {
+    return pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
   }
 
   return (
     <aside
-      className={`${resolvedCollapsed ? "w-[96px]" : "w-[310px]"} flex min-h-screen shrink-0 flex-col border-r border-slate-200 bg-white/92 backdrop-blur-xl transition-[width] duration-200`}
+      className={cn(
+        "sce-sidebar flex-shrink-0",
+        isCollapsed && "collapsed",
+      )}
     >
-      <div className={resolvedCollapsed ? "px-4 py-5" : "px-5 py-5"}>
-        <div className="flex items-start justify-between gap-3">
-          <div
-            className={
-              resolvedCollapsed
-                ? "flex w-full justify-center"
-                : "flex min-w-0 items-center gap-3"
-            }
-          >
-            <div
-              className={
-                resolvedCollapsed
-                  ? "relative h-11 w-11 shrink-0"
-                  : "relative h-12 w-12 shrink-0"
-              }
-            >
-              <Image
-                src="/images/logos/fc-allschwil.png"
-                alt="FC Allschwil"
-                fill
-                className="object-contain"
-                sizes="48px"
-                priority
-              />
-            </div>
-
-            {!resolvedCollapsed ? (
-              <div className="min-w-0">
-                <p className="fca-eyebrow">FC Allschwil</p>
-                <h2 className="mt-1 font-[var(--font-display)] text-[1.7rem] font-bold uppercase leading-[0.92] tracking-[-0.04em] text-[#0b4aa2]">
-                  Admin
-                </h2>
-              </div>
-            ) : null}
-          </div>
-
-          {!resolvedCollapsed ? (
-            <button
-              type="button"
-              onClick={handleToggle}
-              aria-label="Menü einklappen"
-              className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          ) : null}
+      {/* Brand header */}
+      <div className="sce-sidebar-brand">
+        {/* Generic platform icon — replaces tenant-specific logo */}
+        <div
+          className="flex shrink-0 items-center justify-center rounded-[6px] bg-[var(--blue)] text-white"
+          style={{ width: isCollapsed ? 28 : 32, height: isCollapsed ? 28 : 32 }}
+          aria-hidden="true"
+        >
+          <Trophy style={{ width: 14, height: 14 }} />
         </div>
 
-        {resolvedCollapsed ? (
-          <div className="mt-4 flex justify-center">
-            <button
-              type="button"
-              onClick={handleToggle}
-              aria-label="Menü erweitern"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+        {!isCollapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+              SportClubEvo
+            </p>
+            <p className="truncate text-[0.9rem] font-700 leading-tight tracking-tight text-[var(--blue)] font-bold">
+              {displayClubName}
+            </p>
           </div>
-        ) : null}
+        )}
+
+        <button
+          type="button"
+          onClick={handleToggle}
+          aria-label={isCollapsed ? "Menü erweitern" : "Menü einklappen"}
+          className="sce-icon-button shrink-0 ml-auto"
+        >
+          {isCollapsed
+            ? <ChevronRight className="h-3.5 w-3.5" />
+            : <ChevronLeft className="h-3.5 w-3.5" />
+          }
+        </button>
       </div>
 
-      <nav className={resolvedCollapsed ? "flex-1 px-3 py-3" : "flex-1 px-4 py-3"}>
-        <ul className="space-y-2">
-          {mainItems.map((item) => {
-            const Icon = getNavIcon(item.label);
-            const resolvedHref = buildHref(item.href);
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
+        {sections.map((section, sectionIdx) => (
+          <div key={section.sectionLabel ?? "__top__"}>
+            {/* Section divider */}
+            {section.sectionLabel && !isCollapsed && (
+              <p
+                className={cn(
+                  "px-2 pb-1 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]",
+                  sectionIdx > 0 && "mt-4",
+                )}
+              >
+                {section.sectionLabel}
+              </p>
+            )}
+            {section.sectionLabel && isCollapsed && sectionIdx > 0 && (
+              <div className="my-2 mx-2 border-t border-[var(--border)]" />
+            )}
 
-            return (
-              <li key={item.href}>
-                <Link
-                  href={resolvedHref}
-                  title={resolvedCollapsed ? item.label : undefined}
-                  className={
-                    isActive
-                      ? resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-[#0b4aa2] shadow-sm"
-                        : "flex items-center gap-3 rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-3.5 text-sm font-semibold text-[#0b4aa2] shadow-sm"
-                      : resolvedCollapsed
-                        ? "flex h-12 items-center justify-center rounded-[20px] text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                        : "flex items-center gap-3 rounded-[20px] px-4 py-3.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                  }
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!resolvedCollapsed ? <span>{item.label}</span> : null}
-                </Link>
+            <ul className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = getNavIcon(item.label);
+                const resolvedHref = buildHref(item.href);
+                const childActive = item.children?.some((c) => isItemActive(c.href)) ?? false;
+                const isActive = isItemActive(item.href) || childActive;
 
-                {!resolvedCollapsed && item.label === "Vereinsleitung" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
-                    {vereinsleitungChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+                return (
+                  <li key={item.key}>
+                    <Link
+                      href={resolvedHref}
+                      title={isCollapsed ? item.label : undefined}
+                      className={cn(
+                        "sce-nav-item",
+                        isActive && "active",
+                        isCollapsed && "justify-center px-2",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {!isCollapsed && <span>{item.label}</span>}
+                    </Link>
 
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={child.href}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
-                          >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-
-                {!resolvedCollapsed && item.label === "Saisonplanner" ? (
-                  <ul className="mt-2 space-y-2 pl-7">
-                    {plannerChildren.map((child) => {
-                      const ChildIcon = getNavIcon(child.label);
-                      const childHref = buildHref(child.href);
-                      const childActive =
-                        pathname === child.href || pathname.startsWith(`${child.href}/`);
-
-                      return (
-                        <li key={child.href}>
-                          <Link
-                            href={childHref}
-                            className={
-                              childActive
-                                ? "flex items-center gap-3 rounded-[16px] border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-[#0b4aa2]"
-                                : "flex items-center gap-3 rounded-[16px] px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                            }
-                          >
-                            <ChildIcon className="h-4 w-4 shrink-0" />
-                            <span>{child.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+                    {/* Children (always expanded when sidebar is open) */}
+                    {!isCollapsed && item.children && item.children.length > 0 && (
+                      <ul className="mt-0.5 space-y-0.5">
+                        {item.children.map((child) => {
+                          const ChildIcon = getNavIcon(child.label);
+                          const childHref = buildHref(child.href);
+                          const isChildActive = isItemActive(child.href);
+                          return (
+                            <li key={child.key}>
+                              <Link
+                                href={childHref}
+                                className={cn("sce-nav-child", isChildActive && "active")}
+                              >
+                                <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span>{child.label}</span>
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      <div
-        className={
-          resolvedCollapsed
-            ? "border-t border-slate-200 px-3 py-4"
-            : "border-t border-slate-200 px-5 py-5"
-        }
-      >
-        {!resolvedCollapsed ? (
-          <div className="mb-4 rounded-[24px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
-            <p className="text-sm font-semibold text-slate-900">
-              {firstName} {lastName}
-            </p>
-            <p className="mt-1 truncate text-xs text-slate-500">{email}</p>
+      {/* Footer */}
+      <div className="border-t border-[var(--border)] px-2 py-3 space-y-2">
+        {!isCollapsed && (
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
+              style={{ background: "var(--blue)" }}
+              aria-hidden="true"
+            >
+              {getInitials(firstName, lastName)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-[var(--foreground)]">
+                {firstName} {lastName}
+              </p>
+              <p className="truncate text-[0.7rem] text-[var(--muted)]">{email}</p>
+            </div>
           </div>
-        ) : null}
+        )}
 
-        <SignOutButton collapsed={resolvedCollapsed} />
+        {isCollapsed && (
+          <div className="flex justify-center">
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
+              style={{ background: "var(--blue)" }}
+              title={`${firstName} ${lastName}`}
+            >
+              {getInitials(firstName, lastName)}
+            </div>
+          </div>
+        )}
+
+        <SignOutButton collapsed={isCollapsed} />
       </div>
     </aside>
   );

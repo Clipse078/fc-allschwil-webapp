@@ -20,10 +20,28 @@ export async function GET() {
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
       updatedAt: true,
+      _count: {
+        select: {
+          userRoles: true,
+          rolePermissions: true,
+        },
+      },
     },
   });
 
-  return NextResponse.json({ roles });
+  return NextResponse.json({
+    roles: roles.map((role) => ({
+      id: role.id,
+      key: role.key,
+      name: role.name,
+      description: role.description,
+      canAccessVereinsleitung: role.canAccessVereinsleitung,
+      canAttendVereinsleitungMeetings: role.canAttendVereinsleitungMeetings,
+      updatedAt: role.updatedAt,
+      userCount: role._count.userRoles,
+      permissionCount: role._count.rolePermissions,
+    })),
+  });
 }
 
 export async function POST(request: NextRequest) {

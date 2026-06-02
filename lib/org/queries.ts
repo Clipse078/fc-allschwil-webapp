@@ -51,7 +51,33 @@ export async function getOrgUnitById(id: string) {
       children: { select: { id: true, name: true, key: true, type: true, status: true }, orderBy: { sortOrder: "asc" } },
       memberships: {
         where: { status: "ACTIVE" },
-        select: { id: true, userId: true, personId: true, roleKey: true, isPrimary: true, status: true },
+        select: {
+          id: true,
+          userId: true,
+          personId: true,
+          roleKey: true,
+          isPrimary: true,
+          status: true,
+          startsAt: true,
+          endsAt: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          person: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              displayName: true,
+              email: true,
+            },
+          },
+        },
         orderBy: { createdAt: "asc" },
       },
     },

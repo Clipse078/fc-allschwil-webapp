@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
 
 type EventModuleCardProps = {
   icon: LucideIcon;
@@ -17,24 +16,24 @@ function getAccentClasses(accent: EventModuleCardProps["accent"]) {
   switch (accent) {
     case "red":
       return {
-        glow: "shadow-[0_18px_40px_rgba(199,51,44,0.08)]",
-        icon: "text-red-600 border-red-100 bg-red-50",
+        iconClass: "border-red-200 bg-red-50 text-red-600",
+        sourceBadge: "border-red-200 bg-red-50 text-red-700",
       };
     case "green":
       return {
-        glow: "shadow-[0_18px_40px_rgba(34,197,94,0.10)]",
-        icon: "text-emerald-600 border-emerald-100 bg-emerald-50",
+        iconClass: "border-emerald-200 bg-emerald-50 text-emerald-600",
+        sourceBadge: "border-emerald-200 bg-emerald-50 text-emerald-700",
       };
     case "amber":
       return {
-        glow: "shadow-[0_18px_40px_rgba(245,158,11,0.10)]",
-        icon: "text-amber-600 border-amber-100 bg-amber-50",
+        iconClass: "border-amber-200 bg-amber-50 text-amber-600",
+        sourceBadge: "border-amber-200 bg-amber-50 text-amber-700",
       };
     case "blue":
     default:
       return {
-        glow: "shadow-[0_18px_40px_rgba(59,130,246,0.10)]",
-        icon: "text-[#0b4aa2] border-blue-100 bg-blue-50",
+        iconClass: "border-blue-200 bg-blue-50 text-[var(--blue)]",
+        sourceBadge: "border-blue-200 bg-blue-50 text-blue-700",
       };
   }
 }
@@ -51,30 +50,36 @@ export default function EventModuleCard({
 }: EventModuleCardProps) {
   const styles = getAccentClasses(accent);
 
-  const content = (
-    <AdminSurfaceCard className={"h-full p-6 transition hover:-translate-y-[2px] " + styles.glow}>
-      <div className="flex h-full flex-col">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="fca-eyebrow">{eyebrow}</p>
-            <h3 className="fca-heading mt-2">{title}</h3>
+  const inner = (
+    <div className="sce-detail-section h-full transition-all hover:-translate-y-[1px] hover:shadow-[var(--shadow-md)]">
+      <div className="sce-detail-section-header">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${styles.iconClass}`}
+          >
+            <Icon className="h-4 w-4" />
           </div>
-
-          <div className={"flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border " + styles.icon}>
-            <Icon className="h-5 w-5" />
+          <div>
+            <p className="sce-data-label">{eyebrow}</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              {title}
+            </p>
           </div>
         </div>
+      </div>
 
-        <p className="mt-4 text-sm leading-6 text-slate-600">{description}</p>
+      <div className="sce-detail-section-body space-y-4">
+        <p className="text-sm text-[var(--muted)]">{description}</p>
 
-        <div className="mt-5 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Datenquellen
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="sce-data-label mb-1.5">Datenquellen</p>
+            <div className="flex flex-wrap gap-1.5">
               {sources.map((source) => (
-                <span key={source} className="fca-pill">
+                <span
+                  key={source}
+                  className={`inline-flex h-5 items-center rounded-full border px-2 text-[0.65rem] font-semibold ${styles.sourceBadge}`}
+                >
                   {source}
                 </span>
               ))}
@@ -82,37 +87,30 @@ export default function EventModuleCard({
           </div>
 
           <div>
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Ausspielung
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="sce-data-label mb-1.5">Ausspielung</p>
+            <div className="flex flex-wrap gap-1.5">
               {outputs.map((output) => (
-                <span key={output} className="fca-pill">
+                <span
+                  key={output}
+                  className="inline-flex h-5 items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 text-[0.65rem] font-semibold text-[var(--muted)]"
+                >
                   {output}
                 </span>
               ))}
             </div>
           </div>
         </div>
-
-        <div className="mt-6 pt-2">
-          {href ? (
-            <span className="fca-button-primary inline-flex">Bereich öffnen</span>
-          ) : (
-            <span className="fca-pill">Foundation</span>
-          )}
-        </div>
       </div>
-    </AdminSurfaceCard>
+    </div>
   );
 
   if (!href) {
-    return content;
+    return inner;
   }
 
   return (
     <Link href={href} className="block h-full">
-      {content}
+      {inner}
     </Link>
   );
 }

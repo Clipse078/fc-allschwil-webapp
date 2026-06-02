@@ -16,8 +16,11 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "FC Allschwil WebApp",
-  description: "Management WebApp für FC Allschwil",
+  title: {
+    default: "SportClubEvo",
+    template: "%s · SportClubEvo",
+  },
+  description: "Club Management WebApp — powered by SportClubEvo",
 };
 
 type RootLayoutProps = {

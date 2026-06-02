@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
+import { CalendarDays, Plus } from "lucide-react";
 
 type SeasonApiItem = {
   id: string;
@@ -71,7 +71,9 @@ export default function NextSeasonPlannerCard() {
           return;
         }
 
-        setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+        setError(
+          err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.",
+        );
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -108,10 +110,14 @@ export default function NextSeasonPlannerCard() {
         | null;
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Die nächste Saison konnte nicht erstellt werden.");
+        throw new Error(
+          data?.error ?? "Die nächste Saison konnte nicht erstellt werden.",
+        );
       }
 
-      setMessage(data?.message ?? "Die nächste Saison wurde erfolgreich erstellt.");
+      setMessage(
+        data?.message ?? "Die nächste Saison wurde erfolgreich erstellt.",
+      );
 
       const refreshResponse = await fetch("/api/seasons", {
         method: "GET",
@@ -132,72 +138,99 @@ export default function NextSeasonPlannerCard() {
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+      setError(
+        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.",
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <AdminSurfaceCard className="p-6">
-      <div className="space-y-6">
-        <div>
-          <p className="fca-eyebrow">Season-led planning</p>
-          <h3 className="fca-heading mt-2">Nächste Saison vorbereiten</h3>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            Saison ist die führende Entität im Club. Zuerst wird die künftige
-            Saison erstellt. Danach können Teams, Sponsoren und Events gezielt
-            für diese Zukunftssaison geplant werden.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="fca-section-card p-4">
-            <div className="fca-label">Aktuelle Saison</div>
-            <div className="mt-3 text-lg font-semibold text-slate-900">
-              {loading ? "Lädt..." : currentSeasonKey ?? "-"}
+    <div className="space-y-4">
+      {/* Season key cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="sce-detail-section">
+          <div className="sce-detail-section-header">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-white">
+                <CalendarDays className="h-4 w-4 text-[var(--blue)]" />
+              </div>
+              <span className="text-sm font-semibold text-[var(--foreground)]">
+                Aktuelle Saison
+              </span>
             </div>
           </div>
-
-          <div className="fca-section-card p-4">
-            <div className="fca-label">Nächste Saison gemäss Logik</div>
-            <div className="mt-3 text-lg font-semibold text-slate-900">
-              {loading ? "Lädt..." : nextSeasonKey ?? "-"}
-            </div>
-          </div>
-        </div>
-
-        {error ? (
-          <div className="fca-status-box fca-status-box-error">{error}</div>
-        ) : null}
-
-        {message ? (
-          <div className="fca-status-box fca-status-box-success">{message}</div>
-        ) : null}
-
-        {loading ? (
-          <div className="fca-status-box fca-status-box-muted">
-            Saisoninformationen werden geladen.
-          </div>
-        ) : nextSeasonAlreadyExists ? (
-          <div className="fca-status-box fca-status-box-muted">
-            Die nächste Saison ({nextSeasonKey}) existiert bereits. Als Nächstes
-            können wir daraus einen echten Next Season Planner Flow für Teams,
-            Sponsoren und Events aufbauen.
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleCreateNextSeason}
-              disabled={submitting || !nextSeasonKey}
-              className="fca-button-primary"
+          <div className="sce-detail-section-body">
+            <p
+              className="text-xl font-bold text-[var(--foreground)]"
+              style={{ fontFamily: "var(--font-display)" }}
             >
-              {submitting ? "Erstelle..." : "Nächste Saison erstellen"}
-            </button>
+              {loading ? (
+                <span className="text-[var(--muted)]">Lädt…</span>
+              ) : (
+                (currentSeasonKey ?? "–")
+              )}
+            </p>
           </div>
-        )}
+        </div>
+
+        <div className="sce-detail-section">
+          <div className="sce-detail-section-header">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50">
+                <CalendarDays className="h-4 w-4 text-amber-600" />
+              </div>
+              <span className="text-sm font-semibold text-[var(--foreground)]">
+                Nächste Saison gemäss Logik
+              </span>
+            </div>
+          </div>
+          <div className="sce-detail-section-body">
+            <p
+              className="text-xl font-bold text-[var(--foreground)]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {loading ? (
+                <span className="text-[var(--muted)]">Lädt…</span>
+              ) : (
+                (nextSeasonKey ?? "–")
+              )}
+            </p>
+          </div>
+        </div>
       </div>
-    </AdminSurfaceCard>
+
+      {/* Feedback messages */}
+      {error ? (
+        <div className="fca-status-box fca-status-box-error">{error}</div>
+      ) : null}
+
+      {message ? (
+        <div className="fca-status-box fca-status-box-success">{message}</div>
+      ) : null}
+
+      {/* Action / info */}
+      {loading ? (
+        <div className="fca-status-box fca-status-box-muted">
+          Saisoninformationen werden geladen…
+        </div>
+      ) : nextSeasonAlreadyExists ? (
+        <div className="fca-status-box fca-status-box-muted">
+          Die nächste Saison ({nextSeasonKey}) existiert bereits. Teams,
+          Sponsoren und Events können nun saisonspezifisch geplant werden.
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleCreateNextSeason}
+          disabled={submitting || !nextSeasonKey}
+          className="fca-button-primary"
+        >
+          <Plus className="h-4 w-4" />
+          {submitting ? "Erstelle…" : "Nächste Saison erstellen"}
+        </button>
+      )}
+    </div>
   );
 }

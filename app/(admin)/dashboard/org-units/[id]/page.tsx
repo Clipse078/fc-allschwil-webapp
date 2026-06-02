@@ -1,18 +1,58 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  ArrowLeft,
+  Building2,
+  ChevronRight,
+  GitBranch,
+  Hash,
+  Layers,
+  Pencil,
+  Users,
+} from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import { ArrowLeft, Building2, Users } from "lucide-react";
+import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
 
 const TYPE_LABELS: Record<string, string> = {
-  CLUB: "Verein", DIVISION: "Abteilung", DEPARTMENT: "Ressort",
-  SUB_DEPARTMENT: "Unterressort", TEAM: "Mannschaft", COMMITTEE: "Ausschuss",
-  PROJECT_GROUP: "Projektgruppe", CUSTOM: "Benutzerdefiniert",
+  CLUB: "Verein",
+  DIVISION: "Abteilung",
+  DEPARTMENT: "Ressort",
+  SUB_DEPARTMENT: "Unterressort",
+  TEAM: "Mannschaft",
+  COMMITTEE: "Ausschuss",
+  PROJECT_GROUP: "Projektgruppe",
+  CUSTOM: "Benutzerdefiniert",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Aktiv",
+  INACTIVE: "Inaktiv",
+  ARCHIVED: "Archiviert",
+};
+
+const CHILD_TYPE_COLORS: Record<string, string> = {
+  CLUB: "bg-blue-50 border-blue-100",
+  DIVISION: "bg-indigo-50 border-indigo-100",
+  DEPARTMENT: "bg-violet-50 border-violet-100",
+  SUB_DEPARTMENT: "bg-purple-50 border-purple-100",
+  TEAM: "bg-emerald-50 border-emerald-100",
+  COMMITTEE: "bg-amber-50 border-amber-100",
+  PROJECT_GROUP: "bg-orange-50 border-orange-100",
+  CUSTOM: "bg-slate-50 border-slate-200",
 };
 
 type PageProps = { params: Promise<{ id: string }> };
+
+function getInitials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join("");
+}
 
 export default async function OrgUnitDetailPage({ params }: PageProps) {
   await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
@@ -20,81 +60,265 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   const unit = await getOrgUnitById(id);
   if (!unit) notFound();
 
+  const typeLabel = TYPE_LABELS[unit.type] ?? unit.type;
+  const statusLabel = STATUS_LABELS[unit.status] ?? unit.status;
+  const initials = getInitials(unit.name);
+  const memberCount = unit.memberships.length;
+  const childCount = unit.children.length;
+
   return (
     <div className="space-y-6">
-      <AdminSectionHeader
-        eyebrow="Organisation"
-        title={unit.name}
-        description={`${TYPE_LABELS[unit.type] ?? unit.type} · ${unit.key}`}
-        actions={
-          <Link href="/dashboard/org-units" className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            <ArrowLeft className="h-4 w-4" />Zurück
-          </Link>
-        }
-      />
-
-      <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
-        <div className="space-y-5">
-          {unit.children.length > 0 ? (
-            <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-              <h3 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">Untereinheiten</h3>
-              <div className="space-y-2">
-                {unit.children.map((child) => (
-                  <Link key={child.id} href={`/dashboard/org-units/${child.id}`}
-                    className="flex items-center gap-3 rounded-[16px] border border-slate-100 bg-slate-50 px-4 py-3 hover:bg-white">
-                    <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{child.name}</p>
-                      <p className="text-[11px] text-slate-500">{TYPE_LABELS[child.type] ?? child.type} · {child.key}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-[#0b4aa2]" />
-                <h3 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">Mitglieder</h3>
-              </div>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {unit.memberships.length}
-              </span>
+      {/* Hero */}
+      <div className="sce-entity-hero">
+        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-5">
+            {/* Avatar */}
+            <div className="sce-avatar-xl">
+              {initials}
             </div>
-            {unit.memberships.length === 0 ? (
-              <p className="text-[12px] text-slate-400 italic">Noch keine Mitglieder. POST /api/org-units/{id}/memberships</p>
-            ) : (
-              <div className="space-y-2">
-                {unit.memberships.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between rounded-[14px] border border-slate-100 bg-slate-50 px-3 py-2.5">
-                    <div>
-                      <p className="text-[12px] font-medium text-slate-800">
-                        {m.userId ? `User: ${m.userId.substring(0, 8)}…` : m.personId ? `Person: ${m.personId.substring(0, 8)}…` : "—"}
-                      </p>
-                      {m.roleKey ? <p className="mt-0.5 text-[10px] text-slate-500">{m.roleKey}</p> : null}
-                    </div>
-                    {m.isPrimary ? <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Primär</span> : null}
-                  </div>
-                ))}
+
+            {/* Identity */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
+                {typeLabel}
+              </p>
+              <h1
+                className="mt-1 text-2xl font-bold text-white"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {unit.name}
+              </h1>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                {/* Status */}
+                <span
+                  className={`inline-flex h-5 items-center rounded-full border px-2.5 text-[0.65rem] font-semibold ${
+                    unit.status === "ACTIVE"
+                      ? "border-emerald-300/60 bg-emerald-500/20 text-emerald-200"
+                      : "border-white/20 bg-white/10 text-white/60"
+                  }`}
+                >
+                  {statusLabel}
+                </span>
+                {/* Key */}
+                <code className="rounded border border-white/20 bg-white/10 px-2 py-0.5 text-[0.72rem] font-mono text-white/80">
+                  {unit.key}
+                </code>
+                {/* Level */}
+                <span className="inline-flex items-center gap-1 text-xs text-white/60">
+                  <Layers className="h-3 w-3" />
+                  Ebene {unit.level}
+                </span>
               </div>
-            )}
-          </section>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/dashboard/org-units/${unit.id}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/25"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Bearbeiten
+            </Link>
+            <Link
+              href="/dashboard/org-units"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Zurück
+            </Link>
+          </div>
         </div>
 
-        <aside>
-          <section className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <h3 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.12em] text-slate-500">Details</h3>
-            <dl className="space-y-3 text-sm">
-              <div><dt className="text-[11px] text-slate-400">Typ</dt><dd className="font-medium text-slate-900">{TYPE_LABELS[unit.type] ?? unit.type}</dd></div>
-              <div><dt className="text-[11px] text-slate-400">Key</dt><dd className="font-mono text-[12px] text-slate-800">{unit.key}</dd></div>
-              <div><dt className="text-[11px] text-slate-400">Ebene</dt><dd className="font-medium text-slate-900">{unit.level}</dd></div>
-              {unit.parent ? <div><dt className="text-[11px] text-slate-400">Übergeordnet</dt><dd className="font-medium text-slate-900">{unit.parent.name}</dd></div> : null}
-              {unit.description ? <div><dt className="text-[11px] text-slate-400">Beschreibung</dt><dd className="text-slate-600">{unit.description}</dd></div> : null}
-            </dl>
-          </section>
-        </aside>
+        {/* Quick stats */}
+        <div className="relative z-10 mt-6 flex flex-wrap gap-6 border-t border-white/15 pt-4">
+          <div className="flex items-center gap-2 text-sm text-white/80">
+            <Users className="h-4 w-4 text-white/60" />
+            <span className="font-semibold text-white">{memberCount}</span>
+            <span>Mitglied{memberCount !== 1 ? "er" : ""}</span>
+          </div>
+          {childCount > 0 ? (
+            <div className="flex items-center gap-2 text-sm text-white/80">
+              <GitBranch className="h-4 w-4 text-white/60" />
+              <span className="font-semibold text-white">{childCount}</span>
+              <span>Untereinheit{childCount !== 1 ? "en" : ""}</span>
+            </div>
+          ) : null}
+          {unit.parent ? (
+            <div className="flex items-center gap-2 text-sm text-white/80">
+              <Building2 className="h-4 w-4 text-white/60" />
+              <span>unter</span>
+              <span className="font-semibold text-white">
+                {unit.parent.name}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Content grid */}
+      <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
+        {/* Main column */}
+        <div className="space-y-5">
+          {/* Untereinheiten */}
+          {unit.children.length > 0 ? (
+            <div className="sce-detail-section">
+              <div className="sce-detail-section-header">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4 text-[var(--muted)]" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Untereinheiten
+                  </p>
+                  <span className="sce-count-badge">{unit.children.length}</span>
+                </div>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {unit.children.map((child) => {
+                  const childTypeLabel = TYPE_LABELS[child.type] ?? child.type;
+                  const childBg =
+                    CHILD_TYPE_COLORS[child.type] ?? CHILD_TYPE_COLORS.CUSTOM;
+
+                  return (
+                    <Link
+                      key={child.id}
+                      href={`/dashboard/org-units/${child.id}`}
+                      className={`group flex items-center gap-4 px-5 py-3.5 transition hover:bg-[var(--surface-2)]`}
+                    >
+                      <div
+                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${childBg}`}
+                      >
+                        <Building2 className="h-4 w-4 text-[var(--text-2)]" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[var(--foreground)]">
+                          {child.name}
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {childTypeLabel}
+                          {" · "}
+                          <code className="font-mono">{child.key}</code>
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--blue)]" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Membership management (business logic unchanged) */}
+          <OrgMembershipManagementCard
+            orgUnitId={unit.id}
+            initialMemberships={unit.memberships}
+          />
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-5">
+          {/* Details */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                Details
+              </p>
+            </div>
+            <div className="sce-detail-section-body space-y-4">
+              <div className="sce-data-field">
+                <span className="sce-data-label">Typ</span>
+                <span className="sce-data-value">{typeLabel}</span>
+              </div>
+              <div className="sce-data-field">
+                <span className="sce-data-label">Key</span>
+                <code className="sce-data-value font-mono text-[0.8rem]">
+                  {unit.key}
+                </code>
+              </div>
+              <div className="sce-data-field">
+                <span className="sce-data-label">Ebene</span>
+                <span className="sce-data-value flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5 text-[var(--muted)]" />
+                  {unit.level}
+                </span>
+              </div>
+              {unit.parent ? (
+                <div className="sce-data-field">
+                  <span className="sce-data-label">Übergeordnete Einheit</span>
+                  <Link
+                    href={`/dashboard/org-units/${unit.parent.id}`}
+                    className="sce-data-value flex items-center gap-1.5 text-[var(--blue)] hover:underline"
+                  >
+                    <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                    {unit.parent.name}
+                  </Link>
+                </div>
+              ) : (
+                <div className="sce-data-field">
+                  <span className="sce-data-label">Übergeordnete Einheit</span>
+                  <span className="sce-data-value-empty">Keine (Haupteinheit)</span>
+                </div>
+              )}
+              <div className="sce-data-field">
+                <span className="sce-data-label">Status</span>
+                <span className="sce-data-value">{statusLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          {unit.description ? (
+            <div className="sce-detail-section">
+              <div className="sce-detail-section-header">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Beschreibung
+                </p>
+              </div>
+              <div className="sce-detail-section-body">
+                <p className="text-sm leading-relaxed text-[var(--text-2)]">
+                  {unit.description}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Key info card */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <Hash className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Systeminfo
+                </p>
+              </div>
+            </div>
+            <div className="sce-detail-section-body space-y-4">
+              <div className="sce-data-field">
+                <span className="sce-data-label">Erstellt</span>
+                <span className="sce-data-value">
+                  {unit.createdAt.toLocaleDateString("de-CH", {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              <div className="sce-data-field">
+                <span className="sce-data-label">Zuletzt geändert</span>
+                <span className="sce-data-value">
+                  {unit.updatedAt.toLocaleDateString("de-CH", {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

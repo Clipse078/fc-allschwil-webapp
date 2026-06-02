@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminListItem from "@/components/admin/shared/AdminListItem";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
+import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
 import { getCanonicalSeasonLabel } from "@/lib/teams/jahrgang-rules";
 
 type TrainerMember = {
@@ -24,14 +25,6 @@ type TrainerMember = {
   };
 };
 
-type PersonSearchResult = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  displayName: string | null;
-  email: string | null;
-  phone: string | null;
-};
 
 type Props = {
   teamId: string;
@@ -80,11 +73,7 @@ export default function TeamTrainerManagementCard({
     );
   }, [teamSeason.season.startDate, teamSeason.season.name]);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<PersonSearchResult[]>([]);
-  const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [selectedPerson, setSelectedPerson] = useState<PersonPickerResult | null>(null);
 
   const [assignStatus, setAssignStatus] = useState("ACTIVE");
   const [roleLabel, setRoleLabel] = useState("");
@@ -100,55 +89,17 @@ export default function TeamTrainerManagementCard({
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [removeMessage, setRemoveMessage] = useState<string | null>(null);
 
-  async function handleSearch() {
-    if (searchQuery.trim().length < 2) {
-      setSearchError("Bitte mindestens 2 Zeichen eingeben.");
-      setSearchResults([]);
-      setSelectedPersonId("");
-      return;
-    }
-
-    setSearchLoading(true);
-    setSearchError(null);
-
-    try {
-      const response = await fetch(
-        "/api/people/search?q=" +
-          encodeURIComponent(searchQuery.trim()) +
-          "&mode=trainer&teamSeasonId=" +
-          encodeURIComponent(teamSeason.id),
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Trainersuche konnte nicht geladen werden.");
-      }
-
-      const results = Array.isArray(data) ? (data as PersonSearchResult[]) : [];
-      setSearchResults(results);
-      setSelectedPersonId(results[0]?.id ?? "");
-    } catch (err) {
-      setSearchError(
-        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten."
-      );
-      setSearchResults([]);
-      setSelectedPersonId("");
-    } finally {
-      setSearchLoading(false);
-    }
-  }
+  const existingTrainerPersonIds = useMemo(
+    () => teamSeason.trainerTeamMembers.map((m) => m.person.id),
+    [teamSeason.trainerTeamMembers]
+  );
 
   async function handleAssign() {
     if (!canManage) {
       return;
     }
 
-    if (!selectedPersonId) {
+    if (!selectedPerson) {
       setAssignError("Bitte zuerst eine Person auswählen.");
       setAssignMessage(null);
       return;
@@ -169,7 +120,7 @@ export default function TeamTrainerManagementCard({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            personId: selectedPersonId,
+            personId: selectedPerson.id,
             status: assignStatus,
             roleLabel,
             isWebsiteVisible,
@@ -190,9 +141,7 @@ export default function TeamTrainerManagementCard({
       setAssignMessage(
         data?.message ?? "Trainer erfolgreich dem Trainerteam hinzugefügt."
       );
-      setSelectedPersonId("");
-      setSearchQuery("");
-      setSearchResults([]);
+      setSelectedPerson(null);
       setRoleLabel("");
       setIsWebsiteVisible(true);
       setSortOrder("0");
@@ -289,53 +238,21 @@ export default function TeamTrainerManagementCard({
             </p>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Aktiven Trainer suchen nach Name, E-Mail oder Telefon"
-              className="fca-input"
+          <div className="mt-4">
+            <label className="fca-label mb-2 block">Trainer suchen</label>
+            <PeoplePicker
+              mode="trainer"
+              teamSeasonId={teamSeason.id}
+              excludeIds={existingTrainerPersonIds}
+              selected={selectedPerson}
+              onSelect={setSelectedPerson}
+              onClearSelected={() => setSelectedPerson(null)}
+              placeholder="Aktiven Trainer suchen nach Name, E-Mail…"
             />
-            <button
-              type="button"
-              onClick={handleSearch}
-              disabled={searchLoading}
-              className="fca-button-primary"
-            >
-              {searchLoading ? "Suche..." : "Suchen"}
-            </button>
           </div>
 
-          {searchError ? (
-            <div className="fca-status-box fca-status-box-error mt-4">
-              {searchError}
-            </div>
-          ) : null}
-
-          {searchResults.length === 0 ? (
-            <div className="fca-status-box fca-status-box-muted mt-4">
-              Keine passenden aktiven Trainer gefunden. Neue Personen bitte im People-Modul anlegen.
-            </div>
-          ) : null}
-
-          {searchResults.length > 0 ? (
+          {selectedPerson ? (
             <div className="mt-4 grid gap-4">
-              <label className="block space-y-2">
-                <span className="fca-label">Trainer</span>
-                <select
-                  value={selectedPersonId}
-                  onChange={(event) => setSelectedPersonId(event.target.value)}
-                  className="fca-select"
-                >
-                  {searchResults.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {getPersonName(person)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
               <div className="grid gap-4 md:grid-cols-3">
                 <label className="block space-y-2">
                   <span className="fca-label">Status</span>
@@ -406,7 +323,7 @@ export default function TeamTrainerManagementCard({
                 <button
                   type="button"
                   onClick={handleAssign}
-                  disabled={assignLoading || !selectedPersonId}
+                  disabled={assignLoading || !selectedPerson}
                   className="fca-button-primary"
                 >
                   {assignLoading ? "Hinzufügen..." : "Trainer hinzufügen"}
