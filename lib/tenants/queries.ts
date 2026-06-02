@@ -41,7 +41,11 @@ export async function getActiveTenantByKey(key: string) {
 }
 
 export async function getDefaultTenant() {
-  return getActiveTenantByKey(DEFAULT_TENANT_KEY);
+  try {
+    return await getActiveTenantByKey(DEFAULT_TENANT_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export type TenantListItem = Awaited<ReturnType<typeof getTenants>>[number];
