@@ -142,6 +142,22 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    sectionLabel: "Ausspielung",
+    items: [
+      {
+        key: "publishing",
+        label: "Publishing Cockpit",
+        href: "/dashboard/publishing",
+        permissionKeys: [
+          PERMISSIONS.EVENTS_VIEW,
+          PERMISSIONS.EVENTS_MANAGE,
+          PERMISSIONS.WEBSITE_MANAGE,
+          PERMISSIONS.INFOBOARD_MANAGE,
+        ],
+      },
+    ],
+  },
+  {
     sectionLabel: "Spielbetrieb",
     items: [
       {
@@ -231,6 +247,19 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     href: "/dashboard/events",
     permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
     carrySeason: true,
+  },
+  {
+    key: "publishing",
+    label: "Publishing Cockpit",
+    description: "Review-Workflow für Events, News, Teams, Spieler und Trainer.",
+    href: "/dashboard/publishing",
+    permissionKeys: [
+      PERMISSIONS.EVENTS_VIEW,
+      PERMISSIONS.EVENTS_MANAGE,
+      PERMISSIONS.WEBSITE_MANAGE,
+      PERMISSIONS.INFOBOARD_MANAGE,
+    ],
+    carrySeason: false,
   },
   {
     key: "personen",
