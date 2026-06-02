@@ -5,7 +5,7 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardList,
-  Shield,
+  Settings2,
   UserCircle2,
   Users,
 } from "lucide-react";
@@ -20,13 +20,13 @@ import { MODULE_DEFINITIONS, type ModuleDefinition } from "@/lib/nav/nav-config"
 
 // Icon map for dashboard module cards — keyed on ModuleDefinition.key
 const MODULE_ICONS: Record<string, LucideIcon> = {
+  admin:          Settings2,
   vereinsleitung: Briefcase,
   seasons:        CalendarRange,
   saisonplanner:  ClipboardList,
   teams:          Users,
   events:         CalendarDays,
   personen:       UserCircle2,
-  users:          Shield,
 };
 
 type DashboardPageProps = {
