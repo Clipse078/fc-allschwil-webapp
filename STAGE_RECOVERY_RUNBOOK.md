@@ -48,14 +48,25 @@ PostgreSQL cannot run `ALTER TYPE … ADD VALUE` inside a transaction. Prisma wr
 Before starting:
 
 - [ ] You have `psql` and `npx` available in your shell.
-- [ ] `DATABASE_URL` is set and points to **STAGE** (not production).  
-  `echo $DATABASE_URL` — confirm it contains your Neon STAGE connection string.
+- [ ] `DATABASE_URL` is set and points to **STAGE** (pooled/PgBouncer URL — used by the app and by Prisma CLI).  
+  `echo $DATABASE_URL` — confirm it contains your Neon STAGE pooled connection string.
+- [ ] `STAGE_DIRECT_URL` is set and points to **STAGE** (non-pooled direct URL — required for `psql` DDL and `pg_dump`).  
+  `echo $STAGE_DIRECT_URL` — confirm it contains your Neon STAGE direct connection string.
+- [ ] **Direct-vs-pooled validation** — the two URLs must be different. A pooled URL contains `-pooler` in the hostname; a direct URL does not:
+
+  ```bash
+  echo "Pooled (DATABASE_URL):      $DATABASE_URL"
+  echo "Direct (STAGE_DIRECT_URL):  $STAGE_DIRECT_URL"
+  ```
+
+  If both values are identical, stop: using the pooled URL for `psql` DDL will cause `ALTER TYPE` commands to fail or behave inconsistently under PgBouncer.
+
 - [ ] The local repo is on the `STAGE` branch and is clean.  
   `git status` — should show nothing unexpected.
 - [ ] PostgreSQL version on STAGE is ≥ 13.  
-  `psql $DATABASE_URL -c "SELECT version();"` — confirm.
+  `psql $STAGE_DIRECT_URL -c "SELECT version();"` — confirm.
 - [ ] No long-running transactions or locks are blocking schema changes.  
-  `psql $DATABASE_URL -c "SELECT pid, state, query_start, query FROM pg_stat_activity WHERE state != 'idle';"` — should be empty or only show your own session.
+  `psql $STAGE_DIRECT_URL -c "SELECT pid, state, query_start, query FROM pg_stat_activity WHERE state != 'idle';"` — should be empty or only show your own session.
 
 ---
 
@@ -63,16 +74,33 @@ Before starting:
 
 **Do not skip this phase.** Prisma does not support rollback of applied migrations. If anything goes wrong, the only recovery path is restoration from this backup.
 
-### Step 1.1 — Full database dump
+### Step 1.1 — Create Neon branch snapshot
+
+Create a Neon branch from the current STAGE branch state **before** any schema changes. This is your instant restore point — faster to recover from than restoring a `pg_dump` file.
+
+**Via Neon CLI:**
 
 ```bash
-pg_dump $DATABASE_URL > stage_backup_$(date +%Y%m%d_%H%M%S).sql
+neon branches create \
+  --project-id <your-neon-project-id> \
+  --name "stage-pre-recovery-$(date +%Y%m%d_%H%M%S)" \
+  --parent <your-stage-branch-name>
+```
+
+**Via Neon Console (alternative):** Open [console.neon.tech](https://console.neon.tech) → your STAGE project → Branches → **Create branch** → set parent to your STAGE branch → name it `stage-pre-recovery-<date>`.
+
+Note the branch name. If you need to restore, point `STAGE_DIRECT_URL` at this snapshot branch's connection string and redeploy.
+
+### Step 1.2 — Full database dump
+
+```bash
+pg_dump $STAGE_DIRECT_URL > stage_backup_$(date +%Y%m%d_%H%M%S).sql
 echo "Backup size: $(du -sh stage_backup_*.sql | tail -1)"
 ```
 
 Confirm the file is non-zero and ends with `--` PostgreSQL dump footer before continuing.
 
-### Step 1.2 — Confirm current migration state
+### Step 1.3 — Confirm current migration state
 
 ```bash
 npx prisma migrate status
@@ -99,13 +127,14 @@ Following migration(s) are not yet applied:
 
 If the output does not match this exactly, stop and investigate before proceeding.
 
-### Step 1.3 — Record current table count
+### Step 1.4 — Record current table count
 
 ```sql
 -- Run in Neon SQL Editor or psql
 SELECT COUNT(*) FROM information_schema.tables
 WHERE table_schema = 'public'
-  AND table_type = 'BASE TABLE';
+  AND table_type = 'BASE TABLE'
+  AND table_name != '_prisma_migrations';
 ```
 
 Expected: `16` (data tables, excluding `_prisma_migrations`).
@@ -118,11 +147,14 @@ Expected: `16` (data tables, excluding `_prisma_migrations`).
 
 The 16 migrations are split into **7 deployment segments**. Each segment ends when `prisma migrate deploy` either completes all pending migrations or stops at the next `ALTER TYPE` barrier. Manual intervention steps are interspersed between segments.
 
-Set your `DATABASE_URL` once for the session:
+Set both connection variables once for the session:
 
 ```bash
-export DATABASE_URL="<your-neon-stage-connection-string>"
+export DATABASE_URL="<your-neon-stage-pooled-connection-string>"
+export STAGE_DIRECT_URL="<your-neon-stage-direct-connection-string>"
 ```
+
+All `psql` DDL commands below use `$STAGE_DIRECT_URL` (direct, non-pooled). Prisma CLI commands (`migrate deploy`, `migrate resolve`, `migrate status`, `db seed`) use `DATABASE_URL` via `prisma.config.ts`.
 
 ---
 
@@ -151,7 +183,7 @@ Migration 1 is rolled back entirely. Nothing is applied. `_prisma_migrations` is
 #### A1a — Apply the enum value (outside any transaction)
 
 ```bash
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TARGETS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TARGETS';"
 ```
 
 Expected: `ALTER TYPE`
@@ -159,7 +191,7 @@ Expected: `ALTER TYPE`
 #### A1b — Apply remaining DDL (transaction-safe; can run as a block)
 
 ```bash
-psql $DATABASE_URL << 'SQL'
+psql $STAGE_DIRECT_URL << 'SQL'
 CREATE TYPE "TargetCategory" AS ENUM (
   'SPORTLICHE_ENTWICKLUNG', 'MITGLIEDERWACHSTUM', 'FINANZEN',
   'AUSBILDUNG', 'MEDIEN_SOZIALES', 'GOVERNANCE'
@@ -263,9 +295,9 @@ npx prisma migrate deploy
 #### B1a — Apply the three enum values
 
 ```bash
-psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
-psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
-psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'TARGETS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'TARGETS';"
 ```
 
 Expected: `ALTER TYPE` three times.
@@ -273,7 +305,7 @@ Expected: `ALTER TYPE` three times.
 #### B1b — Apply remaining DDL
 
 ```bash
-psql $DATABASE_URL << 'SQL'
+psql $STAGE_DIRECT_URL << 'SQL'
 ALTER TABLE "Target"
   ADD COLUMN "reviewStage" "ReviewWorkflowStage" NOT NULL DEFAULT 'DRAFT',
   ADD COLUMN "requiresFourEyeReview" BOOLEAN NOT NULL DEFAULT false,
@@ -322,8 +354,8 @@ Prisma stops after 5 successful migrations. Current pending: 11 migrations (8–
 **Mode:** MANUAL-ENUM-ONLY — file contains only ALTER TYPE statements; nothing else to apply.
 
 ```bash
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
 npx prisma migrate resolve --applied 20260518190000_add_meeting_initiative_permission_modules
 ```
 
@@ -354,7 +386,7 @@ Prisma stops after 2 successful migrations. Current pending: 6 migrations (11–
 **Mode:** MANUAL-ENUM-ONLY.
 
 ```bash
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TEMPLATES';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TEMPLATES';"
 npx prisma migrate resolve --applied 20260518220000_add_templates_permission_module
 ```
 
@@ -387,7 +419,7 @@ Prisma stops after 2 successful migrations. Current pending: 3 migrations (14–
 #### E1a — Apply the enum value
 
 ```bash
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'REGISTRATIONS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'REGISTRATIONS';"
 ```
 
 Expected: `ALTER TYPE`
@@ -395,7 +427,7 @@ Expected: `ALTER TYPE`
 #### E1b — Apply remaining DDL
 
 ```bash
-psql $DATABASE_URL << 'SQL'
+psql $STAGE_DIRECT_URL << 'SQL'
 CREATE TYPE "RegistrationType" AS ENUM (
     'PROBETRAINING', 'SPIELERANMELDUNG', 'TRAINERANMELDUNG',
     'SPONSORANFRAGE', 'KONTAKTANFRAGE', 'OTHER'
@@ -479,7 +511,7 @@ Prisma stops after 1 successful migration. Current pending: 1 migration (16).
 **Mode:** MANUAL-ENUM-ONLY.
 
 ```bash
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TENANTS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TENANTS';"
 npx prisma migrate resolve --applied 20260602000000_add_tenants_permission_module
 ```
 
@@ -494,7 +526,7 @@ npx prisma migrate deploy
 **Expected output:**
 
 ```
-All migrations have been successfully applied.
+No pending migrations to apply.
 ```
 
 If any migration is still pending, stop and re-check the step that should have resolved it.
@@ -569,6 +601,7 @@ SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'public'
   AND table_type = 'BASE TABLE'
+  AND table_name != '_prisma_migrations'
 ORDER BY table_name;
 ```
 
@@ -791,7 +824,7 @@ All 23 entries with non-null `finished_at` and null `rolled_back_at`.
 1. **Stop immediately.** Do not re-run `prisma migrate deploy` without understanding the failure.
 2. `npx prisma migrate status` — identify which migrations applied before the failure.
 3. Decide whether the partially applied state is safe to continue from or whether a restore is needed.
-4. If restoring: `psql $DATABASE_URL < stage_backup_<timestamp>.sql`
+4. If restoring: `psql $STAGE_DIRECT_URL < stage_backup_<timestamp>.sql`
 5. After restore, confirm table count returns to 16 data tables before retrying.
 
 ### If a hybrid migration applies the ALTER TYPE but then fails on the DDL block
@@ -804,33 +837,33 @@ This leaves the enum value added but the table not yet created, with the migrati
 
 ```bash
 # --- Migration 1: MANUAL-HYBRID (after first deploy attempt fails) ---
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TARGETS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TARGETS';"
 # ... then apply the A1b DDL block above ...
 npx prisma migrate resolve --applied 20260518120000_add_targets_module
 
 # --- Migration 2: MANUAL-HYBRID (after second deploy attempt fails) ---
-psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
-psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
-psql $DATABASE_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'TARGETS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"WorkflowDomain\" ADD VALUE IF NOT EXISTS 'TARGETS';"
 # ... then apply the B1b DDL block above ...
 npx prisma migrate resolve --applied 20260518130000_add_governance_foundation
 
 # --- Migration 8: MANUAL-ENUM-ONLY (after third deploy attempt fails) ---
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'MEETINGS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'INITIATIVES';"
 npx prisma migrate resolve --applied 20260518190000_add_meeting_initiative_permission_modules
 
 # --- Migration 11: MANUAL-ENUM-ONLY (after fourth deploy attempt fails) ---
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TEMPLATES';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TEMPLATES';"
 npx prisma migrate resolve --applied 20260518220000_add_templates_permission_module
 
 # --- Migration 14: MANUAL-HYBRID (after fifth deploy attempt fails) ---
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'REGISTRATIONS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'REGISTRATIONS';"
 # ... then apply the E1b DDL block above ...
 npx prisma migrate resolve --applied 20260601093400_add_registration_inbox
 
 # --- Migration 16: MANUAL-ENUM-ONLY (after sixth deploy attempt fails) ---
-psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TENANTS';"
+psql $STAGE_DIRECT_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS 'TENANTS';"
 npx prisma migrate resolve --applied 20260602000000_add_tenants_permission_module
 ```
 
