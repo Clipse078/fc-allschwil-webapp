@@ -163,6 +163,7 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
 
   const where: Record<string, unknown> = {
     ...buildSurfaceWhere(input.surface),
+    reviewStage: "PUBLISHED",
     status: {
       in: ["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED"],
     },
