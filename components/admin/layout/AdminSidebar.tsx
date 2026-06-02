@@ -17,6 +17,7 @@ import {
   Flag,
   LayoutDashboard,
   ScrollText,
+  Settings2,
   Shield,
   Target,
   Trophy,
@@ -44,6 +45,7 @@ type AdminSidebarProps = {
 function getNavIcon(label: string) {
   switch (label) {
     case "Dashboard":       return LayoutDashboard;
+    case "Admin":           return Settings2;
     case "Vereinsleitung":  return Briefcase;
     case "Meetings":        return ScrollText;
     case "Initiativen":     return Flag;
