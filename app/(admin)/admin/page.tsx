@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarRange,
   ExternalLink,
+  KeyRound,
   Plus,
   Shield,
   UserCircle2,
@@ -27,10 +28,12 @@ async function getAdminOverviewData() {
       prisma.team.count(),
       prisma.user.count(),
       prisma.season.count(),
+      prisma.role.count(),
+      prisma.permission.count(),
     ]),
   ]);
 
-  const [orgUnitCount, personCount, teamCount, userCount, seasonCount] = counts;
+  const [orgUnitCount, personCount, teamCount, userCount, seasonCount, roleCount, permissionCount] = counts;
 
   const activeSeason =
     seasonOptions.find((s: SeasonOption) => s.shouldBeActive) ??
@@ -47,6 +50,8 @@ async function getAdminOverviewData() {
     teamCount,
     userCount,
     seasonCount,
+    roleCount,
+    permissionCount,
   };
 }
 
@@ -412,6 +417,70 @@ export default async function AdminPage() {
             </div>
           </div>
 
+          {/* Governance overview */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                  Governance
+                </p>
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  Rollen & Berechtigungen
+                </p>
+              </div>
+              <Link
+                href="/dashboard/roles"
+                className="flex shrink-0 items-center gap-1.5 text-[0.75rem] font-medium text-[var(--blue)] transition-opacity hover:opacity-70"
+              >
+                Rollen
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            <div className="sce-detail-section-body">
+              <div className="grid grid-cols-2 gap-4">
+                <Link
+                  href="/dashboard/roles"
+                  className="group flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-xs)] transition-all duration-150 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] hover:-translate-y-[1px]"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--blue-light)]">
+                      <Shield className="h-3.5 w-3.5 text-[var(--blue)]" />
+                    </div>
+                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+                      Rollen
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
+                    {data.roleCount}
+                  </p>
+                  <p className="text-[0.72rem] text-[var(--muted)]">
+                    Systemrollen definiert
+                  </p>
+                </Link>
+
+                <Link
+                  href="/dashboard/permissions"
+                  className="group flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-xs)] transition-all duration-150 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] hover:-translate-y-[1px]"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--blue-light)]">
+                      <KeyRound className="h-3.5 w-3.5 text-[var(--blue)]" />
+                    </div>
+                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+                      Berechtigungen
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
+                    {data.permissionCount}
+                  </p>
+                  <p className="text-[0.72rem] text-[var(--muted)]">
+                    Zugriffsrechte im System
+                  </p>
+                </Link>
+              </div>
+            </div>
+          </div>
+
           {/* People & Teams row */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sce-detail-section">
@@ -553,6 +622,16 @@ export default async function AdminPage() {
                 href="/dashboard/users"
                 label="Benutzer"
                 count={data.userCount}
+              />
+              <QuickLinkItem
+                href="/dashboard/roles"
+                label="Rollen"
+                count={data.roleCount}
+              />
+              <QuickLinkItem
+                href="/dashboard/permissions"
+                label="Berechtigungen"
+                count={data.permissionCount}
               />
               <QuickLinkItem
                 href="/dashboard/persons"
