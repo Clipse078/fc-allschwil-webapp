@@ -29,6 +29,7 @@ enum PermissionModule {
   INITIATIVES
   TEMPLATES
   REGISTRATIONS
+  TENANTS
 }
 
 enum RegistrationType {
