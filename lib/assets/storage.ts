@@ -20,9 +20,17 @@
  *
  * ─── Tenant isolation ────────────────────────────────────────────────────────
  *
- * Every upload key is prefixed with `logos/{tenantKey}.{ext}`.
- * One key per tenant per extension — overwrites the same key each time,
- * guaranteeing zero orphaned duplicates by construction.
+ * Every upload key is `logos/{tenantKey}.{ext}` (via getTenantLogoKey).
+ * Re-uploading the same extension overwrites the same key — no duplicate for
+ * that format. When the format changes (e.g. PNG→WebP), the caller MUST invoke
+ * deleteOrphanedLogo() on the old URL after a successful upload to prevent
+ * cross-extension orphans.
+ *
+ * ─── Missing token ───────────────────────────────────────────────────────────
+ *
+ * If BLOB_READ_WRITE_TOKEN is absent at runtime, uploadTenantLogo() returns
+ * { ok: false, status: 503 } so the API route can surface a clean JSON error
+ * rather than crashing with an unhandled exception.
  *
  * ─── Env var ─────────────────────────────────────────────────────────────────
  *
@@ -31,7 +39,7 @@
  *                          The SDK reads it automatically from process.env.
  */
 
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { fileTypeFromBuffer } from "file-type";
 import {
   isAllowedLogoUploadMimeType,
@@ -40,26 +48,30 @@ import {
 } from "@/lib/assets/validation";
 import { getTenantLogoKey } from "@/lib/assets/tenant-paths";
 
-// ── Environment guard ─────────────────────────────────────────────────────────
+// ── Vercel Blob URL detection ─────────────────────────────────────────────────
 
-function requireBlobToken(): string {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
-    throw new Error(
-      "BLOB_READ_WRITE_TOKEN environment variable is not set. " +
-        "Add it to your .env.local (development) or Vercel project settings (production).",
-    );
+const VERCEL_BLOB_HOSTNAME_RE = /\.public\.blob\.vercel-storage\.com$/;
+
+/**
+ * Returns true when `url` is a Vercel Blob CDN URL.
+ * Used to decide whether a previous logoUrl should be deleted after re-upload.
+ */
+export function isVercelBlobUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    return VERCEL_BLOB_HOSTNAME_RE.test(new URL(url).hostname);
+  } catch {
+    return false;
   }
-  return token;
 }
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
 export type UploadLogoResult =
   | { ok: true; publicUrl: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; status: number };
 
-// ── Main adapter function ─────────────────────────────────────────────────────
+// ── Main upload function ──────────────────────────────────────────────────────
 
 /**
  * Validates and uploads a tenant logo to Vercel Blob.
@@ -69,11 +81,15 @@ export type UploadLogoResult =
  *   2. Magic-byte inspection via `file-type` must agree with declared MIME.
  *   3. (File size pre-checked by caller via validateLogoUploadFile().)
  *
- * On success returns the Vercel Blob public CDN URL.
- * The caller must persist this URL to Tenant.logoUrl.
+ * Returns { ok: false, status: 503 } when BLOB_READ_WRITE_TOKEN is absent —
+ * no throw, so the caller can propagate a clean JSON error.
  *
- * @param tenantKey   Tenant's unique key (e.g. "fc-allschwil").
- * @param buffer      Raw file bytes.
+ * On success returns the Vercel Blob public CDN URL.
+ * The caller must persist this URL to Tenant.logoUrl and call
+ * deleteOrphanedLogo() on the previous URL if it was a different blob key.
+ *
+ * @param tenantKey    Tenant's unique key (e.g. "fc-allschwil").
+ * @param buffer       Raw file bytes.
  * @param declaredMime Browser-supplied Content-Type. Pre-validated by caller.
  */
 export async function uploadTenantLogo(
@@ -81,9 +97,21 @@ export async function uploadTenantLogo(
   buffer: Uint8Array,
   declaredMime: string,
 ): Promise<UploadLogoResult> {
+  // ── Token check (no throw — caller surfaces as 503) ───────────────────────
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    return {
+      ok: false,
+      status: 503,
+      error:
+        "Logo-Upload ist derzeit nicht verfügbar (Speicher nicht konfiguriert). " +
+        "Bitte BLOB_READ_WRITE_TOKEN im Vercel-Projekt konfigurieren.",
+    };
+  }
+
   // ── Guard 1: declared MIME must be allowed ────────────────────────────────
   if (!isAllowedLogoUploadMimeType(declaredMime)) {
-    return { ok: false, error: `Nicht erlaubter MIME-Typ: ${declaredMime}.` };
+    return { ok: false, status: 400, error: `Nicht erlaubter MIME-Typ: ${declaredMime}.` };
   }
 
   const allowedMime = declaredMime as AllowedLogoUploadMimeType;
@@ -94,14 +122,15 @@ export async function uploadTenantLogo(
   if (!detected) {
     return {
       ok: false,
-      error:
-        "Dateityp konnte nicht erkannt werden. Nur PNG, JPEG und WebP sind erlaubt.",
+      status: 400,
+      error: "Dateityp konnte nicht erkannt werden. Nur PNG, JPEG und WebP sind erlaubt.",
     };
   }
 
   if (!isAllowedLogoUploadMimeType(detected.mime)) {
     return {
       ok: false,
+      status: 400,
       error: `Erkannter Dateityp (${detected.mime}) ist nicht erlaubt. Nur PNG, JPEG und WebP sind erlaubt.`,
     };
   }
@@ -109,6 +138,7 @@ export async function uploadTenantLogo(
   if (detected.mime !== allowedMime) {
     return {
       ok: false,
+      status: 400,
       error: `Deklarierter Typ (${allowedMime}) stimmt nicht mit dem erkannten Typ (${detected.mime}) überein.`,
     };
   }
@@ -116,23 +146,55 @@ export async function uploadTenantLogo(
   // ── Build storage key ─────────────────────────────────────────────────────
   const ext = mimeToLogoExtension(allowedMime);
   if (!ext) {
-    return { ok: false, error: "Keine Dateiendung für MIME-Typ ermittelt." };
+    return { ok: false, status: 400, error: "Keine Dateiendung für MIME-Typ ermittelt." };
   }
 
   const storageKey = getTenantLogoKey(tenantKey, ext);
 
   // ── Upload to Vercel Blob ─────────────────────────────────────────────────
-  const token = requireBlobToken();
-
   // @vercel/blob's put() accepts Buffer but not Uint8Array directly.
   const blob = await put(storageKey, Buffer.from(buffer), {
     access: "public",
     contentType: allowedMime,
     token,
-    // allowOverwrite ensures a re-upload for the same tenant replaces the
-    // existing blob at the same key — guaranteeing no orphan accumulation.
+    // allowOverwrite: true — same tenant + same extension always overwrites the
+    // same key, so re-uploads of the same format never accumulate duplicates.
     allowOverwrite: true,
   });
 
   return { ok: true, publicUrl: blob.url };
+}
+
+// ── Orphaned blob cleanup ─────────────────────────────────────────────────────
+
+/**
+ * Best-effort deletion of a previous logo blob.
+ *
+ * Call this AFTER a successful upload + DB update when the old logoUrl was a
+ * Vercel Blob URL that differs from the newly uploaded URL (i.e. the extension
+ * changed: PNG→WebP, etc.). If deletion fails the upload is already persisted;
+ * log the error but do not surface it to the caller.
+ *
+ * No-ops silently when:
+ *   - oldUrl is null/empty
+ *   - oldUrl is not a Vercel Blob URL (external CDN, root-relative path, etc.)
+ *   - oldUrl equals newUrl (same key re-uploaded)
+ *   - BLOB_READ_WRITE_TOKEN is absent
+ */
+export async function deleteOrphanedLogo(
+  oldUrl: string | null | undefined,
+  newUrl: string,
+): Promise<void> {
+  if (!oldUrl || !isVercelBlobUrl(oldUrl) || oldUrl === newUrl) return;
+
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) return;
+
+  try {
+    await del(oldUrl, { token });
+  } catch (err) {
+    // Non-fatal: orphan cleanup is best-effort.
+    // The new blob is already uploaded and the DB already updated.
+    console.warn("[storage] deleteOrphanedLogo: failed to delete old blob", oldUrl, err);
+  }
 }
