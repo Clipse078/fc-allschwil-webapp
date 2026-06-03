@@ -6,6 +6,7 @@ import { RegistrationStatus } from "@prisma/client";
 import { Calendar, ChevronRight, Mail, Search, UserX } from "lucide-react";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
+import { formatDateShort } from "@/lib/tenant-runtime/formatters";
 
 type RegistrationsInboxTableProps = {
   tenantSlug: string;
@@ -53,15 +54,6 @@ const TYPE_BADGE_CLASS: Record<string, string> = {
 
 const STATUS_OPTIONS = Object.values(RegistrationStatus);
 
-function makeFormatDate(locale: string) {
-  return function formatDate(value: string) {
-    return new Intl.DateTimeFormat(locale, {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(new Date(value));
-  };
-}
 
 function getInitials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -125,7 +117,7 @@ export default function RegistrationsInboxTable({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  const formatDate = makeFormatDate(locale);
+  const cfg = { locale };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -314,7 +306,7 @@ export default function RegistrationsInboxTable({
                     </span>
                     <span className="flex items-center gap-1 text-xs text-[var(--muted)]">
                       <Calendar className="h-3 w-3" />
-                      {formatDate(reg.submittedAt)}
+                      {formatDateShort(reg.submittedAt, cfg)}
                     </span>
                   </div>
                 </Link>

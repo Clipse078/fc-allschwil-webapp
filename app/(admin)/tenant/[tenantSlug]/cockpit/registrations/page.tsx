@@ -5,7 +5,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { listRegistrationsForTenant } from "@/lib/registrations/queries";
 import { getCurrentTenantContext } from "@/lib/tenants/context";
-import { getCurrentSeasonLabel } from "@/lib/tenants/season-boundary";
+import { getCurrentSeasonLabel } from "@/lib/tenant-runtime/formatters";
 
 type Props = {
   params: Promise<{
