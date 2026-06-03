@@ -154,6 +154,9 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const { tenantSlug } = await params;
   const existing = await prisma.tenant.findUnique({ where: { key: tenantSlug }, select: { id: true, status: true } });
   if (!existing) return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
+  if (existing.status === "ARCHIVED") {
+    return NextResponse.json({ error: "Archivierter Tenant kann nicht bearbeitet werden." }, { status: 409 });
+  }
 
   const body = await req.json().catch(() => ({}));
 

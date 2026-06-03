@@ -280,11 +280,12 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
                   type="text"
                   value={logoUrl}
                   onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://…/logo.svg"
+                  placeholder="https://…/logo.png"
                   className="fca-input"
                 />
                 <p className="mt-1 text-[11px] text-[var(--muted)]">
                   URL oder Pfad zum Vereinslogo (leer = kein Logo konfiguriert).
+                  Direkter Datei-Upload folgt im nächsten Slice (persistenter Storage-Adapter).
                 </p>
               </div>
 
