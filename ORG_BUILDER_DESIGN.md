@@ -341,6 +341,19 @@ NO
 
 ---
 
+## Slice 11.5 — Hierarchy Management (Complete, merged STAGE 8bb9cf6)
+
+- `PUT /api/org-units/[id]`: `parentId` field accepted for re-parenting.
+  - Self-reference guard (400), cycle detection via ancestor chain walk (400), cross-tenant guard (404), max-depth guard (400 if new level + subtree depth > 2), cascading `level` update to all descendants.
+- `POST /api/org-units/[id]/sort`: new endpoint — `{ direction: "up" | "down" }` swaps `sortOrder` with adjacent sibling (same `parentId`, ordered by `sortOrder ASC, name ASC`). Boundary guard (400 at first/last). Equal-sortOrder disambiguation.
+- `/dashboard/org-units/[id]` (server page): ancestor breadcrumb (root → … → current, linked), sibling reorder card (position N/total, up/down arrows, client mutation → `router.refresh()`). Siblings and ancestor chain loaded server-side.
+- `OrgUnitSearchableList`: parent name shown (with `GitBranch` icon) for non-root units in search mode (level indent hidden during search).
+- Runtime validation: 26/26 assertions passed on live Postgres — all 9 checks PASS.
+- No schema changes. No migration required.
+- Merge commit: `8bb9cf698148eee51961090ab814b9670f5c4973`. PR #89.
+
+---
+
 ## Slice 11.3b — Team Create OrgUnit Picker (Complete, merged STAGE b00d287)
 
 - `TeamCreateForm` extended with optional `Organisationseinheit` `<select>` picker (pre-selects nothing; clearable).
