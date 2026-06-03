@@ -48,5 +48,21 @@ export async function getDefaultTenant() {
   }
 }
 
+export async function getTenantDetail(key: string) {
+  return prisma.tenant.findUnique({
+    where: { key },
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: { select: { registrations: true } },
+    },
+  });
+}
+
 export type TenantListItem = Awaited<ReturnType<typeof getTenants>>[number];
-export type TenantDetail = Awaited<ReturnType<typeof getTenantByKey>>;
+export type TenantDetail = NonNullable<Awaited<ReturnType<typeof getTenantDetail>>>;
+export type TenantDetailRaw = Awaited<ReturnType<typeof getTenantByKey>>;
