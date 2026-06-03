@@ -67,7 +67,7 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
         {/* User avatar */}
         <div
           className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none"
-          style={{ background: "var(--blue)" }}
+          style={{ background: "var(--tenant-primary)" }}
           title={`${firstName} ${lastName}`}
           aria-label="Benutzerprofil"
         >

@@ -132,7 +132,7 @@ export default function AdminSidebar({
       <div className="sce-sidebar-brand">
         {/* Generic platform icon — replaces tenant-specific logo */}
         <div
-          className="flex shrink-0 items-center justify-center rounded-[6px] bg-[var(--blue)] text-white"
+          className="flex shrink-0 items-center justify-center rounded-[6px] bg-[var(--tenant-primary)] text-white"
           style={{ width: isCollapsed ? 28 : 32, height: isCollapsed ? 28 : 32 }}
           aria-hidden="true"
         >
@@ -144,7 +144,7 @@ export default function AdminSidebar({
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
               SportClubEvo
             </p>
-            <p className="truncate text-[0.9rem] font-700 leading-tight tracking-tight text-[var(--blue)] font-bold">
+            <p className="truncate text-[0.9rem] font-700 leading-tight tracking-tight text-[var(--tenant-primary)] font-bold">
               {displayClubName}
             </p>
           </div>
@@ -239,7 +239,7 @@ export default function AdminSidebar({
           <div className="flex items-center gap-2.5 px-2 py-1.5">
             <div
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
-              style={{ background: "var(--blue)" }}
+              style={{ background: "var(--tenant-primary)" }}
               aria-hidden="true"
             >
               {getInitials(firstName, lastName)}
@@ -257,7 +257,7 @@ export default function AdminSidebar({
           <div className="flex justify-center">
             <div
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
-              style={{ background: "var(--blue)" }}
+              style={{ background: "var(--tenant-primary)" }}
               title={`${firstName} ${lastName}`}
             >
               {getInitials(firstName, lastName)}

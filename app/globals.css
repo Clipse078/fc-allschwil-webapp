@@ -97,6 +97,17 @@
   --transition-fast:   120ms ease;
   --transition-base:   180ms ease;
   --transition-slow:   280ms ease;
+
+  /* ── Tenant Branding — Slice 10.7 ─────────────────────────────────────────
+   * Global fallback to SportClubEvo platform palette.
+   * The admin layout (app/(admin)/layout.tsx) overrides these per-tenant via
+   * generateTenantCssVars(), scoping the override to all admin shell children.
+   *
+   * All shared utility classes that carry brand accent use ONLY these vars.
+   * No other file may introduce an alias or inline calc for tenant colors.
+   * ─────────────────────────────────────────────────────────────────────── */
+  --tenant-primary:   var(--blue);
+  --tenant-secondary: var(--red);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -131,12 +142,12 @@ button {
 }
 
 ::selection {
-  background: rgba(11, 74, 162, 0.12);
+  background: color-mix(in srgb, var(--tenant-primary) 12%, transparent);
 }
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--tenant-primary);
   outline-offset: 2px;
 }
 
@@ -153,7 +164,7 @@ button {
 }
 
 .fca-heading {
-  color: var(--blue);
+  color: var(--tenant-primary);
   font-family: var(--font-display);
   font-size: clamp(1.6rem, 1.1rem + 1vw, 2.4rem);
   font-weight: 700;
@@ -211,7 +222,7 @@ button {
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--blue) 0%, #4a6fd1 50%, var(--red) 100%);
+  background: linear-gradient(90deg, var(--tenant-primary) 0%, color-mix(in srgb, white 30%, var(--tenant-primary)) 50%, var(--tenant-secondary) 100%);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
 }
 
@@ -229,7 +240,7 @@ button {
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
-  background: linear-gradient(90deg, rgba(11,74,162,0.8) 0%, rgba(74,111,245,0.6) 50%, rgba(199,51,44,0.8) 100%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tenant-primary) 80%, transparent) 0%, color-mix(in srgb, var(--tenant-primary) 60%, transparent) 50%, color-mix(in srgb, var(--tenant-secondary) 80%, transparent) 100%);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
@@ -266,7 +277,7 @@ button {
   bottom: 16px;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: var(--blue);
+  background: var(--tenant-primary);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -291,8 +302,8 @@ button {
 .fca-input:focus,
 .fca-select:focus,
 .fca-textarea:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(11, 74, 162, 0.10);
+  border-color: var(--tenant-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-primary) 10%, transparent);
 }
 
 .fca-input:disabled,
@@ -322,7 +333,7 @@ button {
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--blue);
+  background: var(--tenant-primary);
   color: #ffffff;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -335,9 +346,9 @@ button {
 }
 
 .fca-button-primary:hover {
-  background: var(--blue-hover);
+  background: color-mix(in srgb, black 20%, var(--tenant-primary));
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(11, 74, 162, 0.20);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--tenant-primary) 20%, transparent);
 }
 
 .fca-button-primary:disabled {
@@ -399,10 +410,10 @@ button {
   min-width: 68px;
   height: 26px;
   padding: 0 10px;
-  border: 1px solid rgba(11, 74, 162, 0.15);
+  border: 1px solid color-mix(in srgb, var(--tenant-primary) 15%, transparent);
   border-radius: var(--radius-pill);
-  background: var(--blue-light);
-  color: var(--blue);
+  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
+  color: var(--tenant-primary);
   font-family: var(--font-display);
   font-size: 0.875rem;
   font-weight: 700;
@@ -461,7 +472,7 @@ button {
 .fca-toggle-checkbox {
   height: 1rem;
   width: 1rem;
-  accent-color: var(--blue);
+  accent-color: var(--tenant-primary);
   cursor: pointer;
 }
 
@@ -484,7 +495,7 @@ button {
 }
 
 .fca-admin-glow-blue {
-  background: rgba(11, 74, 162, 0.25);
+  background: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
 }
 
 .fca-admin-glow-red {
@@ -553,8 +564,8 @@ button {
 }
 
 .sce-nav-item.active {
-  background: var(--blue-light);
-  color: var(--blue);
+  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
+  color: var(--tenant-primary);
   font-weight: 600;
 }
 
@@ -566,7 +577,7 @@ button {
   bottom: 6px;
   width: 2px;
   border-radius: 0 2px 2px 0;
-  background: var(--blue);
+  background: var(--tenant-primary);
 }
 
 .sce-nav-child {
@@ -591,9 +602,9 @@ button {
 }
 
 .sce-nav-child.active {
-  color: var(--blue);
+  color: var(--tenant-primary);
   font-weight: 500;
-  background: var(--blue-light);
+  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
 }
 
 .sce-nav-section-label {
@@ -677,7 +688,7 @@ button {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-2xl);
-  background: linear-gradient(135deg, var(--blue) 0%, #1a5bb5 60%, #284a97 100%);
+  background: linear-gradient(135deg, var(--tenant-primary) 0%, color-mix(in srgb, white 15%, var(--tenant-primary)) 60%, color-mix(in srgb, black 15%, var(--tenant-primary)) 100%);
   padding: 32px;
   color: #fff;
 }
@@ -708,9 +719,9 @@ button {
 }
 
 .sce-role-badge-player {
-  background: rgba(11, 74, 162, 0.10);
-  color: var(--blue);
-  border: 1px solid rgba(11, 74, 162, 0.20);
+  background: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+  color: var(--tenant-primary);
+  border: 1px solid color-mix(in srgb, var(--tenant-primary) 20%, transparent);
 }
 
 .sce-role-badge-trainer {
@@ -756,8 +767,8 @@ button {
 }
 
 .sce-page-search:focus-within {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(11, 74, 162, 0.10);
+  border-color: var(--tenant-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-primary) 10%, transparent);
 }
 
 .sce-page-search input {
@@ -907,8 +918,8 @@ button {
   height: 22px;
   padding: 0 6px;
   border-radius: var(--radius-pill);
-  background: var(--blue-light);
-  color: var(--blue);
+  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
+  color: var(--tenant-primary);
   font-size: 0.72rem;
   font-weight: 700;
 }
