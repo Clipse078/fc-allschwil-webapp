@@ -115,7 +115,7 @@ function validateConfig(body: Record<string, unknown>):
     if (raw === null || raw === "") { patch.primaryColor = null; }
     else {
       const v = String(raw).trim();
-      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "primaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #0b4aa2)." };
+      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "primaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
       patch.primaryColor = v.toLowerCase();
     }
   }
@@ -124,7 +124,7 @@ function validateConfig(body: Record<string, unknown>):
     if (raw === null || raw === "") { patch.secondaryColor = null; }
     else {
       const v = String(raw).trim();
-      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "secondaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #c7332c)." };
+      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "secondaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
       patch.secondaryColor = v.toLowerCase();
     }
   }
