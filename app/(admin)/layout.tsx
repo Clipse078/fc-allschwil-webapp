@@ -1,5 +1,6 @@
 ﻿import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import type { ReactNode } from "react";
 import StageEnvironmentBanner from "@/components/admin/deployment/StageEnvironmentBanner";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
@@ -31,14 +32,16 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
       style={tenantCssVars as React.CSSProperties}
     >
       {/* Fixed sidebar */}
-      <AdminSidebar
-        firstName={session.user.firstName}
-        lastName={session.user.lastName}
-        email={session.user.email}
-        permissionKeys={session.user.permissionKeys}
-        clubName={ctx?.name}
-        logoUrl={ctx?.logoUrl}
-      />
+      <Suspense fallback={null}>
+        <AdminSidebar
+          firstName={session.user.firstName}
+          lastName={session.user.lastName}
+          email={session.user.email}
+          permissionKeys={session.user.permissionKeys}
+          clubName={ctx?.name}
+          logoUrl={ctx?.logoUrl}
+        />
+      </Suspense>
 
       {/* Main content area — flex-1, no margin needed since sidebar is in flow */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">

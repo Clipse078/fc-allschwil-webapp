@@ -13,7 +13,15 @@ export default async function TenantsPage() {
     PERMISSIONS.TENANTS_MANAGE,
   ]);
   const canManage = hasPermission(session, PERMISSIONS.TENANTS_MANAGE);
-  const tenants = await getTenants();
+
+  let tenants: Awaited<ReturnType<typeof getTenants>> = [];
+  try {
+    tenants = await getTenants();
+  } catch {
+    // DB schema drift or connection failure — render page with empty list
+    // so the admin can still navigate and diagnose via /dashboard/runtime.
+    tenants = [];
+  }
 
   return (
     <div className="space-y-8">

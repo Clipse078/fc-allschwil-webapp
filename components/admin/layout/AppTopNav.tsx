@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
+import { Suspense } from "react";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 
 type AppTopNavProps = {
@@ -51,7 +52,9 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
       <div className="flex shrink-0 items-center gap-1.5">
         {/* Page-level actions */}
         <div className="hidden xl:flex items-center gap-1.5">
-          <AdminPageActions />
+          <Suspense fallback={null}>
+            <AdminPageActions />
+          </Suspense>
         </div>
 
         {/* Notification bell — placeholder, no dot until notifications are implemented */}
