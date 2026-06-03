@@ -10,7 +10,8 @@ export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const orgUnits = await getOrgUnits();
+  const tenant = await getDefaultTenant();
+  const orgUnits = await getOrgUnits(tenant?.id ?? undefined);
   return NextResponse.json({ orgUnits });
 }
 
