@@ -296,6 +296,14 @@ model Tenant {
   seasonTransitionDay   Int    @default(1)
   seasonTransitionMonth Int    @default(8)
 
+  // Branding v1 — Slice 10.6
+  // All nullable: no DB default for white-label safety.
+  // Application code falls back to SportClubEvo defaults when null.
+  // primaryColor / secondaryColor: 6-digit hex (#rrggbb); validated at API layer.
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+
   registrations Registration[]
 
   @@index([status])

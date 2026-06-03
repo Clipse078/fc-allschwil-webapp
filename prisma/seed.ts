@@ -36,6 +36,10 @@ async function main() {
       seasonStartMonth: 8,
       seasonTransitionDay: 1,
       seasonTransitionMonth: 8,
+      // Branding v1 — Slice 10.6: SportClubEvo defaults for the reference tenant.
+      // These values mirror PLATFORM_BRANDING in lib/tenant-runtime/branding.ts.
+      primaryColor: "#0b4aa2",
+      secondaryColor: "#c7332c",
     },
     create: {
       key: "fc-allschwil",
@@ -49,6 +53,9 @@ async function main() {
       seasonStartMonth: 8,
       seasonTransitionDay: 1,
       seasonTransitionMonth: 8,
+      // Branding v1 — Slice 10.6: SportClubEvo defaults for the reference tenant.
+      primaryColor: "#0b4aa2",
+      secondaryColor: "#c7332c",
     },
   });
 

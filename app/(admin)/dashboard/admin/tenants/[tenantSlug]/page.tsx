@@ -199,6 +199,9 @@ export default async function TenantDetailPage({ params }: PageProps) {
               seasonStartMonth: tenant.seasonStartMonth,
               seasonTransitionDay: tenant.seasonTransitionDay,
               seasonTransitionMonth: tenant.seasonTransitionMonth,
+              logoUrl: tenant.logoUrl,
+              primaryColor: tenant.primaryColor,
+              secondaryColor: tenant.secondaryColor,
             }}
           />
         ) : (
@@ -232,6 +235,38 @@ export default async function TenantDetailPage({ params }: PageProps) {
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Saisonübergang</dt>
                   <dd className="mt-0.5 text-sm">{tenant.seasonTransitionDay}. {tenant.seasonTransitionMonth}.</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Primärfarbe</dt>
+                  <dd className="mt-0.5 flex items-center gap-2">
+                    {tenant.primaryColor ? (
+                      <>
+                        <span
+                          className="inline-block h-4 w-4 rounded-full border border-[var(--border)]"
+                          style={{ background: tenant.primaryColor }}
+                        />
+                        <span className="font-mono text-sm">{tenant.primaryColor}</span>
+                      </>
+                    ) : (
+                      <span className="text-[var(--muted)] italic text-sm">Nicht konfiguriert</span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Sekundärfarbe</dt>
+                  <dd className="mt-0.5 flex items-center gap-2">
+                    {tenant.secondaryColor ? (
+                      <>
+                        <span
+                          className="inline-block h-4 w-4 rounded-full border border-[var(--border)]"
+                          style={{ background: tenant.secondaryColor }}
+                        />
+                        <span className="font-mono text-sm">{tenant.secondaryColor}</span>
+                      </>
+                    ) : (
+                      <span className="text-[var(--muted)] italic text-sm">Nicht konfiguriert</span>
+                    )}
+                  </dd>
                 </div>
               </dl>
             </div>

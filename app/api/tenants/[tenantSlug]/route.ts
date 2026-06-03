@@ -14,6 +14,8 @@ const LOCALE_RE = /^[a-z]{2,3}(-[A-Z]{2,4})?$/;
 const CURRENCY_RE = /^[A-Z]{3}$/;
 // Loose IANA tz check: non-empty, no spaces
 const TIMEZONE_RE = /^[A-Za-z0-9/_+-]{2,60}$/;
+// Branding: 6-digit lowercase or uppercase hex
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 type ConfigPatch = Partial<{
   countryCode: string | null;
@@ -24,6 +26,10 @@ type ConfigPatch = Partial<{
   seasonStartMonth: number;
   seasonTransitionDay: number;
   seasonTransitionMonth: number;
+  // Branding v1 — Slice 10.6
+  logoUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
 }>;
 
 // String config fields are nullable: null or empty string → store NULL.
@@ -94,6 +100,35 @@ function validateConfig(body: Record<string, unknown>):
     patch.seasonTransitionMonth = v;
   }
 
+  // Branding v1 — Slice 10.6
+  if ("logoUrl" in body) {
+    const raw = body.logoUrl;
+    if (raw === null || raw === "") { patch.logoUrl = null; }
+    else {
+      const v = String(raw).trim();
+      if (!v) return { ok: false, error: "logoUrl darf nicht leer sein." };
+      patch.logoUrl = v;
+    }
+  }
+  if ("primaryColor" in body) {
+    const raw = body.primaryColor;
+    if (raw === null || raw === "") { patch.primaryColor = null; }
+    else {
+      const v = String(raw).trim();
+      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "primaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #0b4aa2)." };
+      patch.primaryColor = v.toLowerCase();
+    }
+  }
+  if ("secondaryColor" in body) {
+    const raw = body.secondaryColor;
+    if (raw === null || raw === "") { patch.secondaryColor = null; }
+    else {
+      const v = String(raw).trim();
+      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "secondaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #c7332c)." };
+      patch.secondaryColor = v.toLowerCase();
+    }
+  }
+
   return { ok: true, data: patch };
 }
 
@@ -160,6 +195,10 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
         seasonStartMonth: true,
         seasonTransitionDay: true,
         seasonTransitionMonth: true,
+        // Branding v1 — Slice 10.6
+        logoUrl: true,
+        primaryColor: true,
+        secondaryColor: true,
       },
     });
     return NextResponse.json({ tenant });
