@@ -15,9 +15,12 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
 import { getDefaultTenant } from "@/lib/tenants/queries";
+import { prisma } from "@/lib/db/prisma";
 import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
+import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
 
 // Slice 11.2: tenant guard added. Cross-tenant OrgUnit IDs resolve to notFound().
+// Slice 11.5: sibling sort controls and parent breadcrumb added.
 
 const TYPE_LABELS: Record<string, string> = {
   CLUB: "Verein",
@@ -66,6 +69,34 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   // Tenant guard: null tenantId = pre-migration residue; allow (backwards-compat).
   if (unit.tenantId !== null && tenant && unit.tenantId !== tenant.id) notFound();
 
+  // Sibling list for reorder controls (same parentId, same tenant).
+  const siblings = tenant
+    ? await prisma.orgUnit.findMany({
+        where: { tenantId: tenant.id, parentId: unit.parentId },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        select: { id: true },
+      })
+    : [];
+  const siblingPosition = siblings.findIndex((s) => s.id === id);
+
+  // Ancestor chain for breadcrumb (max 2 ancestors given max depth 3).
+  const ancestors: Array<{ id: string; name: string }> = [];
+  if (unit.parent) {
+    if (unit.level === 2) {
+      const grandparent = await prisma.orgUnit
+        .findUnique({ where: { id: unit.parent.id }, select: { parentId: true } })
+        .then(async (p: { parentId: string | null } | null) => {
+          if (!p?.parentId) return null;
+          return prisma.orgUnit.findUnique({
+            where: { id: p.parentId },
+            select: { id: true, name: true },
+          });
+        });
+      if (grandparent) ancestors.push(grandparent);
+    }
+    ancestors.push({ id: unit.parent.id, name: unit.parent.name });
+  }
+
   const typeLabel = TYPE_LABELS[unit.type] ?? unit.type;
   const statusLabel = STATUS_LABELS[unit.status] ?? unit.status;
   const initials = getInitials(unit.name);
@@ -74,6 +105,30 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
+      {/* Ancestor breadcrumb */}
+      {ancestors.length > 0 ? (
+        <nav className="flex flex-wrap items-center gap-1 text-sm text-[var(--muted)]">
+          <Link href="/dashboard/org-units" className="hover:text-[var(--blue)]">
+            Organisationseinheiten
+          </Link>
+          {ancestors.map((ancestor) => (
+            <span key={ancestor.id} className="flex items-center gap-1">
+              <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+              <Link
+                href={`/dashboard/org-units/${ancestor.id}`}
+                className="hover:text-[var(--blue)]"
+              >
+                {ancestor.name}
+              </Link>
+            </span>
+          ))}
+          <span className="flex items-center gap-1">
+            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="font-medium text-[var(--foreground)]">{unit.name}</span>
+          </span>
+        </nav>
+      ) : null}
+
       {/* Hero */}
       <div className="sce-entity-hero">
         <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -266,6 +321,30 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
               </div>
             )}
           </div>
+
+          {/* Sibling reorder (Slice 11.5) */}
+          {siblings.length > 1 ? (
+            <div className="sce-detail-section">
+              <div className="sce-detail-section-header">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-[var(--muted)]" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Reihenfolge
+                  </p>
+                </div>
+              </div>
+              <div className="sce-detail-section-body">
+                <p className="mb-3 text-sm text-[var(--muted)]">
+                  Position dieser Einheit unter den Geschwistern.
+                </p>
+                <OrgUnitSortControls
+                  orgUnitId={unit.id}
+                  position={siblingPosition >= 0 ? siblingPosition : 0}
+                  total={siblings.length}
+                />
+              </div>
+            </div>
+          ) : null}
 
           {/* Membership management (business logic unchanged) */}
           <OrgMembershipManagementCard

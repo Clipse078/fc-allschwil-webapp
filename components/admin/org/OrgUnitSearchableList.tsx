@@ -28,6 +28,11 @@ type OrgUnitSearchableListProps = {
   orgUnits: OrgUnitItem[];
 };
 
+function getParentName(unit: OrgUnitItem, all: OrgUnitItem[]): string | null {
+  if (!unit.parentId) return null;
+  return all.find((u) => u.id === unit.parentId)?.name ?? null;
+}
+
 const TYPE_LABELS: Record<string, string> = {
   CLUB: "Verein",
   DIVISION: "Abteilung",
