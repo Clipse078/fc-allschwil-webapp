@@ -394,7 +394,7 @@ Expected: `ALTER TYPE`
 
 #### E1b — Apply remaining DDL (wrapped in BEGIN/COMMIT for atomicity)
 
-> **Why BEGIN/COMMIT here:** Same reasoning as A1b — the heredoc block is multi-statement and must be atomic. If the Registration table is partially created before a failure, the block can be re-run after rolling back: the BEGIN/COMMIT ensures full atomicity.
+> **Why BEGIN/COMMIT here:** This heredoc block is multi-statement and must be atomic. If the `Registration` table is partially created before a failure, the entire block must be rolled back before retrying. `BEGIN`/`COMMIT` ensures all-or-nothing execution; the `IF NOT EXISTS` guards on every statement make the block safely re-runnable after a rollback without leaving orphaned objects.
 
 ```bash
 psql $DATABASE_URL << 'SQL'
