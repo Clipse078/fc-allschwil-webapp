@@ -341,6 +341,18 @@ NO
 
 ---
 
+## Slice 11.3b — Team Create OrgUnit Picker (Complete, merged STAGE b00d287)
+
+- `TeamCreateForm` extended with optional `Organisationseinheit` `<select>` picker (pre-selects nothing; clearable).
+- `/dashboard/teams/new` page preloads tenant-scoped OrgUnits via `getOrgUnits(tenant?.id)` and passes as `availableOrgUnits` prop.
+- `POST /api/teams`: accepts optional `orgUnitId`; validates against active tenant (403 cross-tenant, 404 not-found); persists on `team.create`. For `season_assignment` path, updates existing team's OrgUnit when non-null `orgUnitId` is provided.
+- `PATCH /api/teams/[teamId]`: `orgUnitId` in body = set/clear; field absent from body = leave existing unchanged. Cross-tenant guard: 403; not-found: 404.
+- `TeamSettingsCard.handleSave` now includes `orgUnitId: form.orgUnitId` in PATCH body — closes wiring gap from Slice 11.3 where the edit picker was rendered but did not persist.
+- No schema changes. No migration. `Team.orgUnitId` FK was established in Slice 11.3.
+- Merge commit: `b00d287d0c63a755694e91f3d1abf94aa1f33571`. PR #88.
+
+---
+
 ## Slice 11.3 — Team ↔ OrgUnit Linking (Complete, merged STAGE 8e99d22)
 
 - `Team.orgUnitId String?` FK → `OrgUnit.id`, `onDelete: SetNull`.
