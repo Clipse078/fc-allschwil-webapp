@@ -11,6 +11,8 @@ type RegistrationsInboxTableProps = {
   tenantSlug: string;
   initialRegistrations: RegistrationListItem[];
   canEdit: boolean;
+  /** Tenant locale (e.g. "de-CH"). Falls back to "de-CH" when absent. */
+  locale?: string;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -51,12 +53,14 @@ const TYPE_BADGE_CLASS: Record<string, string> = {
 
 const STATUS_OPTIONS = Object.values(RegistrationStatus);
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("de-CH", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(value));
+function makeFormatDate(locale: string) {
+  return function formatDate(value: string) {
+    return new Intl.DateTimeFormat(locale, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(new Date(value));
+  };
 }
 
 function getInitials(firstName: string, lastName: string) {
@@ -115,10 +119,13 @@ export default function RegistrationsInboxTable({
   tenantSlug,
   initialRegistrations,
   canEdit,
+  locale = "de-CH",
 }: RegistrationsInboxTableProps) {
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+
+  const formatDate = makeFormatDate(locale);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
