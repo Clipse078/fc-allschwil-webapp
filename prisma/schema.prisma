@@ -284,11 +284,14 @@ model Tenant {
   updatedAt DateTime     @updatedAt
 
   // Config v1 — Slice 10.2
-  countryCode           String @default("CH")
-  sportCategory         String @default("FOOTBALL")
-  locale                String @default("de-CH")
-  timezone              String @default("Europe/Zurich")
-  currency              String @default("CHF")
+  // String fields are nullable: no opinionated DB default for white-label safety.
+  // Seed sets explicit values for fc-allschwil. New tenants start with nulls.
+  countryCode           String?
+  sportCategory         String?
+  locale                String?
+  timezone              String?
+  currency              String?
+  // Season integers have a neutral structural default (August 1st European convention).
   seasonStartMonth      Int    @default(8)
   seasonTransitionDay   Int    @default(1)
   seasonTransitionMonth Int    @default(8)

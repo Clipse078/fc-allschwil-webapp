@@ -15,45 +15,68 @@ const CURRENCY_RE = /^[A-Z]{3}$/;
 // Loose IANA tz check: non-empty, no spaces
 const TIMEZONE_RE = /^[A-Za-z0-9/_+-]{2,60}$/;
 
-function validateConfig(body: Record<string, unknown>): {
-  ok: true;
-  data: Partial<{
-    countryCode: string;
-    sportCategory: string;
-    locale: string;
-    timezone: string;
-    currency: string;
-    seasonStartMonth: number;
-    seasonTransitionDay: number;
-    seasonTransitionMonth: number;
-  }>;
-} | { ok: false; error: string } {
-  const patch: Record<string, unknown> = {};
+type ConfigPatch = Partial<{
+  countryCode: string | null;
+  sportCategory: string | null;
+  locale: string | null;
+  timezone: string | null;
+  currency: string | null;
+  seasonStartMonth: number;
+  seasonTransitionDay: number;
+  seasonTransitionMonth: number;
+}>;
+
+// String config fields are nullable: null or empty string → store NULL.
+// Non-null, non-empty values are validated. Season integers are NOT NULL.
+function validateConfig(body: Record<string, unknown>):
+  | { ok: true; data: ConfigPatch }
+  | { ok: false; error: string } {
+  const patch: ConfigPatch = {};
 
   if ("countryCode" in body) {
-    const v = String(body.countryCode ?? "").trim().toUpperCase();
-    if (!COUNTRY_CODE_RE.test(v)) return { ok: false, error: "countryCode muss ein 2-stelliger ISO-Ländercode sein (z.B. CH)." };
-    patch.countryCode = v;
+    const raw = body.countryCode;
+    if (raw === null || raw === "") { patch.countryCode = null; }
+    else {
+      const v = String(raw).trim().toUpperCase();
+      if (!COUNTRY_CODE_RE.test(v)) return { ok: false, error: "countryCode muss ein 2-stelliger ISO-Ländercode sein (z.B. CH)." };
+      patch.countryCode = v;
+    }
   }
   if ("sportCategory" in body) {
-    const v = String(body.sportCategory ?? "").trim().toUpperCase();
-    if (!v) return { ok: false, error: "sportCategory darf nicht leer sein." };
-    patch.sportCategory = v;
+    const raw = body.sportCategory;
+    if (raw === null || raw === "") { patch.sportCategory = null; }
+    else {
+      const v = String(raw).trim().toUpperCase();
+      if (!v) return { ok: false, error: "sportCategory darf nicht leer sein." };
+      patch.sportCategory = v;
+    }
   }
   if ("locale" in body) {
-    const v = String(body.locale ?? "").trim();
-    if (!LOCALE_RE.test(v)) return { ok: false, error: "locale muss ein IETF-Tag sein (z.B. de-CH, en-GB)." };
-    patch.locale = v;
+    const raw = body.locale;
+    if (raw === null || raw === "") { patch.locale = null; }
+    else {
+      const v = String(raw).trim();
+      if (!LOCALE_RE.test(v)) return { ok: false, error: "locale muss ein IETF-Tag sein (z.B. de-CH, en-GB)." };
+      patch.locale = v;
+    }
   }
   if ("timezone" in body) {
-    const v = String(body.timezone ?? "").trim();
-    if (!TIMEZONE_RE.test(v)) return { ok: false, error: "timezone muss eine gültige IANA-Zeitzone sein (z.B. Europe/Zurich)." };
-    patch.timezone = v;
+    const raw = body.timezone;
+    if (raw === null || raw === "") { patch.timezone = null; }
+    else {
+      const v = String(raw).trim();
+      if (!TIMEZONE_RE.test(v)) return { ok: false, error: "timezone muss eine gültige IANA-Zeitzone sein (z.B. Europe/Zurich)." };
+      patch.timezone = v;
+    }
   }
   if ("currency" in body) {
-    const v = String(body.currency ?? "").trim().toUpperCase();
-    if (!CURRENCY_RE.test(v)) return { ok: false, error: "currency muss ein 3-stelliger ISO-Währungscode sein (z.B. CHF)." };
-    patch.currency = v;
+    const raw = body.currency;
+    if (raw === null || raw === "") { patch.currency = null; }
+    else {
+      const v = String(raw).trim().toUpperCase();
+      if (!CURRENCY_RE.test(v)) return { ok: false, error: "currency muss ein 3-stelliger ISO-Währungscode sein (z.B. CHF)." };
+      patch.currency = v;
+    }
   }
   if ("seasonStartMonth" in body) {
     const v = Number(body.seasonStartMonth);
@@ -71,7 +94,7 @@ function validateConfig(body: Record<string, unknown>): {
     patch.seasonTransitionMonth = v;
   }
 
-  return { ok: true, data: patch as Parameters<typeof validateConfig>[0] };
+  return { ok: true, data: patch };
 }
 
 // ── Route handlers ────────────────────────────────────────────────────────────

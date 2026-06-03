@@ -163,23 +163,23 @@ export default async function TenantDetailPage({ params }: PageProps) {
               <dl className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Land</dt>
-                  <dd className="mt-0.5 font-mono text-sm">{tenant.countryCode}</dd>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.countryCode ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Sportart</dt>
-                  <dd className="mt-0.5 text-sm">{tenant.sportCategory}</dd>
+                  <dd className="mt-0.5 text-sm">{tenant.sportCategory ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Locale</dt>
-                  <dd className="mt-0.5 font-mono text-sm">{tenant.locale}</dd>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.locale ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Zeitzone</dt>
-                  <dd className="mt-0.5 font-mono text-sm">{tenant.timezone}</dd>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.timezone ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Währung</dt>
-                  <dd className="mt-0.5 font-mono text-sm">{tenant.currency}</dd>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.currency ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
                 </div>
                 <div>
                   <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Saisonbeginn</dt>

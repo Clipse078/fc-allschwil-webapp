@@ -75,11 +75,13 @@ export async function getTenantDetail(key: string) {
 }
 
 export type TenantConfig = {
-  countryCode: string;
-  sportCategory: string;
-  locale: string;
-  timezone: string;
-  currency: string;
+  // Nullable: no DB default; must be configured explicitly per tenant.
+  countryCode: string | null;
+  sportCategory: string | null;
+  locale: string | null;
+  timezone: string | null;
+  currency: string | null;
+  // Not nullable: structural scheduling fields with a neutral platform default.
   seasonStartMonth: number;
   seasonTransitionDay: number;
   seasonTransitionMonth: number;

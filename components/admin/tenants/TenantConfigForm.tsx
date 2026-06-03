@@ -25,6 +25,7 @@ const MONTH_OPTIONS = [
 ] as const;
 
 const SPORT_CATEGORY_OPTIONS = [
+  { value: "", label: "— Nicht gewählt —" },
   { value: "FOOTBALL", label: "Fussball" },
   { value: "BASKETBALL", label: "Basketball" },
   { value: "VOLLEYBALL", label: "Volleyball" },
@@ -35,6 +36,7 @@ const SPORT_CATEGORY_OPTIONS = [
 ] as const;
 
 const LOCALE_OPTIONS = [
+  { value: "", label: "— Nicht gewählt —" },
   { value: "de-CH", label: "Deutsch (Schweiz)" },
   { value: "de-DE", label: "Deutsch (Deutschland)" },
   { value: "de-AT", label: "Deutsch (Österreich)" },
@@ -45,6 +47,7 @@ const LOCALE_OPTIONS = [
 ] as const;
 
 const CURRENCY_OPTIONS = [
+  { value: "", label: "— Nicht gewählt —" },
   { value: "CHF", label: "CHF — Schweizer Franken" },
   { value: "EUR", label: "EUR — Euro" },
   { value: "GBP", label: "GBP — Britisches Pfund" },
@@ -52,6 +55,7 @@ const CURRENCY_OPTIONS = [
 ] as const;
 
 const TIMEZONE_OPTIONS = [
+  { value: "", label: "— Nicht gewählt —" },
   { value: "Europe/Zurich", label: "Europe/Zurich (CET/CEST)" },
   { value: "Europe/Berlin", label: "Europe/Berlin (CET/CEST)" },
   { value: "Europe/Vienna", label: "Europe/Vienna (CET/CEST)" },
@@ -61,11 +65,13 @@ const TIMEZONE_OPTIONS = [
 ] as const;
 
 export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
-  const [countryCode, setCountryCode] = useState(defaultValues.countryCode);
-  const [sportCategory, setSportCategory] = useState(defaultValues.sportCategory);
-  const [locale, setLocale] = useState(defaultValues.locale);
-  const [timezone, setTimezone] = useState(defaultValues.timezone);
-  const [currency, setCurrency] = useState(defaultValues.currency);
+  // String fields: null → "" (form shows "not set" option); "" → sent as null to API.
+  const [countryCode, setCountryCode] = useState(defaultValues.countryCode ?? "");
+  const [sportCategory, setSportCategory] = useState(defaultValues.sportCategory ?? "");
+  const [locale, setLocale] = useState(defaultValues.locale ?? "");
+  const [timezone, setTimezone] = useState(defaultValues.timezone ?? "");
+  const [currency, setCurrency] = useState(defaultValues.currency ?? "");
+  // Season ints always present (NOT NULL in DB).
   const [seasonStartMonth, setSeasonStartMonth] = useState(defaultValues.seasonStartMonth);
   const [seasonTransitionDay, setSeasonTransitionDay] = useState(defaultValues.seasonTransitionDay);
   const [seasonTransitionMonth, setSeasonTransitionMonth] = useState(defaultValues.seasonTransitionMonth);
@@ -85,11 +91,12 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          countryCode,
-          sportCategory,
-          locale,
-          timezone,
-          currency,
+          // Empty string → API treats as null (clear the field).
+          countryCode: countryCode || null,
+          sportCategory: sportCategory || null,
+          locale: locale || null,
+          timezone: timezone || null,
+          currency: currency || null,
           seasonStartMonth,
           seasonTransitionDay,
           seasonTransitionMonth,
@@ -134,7 +141,7 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
                   maxLength={2}
                   className="fca-input font-mono uppercase"
                 />
-                <p className="mt-1 text-[11px] text-[var(--muted)]">ISO 3166-1 alpha-2</p>
+                <p className="mt-1 text-[11px] text-[var(--muted)]">ISO 3166-1 alpha-2 (z.B. CH, DE, GB)</p>
               </div>
 
               <div>
