@@ -6,7 +6,7 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantDetail } from "@/lib/tenants/queries";
 import { getCurrentTenantContext } from "@/lib/tenants/context";
-import { formatCurrency, formatDate } from "@/lib/tenants/format";
+import { formatCurrency, formatDate, formatShortDate } from "@/lib/tenants/format";
 import { getCurrentSeasonLabel } from "@/lib/tenants/season-boundary";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TenantForm from "@/components/admin/tenants/TenantForm";
@@ -46,12 +46,10 @@ export default async function TenantDetailPage({ params }: PageProps) {
   ]);
   if (!tenant) notFound();
 
-  const createdAt = new Date(tenant.createdAt).toLocaleDateString("de-CH", {
-    day: "2-digit", month: "long", year: "numeric",
-  });
-  const updatedAt = new Date(tenant.updatedAt).toLocaleDateString("de-CH", {
-    day: "2-digit", month: "long", year: "numeric",
-  });
+  // Use tenant-aware formatters when ctx is available; formatDate falls back to de-CH if ctx is null.
+  const formatCtx = ctx ?? { locale: null, timezone: null };
+  const createdAt = formatDate(tenant.createdAt, formatCtx);
+  const updatedAt = formatDate(tenant.updatedAt, formatCtx);
 
   const isEditable = canManage && tenant.status !== "ARCHIVED";
 

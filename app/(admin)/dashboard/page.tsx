@@ -17,6 +17,8 @@ import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { prisma } from "@/lib/db/prisma";
 import { cn } from "@/lib/cn";
 import { MODULE_DEFINITIONS, type ModuleDefinition } from "@/lib/nav/nav-config";
+import { getCurrentTenantContext } from "@/lib/tenants/context";
+import { getCurrentSeasonLabel } from "@/lib/tenants/season-boundary";
 
 // Icon map for dashboard module cards — keyed on ModuleDefinition.key
 const MODULE_ICONS: Record<string, LucideIcon> = {
@@ -61,19 +63,21 @@ async function getDashboardKpiData() {
   return { seasonCount, teamCount, personCount, todayEvents };
 }
 
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat("de-CH", {
+function formatTime(date: Date, locale = "de-CH", timezone?: string): string {
+  return new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
+    ...(timezone ? { timeZone: timezone } : {}),
   }).format(date);
 }
 
-function formatTodayDate(): string {
-  return new Intl.DateTimeFormat("de-CH", {
+function formatTodayDate(locale = "de-CH", timezone?: string): string {
+  return new Intl.DateTimeFormat(locale, {
     weekday: "long",
     day: "2-digit",
     month: "long",
     year: "numeric",
+    ...(timezone ? { timeZone: timezone } : {}),
   }).format(new Date());
 }
 
@@ -124,10 +128,15 @@ function ModuleCard({
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = (await searchParams) ?? {};
-  const [seasonOptions, kpiData] = await Promise.all([
+  const [seasonOptions, kpiData, ctx] = await Promise.all([
     getSeasonOptionsData(),
     getDashboardKpiData(),
+    getCurrentTenantContext(),
   ]);
+
+  const locale = ctx?.locale ?? "de-CH";
+  const timezone = ctx?.timezone ?? undefined;
+  const currentSeasonLabel = ctx ? getCurrentSeasonLabel(ctx) : null;
 
   const selectedSeason =
     seasonOptions.find((s) => s.key === params.season) ??
@@ -138,7 +147,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const selectedSeasonKey = selectedSeason?.key ?? "";
 
   const todayAgendaItems = kpiData.todayEvents.map((ev) => ({
-    time: formatTime(ev.startAt),
+    time: formatTime(ev.startAt, locale, timezone),
     title: ev.title,
     type: mapEventType(ev.type),
     location: ev.location ?? undefined,
@@ -152,7 +161,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <KpiCard
           label="Saisons"
           value={String(kpiData.seasonCount)}
-          subtext={selectedSeason ? `Aktiv: ${selectedSeason.name}` : "Keine aktive Saison"}
+          subtext={
+            currentSeasonLabel
+              ? `Saison ${currentSeasonLabel}`
+              : selectedSeason
+              ? `Aktiv: ${selectedSeason.name}`
+              : "Keine aktive Saison"
+          }
           trend="neutral"
         />
         <KpiCard
@@ -191,7 +206,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         {/* Today agenda */}
         <DashboardTodayAgenda
           items={todayAgendaItems}
-          date={formatTodayDate()}
+          date={formatTodayDate(locale, timezone)}
         />
       </div>
 

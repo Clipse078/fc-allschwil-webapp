@@ -46,6 +46,7 @@ export default async function TenantRegistrationsPage({ params }: Props) {
         tenantSlug={tenantSlug}
         initialRegistrations={registrations}
         canEdit={canEdit}
+        locale={ctx?.locale ?? undefined}
       />
     </div>
   );

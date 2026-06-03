@@ -22,6 +22,10 @@ type RegistrationDetailCardProps = {
   tenantSlug: string;
   initialRegistration: RegistrationDetail;
   canEdit: boolean;
+  /** Tenant locale (e.g. "de-CH"). Falls back to "de-CH" when absent. */
+  locale?: string;
+  /** Tenant timezone (e.g. "Europe/Zurich"). Falls back to "Europe/Zurich" when absent. */
+  timezone?: string;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -62,19 +66,25 @@ const STATUS_BADGE_CLASS: Record<RegistrationStatus, string> = {
 
 const STATUS_OPTIONS = Object.values(RegistrationStatus);
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("de-CH", {
-    dateStyle: "long",
-    timeStyle: "short",
-  }).format(new Date(value));
+function makeFormatDate(locale: string, timezone: string) {
+  return function formatDate(value: string) {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "long",
+      timeStyle: "short",
+      timeZone: timezone,
+    }).format(new Date(value));
+  };
 }
 
-function formatDateShort(value: string) {
-  return new Intl.DateTimeFormat("de-CH", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(value));
+function makeFormatDateShort(locale: string, timezone: string) {
+  return function formatDateShort(value: string) {
+    return new Intl.DateTimeFormat(locale, {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      timeZone: timezone,
+    }).format(new Date(value));
+  };
 }
 
 function getInitials(firstName: string, lastName: string) {
@@ -139,9 +149,14 @@ export default function RegistrationDetailCard({
   tenantSlug,
   initialRegistration,
   canEdit,
+  locale = "de-CH",
+  timezone = "Europe/Zurich",
 }: RegistrationDetailCardProps) {
   const [registration, setRegistration] = useState(initialRegistration);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const formatDate = makeFormatDate(locale, timezone);
+  const formatDateShort = makeFormatDateShort(locale, timezone);
 
   const routingSuggestion = getRoutingSuggestion(registration.birthYear);
   const contactName = getContactName(registration.payloadJson);
