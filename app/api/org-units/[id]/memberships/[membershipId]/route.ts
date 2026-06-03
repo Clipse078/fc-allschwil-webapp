@@ -3,14 +3,35 @@ import { prisma } from "@/lib/db/prisma";
 import { OrgUnitMembershipStatus } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 type RouteContext = { params: Promise<{ id: string; membershipId: string }> };
+
+/**
+ * Verify that the parent OrgUnit identified by `id` belongs to the default tenant.
+ * Returns the OrgUnit row if it is accessible; returns null if not found or cross-tenant.
+ */
+async function requireOrgUnitForTenant(orgUnitId: string) {
+  const tenant = await getDefaultTenant();
+  const orgUnit = await prisma.orgUnit.findUnique({
+    where: { id: orgUnitId },
+    select: { id: true, tenantId: true },
+  });
+  if (!orgUnit) return null;
+  if (orgUnit.tenantId !== null && tenant && orgUnit.tenantId !== tenant.id) return null;
+  return orgUnit;
+}
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id, membershipId } = await params;
+
+  // Tenant guard: confirm parent OrgUnit belongs to the default tenant
+  const orgUnit = await requireOrgUnitForTenant(id);
+  if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+
   const existing = await prisma.orgUnitMembership.findUnique({
     where: { id: membershipId, orgUnitId: id },
     select: { id: true },
@@ -76,6 +97,11 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id, membershipId } = await params;
+
+  // Tenant guard: confirm parent OrgUnit belongs to the default tenant
+  const orgUnit = await requireOrgUnitForTenant(id);
+  if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+
   const existing = await prisma.orgUnitMembership.findUnique({
     where: { id: membershipId, orgUnitId: id },
     select: { id: true },

@@ -4,16 +4,27 @@ import { OrgUnitType, OrgUnitStatus } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+/** Returns 404 if the OrgUnit belongs to a different tenant (avoids information disclosure). */
+function isCrossTenant(tenantId: string | null, defaultTenantId: string | undefined): boolean {
+  if (!defaultTenantId) return false;
+  if (tenantId === null) return false; // null = no tenant assigned; allow (defensive)
+  return tenantId !== defaultTenantId;
+}
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id } = await params;
-  const orgUnit = await getOrgUnitById(id);
+  const [orgUnit, tenant] = await Promise.all([getOrgUnitById(id), getDefaultTenant()]);
   if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  if (isCrossTenant(orgUnit.tenantId, tenant?.id)) {
+    return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  }
   return NextResponse.json({ orgUnit });
 }
 
@@ -22,8 +33,12 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id } = await params;
-  const existing = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, level: true } });
+  const tenant = await getDefaultTenant();
+  const existing = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, level: true, tenantId: true } });
   if (!existing) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  if (isCrossTenant(existing.tenantId, tenant?.id)) {
+    return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const validTypes = Object.values(OrgUnitType);
@@ -53,11 +68,15 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id } = await params;
+  const tenant = await getDefaultTenant();
   const existing = await prisma.orgUnit.findUnique({
     where: { id },
-    select: { id: true, _count: { select: { children: true } } },
+    select: { id: true, tenantId: true, _count: { select: { children: true } } },
   });
   if (!existing) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  if (isCrossTenant(existing.tenantId, tenant?.id)) {
+    return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  }
   if (existing._count.children > 0) {
     return NextResponse.json({ error: "Organisationseinheiten mit Untereinheiten können nicht gelöscht werden. Bitte Untereinheiten zuerst entfernen oder archivieren." }, { status: 409 });
   }

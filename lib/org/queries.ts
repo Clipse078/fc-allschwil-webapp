@@ -13,9 +13,12 @@
 
 import { prisma } from "@/lib/db/prisma";
 
-export async function getOrgUnits() {
+export async function getOrgUnits(tenantId?: string) {
   return prisma.orgUnit.findMany({
-    where: { status: { not: "ARCHIVED" } },
+    where: {
+      status: { not: "ARCHIVED" },
+      ...(tenantId ? { tenantId } : {}),
+    },
     orderBy: [{ level: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     select: {
       id: true,
@@ -37,6 +40,7 @@ export async function getOrgUnitById(id: string) {
     where: { id },
     select: {
       id: true,
+      tenantId: true,
       key: true,
       name: true,
       type: true,

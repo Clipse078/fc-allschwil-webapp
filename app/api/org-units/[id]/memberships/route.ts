@@ -12,6 +12,15 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id } = await params;
+
+  // Tenant guard: verify the parent OrgUnit belongs to the default tenant
+  const tenant = await getDefaultTenant();
+  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, tenantId: true } });
+  if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  if (orgUnit.tenantId !== null && tenant && orgUnit.tenantId !== tenant.id) {
+    return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  }
+
   const memberships = await prisma.orgUnitMembership.findMany({
     where: { orgUnitId: id },
     orderBy: { createdAt: "asc" },
@@ -51,11 +60,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id } = await params;
-  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, tenantId: true } });
-  if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-
   const tenant = await getDefaultTenant();
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
+  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, tenantId: true } });
+  if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  if (orgUnit.tenantId !== null && orgUnit.tenantId !== tenant.id) {
+    return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const userId = body?.userId?.trim() || null;
