@@ -3,9 +3,14 @@ import TeamCreateForm from "@/components/admin/teams/TeamCreateForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { getOrgUnits } from "@/lib/org/queries";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 export default async function NewTeamPage() {
   await requirePermission(PERMISSIONS.TEAMS_MANAGE);
+
+  const tenant = await getDefaultTenant();
+  const availableOrgUnits = await getOrgUnits(tenant?.id);
 
   return (
     <div className="space-y-8">
@@ -20,7 +25,7 @@ export default async function NewTeamPage() {
         }
       />
 
-      <TeamCreateForm />
+      <TeamCreateForm availableOrgUnits={availableOrgUnits} />
     </div>
   );
 }

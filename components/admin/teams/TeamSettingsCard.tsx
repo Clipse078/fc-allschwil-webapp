@@ -153,6 +153,7 @@ export default function TeamSettingsCard({
           isActive: form.isActive,
           websiteVisible: form.websiteVisible,
           infoboardVisible: form.infoboardVisible,
+          orgUnitId: form.orgUnitId,
         }),
       });
 

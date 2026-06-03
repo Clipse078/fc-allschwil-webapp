@@ -14,6 +14,7 @@ import {
   normalizeTeamName,
   normalizeTeamSlug,
 } from "@/lib/teams/team-season-rules";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 const ALLOWED_CATEGORIES = [
   "KINDERFUSSBALL",
@@ -120,6 +121,11 @@ export async function POST(request: NextRequest) {
 
     const sortOrder = Number(body.sortOrder ?? 0);
 
+    const orgUnitId: string | null =
+      body.orgUnitId === null || body.orgUnitId === undefined || body.orgUnitId === ""
+        ? null
+        : String(body.orgUnitId).trim() || null;
+
     if (!name || !slug || !seasonId) {
       return NextResponse.json(
         { error: "Teamname, Slug und Saison sind erforderlich." },
@@ -139,6 +145,29 @@ export async function POST(request: NextRequest) {
         { error: "Sortierung muss eine Zahl sein." },
         { status: 400 }
       );
+    }
+
+    // Validate orgUnitId against active tenant if provided.
+    if (orgUnitId !== null) {
+      const tenant = await getDefaultTenant();
+      const orgUnit = await prisma.orgUnit.findUnique({
+        where: { id: orgUnitId },
+        select: { id: true, tenantId: true },
+      });
+
+      if (!orgUnit) {
+        return NextResponse.json(
+          { error: "Organisationseinheit nicht gefunden." },
+          { status: 404 }
+        );
+      }
+
+      if (tenant && orgUnit.tenantId !== tenant.id) {
+        return NextResponse.json(
+          { error: "Die gewählte Organisationseinheit gehört nicht zum aktiven Mandanten." },
+          { status: 403 }
+        );
+      }
     }
 
     const season = await prisma.season.findUnique({
@@ -332,6 +361,14 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // If an orgUnitId was explicitly provided, update the existing team's OrgUnit link.
+      if (orgUnitId !== null) {
+        await prisma.team.update({
+          where: { id: teamToReuse.id },
+          data: { orgUnitId },
+        });
+      }
+
       await logAction({
         actorUserId:
           access.session?.user?.effectiveUserId ??
@@ -351,6 +388,7 @@ export async function POST(request: NextRequest) {
           displayName: createdSeasonEntry.displayName,
           shortName: createdSeasonEntry.shortName,
           status: createdSeasonEntry.status,
+          orgUnitId,
         },
       });
 
@@ -380,6 +418,7 @@ export async function POST(request: NextRequest) {
         isActive: true,
         websiteVisible: true,
         infoboardVisible: true,
+        orgUnitId,
       },
     });
 
@@ -411,6 +450,7 @@ export async function POST(request: NextRequest) {
         genderGroup,
         ageGroup,
         sortOrder,
+        orgUnitId,
         seasonId: season.id,
         seasonKey: season.key,
         seasonName: season.name,
