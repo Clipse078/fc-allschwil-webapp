@@ -37,6 +37,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
         email={session.user.email}
         permissionKeys={session.user.permissionKeys}
         clubName={ctx?.name}
+        logoUrl={ctx?.logoUrl}
       />
 
       {/* Main content area — flex-1, no margin needed since sidebar is in flow */}

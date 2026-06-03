@@ -10,6 +10,7 @@ import { formatCurrency, formatDate, getCurrentSeasonLabel } from "@/lib/tenant-
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TenantForm from "@/components/admin/tenants/TenantForm";
 import TenantConfigForm from "@/components/admin/tenants/TenantConfigForm";
+import BrandingPreviewCard from "@/components/admin/branding/BrandingPreviewCard";
 
 type PageProps = { params: Promise<{ tenantSlug: string }> };
 
@@ -160,6 +161,14 @@ export default async function TenantDetailPage({ params }: PageProps) {
           </div>
         </div>
       )}
+
+      {/* Branding Preview — Slice 10.9 */}
+      <BrandingPreviewCard
+        tenantName={tenant.name}
+        logoUrl={tenant.logoUrl}
+        primaryColor={tenant.primaryColor}
+        secondaryColor={tenant.secondaryColor}
+      />
 
       {/* Core edit form */}
       {isEditable ? (
