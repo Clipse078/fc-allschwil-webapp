@@ -4,6 +4,7 @@ import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantDetail } from "@/lib/tenants/queries";
+import { isValidHexColor } from "@/lib/tenant-runtime/branding-validation";
 
 type RouteContext = { params: Promise<{ tenantSlug: string }> };
 
@@ -14,8 +15,7 @@ const LOCALE_RE = /^[a-z]{2,3}(-[A-Z]{2,4})?$/;
 const CURRENCY_RE = /^[A-Z]{3}$/;
 // Loose IANA tz check: non-empty, no spaces
 const TIMEZONE_RE = /^[A-Za-z0-9/_+-]{2,60}$/;
-// Branding: 6-digit lowercase or uppercase hex
-const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+// Hex color validation: delegated to branding-validation.ts (canonical single source of truth)
 
 type ConfigPatch = Partial<{
   countryCode: string | null;
@@ -115,7 +115,7 @@ function validateConfig(body: Record<string, unknown>):
     if (raw === null || raw === "") { patch.primaryColor = null; }
     else {
       const v = String(raw).trim();
-      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "primaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
+      if (!isValidHexColor(v)) return { ok: false, error: "primaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
       patch.primaryColor = v.toLowerCase();
     }
   }
@@ -124,7 +124,7 @@ function validateConfig(body: Record<string, unknown>):
     if (raw === null || raw === "") { patch.secondaryColor = null; }
     else {
       const v = String(raw).trim();
-      if (!HEX_COLOR_RE.test(v)) return { ok: false, error: "secondaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
+      if (!isValidHexColor(v)) return { ok: false, error: "secondaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
       patch.secondaryColor = v.toLowerCase();
     }
   }
