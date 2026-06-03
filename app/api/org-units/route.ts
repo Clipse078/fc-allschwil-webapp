@@ -7,7 +7,7 @@ import { getOrgUnits } from "@/lib/org/queries";
 import { getDefaultTenant } from "@/lib/tenants/queries";
 
 export async function GET() {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const tenant = await getDefaultTenant();
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const body = await req.json().catch(() => ({}));

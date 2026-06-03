@@ -7,7 +7,7 @@ import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import OrgUnitSearchableList from "@/components/admin/org/OrgUnitSearchableList";
 
 export default async function OrgUnitsPage() {
-  await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
+  await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const orgUnits = await getOrgUnits();
 
   return (

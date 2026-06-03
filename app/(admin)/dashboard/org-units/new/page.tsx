@@ -5,7 +5,7 @@ import OrgUnitForm from "@/components/admin/org/OrgUnitForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
 export default async function NewOrgUnitPage() {
-  await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
+  await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
   const parentOptions = await getOrgUnits();
 
   return (

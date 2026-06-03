@@ -10,7 +10,7 @@ import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 type PageProps = { params: Promise<{ id: string }> };
 
 export default async function EditOrgUnitPage({ params }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
+  await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
 
   const { id } = await params;
   const [unit, parentOptions] = await Promise.all([

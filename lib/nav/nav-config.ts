@@ -66,13 +66,13 @@ export const NAV_SECTIONS: NavSection[] = [
         key: "admin",
         label: "Admin",
         href: "/admin",
-        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+        permissionKeys: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE],
         children: [
           {
             key: "admin-org-units",
             label: "Organisation",
             href: "/dashboard/org-units",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+            permissionKeys: [PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE],
           },
           {
             key: "admin-users",

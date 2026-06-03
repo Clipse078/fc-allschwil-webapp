@@ -55,7 +55,7 @@ function getInitials(name: string): string {
 }
 
 export default async function OrgUnitDetailPage({ params }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
+  await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const { id } = await params;
   const unit = await getOrgUnitById(id);
   if (!unit) notFound();
