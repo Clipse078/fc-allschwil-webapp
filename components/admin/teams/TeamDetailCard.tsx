@@ -62,6 +62,13 @@ type SavedTeamSeasonPayload = {
   };
 };
 
+type OrgUnitOption = {
+  id: string;
+  name: string;
+  key: string;
+  type: string;
+};
+
 type Team = {
   id: string;
   name: string;
@@ -73,6 +80,8 @@ type Team = {
   isActive: boolean;
   websiteVisible: boolean;
   infoboardVisible: boolean;
+  orgUnitId: string | null;
+  orgUnit: OrgUnitOption | null;
   teamSeasons: TeamSeasonItem[];
 };
 
@@ -88,6 +97,7 @@ type SeasonOption = {
 type Props = {
   initialTeam: Team;
   availableSeasons: SeasonOption[];
+  availableOrgUnits: OrgUnitOption[];
   canManage: boolean;
 };
 
@@ -103,6 +113,7 @@ function sortTeamSeasonsDesc(entries: TeamSeasonItem[]) {
 export default function TeamDetailCard({
   initialTeam,
   availableSeasons,
+  availableOrgUnits,
   canManage,
 }: Props) {
   const [team, setTeam] = useState<Team>(initialTeam);
@@ -122,10 +133,13 @@ export default function TeamDetailCard({
     isActive: boolean;
     websiteVisible: boolean;
     infoboardVisible: boolean;
+    orgUnitId: string | null;
   }) {
     setTeam((current) => ({
       ...current,
       ...updatedTeamBase,
+      // Reset orgUnit object when orgUnitId changes — server page revalidation provides the full object.
+      orgUnit: updatedTeamBase.orgUnitId === current.orgUnitId ? current.orgUnit : null,
     }));
   }
 
@@ -178,11 +192,13 @@ export default function TeamDetailCard({
           isActive: team.isActive,
           websiteVisible: team.websiteVisible,
           infoboardVisible: team.infoboardVisible,
+          orgUnitId: team.orgUnitId,
           teamSeasons: team.teamSeasons.map((entry) => ({
             id: entry.id,
             season: entry.season,
           })),
         }}
+        availableOrgUnits={availableOrgUnits}
         canManage={canManage}
         onSaved={handleTeamSaved}
       />

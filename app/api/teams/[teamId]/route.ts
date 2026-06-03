@@ -153,6 +153,7 @@ export async function PATCH(request: NextRequest, context: Context) {
         isActive: updated.isActive,
         websiteVisible: updated.websiteVisible,
         infoboardVisible: updated.infoboardVisible,
+        orgUnitId: updated.orgUnitId,
       },
     });
 

@@ -8,6 +8,7 @@ import {
   Hash,
   Layers,
   Pencil,
+  Shield,
   Users,
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -215,6 +216,56 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
               </div>
             </div>
           ) : null}
+
+          {/* Teams linked via Team.orgUnitId (Slice 11.3) */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Teams
+                </p>
+                {unit.teams.length > 0 ? (
+                  <span className="sce-count-badge">{unit.teams.length}</span>
+                ) : null}
+              </div>
+            </div>
+            {unit.teams.length > 0 ? (
+              <div className="divide-y divide-[var(--border)]">
+                {unit.teams.map((team) => {
+                  const activeSeason = team.teamSeasons[0] ?? null;
+                  return (
+                    <Link
+                      key={team.id}
+                      href={`/dashboard/teams/${team.id}`}
+                      className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-[var(--surface-2)]"
+                    >
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50">
+                        <Shield className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[var(--foreground)]">
+                          {activeSeason?.displayName ?? team.name}
+                        </p>
+                        {activeSeason ? (
+                          <p className="text-xs text-[var(--muted)]">
+                            {activeSeason.season.name}
+                          </p>
+                        ) : null}
+                      </div>
+                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--blue)]" />
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="sce-detail-section-body">
+                <p className="text-sm text-[var(--muted)]">
+                  No teams linked to this organisation unit yet.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Membership management (business logic unchanged) */}
           <OrgMembershipManagementCard

@@ -112,6 +112,15 @@ export async function getTeamDetailData(teamId: string) {
       isActive: true,
       websiteVisible: true,
       infoboardVisible: true,
+      orgUnitId: true,
+      orgUnit: {
+        select: {
+          id: true,
+          name: true,
+          key: true,
+          type: true,
+        },
+      },
       teamSeasons: {
         orderBy: {
           season: {

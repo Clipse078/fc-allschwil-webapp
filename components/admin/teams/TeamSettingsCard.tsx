@@ -8,6 +8,13 @@ import {
   getCanonicalSeasonLabel,
 } from "@/lib/teams/jahrgang-rules";
 
+type OrgUnitOption = {
+  id: string;
+  name: string;
+  key: string;
+  type: string;
+};
+
 type Team = {
   id: string;
   name: string;
@@ -19,6 +26,7 @@ type Team = {
   isActive: boolean;
   websiteVisible: boolean;
   infoboardVisible: boolean;
+  orgUnitId: string | null;
   teamSeasons?: Array<{
     id: string;
     season: {
@@ -34,6 +42,7 @@ type Team = {
 
 type Props = {
   team: Team;
+  availableOrgUnits: OrgUnitOption[];
   canManage: boolean;
   onSaved?: (team: Team) => void;
 };
@@ -65,6 +74,7 @@ function getCategoryLabel(category: string) {
 
 export default function TeamSettingsCard({
   team,
+  availableOrgUnits,
   canManage,
   onSaved,
 }: Props) {
@@ -294,6 +304,28 @@ export default function TeamSettingsCard({
             }
             className="fca-input"
           />
+        </label>
+
+        <label className="block space-y-2 md:col-span-2">
+          <span className="fca-label">Organisationseinheit</span>
+          <select
+            value={form.orgUnitId ?? ""}
+            disabled={!canManage}
+            onChange={(event) =>
+              updateField("orgUnitId", event.target.value || null)
+            }
+            className="fca-select"
+          >
+            <option value="">— keine Verknüpfung —</option>
+            {availableOrgUnits.map((ou) => (
+              <option key={ou.id} value={ou.id}>
+                {ou.name} ({ou.key})
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-400">
+            Optionale Verknüpfung mit einer Organisationseinheit. Nur Einheiten des aktiven Mandanten stehen zur Auswahl.
+          </p>
         </label>
       </div>
 

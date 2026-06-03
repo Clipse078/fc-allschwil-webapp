@@ -57,6 +57,26 @@ export async function getOrgUnitById(id: string) {
       updatedAt: true,
       parent: { select: { id: true, name: true, key: true } },
       children: { select: { id: true, name: true, key: true, type: true, status: true }, orderBy: { sortOrder: "asc" } },
+      // Slice 11.3: linked teams via Team.orgUnitId bridge.
+      teams: {
+        where: { isActive: true },
+        orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          category: true,
+          ageGroup: true,
+          teamSeasons: {
+            where: { season: { isActive: true } },
+            take: 1,
+            select: {
+              displayName: true,
+              season: { select: { name: true } },
+            },
+          },
+        },
+      },
       memberships: {
         where: { status: "ACTIVE" },
         select: {
