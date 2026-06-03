@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { logAction } from "@/lib/audit/log-action";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 type Context = {
   params: Promise<{ teamId: string }>;
@@ -85,6 +86,15 @@ export async function PATCH(request: NextRequest, context: Context) {
         : String(body.ageGroup).trim() || null;
     const sortOrder = Number(body.sortOrder ?? 0);
 
+    // orgUnitId: undefined = not in body (keep existing), null = clear, string = set
+    const orgUnitIdRaw = body.orgUnitId;
+    const orgUnitId: string | null | undefined =
+      orgUnitIdRaw === undefined
+        ? undefined
+        : orgUnitIdRaw === null || orgUnitIdRaw === ""
+          ? null
+          : String(orgUnitIdRaw).trim() || null;
+
     if (!name) {
       return NextResponse.json(
         { error: "Teamname ist erforderlich." },
@@ -106,6 +116,29 @@ export async function PATCH(request: NextRequest, context: Context) {
       );
     }
 
+    // Validate orgUnitId against active tenant if explicitly set to a non-null value.
+    if (orgUnitId !== undefined && orgUnitId !== null) {
+      const tenant = await getDefaultTenant();
+      const orgUnit = await prisma.orgUnit.findUnique({
+        where: { id: orgUnitId },
+        select: { id: true, tenantId: true },
+      });
+
+      if (!orgUnit) {
+        return NextResponse.json(
+          { error: "Organisationseinheit nicht gefunden." },
+          { status: 404 }
+        );
+      }
+
+      if (tenant && orgUnit.tenantId !== tenant.id) {
+        return NextResponse.json(
+          { error: "Die gewählte Organisationseinheit gehört nicht zum aktiven Mandanten." },
+          { status: 403 }
+        );
+      }
+    }
+
     const updated = await prisma.team.update({
       where: { id: teamId },
       data: {
@@ -117,6 +150,7 @@ export async function PATCH(request: NextRequest, context: Context) {
         isActive: Boolean(body.isActive),
         websiteVisible: Boolean(body.websiteVisible),
         infoboardVisible: Boolean(body.infoboardVisible),
+        ...(orgUnitId !== undefined ? { orgUnitId } : {}),
       },
       include: {
         teamSeasons: {

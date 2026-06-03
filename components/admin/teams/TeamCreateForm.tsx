@@ -22,6 +22,17 @@ type SeasonOption = {
   endDate: string;
 };
 
+type OrgUnitOption = {
+  id: string;
+  name: string;
+  key: string;
+  type: string;
+};
+
+type Props = {
+  availableOrgUnits: OrgUnitOption[];
+};
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -30,7 +41,7 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-export default function TeamCreateForm() {
+export default function TeamCreateForm({ availableOrgUnits }: Props) {
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -40,6 +51,7 @@ export default function TeamCreateForm() {
   const [genderGroup, setGenderGroup] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
+  const [orgUnitId, setOrgUnitId] = useState<string | null>(null);
 
   const [seasonOptions, setSeasonOptions] = useState<SeasonOption[]>([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
@@ -125,6 +137,7 @@ export default function TeamCreateForm() {
           genderGroup: genderGroup || null,
           ageGroup: ageGroup || null,
           sortOrder,
+          orgUnitId,
         }),
       });
 
@@ -257,6 +270,22 @@ export default function TeamCreateForm() {
               onChange={(event) => setSortOrder(Number(event.target.value))}
               className="fca-input"
             />
+          </label>
+
+          <label className="block space-y-2 md:col-span-2">
+            <span className="fca-label">Organisationseinheit (optional)</span>
+            <select
+              value={orgUnitId ?? ""}
+              onChange={(event) => setOrgUnitId(event.target.value || null)}
+              className="fca-select"
+            >
+              <option value="">— keine Verknüpfung —</option>
+              {availableOrgUnits.map((ou) => (
+                <option key={ou.id} value={ou.id}>
+                  {ou.name} ({ou.key})
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 
