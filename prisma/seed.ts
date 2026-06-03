@@ -27,11 +27,28 @@ async function main() {
     update: {
       name: "FC Allschwil",
       status: TenantStatus.ACTIVE,
+      // Config v1 — safe to apply on re-seed; only overwrites if values differ
+      countryCode: "CH",
+      sportCategory: "FOOTBALL",
+      locale: "de-CH",
+      timezone: "Europe/Zurich",
+      currency: "CHF",
+      seasonStartMonth: 8,
+      seasonTransitionDay: 1,
+      seasonTransitionMonth: 8,
     },
     create: {
       key: "fc-allschwil",
       name: "FC Allschwil",
       status: TenantStatus.ACTIVE,
+      countryCode: "CH",
+      sportCategory: "FOOTBALL",
+      locale: "de-CH",
+      timezone: "Europe/Zurich",
+      currency: "CHF",
+      seasonStartMonth: 8,
+      seasonTransitionDay: 1,
+      seasonTransitionMonth: 8,
     },
   });
 

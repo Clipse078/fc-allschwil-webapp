@@ -283,6 +283,16 @@ model Tenant {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
+  // Config v1 — Slice 10.2
+  countryCode           String @default("CH")
+  sportCategory         String @default("FOOTBALL")
+  locale                String @default("de-CH")
+  timezone              String @default("Europe/Zurich")
+  currency              String @default("CHF")
+  seasonStartMonth      Int    @default(8)
+  seasonTransitionDay   Int    @default(1)
+  seasonTransitionMonth Int    @default(8)
+
   registrations Registration[]
 
   @@index([status])
