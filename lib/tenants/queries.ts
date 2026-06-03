@@ -11,6 +11,10 @@ const tenantConfigSelect = {
   seasonStartMonth: true,
   seasonTransitionDay: true,
   seasonTransitionMonth: true,
+  // Branding v1 — Slice 10.6
+  logoUrl: true,
+  primaryColor: true,
+  secondaryColor: true,
 } as const;
 
 const tenantSelect = {
@@ -85,6 +89,10 @@ export type TenantConfig = {
   seasonStartMonth: number;
   seasonTransitionDay: number;
   seasonTransitionMonth: number;
+  // Branding v1 — Slice 10.6. All nullable; platform defaults applied via resolveTenantBranding().
+  logoUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
 };
 
 export type TenantListItem = Awaited<ReturnType<typeof getTenants>>[number];

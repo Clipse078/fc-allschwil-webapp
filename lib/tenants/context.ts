@@ -33,6 +33,10 @@ const tenantContextSelect = {
   seasonStartMonth: true,
   seasonTransitionDay: true,
   seasonTransitionMonth: true,
+  // Branding v1 — Slice 10.6
+  logoUrl: true,
+  primaryColor: true,
+  secondaryColor: true,
 } as const;
 
 export type TenantContext = {
@@ -50,6 +54,10 @@ export type TenantContext = {
   seasonStartMonth: number;
   seasonTransitionDay: number;
   seasonTransitionMonth: number;
+  // Branding v1 — Slice 10.6. All nullable; platform defaults applied via resolveTenantBranding().
+  logoUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
 };
 
 /**

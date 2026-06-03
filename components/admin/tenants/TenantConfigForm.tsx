@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { TenantConfig } from "@/lib/tenants/queries";
+import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
 
 type Props = {
   tenantKey: string;
@@ -75,6 +76,14 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
   const [seasonStartMonth, setSeasonStartMonth] = useState(defaultValues.seasonStartMonth);
   const [seasonTransitionDay, setSeasonTransitionDay] = useState(defaultValues.seasonTransitionDay);
   const [seasonTransitionMonth, setSeasonTransitionMonth] = useState(defaultValues.seasonTransitionMonth);
+  // Branding v1 — Slice 10.6. Null → show platform default in picker but store null until explicitly changed.
+  const [logoUrl, setLogoUrl] = useState(defaultValues.logoUrl ?? "");
+  const [primaryColor, setPrimaryColor] = useState(
+    defaultValues.primaryColor ?? PLATFORM_BRANDING.primaryColor,
+  );
+  const [secondaryColor, setSecondaryColor] = useState(
+    defaultValues.secondaryColor ?? PLATFORM_BRANDING.secondaryColor,
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +109,10 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
           seasonStartMonth,
           seasonTransitionDay,
           seasonTransitionMonth,
+          // Branding — empty string → null (clear / use platform default)
+          logoUrl: logoUrl || null,
+          primaryColor: primaryColor || null,
+          secondaryColor: secondaryColor || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -249,6 +262,81 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
                 />
                 <p className="mt-1 text-[11px] text-[var(--muted)]">
                   Tag im Wechselmonat (1–31)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Branding — Slice 10.6 */}
+          <div>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+              Branding
+            </p>
+            <div className={gridClass}>
+              <div className="sm:col-span-2">
+                <label htmlFor="cfg-logo-url" className={labelClass}>Logo-URL</label>
+                <input
+                  id="cfg-logo-url"
+                  type="text"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  placeholder="https://…/logo.svg"
+                  className="fca-input"
+                />
+                <p className="mt-1 text-[11px] text-[var(--muted)]">
+                  URL oder Pfad zum Vereinslogo (leer = kein Logo konfiguriert).
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="cfg-primary-color" className={labelClass}>Primärfarbe</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="cfg-primary-color-picker"
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="h-9 w-12 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] p-0.5"
+                    aria-label="Primärfarbe wählen"
+                  />
+                  <input
+                    id="cfg-primary-color"
+                    type="text"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    placeholder={PLATFORM_BRANDING.primaryColor}
+                    maxLength={7}
+                    className="fca-input font-mono"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--muted)]">
+                  6-stelliger Hex-Wert (z.B. {PLATFORM_BRANDING.primaryColor}).
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="cfg-secondary-color" className={labelClass}>Sekundärfarbe</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="cfg-secondary-color-picker"
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="h-9 w-12 cursor-pointer rounded border border-[var(--border)] bg-[var(--surface)] p-0.5"
+                    aria-label="Sekundärfarbe wählen"
+                  />
+                  <input
+                    id="cfg-secondary-color"
+                    type="text"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    placeholder={PLATFORM_BRANDING.secondaryColor}
+                    maxLength={7}
+                    className="fca-input font-mono"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--muted)]">
+                  6-stelliger Hex-Wert (z.B. {PLATFORM_BRANDING.secondaryColor}).
                 </p>
               </div>
             </div>

@@ -5,7 +5,8 @@ import StageEnvironmentBanner from "@/components/admin/deployment/StageEnvironme
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import AppTopNav from "@/components/admin/layout/AppTopNav";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getCurrentTenantContext } from "@/lib/tenants/context";
+import { generateTenantCssVars } from "@/lib/tenant-runtime/theme";
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -18,17 +19,24 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
     redirect("/login");
   }
 
-  const tenant = await getDefaultTenant();
+  // Use full tenant context to get both identity (name) and branding config.
+  // generateTenantCssVars() applies PLATFORM_BRANDING defaults when null,
+  // so the layout is always safe even if the tenant has no branding configured.
+  const ctx = await getCurrentTenantContext();
+  const tenantCssVars = generateTenantCssVars(ctx);
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div
+      className="flex min-h-screen bg-[var(--background)]"
+      style={tenantCssVars as React.CSSProperties}
+    >
       {/* Fixed sidebar */}
       <AdminSidebar
         firstName={session.user.firstName}
         lastName={session.user.lastName}
         email={session.user.email}
         permissionKeys={session.user.permissionKeys}
-        clubName={tenant?.name}
+        clubName={ctx?.name}
       />
 
       {/* Main content area — flex-1, no margin needed since sidebar is in flow */}

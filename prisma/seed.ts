@@ -7,6 +7,7 @@ import {
   TenantStatus,
 } from "@prisma/client";
 import { Pool } from "pg";
+import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -36,6 +37,9 @@ async function main() {
       seasonStartMonth: 8,
       seasonTransitionDay: 1,
       seasonTransitionMonth: 8,
+      // Branding v1 — Slice 10.6: use PLATFORM_BRANDING — single source of truth.
+      primaryColor: PLATFORM_BRANDING.primaryColor,
+      secondaryColor: PLATFORM_BRANDING.secondaryColor,
     },
     create: {
       key: "fc-allschwil",
@@ -49,6 +53,9 @@ async function main() {
       seasonStartMonth: 8,
       seasonTransitionDay: 1,
       seasonTransitionMonth: 8,
+      // Branding v1 — Slice 10.6: use PLATFORM_BRANDING — single source of truth.
+      primaryColor: PLATFORM_BRANDING.primaryColor,
+      secondaryColor: PLATFORM_BRANDING.secondaryColor,
     },
   });
 
