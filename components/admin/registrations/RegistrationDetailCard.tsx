@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationDetail } from "@/lib/registrations/queries";
+import { formatDate, formatDateTime } from "@/lib/tenant-runtime/formatters";
 
 type RegistrationDetailCardProps = {
   tenantSlug: string;
@@ -66,26 +67,6 @@ const STATUS_BADGE_CLASS: Record<RegistrationStatus, string> = {
 
 const STATUS_OPTIONS = Object.values(RegistrationStatus);
 
-function makeFormatDate(locale: string, timezone: string) {
-  return function formatDate(value: string) {
-    return new Intl.DateTimeFormat(locale, {
-      dateStyle: "long",
-      timeStyle: "short",
-      timeZone: timezone,
-    }).format(new Date(value));
-  };
-}
-
-function makeFormatDateShort(locale: string, timezone: string) {
-  return function formatDateShort(value: string) {
-    return new Intl.DateTimeFormat(locale, {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      timeZone: timezone,
-    }).format(new Date(value));
-  };
-}
 
 function getInitials(firstName: string, lastName: string) {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -155,8 +136,7 @@ export default function RegistrationDetailCard({
   const [registration, setRegistration] = useState(initialRegistration);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const formatDate = makeFormatDate(locale, timezone);
-  const formatDateShort = makeFormatDateShort(locale, timezone);
+  const cfg = { locale, timezone };
 
   const routingSuggestion = getRoutingSuggestion(registration.birthYear);
   const contactName = getContactName(registration.payloadJson);
@@ -260,7 +240,7 @@ export default function RegistrationDetailCard({
             <span>
               Eingegangen:{" "}
               <span className="font-semibold text-white">
-                {formatDate(registration.submittedAt)}
+                {formatDateTime(registration.submittedAt, cfg)}
               </span>
             </span>
           </div>
@@ -430,19 +410,19 @@ export default function RegistrationDetailCard({
                 <span className="sce-data-label">Eingegangen</span>
                 <span className="sce-data-value flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5 text-[var(--muted)]" />
-                  {formatDateShort(registration.submittedAt)}
+                  {formatDate(registration.submittedAt, cfg)}
                 </span>
               </div>
               <div className="sce-data-field">
                 <span className="sce-data-label">Erstellt</span>
                 <span className="sce-data-value">
-                  {formatDateShort(registration.createdAt)}
+                  {formatDate(registration.createdAt, cfg)}
                 </span>
               </div>
               <div className="sce-data-field">
                 <span className="sce-data-label">Zuletzt geändert</span>
                 <span className="sce-data-value">
-                  {formatDateShort(registration.updatedAt)}
+                  {formatDate(registration.updatedAt, cfg)}
                 </span>
               </div>
               <div className="sce-data-field">

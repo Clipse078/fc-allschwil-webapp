@@ -18,7 +18,7 @@ import { prisma } from "@/lib/db/prisma";
 import { cn } from "@/lib/cn";
 import { MODULE_DEFINITIONS, type ModuleDefinition } from "@/lib/nav/nav-config";
 import { getCurrentTenantContext } from "@/lib/tenants/context";
-import { getCurrentSeasonLabel } from "@/lib/tenants/season-boundary";
+import { formatTime, formatTodayDate, getCurrentSeasonLabel } from "@/lib/tenant-runtime/formatters";
 
 // Icon map for dashboard module cards — keyed on ModuleDefinition.key
 const MODULE_ICONS: Record<string, LucideIcon> = {
@@ -63,23 +63,6 @@ async function getDashboardKpiData() {
   return { seasonCount, teamCount, personCount, todayEvents };
 }
 
-function formatTime(date: Date, locale = "de-CH", timezone?: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-    ...(timezone ? { timeZone: timezone } : {}),
-  }).format(date);
-}
-
-function formatTodayDate(locale = "de-CH", timezone?: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    ...(timezone ? { timeZone: timezone } : {}),
-  }).format(new Date());
-}
 
 function mapEventType(type: string): "training" | "match" | "meeting" | "other" {
   if (type === "TRAINING") return "training";
@@ -146,8 +129,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const selectedSeasonKey = selectedSeason?.key ?? "";
 
+  const fmtCfg = { locale, timezone };
   const todayAgendaItems = kpiData.todayEvents.map((ev) => ({
-    time: formatTime(ev.startAt, locale, timezone),
+    time: formatTime(ev.startAt, fmtCfg),
     title: ev.title,
     type: mapEventType(ev.type),
     location: ev.location ?? undefined,
@@ -206,7 +190,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         {/* Today agenda */}
         <DashboardTodayAgenda
           items={todayAgendaItems}
-          date={formatTodayDate(locale, timezone)}
+          date={formatTodayDate(fmtCfg)}
         />
       </div>
 
