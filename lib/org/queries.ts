@@ -4,6 +4,10 @@
  * loadOrgUnitIds() is called to extend ActorContext with org unit memberships,
  * enabling visibleOrgUnitRefs to be evaluated in canSeeEntity().
  *
+ * Slice 11.2: loadOrgUnitIds now accepts an optional tenantId. When provided,
+ * only memberships belonging to that tenant are included in the actor's
+ * orgUnitIds. This prevents cross-tenant memberships from entering ActorContext.
+ *
  * TODO: cache orgUnitIds in JWT at login time to avoid a DB query on every
  *   request. Until then, this is called lazily in routes that need it.
  *
@@ -91,10 +95,19 @@ export async function getOrgUnitById(id: string) {
 /**
  * Load the orgUnit IDs that a user is an active member of.
  * Used to populate ActorContext.orgUnitIds.
+ *
+ * When tenantId is provided, only memberships for that tenant are returned,
+ * preventing cross-tenant memberships from entering ActorContext.
+ * When tenantId is omitted, all active memberships are returned (safe for
+ * single-tenant deployments; the caller documents the backwards-compat reason).
  */
-export async function loadOrgUnitIds(userId: string): Promise<string[]> {
+export async function loadOrgUnitIds(userId: string, tenantId?: string): Promise<string[]> {
   const memberships = await prisma.orgUnitMembership.findMany({
-    where: { userId, status: "ACTIVE" },
+    where: {
+      userId,
+      status: "ACTIVE",
+      ...(tenantId !== undefined ? { tenantId } : {}),
+    },
     select: { orgUnitId: true },
   });
   return memberships.map((m) => m.orgUnitId);

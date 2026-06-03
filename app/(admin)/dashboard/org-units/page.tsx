@@ -1,14 +1,21 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits } from "@/lib/org/queries";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import OrgUnitSearchableList from "@/components/admin/org/OrgUnitSearchableList";
 
+// Slice 11.2: tenant resolved from getDefaultTenant() — the backwards-compat
+// fallback until the session carries tenantId. All reads are scoped to tenant.id.
+
 export default async function OrgUnitsPage() {
   await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
-  const orgUnits = await getOrgUnits();
+  const tenant = await getDefaultTenant();
+  if (!tenant) notFound();
+  const orgUnits = await getOrgUnits(tenant.id);
 
   return (
     <div className="space-y-8">

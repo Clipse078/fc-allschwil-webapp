@@ -6,23 +6,36 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
 import { getDefaultTenant } from "@/lib/tenants/queries";
 
+// Slice 11.2: tenant is resolved once per request from getDefaultTenant().
+// getDefaultTenant() is the backwards-compat fallback until the session carries tenantId.
+
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Returns 404 if the OrgUnit belongs to a different tenant (avoids information disclosure). */
-function isCrossTenant(tenantId: string | null, defaultTenantId: string | undefined): boolean {
-  if (!defaultTenantId) return false;
-  if (tenantId === null) return false; // null = no tenant assigned; allow (defensive)
-  return tenantId !== defaultTenantId;
+/**
+ * Returns true if the OrgUnit belongs to a different tenant than the resolved one.
+ *
+ * Null tenantId: legacy rows backfilled in migration
+ * 20260601124700_add_org_membership_relations_tenant_backfill should have no
+ * null tenantId rows remaining. If one is encountered it is treated as belonging
+ * to the resolved (default) tenant — this is the documented backwards-compat
+ * fallback to avoid breaking any pre-migration residue.
+ */
+function isCrossTenant(orgUnitTenantId: string | null, resolvedTenantId: string): boolean {
+  if (orgUnitTenantId === null) return false; // null = pre-migration residue; allow (backwards-compat)
+  return orgUnitTenantId !== resolvedTenantId;
 }
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
+  const tenant = await getDefaultTenant();
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
   const { id } = await params;
-  const [orgUnit, tenant] = await Promise.all([getOrgUnitById(id), getDefaultTenant()]);
+  const orgUnit = await getOrgUnitById(id);
   if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-  if (isCrossTenant(orgUnit.tenantId, tenant?.id)) {
+  if (isCrossTenant(orgUnit.tenantId, tenant.id)) {
     return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
   }
   return NextResponse.json({ orgUnit });
@@ -32,11 +45,13 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const { id } = await params;
   const tenant = await getDefaultTenant();
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
+  const { id } = await params;
   const existing = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, level: true, tenantId: true } });
   if (!existing) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-  if (isCrossTenant(existing.tenantId, tenant?.id)) {
+  if (isCrossTenant(existing.tenantId, tenant.id)) {
     return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
   }
 
@@ -67,14 +82,16 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const { id } = await params;
   const tenant = await getDefaultTenant();
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
+  const { id } = await params;
   const existing = await prisma.orgUnit.findUnique({
     where: { id },
     select: { id: true, tenantId: true, _count: { select: { children: true } } },
   });
   if (!existing) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-  if (isCrossTenant(existing.tenantId, tenant?.id)) {
+  if (isCrossTenant(existing.tenantId, tenant.id)) {
     return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
   }
   if (existing._count.children > 0) {

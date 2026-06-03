@@ -13,7 +13,10 @@ import {
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
+
+// Slice 11.2: tenant guard added. Cross-tenant OrgUnit IDs resolve to notFound().
 
 const TYPE_LABELS: Record<string, string> = {
   CLUB: "Verein",
@@ -57,8 +60,10 @@ function getInitials(name: string): string {
 export default async function OrgUnitDetailPage({ params }: PageProps) {
   await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const { id } = await params;
-  const unit = await getOrgUnitById(id);
+  const [unit, tenant] = await Promise.all([getOrgUnitById(id), getDefaultTenant()]);
   if (!unit) notFound();
+  // Tenant guard: null tenantId = pre-migration residue; allow (backwards-compat).
+  if (unit.tenantId !== null && tenant && unit.tenantId !== tenant.id) notFound();
 
   const typeLabel = TYPE_LABELS[unit.type] ?? unit.type;
   const statusLabel = STATUS_LABELS[unit.status] ?? unit.status;
