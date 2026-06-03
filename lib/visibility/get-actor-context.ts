@@ -14,6 +14,10 @@
  * Backwards-compatible: if the user has no org unit memberships, orgUnitIds
  * defaults to [] — no false-positive visibility grants.
  *
+ * DB-resilient: if OrgUnitMembership table does not yet exist (pre-migration
+ * STAGE), the query is caught and orgUnitIds falls back to [] rather than
+ * crashing the request. This preserves the documented safe default.
+ *
  * TODO: replace the DB query with a JWT-cached value once membership is
  *   included in the session token. Until then, this is one extra DB query
  *   per request on visibility-gated endpoints.
@@ -31,8 +35,16 @@ type SessionUser = {
 /**
  * Build a fully-hydrated ActorContext, including orgUnitIds from DB.
  * Safe to call even if the user has no memberships — returns [] in that case.
+ * Also safe when the OrgUnitMembership table does not yet exist (falls back to []).
  */
 export async function getActorContext(user: SessionUser) {
-  const orgUnitIds = await loadOrgUnitIds(user.id);
+  let orgUnitIds: string[] = [];
+  try {
+    orgUnitIds = await loadOrgUnitIds(user.id);
+  } catch {
+    // OrgUnitMembership table may not yet exist (pre-migration environment).
+    // orgUnitIds: [] is the documented safe default — no org-unit-based
+    // visibility grants, which is correct when the table is absent.
+  }
   return buildActorContext(user, orgUnitIds);
 }
