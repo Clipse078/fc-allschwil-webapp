@@ -20,12 +20,12 @@ import {
   Settings2,
   Shield,
   Target,
-  Trophy,
   UserCircle2,
   UserRound,
   Users,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
+import TenantLogo from "@/components/admin/branding/TenantLogo";
 import { getVisibleNavSections } from "@/lib/nav/nav-config";
 import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
@@ -38,6 +38,8 @@ type AdminSidebarProps = {
   permissionKeys: string[];
   /** Tenant display name. Falls back to "SportClubEvo" when not provided. */
   clubName?: string;
+  /** Raw logoUrl from tenant config. Null/invalid → fallback icon. */
+  logoUrl?: string | null;
   collapsed?: boolean;
   onToggle?: () => void;
 };
@@ -89,6 +91,7 @@ export default function AdminSidebar({
   email,
   permissionKeys,
   clubName,
+  logoUrl,
   collapsed,
   onToggle,
 }: AdminSidebarProps) {
@@ -130,14 +133,12 @@ export default function AdminSidebar({
     >
       {/* Brand header */}
       <div className="sce-sidebar-brand">
-        {/* Generic platform icon — replaces tenant-specific logo */}
-        <div
-          className="flex shrink-0 items-center justify-center rounded-[6px] bg-[var(--tenant-primary)] text-white"
-          style={{ width: isCollapsed ? 28 : 32, height: isCollapsed ? 28 : 32 }}
-          aria-hidden="true"
-        >
-          <Trophy style={{ width: 14, height: 14 }} />
-        </div>
+        {/* Tenant logo — falls back to platform Trophy icon when no logoUrl configured */}
+        <TenantLogo
+          logoUrl={logoUrl}
+          size={isCollapsed ? 28 : 32}
+          alt={clubName ? `${clubName} logo` : "Club logo"}
+        />
 
         {!isCollapsed && (
           <div className="min-w-0 flex-1">
