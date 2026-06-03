@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Loader2, Upload } from "lucide-react";
 import type { TenantConfig } from "@/lib/tenants/queries";
 import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
+import {
+  ALLOWED_LOGO_UPLOAD_MIME_TYPES,
+  MAX_LOGO_FILE_SIZE_BYTES,
+  validateLogoUploadFile,
+} from "@/lib/assets/validation";
 
 type Props = {
   tenantKey: string;
@@ -89,6 +94,12 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // Logo upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -126,6 +137,52 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
       setError("Netzwerkfehler. Bitte erneut versuchen.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset the input so the same file can be re-selected after an error
+    e.target.value = "";
+
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    // Client-side first-pass validation (reuses canonical helper)
+    const validation = validateLogoUploadFile(file);
+    if (!validation.ok) {
+      setUploadError(validation.error);
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+
+      const res = await fetch(`/api/tenants/${tenantKey}/logo`, {
+        method: "POST",
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setUploadError(data?.error ?? "Upload fehlgeschlagen.");
+        return;
+      }
+
+      // Populate the logoUrl field with the returned CDN URL
+      if (typeof data.logoUrl === "string") {
+        setLogoUrl(data.logoUrl);
+      }
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 3000);
+    } catch {
+      setUploadError("Netzwerkfehler beim Upload. Bitte erneut versuchen.");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -275,17 +332,51 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
             <div className={gridClass}>
               <div className="sm:col-span-2">
                 <label htmlFor="cfg-logo-url" className={labelClass}>Logo-URL</label>
+
+                {/* Hidden file input — triggered by the upload button */}
                 <input
-                  id="cfg-logo-url"
-                  type="text"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://…/logo.png"
-                  className="fca-input"
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ALLOWED_LOGO_UPLOAD_MIME_TYPES.join(",")}
+                  className="sr-only"
+                  aria-label="Logo hochladen"
+                  onChange={handleLogoUpload}
                 />
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="cfg-logo-url"
+                    type="text"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="https://…/logo.png"
+                    className="fca-input flex-1"
+                  />
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="fca-button-secondary flex items-center gap-1.5 shrink-0"
+                    title={`PNG, JPEG oder WebP, max. ${MAX_LOGO_FILE_SIZE_BYTES / 1024 / 1024} MB`}
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {uploading ? "Hochladen…" : "Hochladen"}
+                  </button>
+                </div>
+
+                {uploadError && (
+                  <p className="mt-1.5 text-[11px] font-medium text-rose-600">{uploadError}</p>
+                )}
+                {uploadSuccess && (
+                  <p className="mt-1.5 text-[11px] font-medium text-emerald-600">Logo erfolgreich hochgeladen.</p>
+                )}
+
                 <p className="mt-1 text-[11px] text-[var(--muted)]">
-                  URL oder Pfad zum Vereinslogo (leer = kein Logo konfiguriert).
-                  Direkter Datei-Upload folgt im nächsten Slice (persistenter Storage-Adapter).
+                  URL oder Pfad zum Vereinslogo — oder Datei direkt hochladen (PNG, JPEG, WebP, max. {MAX_LOGO_FILE_SIZE_BYTES / 1024 / 1024} MB).
                 </p>
               </div>
 
