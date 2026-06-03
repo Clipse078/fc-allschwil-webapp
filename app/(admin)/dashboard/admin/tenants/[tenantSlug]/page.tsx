@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Key, Settings2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Key, Settings2, Zap } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantDetail } from "@/lib/tenants/queries";
+import { getCurrentTenantContext } from "@/lib/tenants/context";
+import { formatCurrency, formatDate } from "@/lib/tenants/format";
+import { getCurrentSeasonLabel } from "@/lib/tenants/season-boundary";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TenantForm from "@/components/admin/tenants/TenantForm";
 import TenantConfigForm from "@/components/admin/tenants/TenantConfigForm";
@@ -37,7 +40,10 @@ export default async function TenantDetailPage({ params }: PageProps) {
   const canManage = hasPermission(session, PERMISSIONS.TENANTS_MANAGE);
 
   const { tenantSlug } = await params;
-  const tenant = await getTenantDetail(tenantSlug);
+  const [tenant, ctx] = await Promise.all([
+    getTenantDetail(tenantSlug),
+    getCurrentTenantContext(tenantSlug),
+  ]);
   if (!tenant) notFound();
 
   const createdAt = new Date(tenant.createdAt).toLocaleDateString("de-CH", {
@@ -48,6 +54,12 @@ export default async function TenantDetailPage({ params }: PageProps) {
   });
 
   const isEditable = canManage && tenant.status !== "ARCHIVED";
+
+  // Context preview values — computed server-side using the tenant's own config.
+  // ctx may be null if the tenant is inactive/archived; fall back gracefully.
+  const previewCurrency = ctx ? formatCurrency(1234.5, ctx) : null;
+  const previewDate = ctx ? formatDate(new Date(), ctx) : null;
+  const previewSeason = ctx ? getCurrentSeasonLabel(ctx) : null;
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -116,6 +128,41 @@ export default async function TenantDetailPage({ params }: PageProps) {
           </dl>
         </div>
       </div>
+
+      {/* Context Preview — server-computed from tenant config */}
+      {ctx && (
+        <div className="sce-detail-section">
+          <div className="sce-detail-section-header">
+            <div className="flex items-center gap-2">
+              <Zap className="h-3.5 w-3.5 text-[var(--muted)]" />
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                Laufzeit-Kontext
+              </p>
+            </div>
+          </div>
+          <div className="sce-detail-section-body">
+            <p className="mb-3 text-[11px] text-[var(--muted)]">
+              Vorschau der Formatierungshelfer mit dieser Konfiguration.
+            </p>
+            <dl className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Währung</dt>
+                <dd className="mt-0.5 font-mono text-sm text-[var(--foreground)]">
+                  {previewCurrency}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Datum (heute)</dt>
+                <dd className="mt-0.5 text-sm text-[var(--foreground)]">{previewDate}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Aktive Saison</dt>
+                <dd className="mt-0.5 font-mono text-sm text-[var(--foreground)]">{previewSeason}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      )}
 
       {/* Core edit form */}
       {isEditable ? (
