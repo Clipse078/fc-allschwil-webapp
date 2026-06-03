@@ -5,21 +5,38 @@ import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getDefaultTenant } from "@/lib/tenants/queries";
 
+// Slice 11.2: tenant is resolved once per request. All OrgUnit access is
+// scoped to the resolved tenant. Null tenantId on OrgUnit is treated as
+// pre-migration residue and allowed (backwards-compat; documented below).
+
 type RouteContext = { params: Promise<{ id: string }> };
+
+/**
+ * Verify the parent OrgUnit belongs to the resolved tenant.
+ * Null tenantId = pre-migration residue; treated as default tenant (backwards-compat).
+ * Returns the OrgUnit row if accessible; null if not found or cross-tenant.
+ */
+async function requireOrgUnitForTenant(orgUnitId: string, resolvedTenantId: string) {
+  const orgUnit = await prisma.orgUnit.findUnique({
+    where: { id: orgUnitId },
+    select: { id: true, tenantId: true },
+  });
+  if (!orgUnit) return null;
+  // null tenantId = pre-migration residue; allow access (backwards-compat fallback).
+  if (orgUnit.tenantId !== null && orgUnit.tenantId !== resolvedTenantId) return null;
+  return orgUnit;
+}
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const { id } = await params;
-
-  // Tenant guard: verify the parent OrgUnit belongs to the default tenant
   const tenant = await getDefaultTenant();
-  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, tenantId: true } });
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
+  const { id } = await params;
+  const orgUnit = await requireOrgUnitForTenant(id, tenant.id);
   if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-  if (orgUnit.tenantId !== null && tenant && orgUnit.tenantId !== tenant.id) {
-    return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-  }
 
   const memberships = await prisma.orgUnitMembership.findMany({
     where: { orgUnitId: id },
@@ -59,15 +76,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const { id } = await params;
   const tenant = await getDefaultTenant();
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
-  const orgUnit = await prisma.orgUnit.findUnique({ where: { id }, select: { id: true, tenantId: true } });
+  const { id } = await params;
+  const orgUnit = await requireOrgUnitForTenant(id, tenant.id);
   if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-  if (orgUnit.tenantId !== null && orgUnit.tenantId !== tenant.id) {
-    return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
-  }
 
   const body = await req.json().catch(() => ({}));
   const userId = body?.userId?.trim() || null;
@@ -80,6 +94,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     const membership = await prisma.orgUnitMembership.create({
       data: {
+        // Use the resolved tenant.id so new memberships are always tenant-scoped.
+        // orgUnit.tenantId may be null for pre-migration residue rows; fall back to tenant.id.
         tenantId: orgUnit.tenantId ?? tenant.id,
         orgUnitId: id,
         userId,

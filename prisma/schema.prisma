@@ -832,7 +832,9 @@ model OrgUnit {
   parentId    String?
   type        OrgUnitType   @default(DEPARTMENT)
   status      OrgUnitStatus @default(ACTIVE)
-  key         String        @unique
+  // key is tenant-scoped unique (@@unique below); no longer globally unique.
+  // Slice 11.2: global @unique removed to enable same key across tenants.
+  key         String
   name        String
   description String?
   sortOrder   Int           @default(0)
@@ -844,6 +846,7 @@ model OrgUnit {
   children    OrgUnit[]           @relation("OrgUnitHierarchy")
   memberships OrgUnitMembership[]
 
+  @@unique([tenantId, key])
   @@index([tenantId])
   @@index([parentId])
   @@index([type, status])

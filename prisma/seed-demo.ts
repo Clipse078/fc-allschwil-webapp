@@ -716,10 +716,13 @@ Demo FC Aktive`,
   ] as const;
 
   for (const ou of orgUnitsData) {
+    // Slice 11.2: OrgUnit.key is now tenant-scoped (@@unique([tenantId, key])).
+    // Use composite unique key for upsert; always assign tenantId.
     await prisma.orgUnit.upsert({
-      where: { key: ou.key },
+      where: { tenantId_key: { tenantId: fcAllschwilTenant.id, key: ou.key } },
       update: { name: ou.name, description: ou.description },
       create: {
+        tenantId: fcAllschwilTenant.id,
         key: ou.key,
         name: ou.name,
         type: ou.type,

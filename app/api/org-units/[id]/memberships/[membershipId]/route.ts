@@ -5,20 +5,25 @@ import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getDefaultTenant } from "@/lib/tenants/queries";
 
+// Slice 11.2: tenant is resolved once per request. requireOrgUnitForTenant
+// now receives the resolved tenantId explicitly rather than re-fetching it
+// internally, making the tenant scope visible at the call site.
+
 type RouteContext = { params: Promise<{ id: string; membershipId: string }> };
 
 /**
- * Verify that the parent OrgUnit identified by `id` belongs to the default tenant.
- * Returns the OrgUnit row if it is accessible; returns null if not found or cross-tenant.
+ * Verify the parent OrgUnit belongs to the resolved tenant.
+ * Null tenantId = pre-migration residue; treated as default tenant (backwards-compat).
+ * Returns the OrgUnit row if accessible; null if not found or cross-tenant.
  */
-async function requireOrgUnitForTenant(orgUnitId: string) {
-  const tenant = await getDefaultTenant();
+async function requireOrgUnitForTenant(orgUnitId: string, resolvedTenantId: string) {
   const orgUnit = await prisma.orgUnit.findUnique({
     where: { id: orgUnitId },
     select: { id: true, tenantId: true },
   });
   if (!orgUnit) return null;
-  if (orgUnit.tenantId !== null && tenant && orgUnit.tenantId !== tenant.id) return null;
+  // null tenantId = pre-migration residue; allow access (backwards-compat fallback).
+  if (orgUnit.tenantId !== null && orgUnit.tenantId !== resolvedTenantId) return null;
   return orgUnit;
 }
 
@@ -26,10 +31,12 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
+  const tenant = await getDefaultTenant();
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
   const { id, membershipId } = await params;
 
-  // Tenant guard: confirm parent OrgUnit belongs to the default tenant
-  const orgUnit = await requireOrgUnitForTenant(id);
+  const orgUnit = await requireOrgUnitForTenant(id, tenant.id);
   if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
 
   const existing = await prisma.orgUnitMembership.findUnique({
@@ -96,10 +103,12 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
+  const tenant = await getDefaultTenant();
+  if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+
   const { id, membershipId } = await params;
 
-  // Tenant guard: confirm parent OrgUnit belongs to the default tenant
-  const orgUnit = await requireOrgUnitForTenant(id);
+  const orgUnit = await requireOrgUnitForTenant(id, tenant.id);
   if (!orgUnit) return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
 
   const existing = await prisma.orgUnitMembership.findUnique({
