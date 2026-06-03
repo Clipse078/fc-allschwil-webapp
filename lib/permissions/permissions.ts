@@ -45,6 +45,9 @@ export const PERMISSIONS = {
 
   REGISTRATIONS_VIEW: "registrations.view",
   REGISTRATIONS_EDIT: "registrations.edit",
+
+  TENANTS_VIEW: "tenants.view",
+  TENANTS_MANAGE: "tenants.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
