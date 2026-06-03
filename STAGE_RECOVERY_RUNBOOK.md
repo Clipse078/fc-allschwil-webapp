@@ -392,20 +392,24 @@ psql $DATABASE_URL -c "ALTER TYPE \"PermissionModule\" ADD VALUE IF NOT EXISTS '
 
 Expected: `ALTER TYPE`
 
-#### E1b — Apply remaining DDL
+#### E1b — Apply remaining DDL (wrapped in BEGIN/COMMIT for atomicity)
+
+> **Why BEGIN/COMMIT here:** Same reasoning as A1b — the heredoc block is multi-statement and must be atomic. If the Registration table is partially created before a failure, the block can be re-run after rolling back: the BEGIN/COMMIT ensures full atomicity.
 
 ```bash
 psql $DATABASE_URL << 'SQL'
-CREATE TYPE "RegistrationType" AS ENUM (
+BEGIN;
+
+CREATE TYPE IF NOT EXISTS "RegistrationType" AS ENUM (
     'PROBETRAINING', 'SPIELERANMELDUNG', 'TRAINERANMELDUNG',
     'SPONSORANFRAGE', 'KONTAKTANFRAGE', 'OTHER'
 );
 
-CREATE TYPE "RegistrationStatus" AS ENUM (
+CREATE TYPE IF NOT EXISTS "RegistrationStatus" AS ENUM (
     'NEW', 'REVIEWING', 'CONTACTED', 'ACCEPTED', 'REJECTED', 'ARCHIVED'
 );
 
-CREATE TABLE "Registration" (
+CREATE TABLE IF NOT EXISTS "Registration" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
     "type" "RegistrationType" NOT NULL,
@@ -436,14 +440,22 @@ ALTER TABLE "Registration"
     FOREIGN KEY ("assignedToUserId") REFERENCES "User"("id")
     ON DELETE SET NULL ON UPDATE CASCADE;
 
-CREATE INDEX "Registration_tenantId_status_idx" ON "Registration"("tenantId", "status");
-CREATE INDEX "Registration_tenantId_type_idx" ON "Registration"("tenantId", "type");
-CREATE INDEX "Registration_tenantId_createdAt_idx" ON "Registration"("tenantId", "createdAt");
-CREATE INDEX "Registration_assignedToUserId_idx" ON "Registration"("assignedToUserId");
+CREATE INDEX IF NOT EXISTS "Registration_tenantId_status_idx" ON "Registration"("tenantId", "status");
+CREATE INDEX IF NOT EXISTS "Registration_tenantId_type_idx" ON "Registration"("tenantId", "type");
+CREATE INDEX IF NOT EXISTS "Registration_tenantId_createdAt_idx" ON "Registration"("tenantId", "createdAt");
+CREATE INDEX IF NOT EXISTS "Registration_assignedToUserId_idx" ON "Registration"("assignedToUserId");
+
+COMMIT;
 SQL
 ```
 
-Expected: `CREATE TYPE` ×2, `CREATE TABLE`, `ALTER TABLE` ×2, `CREATE INDEX` ×4.
+Expected: `BEGIN`, `CREATE TYPE` ×2, `CREATE TABLE`, `ALTER TABLE` ×2, `CREATE INDEX` ×4, `COMMIT`.
+
+> **Prerequisite check:** Verify the `Tenant` table exists before running this block:
+> ```sql
+> SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'Tenant' AND table_schema = 'public';
+> ```
+> Expected: `1`. If `0`, migration 13 (`add_tenant_foundation`) did not apply — stop and investigate Segment E before proceeding.
 
 #### E1c — Mark migration as applied
 

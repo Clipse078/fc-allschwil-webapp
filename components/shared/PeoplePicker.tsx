@@ -13,9 +13,10 @@
  * - Multi-select: calls onSelect per pick; caller manages chip list + passes excludeIds
  * - Loading, empty, and error states
  * - SCE design tokens only
+ * - useId() ensures unique ARIA IDs when multiple instances are mounted on the same page
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 
 export type PersonPickerResult = {
@@ -78,9 +79,15 @@ export function PeoplePicker({
   selected = null,
   onSelect,
   onClearSelected,
-  placeholder = "Person suchen…",
+  placeholder = "Person suchen\u2026",
   disabled = false,
 }: PeoplePickerProps) {
+  // useId() generates a unique, stable ID per component instance.
+  // This prevents duplicate id/aria-controls collisions when multiple
+  // PeoplePicker widgets are rendered on the same page simultaneously.
+  const instanceId = useId();
+  const listboxId = `people-picker-listbox-${instanceId}`;
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PersonPickerResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -239,7 +246,7 @@ export function PeoplePicker({
             aria-expanded={open}
             aria-haspopup="listbox"
             aria-autocomplete="list"
-            aria-controls="people-picker-listbox"
+            aria-controls={listboxId}
             role="combobox"
           />
           {query.length > 0 ? (
@@ -283,7 +290,7 @@ export function PeoplePicker({
       {/* Results dropdown */}
       {open && results.length > 0 ? (
         <ul
-          id="people-picker-listbox"
+          id={listboxId}
           role="listbox"
           className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-strong)] bg-[var(--surface)] py-1 shadow-[var(--shadow-lg)]"
         >
