@@ -326,8 +326,45 @@ NO
 - TargetGroups
 - Workflow routing
 - AI
-- Multi-tenant isolation
+- Multi-tenant isolation (deferred — see Slice 11.2 and 11.2b below)
 ```
+
+---
+
+## Slice 11.2 — Tenant Isolation Hardening (Complete, merged STAGE d41e66b)
+
+- `OrgUnit.key` uniqueness changed from global `@unique` to tenant-scoped `@@unique([tenantId, key])`.
+- All org-unit API routes and dashboard pages are now scoped to the resolved tenant.
+- `loadOrgUnitIds(userId, tenantId?)` and `getActorContext(user, tenantId?)` accept tenant context.
+- Cross-tenant access returns 404 (not 403, not 500) — existence not disclosed.
+- `getDefaultTenant()` is retained as the current tenant resolver (session does not carry tenantId).
+
+---
+
+## Roadmap Item: Slice 11.2b — Session Tenant Context
+
+**Goal:** `JWT → tenantId → ActorContext → Queries → APIs`
+
+**Motivation:**
+All org-unit (and other tenant-sensitive) code currently resolves tenant via `getDefaultTenant()`,
+which hard-codes `DEFAULT_TENANT_KEY = "fc-allschwil"`. This is safe while SportClubEvo serves a
+single club, but must be replaced before multi-tenant rollout.
+
+**Required changes:**
+1. Add `tenantId` to `User` model (FK to `Tenant`); assign on user creation.
+2. Include `tenantId` in the JWT (populate in `auth.ts` `authorize` callback).
+3. Include `tenantId` in the session callback so `session.user.tenantId` is available.
+4. Update `requireApiPermission` return type to expose `session.user.tenantId`.
+5. Update `requireAnyPermission` to return `tenantId` alongside the session.
+6. Replace all `getDefaultTenant()` calls in org-unit (and other tenant-sensitive) paths
+   with `getTenantById(session.user.tenantId)`.
+7. Update `getActorContext` callers to pass `session.user.tenantId`.
+8. Remove `DEFAULT_TENANT_KEY` from all tenant-sensitive request paths.
+9. `getDefaultTenant()` may be retained only for legacy/bootstrap paths (e.g. seed scripts).
+
+**Scope:** Auth, session, User model, all tenant-sensitive API routes and server components.
+
+**Prerequisite:** `User.tenantId` must be populated before deploy; a backfill migration is needed.
 
 ---
 
