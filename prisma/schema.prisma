@@ -30,6 +30,7 @@ enum PermissionModule {
   TEMPLATES
   REGISTRATIONS
   TENANTS
+  ORG
 }
 
 enum RegistrationType {

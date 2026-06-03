@@ -120,6 +120,9 @@ async function main() {
 
     { key: "tenants.view", name: "View tenants", module: PermissionModule.TENANTS },
     { key: "tenants.manage", name: "Manage tenants", module: PermissionModule.TENANTS },
+
+    { key: "org.view", name: "View organisations", module: PermissionModule.ORG },
+    { key: "org.manage", name: "Manage organisations", module: PermissionModule.ORG },
   ] as const;
 
   for (const permission of permissions) {

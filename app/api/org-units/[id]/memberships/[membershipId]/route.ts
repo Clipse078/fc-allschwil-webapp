@@ -23,7 +23,7 @@ async function requireOrgUnitForTenant(orgUnitId: string) {
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id, membershipId } = await params;
@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { id, membershipId } = await params;
