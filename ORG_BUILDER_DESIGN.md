@@ -341,6 +341,21 @@ NO
 
 ---
 
+## Slice 11.3 — Team ↔ OrgUnit Linking (Complete, merged STAGE 8e99d22)
+
+- `Team.orgUnitId String?` FK → `OrgUnit.id`, `onDelete: SetNull`.
+- `OrgUnit.teams Team[]` inverse relation added.
+- `getTeamDetailData` now selects `orgUnitId` + `orgUnit { id, name, key, type }`.
+- `getOrgUnitById` now selects `teams[]` with active season context.
+- `/dashboard/teams/[teamId]` shows linked OrgUnit card or empty-state; includes OrgUnit picker in edit form.
+- `/dashboard/org-units/[id]` shows Teams section with linked teams list or empty-state.
+- `PATCH /api/teams/[teamId]` accepts `orgUnitId`, validates against active tenant (403 for cross-tenant, 404 for not-found).
+- Migration `20260603200000_team_orgunit_bridge` applied to STAGE (Neon).
+- Bridge is purely optional — no Team is forced to carry an `orgUnitId`.
+- Hardening note: the 403 for cross-tenant orgUnitId may later be changed to 404 for non-disclosure consistency (currently 404 is used for cross-tenant OrgUnit page access per Slice 11.2, but 403 for PATCH is acceptable for now since it differentiates "not mine" from "not found").
+
+---
+
 ## Roadmap Item: Slice 11.2b — Session Tenant Context
 
 **Goal:** `JWT → tenantId → ActorContext → Queries → APIs`
