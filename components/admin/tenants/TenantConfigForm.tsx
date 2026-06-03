@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Loader2, Upload } from "lucide-react";
 import type { TenantConfig } from "@/lib/tenants/queries";
 import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
+import { ALLOWED_LOGO_MIME_TYPES, MAX_LOGO_FILE_SIZE_BYTES, validateLogoFile } from "@/lib/assets/validation";
 
 type Props = {
   tenantKey: string;
@@ -88,6 +89,55 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Logo upload state — separate from the main form save flow
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Client-side pre-validation (mirrors server validation — no duplication of rules)
+    const validation = validateLogoFile(file);
+    if (!validation.ok) {
+      setUploadError(validation.error);
+      e.target.value = "";
+      return;
+    }
+
+    setUploadError(null);
+    setUploadSuccess(false);
+    setUploadLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/tenants/${tenantKey}/logo`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setUploadError(data?.error ?? "Upload fehlgeschlagen.");
+        return;
+      }
+
+      // Populate the logoUrl text field with the returned server path
+      setLogoUrl(data.logoUrl ?? "");
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 4000);
+    } catch {
+      setUploadError("Netzwerkfehler beim Upload. Bitte erneut versuchen.");
+    } finally {
+      setUploadLoading(false);
+      e.target.value = "";
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -274,7 +324,44 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
             </p>
             <div className={gridClass}>
               <div className="sm:col-span-2">
-                <label htmlFor="cfg-logo-url" className={labelClass}>Logo-URL</label>
+                <label htmlFor="cfg-logo-url" className={labelClass}>Vereinslogo</label>
+
+                {/* Hidden file input — triggered by the upload button */}
+                <input
+                  ref={logoFileInputRef}
+                  id="cfg-logo-file"
+                  type="file"
+                  accept={ALLOWED_LOGO_MIME_TYPES.join(",")}
+                  className="sr-only"
+                  onChange={handleLogoUpload}
+                  aria-label="Logo-Datei auswählen"
+                />
+
+                {/* Upload button */}
+                <div className="mb-2">
+                  <button
+                    type="button"
+                    disabled={uploadLoading}
+                    onClick={() => logoFileInputRef.current?.click()}
+                    className="fca-button-secondary inline-flex items-center gap-2 text-sm"
+                    title={`Erlaubt: JPEG, PNG, SVG, WebP — max. ${MAX_LOGO_FILE_SIZE_BYTES / 1024 / 1024} MB`}
+                  >
+                    {uploadLoading
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <Upload className="h-4 w-4" />}
+                    {uploadLoading ? "Hochladen…" : "Logo hochladen"}
+                  </button>
+                </div>
+
+                {/* Upload feedback */}
+                {uploadError && (
+                  <p className="mb-2 text-[12px] font-medium text-rose-600">{uploadError}</p>
+                )}
+                {uploadSuccess && (
+                  <p className="mb-2 text-[12px] font-medium text-emerald-600">Logo erfolgreich hochgeladen.</p>
+                )}
+
+                {/* Existing URL text field — kept for manual overrides */}
                 <input
                   id="cfg-logo-url"
                   type="text"
@@ -284,7 +371,7 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
                   className="fca-input"
                 />
                 <p className="mt-1 text-[11px] text-[var(--muted)]">
-                  URL oder Pfad zum Vereinslogo (leer = kein Logo konfiguriert).
+                  Datei hochladen (JPEG, PNG, SVG, WebP, max. 2 MB) oder URL/Pfad manuell eingeben.
                 </p>
               </div>
 
