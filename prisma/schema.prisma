@@ -517,15 +517,18 @@ model Team {
   isActive         Boolean      @default(true)
   websiteVisible   Boolean      @default(true)
   infoboardVisible Boolean      @default(true)
+  orgUnitId        String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   teamSeasons     TeamSeason[]
   events          Event[]
   eventImportRuns EventImportRun[]
+  orgUnit         OrgUnit?     @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([category, sortOrder])
   @@index([isActive])
+  @@index([orgUnitId])
 }
 
 model TeamSeason {
@@ -845,6 +848,7 @@ model OrgUnit {
   parent      OrgUnit?            @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   children    OrgUnit[]           @relation("OrgUnitHierarchy")
   memberships OrgUnitMembership[]
+  teams       Team[]
 
   @@unique([tenantId, key])
   @@index([tenantId])

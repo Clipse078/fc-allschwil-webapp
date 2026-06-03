@@ -1,6 +1,6 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Globe, Monitor, Shield, Users } from "lucide-react";
+import { ArrowLeft, Building2, Globe, Monitor, Shield, Users } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -8,6 +8,8 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTeamDetailData } from "@/lib/teams/queries";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
+import { getOrgUnits } from "@/lib/org/queries";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 const CATEGORY_LABELS: Record<string, string> = {
   KINDERFUSSBALL: "Kinderfussball",
@@ -48,9 +50,11 @@ export default async function TeamDetailPage({ params }: Props) {
   const canManage = hasPermission(session, PERMISSIONS.TEAMS_MANAGE);
   const { teamId } = await params;
 
-  const [team, availableSeasons] = await Promise.all([
+  const tenant = await getDefaultTenant();
+  const [team, availableSeasons, availableOrgUnits] = await Promise.all([
     getTeamDetailData(teamId),
     getSeasonOptionsData(),
+    getOrgUnits(tenant?.id),
   ]);
 
   if (!team) {
@@ -143,10 +147,46 @@ export default async function TeamDetailPage({ params }: Props) {
         ) : null}
       </div>
 
+      {/* Organisation unit link */}
+      <div className="sce-detail-section">
+        <div className="sce-detail-section-header">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-[var(--muted)]" />
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+              Organisationseinheit
+            </p>
+          </div>
+        </div>
+        <div className="sce-detail-section-body">
+          {team.orgUnit ? (
+            <Link
+              href={`/dashboard/org-units/${team.orgUnit.id}`}
+              className="inline-flex items-center gap-2 text-sm font-medium text-[var(--blue)] hover:underline"
+            >
+              <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+              {team.orgUnit.name}
+              <code className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0.5 text-[0.72rem] font-mono text-[var(--muted)]">
+                {team.orgUnit.key}
+              </code>
+            </Link>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">
+              No organisation unit linked yet.
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* Management card stack */}
       <TeamDetailCard
         initialTeam={team}
         availableSeasons={availableSeasons}
+        availableOrgUnits={availableOrgUnits.map(ou => ({
+          id: ou.id,
+          name: ou.name,
+          key: ou.key,
+          type: ou.type,
+        }))}
         canManage={canManage}
       />
     </div>
