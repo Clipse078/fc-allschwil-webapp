@@ -283,6 +283,19 @@ model Tenant {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
+  // Config v1 — Slice 10.2
+  // String fields are nullable: no opinionated DB default for white-label safety.
+  // Seed sets explicit values for fc-allschwil. New tenants start with nulls.
+  countryCode           String?
+  sportCategory         String?
+  locale                String?
+  timezone              String?
+  currency              String?
+  // Season integers have a neutral structural default (August 1st European convention).
+  seasonStartMonth      Int    @default(8)
+  seasonTransitionDay   Int    @default(1)
+  seasonTransitionMonth Int    @default(8)
+
   registrations Registration[]
 
   @@index([status])

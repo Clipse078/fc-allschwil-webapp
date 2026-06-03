@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Key } from "lucide-react";
+import { ArrowLeft, CalendarDays, Key, Settings2 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantDetail } from "@/lib/tenants/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TenantForm from "@/components/admin/tenants/TenantForm";
+import TenantConfigForm from "@/components/admin/tenants/TenantConfigForm";
 
 type PageProps = { params: Promise<{ tenantSlug: string }> };
 
@@ -45,6 +46,8 @@ export default async function TenantDetailPage({ params }: PageProps) {
   const updatedAt = new Date(tenant.updatedAt).toLocaleDateString("de-CH", {
     day: "2-digit", month: "long", year: "numeric",
   });
+
+  const isEditable = canManage && tenant.status !== "ARCHIVED";
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -114,8 +117,8 @@ export default async function TenantDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Edit form — only shown when canManage and tenant is not archived */}
-      {canManage && tenant.status !== "ARCHIVED" ? (
+      {/* Core edit form */}
+      {isEditable ? (
         <div>
           <p className="mb-4 text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
             Bearbeiten
@@ -131,6 +134,66 @@ export default async function TenantDetailPage({ params }: PageProps) {
           Dieser Tenant ist archiviert und kann nicht mehr bearbeitet werden.
         </div>
       ) : null}
+
+      {/* Config section */}
+      <div>
+        <div className="mb-4 flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-[var(--muted)]" />
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+            Konfiguration
+          </p>
+        </div>
+        {isEditable ? (
+          <TenantConfigForm
+            tenantKey={tenant.key}
+            defaultValues={{
+              countryCode: tenant.countryCode,
+              sportCategory: tenant.sportCategory,
+              locale: tenant.locale,
+              timezone: tenant.timezone,
+              currency: tenant.currency,
+              seasonStartMonth: tenant.seasonStartMonth,
+              seasonTransitionDay: tenant.seasonTransitionDay,
+              seasonTransitionMonth: tenant.seasonTransitionMonth,
+            }}
+          />
+        ) : (
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-body">
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Land</dt>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.countryCode ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Sportart</dt>
+                  <dd className="mt-0.5 text-sm">{tenant.sportCategory ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Locale</dt>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.locale ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Zeitzone</dt>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.timezone ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Währung</dt>
+                  <dd className="mt-0.5 font-mono text-sm">{tenant.currency ?? <span className="text-[var(--muted)] italic">Nicht konfiguriert</span>}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Saisonbeginn</dt>
+                  <dd className="mt-0.5 text-sm">Monat {tenant.seasonStartMonth}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Saisonübergang</dt>
+                  <dd className="mt-0.5 text-sm">{tenant.seasonTransitionDay}. {tenant.seasonTransitionMonth}.</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
