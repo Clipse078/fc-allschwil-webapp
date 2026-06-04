@@ -176,6 +176,15 @@ export async function PATCH(request: NextRequest, context: Context) {
       return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
     }
 
+    // Surface tenant-isolation validation errors as 400 (client fault, not server fault).
+    if (
+      error instanceof Error &&
+      (error.message.includes("belongs to a different tenant") ||
+        error.message.includes("not found"))
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json(
       { error: "Anmeldung konnte nicht aktualisiert werden." },
       { status: 500 }

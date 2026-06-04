@@ -115,23 +115,27 @@ export async function updateRegistrationStatusForTenant(
   }
 
   if (input.assignedToUserId) {
-    const assignee = await prisma.user.findUnique({
-      where: { id: input.assignedToUserId },
+    // Tenant-scoped: assignee must belong to the same tenant.
+    const assignee = await prisma.user.findFirst({
+      where: { id: input.assignedToUserId, tenantId: tenant.id },
       select: { id: true },
     });
-
     if (!assignee) {
-      throw new Error("Assigned user not found.");
+      throw new Error("Assigned user not found or belongs to a different tenant.");
     }
   }
 
   if (input.targetGroupId) {
-    const targetGroup = await prisma.targetGroup.findUnique({
-      where: { id: input.targetGroupId },
+    // Tenant-scoped: target group must belong to this tenant or be global (tenantId IS NULL).
+    const targetGroup = await prisma.targetGroup.findFirst({
+      where: {
+        id: input.targetGroupId,
+        OR: [{ tenantId: tenant.id }, { tenantId: null }],
+      },
       select: { id: true },
     });
     if (!targetGroup) {
-      throw new Error("Target group not found.");
+      throw new Error("Target group not found or belongs to a different tenant.");
     }
   }
 
