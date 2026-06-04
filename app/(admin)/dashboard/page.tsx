@@ -17,7 +17,8 @@ import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { prisma } from "@/lib/db/prisma";
 import { cn } from "@/lib/cn";
 import { MODULE_DEFINITIONS, type ModuleDefinition } from "@/lib/nav/nav-config";
-import { getCurrentTenantContext } from "@/lib/tenants/context";
+import { getTenantContextFromSession } from "@/lib/tenants/context";
+import { auth } from "@/auth";
 import { formatTime, formatTodayDate, getCurrentSeasonLabel } from "@/lib/tenant-runtime/formatters";
 
 // Icon map for dashboard module cards — keyed on ModuleDefinition.key
@@ -111,10 +112,11 @@ function ModuleCard({
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = (await searchParams) ?? {};
+  const session = await auth();
   const [seasonOptions, kpiData, ctx] = await Promise.all([
     getSeasonOptionsData(),
     getDashboardKpiData(),
-    getCurrentTenantContext(),
+    getTenantContextFromSession(session?.user?.tenantId),
   ]);
 
   const locale = ctx?.locale ?? "de-CH";

@@ -96,3 +96,41 @@ export async function requireCurrentTenantContext(
   }
   return ctx;
 }
+
+/**
+ * Slice 11.2b / Branding: looks up TenantContext by primary key (id).
+ * Faster than getCurrentTenantContext() (PK lookup vs. index scan on key).
+ * Returns null on failure — safe for layouts that have a fallback.
+ */
+export async function getCurrentTenantContextById(
+  id: string,
+): Promise<TenantContext | null> {
+  try {
+    const tenant = await prisma.tenant.findFirst({
+      where: { id, status: "ACTIVE" },
+      select: tenantContextSelect,
+    });
+    return tenant ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Session-aware TenantContext resolver — Branding Runtime Adoption.
+ *
+ * When tenantId is present (Slice 11.2b session users): resolves context by PK
+ * via getCurrentTenantContextById() — no hard-coded key dependency.
+ *
+ * When tenantId is absent (legacy sessions / bootstrap paths): falls back to
+ * getCurrentTenantContext() using the DEFAULT_TENANT_KEY — same behaviour as before.
+ *
+ * Use this in layouts and server components that need the full context including
+ * branding (logoUrl, primaryColor, secondaryColor) and locale/season config.
+ */
+export async function getTenantContextFromSession(
+  tenantId: string | null | undefined,
+): Promise<TenantContext | null> {
+  if (tenantId) return getCurrentTenantContextById(tenantId);
+  return getCurrentTenantContext();
+}

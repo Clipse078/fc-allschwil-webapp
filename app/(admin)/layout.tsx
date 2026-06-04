@@ -6,7 +6,7 @@ import StageEnvironmentBanner from "@/components/admin/deployment/StageEnvironme
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import AppTopNav from "@/components/admin/layout/AppTopNav";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
-import { getCurrentTenantContext } from "@/lib/tenants/context";
+import { getTenantContextFromSession } from "@/lib/tenants/context";
 import { generateTenantCssVars } from "@/lib/tenant-runtime/theme";
 
 type AdminLayoutProps = {
@@ -20,10 +20,12 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
     redirect("/login");
   }
 
-  // Use full tenant context to get both identity (name) and branding config.
+  // Branding runtime adoption (Slice 11.2b): resolve tenant context from session-carried
+  // tenantId instead of the DEFAULT_TENANT_KEY hard-code. Falls back to
+  // getCurrentTenantContext() for legacy sessions where tenantId is not yet in the JWT.
   // generateTenantCssVars() applies PLATFORM_BRANDING defaults when null,
   // so the layout is always safe even if the tenant has no branding configured.
-  const ctx = await getCurrentTenantContext();
+  const ctx = await getTenantContextFromSession(session.user.tenantId);
   const tenantCssVars = generateTenantCssVars(ctx);
 
   return (
