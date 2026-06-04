@@ -10,7 +10,6 @@
  * - generateTenantCssVars() returns a plain Record<string, string>.
  *   Callers apply it however suits their context:
  *     • React inline style prop (cast to React.CSSProperties)
- *     • Serialised to a CSS string for a <style> tag
  * - Does NOT touch the global --blue / --red / --sce-* / --color-brand-* tokens.
  *   Those are fixed SportClubEvo UX tokens defined in globals.css and unchanged.
  * - Does NOT import from prisma or next/server — client-safe.
@@ -67,7 +66,6 @@ export type TenantCssVarName = (typeof TENANT_CSS_VARS)[keyof typeof TENANT_CSS_
  *
  * Returns a plain Record<string, string> suitable for:
  *   • React inline style prop: `style={vars as React.CSSProperties}`
- *   • CSS string via tenantCssVarString()
  *
  * @example
  *   const vars = generateTenantCssVars(ctx);
@@ -83,21 +81,3 @@ export function generateTenantCssVars(
   };
 }
 
-/**
- * Serialises the CSS variable map as a semicolon-delimited inline style string.
- *
- * Useful when you need to inject vars into a raw style attribute or a
- * server-rendered <style> block.
- *
- * @example
- *   tenantCssVarString(ctx)
- *   // "--tenant-primary:#0b4aa2;--tenant-secondary:#c7332c"
- */
-export function tenantCssVarString(
-  cfg: TenantBrandingConfig | null | undefined,
-): string {
-  const vars = generateTenantCssVars(cfg);
-  return Object.entries(vars)
-    .map(([k, v]) => `${k}:${v}`)
-    .join(";");
-}
