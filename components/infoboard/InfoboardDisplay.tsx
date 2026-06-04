@@ -291,10 +291,13 @@ function ScheduleScreen({
   groups,
   loading,
   error,
+  variantBadge,
 }: {
   groups: DayGroup[];
   loading: boolean;
   error: string | null;
+  /** Active plan variant label, e.g. "KW 23 | Schlechtwetter-Wochenplan aktiv" */
+  variantBadge?: string | null;
 }) {
   if (loading) {
     return (
@@ -325,7 +328,18 @@ function ScheduleScreen({
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <div className="space-y-4">
+      {/* Active plan variant banner */}
+      {variantBadge ? (
+        <div className="flex items-center justify-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-5 py-1.5 text-sm font-semibold tracking-wide text-emerald-300">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+            {variantBadge}
+          </span>
+        </div>
+      ) : null}
+
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
       {groups.map((group) => (
         <div key={group.date} className="space-y-3">
           {/* Day header */}
@@ -421,6 +435,7 @@ function ScheduleScreen({
           })}
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -648,12 +663,26 @@ function SponsorScreen() {
 
 // ── Root component ────────────────────────────────────────────────────────────
 
+/** ISO week identifier "YYYY-WN" for the current week. */
+function getCurrentWeekId(): string {
+  const now = new Date();
+  // ISO week: Mon–Sun
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${weekNum}`;
+}
+
 export default function InfoboardDisplay() {
   const [groups, setGroups] = useState<DayGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [activeScreen, setActiveScreen] = useState<ScreenId>("schedule");
+  /** Active variant badge text, e.g. "KW 23 | Schlechtwetter-Wochenplan aktiv" */
+  const [variantBadge, setVariantBadge] = useState<string | null>(null);
 
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const screenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -682,6 +711,20 @@ export default function InfoboardDisplay() {
     }
   }
 
+  async function fetchVariantBadge() {
+    try {
+      const weekId = getCurrentWeekId();
+      const res = await fetch(`/api/public/wochenplan?weekId=${weekId}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setVariantBadge(data?.publication?.variantBadge ?? null);
+    } catch {
+      // Non-critical — badge simply won't show if fetch fails.
+    }
+  }
+
   function advanceScreen() {
     setActiveScreen((current) => {
       const idx = SCREEN_SEQUENCE.indexOf(current);
@@ -691,13 +734,17 @@ export default function InfoboardDisplay() {
 
   useEffect(() => {
     fetchFeed();
+    fetchVariantBadge();
     fetchTimerRef.current = setInterval(fetchFeed, REFRESH_INTERVAL_MS);
+    // Refresh variant badge every 5 minutes (it changes rarely)
+    const variantTimerRef = setInterval(fetchVariantBadge, 5 * 60_000);
 
     screenTimerRef.current = setInterval(advanceScreen, SCREEN_DURATION_MS);
 
     return () => {
       if (fetchTimerRef.current) clearInterval(fetchTimerRef.current);
       if (screenTimerRef.current) clearInterval(screenTimerRef.current);
+      clearInterval(variantTimerRef);
     };
   }, []);
 
@@ -707,7 +754,7 @@ export default function InfoboardDisplay() {
 
       <main className="flex-1 overflow-hidden px-8 py-6">
         {activeScreen === "schedule" && (
-          <ScheduleScreen groups={groups} loading={loading} error={error} />
+          <ScheduleScreen groups={groups} loading={loading} error={error} variantBadge={variantBadge} />
         )}
         {activeScreen === "navigation" && (
           <NavigationScreen groups={groups} loading={loading} />

@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGroupedWochenplan } from "@/lib/events/public-event-feed";
+import { getDefaultTenant } from "@/lib/tenants/queries";
+import {
+  getWochenplanPublication,
+  formatWochenplanVariantBadge,
+} from "@/lib/wochenplan/publication-queries";
+
+// TODO(tenant-isolation/website): resolve tenant from request context (host/subdomain/path)
+// for multi-tenant deployments. Currently defaults to fc-allschwil for the
+// single-tenant kiosk/website setup.
 
 function parseLimit(value: string | null) {
   if (!value) {
@@ -24,6 +33,7 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const limit = parseLimit(searchParams.get("limit"));
+    const weekId = searchParams.get("weekId");
 
     const days = await getGroupedWochenplan({
       seasonKey,
@@ -33,15 +43,43 @@ export async function GET(request: NextRequest) {
       limit,
     });
 
+    // Resolve active variant publication for the requested week.
+    // TODO(tenant-isolation/website): replace with resolveTenantFromRequest(request).
+    let publication: {
+      weekId: string;
+      variantLabel: string;
+      variantBadge: string;
+      isPublished: boolean;
+      publishedAt: Date | null;
+    } | null = null;
+
+    if (weekId) {
+      const tenant = await getDefaultTenant();
+      if (tenant) {
+        const pub = await getWochenplanPublication(tenant.id, weekId);
+        if (pub && pub.isPublished) {
+          publication = {
+            weekId: pub.weekId,
+            variantLabel: pub.variantLabel,
+            variantBadge: formatWochenplanVariantBadge(pub.weekId, pub.variantLabel),
+            isPublished: pub.isPublished,
+            publishedAt: pub.publishedAt,
+          };
+        }
+      }
+    }
+
     return NextResponse.json({
       countDays: days.length,
       countEvents: days.reduce((sum, day) => sum + day.events.length, 0),
+      publication,
       filters: {
         seasonKey,
         teamSlug,
         dateFrom,
         dateTo,
         limit,
+        weekId,
       },
       days,
     });
