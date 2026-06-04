@@ -204,6 +204,14 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/dashboard/target-groups" || pathname.startsWith("/dashboard/target-groups/")) {
+    return {
+      eyebrow: "Organisation",
+      title: "Zielgruppen",
+      description: "Benannte, wiederverwendbare Gruppen für Sichtbarkeit, Kommunikation und Workflow-Routing.",
+    };
+  }
+
   if (pathname === "/dashboard/users" || pathname.startsWith("/dashboard/users/")) {
     return {
       eyebrow: "Benutzer & Rechte",

@@ -64,6 +64,7 @@ function getNavIcon(label: string) {
     case "Spieler":         return UserRound;
     case "Trainer":         return BadgeIcon;
     case "Organisation":    return Building2;
+    case "Zielgruppen":     return Target;
     case "Benutzer":        return Shield;
     default:                return LayoutDashboard;
   }

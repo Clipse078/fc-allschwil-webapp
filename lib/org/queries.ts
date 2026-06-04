@@ -134,4 +134,45 @@ export async function loadOrgUnitIds(userId: string, tenantId?: string): Promise
 }
 
 export type OrgUnitListItem = Awaited<ReturnType<typeof getOrgUnits>>[number];
+
+// ── TargetGroup queries ───────────────────────────────────────────────────────
+
+export async function getTargetGroups(tenantId?: string) {
+  return prisma.targetGroup.findMany({
+    where: {
+      status: { not: "ARCHIVED" },
+      ...(tenantId ? { tenantId } : {}),
+    },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      description: true,
+      status: true,
+      ruleJson: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
+export async function getTargetGroupById(id: string) {
+  return prisma.targetGroup.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      tenantId: true,
+      key: true,
+      name: true,
+      description: true,
+      status: true,
+      ruleJson: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
+export type TargetGroupListItem = Awaited<ReturnType<typeof getTargetGroups>>[number];
 export type OrgUnitDetail = Awaited<ReturnType<typeof getOrgUnitById>>;

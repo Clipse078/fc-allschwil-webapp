@@ -884,7 +884,9 @@ model OrgUnitMembership {
 model TargetGroup {
   id          String        @id @default(cuid())
   tenantId    String?
-  key         String        @unique
+  // key is tenant-scoped unique (@@unique below); no longer globally unique.
+  // Slice 11.6: global @unique removed to enable same key across tenants.
+  key         String
   name        String
   description String?
   status      OrgUnitStatus @default(ACTIVE)
@@ -892,7 +894,7 @@ model TargetGroup {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  @@index([tenantId])
+  @@unique([tenantId, key])
   @@index([status])
 }
 
