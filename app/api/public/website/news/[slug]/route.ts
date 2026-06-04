@@ -12,6 +12,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveTenantFromRequest } from "@/lib/tenants/resolve-from-request";
 import { getPublishedNewsPostBySlug } from "@/lib/website/news-queries";
+import { addCorsHeaders, handleCorsPreflightPublic } from "@/lib/api/cors";
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsPreflightPublic(request) ?? new NextResponse(null, { status: 204 });
+}
 
 type RouteParams = { params: Promise<{ slug: string }> };
 
@@ -29,15 +34,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const article = await getPublishedNewsPostBySlug(tenant.id, slug);
     if (!article) {
-      return NextResponse.json({ error: "Artikel nicht gefunden." }, { status: 404 });
+      return addCorsHeaders(
+        NextResponse.json({ error: "Artikel nicht gefunden." }, { status: 404 }),
+        request,
+      );
     }
 
-    return NextResponse.json({ article });
+    return addCorsHeaders(NextResponse.json({ article }), request);
   } catch (error) {
     console.error("Public website news article failed:", error);
-    return NextResponse.json(
-      { error: "Artikel konnte nicht geladen werden." },
-      { status: 500 },
+    return addCorsHeaders(
+      NextResponse.json(
+        { error: "Artikel konnte nicht geladen werden." },
+        { status: 500 },
+      ),
+      request,
     );
   }
 }

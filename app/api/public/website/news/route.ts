@@ -16,6 +16,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveTenantFromRequest } from "@/lib/tenants/resolve-from-request";
 import { getPublishedNewsPosts } from "@/lib/website/news-queries";
+import { addCorsHeaders, handleCorsPreflightPublic } from "@/lib/api/cors";
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsPreflightPublic(request) ?? new NextResponse(null, { status: 204 });
+}
 
 function parseIntParam(value: string | null, def: number, max: number): number {
   if (!value) return def;
@@ -37,17 +42,21 @@ export async function GET(request: NextRequest) {
 
     const articles = await getPublishedNewsPosts(tenant.id, { limit, offset });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       total: articles.length,
       limit,
       offset,
       articles,
     });
+    return addCorsHeaders(response, request);
   } catch (error) {
     console.error("Public website news feed failed:", error);
-    return NextResponse.json(
-      { error: "News Feed konnte nicht geladen werden." },
-      { status: 500 },
+    return addCorsHeaders(
+      NextResponse.json(
+        { error: "News Feed konnte nicht geladen werden." },
+        { status: 500 },
+      ),
+      request,
     );
   }
 }

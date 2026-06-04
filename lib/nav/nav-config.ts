@@ -122,6 +122,12 @@ export const NAV_SECTIONS: NavSection[] = [
             href: "/dashboard/admin/website",
             permissionKeys: [PERMISSIONS.WEBSITE_MANAGE, PERMISSIONS.NEWS_MANAGE],
           },
+          {
+            key: "admin-website-config",
+            label: "Website-Einstellungen",
+            href: "/dashboard/admin/website/config",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
         ],
       },
     ],

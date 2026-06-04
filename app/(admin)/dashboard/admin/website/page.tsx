@@ -75,21 +75,24 @@ export default async function WebsiteOverviewPage() {
           </span>
         </Link>
 
-        <div className="fca-card flex flex-col gap-4 p-6 opacity-60">
+        <Link
+          href="/dashboard/admin/website/config"
+          className="fca-card group flex flex-col gap-4 p-6 transition-shadow hover:shadow-md"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
-            <Settings className="h-5 w-5 text-slate-400" />
+            <Settings className="h-5 w-5 text-slate-500" />
           </div>
           <div>
             <h3 className="fca-subheading">Website-Einstellungen</h3>
             <p className="mt-1 text-[0.78rem] text-[var(--muted)]">
-              Navigation, Kontaktdaten, Social-Media-Links und weitere
-              Website-Konfiguration. (Folgt in nächstem Release)
+              Tagline, Kontaktdaten, Adresse und Social-Media-Links konfigurieren.
+              Wird von der öffentlichen Website über die API abgerufen.
             </p>
           </div>
-          <span className="mt-auto text-[0.72rem] font-semibold text-slate-400">
-            Demnächst verfügbar
+          <span className="mt-auto text-[0.72rem] font-semibold text-[var(--blue)] group-hover:underline">
+            Einstellungen konfigurieren →
           </span>
-        </div>
+        </Link>
 
         <div className="fca-card flex flex-col gap-4 p-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">

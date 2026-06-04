@@ -333,6 +333,7 @@ model Tenant {
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
   newsPosts              NewsPost[]
+  websiteConfig          WebsiteConfig?
 
   @@index([status])
   @@index([name])
@@ -1244,4 +1245,42 @@ model NewsPost {
   @@unique([tenantId, slug])
   @@index([tenantId, isPublished])
   @@index([tenantId, publishedAt])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteConfig — Per-Tenant Website Settings
+//
+// Stores website-specific configuration for the public FC Allschwil website:
+// hero tagline, contact details, social media links, SEO meta.
+// One record per Tenant (1:1). Created on first save by the admin.
+// ---------------------------------------------------------------------------
+
+model WebsiteConfig {
+  id              String  @id @default(cuid())
+  tenantId        String  @unique
+
+  // Identity / SEO
+  websiteTitle       String?
+  websiteDescription String?
+  heroTagline        String?
+
+  // Contact
+  contactEmail   String?
+  contactPhone   String?
+  addressStreet  String?
+  addressCity    String?
+  addressCountry String?
+  googleMapsUrl  String?
+
+  // Social media
+  facebookUrl    String?
+  instagramUrl   String?
+  youtubeUrl     String?
+  twitterUrl     String?
+  tiktokUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
