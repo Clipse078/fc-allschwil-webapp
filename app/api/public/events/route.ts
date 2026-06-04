@@ -4,6 +4,10 @@ import {
   type PublicEventSurface,
 } from "@/lib/events/public-event-feed";
 
+// TODO(tenant-isolation): Public events feed is currently not tenant-scoped.
+// See app/api/public/infoboard/route.ts for the full tracking note.
+// When multi-tenant public websites go live, add tenant resolution here too.
+
 const ALLOWED_SURFACES: PublicEventSurface[] = [
   "all",
   "homepage",
@@ -50,7 +54,7 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get("dateTo");
     const limit = parseLimit(searchParams.get("limit"));
 
-    const events = await getPublicEvents({
+    const rawEvents = await getPublicEvents({
       surface,
       seasonKey,
       teamSlug,
@@ -58,6 +62,14 @@ export async function GET(request: NextRequest) {
       dateTo,
       limit,
     });
+
+    // Strip internal allocation codes — raw codes are not for public consumption.
+    // Callers that need display labels should use /api/public/infoboard or call
+    // getInfoboardFeed() which resolves codes → human-readable labels.
+    const events = rawEvents.map(
+      ({ pitchCode: _p, homeDressingRoomCode: _h, awayDressingRoomCode: _a, ...rest }) =>
+        rest,
+    );
 
     return NextResponse.json({
       surface,

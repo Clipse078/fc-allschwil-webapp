@@ -1,4 +1,5 @@
 ﻿import { prisma } from "@/lib/db/prisma";
+import { getEventAllocationDisplay } from "@/lib/facilities/display-helpers";
 
 export type PublicEventSurface =
   | "all"
@@ -42,6 +43,10 @@ export type PublicEventItem = {
     teamPage: boolean;
   };
   remarks: string | null;
+  /** Allocation codes — null when not assigned. Raw codes, not display labels. */
+  pitchCode: string | null;
+  homeDressingRoomCode: string | null;
+  awayDressingRoomCode: string | null;
   season: {
     id: string;
     key: string;
@@ -84,6 +89,9 @@ type PublicEventQueryRow = {
   trainingsplanVisible: boolean;
   teamPageVisible: boolean;
   remarks: string | null;
+  pitchCode: string | null;
+  homeDressingRoomCode: string | null;
+  awayDressingRoomCode: string | null;
   season: {
     id: string;
     key: string;
@@ -153,6 +161,9 @@ function toPublicEventItem(event: PublicEventQueryRow): PublicEventItem {
       teamPage: event.teamPageVisible,
     },
     remarks: event.remarks,
+    pitchCode: event.pitchCode,
+    homeDressingRoomCode: event.homeDressingRoomCode,
+    awayDressingRoomCode: event.awayDressingRoomCode,
     season: event.season,
     team: event.team,
   };
@@ -225,6 +236,9 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
       trainingsplanVisible: true,
       teamPageVisible: true,
       remarks: true,
+      pitchCode: true,
+      homeDressingRoomCode: true,
+      awayDressingRoomCode: true,
       season: {
         select: {
           id: true,
@@ -305,23 +319,35 @@ export async function getInfoboardFeed(input: Omit<GetPublicEventsInput, "surfac
     surface: "infoboard",
   });
 
-  return events.map((event) => ({
-    id: event.id,
-    type: event.type,
-    title: event.title,
-    teamName: event.team?.name ?? null,
-    teamSlug: event.team?.slug ?? null,
-    opponentName: event.opponentName,
-    organizerName: event.organizerName,
-    competitionLabel: event.competitionLabel,
-    homeAway: event.homeAway,
-    location: event.location,
-    startAt: event.startAt,
-    endAt: event.endAt,
-    meetingTime: event.meetingTime,
-    resultLabel: event.resultLabel,
-    status: event.status,
-    seasonKey: event.season.key,
-    seasonName: event.season.name,
-  }));
+  return events.map((event) => {
+    const allocation = getEventAllocationDisplay({
+      type: event.type,
+      pitchCode: event.pitchCode,
+      homeDressingRoomCode: event.homeDressingRoomCode,
+      awayDressingRoomCode: event.awayDressingRoomCode,
+    });
+
+    return {
+      id: event.id,
+      type: event.type,
+      title: event.title,
+      teamName: event.team?.name ?? null,
+      teamSlug: event.team?.slug ?? null,
+      opponentName: event.opponentName,
+      organizerName: event.organizerName,
+      competitionLabel: event.competitionLabel,
+      homeAway: event.homeAway,
+      location: event.location,
+      startAt: event.startAt,
+      endAt: event.endAt,
+      meetingTime: event.meetingTime,
+      resultLabel: event.resultLabel,
+      status: event.status,
+      seasonKey: event.season.key,
+      seasonName: event.season.name,
+      pitchLabel: allocation.pitchLabel,
+      homeDressingRoomLabel: allocation.homeDressingRoomLabel,
+      awayDressingRoomLabel: allocation.awayDressingRoomLabel,
+    };
+  });
 }
