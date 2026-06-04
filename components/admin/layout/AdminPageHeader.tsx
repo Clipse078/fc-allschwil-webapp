@@ -212,6 +212,14 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/dashboard/admin/branding") {
+    return {
+      eyebrow: "Admin",
+      title: "Darstellung",
+      description: "Logo und Vereinsfarben konfigurieren — wirkt sofort auf alle Branding-Oberflächen.",
+    };
+  }
+
   if (pathname === "/dashboard/users" || pathname.startsWith("/dashboard/users/")) {
     return {
       eyebrow: "Benutzer & Rechte",

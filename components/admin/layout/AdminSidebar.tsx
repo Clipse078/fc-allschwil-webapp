@@ -16,6 +16,7 @@ import {
   FileText,
   Flag,
   LayoutDashboard,
+  Palette,
   ScrollText,
   Settings2,
   Shield,
@@ -65,6 +66,7 @@ function getNavIcon(label: string) {
     case "Trainer":         return BadgeIcon;
     case "Organisation":    return Building2;
     case "Zielgruppen":     return Target;
+    case "Darstellung":     return Palette;
     case "Benutzer":        return Shield;
     default:                return LayoutDashboard;
   }
