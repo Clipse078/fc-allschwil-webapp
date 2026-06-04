@@ -160,6 +160,17 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    sectionLabel: "Vereinsverwaltung",
+    items: [
+      {
+        key: "registrations",
+        label: "Registrierungen",
+        href: "/dashboard/registrations",
+        permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+      },
+    ],
+  },
+  {
     sectionLabel: "Spielbetrieb",
     items: [
       {

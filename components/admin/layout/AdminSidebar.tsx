@@ -15,6 +15,7 @@ import {
   ClipboardList,
   FileText,
   Flag,
+  Inbox,
   LayoutDashboard,
   Palette,
   ScrollText,
@@ -68,6 +69,7 @@ function getNavIcon(label: string) {
     case "Zielgruppen":     return Target;
     case "Darstellung":     return Palette;
     case "Benutzer":        return Shield;
+    case "Registrierungen": return Inbox;
     default:                return LayoutDashboard;
   }
 }

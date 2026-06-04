@@ -68,25 +68,42 @@ export async function PATCH(request: NextRequest, context: Context) {
     const { tenantSlug, registrationId } = await context.params;
     const body = await request.json();
 
-    // Phase 1: assignment changes are deferred to Phase 2 — reject any attempt here.
-    if ("assignedToUserId" in body) {
-      return NextResponse.json(
-        { error: "Zuweisung kann in Phase 1 nicht geaendert werden." },
-        { status: 400 }
-      );
-    }
-
-    const data: { status?: RegistrationStatus } = {};
+    const data: {
+      status?: RegistrationStatus;
+      assignedToUserId?: string | null;
+      targetGroupId?: string | null;
+    } = {};
 
     if ("status" in body) {
       if (!isRegistrationStatus(body.status)) {
         return NextResponse.json({ error: "Ungueltiger Status." }, { status: 400 });
       }
-
       data.status = body.status;
     }
 
-    if (!("status" in data)) {
+    if ("assignedToUserId" in body) {
+      const val = body.assignedToUserId;
+      if (val !== null && typeof val !== "string") {
+        return NextResponse.json(
+          { error: "assignedToUserId muss ein String oder null sein." },
+          { status: 400 }
+        );
+      }
+      data.assignedToUserId = val;
+    }
+
+    if ("targetGroupId" in body) {
+      const val = body.targetGroupId;
+      if (val !== null && typeof val !== "string") {
+        return NextResponse.json(
+          { error: "targetGroupId muss ein String oder null sein." },
+          { status: 400 }
+        );
+      }
+      data.targetGroupId = val;
+    }
+
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "Keine unterstuetzte Aenderung uebergeben." },
         { status: 400 }
@@ -119,6 +136,32 @@ export async function PATCH(request: NextRequest, context: Context) {
       });
     }
 
+    if (before.assignedToUserId !== registration.assignedToUserId) {
+      void logAction({
+        actorUserId: actorId,
+        moduleKey: "registrations",
+        entityType: "Registration",
+        entityId: registration.id,
+        action: "ASSIGNMENT_CHANGE",
+        beforeJson: { assignedToUserId: before.assignedToUserId },
+        afterJson: { assignedToUserId: registration.assignedToUserId },
+        metadataJson: { tenantSlug },
+      });
+    }
+
+    if (before.targetGroupId !== registration.targetGroupId) {
+      void logAction({
+        actorUserId: actorId,
+        moduleKey: "registrations",
+        entityType: "Registration",
+        entityId: registration.id,
+        action: "TARGET_GROUP_CHANGE",
+        beforeJson: { targetGroupId: before.targetGroupId },
+        afterJson: { targetGroupId: registration.targetGroupId },
+        metadataJson: { tenantSlug },
+      });
+    }
+
     revalidatePath(`/tenant/${tenantSlug}/cockpit/registrations`);
     revalidatePath(`/tenant/${tenantSlug}/cockpit/registrations/${registration.id}`);
 
@@ -131,6 +174,15 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     if (error instanceof Error && error.message.startsWith("Active tenant not found")) {
       return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
+    }
+
+    // Surface tenant-isolation validation errors as 400 (client fault, not server fault).
+    if (
+      error instanceof Error &&
+      (error.message.includes("belongs to a different tenant") ||
+        error.message.includes("not found"))
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json(

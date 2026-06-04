@@ -16,6 +16,7 @@ const registrationSelect = {
   payloadJson: true,
   source: true,
   assignedToUserId: true,
+  targetGroupId: true,
   submittedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -34,6 +35,13 @@ const registrationSelect = {
       email: true,
     },
   },
+  targetGroup: {
+    select: {
+      id: true,
+      key: true,
+      name: true,
+    },
+  },
 } satisfies Prisma.RegistrationSelect;
 
 type RegistrationRecord = Prisma.RegistrationGetPayload<{
@@ -43,6 +51,7 @@ type RegistrationRecord = Prisma.RegistrationGetPayload<{
 type UpdateRegistrationInput = {
   status?: RegistrationStatus;
   assignedToUserId?: string | null;
+  targetGroupId?: string | null;
 };
 
 function serializeRegistration(registration: RegistrationRecord) {
@@ -106,13 +115,27 @@ export async function updateRegistrationStatusForTenant(
   }
 
   if (input.assignedToUserId) {
-    const assignee = await prisma.user.findUnique({
-      where: { id: input.assignedToUserId },
+    // Tenant-scoped: assignee must belong to the same tenant.
+    const assignee = await prisma.user.findFirst({
+      where: { id: input.assignedToUserId, tenantId: tenant.id },
       select: { id: true },
     });
-
     if (!assignee) {
-      throw new Error("Assigned user not found.");
+      throw new Error("Assigned user not found or belongs to a different tenant.");
+    }
+  }
+
+  if (input.targetGroupId) {
+    // Tenant-scoped: target group must belong to this tenant or be global (tenantId IS NULL).
+    const targetGroup = await prisma.targetGroup.findFirst({
+      where: {
+        id: input.targetGroupId,
+        OR: [{ tenantId: tenant.id }, { tenantId: null }],
+      },
+      select: { id: true },
+    });
+    if (!targetGroup) {
+      throw new Error("Target group not found or belongs to a different tenant.");
     }
   }
 
@@ -126,6 +149,8 @@ export async function updateRegistrationStatusForTenant(
         input.assignedToUserId === undefined
           ? undefined
           : input.assignedToUserId,
+      targetGroupId:
+        input.targetGroupId === undefined ? undefined : input.targetGroupId,
     },
     select: registrationSelect,
   });
