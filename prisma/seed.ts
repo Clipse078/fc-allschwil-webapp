@@ -2,6 +2,8 @@ import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
+  FacilityResourceType,
+  FacilityType,
   PermissionModule,
   PrismaClient,
   TenantStatus,
@@ -123,6 +125,9 @@ async function main() {
 
     { key: "org.view", name: "View organisations", module: PermissionModule.ORG },
     { key: "org.manage", name: "Manage organisations", module: PermissionModule.ORG },
+
+    { key: "facilities.view", name: "View facilities & resources", module: PermissionModule.FACILITIES },
+    { key: "facilities.manage", name: "Manage facilities & resources", module: PermissionModule.FACILITIES },
   ] as const;
 
   for (const permission of permissions) {
@@ -168,6 +173,8 @@ async function main() {
         "fixtures.publish_infoboard",
         "wochenplan.manage",
         "infoboard.manage",
+        "facilities.view",
+        "facilities.manage",
       ],
     },
     {
@@ -210,6 +217,7 @@ async function main() {
         "people.view",
         "events.view",
         "fixtures.view",
+        "facilities.view",
       ],
     },
   ] as const;
@@ -298,6 +306,104 @@ async function main() {
         isActive: seasonData.isActive,
       },
     });
+  }
+
+  // ── FC Allschwil: Facility & Resource defaults ──────────────────────────────
+  // Seeds the canonical FCA pitch and dressing-room configuration into the DB.
+  // Display helpers first check these tenant-scoped records before falling back
+  // to the static FCA registries in lib/facilities/pitches.ts and dressing-rooms.ts.
+  const fcaTenant = await prisma.tenant.findUnique({ where: { key: "fc-allschwil" }, select: { id: true } });
+
+  if (fcaTenant) {
+    const facilitySeedData: Array<{
+      name: string;
+      type: FacilityType;
+      sortOrder: number;
+      resources: Array<{ name: string; code: string; type: FacilityResourceType; sortOrder: number }>;
+    }> = [
+      {
+        name: "Hauptplatz",
+        type: FacilityType.PITCH,
+        sortOrder: 10,
+        resources: [
+          { name: "Hauptplatz", code: "STADION", type: FacilityResourceType.FULL_PITCH, sortOrder: 10 },
+          { name: "Hauptplatz A", code: "STADION_A", type: FacilityResourceType.HALF_PITCH, sortOrder: 20 },
+          { name: "Hauptplatz B", code: "STADION_B", type: FacilityResourceType.HALF_PITCH, sortOrder: 30 },
+        ],
+      },
+      {
+        name: "Kunstrasen 2",
+        type: FacilityType.PITCH,
+        sortOrder: 20,
+        resources: [
+          { name: "Kunstrasen 2", code: "KUNSTRASEN_2", type: FacilityResourceType.FULL_PITCH, sortOrder: 10 },
+          { name: "Kunstrasen 2 A", code: "KUNSTRASEN_2_A", type: FacilityResourceType.HALF_PITCH, sortOrder: 20 },
+          { name: "Kunstrasen 2 B", code: "KUNSTRASEN_2_B", type: FacilityResourceType.HALF_PITCH, sortOrder: 30 },
+        ],
+      },
+      {
+        name: "Kunstrasen 3",
+        type: FacilityType.PITCH,
+        sortOrder: 30,
+        resources: [
+          { name: "Kunstrasen 3", code: "KUNSTRASEN_3", type: FacilityResourceType.FULL_PITCH, sortOrder: 10 },
+          { name: "Kunstrasen 3 A", code: "KUNSTRASEN_3_A", type: FacilityResourceType.HALF_PITCH, sortOrder: 20 },
+          { name: "Kunstrasen 3 B", code: "KUNSTRASEN_3_B", type: FacilityResourceType.HALF_PITCH, sortOrder: 30 },
+        ],
+      },
+      {
+        name: "Garderoben",
+        type: FacilityType.DRESSING_ROOM_BLOCK,
+        sortOrder: 40,
+        resources: [
+          { name: "E1", code: "E1", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 10 },
+          { name: "E2", code: "E2", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 20 },
+          { name: "E3", code: "E3", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 30 },
+          { name: "E4", code: "E4", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 40 },
+          { name: "O1", code: "O1", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 50 },
+          { name: "O2", code: "O2", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 60 },
+          { name: "O3", code: "O3", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 70 },
+          { name: "O4", code: "O4", type: FacilityResourceType.DRESSING_ROOM, sortOrder: 80 },
+        ],
+      },
+    ];
+
+    for (const facilityDef of facilitySeedData) {
+      // Upsert by (tenantId, name) — safe to re-run
+      const existing = await prisma.facility.findFirst({
+        where: { tenantId: fcaTenant.id, name: facilityDef.name },
+        select: { id: true },
+      });
+
+      const facility = existing
+        ? await prisma.facility.update({
+            where: { id: existing.id },
+            data: { type: facilityDef.type, sortOrder: facilityDef.sortOrder },
+          })
+        : await prisma.facility.create({
+            data: {
+              tenantId: fcaTenant.id,
+              name: facilityDef.name,
+              type: facilityDef.type,
+              sortOrder: facilityDef.sortOrder,
+            },
+          });
+
+      for (const resourceDef of facilityDef.resources) {
+        await prisma.facilityResource.upsert({
+          where: { tenantId_code: { tenantId: fcaTenant.id, code: resourceDef.code } },
+          update: { name: resourceDef.name, type: resourceDef.type, sortOrder: resourceDef.sortOrder, facilityId: facility.id },
+          create: {
+            tenantId: fcaTenant.id,
+            facilityId: facility.id,
+            name: resourceDef.name,
+            code: resourceDef.code,
+            type: resourceDef.type,
+            sortOrder: resourceDef.sortOrder,
+          },
+        });
+      }
+    }
   }
 
   console.log("Seed finished successfully.");

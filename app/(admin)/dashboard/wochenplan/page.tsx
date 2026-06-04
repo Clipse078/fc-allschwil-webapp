@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import { getWeekWindow, getIsoWeekNumber, startOfIsoWeek } from "@/lib/planner/date-utils";
+import { getWochenplanPitchRowLabels } from "@/lib/facilities/queries";
+import type { WochenplanBoardPitchRowKey } from "@/lib/wochenplan/types";
 
 type PageProps = {
   searchParams: Promise<{ week?: string }>;
@@ -19,6 +21,15 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
 
   // Load real events from DB for this week (scoped to actor's tenant)
   const boardData = await getWochenplanBoardData(start, end, weekId, tenantId);
+
+  // Resolve pitch row labels via the canonical facility/resource display helper.
+  // Falls back to static FCA labels when no tenant-configured records exist.
+  const defaultPitchRows: Array<{ key: WochenplanBoardPitchRowKey; label: string }> = [
+    { key: "STADION", label: "Stadion" },
+    { key: "KUNSTRASEN_2", label: "KR 2" },
+    { key: "KUNSTRASEN_3", label: "KR 3" },
+  ];
+  const pitchRows = await getWochenplanPitchRowLabels(tenantId, defaultPitchRows);
 
   const weekNumber = getIsoWeekNumber(start);
   const weekYear = startOfIsoWeek(start).getUTCFullYear();
@@ -111,8 +122,12 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         </div>
       ) : null}
 
-      {/* Real-data board */}
-      <WochenplanBoard initialEvents={boardData.placed} weekId={weekId} />
+      {/* Real-data board — pitch row labels resolved via canonical display helper */}
+      <WochenplanBoard
+        initialEvents={boardData.placed}
+        weekId={weekId}
+        pitchRows={pitchRows}
+      />
     </div>
   );
 }

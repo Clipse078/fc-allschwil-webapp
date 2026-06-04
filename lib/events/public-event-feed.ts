@@ -1,5 +1,5 @@
-﻿import { prisma } from "@/lib/db/prisma";
-import { getEventAllocationDisplay } from "@/lib/facilities/display-helpers";
+import { prisma } from "@/lib/db/prisma";
+import { batchGetEventAllocationDisplayForTenant } from "@/lib/facilities/display-helpers";
 
 export type PublicEventSurface =
   | "all"
@@ -313,20 +313,30 @@ export async function getGroupedWochenplan(input: Omit<GetPublicEventsInput, "su
   return Array.from(grouped.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export async function getInfoboardFeed(input: Omit<GetPublicEventsInput, "surface">) {
+export type GetInfoboardFeedInput = Omit<GetPublicEventsInput, "surface"> & {
+  /** Tenant ID for facility/resource label resolution. Falls back to static FCA registry when absent. */
+  tenantId?: string | null;
+};
+
+export async function getInfoboardFeed(input: GetInfoboardFeedInput) {
   const events = await getPublicEvents({
     ...input,
     surface: "infoboard",
   });
 
-  return events.map((event) => {
-    const allocation = getEventAllocationDisplay({
-      type: event.type,
-      pitchCode: event.pitchCode,
-      homeDressingRoomCode: event.homeDressingRoomCode,
-      awayDressingRoomCode: event.awayDressingRoomCode,
-    });
+  // Batch-resolve all allocation labels in a single DB round-trip.
+  const allocations = await batchGetEventAllocationDisplayForTenant(
+    events.map((e) => ({
+      type: e.type,
+      pitchCode: e.pitchCode,
+      homeDressingRoomCode: e.homeDressingRoomCode,
+      awayDressingRoomCode: e.awayDressingRoomCode,
+    })),
+    input.tenantId,
+  );
 
+  return events.map((event, index) => {
+    const allocation = allocations[index]!;
     return {
       id: event.id,
       type: event.type,

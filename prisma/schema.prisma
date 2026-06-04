@@ -31,6 +31,27 @@ enum PermissionModule {
   REGISTRATIONS
   TENANTS
   ORG
+  FACILITIES
+}
+
+enum FacilityType {
+  PITCH
+  DRESSING_ROOM_BLOCK
+  INDOOR_HALL
+  OTHER
+}
+
+enum FacilityResourceType {
+  FULL_PITCH
+  HALF_PITCH
+  DRESSING_ROOM
+  OTHER
+}
+
+enum FacilityStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
 }
 
 enum RegistrationType {
@@ -305,9 +326,11 @@ model Tenant {
   primaryColor   String?
   secondaryColor String?
 
-  registrations Registration[]
-  users         User[]
-  events        Event[]
+  registrations      Registration[]
+  users              User[]
+  events             Event[]
+  facilities         Facility[]
+  facilityResources  FacilityResource[]
 
   @@index([status])
   @@index([name])
@@ -1104,4 +1127,56 @@ model TargetDataPoint {
 
   @@index([metricId])
   @@index([measuredAt])
+}
+
+// ---------------------------------------------------------------------------
+// Facilities & Resources — Admin → Facilities & Resources MVP
+//
+// Tenant-scoped configurable facilities (pitches, dressing room blocks, halls)
+// and their allocatable resources (full pitch, half A/B, individual dressing rooms).
+//
+// Display helpers in lib/facilities/display-helpers.ts resolve allocation codes
+// to labels by checking tenant-configured resources first, then falling back to
+// the FCA static registries in lib/facilities/pitches.ts and dressing-rooms.ts.
+//
+// TODO(tenant-isolation/website): Public domain resolution
+//   resolveTenantFromRequest(request) → tenant-scoped facility/resource lookup
+//   Required before multi-tenant public websites can show per-tenant facility labels.
+// ---------------------------------------------------------------------------
+
+model Facility {
+  id        String         @id @default(cuid())
+  tenantId  String
+  name      String
+  type      FacilityType   @default(OTHER)
+  status    FacilityStatus @default(ACTIVE)
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  resources FacilityResource[]
+
+  @@index([tenantId])
+  @@index([tenantId, sortOrder])
+}
+
+model FacilityResource {
+  id         String               @id @default(cuid())
+  tenantId   String
+  facilityId String
+  name       String
+  code       String
+  type       FacilityResourceType @default(OTHER)
+  status     FacilityStatus       @default(ACTIVE)
+  sortOrder  Int                  @default(0)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([facilityId])
 }
