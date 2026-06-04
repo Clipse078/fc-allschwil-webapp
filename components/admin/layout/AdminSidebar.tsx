@@ -17,6 +17,7 @@ import {
   Flag,
   Inbox,
   LayoutDashboard,
+  Monitor,
   Palette,
   ScrollText,
   Settings2,
@@ -70,6 +71,7 @@ function getNavIcon(label: string) {
     case "Darstellung":     return Palette;
     case "Benutzer":        return Shield;
     case "Registrierungen": return Inbox;
+    case "Infoboard":       return Monitor;
     default:                return LayoutDashboard;
   }
 }
