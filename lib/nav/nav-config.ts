@@ -155,6 +155,12 @@ export const NAV_SECTIONS: NavSection[] = [
             href: "/dashboard/planner/day",
             permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
           },
+          {
+            key: "feldplanung",
+            label: "Feld-/Garderobenplanung",
+            href: "/dashboard/wochenplan",
+            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+          },
         ],
       },
     ],

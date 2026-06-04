@@ -10,6 +10,7 @@ import WochenplanRoomDayPlannerDialog, {
 } from "@/components/admin/wochenplan/WochenplanRoomDayPlannerDialog";
 import WochenplanRoomDrawer from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 import { getWochenplanConflicts } from "@/lib/wochenplan/conflict-engine";
+import { parseIsoWeekId } from "@/lib/planner/date-utils";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -55,16 +56,25 @@ function getSlotStartHour(slotKey: WochenplanBoardSlotKey) {
   return { hour: 20, minute: 15, endHour: 21, endMinute: 45 };
 }
 
-function getBoardDate(dayKey: WochenplanBoardDayKey) {
-  if (dayKey === "MONDAY") return "2026-04-13";
-  if (dayKey === "TUESDAY") return "2026-04-14";
-  if (dayKey === "WEDNESDAY") return "2026-04-15";
-  if (dayKey === "THURSDAY") return "2026-04-16";
-  return "2026-04-17";
+function getBoardDate(dayKey: WochenplanBoardDayKey, weekStart: Date | null): string {
+  // If no weekStart is available, fall back to a known Monday.
+  const base = weekStart ?? new Date("2026-04-13T00:00:00.000Z");
+  const DAY_OFFSET: Record<WochenplanBoardDayKey, number> = {
+    MONDAY: 0,
+    TUESDAY: 1,
+    WEDNESDAY: 2,
+    THURSDAY: 3,
+    FRIDAY: 4,
+  };
+  const d = new Date(base.getTime() + DAY_OFFSET[dayKey] * 86400000);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-function formatBoardDayLabel(dayKey: WochenplanBoardDayKey, dayLabel: string) {
-  const date = new Date(getBoardDate(dayKey) + "T12:00:00");
+function formatBoardDayLabel(dayKey: WochenplanBoardDayKey, dayLabel: string, weekStart: Date | null) {
+  const date = new Date(getBoardDate(dayKey, weekStart) + "T12:00:00Z");
   const formattedDate = new Intl.DateTimeFormat("de-CH", {
     day: "numeric",
     month: "long",
@@ -79,8 +89,9 @@ function createIsoDateTime(
   dayKey: WochenplanBoardDayKey,
   slotKey: WochenplanBoardSlotKey,
   end: boolean,
+  weekStart: Date | null = null,
 ) {
-  const date = getBoardDate(dayKey);
+  const date = getBoardDate(dayKey, weekStart);
   const slot = getSlotStartHour(slotKey);
   const hour = end ? slot.endHour : slot.hour;
   const minute = end ? slot.endMinute : slot.minute;
@@ -580,10 +591,21 @@ function buildSnapshot(events: WochenplanBoardEvent[]) {
   );
 }
 
-export default function WochenplanBoard() {
-  const [events, setEvents] = useState<WochenplanBoardEvent[]>(buildDemoEvents());
+type WochenplanBoardProps = {
+  /** Real events loaded from the database. Falls back to demo data when absent. */
+  initialEvents?: WochenplanBoardEvent[];
+  /** ISO week identifier (e.g. "2026-W23") used for publish API call. */
+  weekId?: string;
+};
+
+export default function WochenplanBoard({ initialEvents, weekId }: WochenplanBoardProps) {
+  const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
+  const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
+  const [events, setEvents] = useState<WochenplanBoardEvent[]>(seedEvents);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dayPlannerState, setDayPlannerState] = useState<{
     dayKey: WochenplanBoardDayKey | null;
     dayLabel: string | null;
@@ -592,9 +614,50 @@ export default function WochenplanBoard() {
     dayLabel: null,
   });
 
-  const initialSnapshot = useMemo(() => buildSnapshot(buildDemoEvents()), []);
+  const initialSnapshot = useMemo(() => buildSnapshot(seedEvents), []);
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
+
+  /** Persist allocation for a single event immediately. */
+  async function persistAllocation(event: WochenplanBoardEvent) {
+    const pitchCode = toPitchCode(event);
+    try {
+      await fetch(`/api/wochenplan/${event.id}/allocation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pitchCode,
+          homeDressingRoomCode: event.allocation.homeDressingRoomCode,
+          awayDressingRoomCode: event.allocation.awayDressingRoomCode,
+        }),
+      });
+    } catch {
+      // Silent: allocation is still shown in UI; next explicit save will retry.
+    }
+  }
+
+  /** Publish all board events: set wochenplanVisible = true. */
+  async function publishWeek() {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const eventIds = events.map((e) => e.id);
+      const res = await fetch("/api/wochenplan/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventIds, wochenplanVisible: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data?.error ?? "Fehler beim Publizieren.");
+      }
+    } catch {
+      setSaveError("Netzwerkfehler. Bitte erneut versuchen.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   const conflicts = useMemo(() => {
     return getWochenplanConflicts(events.map(toConflictEvent));
@@ -645,15 +708,13 @@ export default function WochenplanBoard() {
     nextPitchRowKey: WochenplanBoardPitchRowKey,
     nextSlotKey: WochenplanBoardSlotKey,
   ) {
-    setEvents((current) =>
-      current.map((event) => {
-        if (event.id !== eventId) {
-          return event;
-        }
+    setEvents((current) => {
+      const next = current.map((event) => {
+        if (event.id !== eventId) return event;
 
         const nextFieldLabel =
           event.eventType === "TRAINING"
-            ? getNextTrainingField(current, event.id, nextDayKey, nextPitchRowKey, nextSlotKey)
+            ? (getNextTrainingField(current, event.id, nextDayKey, nextPitchRowKey, nextSlotKey) as "A" | "B" | null)
             : null;
 
         return {
@@ -671,13 +732,17 @@ export default function WochenplanBoard() {
                 ? "Kunstrasen 2"
                 : "Kunstrasen 3",
         };
-      }),
-    );
+      });
+      // Persist the updated event's allocation immediately.
+      const updated = next.find((e) => e.id === eventId);
+      if (updated) void persistAllocation(updated);
+      return next;
+    });
   }
 
   function updateRoom(eventId: string, roomType: "home" | "away", roomCode: string | null) {
-    setEvents((current) =>
-      current.map((event) =>
+    setEvents((current) => {
+      const next = current.map((event) =>
         event.id === eventId
           ? {
               ...event,
@@ -690,20 +755,34 @@ export default function WochenplanBoard() {
               },
             }
           : event,
-      ),
-    );
+      );
+      // Persist room change immediately.
+      const updated = next.find((e) => e.id === eventId);
+      if (updated) void persistAllocation(updated);
+      return next;
+    });
   }
 
   return (
     <div className="space-y-6">
-      <WochenplanPublishBar hasUnsavedChanges={hasUnsavedChanges} />
+      {saveError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {saveError}
+        </div>
+      ) : null}
+      <WochenplanPublishBar
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
+        onPublish={publishWeek}
+        weekId={weekId}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
         <div className="space-y-6">
           {DAYS.map((day) => (
             <WochenplanDayGrid
               key={day.key}
-              dayLabel={formatBoardDayLabel(day.key, day.label)}
+              dayLabel={formatBoardDayLabel(day.key, day.label, weekStart)}
               dayKey={day.key}
               pitchRows={PITCH_ROWS}
               timeSlots={TIME_SLOTS}
