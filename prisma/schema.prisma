@@ -329,8 +329,9 @@ model Tenant {
   registrations      Registration[]
   users              User[]
   events             Event[]
-  facilities         Facility[]
-  facilityResources  FacilityResource[]
+  facilities             Facility[]
+  facilityResources      FacilityResource[]
+  wochenplanPublications WochenplanPublication[]
 
   @@index([status])
   @@index([name])
@@ -1179,4 +1180,36 @@ model FacilityResource {
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([facilityId])
+}
+
+// ---------------------------------------------------------------------------
+// WochenplanPublication — Week Plan Publishing + Active Variant Display
+//
+// Tracks the active publication state for a tenant's week plan.
+// One record per (tenantId, weekId): upserted each time the admin publishes.
+//
+// variantLabel — human-readable name of the active plan variant shown on
+//   the public website and InfoBoard: e.g. "Standard-Wochenplan",
+//   "Schlechtwetter-Wochenplan", "Ferienplan".
+// isPublished  — false when saved as draft; true when fully published.
+//
+// Public display format: "KW 23 | Schlechtwetter-Wochenplan aktiv"
+// ---------------------------------------------------------------------------
+
+model WochenplanPublication {
+  id                String    @id @default(cuid())
+  tenantId          String
+  weekId            String    // ISO week identifier, e.g. "2026-W23"
+  variantLabel      String    @default("Standard-Wochenplan")
+  isPublished       Boolean   @default(false)
+  publishedAt       DateTime?
+  publishedByUserId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, weekId])
+  @@index([tenantId, weekId])
+  @@index([tenantId, isPublished])
 }

@@ -6,6 +6,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import { getWeekWindow, getIsoWeekNumber, startOfIsoWeek } from "@/lib/planner/date-utils";
 import { getWochenplanPitchRowLabels } from "@/lib/facilities/queries";
+import { getWochenplanPublication } from "@/lib/wochenplan/publication-queries";
 import type { WochenplanBoardPitchRowKey } from "@/lib/wochenplan/types";
 
 type PageProps = {
@@ -19,11 +20,13 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
   const { week } = await searchParams;
   const { weekId, start, end, previousWeekId, nextWeekId } = getWeekWindow(week);
 
-  // Load real events from DB for this week (scoped to actor's tenant)
-  const boardData = await getWochenplanBoardData(start, end, weekId, tenantId);
+  // Load real events + active publication in parallel (scoped to actor's tenant)
+  const [boardData, publication] = await Promise.all([
+    getWochenplanBoardData(start, end, weekId, tenantId),
+    tenantId ? getWochenplanPublication(tenantId, weekId) : Promise.resolve(null),
+  ]);
 
   // Resolve pitch row labels via the canonical facility/resource display helper.
-  // Falls back to static FCA labels when no tenant-configured records exist.
   const defaultPitchRows: Array<{ key: WochenplanBoardPitchRowKey; label: string }> = [
     { key: "STADION", label: "Stadion" },
     { key: "KUNSTRASEN_2", label: "KR 2" },
@@ -122,11 +125,12 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         </div>
       ) : null}
 
-      {/* Real-data board — pitch row labels resolved via canonical display helper */}
+      {/* Real-data board with canonical pitch labels + active variant publication */}
       <WochenplanBoard
         initialEvents={boardData.placed}
         weekId={weekId}
         pitchRows={pitchRows}
+        activeVariantLabel={publication?.isPublished ? publication.variantLabel : null}
       />
     </div>
   );

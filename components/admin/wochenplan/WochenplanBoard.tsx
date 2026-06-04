@@ -601,10 +601,16 @@ type WochenplanBoardProps = {
    * Falls back to DEFAULT_PITCH_ROWS (static FCA registry labels) when not provided.
    */
   pitchRows?: Array<{ key: WochenplanBoardPitchRowKey; label: string }>;
+  /**
+   * The currently active plan variant label for this week (from WochenplanPublication).
+   * Shown in the publish bar as "KW N | Variantname aktiv".
+   */
+  activeVariantLabel?: string | null;
 };
 
-export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitchRowsProp }: WochenplanBoardProps) {
+export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitchRowsProp, activeVariantLabel }: WochenplanBoardProps) {
   const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
+  const [publishedVariant, setPublishedVariant] = useState<string | null>(activeVariantLabel ?? null);
   const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
   const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(seedEvents);
@@ -620,6 +626,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
     dayLabel: null,
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const initialSnapshot = useMemo(() => buildSnapshot(seedEvents), []);
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
@@ -643,7 +650,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   }
 
   /** Publish all board events: set wochenplanVisible = true. */
-  async function publishWeek() {
+  async function publishWeek(variantLabel: string) {
     if (isSaving) return;
     setIsSaving(true);
     setSaveError(null);
@@ -652,11 +659,18 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
       const res = await fetch("/api/wochenplan/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventIds, wochenplanVisible: true }),
+        body: JSON.stringify({
+          eventIds,
+          wochenplanVisible: true,
+          weekId,
+          variantLabel,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setSaveError(data?.error ?? "Fehler beim Publizieren.");
+      } else {
+        setPublishedVariant(variantLabel);
       }
     } catch {
       setSaveError("Netzwerkfehler. Bitte erneut versuchen.");
@@ -779,6 +793,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
         isSaving={isSaving}
         onPublish={publishWeek}
         weekId={weekId}
+        activeVariantLabel={publishedVariant}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
