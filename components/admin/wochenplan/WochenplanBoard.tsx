@@ -19,7 +19,7 @@ import type {
   WochenplanEventItem,
 } from "@/lib/wochenplan/types";
 
-const PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; label: string }> = [
+const DEFAULT_PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; label: string }> = [
   { key: "STADION", label: "Stadion" },
   { key: "KUNSTRASEN_2", label: "KR 2" },
   { key: "KUNSTRASEN_3", label: "KR 3" },
@@ -596,9 +596,15 @@ type WochenplanBoardProps = {
   initialEvents?: WochenplanBoardEvent[];
   /** ISO week identifier (e.g. "2026-W23") used for publish API call. */
   weekId?: string;
+  /**
+   * Pitch row labels resolved via the canonical facility/resource display helper.
+   * Falls back to DEFAULT_PITCH_ROWS (static FCA registry labels) when not provided.
+   */
+  pitchRows?: Array<{ key: WochenplanBoardPitchRowKey; label: string }>;
 };
 
-export default function WochenplanBoard({ initialEvents, weekId }: WochenplanBoardProps) {
+export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitchRowsProp }: WochenplanBoardProps) {
+  const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
   const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
   const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(seedEvents);
@@ -717,6 +723,9 @@ export default function WochenplanBoard({ initialEvents, weekId }: WochenplanBoa
             ? (getNextTrainingField(current, event.id, nextDayKey, nextPitchRowKey, nextSlotKey) as "A" | "B" | null)
             : null;
 
+        const resolvedLocation =
+          PITCH_ROWS.find((r: { key: string; label: string }) => r.key === nextPitchRowKey)?.label ?? nextPitchRowKey;
+
         return {
           ...event,
           boardDayKey: nextDayKey,
@@ -725,12 +734,7 @@ export default function WochenplanBoard({ initialEvents, weekId }: WochenplanBoa
           fieldLabel: nextFieldLabel,
           startAt: createIsoDateTime(nextDayKey, nextSlotKey, false),
           endAt: createIsoDateTime(nextDayKey, nextSlotKey, true),
-          location:
-            nextPitchRowKey === "STADION"
-              ? "Stadion"
-              : nextPitchRowKey === "KUNSTRASEN_2"
-                ? "Kunstrasen 2"
-                : "Kunstrasen 3",
+          location: resolvedLocation,
         };
       });
       // Persist the updated event's allocation immediately.

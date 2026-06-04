@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getInfoboardFeed } from "@/lib/events/public-event-feed";
+import { getDefaultTenant } from "@/lib/tenants/queries";
 
 // TODO(tenant-isolation): Public InfoBoard feed is currently not tenant-scoped.
 //
@@ -43,12 +44,17 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get("dateTo");
     const limit = parseLimit(searchParams.get("limit"));
 
+    // Resolve the default tenant so facility/resource labels use tenant-configured names.
+    // TODO(tenant-isolation/website): replace with resolveTenantFromRequest(request).
+    const tenant = await getDefaultTenant();
+
     const events = await getInfoboardFeed({
       seasonKey,
       teamSlug,
       dateFrom,
       dateTo,
       limit,
+      tenantId: tenant?.id ?? null,
     });
 
     return NextResponse.json({

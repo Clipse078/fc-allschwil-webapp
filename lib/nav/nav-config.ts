@@ -110,6 +110,12 @@ export const NAV_SECTIONS: NavSection[] = [
             href: "/dashboard/admin/tenants",
             permissionKeys: [PERMISSIONS.TENANTS_VIEW, PERMISSIONS.TENANTS_MANAGE],
           },
+          {
+            key: "admin-facilities",
+            label: "Anlagen & Ressourcen",
+            href: "/dashboard/admin/facilities",
+            permissionKeys: [PERMISSIONS.FACILITIES_VIEW, PERMISSIONS.FACILITIES_MANAGE],
+          },
         ],
       },
     ],

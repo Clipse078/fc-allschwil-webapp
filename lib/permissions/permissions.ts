@@ -51,6 +51,9 @@ export const PERMISSIONS = {
 
   ORG_VIEW: "org.view",
   ORG_MANAGE: "org.manage",
+
+  FACILITIES_VIEW: "facilities.view",
+  FACILITIES_MANAGE: "facilities.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
