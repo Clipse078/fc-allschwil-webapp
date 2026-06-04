@@ -91,6 +91,22 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const validStatuses = Object.values(OrgUnitMembershipStatus);
   const status: OrgUnitMembershipStatus = validStatuses.includes(body?.status) ? body.status : OrgUnitMembershipStatus.ACTIVE;
 
+  // Slice 11.4: validate roleKey against Role table when provided.
+  // roleKey is organisational metadata only — does not affect permissions.
+  const rawRoleKey: string | null = body?.roleKey?.trim() || null;
+  if (rawRoleKey) {
+    const roleExists = await prisma.role.findUnique({
+      where: { key: rawRoleKey },
+      select: { id: true },
+    });
+    if (!roleExists) {
+      return NextResponse.json(
+        { error: `Rolle „${rawRoleKey}" wurde nicht gefunden.` },
+        { status: 400 },
+      );
+    }
+  }
+
   try {
     const membership = await prisma.orgUnitMembership.create({
       data: {
@@ -100,7 +116,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         orgUnitId: id,
         userId,
         personId,
-        roleKey: body?.roleKey?.trim() || null,
+        roleKey: rawRoleKey,
         status,
         isPrimary: body?.isPrimary === true,
         startsAt: body?.startsAt ? new Date(body.startsAt) : null,

@@ -4,11 +4,14 @@ import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
 
+type RoleSummary = { id: string; key: string; name: string };
+
 type OrgMembershipPickerProps = {
   orgUnitId: string;
   existingMemberUserIds: string[];
   existingMemberPersonIds: string[];
   onAdded: () => void;
+  roles: RoleSummary[];
 };
 
 type UserOption = { id: string; name: string; email: string };
@@ -19,6 +22,7 @@ export default function OrgMembershipPicker({
   existingMemberUserIds,
   existingMemberPersonIds,
   onAdded,
+  roles,
 }: OrgMembershipPickerProps) {
   const [mode, setMode] = useState<Mode>("user");
 
@@ -259,13 +263,18 @@ export default function OrgMembershipPicker({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className={labelClass}>Rolle (optional)</label>
-          <input
-            type="text"
+          <select
             value={roleKey}
             onChange={(e) => setRoleKey(e.target.value)}
-            placeholder="z.B. Kassier, Präsident…"
-            className={inputClass}
-          />
+            className="fca-select"
+          >
+            <option value="">— Keine Rolle —</option>
+            {roles.map((r) => (
+              <option key={r.id} value={r.key}>
+                {r.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-3 pt-5">
           <input
