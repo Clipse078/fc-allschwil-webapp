@@ -24,6 +24,7 @@ export type WochenplanEventItem = {
 
 export type WochenplanConflictType =
   | "PITCH_CONFLICT"
+  | "PITCH_CAPACITY_EXCEEDED"
   | "DRESSING_ROOM_CONFLICT"
   | "INVALID_PITCH_MODE"
   | "MISSING_PITCH"
