@@ -306,6 +306,7 @@ model Tenant {
   secondaryColor String?
 
   registrations Registration[]
+  users         User[]
 
   @@index([status])
   @@index([name])
@@ -322,12 +323,19 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Slice 11.2b: tenantId added so the JWT can carry tenant context.
+  // Nullable: legacy users are backfilled in 20260604064000_user_tenant_fk.
+  // getDefaultTenant() retained as fallback only for seed/bootstrap paths.
+  tenantId     String?
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   userRoles             UserRole[]
   auditLogs             AuditLog[]      @relation("AuditActor")
   assignedRegistrations Registration[]  @relation("RegistrationAssignedUser")
   orgUnitMemberships    OrgUnitMembership[]
 
   @@index([isActive])
+  @@index([tenantId])
 }
 
 model Registration {

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { logAction } from "@/lib/audit/log-action";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 
 type Context = {
   params: Promise<{ teamId: string }>;
@@ -118,7 +118,7 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     // Validate orgUnitId against active tenant if explicitly set to a non-null value.
     if (orgUnitId !== undefined && orgUnitId !== null) {
-      const tenant = await getDefaultTenant();
+      const tenant = await getTenantFromSession(access.session.user?.tenantId);
       const orgUnit = await prisma.orgUnit.findUnique({
         where: { id: orgUnitId },
         select: { id: true, tenantId: true },

@@ -9,7 +9,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTeamDetailData } from "@/lib/teams/queries";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { getOrgUnits } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 
 const CATEGORY_LABELS: Record<string, string> = {
   KINDERFUSSBALL: "Kinderfussball",
@@ -50,7 +50,7 @@ export default async function TeamDetailPage({ params }: Props) {
   const canManage = hasPermission(session, PERMISSIONS.TEAMS_MANAGE);
   const { teamId } = await params;
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(session.user?.tenantId);
   const [team, availableSeasons, availableOrgUnits] = await Promise.all([
     getTeamDetailData(teamId),
     getSeasonOptionsData(),

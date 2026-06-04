@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { OrgUnitMembershipStatus } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 
 // Slice 11.2: tenant is resolved once per request. All OrgUnit access is
 // scoped to the resolved tenant. Null tenantId on OrgUnit is treated as
@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;

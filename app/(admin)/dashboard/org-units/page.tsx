@@ -4,16 +4,15 @@ import { Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import OrgUnitSearchableList from "@/components/admin/org/OrgUnitSearchableList";
 
-// Slice 11.2: tenant resolved from getDefaultTenant() — the backwards-compat
-// fallback until the session carries tenantId. All reads are scoped to tenant.id.
+// Slice 11.2b: tenant resolved from session-carried tenantId.
 
 export default async function OrgUnitsPage() {
-  await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
-  const tenant = await getDefaultTenant();
+  const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
+  const tenant = await getTenantFromSession(session.user?.tenantId);
   if (!tenant) notFound();
   const orgUnits = await getOrgUnits(tenant.id);
 

@@ -4,13 +4,13 @@ import { prisma } from "@/lib/db/prisma";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTargetGroups } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 
 export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const targetGroups = await getTargetGroups(tenant.id);
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const body = await req.json().catch(() => ({}));

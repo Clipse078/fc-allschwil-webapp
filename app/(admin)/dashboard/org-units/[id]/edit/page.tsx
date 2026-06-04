@@ -4,19 +4,19 @@ import { ArrowLeft } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById, getOrgUnits } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 import OrgUnitForm from "@/components/admin/org/OrgUnitForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
-// Slice 11.2: tenant guard added; parent options scoped to current tenant.
+// Slice 11.2b: tenant resolved from session-carried tenantId.
 
 type PageProps = { params: Promise<{ id: string }> };
 
 export default async function EditOrgUnitPage({ params }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
 
   const { id } = await params;
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(session.user?.tenantId);
   if (!tenant) notFound();
 
   const [unit, parentOptions] = await Promise.all([

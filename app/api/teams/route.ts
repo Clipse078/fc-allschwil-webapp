@@ -14,7 +14,7 @@ import {
   normalizeTeamName,
   normalizeTeamSlug,
 } from "@/lib/teams/team-season-rules";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 
 const ALLOWED_CATEGORIES = [
   "KINDERFUSSBALL",
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
 
     // Validate orgUnitId against active tenant if provided.
     if (orgUnitId !== null) {
-      const tenant = await getDefaultTenant();
+      const tenant = await getTenantFromSession(access.session.user?.tenantId);
       const orgUnit = await prisma.orgUnit.findUnique({
         where: { id: orgUnitId },
         select: { id: true, tenantId: true },

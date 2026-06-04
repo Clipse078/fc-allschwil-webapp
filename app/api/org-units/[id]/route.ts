@@ -4,11 +4,10 @@ import { OrgUnitType, OrgUnitStatus } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 import { revalidatePath } from "next/cache";
 
-// Slice 11.2: tenant is resolved once per request from getDefaultTenant().
-// getDefaultTenant() is the backwards-compat fallback until the session carries tenantId.
+// Slice 11.2b: tenant resolved from session-carried tenantId via getTenantFromSession().
 // Slice 11.5: PUT now handles parentId re-parenting with cycle detection,
 // max-depth guard, and cascading level updates.
 
@@ -82,7 +81,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;
@@ -98,7 +97,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;
@@ -226,7 +225,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;

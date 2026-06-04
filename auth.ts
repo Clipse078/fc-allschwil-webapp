@@ -3,6 +3,9 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
 
+// Slice 11.2b: tenantId added to carry tenant context through JWT/session.
+// Users without a tenantId (legacy / unbackfilled) fall back to getDefaultTenant()
+// in getTenantFromSession() — no breakage for existing sessions.
 type SessionUserShape = {
   id: string;
   email: string;
@@ -15,6 +18,7 @@ type SessionUserShape = {
   actorEmail?: string;
   actorName?: string;
   effectiveUserId?: string;
+  tenantId?: string | null;
 };
 
 function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUserShape {
@@ -33,6 +37,7 @@ function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUse
       typeof value.effectiveUserId === "string"
         ? value.effectiveUserId
         : String(value.id ?? ""),
+    tenantId: typeof value.tenantId === "string" ? value.tenantId : null,
   };
 }
 
@@ -116,6 +121,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           permissionKeys,
           isImpersonating: false,
           effectiveUserId: user.id,
+          tenantId: user.tenantId ?? null,
         };
 
         return authUser;
@@ -138,6 +144,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = authUser.actorEmail;
         token.actorName = authUser.actorName;
         token.effectiveUserId = authUser.effectiveUserId;
+        token.tenantId = authUser.tenantId;
       }
 
       if (trigger === "update" && session?.user) {
@@ -156,6 +163,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = updatedUser.actorEmail;
         token.actorName = updatedUser.actorName;
         token.effectiveUserId = updatedUser.effectiveUserId;
+        token.tenantId = updatedUser.tenantId;
       }
 
       return token;
@@ -181,6 +189,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           typeof token.effectiveUserId === "string"
             ? token.effectiveUserId
             : session.user.id;
+        session.user.tenantId =
+          typeof token.tenantId === "string" ? token.tenantId : null;
       }
 
       return session;

@@ -4,18 +4,16 @@ import { OrgUnitType } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 
-// Slice 11.2: tenant is resolved once per request and forwarded to all queries.
-// getDefaultTenant() is used because the session does not carry tenantId in
-// the current architecture. This is the documented backwards-compat fallback;
-// replace with session-derived tenant resolution when the JWT carries tenantId.
+// Slice 11.2b: tenant resolved from session-carried tenantId via getTenantFromSession().
+// Falls back to getDefaultTenant() for legacy sessions where tenantId is null.
 
 export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const orgUnits = await getOrgUnits(tenant.id);
@@ -26,7 +24,7 @@ export async function POST(req: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const body = await req.json().catch(() => ({}));

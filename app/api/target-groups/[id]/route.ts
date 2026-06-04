@@ -3,7 +3,7 @@ import { OrgUnitStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;
@@ -100,7 +100,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getDefaultTenant();
+  const tenant = await getTenantFromSession(access.session.user?.tenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id } = await params;
