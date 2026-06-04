@@ -27,7 +27,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const sessionTenant = await getTenantFromSession(access.session.user?.tenantId);
+  const sessionTenantId = access.session.user?.tenantId;
+  if (!sessionTenantId) {
+    return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
+  }
+
+  const sessionTenant = await getTenantFromSession(sessionTenantId);
   if (!sessionTenant) {
     return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
   }

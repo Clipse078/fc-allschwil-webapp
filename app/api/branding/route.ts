@@ -24,7 +24,12 @@ export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const sessionTenantId = access.session.user?.tenantId;
+  if (!sessionTenantId) {
+    return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
+  }
+
+  const tenant = await getTenantFromSession(sessionTenantId);
   if (!tenant) {
     return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
   }
@@ -50,7 +55,12 @@ export async function PATCH(req: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const sessionTenantId = access.session.user?.tenantId;
+  if (!sessionTenantId) {
+    return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
+  }
+
+  const tenant = await getTenantFromSession(sessionTenantId);
   if (!tenant) {
     return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
   }

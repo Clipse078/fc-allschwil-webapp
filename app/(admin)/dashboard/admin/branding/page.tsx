@@ -11,7 +11,9 @@ import BrandingSettingsForm from "@/components/admin/branding/BrandingSettingsFo
 
 export default async function BrandingPage() {
   const session = await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
-  const ctx = await getTenantContextFromSession(session.user?.tenantId);
+  const tenantId = session.user?.tenantId;
+  if (!tenantId) notFound();
+  const ctx = await getTenantContextFromSession(tenantId);
   if (!ctx) notFound();
 
   return (
