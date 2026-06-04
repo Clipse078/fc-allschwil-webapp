@@ -116,6 +116,12 @@ export const NAV_SECTIONS: NavSection[] = [
             href: "/dashboard/admin/facilities",
             permissionKeys: [PERMISSIONS.FACILITIES_VIEW, PERMISSIONS.FACILITIES_MANAGE],
           },
+          {
+            key: "admin-website",
+            label: "Website",
+            href: "/dashboard/admin/website",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE, PERMISSIONS.NEWS_MANAGE],
+          },
         ],
       },
     ],
@@ -296,6 +302,14 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: "Öffentliches Anzeigeboard für Events, Resultate und Spielplan.",
     href: "/dashboard/infoboard",
     permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD],
+    carrySeason: false,
+  },
+  {
+    key: "website",
+    label: "Website-Verwaltung",
+    description: "Vereins-News und Website-Inhalte verwalten und publizieren.",
+    href: "/dashboard/admin/website",
+    permissionKeys: [PERMISSIONS.WEBSITE_MANAGE, PERMISSIONS.NEWS_MANAGE],
     carrySeason: false,
   },
 ];

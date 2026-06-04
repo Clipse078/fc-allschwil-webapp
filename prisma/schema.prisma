@@ -332,6 +332,7 @@ model Tenant {
   facilities             Facility[]
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
+  newsPosts              NewsPost[]
 
   @@index([status])
   @@index([name])
@@ -1212,4 +1213,35 @@ model WochenplanPublication {
   @@unique([tenantId, weekId])
   @@index([tenantId, weekId])
   @@index([tenantId, isPublished])
+}
+
+// ---------------------------------------------------------------------------
+// NewsPost — Website News & Updates
+//
+// Club news articles published to the public website.
+// One record per (tenantId, slug): upserted via admin CRUD.
+//
+// body stores the article body in Markdown.
+// isPublished / publishedAt gate public visibility.
+// ---------------------------------------------------------------------------
+
+model NewsPost {
+  id            String    @id @default(cuid())
+  tenantId      String
+  slug          String
+  title         String
+  excerpt       String?
+  body          String    @default("")
+  coverImageUrl String?
+  authorName    String?
+  isPublished   Boolean   @default(false)
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, isPublished])
+  @@index([tenantId, publishedAt])
 }
