@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
 
   // Step 1+2: visibility (404-mask) + permission (403)
   const guard = await requireMeetingAccess({ actor, id, access: "stage" });

@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "read" });
   if (!guard.ok) return guard.response;
   const decisions = await prisma.meetingDecision.findMany({
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
   const body = await req.json().catch(() => ({}));

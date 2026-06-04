@@ -26,7 +26,7 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
   const targets = await getTargets(actor);
   return NextResponse.json({ targets });
 }
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
   if (!actor.permissionKeys.includes("targets.manage")) {
     return NextResponse.json({ error: "targets.manage Berechtigung erforderlich." }, { status: 403 });
   }

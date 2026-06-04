@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
   const guard = await requireTemplateAccess({ actor, id, access: "read" });
   if (!guard.ok) return guard.response;
 
