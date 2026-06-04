@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Upload, X } from "lucide-react";
-import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
+import { PLATFORM_BRANDING, resolveTenantBranding } from "@/lib/tenant-runtime/branding";
 import { isValidHexColor } from "@/lib/tenant-runtime/branding-validation";
 import {
   ALLOWED_LOGO_UPLOAD_MIME_TYPES,
@@ -31,13 +31,10 @@ export default function BrandingSettingsForm({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [logoUrl, setLogoUrl] = useState(defaultValues.logoUrl ?? "");
-  const [primaryColor, setPrimaryColor] = useState(
-    defaultValues.primaryColor ?? PLATFORM_BRANDING.primaryColor,
-  );
-  const [secondaryColor, setSecondaryColor] = useState(
-    defaultValues.secondaryColor ?? PLATFORM_BRANDING.secondaryColor,
-  );
+  const resolved = resolveTenantBranding(defaultValues);
+  const [logoUrl, setLogoUrl] = useState(resolved.logoUrl ?? "");
+  const [primaryColor, setPrimaryColor] = useState(resolved.primaryColor);
+  const [secondaryColor, setSecondaryColor] = useState(resolved.secondaryColor);
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);

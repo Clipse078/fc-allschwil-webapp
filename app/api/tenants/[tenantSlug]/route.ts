@@ -4,7 +4,7 @@ import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantDetail } from "@/lib/tenants/queries";
-import { isValidHexColor } from "@/lib/tenant-runtime/branding-validation";
+import { parseBrandingPatch } from "@/lib/tenant-runtime/branding-patch";
 
 type RouteContext = { params: Promise<{ tenantSlug: string }> };
 
@@ -100,34 +100,10 @@ function validateConfig(body: Record<string, unknown>):
     patch.seasonTransitionMonth = v;
   }
 
-  // Branding v1 — Slice 10.6
-  if ("logoUrl" in body) {
-    const raw = body.logoUrl;
-    if (raw === null || raw === "") { patch.logoUrl = null; }
-    else {
-      const v = String(raw).trim();
-      if (!v) return { ok: false, error: "logoUrl darf nicht leer sein." };
-      patch.logoUrl = v;
-    }
-  }
-  if ("primaryColor" in body) {
-    const raw = body.primaryColor;
-    if (raw === null || raw === "") { patch.primaryColor = null; }
-    else {
-      const v = String(raw).trim();
-      if (!isValidHexColor(v)) return { ok: false, error: "primaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
-      patch.primaryColor = v.toLowerCase();
-    }
-  }
-  if ("secondaryColor" in body) {
-    const raw = body.secondaryColor;
-    if (raw === null || raw === "") { patch.secondaryColor = null; }
-    else {
-      const v = String(raw).trim();
-      if (!isValidHexColor(v)) return { ok: false, error: "secondaryColor muss ein 6-stelliger Hex-Farbwert sein (z.B. #1a2b3c)." };
-      patch.secondaryColor = v.toLowerCase();
-    }
-  }
+  // Branding v1 — Slice 10.6: delegated to canonical parseBrandingPatch()
+  const brandingResult = parseBrandingPatch(body);
+  if (!brandingResult.ok) return { ok: false, error: brandingResult.error };
+  Object.assign(patch, brandingResult.data);
 
   return { ok: true, data: patch };
 }

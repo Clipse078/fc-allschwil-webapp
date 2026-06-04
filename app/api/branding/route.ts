@@ -10,7 +10,8 @@
  * PATCH → accepts { logoUrl?, primaryColor?, secondaryColor? }; validates hex colors
  *
  * Permission: USERS_MANAGE (club-admin level)
- * Tenant isolation: tenant resolved from session, never from user-supplied body
+ * Tenant isolation: tenant resolved from session, never from user-supplied body.
+ *   Explicit tenantId guard ensures no fall-through to DEFAULT_TENANT_KEY.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,7 +19,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantFromSession } from "@/lib/tenants/queries";
-import { isValidHexColor } from "@/lib/tenant-runtime/branding-validation";
+import { parseBrandingPatch } from "@/lib/tenant-runtime/branding-patch";
 
 export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
@@ -67,49 +68,12 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
 
-  const data: {
-    logoUrl?: string | null;
-    primaryColor?: string | null;
-    secondaryColor?: string | null;
-  } = {};
-
-  if ("logoUrl" in body) {
-    const raw = body.logoUrl;
-    data.logoUrl = raw === null || raw === "" ? null : String(raw).trim();
+  const parsed = parseBrandingPatch(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  if ("primaryColor" in body) {
-    const raw = body.primaryColor;
-    if (raw === null || raw === "") {
-      data.primaryColor = null;
-    } else {
-      const v = String(raw).trim();
-      if (!isValidHexColor(v)) {
-        return NextResponse.json(
-          { error: "primaryColor muss ein gültiger 6-stelliger Hex-Farbwert sein (z.B. #0b4aa2)." },
-          { status: 400 },
-        );
-      }
-      data.primaryColor = v;
-    }
-  }
-
-  if ("secondaryColor" in body) {
-    const raw = body.secondaryColor;
-    if (raw === null || raw === "") {
-      data.secondaryColor = null;
-    } else {
-      const v = String(raw).trim();
-      if (!isValidHexColor(v)) {
-        return NextResponse.json(
-          { error: "secondaryColor muss ein gültiger 6-stelliger Hex-Farbwert sein (z.B. #c7332c)." },
-          { status: 400 },
-        );
-      }
-      data.secondaryColor = v;
-    }
-  }
-
+  const data = parsed.data;
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
       { error: "Keine gültigen Felder zum Aktualisieren angegeben." },

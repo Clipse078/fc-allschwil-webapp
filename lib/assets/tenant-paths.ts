@@ -36,15 +36,3 @@ export function getTenantLogoKey(tenantKey: string, ext: string): string {
   return `logos/${tenantKey}.${ext}`;
 }
 
-/**
- * Returns the public URL path for a tenant logo served from the app's
- * static asset base (or a CDN origin that mirrors the same convention).
- *
- * Suitable as Tenant.logoUrl — passes isValidLogoUrl() (root-relative path).
- *
- * Example: getTenantLogoPublicPath("fc-allschwil", "png")
- *          → "/images/logos/fc-allschwil.png"
- */
-export function getTenantLogoPublicPath(tenantKey: string, ext: string): string {
-  return `/images/logos/${tenantKey}.${ext}`;
-}

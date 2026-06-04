@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
 import type { TenantConfig } from "@/lib/tenants/queries";
-import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
+import { PLATFORM_BRANDING, resolveTenantBranding } from "@/lib/tenant-runtime/branding";
+import { isValidHexColor } from "@/lib/tenant-runtime/branding-validation";
 import {
   ALLOWED_LOGO_UPLOAD_MIME_TYPES,
   MAX_LOGO_FILE_SIZE_BYTES,
@@ -81,14 +82,11 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
   const [seasonStartMonth, setSeasonStartMonth] = useState(defaultValues.seasonStartMonth);
   const [seasonTransitionDay, setSeasonTransitionDay] = useState(defaultValues.seasonTransitionDay);
   const [seasonTransitionMonth, setSeasonTransitionMonth] = useState(defaultValues.seasonTransitionMonth);
-  // Branding v1 — Slice 10.6. Null → show platform default in picker but store null until explicitly changed.
-  const [logoUrl, setLogoUrl] = useState(defaultValues.logoUrl ?? "");
-  const [primaryColor, setPrimaryColor] = useState(
-    defaultValues.primaryColor ?? PLATFORM_BRANDING.primaryColor,
-  );
-  const [secondaryColor, setSecondaryColor] = useState(
-    defaultValues.secondaryColor ?? PLATFORM_BRANDING.secondaryColor,
-  );
+  // Branding v1 — Slice 10.6. Resolved via canonical resolver for consistent init.
+  const resolvedBranding = resolveTenantBranding(defaultValues);
+  const [logoUrl, setLogoUrl] = useState(resolvedBranding.logoUrl ?? "");
+  const [primaryColor, setPrimaryColor] = useState(resolvedBranding.primaryColor);
+  const [secondaryColor, setSecondaryColor] = useState(resolvedBranding.secondaryColor);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +102,16 @@ export default function TenantConfigForm({ tenantKey, defaultValues }: Props) {
     e.preventDefault();
     setError(null);
     setSaved(false);
+
+    if (primaryColor && !isValidHexColor(primaryColor)) {
+      setError("Primärfarbe muss ein gültiger Hex-Wert sein (z.B. #0b4aa2).");
+      return;
+    }
+    if (secondaryColor && !isValidHexColor(secondaryColor)) {
+      setError("Sekundärfarbe muss ein gültiger Hex-Wert sein (z.B. #c7332c).");
+      return;
+    }
+
     setLoading(true);
 
     try {
