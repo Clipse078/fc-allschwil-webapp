@@ -31,8 +31,10 @@ export async function POST(req: NextRequest) {
   const rawKey = (body?.key ?? "").trim();
   const key = rawKey || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  const existing = await prisma.targetGroup.findUnique({
-    where: { key },
+  // Slice 11.6: key uniqueness is tenant-scoped (@@unique([tenantId, key])).
+  // Use findFirst with explicit tenantId filter rather than the removed global @unique.
+  const existing = await prisma.targetGroup.findFirst({
+    where: { tenantId: tenant.id, key },
     select: { id: true },
   });
   if (existing) {
