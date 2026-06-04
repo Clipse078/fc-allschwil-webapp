@@ -331,6 +331,23 @@ NO
 
 ---
 
+## Slice 11.6 — Target Groups Foundation (Complete, merged STAGE 9a3497f)
+
+- `TargetGroup` model already in schema (since `20260518230000_add_org_builder_foundation`); application layer was missing.
+- **Safety fix applied:** `TargetGroup.key` uniqueness corrected from global `@unique` to tenant-scoped `@@unique([tenantId, key])` — matching OrgUnit pattern from Slice 11.2. Migration `20260604063500_target_group_tenant_scoped_key` drops `TargetGroup_key_key` and creates `TargetGroup_tenantId_key_key`.
+- `lib/org/queries.ts`: `getTargetGroups(tenantId?)`, `getTargetGroupById(id)`, `TargetGroupListItem` type added.
+- `app/api/target-groups/route.ts`: GET (tenant-scoped list), POST (key auto-gen, `findFirst({ tenantId, key })` for uniqueness).
+- `app/api/target-groups/[id]/route.ts`: GET + PATCH (`Prisma.DbNull` for ruleJson clear) + DELETE, all with tenant guard.
+- Dashboard: list page, create page, detail/edit page (hero, inline edit, sidebar metadata, ruleJson viewer).
+- `TargetGroupForm` component: name/key/description/status; key auto-gen from name; key locked in edit mode.
+- Nav: `Zielgruppen` child item under Admin with `Target` icon; `AppTopNav` + `AdminPageHeader` metadata added.
+- `ruleJson` stored as `Json?`; rule evaluation deferred to a later slice.
+- `ORG_VIEW` → view access (dashboard pages). `ORG_MANAGE` → create/edit/delete (API routes). No auth changes.
+- Migration `20260604063500_target_group_tenant_scoped_key` required (safe DDL: drop+create index only).
+- `tsc --noEmit`: 0 errors. Build: clean (71 routes, +3). PR #91.
+
+---
+
 ## Slice 11.4 — Membership Role Picker (Complete, merged STAGE b3b7c5f)
 
 - `OrgMembershipPicker`: `<input type="text">` for `roleKey` replaced with `<select>` populated from all `Role` records (`id`, `key`, `name`); stores `role.key`, not `role.id`. Default option: `— Keine Rolle —`.
