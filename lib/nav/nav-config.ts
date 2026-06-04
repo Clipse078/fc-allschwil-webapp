@@ -174,6 +174,15 @@ export const NAV_SECTIONS: NavSection[] = [
     sectionLabel: "Spielbetrieb",
     items: [
       {
+        key: "infoboard",
+        label: "Infoboard",
+        href: "/dashboard/infoboard",
+        permissionKeys: [
+          PERMISSIONS.INFOBOARD_MANAGE,
+          PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
+        ],
+      },
+      {
         key: "teams",
         label: "Teams",
         href: "/dashboard/teams",
@@ -267,6 +276,14 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: "Stammdaten für Spieler, Trainer und weitere Rollen.",
     href: "/dashboard/persons",
     permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
+    carrySeason: false,
+  },
+  {
+    key: "infoboard",
+    label: "Infoboard",
+    description: "Öffentliches Anzeigeboard für Events, Resultate und Spielplan.",
+    href: "/dashboard/infoboard",
+    permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD],
     carrySeason: false,
   },
 ];
