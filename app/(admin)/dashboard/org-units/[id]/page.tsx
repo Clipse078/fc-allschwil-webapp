@@ -64,7 +64,14 @@ function getInitials(name: string): string {
 export default async function OrgUnitDetailPage({ params }: PageProps) {
   await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const { id } = await params;
-  const [unit, tenant] = await Promise.all([getOrgUnitById(id), getDefaultTenant()]);
+  const [unit, tenant, roles] = await Promise.all([
+    getOrgUnitById(id),
+    getDefaultTenant(),
+    prisma.role.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, key: true, name: true },
+    }),
+  ]);
   if (!unit) notFound();
   // Tenant guard: null tenantId = pre-migration residue; allow (backwards-compat).
   if (unit.tenantId !== null && tenant && unit.tenantId !== tenant.id) notFound();
@@ -346,10 +353,11 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
             </div>
           ) : null}
 
-          {/* Membership management (business logic unchanged) */}
+          {/* Membership management (Slice 11.4: role picker) */}
           <OrgMembershipManagementCard
             orgUnitId={unit.id}
             initialMemberships={unit.memberships}
+            roles={roles}
           />
         </div>
 

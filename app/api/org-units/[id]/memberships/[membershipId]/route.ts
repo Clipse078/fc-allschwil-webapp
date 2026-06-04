@@ -56,8 +56,23 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     endsAt?: Date | null;
   } = {};
 
+  // Slice 11.4: validate roleKey against Role table when provided.
+  // roleKey is organisational metadata only — does not affect permissions.
   if ("roleKey" in body) {
-    data.roleKey = typeof body.roleKey === "string" ? body.roleKey.trim() || null : null;
+    const newRoleKey = typeof body.roleKey === "string" ? body.roleKey.trim() || null : null;
+    if (newRoleKey) {
+      const roleExists = await prisma.role.findUnique({
+        where: { key: newRoleKey },
+        select: { id: true },
+      });
+      if (!roleExists) {
+        return NextResponse.json(
+          { error: `Rolle „${newRoleKey}" wurde nicht gefunden.` },
+          { status: 400 },
+        );
+      }
+    }
+    data.roleKey = newRoleKey;
   }
   if ("isPrimary" in body) {
     data.isPrimary = body.isPrimary === true;

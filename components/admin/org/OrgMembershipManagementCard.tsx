@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarRange, ChevronUp, UserPlus, Users } from "lucide-react";
+import { CalendarRange, ChevronUp, Loader2, Pencil, UserPlus, Users } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import OrgMembershipPicker from "@/components/admin/org/OrgMembershipPicker";
@@ -35,10 +35,20 @@ export type Membership = {
   person: MembershipPerson | null;
 };
 
+export type RoleSummary = { id: string; key: string; name: string };
+
 type OrgMembershipManagementCardProps = {
   orgUnitId: string;
   initialMemberships: Membership[];
+  roles: RoleSummary[];
 };
+
+function resolveRoleName(roleKey: string | null, roles: RoleSummary[]): string | null {
+  if (!roleKey) return null;
+  const match = roles.find((r) => r.key === roleKey);
+  // If no matching Role record, fall back to the raw key (backward compat for old free-text values).
+  return match ? match.name : roleKey;
+}
 
 function getMemberTitle(m: Membership): string {
   if (m.user) return `${m.user.firstName} ${m.user.lastName}`;
@@ -91,11 +101,52 @@ function getStatusTone(status: string): "success" | "warning" | "muted" | "defau
 export default function OrgMembershipManagementCard({
   orgUnitId,
   initialMemberships,
+  roles,
 }: OrgMembershipManagementCardProps) {
   const router = useRouter();
   const [addPanelOpen, setAddPanelOpen] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+
+  // Inline role edit state
+  const [editingRoleMemberId, setEditingRoleMemberId] = useState<string | null>(null);
+  const [editingRoleKey, setEditingRoleKey] = useState("");
+  const [roleEditSubmitting, setRoleEditSubmitting] = useState(false);
+  const [roleEditError, setRoleEditError] = useState<string | null>(null);
+
+  function startRoleEdit(m: Membership) {
+    setEditingRoleMemberId(m.id);
+    setEditingRoleKey(m.roleKey ?? "");
+    setRoleEditError(null);
+  }
+
+  function cancelRoleEdit() {
+    setEditingRoleMemberId(null);
+    setRoleEditError(null);
+  }
+
+  async function handleRoleSave(membershipId: string) {
+    setRoleEditSubmitting(true);
+    setRoleEditError(null);
+    try {
+      const res = await fetch(`/api/org-units/${orgUnitId}/memberships/${membershipId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roleKey: editingRoleKey || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRoleEditError(data?.error ?? "Fehler beim Speichern.");
+        return;
+      }
+      setEditingRoleMemberId(null);
+      router.refresh();
+    } catch {
+      setRoleEditError("Netzwerkfehler. Bitte erneut versuchen.");
+    } finally {
+      setRoleEditSubmitting(false);
+    }
+  }
 
   const existingMemberUserIds = initialMemberships
     .map((m) => m.userId)
@@ -172,6 +223,7 @@ export default function OrgMembershipManagementCard({
             existingMemberUserIds={existingMemberUserIds}
             existingMemberPersonIds={existingMemberPersonIds}
             onAdded={handleAdded}
+            roles={roles}
           />
         </div>
       ) : null}
@@ -204,6 +256,8 @@ export default function OrgMembershipManagementCard({
             const title = getMemberTitle(m);
             const subtitle = getMemberSubtitle(m);
             const period = getMemberPeriod(m);
+            const resolvedRole = resolveRoleName(m.roleKey, roles);
+            const isEditingRole = editingRoleMemberId === m.id;
 
             return (
               <div key={m.id} className="flex items-start gap-4 px-5 py-4">
@@ -244,12 +298,58 @@ export default function OrgMembershipManagementCard({
                       tone={getStatusTone(m.status)}
                     />
 
-                    {/* Role */}
-                    {m.roleKey ? (
-                      <span className="sce-role-badge sce-role-badge-staff">
-                        {m.roleKey}
-                      </span>
-                    ) : null}
+                    {/* Role — inline picker or resolved display */}
+                    {isEditingRole ? (
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={editingRoleKey}
+                          onChange={(e) => setEditingRoleKey(e.target.value)}
+                          className="rounded border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-[var(--blue)]"
+                        >
+                          <option value="">— Keine Rolle —</option>
+                          {roles.map((r) => (
+                            <option key={r.id} value={r.key}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => handleRoleSave(m.id)}
+                          disabled={roleEditSubmitting}
+                          className="inline-flex items-center gap-1 rounded bg-[var(--blue)] px-2 py-0.5 text-[10px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                        >
+                          {roleEditSubmitting ? (
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                          ) : null}
+                          {roleEditSubmitting ? "…" : "OK"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelRoleEdit}
+                          className="text-[10px] text-[var(--muted)] transition hover:text-[var(--foreground)]"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        {resolvedRole ? (
+                          <span className="sce-role-badge sce-role-badge-staff">
+                            {resolvedRole}
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => startRoleEdit(m)}
+                          className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--text-2)]"
+                          title="Rolle bearbeiten"
+                        >
+                          <Pencil className="h-2.5 w-2.5" />
+                          {resolvedRole ? null : "Rolle"}
+                        </button>
+                      </div>
+                    )}
 
                     {/* Primary badge */}
                     {m.isPrimary ? (
@@ -273,6 +373,11 @@ export default function OrgMembershipManagementCard({
                       </span>
                     ) : null}
                   </div>
+
+                  {/* Role edit error (shown below metadata row for the active row) */}
+                  {isEditingRole && roleEditError ? (
+                    <p className="text-[11px] font-medium text-rose-600">{roleEditError}</p>
+                  ) : null}
                 </div>
 
                 {/* Remove action */}
