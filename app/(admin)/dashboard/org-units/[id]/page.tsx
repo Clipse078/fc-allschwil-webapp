@@ -12,15 +12,18 @@ import {
   Users,
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
+import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import { prisma } from "@/lib/db/prisma";
 import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
 import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
+import OrgUnitArchiveButton from "@/components/admin/org/OrgUnitArchiveButton";
 
 // Slice 11.2b: tenant resolved from session-carried tenantId.
 // Slice 11.5: sibling sort controls and parent breadcrumb added.
+// Slice 12.3: archive button added to danger zone in sidebar.
 
 const TYPE_LABELS: Record<string, string> = {
   CLUB: "Verein",
@@ -109,6 +112,8 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   const initials = getInitials(unit.name);
   const memberCount = unit.memberships.length;
   const childCount = unit.children.length;
+  const canManage = hasPermission(session, PERMISSIONS.ORG_MANAGE);
+  const canArchive = canManage && unit.status !== "ARCHIVED" && childCount === 0;
 
   return (
     <div className="space-y-6">
@@ -461,6 +466,30 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
               </div>
             </div>
           </div>
+
+          {/* Danger zone — archive action (ORG_MANAGE + leaf unit + not already archived) */}
+          {canArchive ? (
+            <div className="sce-detail-section border-rose-100">
+              <div className="sce-detail-section-header">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-rose-400">
+                  Gefahrenzone
+                </p>
+              </div>
+              <div className="sce-detail-section-body">
+                <OrgUnitArchiveButton
+                  orgUnitId={unit.id}
+                  orgUnitName={unit.name}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {/* Info: non-leaf units cannot be archived */}
+          {canManage && unit.status !== "ARCHIVED" && childCount > 0 ? (
+            <div className="rounded-[var(--radius-xl)] border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
+              Diese Einheit hat {childCount} untergeordnete{childCount === 1 ? " Einheit" : " Einheiten"}. Archiviere zuerst alle untergeordneten Einheiten.
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
