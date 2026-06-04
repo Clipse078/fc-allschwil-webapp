@@ -148,6 +148,9 @@ async function validatePlannerForm(
     wochenplanVisible: toBool(formData.get("wochenplanVisible")),
     trainingsplanVisible: toBool(formData.get("trainingsplanVisible")),
     teamPageVisible: toBool(formData.get("teamPageVisible")),
+    pitchCode: toNullableString(formData.get("pitchCode")),
+    homeDressingRoomCode: toNullableString(formData.get("homeDressingRoomCode")),
+    awayDressingRoomCode: toNullableString(formData.get("awayDressingRoomCode")),
   };
 }
 
@@ -155,6 +158,7 @@ function revalidatePlannerPaths() {
   revalidatePath("/dashboard/planner");
   revalidatePath("/dashboard/planner/week");
   revalidatePath("/dashboard/planner/day");
+  revalidatePath("/dashboard/wochenplan");
   revalidatePath("/dashboard/events");
 }
 
@@ -184,6 +188,9 @@ export async function createPlannerEntryAction(formData: FormData) {
       wochenplanVisible: data.wochenplanVisible,
       trainingsplanVisible: data.trainingsplanVisible,
       teamPageVisible: data.teamPageVisible,
+      pitchCode: data.pitchCode,
+      homeDressingRoomCode: data.homeDressingRoomCode,
+      awayDressingRoomCode: data.awayDressingRoomCode,
     },
   });
 
@@ -237,6 +244,9 @@ export async function updatePlannerEntryAction(formData: FormData) {
       wochenplanVisible: data.wochenplanVisible,
       trainingsplanVisible: data.trainingsplanVisible,
       teamPageVisible: data.teamPageVisible,
+      pitchCode: data.pitchCode,
+      homeDressingRoomCode: data.homeDressingRoomCode,
+      awayDressingRoomCode: data.awayDressingRoomCode,
     },
   });
 

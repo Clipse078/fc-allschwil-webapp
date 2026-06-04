@@ -580,10 +580,20 @@ function buildSnapshot(events: WochenplanBoardEvent[]) {
   );
 }
 
-export default function WochenplanBoard() {
-  const [events, setEvents] = useState<WochenplanBoardEvent[]>(buildDemoEvents());
+type WochenplanBoardProps = {
+  /** Real events loaded from the database. Falls back to demo data when absent. */
+  initialEvents?: WochenplanBoardEvent[];
+  /** ISO week identifier (e.g. "2026-W23") used for publish API call. */
+  weekId?: string;
+};
+
+export default function WochenplanBoard({ initialEvents, weekId }: WochenplanBoardProps) {
+  const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
+  const [events, setEvents] = useState<WochenplanBoardEvent[]>(seedEvents);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dayPlannerState, setDayPlannerState] = useState<{
     dayKey: WochenplanBoardDayKey | null;
     dayLabel: string | null;
@@ -592,9 +602,50 @@ export default function WochenplanBoard() {
     dayLabel: null,
   });
 
-  const initialSnapshot = useMemo(() => buildSnapshot(buildDemoEvents()), []);
+  const initialSnapshot = useMemo(() => buildSnapshot(seedEvents), []);
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
+
+  /** Persist allocation for a single event immediately. */
+  async function persistAllocation(event: WochenplanBoardEvent) {
+    const pitchCode = toPitchCode(event);
+    try {
+      await fetch(`/api/wochenplan/${event.id}/allocation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pitchCode,
+          homeDressingRoomCode: event.allocation.homeDressingRoomCode,
+          awayDressingRoomCode: event.allocation.awayDressingRoomCode,
+        }),
+      });
+    } catch {
+      // Silent: allocation is still shown in UI; next explicit save will retry.
+    }
+  }
+
+  /** Publish all board events: set wochenplanVisible = true. */
+  async function publishWeek() {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const eventIds = events.map((e) => e.id);
+      const res = await fetch("/api/wochenplan/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventIds, wochenplanVisible: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data?.error ?? "Fehler beim Publizieren.");
+      }
+    } catch {
+      setSaveError("Netzwerkfehler. Bitte erneut versuchen.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   const conflicts = useMemo(() => {
     return getWochenplanConflicts(events.map(toConflictEvent));
@@ -645,15 +696,13 @@ export default function WochenplanBoard() {
     nextPitchRowKey: WochenplanBoardPitchRowKey,
     nextSlotKey: WochenplanBoardSlotKey,
   ) {
-    setEvents((current) =>
-      current.map((event) => {
-        if (event.id !== eventId) {
-          return event;
-        }
+    setEvents((current) => {
+      const next = current.map((event) => {
+        if (event.id !== eventId) return event;
 
         const nextFieldLabel =
           event.eventType === "TRAINING"
-            ? getNextTrainingField(current, event.id, nextDayKey, nextPitchRowKey, nextSlotKey)
+            ? (getNextTrainingField(current, event.id, nextDayKey, nextPitchRowKey, nextSlotKey) as "A" | "B" | null)
             : null;
 
         return {
@@ -671,13 +720,17 @@ export default function WochenplanBoard() {
                 ? "Kunstrasen 2"
                 : "Kunstrasen 3",
         };
-      }),
-    );
+      });
+      // Persist the updated event's allocation immediately.
+      const updated = next.find((e) => e.id === eventId);
+      if (updated) void persistAllocation(updated);
+      return next;
+    });
   }
 
   function updateRoom(eventId: string, roomType: "home" | "away", roomCode: string | null) {
-    setEvents((current) =>
-      current.map((event) =>
+    setEvents((current) => {
+      const next = current.map((event) =>
         event.id === eventId
           ? {
               ...event,
@@ -690,13 +743,27 @@ export default function WochenplanBoard() {
               },
             }
           : event,
-      ),
-    );
+      );
+      // Persist room change immediately.
+      const updated = next.find((e) => e.id === eventId);
+      if (updated) void persistAllocation(updated);
+      return next;
+    });
   }
 
   return (
     <div className="space-y-6">
-      <WochenplanPublishBar hasUnsavedChanges={hasUnsavedChanges} />
+      {saveError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {saveError}
+        </div>
+      ) : null}
+      <WochenplanPublishBar
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
+        onPublish={publishWeek}
+        weekId={weekId}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
         <div className="space-y-6">

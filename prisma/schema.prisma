@@ -361,6 +361,7 @@ model Registration {
   targetGroupId    String?
 
   submittedAt DateTime @default(now())
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -663,6 +664,11 @@ model Event {
   sortOrder Int     @default(0)
   remarks   String?
 
+  // Wochenplan pitch + dressing-room allocation (Week Planner V1)
+  pitchCode             String?
+  homeDressingRoomCode  String?
+  awayDressingRoomCode  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -684,6 +690,7 @@ model Event {
   @@index([teamPageVisible])
   @@index([externalSource, externalSourceId])
   @@index([importBatchKey])
+  @@index([pitchCode])
 }
 
 model EventImportRun {
