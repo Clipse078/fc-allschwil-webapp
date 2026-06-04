@@ -5,6 +5,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getRegistrationForTenant } from "@/lib/registrations/queries";
 import { getCurrentTenantContext } from "@/lib/tenants/context";
+import { prisma } from "@/lib/db/prisma";
 
 type Props = {
   params: Promise<{
@@ -20,9 +21,19 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
   ]);
   const { tenantSlug, registrationId } = await params;
 
-  const [registration, ctx] = await Promise.all([
+  const [registration, ctx, users, targetGroups] = await Promise.all([
     getRegistrationForTenant(tenantSlug, registrationId),
     getCurrentTenantContext(tenantSlug),
+    prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+      select: { id: true, firstName: true, lastName: true, email: true },
+    }),
+    prisma.targetGroup.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, key: true },
+    }),
   ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
@@ -38,6 +49,8 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
       canEdit={canEdit}
       locale={ctx?.locale ?? undefined}
       timezone={ctx?.timezone ?? undefined}
+      assignableUsers={users}
+      targetGroups={targetGroups}
     />
   );
 }

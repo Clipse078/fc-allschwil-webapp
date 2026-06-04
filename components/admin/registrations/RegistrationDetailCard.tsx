@@ -14,10 +14,24 @@ import {
   Phone,
   User,
   UserCheck,
+  Users,
 } from "lucide-react";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationDetail } from "@/lib/registrations/queries";
 import { formatDate, formatDateTime } from "@/lib/tenant-runtime/formatters";
+
+type AssignableUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+type TargetGroupOption = {
+  id: string;
+  name: string;
+  key: string;
+};
 
 type RegistrationDetailCardProps = {
   tenantSlug: string;
@@ -27,6 +41,10 @@ type RegistrationDetailCardProps = {
   locale?: string;
   /** Tenant timezone (e.g. "Europe/Zurich"). Falls back to "Europe/Zurich" when absent. */
   timezone?: string;
+  /** Active users available for assignment. */
+  assignableUsers?: AssignableUser[];
+  /** Active target groups for routing. */
+  targetGroups?: TargetGroupOption[];
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -132,9 +150,12 @@ export default function RegistrationDetailCard({
   canEdit,
   locale = "de-CH",
   timezone = "Europe/Zurich",
+  assignableUsers = [],
+  targetGroups = [],
 }: RegistrationDetailCardProps) {
   const [registration, setRegistration] = useState(initialRegistration);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const cfg = { locale, timezone };
 
@@ -144,16 +165,16 @@ export default function RegistrationDetailCard({
   const typeLabel = TYPE_LABELS[registration.type] ?? registration.type;
   const backHref = `/tenant/${tenantSlug}/cockpit/registrations`;
 
-  async function updateStatus(status: RegistrationStatus) {
+  async function patchRegistration(patch: Record<string, unknown>) {
     setIsUpdating(true);
-
+    setUpdateError(null);
     try {
       const response = await fetch(
         `/api/tenants/${encodeURIComponent(tenantSlug)}/registrations/${encodeURIComponent(registration.id)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify(patch),
         },
       );
 
@@ -161,20 +182,32 @@ export default function RegistrationDetailCard({
 
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "Status konnte nicht aktualisiert werden.",
+          payload.error ?? "Änderung konnte nicht gespeichert werden.",
         );
       }
 
       setRegistration(payload.registration);
     } catch (error) {
-      alert(
+      setUpdateError(
         error instanceof Error
           ? error.message
-          : "Status konnte nicht aktualisiert werden.",
+          : "Änderung konnte nicht gespeichert werden.",
       );
     } finally {
       setIsUpdating(false);
     }
+  }
+
+  function updateStatus(status: RegistrationStatus) {
+    return patchRegistration({ status });
+  }
+
+  function updateAssignee(assignedToUserId: string | null) {
+    return patchRegistration({ assignedToUserId });
+  }
+
+  function updateTargetGroup(targetGroupId: string | null) {
+    return patchRegistration({ targetGroupId });
   }
 
   return (
@@ -206,8 +239,13 @@ export default function RegistrationDetailCard({
                 >
                   {STATUS_LABELS[registration.status]}
                 </span>
-                {/* Routing suggestion */}
-                {routingSuggestion ? (
+                {/* Target group badge (if assigned) */}
+                {registration.targetGroup ? (
+                  <span className="inline-flex h-5 items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-500/20 px-2.5 text-[0.65rem] font-semibold text-emerald-200">
+                    <Users className="h-2.5 w-2.5" />
+                    {registration.targetGroup.name}
+                  </span>
+                ) : routingSuggestion ? (
                   <span className="inline-flex h-5 items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 text-[0.65rem] font-semibold text-white/80">
                     <MapPin className="h-2.5 w-2.5" />
                     {routingSuggestion}
@@ -348,6 +386,15 @@ export default function RegistrationDetailCard({
               </span>
             </div>
             <div className="sce-detail-section-body space-y-4">
+
+              {/* Error */}
+              {updateError ? (
+                <div className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-2 text-[0.75rem] text-rose-700">
+                  {updateError}
+                </div>
+              ) : null}
+
+              {/* Status */}
               <div className="sce-data-field">
                 <span className="sce-data-label">Status</span>
                 {canEdit ? (
@@ -374,9 +421,29 @@ export default function RegistrationDetailCard({
                 )}
               </div>
 
+              {/* Assignee */}
               <div className="sce-data-field">
-                <span className="sce-data-label">Zugewiesen an</span>
-                {registration.assignedToUser ? (
+                <span className="sce-data-label flex items-center gap-1.5">
+                  <UserCheck className="h-3 w-3" />
+                  Zugewiesen an
+                </span>
+                {canEdit && assignableUsers.length > 0 ? (
+                  <select
+                    value={registration.assignedToUserId ?? ""}
+                    disabled={isUpdating}
+                    onChange={(e) =>
+                      updateAssignee(e.target.value || null)
+                    }
+                    className="fca-select mt-1"
+                  >
+                    <option value="">— Nicht zugewiesen —</option>
+                    {assignableUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.firstName} {u.lastName}
+                      </option>
+                    ))}
+                  </select>
+                ) : registration.assignedToUser ? (
                   <span className="sce-data-value flex items-center gap-1.5">
                     <UserCheck className="h-3.5 w-3.5 text-[var(--muted)]" />
                     {registration.assignedToUser.firstName}{" "}
@@ -387,9 +454,41 @@ export default function RegistrationDetailCard({
                 )}
               </div>
 
+              {/* Target group */}
+              <div className="sce-data-field">
+                <span className="sce-data-label flex items-center gap-1.5">
+                  <Users className="h-3 w-3" />
+                  Zielgruppe
+                </span>
+                {canEdit && targetGroups.length > 0 ? (
+                  <select
+                    value={registration.targetGroupId ?? ""}
+                    disabled={isUpdating}
+                    onChange={(e) =>
+                      updateTargetGroup(e.target.value || null)
+                    }
+                    className="fca-select mt-1"
+                  >
+                    <option value="">— Nicht zugewiesen —</option>
+                    {targetGroups.map((tg) => (
+                      <option key={tg.id} value={tg.id}>
+                        {tg.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : registration.targetGroup ? (
+                  <span className="sce-data-value flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-[var(--muted)]" />
+                    {registration.targetGroup.name}
+                  </span>
+                ) : (
+                  <span className="sce-data-value-empty">Keine Zielgruppe</span>
+                )}
+              </div>
+
               {isUpdating ? (
                 <p className="text-xs text-[var(--muted)]">
-                  Status wird gespeichert…
+                  Wird gespeichert…
                 </p>
               ) : null}
             </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { RegistrationStatus } from "@prisma/client";
-import { Calendar, ChevronRight, Mail, Search, UserX } from "lucide-react";
+import { Calendar, ChevronRight, Mail, Search, UserCheck, UserX } from "lucide-react";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import { formatDateShort } from "@/lib/tenant-runtime/formatters";
@@ -313,6 +313,14 @@ export default function RegistrationsInboxTable({
 
                 {/* Routing suggestion */}
                 <RoutingSuggestionBadge birthYear={reg.birthYear} />
+
+                {/* Assignee — show if set */}
+                {reg.assignedToUser ? (
+                  <span className="hidden xl:inline-flex items-center gap-1 text-[0.65rem] font-semibold text-[var(--muted)] border border-[var(--border)] rounded-full px-2 py-0.5">
+                    <UserCheck className="h-3 w-3" />
+                    {reg.assignedToUser.firstName} {reg.assignedToUser.lastName}
+                  </span>
+                ) : null}
 
                 {/* Status — interactive, not inside a link */}
                 {canEdit ? (

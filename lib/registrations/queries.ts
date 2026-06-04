@@ -16,6 +16,7 @@ const registrationSelect = {
   payloadJson: true,
   source: true,
   assignedToUserId: true,
+  targetGroupId: true,
   submittedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -34,6 +35,13 @@ const registrationSelect = {
       email: true,
     },
   },
+  targetGroup: {
+    select: {
+      id: true,
+      key: true,
+      name: true,
+    },
+  },
 } satisfies Prisma.RegistrationSelect;
 
 type RegistrationRecord = Prisma.RegistrationGetPayload<{
@@ -43,6 +51,7 @@ type RegistrationRecord = Prisma.RegistrationGetPayload<{
 type UpdateRegistrationInput = {
   status?: RegistrationStatus;
   assignedToUserId?: string | null;
+  targetGroupId?: string | null;
 };
 
 function serializeRegistration(registration: RegistrationRecord) {
@@ -116,6 +125,16 @@ export async function updateRegistrationStatusForTenant(
     }
   }
 
+  if (input.targetGroupId) {
+    const targetGroup = await prisma.targetGroup.findUnique({
+      where: { id: input.targetGroupId },
+      select: { id: true },
+    });
+    if (!targetGroup) {
+      throw new Error("Target group not found.");
+    }
+  }
+
   const updated = await prisma.registration.update({
     where: {
       id: existing.id,
@@ -126,6 +145,8 @@ export async function updateRegistrationStatusForTenant(
         input.assignedToUserId === undefined
           ? undefined
           : input.assignedToUserId,
+      targetGroupId:
+        input.targetGroupId === undefined ? undefined : input.targetGroupId,
     },
     select: registrationSelect,
   });
