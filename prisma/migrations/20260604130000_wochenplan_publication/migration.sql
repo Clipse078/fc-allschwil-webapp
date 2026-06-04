@@ -3,7 +3,7 @@
 -- Safe and non-destructive: new table only, no existing columns modified.
 --
 -- variantLabel stores the human-readable plan name shown on InfoBoard / website,
--- e.g. "Normalplan", "Schlechtwetter-Wochenplan", "Ferienplan".
+-- e.g. "Standard-Wochenplan", "Schlechtwetter-Wochenplan", "Ferienplan".
 -- Public display format: "KW 23 | Schlechtwetter-Wochenplan aktiv"
 
 -- CreateTable: WochenplanPublication
@@ -11,7 +11,7 @@ CREATE TABLE "WochenplanPublication" (
     "id"                TEXT         NOT NULL,
     "tenantId"          TEXT         NOT NULL,
     "weekId"            TEXT         NOT NULL,
-    "variantLabel"      TEXT         NOT NULL DEFAULT 'Normalplan',
+    "variantLabel"      TEXT         NOT NULL DEFAULT 'Standard-Wochenplan',
     "isPublished"       BOOLEAN      NOT NULL DEFAULT false,
     "publishedAt"       TIMESTAMP(3),
     "publishedByUserId" TEXT,

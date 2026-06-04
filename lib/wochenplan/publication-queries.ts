@@ -8,6 +8,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+export { formatWochenplanVariantBadge, parseWeekNumber } from "@/lib/wochenplan/format-variant-badge";
 
 // ── Read ─────────────────────────────────────────────────────────────────────
 
@@ -93,23 +94,5 @@ export async function upsertWochenplanPublication(input: UpsertPublicationInput)
 }
 
 // ── Display formatting ────────────────────────────────────────────────────────
-
-/**
- * Formats the canonical week-label string shown on the public website
- * and InfoBoard: "KW 23 | Schlechtwetter-Wochenplan aktiv"
- */
-export function formatWochenplanVariantBadge(
-  weekId: string,
-  variantLabel: string,
-): string {
-  const weekNumber = parseWeekNumber(weekId);
-  return weekNumber !== null
-    ? `KW ${weekNumber} | ${variantLabel} aktiv`
-    : `${weekId} | ${variantLabel} aktiv`;
-}
-
-function parseWeekNumber(weekId: string): number | null {
-  // weekId format: "2026-W23"
-  const match = /^(\d{4})-W(\d{1,2})$/.exec(weekId);
-  return match ? parseInt(match[2], 10) : null;
-}
+// formatWochenplanVariantBadge and parseWeekNumber are re-exported from
+// lib/wochenplan/format-variant-badge (client-safe, no Prisma dependency).

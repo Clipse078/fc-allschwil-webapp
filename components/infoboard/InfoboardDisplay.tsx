@@ -458,7 +458,6 @@ function NavigationScreen({
   }
 
   // Show today + tomorrow events with allocation context
-  const today = new Date().toISOString().slice(0, 10);
   const relevantGroups = groups.filter((g) => isTodayOrSoon(g.date)).slice(0, 2);
 
   // Collect events that have at least one allocation field set
@@ -468,9 +467,6 @@ function NavigationScreen({
         ev.pitchLabel || ev.homeDressingRoomLabel || ev.awayDressingRoomLabel,
     ).map((ev) => ({ ...ev, dateLabel: g.label })),
   );
-
-  const todayDateKey = today;
-  const todayLabel = toDayLabel(todayDateKey);
 
   return (
     <div className="flex h-full flex-col gap-6">

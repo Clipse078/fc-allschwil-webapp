@@ -1189,7 +1189,7 @@ model FacilityResource {
 // One record per (tenantId, weekId): upserted each time the admin publishes.
 //
 // variantLabel — human-readable name of the active plan variant shown on
-//   the public website and InfoBoard: e.g. "Normalplan",
+//   the public website and InfoBoard: e.g. "Standard-Wochenplan",
 //   "Schlechtwetter-Wochenplan", "Ferienplan".
 // isPublished  — false when saved as draft; true when fully published.
 //
@@ -1200,7 +1200,7 @@ model WochenplanPublication {
   id                String    @id @default(cuid())
   tenantId          String
   weekId            String    // ISO week identifier, e.g. "2026-W23"
-  variantLabel      String    @default("Normalplan")
+  variantLabel      String    @default("Standard-Wochenplan")
   isPublished       Boolean   @default(false)
   publishedAt       DateTime?
   publishedByUserId String?

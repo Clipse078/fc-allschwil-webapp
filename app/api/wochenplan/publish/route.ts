@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const label =
       typeof variantLabel === "string" && variantLabel.trim()
         ? variantLabel.trim()
-        : "Normalplan";
+        : "Standard-Wochenplan";
 
     publication = await upsertWochenplanPublication({
       tenantId: actorTenantId,

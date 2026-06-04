@@ -626,6 +626,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
     dayLabel: null,
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const initialSnapshot = useMemo(() => buildSnapshot(seedEvents), []);
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;

@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2, ChevronDown } from "lucide-react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
+import {
+  parseWeekNumber,
+  formatWochenplanVariantBadge,
+} from "@/lib/wochenplan/format-variant-badge";
 
 // ── Variant options ───────────────────────────────────────────────────────────
 
 export const WEEKPLAN_VARIANT_OPTIONS = [
-  { value: "Normalplan", label: "Normalplan" },
+  { value: "Standard-Wochenplan", label: "Standard-Wochenplan" },
   { value: "Schlechtwetter-Wochenplan", label: "Schlechtwetter-Wochenplan" },
   { value: "Ferienplan", label: "Ferienplan" },
   { value: "Turnierwoche", label: "Turnierwoche" },
@@ -36,12 +40,11 @@ export default function WochenplanPublishBar({
   activeVariantLabel,
 }: WochenplanPublishBarProps) {
   const [selectedVariant, setSelectedVariant] = useState<string>(
-    activeVariantLabel ?? "Normalplan",
+    activeVariantLabel ?? "Standard-Wochenplan",
   );
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
 
-  const isPreset = WEEKPLAN_VARIANT_OPTIONS.some((o) => o.value === selectedVariant);
   const effectiveLabel = showCustomInput && customLabel.trim()
     ? customLabel.trim()
     : selectedVariant;
@@ -62,8 +65,8 @@ export default function WochenplanPublishBar({
 
   const weekNumber = weekId ? parseWeekNumber(weekId) : null;
   const activeVariantBadge =
-    activeVariantLabel && weekNumber !== null
-      ? `KW ${weekNumber} | ${activeVariantLabel} aktiv`
+    activeVariantLabel && weekId
+      ? formatWochenplanVariantBadge(weekId, activeVariantLabel)
       : activeVariantLabel
         ? `${activeVariantLabel} aktiv`
         : null;
@@ -160,7 +163,3 @@ export default function WochenplanPublishBar({
   );
 }
 
-function parseWeekNumber(weekId: string): number | null {
-  const match = /^(\d{4})-W(\d{1,2})$/.exec(weekId);
-  return match ? parseInt(match[2], 10) : null;
-}
