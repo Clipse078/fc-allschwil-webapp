@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, Loader2, Globe } from "lucide-react";
 import type { AdminNewsItem } from "@/lib/website/news-queries";
+import { generateNewsSlug } from "@/lib/website/slug-utils";
 
 type WebsiteNewsFormProps = {
   /** When provided, the form is in edit mode. */
@@ -26,22 +27,10 @@ export default function WebsiteNewsForm({ post, tenantId }: WebsiteNewsFormProps
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function generateSlug(value: string): string {
-    return value
-      .toLowerCase()
-      .replace(/ä/g, "ae")
-      .replace(/ö/g, "oe")
-      .replace(/ü/g, "ue")
-      .replace(/ß/g, "ss")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80);
-  }
-
   function handleTitleChange(value: string) {
     setTitle(value);
     if (!isEdit || !post?.slug) {
-      setSlug(generateSlug(value));
+      setSlug(generateNewsSlug(value));
     }
   }
 
@@ -56,7 +45,7 @@ export default function WebsiteNewsForm({ post, tenantId }: WebsiteNewsFormProps
 
     const payload = {
       title: title.trim(),
-      slug: slug.trim() || generateSlug(title),
+      slug: slug.trim() || generateNewsSlug(title),
       excerpt: excerpt.trim() || null,
       bodyContent: body,
       authorName: authorName.trim() || null,

@@ -20,16 +20,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { resolveTenantFromRequest } from "@/lib/tenants/resolve-from-request";
 import { addCorsHeaders, handleCorsPreflightPublic } from "@/lib/api/cors";
+import { parseIntParam } from "@/lib/api/params";
 
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflightPublic(request) ?? new NextResponse(null, { status: 204 });
-}
-
-function parseIntParam(value: string | null, def: number, max: number): number {
-  if (!value) return def;
-  const n = parseInt(value, 10);
-  if (!Number.isFinite(n) || n < 0) return def;
-  return Math.min(n, max);
 }
 
 export async function GET(request: NextRequest) {

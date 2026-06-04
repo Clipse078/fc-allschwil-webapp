@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+export { generateNewsSlug } from "@/lib/website/slug-utils";
 
 // ── Public select (safe for unauthenticated surfaces) ─────────────────────────
 
@@ -83,12 +84,16 @@ export async function getPublishedNewsPosts(
   });
 }
 
+export async function countPublishedNewsPosts(tenantId: string): Promise<number> {
+  return prisma.newsPost.count({ where: { tenantId, isPublished: true } });
+}
+
 export async function getPublishedNewsPostBySlug(
   tenantId: string,
   slug: string,
 ): Promise<PublicNewsDetail | null> {
-  return prisma.newsPost.findUnique({
-    where: { tenantId_slug: { tenantId, slug } },
+  return prisma.newsPost.findFirst({
+    where: { tenantId, slug, isPublished: true },
     select: publicNewsDetailSelect,
   }) as Promise<PublicNewsDetail | null>;
 }
@@ -189,16 +194,3 @@ export async function deleteNewsPost(tenantId: string, id: string): Promise<bool
   return true;
 }
 
-// ── Slug generation helper ─────────────────────────────────────────────────────
-
-export function generateNewsSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/ä/g, "ae")
-    .replace(/ö/g, "oe")
-    .replace(/ü/g, "ue")
-    .replace(/ß/g, "ss")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}

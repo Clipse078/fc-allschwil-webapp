@@ -15,18 +15,12 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { resolveTenantFromRequest } from "@/lib/tenants/resolve-from-request";
-import { getPublishedNewsPosts } from "@/lib/website/news-queries";
+import { getPublishedNewsPosts, countPublishedNewsPosts } from "@/lib/website/news-queries";
 import { addCorsHeaders, handleCorsPreflightPublic } from "@/lib/api/cors";
+import { parseIntParam } from "@/lib/api/params";
 
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflightPublic(request) ?? new NextResponse(null, { status: 204 });
-}
-
-function parseIntParam(value: string | null, def: number, max: number): number {
-  if (!value) return def;
-  const n = parseInt(value, 10);
-  if (!Number.isFinite(n) || n < 0) return def;
-  return Math.min(n, max);
 }
 
 export async function GET(request: NextRequest) {
@@ -40,10 +34,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
     }
 
-    const articles = await getPublishedNewsPosts(tenant.id, { limit, offset });
+    const [articles, total] = await Promise.all([
+      getPublishedNewsPosts(tenant.id, { limit, offset }),
+      countPublishedNewsPosts(tenant.id),
+    ]);
 
     const response = NextResponse.json({
-      total: articles.length,
+      total,
       limit,
       offset,
       articles,
