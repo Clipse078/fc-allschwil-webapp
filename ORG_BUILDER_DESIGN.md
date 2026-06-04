@@ -465,6 +465,51 @@ single club, but must be replaced before multi-tenant rollout.
 
 ---
 
+## Slice 12.1 — Admin Branding Management UI (Complete, merged STAGE ff62f14)
+
+**PR:** #94 | **Branch:** `cursor/admin-branding-ui-4b4f` → `STAGE`  
+**Merge commit:** `ff62f14`
+
+**Goal:** Self-service branding management for club admins (USERS_MANAGE) without requiring TENANTS_MANAGE.
+
+**What was built:**
+- `GET/PATCH /api/branding` — tenant resolved from `session.user.tenantId`; explicit tenantId guard (HTTP 401 if absent)
+- `POST /api/branding/logo` — multipart upload; same permission + tenant isolation model
+- `/dashboard/admin/branding` — server page; `requireAnyPermission([USERS_MANAGE])`
+- `BrandingSettingsForm` — logo upload + URL field + color pickers + live `BrandingPreviewCard`
+- Nav: `Darstellung` under Admin sidebar (Palette icon, USERS_MANAGE)
+- "Darstellung" in AppTopNav + AdminPageHeader
+
+**Key design decisions:**
+- Tenant resolved from `session.user.tenantId` exclusively — no body override, no DEFAULT_TENANT_KEY fallback
+- Explicit guard added before `getTenantFromSession()` call in all three routes
+- Permission: `USERS_MANAGE` (club-admin level, not `TENANTS_MANAGE`)
+- Build: 74 routes (+3), 0 tsc errors
+
+---
+
+## Slice 12.2 — Tenant Branding Audit + Non-Duplication Cleanup (Complete, merged STAGE 09dc5ed)
+
+**PR:** #95 | **Branch:** `cursor/branding-audit-dedup-97c8` → `STAGE`  
+**Merge commit:** `09dc5ed`
+
+**Goal:** Eliminate all duplication in branding resolution logic; 100% canonical chain.
+
+**New canonical helpers:**
+- `lib/tenant-runtime/branding-patch.ts` — `parseBrandingPatch()`: single source of truth for PATCH body parsing across `/api/branding` and `/api/tenants/[slug]`
+- `lib/assets/logo-upload.ts` — `executeLogoUpload()`: single source of truth for the multipart upload pipeline across `/api/branding/logo` and `/api/tenants/[slug]/logo`
+
+**Changes:**
+- Both PATCH routes now delegate branding field parsing to `parseBrandingPatch()`
+- Both logo upload routes now delegate to `executeLogoUpload()`
+- Both branding forms (`BrandingSettingsForm`, `TenantConfigForm`) init via `resolveTenantBranding(defaultValues)` instead of `?? PLATFORM_BRANDING`
+- `TenantConfigForm` gains `isValidHexColor` client-side validation before submit (parity)
+- Dead code removed: `tenantCssVarString()` (theme.ts), `getTenantLogoPublicPath()` (tenant-paths.ts)
+
+**Build:** 74 routes, 0 tsc errors
+
+---
+
 ## Operator Commands (Post-Merge)
 
 ```bash

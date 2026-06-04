@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id, actionId } = await params;
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
   const existing = await prisma.meetingAction.findUnique({ where: { id: actionId, meetingId: id }, select: { id: true } });
@@ -40,7 +40,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id, actionId } = await params;
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
   const existing = await prisma.meetingAction.findUnique({ where: { id: actionId, meetingId: id }, select: { id: true } });

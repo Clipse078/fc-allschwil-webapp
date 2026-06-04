@@ -14,7 +14,7 @@ export default async function EditInitiativePage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
-  const actor = await getActorContext(session.user);
+  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
   const initiative = await getInitiativeBySlug(slug, actor);
 
   if (!initiative) notFound();

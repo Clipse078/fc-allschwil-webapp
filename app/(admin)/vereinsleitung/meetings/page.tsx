@@ -11,7 +11,7 @@ export default async function VereinsleitungMeetingsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const actor = await getActorContext(session.user);
+  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
   const meetings = await getMeetings(actor);
 
   return (

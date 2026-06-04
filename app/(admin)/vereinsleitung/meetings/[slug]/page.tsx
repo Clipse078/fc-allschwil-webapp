@@ -14,7 +14,7 @@ export default async function MeetingDetailPage({ params }: MeetingDetailPagePro
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
-  const actor = await getActorContext(session.user);
+  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
 
   // 404-masking: null if actor cannot see this meeting
   const dbMeeting = await getMeetingBySlug(slug, actor);

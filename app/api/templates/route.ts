@@ -19,7 +19,7 @@ export async function GET() {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
-  const actor = await getActorContext(check.session.user);
+  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
 
   // Templates permission check for listing
   if (!actor.permissionKeys.includes("templates.view") && !actor.permissionKeys.includes("templates.manage")) {

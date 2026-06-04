@@ -14,7 +14,7 @@ export default async function EditMeetingPage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
-  const actor = await getActorContext(session.user);
+  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
   const meeting = await getMeetingBySlug(slug, actor);
 
   if (!meeting) notFound();
