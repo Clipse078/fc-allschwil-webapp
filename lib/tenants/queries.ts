@@ -50,6 +50,31 @@ export async function getTenantByKey(key: string) {
   });
 }
 
+export async function getTenantById(id: string) {
+  return prisma.tenant.findUnique({
+    where: { id },
+    select: tenantSelect,
+  });
+}
+
+/**
+ * Slice 11.2b: resolve tenant from session-carried tenantId.
+ *
+ * When tenantId is present (post-migration users): looks up the tenant by ID
+ * directly — no hard-coded key, no DEFAULT_TENANT_KEY dependency.
+ *
+ * When tenantId is absent (legacy users whose tenantId was not yet backfilled,
+ * or bootstrap/seed paths): falls back to getDefaultTenant() so existing
+ * behaviour is preserved exactly.
+ *
+ * Replace all getDefaultTenant() calls in API routes and server components
+ * with this function using the session-carried tenantId.
+ */
+export async function getTenantFromSession(tenantId: string | null | undefined) {
+  if (tenantId) return getTenantById(tenantId);
+  return getDefaultTenant();
+}
+
 export async function getActiveTenantByKey(key: string) {
   return prisma.tenant.findFirst({
     where: {

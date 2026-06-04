@@ -4,7 +4,7 @@ import { Plus, Target, Users } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTargetGroups } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 
@@ -20,8 +20,8 @@ function getStatusTone(status: string): "success" | "muted" | "default" {
 }
 
 export default async function TargetGroupsPage() {
-  await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
-  const tenant = await getDefaultTenant();
+  const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
+  const tenant = await getTenantFromSession(session.user?.tenantId);
   if (!tenant) notFound();
   const targetGroups = await getTargetGroups(tenant.id);
 

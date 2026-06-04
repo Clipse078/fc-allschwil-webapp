@@ -4,7 +4,7 @@ import { ArrowLeft, Hash, Pencil, Target } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTargetGroupById } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import TargetGroupForm from "@/components/admin/org/TargetGroupForm";
@@ -23,11 +23,11 @@ function getStatusTone(status: string): "success" | "muted" | "default" {
 }
 
 export default async function TargetGroupDetailPage({ params }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const { id } = await params;
   const [tg, tenant] = await Promise.all([
     getTargetGroupById(id),
-    getDefaultTenant(),
+    getTenantFromSession(session.user?.tenantId),
   ]);
   if (!tg) notFound();
   if (tg.tenantId !== null && tenant && tg.tenantId !== tenant.id) notFound();

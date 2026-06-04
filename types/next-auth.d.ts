@@ -15,6 +15,8 @@ declare module "next-auth" {
       actorEmail?: string;
       actorName?: string;
       effectiveUserId?: string;
+      /** Slice 11.2b: tenant FK carried in JWT. Null for legacy/unset users. */
+      tenantId?: string | null;
     };
   }
 
@@ -30,6 +32,8 @@ declare module "next-auth" {
     actorEmail?: string;
     actorName?: string;
     effectiveUserId?: string;
+    /** Slice 11.2b: tenant FK carried in JWT. Null for legacy/unset users. */
+    tenantId?: string | null;
   }
 }
 
@@ -46,5 +50,7 @@ declare module "next-auth/jwt" {
     actorEmail?: string;
     actorName?: string;
     effectiveUserId?: string;
+    /** Slice 11.2b: tenant FK carried in JWT. Null for legacy/unset users. */
+    tenantId?: string | null;
   }
 }

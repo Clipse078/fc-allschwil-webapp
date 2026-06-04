@@ -14,12 +14,12 @@ import {
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById } from "@/lib/org/queries";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { getTenantFromSession } from "@/lib/tenants/queries";
 import { prisma } from "@/lib/db/prisma";
 import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
 import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
 
-// Slice 11.2: tenant guard added. Cross-tenant OrgUnit IDs resolve to notFound().
+// Slice 11.2b: tenant resolved from session-carried tenantId.
 // Slice 11.5: sibling sort controls and parent breadcrumb added.
 
 const TYPE_LABELS: Record<string, string> = {
@@ -62,11 +62,11 @@ function getInitials(name: string): string {
 }
 
 export default async function OrgUnitDetailPage({ params }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const { id } = await params;
   const [unit, tenant, roles] = await Promise.all([
     getOrgUnitById(id),
-    getDefaultTenant(),
+    getTenantFromSession(session.user?.tenantId),
     prisma.role.findMany({
       orderBy: { name: "asc" },
       select: { id: true, key: true, name: true },
