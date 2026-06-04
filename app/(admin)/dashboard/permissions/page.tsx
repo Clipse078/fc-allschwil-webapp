@@ -130,14 +130,14 @@ export default async function PermissionsPage() {
       <AdminSectionHeader
         eyebrow="Governance"
         title="Berechtigungen"
-        description="Alle Systemberechtigungen nach Modul gegliedert — Rollen-Zuweisungen und Zugriffsrechte auf einen Blick. Nur lesend."
+        description="Alle Systemberechtigungen nach Modul gegliedert — Rollen-Zuweisungen und Zugriffsrechte auf einen Blick. Berechtigungen einer Rolle bearbeiten: Rolle öffnen → Berechtigungen bearbeiten."
         actions={
           <Link
             href="/dashboard/roles"
             className="fca-button-secondary flex items-center gap-2"
           >
             <Shield className="h-4 w-4" />
-            Rollen
+            Rollen bearbeiten
           </Link>
         }
       />

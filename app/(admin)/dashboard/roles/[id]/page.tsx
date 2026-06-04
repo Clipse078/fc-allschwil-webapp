@@ -14,23 +14,16 @@ import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   getRoleDetailData,
-  type RolePermissionItem,
+  getPermissionEditorData,
   type RoleUser,
   type RoleOrgUnit,
 } from "@/lib/roles/queries";
+import RolePermissionEditor from "@/components/admin/roles/RolePermissionEditor";
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-function ModuleBadge({ module }: { module: string }) {
-  const label = module.charAt(0) + module.slice(1).toLowerCase();
-  return (
-    <span className="inline-flex items-center rounded-full bg-[var(--blue-light)] px-2.5 py-0.5 text-[0.7rem] font-semibold text-[var(--blue)]">
-      {label}
-    </span>
-  );
-}
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("de-CH", {
@@ -43,16 +36,13 @@ function formatDate(date: Date) {
 export default async function RoleDetailPage({ params }: PageProps) {
   await requirePermission(PERMISSIONS.USERS_MANAGE);
   const { id } = await params;
-  const role = await getRoleDetailData(id);
+  const [role, editorData] = await Promise.all([
+    getRoleDetailData(id),
+    getPermissionEditorData(id),
+  ]);
 
   if (!role) {
     notFound();
-  }
-
-  const groupedPermissions: Record<string, RolePermissionItem[]> = {};
-  for (const perm of role.permissions) {
-    const key = perm.module;
-    groupedPermissions[key] = [...(groupedPermissions[key] ?? []), perm];
   }
 
   return (
@@ -238,66 +228,15 @@ export default async function RoleDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Permissions */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <div className="flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-[var(--muted)]" />
-                <div>
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
-                    Berechtigungen
-                  </p>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">
-                    Zugriffsrechte dieser Rolle
-                  </p>
-                </div>
-              </div>
-              <span className="shrink-0 rounded-full bg-[var(--surface-3)] px-2.5 py-1 text-[0.72rem] font-semibold tabular-nums text-[var(--text-2)]">
-                {role.permissions.length}
-              </span>
-            </div>
-            <div className="sce-detail-section-body">
-              {role.permissions.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <KeyRound className="h-8 w-8 text-[var(--muted)]" />
-                  <p className="text-sm font-medium text-[var(--text-2)]">
-                    Keine Berechtigungen
-                  </p>
-                  <p className="text-[0.78rem] text-[var(--muted)]">
-                    Dieser Rolle sind noch keine Berechtigungen zugewiesen.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {Object.entries(groupedPermissions).map(([module, perms]: [string, RolePermissionItem[]]) => (
-                    <div key={module}>
-                      <div className="mb-2 flex items-center gap-2">
-                        <ModuleBadge module={module} />
-                        <span className="text-[0.72rem] text-[var(--muted)]">
-                          {perms.length} {perms.length === 1 ? "Recht" : "Rechte"}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {perms.map((perm: RolePermissionItem) => (
-                          <div
-                            key={perm.id}
-                            className="group flex flex-col rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[var(--shadow-xs)]"
-                          >
-                            <span className="text-[0.75rem] font-semibold text-[var(--foreground)]">
-                              {perm.name}
-                            </span>
-                            <span className="mt-0.5 font-mono text-[0.65rem] text-[var(--muted)]">
-                              {perm.key}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Permissions — editable matrix */}
+          {editorData ? (
+            <RolePermissionEditor
+              roleId={role.id}
+              roleName={role.name}
+              moduleGroups={editorData.moduleGroups}
+              initialAssignedKeys={editorData.assignedKeys}
+            />
+          ) : null}
 
         </div>
 
