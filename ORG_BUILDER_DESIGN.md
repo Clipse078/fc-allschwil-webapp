@@ -413,6 +413,16 @@ NO
 
 ---
 
+## Tenant Branding Runtime Adoption (Complete, merged STAGE 1933b69)
+
+- **Problem fixed:** `app/(admin)/layout.tsx` and `app/(admin)/dashboard/page.tsx` both called `getCurrentTenantContext()` with no argument, which hard-coded `DEFAULT_TENANT_KEY = "fc-allschwil"`. Tenant B users saw Tenant A branding.
+- `lib/tenants/context.ts`: `getCurrentTenantContextById(id)` added (PK lookup, O(1)); `getTenantContextFromSession(tenantId?)` added (session-aware: PK lookup if tenantId present, `getCurrentTenantContext()` fallback for legacy JWTs).
+- `app/(admin)/layout.tsx`: `getCurrentTenantContext()` → `getTenantContextFromSession(session.user.tenantId)`. Sidebar logo (`ctx.logoUrl`), club name (`ctx.name`), and CSS vars (`--tenant-primary`, `--tenant-secondary`) now per-user's tenant.
+- `app/(admin)/dashboard/page.tsx`: `auth()` added; `getCurrentTenantContext()` → `getTenantContextFromSession(session?.user?.tenantId)`. Locale, timezone, season label now per-user's tenant.
+- No schema changes. No migration. 3 files. tsc: 0 errors. Build: 71 routes. PR #93.
+
+---
+
 ## Slice 11.2b — Session Tenant Context (Complete, merged STAGE b8dfc4b)
 
 - `User.tenantId String?` FK → `Tenant.id` added (onDelete: SetNull). `Tenant.users User[]` inverse relation added.
