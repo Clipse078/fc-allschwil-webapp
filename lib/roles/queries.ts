@@ -276,3 +276,67 @@ export async function getPermissionsWithRoleMappingsData(): Promise<PermissionsD
     })),
   };
 }
+
+// ── Permission matrix editor ──────────────────────────────────────────────────
+
+export type PermissionEditorRow = {
+  id: string;
+  key: string;
+  name: string;
+  module: string;
+};
+
+export type PermissionEditorModuleGroup = {
+  module: string;
+  permissions: PermissionEditorRow[];
+};
+
+export type PermissionEditorData = {
+  moduleGroups: PermissionEditorModuleGroup[];
+  /** Keys currently assigned to this role. */
+  assignedKeys: string[];
+};
+
+/**
+ * Returns all system permissions grouped by module, plus the set of keys
+ * currently assigned to the given role.
+ *
+ * Used by the RolePermissionEditor to render the full checklist with correct
+ * initial state. One query for all permissions, one for the role's assignments.
+ */
+export async function getPermissionEditorData(roleId: string): Promise<PermissionEditorData | null> {
+  const [allPerms, role] = await Promise.all([
+    prisma.permission.findMany({
+      orderBy: [{ module: "asc" }, { name: "asc" }],
+      select: { id: true, key: true, name: true, module: true },
+    }),
+    prisma.role.findUnique({
+      where: { id: roleId },
+      select: {
+        rolePermissions: {
+          select: { permission: { select: { key: true } } },
+        },
+      },
+    }),
+  ]);
+
+  if (!role) return null;
+
+  const assignedKeys = role.rolePermissions.map((rp) => rp.permission.key);
+
+  const moduleGroups = new Map<string, PermissionEditorRow[]>();
+  for (const perm of allPerms) {
+    const mod = String(perm.module);
+    const rows = moduleGroups.get(mod) ?? [];
+    rows.push({ id: perm.id, key: perm.key, name: perm.name, module: mod });
+    moduleGroups.set(mod, rows);
+  }
+
+  return {
+    moduleGroups: Array.from(moduleGroups.entries()).map(([module, permissions]) => ({
+      module,
+      permissions,
+    })),
+    assignedKeys,
+  };
+}
