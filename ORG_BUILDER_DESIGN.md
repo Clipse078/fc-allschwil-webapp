@@ -413,6 +413,21 @@ NO
 
 ---
 
+## Slice 11.2b — Session Tenant Context (Complete, merged STAGE b8dfc4b)
+
+- `User.tenantId String?` FK → `Tenant.id` added (onDelete: SetNull). `Tenant.users User[]` inverse relation added.
+- Migration `20260604064000_user_tenant_fk`: `ALTER TABLE "User" ADD COLUMN "tenantId" TEXT` (nullable); backfill `UPDATE "User" SET tenantId = fc-allschwil.id`; FK `User_tenantId_fkey` (SET NULL on delete); index `User_tenantId_idx`.
+- `lib/tenants/queries.ts`: `getTenantById(id)` + `getTenantFromSession(tenantId?)` — uses `getTenantById` when tenantId present; falls back to `getDefaultTenant()` for null (legacy session safety).
+- `types/next-auth.d.ts`: `tenantId?: string | null` added to `Session.user`, `User`, `JWT`.
+- `auth.ts`: `authorize` reads `user.tenantId`; `jwt` callback stores on token; `session` callback surfaces as `session.user.tenantId`.
+- 18 files migrated: 9 API routes + 9 dashboard server components — all `getDefaultTenant()` calls replaced with `getTenantFromSession(session.user?.tenantId)`.
+- 0 remaining `getDefaultTenant()` calls in application paths (only in `lib/tenants/queries.ts` as internal fallback).
+- Old-session safety: `getTenantFromSession(null)` → `getDefaultTenant()` → zero breakage for existing JWTs without tenantId.
+- Tenant isolation confirmed: `getOrgUnits(tenant.id)`, `getTargetGroups(tenant.id)`, `requireOrgUnitForTenant`, `requireTargetGroupForTenant` all enforce `WHERE tenantId = resolved.id`.
+- No permission changes. Migration required (safe additive DDL + backfill). PR #92.
+
+---
+
 ## Roadmap Item: Slice 11.2b — Session Tenant Context
 
 **Goal:** `JWT → tenantId → ActorContext → Queries → APIs`
