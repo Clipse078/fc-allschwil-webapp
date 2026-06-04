@@ -181,11 +181,13 @@ export async function getWochenplanBoardData(
   weekStart: Date,
   weekEnd: Date,
   weekId: string,
+  tenantId?: string | null,
 ): Promise<WochenplanBoardData> {
   const events = await prisma.event.findMany({
     where: {
       startAt: { gte: weekStart, lte: weekEnd },
       status: { in: ["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED"] },
+      ...(tenantId ? { tenantId } : {}),
     },
     orderBy: [{ startAt: "asc" }],
     select: BOARD_EVENT_SELECT,
@@ -266,11 +268,13 @@ export async function getWochenplanBoardData(
 export async function getWochenplanWeekEventIds(
   weekStart: Date,
   weekEnd: Date,
+  tenantId?: string | null,
 ): Promise<string[]> {
   const events = await prisma.event.findMany({
     where: {
       startAt: { gte: weekStart, lte: weekEnd },
       status: { in: ["SCHEDULED", "LIVE", "POSTPONED"] },
+      ...(tenantId ? { tenantId } : {}),
     },
     select: { id: true },
   });

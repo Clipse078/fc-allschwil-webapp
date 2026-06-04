@@ -307,6 +307,7 @@ model Tenant {
 
   registrations Registration[]
   users         User[]
+  events        Event[]
 
   @@index([status])
   @@index([name])
@@ -669,6 +670,10 @@ model Event {
   homeDressingRoomCode  String?
   awayDressingRoomCode  String?
 
+  // Tenant isolation (nullable: backward-compat with seed/legacy events)
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -689,6 +694,7 @@ model Event {
   @@index([trainingsplanVisible])
   @@index([teamPageVisible])
   @@index([externalSource, externalSourceId])
+  @@index([tenantId])
   @@index([importBatchKey])
   @@index([pitchCode])
 }

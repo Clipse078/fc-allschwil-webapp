@@ -163,7 +163,8 @@ function revalidatePlannerPaths() {
 }
 
 export async function createPlannerEntryAction(formData: FormData) {
-  await requirePlannerManagePermission();
+  const session = await requirePlannerManagePermission();
+  const tenantId = session?.user?.tenantId ?? null;
   const data = await validatePlannerForm(formData, "create");
 
   await prisma.event.create({
@@ -191,6 +192,7 @@ export async function createPlannerEntryAction(formData: FormData) {
       pitchCode: data.pitchCode,
       homeDressingRoomCode: data.homeDressingRoomCode,
       awayDressingRoomCode: data.awayDressingRoomCode,
+      tenantId,
     },
   });
 

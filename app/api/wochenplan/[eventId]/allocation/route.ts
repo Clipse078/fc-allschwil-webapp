@@ -5,6 +5,7 @@
  * Body: { pitchCode: string | null, homeDressingRoomCode: string | null, awayDressingRoomCode: string | null }
  *
  * Permission: WOCHENPLAN_MANAGE or EVENTS_MANAGE
+ * Tenant isolation: only events belonging to the actor's tenant can be modified.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
@@ -32,6 +33,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   ]);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
+  const actorTenantId = access.session?.user?.tenantId ?? null;
+
   const { eventId } = await params;
   const body = await req.json().catch(() => ({}));
 
@@ -44,8 +47,16 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const awayResult = validateNullableCode(body.awayDressingRoomCode, VALID_ROOM_CODES, "awayDressingRoomCode");
   if (!awayResult.ok) return NextResponse.json({ error: awayResult.error }, { status: 400 });
 
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, tenantId: true },
+  });
   if (!event) return NextResponse.json({ error: "Event nicht gefunden." }, { status: 404 });
+
+  // Tenant isolation: if the event has a tenantId, it must match the actor's tenant.
+  if (event.tenantId && actorTenantId && event.tenantId !== actorTenantId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const updated = await prisma.event.update({
     where: { id: eventId },

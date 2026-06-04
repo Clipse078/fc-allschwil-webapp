@@ -10,6 +10,7 @@ import WochenplanRoomDayPlannerDialog, {
 } from "@/components/admin/wochenplan/WochenplanRoomDayPlannerDialog";
 import WochenplanRoomDrawer from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 import { getWochenplanConflicts } from "@/lib/wochenplan/conflict-engine";
+import { parseIsoWeekId } from "@/lib/planner/date-utils";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -55,16 +56,25 @@ function getSlotStartHour(slotKey: WochenplanBoardSlotKey) {
   return { hour: 20, minute: 15, endHour: 21, endMinute: 45 };
 }
 
-function getBoardDate(dayKey: WochenplanBoardDayKey) {
-  if (dayKey === "MONDAY") return "2026-04-13";
-  if (dayKey === "TUESDAY") return "2026-04-14";
-  if (dayKey === "WEDNESDAY") return "2026-04-15";
-  if (dayKey === "THURSDAY") return "2026-04-16";
-  return "2026-04-17";
+function getBoardDate(dayKey: WochenplanBoardDayKey, weekStart: Date | null): string {
+  // If no weekStart is available, fall back to a known Monday.
+  const base = weekStart ?? new Date("2026-04-13T00:00:00.000Z");
+  const DAY_OFFSET: Record<WochenplanBoardDayKey, number> = {
+    MONDAY: 0,
+    TUESDAY: 1,
+    WEDNESDAY: 2,
+    THURSDAY: 3,
+    FRIDAY: 4,
+  };
+  const d = new Date(base.getTime() + DAY_OFFSET[dayKey] * 86400000);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-function formatBoardDayLabel(dayKey: WochenplanBoardDayKey, dayLabel: string) {
-  const date = new Date(getBoardDate(dayKey) + "T12:00:00");
+function formatBoardDayLabel(dayKey: WochenplanBoardDayKey, dayLabel: string, weekStart: Date | null) {
+  const date = new Date(getBoardDate(dayKey, weekStart) + "T12:00:00Z");
   const formattedDate = new Intl.DateTimeFormat("de-CH", {
     day: "numeric",
     month: "long",
@@ -79,8 +89,9 @@ function createIsoDateTime(
   dayKey: WochenplanBoardDayKey,
   slotKey: WochenplanBoardSlotKey,
   end: boolean,
+  weekStart: Date | null = null,
 ) {
-  const date = getBoardDate(dayKey);
+  const date = getBoardDate(dayKey, weekStart);
   const slot = getSlotStartHour(slotKey);
   const hour = end ? slot.endHour : slot.hour;
   const minute = end ? slot.endMinute : slot.minute;
@@ -588,6 +599,7 @@ type WochenplanBoardProps = {
 };
 
 export default function WochenplanBoard({ initialEvents, weekId }: WochenplanBoardProps) {
+  const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
   const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(seedEvents);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
@@ -770,7 +782,7 @@ export default function WochenplanBoard({ initialEvents, weekId }: WochenplanBoa
           {DAYS.map((day) => (
             <WochenplanDayGrid
               key={day.key}
-              dayLabel={formatBoardDayLabel(day.key, day.label)}
+              dayLabel={formatBoardDayLabel(day.key, day.label, weekStart)}
               dayKey={day.key}
               pitchRows={PITCH_ROWS}
               timeSlots={TIME_SLOTS}

@@ -11,13 +11,14 @@ type PageProps = {
 };
 
 export default async function WochenplanPage({ searchParams }: PageProps) {
-  await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
+  const session = await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
+  const tenantId = session?.user?.tenantId ?? null;
 
   const { week } = await searchParams;
   const { weekId, start, end, previousWeekId, nextWeekId } = getWeekWindow(week);
 
-  // Load real events from DB for this week
-  const boardData = await getWochenplanBoardData(start, end, weekId);
+  // Load real events from DB for this week (scoped to actor's tenant)
+  const boardData = await getWochenplanBoardData(start, end, weekId, tenantId);
 
   const weekNumber = getIsoWeekNumber(start);
   const weekYear = startOfIsoWeek(start).getUTCFullYear();
