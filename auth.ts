@@ -63,36 +63,48 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-          include: {
-            userRoles: {
-              include: {
-                role: {
-                  include: {
-                    rolePermissions: {
-                      include: {
-                        permission: true,
+        let user;
+        try {
+          user = await prisma.user.findUnique({
+            where: { email },
+            include: {
+              userRoles: {
+                include: {
+                  role: {
+                    include: {
+                      rolePermissions: {
+                        include: {
+                          permission: true,
+                        },
                       },
                     },
                   },
                 },
               },
             },
-          },
-        });
+          });
+        } catch (lookupErr) {
+          console.error(
+            "[auth] authorize: user lookup failed",
+            lookupErr instanceof Error ? lookupErr.message : String(lookupErr),
+          );
+          return null;
+        }
 
         if (!user) {
+          console.error("[auth] authorize: no user found for email prefix", email.slice(0, 3) + "***");
           return null;
         }
 
         if (!user.isActive) {
+          console.error("[auth] authorize: user inactive");
           return null;
         }
 
         const isPasswordValid = await verifyPassword(password, user.passwordHash);
 
         if (!isPasswordValid) {
+          console.error("[auth] authorize: bcrypt comparison failed — wrong password or stale hash");
           return null;
         }
 

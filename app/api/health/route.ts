@@ -7,6 +7,18 @@ import { getDeploymentMetadata } from "@/lib/server/deployment";
 
 export const dynamic = "force-dynamic";
 
+/** Extract only the hostname from DATABASE_URL — no credentials exposed. */
+function getDatabaseHost(): string {
+  try {
+    const raw = process.env.DATABASE_URL;
+    if (!raw) return "not-set";
+    const url = new URL(raw);
+    return url.hostname;
+  } catch {
+    return "unparseable";
+  }
+}
+
 export async function GET(): Promise<NextResponse> {
   const runtime = evaluateRuntimeConfiguration();
   const deployment = getDeploymentMetadata();
@@ -41,6 +53,7 @@ export async function GET(): Promise<NextResponse> {
         hasNextAuthUrl: Boolean(runtime.env.nextAuthUrl),
       },
       database,
+      databaseHost: getDatabaseHost(),
       warnings: runtime.warnings,
       errors: runtime.errors,
       timestamp: new Date().toISOString(),
