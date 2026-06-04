@@ -331,6 +331,21 @@ NO
 
 ---
 
+## Slice 11.4 — Membership Role Picker (Complete, merged STAGE b3b7c5f)
+
+- `OrgMembershipPicker`: `<input type="text">` for `roleKey` replaced with `<select>` populated from all `Role` records (`id`, `key`, `name`); stores `role.key`, not `role.id`. Default option: `— Keine Rolle —`.
+- `OrgMembershipManagementCard`: accepts `roles: RoleSummary[]` prop; `resolveRoleName(roleKey, roles)` resolves `roleKey` → `Role.name` for display with raw-key fallback for legacy free-text values; inline pencil-icon role edit per row → PATCH endpoint → `router.refresh()`.
+- `/dashboard/org-units/[id]` page: `roles` loaded server-side in existing `Promise.all` (`prisma.role.findMany`); passed to `OrgMembershipManagementCard` — no client-side fetch, no extra API endpoints.
+- `POST /api/org-units/[id]/memberships`: validates `roleKey` against `Role` table when non-empty; rejects unknown keys with HTTP 400.
+- `PATCH /api/org-units/[id]/memberships/[membershipId]`: same `roleKey` validation.
+- Permission system **unchanged**: `ActorContext.permissionKeys`, `UserRole`, `RolePermission` — all untouched. `roleKey` is organisational metadata only.
+- No schema migration. `OrgUnitMembership.roleKey String?` field unchanged.
+- Backward compatible: existing memberships without `roleKey` render without issue; legacy free-text `roleKey` values display as raw key fallback.
+- `tsc --noEmit`: 0 errors. Build: clean (68 routes). No migration required.
+- Merge commit: `b3b7c5f4511c34259f531f3a1089329edeb86779`. PR #90.
+
+---
+
 ## Slice 11.2 — Tenant Isolation Hardening (Complete, merged STAGE d41e66b)
 
 - `OrgUnit.key` uniqueness changed from global `@unique` to tenant-scoped `@@unique([tenantId, key])`.
