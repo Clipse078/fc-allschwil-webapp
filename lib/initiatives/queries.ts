@@ -30,6 +30,8 @@ const INITIATIVE_LIST_SELECT = {
   visibleTeamRefs: true,
   visibleOrgUnitRefs: true,
   visiblePersonRefs: true,
+  // Phase D: target group visibility refs
+  visibleTargetGroupRefs: true,
 } as const;
 
 export async function getInitiatives(actor: ActorContext) {

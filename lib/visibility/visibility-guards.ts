@@ -81,6 +81,7 @@ const MEETING_GUARD_SELECT = {
   visibleTeamRefs: true,
   visibleOrgUnitRefs: true,
   visiblePersonRefs: true,
+  visibleTargetGroupRefs: true,
 } as const;
 
 const INITIATIVE_GUARD_SELECT = {
@@ -95,6 +96,7 @@ const INITIATIVE_GUARD_SELECT = {
   visibleTeamRefs: true,
   visibleOrgUnitRefs: true,
   visiblePersonRefs: true,
+  visibleTargetGroupRefs: true,
 } as const;
 
 const TARGET_GUARD_SELECT = {
@@ -109,6 +111,7 @@ const TARGET_GUARD_SELECT = {
   visibleTeamRefs: true,
   visibleOrgUnitRefs: true,
   visiblePersonRefs: true,
+  visibleTargetGroupRefs: true,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -127,6 +130,7 @@ type MeetingGuardEntity = {
   visibleTeamRefs: unknown;
   visibleOrgUnitRefs: unknown;
   visiblePersonRefs: unknown;
+  visibleTargetGroupRefs: unknown;
 };
 
 type InitiativeGuardEntity = MeetingGuardEntity; // same shape
@@ -143,6 +147,7 @@ type TargetGuardEntity = {
   visibleTeamRefs: unknown;
   visibleOrgUnitRefs: unknown;
   visiblePersonRefs: unknown;
+  visibleTargetGroupRefs: unknown;
 };
 
 type GuardSuccess<T> = { ok: true; entity: T };
