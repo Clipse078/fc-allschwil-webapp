@@ -12,6 +12,12 @@ enum TenantStatus {
   ARCHIVED
 }
 
+enum NewsArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum PermissionModule {
   USERS
   SEASONS
@@ -326,12 +332,20 @@ model Tenant {
   primaryColor   String?
   secondaryColor String?
 
+  // Website integration flags — Slice 4 (News Detail Endpoint)
+  // websiteEnabled: gates all /api/public/v1/website/* endpoints for this tenant.
+  // approvedDataOnly: when true, only content that has passed editorial approval
+  //   is surfaced on the public website feed. Defaults false for backward-compat.
+  websiteEnabled   Boolean @default(true)
+  approvedDataOnly Boolean @default(false)
+
   registrations      Registration[]
   users              User[]
   events             Event[]
   facilities             Facility[]
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
+  newsArticles           NewsArticle[]
 
   @@index([status])
   @@index([name])
@@ -1226,4 +1240,43 @@ model WochenplanPublication {
   @@unique([tenantId, weekId])
   @@index([tenantId, weekId])
   @@index([tenantId, isPublished])
+}
+
+// ---------------------------------------------------------------------------
+// NewsArticle — Public website news feed (Slice 4)
+//
+// Tenant-scoped news articles surfaced via the public website API.
+// Only PUBLISHED articles are returned by the public endpoints.
+//
+// The public list endpoint (/api/public/v1/website/news) omits `content`
+// for performance. The detail endpoint (/api/public/v1/website/news/[slug])
+// includes the full `content` body.
+//
+// Safe public fields: id, title, slug, excerpt, content (detail only),
+//   imageUrl, publishedAt.
+//
+// Internal fields never exposed on public endpoints: tenantId, status,
+//   createdAt, updatedAt.
+// ---------------------------------------------------------------------------
+
+model NewsArticle {
+  id          String            @id @default(cuid())
+  tenantId    String
+  slug        String
+  title       String
+  excerpt     String?
+  content     String
+  imageUrl    String?
+  status      NewsArticleStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, status, publishedAt])
+  @@index([slug])
 }
