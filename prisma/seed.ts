@@ -101,6 +101,7 @@ async function main() {
 
     { key: "wochenplan.manage", name: "Manage Wochenplan", module: PermissionModule.WOCHENPLAN },
     { key: "news.manage", name: "Manage news", module: PermissionModule.NEWS },
+    { key: "news.publish", name: "Publish news articles", module: PermissionModule.NEWS },
     { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE },
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
@@ -189,6 +190,7 @@ async function main() {
         "fixtures.view",
         "fixtures.publish_website",
         "news.manage",
+        "news.publish",
         "website.manage",
       ],
     },

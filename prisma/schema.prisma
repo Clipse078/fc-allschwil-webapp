@@ -14,8 +14,16 @@ enum TenantStatus {
 
 enum NewsArticleStatus {
   DRAFT
+  IN_REVIEW
+  APPROVED
   PUBLISHED
   ARCHIVED
+}
+
+enum MediaAssetType {
+  IMAGE
+  VIDEO
+  EMBED
 }
 
 enum PermissionModule {
@@ -346,6 +354,7 @@ model Tenant {
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
   newsArticles           NewsArticle[]
+  mediaAssets            MediaAsset[]
 
   @@index([status])
   @@index([name])
@@ -1267,6 +1276,7 @@ model NewsArticle {
   excerpt     String?
   content     String
   imageUrl    String?
+  authorName  String?
   status      NewsArticleStatus @default(DRAFT)
   publishedAt DateTime?
   createdAt   DateTime          @default(now())
@@ -1279,4 +1289,41 @@ model NewsArticle {
   @@index([tenantId, status])
   @@index([tenantId, status, publishedAt])
   @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// MediaAsset — reusable tenant-scoped media library.
+//
+// Architecture notes:
+// - Tenant-scoped: every asset belongs to one tenant (strict isolation).
+// - Type-agnostic: IMAGE / VIDEO / EMBED covers all current and near-future
+//   use cases (hero images, inline images, embedded YouTube/Vimeo, videos).
+// - Not news-only: future modules (events, pages, galleries) can reference
+//   assets by URL or by relation without schema changes to this model.
+// - storageKey: internal object-store key (e.g. Vercel Blob path). Allows
+//   later cleanup / de-duplication without scanning CDN URLs.
+// - width / height: optional, populated server-side from image metadata
+//   if the upload implementation supports it; graceful null otherwise.
+// ---------------------------------------------------------------------------
+
+model MediaAsset {
+  id          String         @id @default(cuid())
+  tenantId    String
+  type        MediaAssetType
+  url         String
+  storageKey  String?
+  mimeType    String?
+  fileName    String?
+  altText     String?
+  caption     String?
+  size        Int?
+  width       Int?
+  height      Int?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, type])
 }

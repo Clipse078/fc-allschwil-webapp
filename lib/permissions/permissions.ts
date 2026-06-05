@@ -26,6 +26,7 @@ export const PERMISSIONS = {
 
   WOCHENPLAN_MANAGE: "wochenplan.manage",
   NEWS_MANAGE: "news.manage",
+  NEWS_PUBLISH: "news.publish",
   WEBSITE_MANAGE: "website.manage",
   INFOBOARD_MANAGE: "infoboard.manage",
   FUNCTIONS_MANAGE: "functions.manage",

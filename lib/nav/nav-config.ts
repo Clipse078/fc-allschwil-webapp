@@ -183,6 +183,37 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    sectionLabel: "Website",
+    items: [
+      {
+        key: "website-news",
+        label: "News",
+        href: "/dashboard/website/news",
+        permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+        children: [
+          {
+            key: "website-news-new",
+            label: "Neuer Artikel",
+            href: "/dashboard/website/news/new",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE],
+          },
+          {
+            key: "website-news-drafts",
+            label: "Entwürfe",
+            href: "/dashboard/website/news?status=DRAFT",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE],
+          },
+          {
+            key: "website-news-published",
+            label: "Veröffentlicht",
+            href: "/dashboard/website/news?status=PUBLISHED",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+  {
     sectionLabel: "Spielbetrieb",
     items: [
       {
@@ -296,6 +327,14 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: "Öffentliches Anzeigeboard für Events, Resultate und Spielplan.",
     href: "/dashboard/infoboard",
     permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD],
+    carrySeason: false,
+  },
+  {
+    key: "website-news",
+    label: "Website News",
+    description: "News-Artikel erstellen, bearbeiten und auf der Website veröffentlichen.",
+    href: "/dashboard/website/news",
+    permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
     carrySeason: false,
   },
 ];
