@@ -6,6 +6,8 @@ import {
   FacilityType,
   PermissionModule,
   PrismaClient,
+  PublishStatus,
+  SponsorTier,
   TenantStatus,
 } from "@prisma/client";
 import { Pool } from "pg";
@@ -42,6 +44,10 @@ async function main() {
       // Branding v1 — Slice 10.6: use PLATFORM_BRANDING — single source of truth.
       primaryColor: PLATFORM_BRANDING.primaryColor,
       secondaryColor: PLATFORM_BRANDING.secondaryColor,
+      // Website Feed v1 — Slice 2
+      websiteEnabled: true,
+      websiteDomain: "www.fcallschwil.ch",
+      approvedDataOnly: true,
     },
     create: {
       key: "fc-allschwil",
@@ -58,6 +64,10 @@ async function main() {
       // Branding v1 — Slice 10.6: use PLATFORM_BRANDING — single source of truth.
       primaryColor: PLATFORM_BRANDING.primaryColor,
       secondaryColor: PLATFORM_BRANDING.secondaryColor,
+      // Website Feed v1 — Slice 2
+      websiteEnabled: true,
+      websiteDomain: "www.fcallschwil.ch",
+      approvedDataOnly: true,
     },
   });
 
@@ -403,6 +413,96 @@ async function main() {
           },
         });
       }
+    }
+
+    // ── FC Allschwil: Demo Sponsors (Website Feed v1) ──────────────────────────
+    // Two published sponsors for STAGE validation.
+    // Safe to re-run: upsert by (tenantId, name).
+    const sponsorSeedData: Array<{
+      name: string;
+      logoUrl: string | null;
+      websiteUrl: string | null;
+      tier: SponsorTier;
+      isActive: boolean;
+      sortOrder: number;
+      publishStatus: PublishStatus;
+    }> = [
+      {
+        name: "Gemeinde Allschwil",
+        logoUrl: null,
+        websiteUrl: "https://www.allschwil.ch",
+        tier: SponsorTier.GOLD,
+        isActive: true,
+        sortOrder: 10,
+        publishStatus: PublishStatus.PUBLISHED,
+      },
+      {
+        name: "SportClubEvo",
+        logoUrl: null,
+        websiteUrl: "https://sportclubevo.ch",
+        tier: SponsorTier.PARTNER,
+        isActive: true,
+        sortOrder: 10,
+        publishStatus: PublishStatus.PUBLISHED,
+      },
+    ];
+
+    for (const sponsorDef of sponsorSeedData) {
+      const existing = await prisma.sponsor.findFirst({
+        where: { tenantId: fcaTenant.id, name: sponsorDef.name },
+        select: { id: true },
+      });
+
+      if (existing) {
+        await prisma.sponsor.update({
+          where: { id: existing.id },
+          data: sponsorDef,
+        });
+      } else {
+        await prisma.sponsor.create({
+          data: { tenantId: fcaTenant.id, ...sponsorDef },
+        });
+      }
+    }
+
+    // ── FC Allschwil: Demo News Articles (Website Feed v1) ────────────────────
+    // Two published news articles for STAGE validation.
+    // Safe to re-run: upsert by (tenantId, slug).
+    const newsSeedData: Array<{
+      slug: string;
+      title: string;
+      excerpt: string;
+      body: string | null;
+      imageUrl: string | null;
+      publishedAt: Date;
+      publishStatus: PublishStatus;
+    }> = [
+      {
+        slug: "willkommen-saison-2025-2026",
+        title: "Willkommen zur Saison 2025/2026",
+        excerpt: "Der FC Allschwil startet mit großer Vorfreude in die neue Saison. Alle Teams sind bereit.",
+        body: null,
+        imageUrl: null,
+        publishedAt: new Date("2025-08-01T08:00:00.000Z"),
+        publishStatus: PublishStatus.PUBLISHED,
+      },
+      {
+        slug: "neue-website-launch",
+        title: "Neue Website des FC Allschwil ist online",
+        excerpt: "Wir freuen uns, unsere neue Website vorzustellen — mit aktuellen Spielplänen, News und Sponsoren.",
+        body: null,
+        imageUrl: null,
+        publishedAt: new Date("2025-09-15T10:00:00.000Z"),
+        publishStatus: PublishStatus.PUBLISHED,
+      },
+    ];
+
+    for (const newsDef of newsSeedData) {
+      await prisma.newsArticle.upsert({
+        where: { tenantId_slug: { tenantId: fcaTenant.id, slug: newsDef.slug } },
+        update: newsDef,
+        create: { tenantId: fcaTenant.id, ...newsDef },
+      });
     }
   }
 

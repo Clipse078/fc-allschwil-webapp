@@ -12,6 +12,21 @@ enum TenantStatus {
   ARCHIVED
 }
 
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SponsorTier {
+  PLATINUM
+  GOLD
+  SILVER
+  BRONZE
+  PARTNER
+  OTHER
+}
+
 enum PermissionModule {
   USERS
   SEASONS
@@ -326,12 +341,23 @@ model Tenant {
   primaryColor   String?
   secondaryColor String?
 
+  // Website Feed v1 — Slice 2
+  // websiteEnabled: gates all /api/public/v1/website/* routes.
+  // websiteDomain: canonical domain for CORS / origin validation (future use).
+  // approvedDataOnly: when true, only records with publishStatus=PUBLISHED are served.
+  //   Always true in production; set false only for local dev/testing.
+  websiteEnabled   Boolean @default(false)
+  websiteDomain    String?
+  approvedDataOnly Boolean @default(true)
+
   registrations      Registration[]
   users              User[]
   events             Event[]
   facilities             Facility[]
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
+  sponsors           Sponsor[]
+  newsArticles       NewsArticle[]
 
   @@index([status])
   @@index([name])
@@ -1226,4 +1252,73 @@ model WochenplanPublication {
   @@unique([tenantId, weekId])
   @@index([tenantId, weekId])
   @@index([tenantId, isPublished])
+}
+
+// ---------------------------------------------------------------------------
+// Sponsor — Website Feed v1 (Slice 2)
+//
+// Tenant-scoped sponsors for the public website sponsor feed.
+// Public route: GET /api/public/v1/website/sponsors
+//
+// isActive:      hides record from public feed without deleting it.
+// publishStatus: PUBLISHED is the only value served by the public feed.
+// tier:          display ordering / grouping on the website (PLATINUM → OTHER).
+// sortOrder:     secondary sort within a tier.
+//
+// Public feed exposes only: id, name, logoUrl, websiteUrl, tier, sortOrder.
+// Internal fields (tenantId, createdAt, updatedAt) are never exposed.
+// ---------------------------------------------------------------------------
+
+model Sponsor {
+  id            String        @id @default(cuid())
+  tenantId      String
+  name          String
+  logoUrl       String?
+  websiteUrl    String?
+  tier          SponsorTier   @default(OTHER)
+  isActive      Boolean       @default(true)
+  sortOrder     Int           @default(0)
+  publishStatus PublishStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId, publishStatus, isActive])
+  @@index([tenantId, tier, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// NewsArticle — Website Feed v1 (Slice 2)
+//
+// Tenant-scoped news articles for the public website news feed.
+// Public route: GET /api/public/v1/website/news
+//
+// slug:          URL-safe unique identifier per tenant (tenant-scoped unique).
+// publishStatus: PUBLISHED is the only value served by the public feed.
+// publishedAt:   explicit publish date for ordering; set at publish time.
+//
+// Public feed exposes only: id, title, slug, excerpt, imageUrl, publishedAt.
+// Body/content is intentionally excluded from the list feed (bandwidth).
+// A future /api/public/v1/website/news/[slug] detail route will expose body.
+// Internal fields (tenantId, createdAt, updatedAt) are never exposed.
+// ---------------------------------------------------------------------------
+
+model NewsArticle {
+  id            String        @id @default(cuid())
+  tenantId      String
+  title         String
+  slug          String
+  excerpt       String?
+  body          String?
+  imageUrl      String?
+  publishedAt   DateTime?
+  publishStatus PublishStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, publishStatus, publishedAt])
 }
