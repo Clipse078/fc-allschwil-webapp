@@ -36,6 +36,7 @@ type TargetFormProps = {
     visibleOrgUnitRefs?: string[];
     visibleRoleRefs?: string[];
     visibleUserRefs?: string[];
+    visibleTargetGroupRefs?: string[];
     startsAt?: string;
     endsAt?: string;
     metrics?: MetricDraft[];
@@ -113,6 +114,9 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
   const [visibleUserRefs, setVisibleUserRefs] = useState<string[]>(
     defaultValues?.visibleUserRefs ?? [],
   );
+  const [visibleTargetGroupRefs, setVisibleTargetGroupRefs] = useState<string[]>(
+    defaultValues?.visibleTargetGroupRefs ?? [],
+  );
   const [sportCategory, setSportCategory] = useState(defaultValues?.sportCategory ?? "");
   const [ageGroupHint, setAgeGroupHint] = useState(defaultValues?.ageGroupHint ?? "");
   const [startsAt, setStartsAt] = useState(defaultValues?.startsAt ?? "");
@@ -166,6 +170,7 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
         visibleOrgUnitRefs: visibilityScope === "RESTRICTED" ? visibleOrgUnitRefs : [],
         visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
         visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
+        visibleTargetGroupRefs: visibilityScope === "RESTRICTED" ? visibleTargetGroupRefs : [],
         metrics: metrics
           .filter((m) => m.label.trim())
           .map((m, idx) => ({
@@ -486,9 +491,11 @@ export default function TargetForm({ mode, targetId, defaultValues }: TargetForm
           visibleOrgUnitRefs={visibleOrgUnitRefs}
           visibleRoleRefs={visibleRoleRefs}
           visibleUserRefs={visibleUserRefs}
+          visibleTargetGroupRefs={visibleTargetGroupRefs}
           onOrgUnitsChange={setVisibleOrgUnitRefs}
           onRolesChange={setVisibleRoleRefs}
           onUsersChange={setVisibleUserRefs}
+          onTargetGroupsChange={setVisibleTargetGroupRefs}
         />
       </section>
 

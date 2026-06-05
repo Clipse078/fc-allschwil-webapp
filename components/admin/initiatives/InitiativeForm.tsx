@@ -23,6 +23,7 @@ type InitiativeFormProps = {
     visibleOrgUnitRefs?: string[];
     visibleRoleRefs?: string[];
     visibleUserRefs?: string[];
+    visibleTargetGroupRefs?: string[];
   };
 };
 
@@ -57,6 +58,9 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
   const [visibleUserRefs, setVisibleUserRefs] = useState<string[]>(
     defaultValues?.visibleUserRefs ?? [],
   );
+  const [visibleTargetGroupRefs, setVisibleTargetGroupRefs] = useState<string[]>(
+    defaultValues?.visibleTargetGroupRefs ?? [],
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +89,7 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
         visibleOrgUnitRefs: visibilityScope === "RESTRICTED" ? visibleOrgUnitRefs : [],
         visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
         visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
+        visibleTargetGroupRefs: visibilityScope === "RESTRICTED" ? visibleTargetGroupRefs : [],
       };
 
       const url = mode === "edit" ? `/api/initiatives/${initiativeId}` : "/api/initiatives";
@@ -225,9 +230,11 @@ export default function InitiativeForm({ mode, initiativeId, defaultValues }: In
           visibleOrgUnitRefs={visibleOrgUnitRefs}
           visibleRoleRefs={visibleRoleRefs}
           visibleUserRefs={visibleUserRefs}
+          visibleTargetGroupRefs={visibleTargetGroupRefs}
           onOrgUnitsChange={setVisibleOrgUnitRefs}
           onRolesChange={setVisibleRoleRefs}
           onUsersChange={setVisibleUserRefs}
+          onTargetGroupsChange={setVisibleTargetGroupRefs}
         />
       </section>
 

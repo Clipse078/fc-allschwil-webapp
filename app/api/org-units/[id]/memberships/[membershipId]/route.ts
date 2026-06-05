@@ -54,6 +54,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     status?: OrgUnitMembershipStatus;
     startsAt?: Date | null;
     endsAt?: Date | null;
+    seasonId?: string | null;
+    notes?: string | null;
   } = {};
 
   // Slice 11.4: validate roleKey against Role table when provided.
@@ -86,6 +88,23 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if ("endsAt" in body) {
     data.endsAt = body.endsAt ? new Date(body.endsAt) : null;
   }
+  // Phase A: seasonId + notes
+  if ("seasonId" in body) {
+    const rawSeasonId = typeof body.seasonId === "string" ? body.seasonId.trim() || null : null;
+    if (rawSeasonId) {
+      const seasonExists = await prisma.season.findUnique({
+        where: { id: rawSeasonId },
+        select: { id: true },
+      });
+      if (!seasonExists) {
+        return NextResponse.json({ error: "Saison nicht gefunden." }, { status: 400 });
+      }
+    }
+    data.seasonId = rawSeasonId;
+  }
+  if ("notes" in body) {
+    data.notes = typeof body.notes === "string" ? body.notes.trim() || null : null;
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
@@ -105,6 +124,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         status: true,
         startsAt: true,
         endsAt: true,
+        seasonId: true,
+        notes: true,
       },
     });
     return NextResponse.json({ membership: updated });

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Building2,
   ChevronRight,
+  Clock,
   GitBranch,
   Hash,
   Layers,
@@ -67,12 +68,16 @@ function getInitials(name: string): string {
 export default async function OrgUnitDetailPage({ params }: PageProps) {
   const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const { id } = await params;
-  const [unit, tenant, roles] = await Promise.all([
+  const [unit, tenant, roles, seasons] = await Promise.all([
     getOrgUnitById(id),
     getTenantFromSession(session.user?.tenantId),
     prisma.role.findMany({
       orderBy: { name: "asc" },
       select: { id: true, key: true, name: true },
+    }),
+    prisma.season.findMany({
+      orderBy: { startDate: "desc" },
+      select: { id: true, name: true, key: true, isActive: true },
     }),
   ]);
   if (!unit) notFound();
@@ -233,6 +238,21 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Tab navigation — Phase B */}
+      <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
+        <span className="flex items-center gap-1.5 rounded-lg bg-[var(--surface-2)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]">
+          <Users className="h-4 w-4" />
+          Aktive Mitglieder
+        </span>
+        <Link
+          href={`/dashboard/org-units/${unit.id}/history`}
+          className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:text-[var(--foreground)]"
+        >
+          <Clock className="h-4 w-4" />
+          Verlauf
+        </Link>
+      </div>
+
       {/* Content grid */}
       <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
         {/* Main column */}
@@ -358,11 +378,12 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
             </div>
           ) : null}
 
-          {/* Membership management (Slice 11.4: role picker) */}
+          {/* Membership management (Slice 11.4: role picker; Phase A: season/notes) */}
           <OrgMembershipManagementCard
             orgUnitId={unit.id}
             initialMemberships={unit.memberships}
             roles={roles}
+            seasons={seasons}
           />
         </div>
 

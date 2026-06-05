@@ -22,6 +22,7 @@ type MeetingFormProps = {
     visibleOrgUnitRefs?: string[];
     visibleRoleRefs?: string[];
     visibleUserRefs?: string[];
+    visibleTargetGroupRefs?: string[];
   };
 };
 
@@ -51,6 +52,9 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
   );
   const [visibleUserRefs, setVisibleUserRefs] = useState<string[]>(
     defaultValues?.visibleUserRefs ?? [],
+  );
+  const [visibleTargetGroupRefs, setVisibleTargetGroupRefs] = useState<string[]>(
+    defaultValues?.visibleTargetGroupRefs ?? [],
   );
 
   const [loading, setLoading] = useState(false);
@@ -82,6 +86,7 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
         visibleOrgUnitRefs: visibilityScope === "RESTRICTED" ? visibleOrgUnitRefs : [],
         visibleRoleRefs: visibilityScope === "RESTRICTED" ? visibleRoleRefs : [],
         visibleUserRefs: visibilityScope === "RESTRICTED" ? visibleUserRefs : [],
+        visibleTargetGroupRefs: visibilityScope === "RESTRICTED" ? visibleTargetGroupRefs : [],
       };
 
       const url = mode === "edit" ? `/api/meetings/${meetingId}` : "/api/meetings";
@@ -211,9 +216,11 @@ export default function MeetingForm({ mode, meetingId, defaultValues }: MeetingF
           visibleOrgUnitRefs={visibleOrgUnitRefs}
           visibleRoleRefs={visibleRoleRefs}
           visibleUserRefs={visibleUserRefs}
+          visibleTargetGroupRefs={visibleTargetGroupRefs}
           onOrgUnitsChange={setVisibleOrgUnitRefs}
           onRolesChange={setVisibleRoleRefs}
           onUsersChange={setVisibleUserRefs}
+          onTargetGroupsChange={setVisibleTargetGroupRefs}
         />
       </section>
 

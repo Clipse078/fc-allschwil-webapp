@@ -107,6 +107,21 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
   }
 
+  // Phase A: seasonId — optional reference to a Season for time-bounded memberships.
+  const rawSeasonId: string | null = body?.seasonId?.trim() || null;
+  if (rawSeasonId) {
+    const seasonExists = await prisma.season.findUnique({
+      where: { id: rawSeasonId },
+      select: { id: true },
+    });
+    if (!seasonExists) {
+      return NextResponse.json({ error: "Saison nicht gefunden." }, { status: 400 });
+    }
+  }
+
+  // Phase A: notes — optional free-text for contextual information.
+  const notes: string | null = body?.notes?.trim() || null;
+
   try {
     const membership = await prisma.orgUnitMembership.create({
       data: {
@@ -121,8 +136,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         isPrimary: body?.isPrimary === true,
         startsAt: body?.startsAt ? new Date(body.startsAt) : null,
         endsAt: body?.endsAt ? new Date(body.endsAt) : null,
+        seasonId: rawSeasonId,
+        notes,
       },
-      select: { id: true, userId: true, personId: true, roleKey: true, status: true },
+      select: { id: true, userId: true, personId: true, roleKey: true, status: true, seasonId: true },
     });
     return NextResponse.json({ membership }, { status: 201 });
   } catch (e) {

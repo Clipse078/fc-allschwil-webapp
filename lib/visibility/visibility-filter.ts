@@ -36,6 +36,8 @@ export type VisibilityCheckable = {
   visibleTeamRefs: unknown;
   visibleOrgUnitRefs: unknown;
   visiblePersonRefs: unknown;
+  /** Phase D: TargetGroup IDs whose resolved members can see this entity. */
+  visibleTargetGroupRefs?: unknown;
 };
 
 /** Parse a JSONB field that stores a plain string[]. */
@@ -77,6 +79,12 @@ export function canSeeEntity(entity: VisibilityCheckable, actor: ActorContext): 
   const visibleOrgUnitIds = parseStringArray(entity.visibleOrgUnitRefs);
   if (visibleOrgUnitIds.length > 0 && actor.orgUnitIds.length > 0) {
     if (visibleOrgUnitIds.some((id) => actor.orgUnitIds.includes(id))) return true;
+  }
+
+  // Phase D: TargetGroup check — actor is a resolved member of any of the visible target groups
+  const visibleTargetGroupIds = parseStringArray(entity.visibleTargetGroupRefs);
+  if (visibleTargetGroupIds.length > 0 && actor.targetGroupIds.length > 0) {
+    if (visibleTargetGroupIds.some((id) => actor.targetGroupIds.includes(id))) return true;
   }
 
   // TODO: person ID check — requires actor.personId (not yet in session)

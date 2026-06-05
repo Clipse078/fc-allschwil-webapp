@@ -36,6 +36,8 @@ const MEETING_LIST_SELECT = {
   visibleTeamRefs: true,
   visibleOrgUnitRefs: true,
   visiblePersonRefs: true,
+  // Phase D: target group visibility refs
+  visibleTargetGroupRefs: true,
 } as const;
 
 export async function getMeetings(actor: ActorContext) {

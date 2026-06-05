@@ -84,6 +84,8 @@ export async function POST(request: NextRequest) {
         visibleOrgUnitRefs: Array.isArray(body?.visibleOrgUnitRefs) ? body.visibleOrgUnitRefs : undefined,
         visibleRoleRefs: Array.isArray(body?.visibleRoleRefs) ? body.visibleRoleRefs : undefined,
         visibleUserRefs: Array.isArray(body?.visibleUserRefs) ? body.visibleUserRefs : undefined,
+        // Phase D: target group refs for resolved-member visibility
+        visibleTargetGroupRefs: Array.isArray(body?.visibleTargetGroupRefs) ? body.visibleTargetGroupRefs : undefined,
         visibilityScope: Object.values(VisibilityScope).includes(body?.visibilityScope as VisibilityScope)
           ? (body.visibilityScope as VisibilityScope)
           : VisibilityScope.ORGANISATION,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarRange, ChevronUp, Loader2, Pencil, UserPlus, Users } from "lucide-react";
+import { CalendarRange, ChevronUp, Clock, Loader2, Pencil, UserPlus, Users } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import OrgMembershipPicker from "@/components/admin/org/OrgMembershipPicker";
@@ -22,6 +22,12 @@ type MembershipPerson = {
   email: string | null;
 };
 
+type MembershipSeason = {
+  id: string;
+  name: string;
+  key: string;
+};
+
 export type Membership = {
   id: string;
   userId: string | null;
@@ -31,16 +37,21 @@ export type Membership = {
   status: string;
   startsAt: Date | null;
   endsAt: Date | null;
+  notes: string | null;
+  seasonId: string | null;
+  season: MembershipSeason | null;
   user: MembershipUser | null;
   person: MembershipPerson | null;
 };
 
 export type RoleSummary = { id: string; key: string; name: string };
+export type SeasonSummary = { id: string; name: string; key: string; isActive: boolean };
 
 type OrgMembershipManagementCardProps = {
   orgUnitId: string;
   initialMemberships: Membership[];
   roles: RoleSummary[];
+  seasons?: SeasonSummary[];
 };
 
 function resolveRoleName(roleKey: string | null, roles: RoleSummary[]): string | null {
@@ -102,6 +113,7 @@ export default function OrgMembershipManagementCard({
   orgUnitId,
   initialMemberships,
   roles,
+  seasons = [],
 }: OrgMembershipManagementCardProps) {
   const router = useRouter();
   const [addPanelOpen, setAddPanelOpen] = useState(false);
@@ -224,6 +236,7 @@ export default function OrgMembershipManagementCard({
             existingMemberPersonIds={existingMemberPersonIds}
             onAdded={handleAdded}
             roles={roles}
+            seasons={seasons}
           />
         </div>
       ) : null}
@@ -372,7 +385,22 @@ export default function OrgMembershipManagementCard({
                         {period}
                       </span>
                     ) : null}
+
+                    {/* Season badge — Phase A */}
+                    {m.season ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                        <Clock className="h-2.5 w-2.5" />
+                        {m.season.name}
+                      </span>
+                    ) : null}
                   </div>
+
+                  {/* Notes — Phase A */}
+                  {m.notes ? (
+                    <p className="mt-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[12px] text-[var(--text-2)]">
+                      {m.notes}
+                    </p>
+                  ) : null}
 
                   {/* Role edit error (shown below metadata row for the active row) */}
                   {isEditingRole && roleEditError ? (
