@@ -267,6 +267,35 @@ enum ReviewWorkflowStage {
   PUBLISHED
 }
 
+// ---------------------------------------------------------------------------
+// WebsitePublishStatus — Website Management Foundation
+//
+// Lifecycle enum for publishable website content sections.
+// Mirrors ReviewWorkflowStage vocabulary for consistency but is website-specific:
+//  DRAFT        — not yet submitted for review
+//  IN_REVIEW    — submitted, awaiting approval
+//  APPROVED     — approved by reviewer, not yet published live
+//  PUBLISHED    — live on the public website
+//  UNPUBLISHED  — was published, now taken offline
+// ---------------------------------------------------------------------------
+enum WebsitePublishStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  UNPUBLISHED
+}
+
+// WebsiteSectionType — canonical section identifiers for the public website
+enum WebsiteSectionType {
+  TEAMS
+  EVENTS
+  WEEKPLAN
+  SPONSORS
+  NEWS
+  CONTENT
+}
+
 enum WorkflowDomain {
   EVENTS
   SEASONS
@@ -326,12 +355,23 @@ model Tenant {
   primaryColor   String?
   secondaryColor String?
 
+  // Website Management Foundation
+  // All nullable: no opinionated defaults — callers apply platform defaults when null.
+  // websiteDomain   : public hostname (e.g. "www.fc-allschwil.ch"); used for tenant resolution.
+  // websiteEnabled  : master switch; when false, public website feeds are disabled.
+  // approvedDataOnly: when true, only APPROVED/PUBLISHED content is served via public API.
+  websiteDomain    String?
+  websiteEnabled   Boolean @default(false)
+  approvedDataOnly Boolean @default(true)
+
   registrations      Registration[]
   users              User[]
   events             Event[]
   facilities             Facility[]
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
+  websiteSections        WebsiteSection[]
+  publishedSnapshots     PublishedSnapshot[]
 
   @@index([status])
   @@index([name])
@@ -1226,4 +1266,69 @@ model WochenplanPublication {
   @@unique([tenantId, weekId])
   @@index([tenantId, weekId])
   @@index([tenantId, isPublished])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteSection — Website Management Foundation
+//
+// One record per (tenantId, type): tracks the current publish status of each
+// canonical section of the public website for a given tenant.
+//
+// sectionType  — canonical section identifier (TEAMS, EVENTS, WEEKPLAN, …)
+// status       — current publication lifecycle stage
+// label        — optional human-readable override for UI (falls back to type)
+// sortOrder    — display order in the Website dashboard
+// isEnabled    — per-section master switch independent of global websiteEnabled
+// lastPublishedAt — when this section last transitioned to PUBLISHED
+// lastPublishedByUserId — user who triggered the last publish
+// ---------------------------------------------------------------------------
+model WebsiteSection {
+  id                    String               @id @default(cuid())
+  tenantId              String
+  sectionType           WebsiteSectionType
+  status                WebsitePublishStatus @default(DRAFT)
+  label                 String?
+  sortOrder             Int                  @default(0)
+  isEnabled             Boolean              @default(true)
+  lastPublishedAt       DateTime?
+  lastPublishedByUserId String?
+  notes                 String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  publishedSnapshots PublishedSnapshot[]
+
+  @@unique([tenantId, sectionType])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// PublishedSnapshot — Website Management Foundation
+//
+// Immutable audit trail of publish events for a website section.
+// Each time a section transitions to PUBLISHED (or UNPUBLISHED), a snapshot
+// is appended. This enables rollback UI and history display without overwriting
+// the live section record.
+//
+// snapshotJson — arbitrary JSON payload capturing what was published,
+//   e.g. { teamCount, eventCount, weekplanVariant } for future enrichment.
+// ---------------------------------------------------------------------------
+model PublishedSnapshot {
+  id             String               @id @default(cuid())
+  tenantId       String
+  sectionId      String
+  status         WebsitePublishStatus
+  publishedByUserId String?
+  snapshotJson   Json?
+  notes          String?
+  createdAt      DateTime             @default(now())
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  section WebsiteSection @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([sectionId, createdAt])
 }

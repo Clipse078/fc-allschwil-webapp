@@ -37,6 +37,10 @@ const tenantContextSelect = {
   logoUrl: true,
   primaryColor: true,
   secondaryColor: true,
+  // Website Management Foundation
+  websiteDomain: true,
+  websiteEnabled: true,
+  approvedDataOnly: true,
 } as const;
 
 export type TenantContext = {
@@ -58,6 +62,10 @@ export type TenantContext = {
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  // Website Management Foundation. websiteEnabled/approvedDataOnly have DB defaults.
+  websiteDomain: string | null;
+  websiteEnabled: boolean;
+  approvedDataOnly: boolean;
 };
 
 /**

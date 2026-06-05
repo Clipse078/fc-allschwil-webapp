@@ -116,6 +116,12 @@ export const NAV_SECTIONS: NavSection[] = [
             href: "/dashboard/admin/facilities",
             permissionKeys: [PERMISSIONS.FACILITIES_VIEW, PERMISSIONS.FACILITIES_MANAGE],
           },
+          {
+            key: "admin-website",
+            label: "Website-Integration",
+            href: "/dashboard/admin/website",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
         ],
       },
     ],
@@ -192,6 +198,26 @@ export const NAV_SECTIONS: NavSection[] = [
         permissionKeys: [
           PERMISSIONS.INFOBOARD_MANAGE,
           PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
+        ],
+      },
+      {
+        key: "website",
+        label: "Website",
+        href: "/dashboard/website",
+        permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+        children: [
+          {
+            key: "website-sections",
+            label: "Sektionen",
+            href: "/dashboard/website/sections",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
+            key: "website-settings",
+            label: "Einstellungen",
+            href: "/dashboard/website/settings",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
         ],
       },
       {
@@ -296,6 +322,14 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     description: "Öffentliches Anzeigeboard für Events, Resultate und Spielplan.",
     href: "/dashboard/infoboard",
     permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD],
+    carrySeason: false,
+  },
+  {
+    key: "website",
+    label: "Website",
+    description: "Öffentliche Website verwalten: Sektionen, Publikationsstatus und Inhaltssteuerung.",
+    href: "/dashboard/website",
+    permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
     carrySeason: false,
   },
 ];
