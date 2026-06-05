@@ -8,16 +8,34 @@
 --   4. NewsArticle table — tenant-scoped, slug-unique per tenant, PUBLISHED-gated for public feeds.
 --
 -- Additive only: no destructive changes, no data loss, zero downtime safe.
+--
+-- Idempotency: all statements use IF NOT EXISTS guards. Safe to re-run if
+-- parts were applied out-of-band (e.g. manual hotfix on STAGE DB).
 
 -- 1. Tenant website flags
-ALTER TABLE "Tenant" ADD COLUMN "websiteEnabled" BOOLEAN NOT NULL DEFAULT true;
-ALTER TABLE "Tenant" ADD COLUMN "approvedDataOnly" BOOLEAN NOT NULL DEFAULT false;
+--    ADD COLUMN IF NOT EXISTS ensures no error if columns were added manually.
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "websiteEnabled" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "approvedDataOnly" BOOLEAN NOT NULL DEFAULT false;
+
+-- 1a. Correct defaults if columns existed with wrong defaults from an earlier out-of-band apply.
+ALTER TABLE "Tenant" ALTER COLUMN "websiteEnabled" SET DEFAULT true;
+ALTER TABLE "Tenant" ALTER COLUMN "approvedDataOnly" SET DEFAULT false;
+
+-- 1b. Enable website integration for the fc-allschwil tenant.
+--     Required so /api/public/v1/website/news routes serve data instead of 403.
+--     Only updates if it is currently false (safe no-op if already true).
+UPDATE "Tenant" SET "websiteEnabled" = true WHERE key = 'fc-allschwil' AND "websiteEnabled" = false;
 
 -- 2. NewsArticleStatus enum
-CREATE TYPE "NewsArticleStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+--    Uses DO block for CREATE TYPE to allow idempotent re-runs.
+DO $$ BEGIN
+  CREATE TYPE "NewsArticleStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+EXCEPTION WHEN duplicate_object THEN
+  NULL; -- enum already exists, no-op
+END $$;
 
 -- 3. NewsArticle table
-CREATE TABLE "NewsArticle" (
+CREATE TABLE IF NOT EXISTS "NewsArticle" (
     "id"          TEXT NOT NULL,
     "tenantId"    TEXT NOT NULL,
     "slug"        TEXT NOT NULL,
@@ -33,14 +51,19 @@ CREATE TABLE "NewsArticle" (
 );
 
 -- Unique constraint: slug is unique per tenant
-CREATE UNIQUE INDEX "NewsArticle_tenantId_slug_key" ON "NewsArticle"("tenantId", "slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "NewsArticle_tenantId_slug_key" ON "NewsArticle"("tenantId", "slug");
 
 -- Indexes
-CREATE INDEX "NewsArticle_tenantId_idx" ON "NewsArticle"("tenantId");
-CREATE INDEX "NewsArticle_tenantId_status_idx" ON "NewsArticle"("tenantId", "status");
-CREATE INDEX "NewsArticle_tenantId_status_publishedAt_idx" ON "NewsArticle"("tenantId", "status", "publishedAt");
-CREATE INDEX "NewsArticle_slug_idx" ON "NewsArticle"("slug");
+CREATE INDEX IF NOT EXISTS "NewsArticle_tenantId_idx" ON "NewsArticle"("tenantId");
+CREATE INDEX IF NOT EXISTS "NewsArticle_tenantId_status_idx" ON "NewsArticle"("tenantId", "status");
+CREATE INDEX IF NOT EXISTS "NewsArticle_tenantId_status_publishedAt_idx" ON "NewsArticle"("tenantId", "status", "publishedAt");
+CREATE INDEX IF NOT EXISTS "NewsArticle_slug_idx" ON "NewsArticle"("slug");
 
 -- Foreign key: NewsArticle.tenantId → Tenant.id (cascade delete/update)
-ALTER TABLE "NewsArticle" ADD CONSTRAINT "NewsArticle_tenantId_fkey"
+--    DO block allows idempotent re-runs if constraint already exists.
+DO $$ BEGIN
+  ALTER TABLE "NewsArticle" ADD CONSTRAINT "NewsArticle_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN
+  NULL; -- constraint already exists, no-op
+END $$;

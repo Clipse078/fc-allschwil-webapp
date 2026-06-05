@@ -53,6 +53,13 @@ async function main() {
   const prisma = new PrismaClient({ adapter });
 
   try {
+    // ── pre-run teardown ─────────────────────────────────────────────────
+    // Remove any leftover test tenants from a previous interrupted run.
+    // NewsArticle rows cascade-delete with their tenant.
+    await prisma.tenant.deleteMany({
+      where: { key: { in: ["news-feed-test-a", "news-feed-test-b"] } },
+    });
+
     // ── seed fixture ────────────────────────────────────────────────────────
 
     // Tenant A — websiteEnabled=true
@@ -377,6 +384,15 @@ async function main() {
       process.exit(1);
     }
   } finally {
+    // ── post-run teardown ─────────────────────────────────────────────────
+    // Always remove test fixtures regardless of pass/fail.
+    try {
+      await prisma.tenant.deleteMany({
+        where: { key: { in: ["news-feed-test-a", "news-feed-test-b"] } },
+      });
+    } catch {
+      // Ignore cleanup errors — test data is prefixed to avoid collisions.
+    }
     await prisma.$disconnect();
     await pool.end();
   }
