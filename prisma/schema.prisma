@@ -326,6 +326,19 @@ model Tenant {
   primaryColor   String?
   secondaryColor String?
 
+  // Website Feed Contract v1 — Slice 1
+  // websiteDomain: custom domain for this tenant's public website (e.g. "www.fc-allschwil.ch").
+  //   Used to resolve tenant from Host header on public /api/public/v1/website/* routes.
+  //   Null = domain-based resolution not configured; fall back to ?tenant= slug param.
+  // websiteEnabled: gates all /api/public/v1/website/* endpoints for this tenant.
+  //   False = 503/disabled response regardless of other settings.
+  // approvedDataOnly: when true, only content that passed review workflow
+  //   (reviewStage APPROVED or PUBLISHED) appears in public feeds.
+  //   False = all published/scheduled data is eligible (useful for dev/staging).
+  websiteDomain    String?  @unique
+  websiteEnabled   Boolean  @default(false)
+  approvedDataOnly Boolean  @default(true)
+
   registrations      Registration[]
   users              User[]
   events             Event[]

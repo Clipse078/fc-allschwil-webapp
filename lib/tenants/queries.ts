@@ -15,6 +15,10 @@ const tenantConfigSelect = {
   logoUrl: true,
   primaryColor: true,
   secondaryColor: true,
+  // Website Feed Contract v1 — Slice 1
+  websiteDomain: true,
+  websiteEnabled: true,
+  approvedDataOnly: true,
 } as const;
 
 const tenantSelect = {
@@ -118,6 +122,14 @@ export type TenantConfig = {
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+};
+
+// Website Feed Contract v1 — Slice 1.
+// Separate from TenantConfig to avoid coupling the admin config form to website settings.
+export type TenantWebsiteConfig = {
+  websiteDomain: string | null;
+  websiteEnabled: boolean;
+  approvedDataOnly: boolean;
 };
 
 export type TenantListItem = Awaited<ReturnType<typeof getTenants>>[number];
