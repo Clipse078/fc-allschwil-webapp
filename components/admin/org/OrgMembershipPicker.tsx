@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
 
 type RoleSummary = { id: string; key: string; name: string };
+type SeasonSummary = { id: string; name: string; key: string; isActive: boolean };
 
 type OrgMembershipPickerProps = {
   orgUnitId: string;
@@ -12,6 +13,7 @@ type OrgMembershipPickerProps = {
   existingMemberPersonIds: string[];
   onAdded: () => void;
   roles: RoleSummary[];
+  seasons?: SeasonSummary[];
 };
 
 type UserOption = { id: string; name: string; email: string };
@@ -23,6 +25,7 @@ export default function OrgMembershipPicker({
   existingMemberPersonIds,
   onAdded,
   roles,
+  seasons = [],
 }: OrgMembershipPickerProps) {
   const [mode, setMode] = useState<Mode>("user");
 
@@ -41,6 +44,9 @@ export default function OrgMembershipPicker({
   const [isPrimary, setIsPrimary] = useState(false);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
+  // Phase A: season + notes
+  const [seasonId, setSeasonId] = useState("");
+  const [notes, setNotes] = useState("");
 
   // Submit state
   const [submitting, setSubmitting] = useState(false);
@@ -81,6 +87,8 @@ export default function OrgMembershipPicker({
     setIsPrimary(false);
     setStartsAt("");
     setEndsAt("");
+    setSeasonId("");
+    setNotes("");
     setSubmitError(null);
     if (next === "user") loadUsers();
   }
@@ -93,6 +101,8 @@ export default function OrgMembershipPicker({
     setIsPrimary(false);
     setStartsAt("");
     setEndsAt("");
+    setSeasonId("");
+    setNotes("");
     setSubmitError(null);
   }
 
@@ -131,6 +141,8 @@ export default function OrgMembershipPicker({
           isPrimary,
           startsAt: startsAt || undefined,
           endsAt: endsAt || undefined,
+          seasonId: seasonId || undefined,
+          notes: notes.trim() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -310,6 +322,40 @@ export default function OrgMembershipPicker({
             className={inputClass}
           />
         </div>
+      </div>
+
+      {/* Phase A — Season picker */}
+      {seasons.length > 0 ? (
+        <div>
+          <label className={labelClass}>Saison (optional)</label>
+          <select
+            value={seasonId}
+            onChange={(e) => setSeasonId(e.target.value)}
+            className="fca-select"
+          >
+            <option value="">— Keine Saison zuordnen —</option>
+            {seasons.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}{s.isActive ? " (Aktiv)" : ""}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-[var(--muted)]">
+            Ordne die Mitgliedschaft einer Saison zu, um die Saisonzugehörigkeit zu dokumentieren.
+          </p>
+        </div>
+      ) : null}
+
+      {/* Phase A — Notes */}
+      <div>
+        <label className={labelClass}>Notizen (optional)</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="z.B. Übernahme aus Vorsaison, Urlaubsvertretung…"
+          rows={2}
+          className={`${inputClass} resize-none`}
+        />
       </div>
 
       {/* Submit error */}

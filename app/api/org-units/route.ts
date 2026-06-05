@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { OrgUnitType } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 
 // Slice 11.2b: tenant resolved from session-carried tenantId via getTenantFromSession().
 // Falls back to getDefaultTenant() for legacy sessions where tenantId is null.
+// Phase 1 Core: GET accepts ORG_VIEW in addition to ORG_MANAGE so the
+// AllowlistPanel can fetch org units for any user with read access.
 
 export async function GET() {
-  const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
+  const access = await requireApiAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const tenant = await getTenantFromSession(access.session.user?.tenantId);

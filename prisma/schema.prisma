@@ -510,9 +510,10 @@ model Season {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teamSeasons     TeamSeason[]
-  events          Event[]
-  eventImportRuns EventImportRun[]
+  teamSeasons        TeamSeason[]
+  events             Event[]
+  eventImportRuns    EventImportRun[]
+  orgUnitMemberships OrgUnitMembership[]
 
   @@index([isActive])
 }
@@ -808,13 +809,15 @@ model Initiative {
   reviewedAt            DateTime?
 
   // Visibility / access control
-  visibilityScope    VisibilityScope @default(ORGANISATION)
-  createdByUserId    String?
-  visibleRoleRefs    Json?
-  visibleUserRefs    Json?
-  visibleTeamRefs    Json?
-  visibleOrgUnitRefs Json?
-  visiblePersonRefs  Json?
+  visibilityScope        VisibilityScope @default(ORGANISATION)
+  createdByUserId        String?
+  visibleRoleRefs        Json?
+  visibleUserRefs        Json?
+  visibleTeamRefs        Json?
+  visibleOrgUnitRefs     Json?
+  visiblePersonRefs      Json?
+  // Phase D — TargetGroup visibility: resolved target group members can see this entity.
+  visibleTargetGroupRefs Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -854,14 +857,16 @@ model Meeting {
   reviewedAt            DateTime?
 
   // Visibility / access control
-  visibilityScope    VisibilityScope @default(ORGANISATION)
-  createdByUserId    String?
-  // String[] stored as JSON — role keys, user IDs, team IDs, org unit IDs, person IDs
-  visibleRoleRefs    Json?
-  visibleUserRefs    Json?
-  visibleTeamRefs    Json?
-  visibleOrgUnitRefs Json?
-  visiblePersonRefs  Json?
+  visibilityScope        VisibilityScope @default(ORGANISATION)
+  createdByUserId        String?
+  // String[] stored as JSON — role keys, user IDs, team IDs, org unit IDs, person IDs, target group IDs
+  visibleRoleRefs        Json?
+  visibleUserRefs        Json?
+  visibleTeamRefs        Json?
+  visibleOrgUnitRefs     Json?
+  visiblePersonRefs      Json?
+  // Phase D — TargetGroup visibility: resolved target group members can see this entity.
+  visibleTargetGroupRefs Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -915,18 +920,25 @@ model OrgUnitMembership {
   isPrimary Boolean                 @default(false)
   startsAt  DateTime?
   endsAt    DateTime?
+  // Phase A — season-aware membership: optional season reference for time-bounded memberships.
+  // Notes field for contextual information (e.g. reason for joining, handover notes).
+  seasonId  String?
+  notes     String?
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
 
   orgUnit OrgUnit @relation(fields: [orgUnitId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   person  Person? @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  season  Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([orgUnitId])
   @@index([userId])
   @@index([personId])
   @@index([tenantId, userId])
   @@index([orgUnitId, status])
+  @@index([seasonId])
+  @@index([tenantId, orgUnitId, status])
 }
 
 model TargetGroup {
@@ -1075,13 +1087,15 @@ model Target {
   linkedMeetingRefs    Json?
 
   // Visibility / access control — consistent with Meeting and Initiative pattern
-  visibilityScope    VisibilityScope @default(ORGANISATION)
-  createdByUserId    String?
-  visibleRoleRefs    Json?
-  visibleUserRefs    Json?
-  visibleTeamRefs    Json?
-  visibleOrgUnitRefs Json?
-  visiblePersonRefs  Json?
+  visibilityScope        VisibilityScope @default(ORGANISATION)
+  createdByUserId        String?
+  visibleRoleRefs        Json?
+  visibleUserRefs        Json?
+  visibleTeamRefs        Json?
+  visibleOrgUnitRefs     Json?
+  visiblePersonRefs      Json?
+  // Phase D — TargetGroup visibility: resolved target group members can see this entity.
+  visibleTargetGroupRefs Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
