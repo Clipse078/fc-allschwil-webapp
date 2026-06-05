@@ -93,6 +93,42 @@ export async function getDefaultTenant() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Website feed queries — Slice 4 (News Detail Endpoint)
+//
+// These functions include websiteEnabled and approvedDataOnly in their select
+// so the public feed routes can gate access without an extra DB round-trip.
+// Kept separate from the base tenantSelect to avoid widening existing types.
+// ---------------------------------------------------------------------------
+
+const websiteTenantSelect = {
+  id: true,
+  key: true,
+  name: true,
+  status: true,
+  websiteEnabled: true,
+  approvedDataOnly: true,
+} as const;
+
+export async function getActiveTenantForWebsiteFeed(key: string) {
+  return prisma.tenant.findFirst({
+    where: { key, status: "ACTIVE" },
+    select: websiteTenantSelect,
+  });
+}
+
+export async function getDefaultTenantForWebsiteFeed() {
+  try {
+    return await getActiveTenantForWebsiteFeed(DEFAULT_TENANT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export type WebsiteFeedTenant = NonNullable<
+  Awaited<ReturnType<typeof getActiveTenantForWebsiteFeed>>
+>;
+
 export async function getTenantDetail(key: string) {
   return prisma.tenant.findUnique({
     where: { key },
