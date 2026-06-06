@@ -50,6 +50,20 @@ async function main() {
     );
   }
 
+  // Resolve the default tenant so the admin user receives a valid tenantId.
+  // Without this, session.user.tenantId is null and strict API routes (branding,
+  // facilities, news, etc.) return "Kein Mandant in der Sitzung".
+  const defaultTenant = await prisma.tenant.findFirst({
+    where: { key: "fc-allschwil", status: "ACTIVE" },
+    select: { id: true },
+  });
+
+  if (!defaultTenant) {
+    throw new Error(
+      "Default tenant 'fc-allschwil' not found or not ACTIVE. Run `npm run db:seed` first."
+    );
+  }
+
   const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
   const adminUser = await prisma.user.upsert({
@@ -59,6 +73,7 @@ async function main() {
       lastName: "Admin",
       passwordHash,
       isActive: true,
+      tenantId: defaultTenant.id,
     },
     create: {
       email: "admin@fcallschwil.ch",
@@ -66,6 +81,7 @@ async function main() {
       lastName: "Admin",
       passwordHash,
       isActive: true,
+      tenantId: defaultTenant.id,
     },
   });
 
@@ -85,6 +101,7 @@ async function main() {
 
   console.log("Bootstrap admin complete.");
   console.log("Email:", adminUser.email);
+  console.log("Tenant:", defaultTenant.id);
   console.log("Change the password immediately after first login.");
 }
 
