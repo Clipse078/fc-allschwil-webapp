@@ -183,6 +183,31 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    sectionLabel: "Website",
+    items: [
+      {
+        key: "website",
+        label: "Website",
+        href: "/dashboard/website/news",
+        permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+        children: [
+          {
+            key: "website-news",
+            label: "News",
+            href: "/dashboard/website/news",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE],
+          },
+          {
+            key: "website-media",
+            label: "Medien",
+            href: "/dashboard/website/media",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+  {
     sectionLabel: "Spielbetrieb",
     items: [
       {
