@@ -14,7 +14,7 @@
  */
 
 import { useState } from "react";
-import { Film, ImageIcon, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Film, ImageIcon, Loader2, Plus, X } from "lucide-react";
 import MediaLibraryModal from "@/components/admin/media/MediaLibraryModal";
 import type { MediaPickerValue } from "@/components/admin/media/MediaLibraryModal";
 import type { NewsArticleGalleryItem } from "@/lib/news/admin-queries";
@@ -217,15 +217,9 @@ function GalleryItemCard({
   removing: boolean;
   onRemove: () => void;
 }) {
-  const [confirmRemove, setConfirmRemove] = useState(false);
 
   function handleRemoveClick(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirmRemove) {
-      setConfirmRemove(true);
-      setTimeout(() => setConfirmRemove(false), 2500);
-      return;
-    }
     onRemove();
   }
 
@@ -246,23 +240,15 @@ function GalleryItemCard({
           </div>
         )}
 
-        {/* Remove button */}
+        {/* Remove button — visible on hover */}
         <button
           type="button"
           onClick={handleRemoveClick}
           disabled={removing}
-          className={`absolute right-1.5 top-1.5 flex items-center justify-center rounded-full p-1 text-white transition ${
-            confirmRemove ? "bg-rose-600 opacity-100" : "bg-black/50 opacity-0 group-hover:opacity-100"
-          }`}
-          title={confirmRemove ? "Wirklich entfernen?" : "Aus Galerie entfernen"}
+          className="absolute right-1.5 top-1.5 flex items-center justify-center rounded-full bg-rose-600 p-1 text-white opacity-0 transition group-hover:opacity-100"
+          title="Aus Galerie entfernen"
         >
-          {removing ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : confirmRemove ? (
-            <Trash2 className="h-3 w-3" />
-          ) : (
-            <X className="h-3 w-3" />
-          )}
+          {removing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
         </button>
       </div>
 

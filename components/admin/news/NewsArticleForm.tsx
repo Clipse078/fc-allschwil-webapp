@@ -97,10 +97,13 @@ export default function NewsArticleForm({ article }: NewsArticleFormProps) {
   const [reviewNotes, setReviewNotes] = useState(article?.reviewNotes ?? "");
   const [showReviewPanel, setShowReviewPanel] = useState(false);
 
-  // Gallery
+  // Gallery — local state for create mode; server-persisted in edit mode
   const [galleryItems] = useState<NewsArticleGalleryItem[]>(
     article?.galleryMedia ?? [],
   );
+  const [localGalleryItems, setLocalGalleryItems] = useState<
+    { id: string; mediaAssetId: string; caption: string | null; orderIndex: number; mediaAsset: { id: string; url: string; altText: string | null; filename: string; mimeType: string; sizeBytes: number; width: number | null; height: number | null; type: string } }[]
+  >([]);
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -182,6 +185,18 @@ export default function NewsArticleForm({ article }: NewsArticleFormProps) {
       if (data.article?.status) setStatus(data.article.status as ArticleStatus);
 
       const savedId: string = data.article?.id ?? article?.id;
+
+      // In create mode, persist any locally-staged gallery items to the server
+      if (!isEdit && localGalleryItems.length > 0) {
+        for (const item of localGalleryItems) {
+          await fetch(`/api/news/${savedId}/gallery`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mediaAssetId: item.mediaAssetId, caption: item.caption }),
+          });
+        }
+      }
+
       router.push(`/dashboard/website/news/${savedId}/edit`);
       router.refresh();
       setSaveSuccess(true);
@@ -295,6 +310,7 @@ export default function NewsArticleForm({ article }: NewsArticleFormProps) {
             <NewsArticleGalleryPicker
               articleId={article?.id}
               initialItems={galleryItems}
+              onGalleryChange={!isEdit ? setLocalGalleryItems : undefined}
             />
           </div>
         </div>
