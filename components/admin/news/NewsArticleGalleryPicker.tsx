@@ -25,7 +25,8 @@ type LocalGalleryItem = {
   id: string;
   mediaAssetId: string;
   caption: string | null;
-  orderIndex: number;
+  sortOrder: number;
+  placement: string | null;
   mediaAsset: {
     id: string;
     url: string;
@@ -107,7 +108,8 @@ export default function NewsArticleGalleryPicker({
         id: `local-${Date.now()}`,
         mediaAssetId: asset.id,
         caption: null,
-        orderIndex: nextOrder,
+        sortOrder: nextOrder,
+        placement: null,
         mediaAsset: {
           id: asset.id,
           url: asset.url,

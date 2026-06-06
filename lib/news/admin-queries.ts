@@ -31,7 +31,8 @@ export type NewsArticleGalleryItem = {
   id: string;
   mediaAssetId: string;
   caption: string | null;
-  orderIndex: number;
+  sortOrder: number;
+  placement: string | null;
   mediaAsset: {
     id: string;
     url: string;
@@ -55,6 +56,7 @@ export type NewsArticleAdminListItem = {
   publishedAt: Date | null;
   scheduledAt: Date | null;
   authorName: string | null;
+  authorPersonId: string | null;
   channels: unknown;
   tags: unknown;
   heroMediaId: string | null;
@@ -95,7 +97,8 @@ const galleryMediaSelect = {
   id: true,
   mediaAssetId: true,
   caption: true,
-  orderIndex: true,
+  sortOrder: true,
+  placement: true,
   mediaAsset: { select: galleryMediaAssetSelect },
 } as const;
 
@@ -109,6 +112,7 @@ const adminListSelect = {
   publishedAt: true,
   scheduledAt: true,
   authorName: true,
+  authorPersonId: true,
   channels: true,
   tags: true,
   heroMediaId: true,
@@ -124,7 +128,7 @@ const adminDetailSelect = {
   content: true,
   galleryMedia: {
     select: galleryMediaSelect,
-    orderBy: { orderIndex: "asc" as const },
+    orderBy: { sortOrder: "asc" as const },
   },
 } as const;
 
@@ -262,6 +266,7 @@ export type UpdateNewsArticleInput = {
   channels?: string[] | null;
   scheduledAt?: Date | null;
   authorName?: string | null;
+  authorPersonId?: string | null;
   tags?: string[] | null;
   reviewStage?: ArticleReviewStage;
   reviewNotes?: string | null;
@@ -293,6 +298,11 @@ export async function updateNewsArticle(
   }
   if (input.channels !== undefined) data.channels = input.channels ?? null;
   if (input.authorName !== undefined) data.authorName = input.authorName;
+  if (input.authorPersonId !== undefined) {
+    data.authorPerson = input.authorPersonId
+      ? { connect: { id: input.authorPersonId } }
+      : { disconnect: true };
+  }
   if (input.tags !== undefined) data.tags = input.tags ?? null;
   if (input.reviewStage !== undefined) data.reviewStage = input.reviewStage;
   if (input.reviewNotes !== undefined) data.reviewNotes = input.reviewNotes;
@@ -455,16 +465,16 @@ export async function addGalleryItem(
   });
   if (!asset) return null;
 
-  // Determine next orderIndex
+  // Determine next sortOrder
   const maxOrder = await prisma.newsArticleMedia.aggregate({
-    where: { newsArticleId },
-    _max: { orderIndex: true },
+    where: { articleId: newsArticleId },
+    _max: { sortOrder: true },
   });
-  const nextOrder = (maxOrder._max.orderIndex ?? -1) + 1;
+  const nextOrder = (maxOrder._max.sortOrder ?? -1) + 1;
 
   const item = await prisma.newsArticleMedia.upsert({
-    where: { newsArticleId_mediaAssetId: { newsArticleId, mediaAssetId } },
-    create: { newsArticleId, mediaAssetId, caption: caption ?? null, orderIndex: nextOrder },
+    where: { articleId_mediaAssetId: { articleId: newsArticleId, mediaAssetId } },
+    create: { tenantId, articleId: newsArticleId, mediaAssetId, caption: caption ?? null, sortOrder: nextOrder },
     update: { caption: caption ?? null },
     select: galleryMediaSelect,
   });
@@ -485,7 +495,7 @@ export async function updateGalleryItemCaption(
   if (!article) return false;
 
   await prisma.newsArticleMedia.updateMany({
-    where: { id: galleryItemId, newsArticleId },
+    where: { id: galleryItemId, articleId: newsArticleId },
     data: { caption },
   });
   return true;
@@ -503,7 +513,7 @@ export async function removeGalleryItem(
   if (!article) return false;
 
   await prisma.newsArticleMedia.deleteMany({
-    where: { id: galleryItemId, newsArticleId },
+    where: { id: galleryItemId, articleId: newsArticleId },
   });
   return true;
 }

@@ -102,7 +102,7 @@ export default function NewsArticleForm({ article }: NewsArticleFormProps) {
     article?.galleryMedia ?? [],
   );
   const [localGalleryItems, setLocalGalleryItems] = useState<
-    { id: string; mediaAssetId: string; caption: string | null; orderIndex: number; mediaAsset: { id: string; url: string; altText: string | null; filename: string; mimeType: string; sizeBytes: number; width: number | null; height: number | null; type: string } }[]
+    { id: string; mediaAssetId: string; caption: string | null; sortOrder: number; placement: string | null; mediaAsset: { id: string; url: string; altText: string | null; filename: string; mimeType: string; sizeBytes: number; width: number | null; height: number | null; type: string } }[]
   >([]);
 
   // UI state
