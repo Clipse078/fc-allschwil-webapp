@@ -15,9 +15,12 @@ import {
   ClipboardList,
   FileText,
   Flag,
+  Globe,
+  ImageIcon,
   Inbox,
   LayoutDashboard,
   Monitor,
+  Newspaper,
   Palette,
   ScrollText,
   Settings2,
@@ -72,6 +75,9 @@ function getNavIcon(label: string) {
     case "Benutzer":        return Shield;
     case "Registrierungen": return Inbox;
     case "Infoboard":       return Monitor;
+    case "News":            return Newspaper;
+    case "Medien":          return ImageIcon;
+    case "Website":         return Globe;
     default:                return LayoutDashboard;
   }
 }
