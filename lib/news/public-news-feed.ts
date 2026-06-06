@@ -7,6 +7,11 @@
  * - Detail query selects content/body but only for a single article.
  * - All queries are scoped to a tenantId to enforce tenant isolation.
  * - Internal fields (status, createdAt, updatedAt, tenantId) are never returned.
+ *
+ * imageUrl resolution (Phase 3):
+ *   heroMedia.storagePath takes priority when heroMediaId is set.
+ *   Falls back to the plain imageUrl string for backward compat.
+ *   The public API contract always surfaces a single imageUrl field.
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -26,6 +31,7 @@ const publicArticleListSelect = {
   excerpt: true,
   imageUrl: true,
   publishedAt: true,
+  heroMedia: { select: { storagePath: true } },
 } as const;
 
 const publicArticleDetailSelect = {
@@ -36,6 +42,7 @@ const publicArticleDetailSelect = {
   content: true,
   imageUrl: true,
   publishedAt: true,
+  heroMedia: { select: { storagePath: true } },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -81,7 +88,11 @@ export async function getPublicNewsArticles(
   });
 
   return rows.map((row) => ({
-    ...row,
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt ?? null,
+    imageUrl: row.heroMedia?.storagePath ?? row.imageUrl ?? null,
     publishedAt: row.publishedAt!,
   }));
 }
@@ -113,7 +124,12 @@ export async function getPublicNewsArticleBySlug(
   if (!row) return null;
 
   return {
-    ...row,
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt ?? null,
+    content: row.content,
+    imageUrl: row.heroMedia?.storagePath ?? row.imageUrl ?? null,
     publishedAt: row.publishedAt!,
   };
 }

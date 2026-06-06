@@ -298,6 +298,14 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD],
     carrySeason: false,
   },
+  {
+    key: "website",
+    label: "Website",
+    description: "News-CMS, Medien-Bibliothek und Website-Inhalte verwalten.",
+    href: "/dashboard/website/news",
+    permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+    carrySeason: false,
+  },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

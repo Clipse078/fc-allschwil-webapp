@@ -11,9 +11,45 @@ enum TenantStatus {
   INACTIVE
   ARCHIVED
 }
+enum MediaAssetType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum MediaAssetStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum StorageProvider {
+  LOCAL
+  BLOB
+  S3
+  R2
+}
+
+enum NewsContentBlockType {
+  TEXT
+  IMAGE
+  GALLERY
+  VIDEO
+  QUOTE
+  DIVIDER
+  CTA
+}
+
+enum NewsChannel {
+  WEBSITE
+  MOBILE_APP
+  INFOBOARD
+  NEWSLETTER
+}
 
 enum NewsArticleStatus {
   DRAFT
+  REVIEW
+  APPROVED
   PUBLISHED
   ARCHIVED
 }
@@ -346,6 +382,7 @@ model Tenant {
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
   newsArticles           NewsArticle[]
+  mediaAssets            MediaAsset[]
 
   @@index([status])
   @@index([name])
@@ -372,6 +409,8 @@ model User {
   auditLogs             AuditLog[]      @relation("AuditActor")
   assignedRegistrations Registration[]  @relation("RegistrationAssignedUser")
   orgUnitMemberships    OrgUnitMembership[]
+  mediaAssets           MediaAsset[]    @relation("MediaAssetCreatedBy")
+  newsArticles          NewsArticle[]   @relation("NewsArticleCreatedBy")
 
   @@index([isActive])
   @@index([tenantId])
@@ -1241,22 +1280,20 @@ model WochenplanPublication {
   @@index([tenantId, weekId])
   @@index([tenantId, isPublished])
 }
-
 // ---------------------------------------------------------------------------
-// NewsArticle — Public website news feed (Slice 4)
+// NewsArticle — Website News CMS (V2)
 //
-// Tenant-scoped news articles surfaced via the public website API.
-// Only PUBLISHED articles are returned by the public endpoints.
+// Tenant-scoped news articles for the public website and future channels.
+// Only PUBLISHED articles with a non-null publishedAt are returned by public endpoints.
 //
-// The public list endpoint (/api/public/v1/website/news) omits `content`
-// for performance. The detail endpoint (/api/public/v1/website/news/[slug])
-// includes the full `content` body.
+// Phase 3: heroMediaId — FK to MediaAsset (replaces plain imageUrl for new articles).
+//   imageUrl is retained for backward compat with the public API contract.
+//   publishNewsArticle() syncs imageUrl from heroMedia.storagePath.
 //
-// Safe public fields: id, title, slug, excerpt, content (detail only),
-//   imageUrl, publishedAt.
-//
-// Internal fields never exposed on public endpoints: tenantId, status,
-//   createdAt, updatedAt.
+// Phase 8: authorName — display name for the article author.
+// Phase 9: channels — JSON array of NewsChannel values. Default: [WEBSITE].
+//   WEBSITE is active; others are DB-ready preparation for future channels.
+// Phase 10: createdById — FK to User, for four-eye audit trail.
 // ---------------------------------------------------------------------------
 
 model NewsArticle {
@@ -1266,17 +1303,124 @@ model NewsArticle {
   title       String
   excerpt     String?
   content     String
+  // Kept for public API backward compat; synced from heroMedia.storagePath on publish.
   imageUrl    String?
   status      NewsArticleStatus @default(DRAFT)
   publishedAt DateTime?
+
+  // Phase 3 — Hero image via Media Library
+  heroMediaId String?
+
+  // Phase 8 — Author display name
+  authorName  String?
+
+  // Phase 9 — Publishing channels (JSON array of NewsChannel enum values)
+  channels    Json?
+
+  // Phase 10 — Four-eye audit trail
+  createdById String?
+
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  heroMedia     MediaAsset?   @relation("NewsArticleHeroMedia", fields: [heroMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy     User?         @relation("NewsArticleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  contentBlocks NewsContentBlock[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, status, publishedAt])
   @@index([slug])
+  @@index([heroMediaId])
+}
+
+// ---------------------------------------------------------------------------
+// MediaAsset — Shared Media Library (Phase 1)
+//
+// Single source of truth for all uploaded assets across ClubEvo.
+// Future consumers: News, Sponsors, Website Pages, Mobile App, Newsletter.
+//
+// Storage is provider-agnostic:
+//   storageProvider  — which backend holds the bytes (BLOB, S3, R2, LOCAL)
+//   storageKey       — provider-internal path (e.g. Vercel Blob pathname)
+//   storagePath      — public CDN URL served to consumers
+//
+// Focal point (focalX/focalY, 0-100) enables smart cropping for hero images,
+// sponsor banners, and future page builder components.
+//
+// Sponsor and WebsitePage relations remain as preparation-only (no Sponsor or
+// WebsitePage models yet). The architecture avoids future migration rework:
+// when those models are added, they simply add an FK pointing here.
+// ---------------------------------------------------------------------------
+
+model MediaAsset {
+  id              String           @id @default(cuid())
+  tenantId        String
+  type            MediaAssetType
+  status          MediaAssetStatus @default(ACTIVE)
+  name            String
+  altText         String?
+  fileName        String
+  mimeType        String
+  fileSize        Int
+  storageProvider StorageProvider  @default(BLOB)
+  storageKey      String
+  storagePath     String
+  focalX          Int?
+  focalY          Int?
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdBy   User?        @relation("MediaAssetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  // Phase 3: Hero image for news articles
+  newsArticleHeroes  NewsArticle[]       @relation("NewsArticleHeroMedia")
+  // Phase 4/5: Content block image references
+  contentBlocks      NewsContentBlock[]
+
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@index([createdById])
+}
+
+// ---------------------------------------------------------------------------
+// NewsContentBlock — Structured content foundation (Phase 4)
+//
+// Additive blocks enable future migration to structured content without
+// breaking the editor. Markdown content field remains active.
+//
+// type  — block variant (TEXT, IMAGE, GALLERY, VIDEO, QUOTE, DIVIDER, CTA)
+// data  — JSON payload; shape depends on block type:
+//         TEXT    : { markdown: string }
+//         IMAGE   : { mediaId: string, caption?: string }
+//         VIDEO   : { provider: "youtube"|"vimeo", url: string, caption?: string }
+//         QUOTE   : { text: string, attribution?: string }
+//         CTA     : { label: string, url: string }
+//         DIVIDER : {}
+//         GALLERY : { mediaIds: string[] }
+//
+// Phases 5/6: IMAGE blocks reference MediaAsset via mediaId for embedded images.
+//             VIDEO blocks store provider + URL only (no video file uploads).
+// ---------------------------------------------------------------------------
+
+model NewsContentBlock {
+  id        String               @id @default(cuid())
+  articleId String
+  sortOrder Int                  @default(0)
+  type      NewsContentBlockType
+  data      Json
+  mediaId   String?
+  createdAt DateTime             @default(now())
+
+  article NewsArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  media   MediaAsset?  @relation(fields: [mediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([articleId])
+  @@index([articleId, sortOrder])
+  @@index([mediaId])
 }
