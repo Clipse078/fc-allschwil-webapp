@@ -5,6 +5,7 @@
  * - WebsiteResponseEnvelope<T> is the single envelope wrapper for all website API responses.
  * - Article types are split: list items never expose content/body (bandwidth + security).
  * - Only safe, website-facing fields are declared here; internal DB fields stay in lib/news/.
+ * - Workflow/review fields (status, reviewNotes, etc.) are never exposed publicly.
  */
 
 // ---------------------------------------------------------------------------
@@ -20,12 +21,6 @@ export type WebsiteEnvelopeTenant = {
 
 /**
  * Standard response envelope for all /api/public/v1/website/* endpoints.
- *
- * version     — API contract version. Bump when shape changes are breaking.
- * tenant      — Identifies which tenant's data this response contains.
- * generatedAt — ISO 8601 UTC timestamp of response generation.
- * data        — Endpoint-specific payload (typed via T).
- * meta        — Endpoint-specific pagination / count metadata.
  */
 export type WebsiteResponseEnvelope<T> = {
   version: string;
@@ -33,6 +28,34 @@ export type WebsiteResponseEnvelope<T> = {
   generatedAt: string;
   data: T;
   meta: Record<string, unknown>;
+};
+
+// ---------------------------------------------------------------------------
+// Shared media snippet
+// ---------------------------------------------------------------------------
+
+export type PublicMediaSnippet = {
+  id: string;
+  url: string;
+  altText: string | null;
+  filename: string;
+};
+
+export type PublicAdditionalMediaItem = {
+  id: string;
+  sortOrder: number;
+  caption: string | null;
+  placement: string | null;
+  mediaAsset: {
+    id: string;
+    url: string;
+    filename: string;
+    altText: string | null;
+    type: string;
+    mimeType: string;
+    width: number | null;
+    height: number | null;
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -50,15 +73,17 @@ export type PublicNewsArticleListItem = {
   excerpt: string | null;
   imageUrl: string | null;
   publishedAt: Date;
+  heroMedia: PublicMediaSnippet | null;
 };
 
 // ---------------------------------------------------------------------------
-// News article — detail (includes content/body)
+// News article — detail (includes content/body and all media)
 // ---------------------------------------------------------------------------
 
 /**
  * Safe article fields exposed on the detail endpoint.
- * Includes content/body. Only returned for PUBLISHED articles.
+ * Includes content/body, hero media, and additional gallery media.
+ * Only returned for PUBLISHED articles with publishedAt <= now.
  */
 export type PublicNewsArticleDetail = {
   id: string;
@@ -68,6 +93,8 @@ export type PublicNewsArticleDetail = {
   content: string;
   imageUrl: string | null;
   publishedAt: Date;
+  heroMedia: PublicMediaSnippet | null;
+  additionalMedia: PublicAdditionalMediaItem[];
 };
 
 // ---------------------------------------------------------------------------

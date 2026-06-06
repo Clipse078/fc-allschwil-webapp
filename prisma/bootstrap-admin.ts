@@ -40,6 +40,16 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  const tenant = await prisma.tenant.findUnique({
+    where: { key: "fc-allschwil" },
+  });
+
+  if (!tenant) {
+    throw new Error(
+      "fc-allschwil tenant not found. Run `npm run db:seed` first to create tenant."
+    );
+  }
+
   const superAdminRole = await prisma.role.findUnique({
     where: { key: "super_admin" },
   });
@@ -59,6 +69,7 @@ async function main() {
       lastName: "Admin",
       passwordHash,
       isActive: true,
+      tenantId: tenant.id,
     },
     create: {
       email: "admin@fcallschwil.ch",
@@ -66,6 +77,7 @@ async function main() {
       lastName: "Admin",
       passwordHash,
       isActive: true,
+      tenantId: tenant.id,
     },
   });
 

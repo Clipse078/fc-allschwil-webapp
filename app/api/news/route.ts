@@ -18,6 +18,14 @@ import {
   type ArticleStatus,
 } from "@/lib/news/admin-queries";
 
+const VALID_STATUSES: ArticleStatus[] = [
+  "DRAFT",
+  "IN_REVIEW",
+  "SCHEDULED",
+  "PUBLISHED",
+  "ARCHIVED",
+];
+
 // ── GET /api/news ─────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -33,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const rawStatus = searchParams.get("status")?.toUpperCase();
-  const status = ["DRAFT", "SCHEDULED", "PUBLISHED", "ARCHIVED"].includes(rawStatus ?? "")
+  const status = VALID_STATUSES.includes(rawStatus as ArticleStatus)
     ? (rawStatus as ArticleStatus)
     : undefined;
   const limit = Math.min(Number(searchParams.get("limit") ?? "50"), 200);
@@ -74,11 +82,9 @@ export async function POST(request: NextRequest) {
 
   const content = typeof body.content === "string" ? body.content : "";
 
-  // Resolve slug
   let slug = typeof body.slug === "string" ? body.slug.trim() : "";
   if (!slug) slug = slugify(title);
 
-  // Ensure uniqueness — append counter on collision
   let finalSlug = slug;
   let counter = 1;
   while (!(await isSlugAvailable(tenantId, finalSlug))) {
@@ -96,6 +102,7 @@ export async function POST(request: NextRequest) {
     channels: Array.isArray(body.channels) ? (body.channels as string[]) : null,
     scheduledAt: typeof body.scheduledAt === "string" ? new Date(body.scheduledAt) : null,
     authorName: typeof body.authorName === "string" ? body.authorName.trim() || null : null,
+    authorPersonId: typeof body.authorPersonId === "string" ? body.authorPersonId : null,
     tags: Array.isArray(body.tags) ? (body.tags as string[]) : null,
   });
 

@@ -55,7 +55,11 @@ export default function NewsArticleList() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data?.error ?? "Fehler"); return; }
       setArticles((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: data.article.status, publishedAt: data.article.publishedAt } : a)),
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, status: data.article.status, publishedAt: data.article.publishedAt }
+            : a,
+        ),
       );
     } finally {
       setActionPending(null);
@@ -79,6 +83,7 @@ export default function NewsArticleList() {
   const filters: { label: string; value: FilterStatus }[] = [
     { label: "Alle", value: "ALL" },
     { label: "Entwurf", value: "DRAFT" },
+    { label: "In Prüfung", value: "IN_REVIEW" },
     { label: "Geplant", value: "SCHEDULED" },
     { label: "Veröffentlicht", value: "PUBLISHED" },
     { label: "Archiviert", value: "ARCHIVED" },
@@ -88,7 +93,7 @@ export default function NewsArticleList() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
+        <div className="inline-flex flex-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
           {filters.map((f) => (
             <button
               key={f.value}
@@ -133,7 +138,10 @@ export default function NewsArticleList() {
       {loading && articles.length === 0 ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]" />
+            <div
+              key={i}
+              className="h-14 animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]"
+            />
           ))}
         </div>
       ) : articles.length === 0 ? (
@@ -198,19 +206,26 @@ export default function NewsArticleList() {
                       >
                         <PenLine className="h-3.5 w-3.5" />
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => handlePublish(article.id, article.status)}
-                        disabled={actionPending === article.id}
-                        className="sce-icon-button"
-                        title={article.status === "PUBLISHED" ? "Depublizieren" : "Veröffentlichen"}
-                      >
-                        {article.status === "PUBLISHED" ? (
-                          <EyeOff className="h-3.5 w-3.5" />
-                        ) : (
-                          <Eye className="h-3.5 w-3.5" />
-                        )}
-                      </button>
+                      {/* Only show publish toggle for non-review statuses */}
+                      {article.status !== "IN_REVIEW" && (
+                        <button
+                          type="button"
+                          onClick={() => handlePublish(article.id, article.status)}
+                          disabled={actionPending === article.id}
+                          className="sce-icon-button"
+                          title={
+                            article.status === "PUBLISHED"
+                              ? "Depublizieren"
+                              : "Veröffentlichen"
+                          }
+                        >
+                          {article.status === "PUBLISHED" ? (
+                            <EyeOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleDelete(article.id)}

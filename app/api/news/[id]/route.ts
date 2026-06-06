@@ -74,14 +74,48 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const updated = await updateNewsArticle(tenantId, id, {
     ...(typeof body.title === "string" ? { title: body.title.trim() } : {}),
     ...(typeof body.slug === "string" ? { slug: body.slug.trim() } : {}),
-    ...(body.excerpt !== undefined ? { excerpt: typeof body.excerpt === "string" ? body.excerpt.trim() || null : null } : {}),
+    ...(body.excerpt !== undefined
+      ? { excerpt: typeof body.excerpt === "string" ? body.excerpt.trim() || null : null }
+      : {}),
     ...(typeof body.content === "string" ? { content: body.content } : {}),
-    ...(body.imageUrl !== undefined ? { imageUrl: typeof body.imageUrl === "string" ? body.imageUrl.trim() || null : null } : {}),
-    ...(body.heroMediaId !== undefined ? { heroMediaId: typeof body.heroMediaId === "string" ? body.heroMediaId : null } : {}),
-    ...(body.channels !== undefined ? { channels: Array.isArray(body.channels) ? (body.channels as string[]) : null } : {}),
-    ...(body.scheduledAt !== undefined ? { scheduledAt: typeof body.scheduledAt === "string" ? new Date(body.scheduledAt) : null } : {}),
-    ...(body.authorName !== undefined ? { authorName: typeof body.authorName === "string" ? body.authorName.trim() || null : null } : {}),
-    ...(body.tags !== undefined ? { tags: Array.isArray(body.tags) ? (body.tags as string[]) : null } : {}),
+    ...(body.imageUrl !== undefined
+      ? { imageUrl: typeof body.imageUrl === "string" ? body.imageUrl.trim() || null : null }
+      : {}),
+    ...(body.heroMediaId !== undefined
+      ? { heroMediaId: typeof body.heroMediaId === "string" ? body.heroMediaId : null }
+      : {}),
+    ...(body.channels !== undefined
+      ? { channels: Array.isArray(body.channels) ? (body.channels as string[]) : null }
+      : {}),
+    ...(body.scheduledAt !== undefined
+      ? {
+          scheduledAt:
+            typeof body.scheduledAt === "string" && body.scheduledAt
+              ? new Date(body.scheduledAt)
+              : null,
+        }
+      : {}),
+    ...(body.authorName !== undefined
+      ? {
+          authorName:
+            typeof body.authorName === "string" ? body.authorName.trim() || null : null,
+        }
+      : {}),
+    ...(body.authorPersonId !== undefined
+      ? {
+          authorPersonId:
+            typeof body.authorPersonId === "string" ? body.authorPersonId || null : null,
+        }
+      : {}),
+    ...(body.tags !== undefined
+      ? { tags: Array.isArray(body.tags) ? (body.tags as string[]) : null }
+      : {}),
+    ...(body.reviewNotes !== undefined
+      ? {
+          reviewNotes:
+            typeof body.reviewNotes === "string" ? body.reviewNotes.trim() || null : null,
+        }
+      : {}),
   });
 
   if (!updated) {

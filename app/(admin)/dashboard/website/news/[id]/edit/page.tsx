@@ -44,7 +44,7 @@ export default async function NewsArticleEditPage({
         description={`Slug: ${article.slug}`}
       />
 
-      <NewsArticleForm article={article} />
+      <NewsArticleForm article={article} requiresReview={ctx.approvedDataOnly} />
     </div>
   );
 }
