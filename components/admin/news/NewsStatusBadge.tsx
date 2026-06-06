@@ -5,6 +5,10 @@ const STATUS_STYLES: Record<ArticleStatus, { label: string; className: string }>
     label: "Entwurf",
     className: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]",
   },
+  IN_REVIEW: {
+    label: "In Prüfung",
+    className: "bg-blue-50 text-blue-700 border-blue-200",
+  },
   SCHEDULED: {
     label: "Geplant",
     className: "bg-amber-50 text-amber-700 border-amber-200",

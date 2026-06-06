@@ -37,6 +37,8 @@ const tenantContextSelect = {
   logoUrl: true,
   primaryColor: true,
   secondaryColor: true,
+  // Website feature flags
+  approvedDataOnly: true,
 } as const;
 
 export type TenantContext = {
@@ -58,6 +60,8 @@ export type TenantContext = {
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  // Website flags — false by default (backward-compatible).
+  approvedDataOnly: boolean;
 };
 
 /**

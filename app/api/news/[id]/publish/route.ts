@@ -1,6 +1,9 @@
 /**
- * POST /api/news/[id]/publish   — publish a news article.
- * POST /api/news/[id]/publish?action=unpublish — revert to DRAFT.
+ * POST /api/news/[id]/publish               — publish (or schedule) an article.
+ * POST /api/news/[id]/publish?action=unpublish   — revert to DRAFT.
+ * POST /api/news/[id]/publish?action=submit      — submit for review.
+ * POST /api/news/[id]/publish?action=approve     — reviewer approves.
+ * POST /api/news/[id]/publish?action=reject      — reviewer rejects (body: { notes }).
  *
  * Permission: NEWS_MANAGE
  */
@@ -8,7 +11,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { publishNewsArticle, unpublishNewsArticle } from "@/lib/news/admin-queries";
+import {
+  publishNewsArticle,
+  unpublishNewsArticle,
+  submitNewsArticleForReview,
+  approveNewsArticle,
+  rejectNewsArticle,
+} from "@/lib/news/admin-queries";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -27,10 +36,51 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action");
 
-  const article =
-    action === "unpublish"
-      ? await unpublishNewsArticle(tenantId, id)
-      : await publishNewsArticle(tenantId, id);
+  let body: Record<string, unknown> = {};
+  try {
+    body = await request.json().catch(() => ({}));
+  } catch {
+    // body is optional for most actions
+  }
+
+  let article;
+
+  switch (action) {
+    case "unpublish":
+      article = await unpublishNewsArticle(tenantId, id);
+      break;
+    case "submit":
+      article = await submitNewsArticleForReview(tenantId, id);
+      if (!article) {
+        return NextResponse.json(
+          { error: "Artikel nicht gefunden oder Status nicht erlaubt." },
+          { status: 404 },
+        );
+      }
+      break;
+    case "approve":
+      article = await approveNewsArticle(tenantId, id);
+      if (!article) {
+        return NextResponse.json(
+          { error: "Artikel nicht gefunden." },
+          { status: 404 },
+        );
+      }
+      break;
+    case "reject": {
+      const notes = typeof body.notes === "string" ? body.notes.trim() || null : null;
+      article = await rejectNewsArticle(tenantId, id, notes);
+      if (!article) {
+        return NextResponse.json(
+          { error: "Artikel nicht gefunden." },
+          { status: 404 },
+        );
+      }
+      break;
+    }
+    default:
+      article = await publishNewsArticle(tenantId, id);
+  }
 
   if (!article) {
     return NextResponse.json({ error: "Artikel nicht gefunden." }, { status: 404 });
