@@ -14,7 +14,18 @@ enum TenantStatus {
 
 enum NewsArticleStatus {
   DRAFT
+  SCHEDULED
   PUBLISHED
+  ARCHIVED
+}
+
+enum MediaAssetType {
+  IMAGE
+  VIDEO
+}
+
+enum MediaAssetStatus {
+  ACTIVE
   ARCHIVED
 }
 
@@ -339,13 +350,14 @@ model Tenant {
   websiteEnabled   Boolean @default(true)
   approvedDataOnly Boolean @default(false)
 
-  registrations      Registration[]
-  users              User[]
-  events             Event[]
+  registrations          Registration[]
+  users                  User[]
+  events                 Event[]
   facilities             Facility[]
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
   newsArticles           NewsArticle[]
+  mediaAssets            MediaAsset[]
 
   @@index([status])
   @@index([name])
@@ -1243,40 +1255,91 @@ model WochenplanPublication {
 }
 
 // ---------------------------------------------------------------------------
-// NewsArticle — Public website news feed (Slice 4)
+// MediaAsset — Shared Media Library (News CMS V2)
+//
+// Tenant-scoped media assets (images and videos) managed via the
+// admin media library. Assets are stored on Vercel Blob and referenced
+// by news articles as hero images or embedded content.
+//
+// Provider-agnostic: url stores the CDN-served public URL regardless
+// of the underlying storage backend (Vercel Blob today; S3-compatible later).
+// ---------------------------------------------------------------------------
+
+model MediaAsset {
+  id              String           @id @default(cuid())
+  tenantId        String
+  type            MediaAssetType   @default(IMAGE)
+  status          MediaAssetStatus @default(ACTIVE)
+  filename        String
+  mimeType        String
+  sizeBytes       Int
+  url             String
+  altText         String?
+  caption         String?
+  width           Int?
+  height          Int?
+  durationSec     Int?
+  createdByUserId String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  newsArticles NewsArticle[] @relation("NewsArticleHeroMedia")
+
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// NewsArticle — Public website news feed (News CMS V2)
 //
 // Tenant-scoped news articles surfaced via the public website API.
 // Only PUBLISHED articles are returned by the public endpoints.
 //
-// The public list endpoint (/api/public/v1/website/news) omits `content`
-// for performance. The detail endpoint (/api/public/v1/website/news/[slug])
-// includes the full `content` body.
+// V2 extensions (additive, backward-compatible):
+//   heroMediaId — FK to MediaAsset for the article hero image.
+//     imageUrl is kept for public-API backward-compat and populated
+//     automatically from heroMedia.url when heroMediaId is set.
+//   channels   — JSON string[] of publication channel keys
+//                (e.g. ["website", "newsletter"]).
+//   scheduledAt — UTC timestamp for deferred publication (SCHEDULED status).
+//   authorName  — display name of the article author.
+//   tags        — JSON string[] of tag labels for filtering/search.
 //
-// Safe public fields: id, title, slug, excerpt, content (detail only),
-//   imageUrl, publishedAt.
-//
-// Internal fields never exposed on public endpoints: tenantId, status,
-//   createdAt, updatedAt.
+// Public list endpoint omits content. Detail endpoint includes content.
+// Internal fields (tenantId, status, etc.) are never exposed publicly.
 // ---------------------------------------------------------------------------
 
 model NewsArticle {
-  id          String            @id @default(cuid())
-  tenantId    String
-  slug        String
-  title       String
-  excerpt     String?
-  content     String
-  imageUrl    String?
-  status      NewsArticleStatus @default(DRAFT)
-  publishedAt DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id           String            @id @default(cuid())
+  tenantId     String
+  slug         String
+  title        String
+  excerpt      String?
+  content      String
+  imageUrl     String?
+  status       NewsArticleStatus @default(DRAFT)
+  publishedAt  DateTime?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  // V2 extensions
+  heroMediaId  String?
+  channels     Json?
+  scheduledAt  DateTime?
+  authorName   String?
+  tags         Json?
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  heroMedia MediaAsset? @relation("NewsArticleHeroMedia", fields: [heroMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, status, publishedAt])
+  @@index([tenantId, heroMediaId])
   @@index([slug])
 }
