@@ -1,11 +1,16 @@
 /**
- * News CMS V2 — Admin query layer.
+ * News CMS V2.1 — Admin query layer.
  *
  * All queries are tenant-scoped. Callers must verify the tenantId
  * from the authenticated session before passing it here.
  *
  * Complements lib/news/public-news-feed.ts (public-read-only, published-only).
  * This file exposes full CRUD for all statuses (DRAFT, SCHEDULED, PUBLISHED, ARCHIVED).
+ *
+ * V2.1 additions:
+ *   - galleryMedia: ordered NewsArticleMedia items for the article gallery
+ *   - reviewStage / reviewNotes: editorial review workflow
+ *   - scheduledAt: auto-transitions status to SCHEDULED when set to future date
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -13,6 +18,7 @@ import { prisma } from "@/lib/db/prisma";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ArticleStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED" | "ARCHIVED";
+export type ArticleReviewStage = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "PUBLISHED";
 
 export type NewsArticleHeroMediaSnippet = {
   id: string;
@@ -20,6 +26,24 @@ export type NewsArticleHeroMediaSnippet = {
   altText: string | null;
   filename: string;
 } | null;
+
+export type NewsArticleGalleryItem = {
+  id: string;
+  mediaAssetId: string;
+  caption: string | null;
+  orderIndex: number;
+  mediaAsset: {
+    id: string;
+    url: string;
+    altText: string | null;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+    width: number | null;
+    height: number | null;
+    type: string;
+  };
+};
 
 export type NewsArticleAdminListItem = {
   id: string;
@@ -34,6 +58,8 @@ export type NewsArticleAdminListItem = {
   channels: unknown;
   tags: unknown;
   heroMediaId: string | null;
+  reviewStage: ArticleReviewStage;
+  reviewNotes: string | null;
   createdAt: Date;
   updatedAt: Date;
   heroMedia: NewsArticleHeroMediaSnippet;
@@ -41,6 +67,7 @@ export type NewsArticleAdminListItem = {
 
 export type NewsArticleAdminDetail = NewsArticleAdminListItem & {
   content: string;
+  galleryMedia: NewsArticleGalleryItem[];
 };
 
 // ── Select shapes ─────────────────────────────────────────────────────────────
@@ -50,6 +77,26 @@ const heroMediaSelect = {
   url: true,
   altText: true,
   filename: true,
+} as const;
+
+const galleryMediaAssetSelect = {
+  id: true,
+  url: true,
+  altText: true,
+  filename: true,
+  mimeType: true,
+  sizeBytes: true,
+  width: true,
+  height: true,
+  type: true,
+} as const;
+
+const galleryMediaSelect = {
+  id: true,
+  mediaAssetId: true,
+  caption: true,
+  orderIndex: true,
+  mediaAsset: { select: galleryMediaAssetSelect },
 } as const;
 
 const adminListSelect = {
@@ -65,6 +112,8 @@ const adminListSelect = {
   channels: true,
   tags: true,
   heroMediaId: true,
+  reviewStage: true,
+  reviewNotes: true,
   createdAt: true,
   updatedAt: true,
   heroMedia: { select: heroMediaSelect },
@@ -73,6 +122,10 @@ const adminListSelect = {
 const adminDetailSelect = {
   ...adminListSelect,
   content: true,
+  galleryMedia: {
+    select: galleryMediaSelect,
+    orderBy: { orderIndex: "asc" as const },
+  },
 } as const;
 
 // ── List ──────────────────────────────────────────────────────────────────────
@@ -189,7 +242,8 @@ export async function createNewsArticle(
     scheduledAt: input.scheduledAt ?? null,
     authorName: input.authorName ?? null,
     tags: input.tags ?? null,
-    status: "DRAFT",
+    status: deriveStatusFromScheduledAt(input.scheduledAt, "DRAFT"),
+    reviewStage: "DRAFT",
   };
 
   const row = await prisma.newsArticle.create({ data, select: adminDetailSelect });
@@ -209,6 +263,8 @@ export type UpdateNewsArticleInput = {
   scheduledAt?: Date | null;
   authorName?: string | null;
   tags?: string[] | null;
+  reviewStage?: ArticleReviewStage;
+  reviewNotes?: string | null;
 };
 
 export async function updateNewsArticle(
@@ -218,13 +274,10 @@ export async function updateNewsArticle(
 ): Promise<NewsArticleAdminDetail | null> {
   const existing = await prisma.newsArticle.findFirst({
     where: { id, tenantId },
-    select: { id: true },
+    select: { id: true, status: true, scheduledAt: true },
   });
   if (!existing) return null;
 
-  // Build data object carefully to avoid Prisma relation/FK type conflicts.
-  // heroMedia is updated via relation (connect/disconnect) not FK field.
-  // JSON fields (channels, tags) cast via `never` to satisfy Prisma's InputJsonValue.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: Record<string, any> = {};
 
@@ -239,9 +292,19 @@ export async function updateNewsArticle(
       : { disconnect: true };
   }
   if (input.channels !== undefined) data.channels = input.channels ?? null;
-  if (input.scheduledAt !== undefined) data.scheduledAt = input.scheduledAt;
   if (input.authorName !== undefined) data.authorName = input.authorName;
   if (input.tags !== undefined) data.tags = input.tags ?? null;
+  if (input.reviewStage !== undefined) data.reviewStage = input.reviewStage;
+  if (input.reviewNotes !== undefined) data.reviewNotes = input.reviewNotes;
+
+  // scheduledAt drives status auto-transition for DRAFT/SCHEDULED articles
+  if (input.scheduledAt !== undefined) {
+    data.scheduledAt = input.scheduledAt;
+    const currentStatus = existing.status as ArticleStatus;
+    if (currentStatus === "DRAFT" || currentStatus === "SCHEDULED") {
+      data.status = deriveStatusFromScheduledAt(input.scheduledAt, currentStatus);
+    }
+  }
 
   const row = await prisma.newsArticle.update({
     where: { id },
@@ -267,6 +330,7 @@ export async function publishNewsArticle(
     where: { id },
     data: {
       status: "PUBLISHED",
+      reviewStage: "PUBLISHED",
       ...(existing.status !== "PUBLISHED" ? { publishedAt: new Date() } : {}),
     },
     select: adminDetailSelect,
@@ -286,7 +350,7 @@ export async function unpublishNewsArticle(
 
   const row = await prisma.newsArticle.update({
     where: { id },
-    data: { status: "DRAFT" },
+    data: { status: "DRAFT", reviewStage: "DRAFT" },
     select: adminDetailSelect,
   });
   return row as unknown as NewsArticleAdminDetail;
@@ -302,6 +366,145 @@ export async function archiveNewsArticle(
   });
   if (!existing) return false;
   await prisma.newsArticle.update({ where: { id }, data: { status: "ARCHIVED" } });
+  return true;
+}
+
+// ── Review workflow ───────────────────────────────────────────────────────────
+
+export async function submitNewsArticleForReview(
+  tenantId: string,
+  id: string,
+): Promise<NewsArticleAdminDetail | null> {
+  const existing = await prisma.newsArticle.findFirst({
+    where: { id, tenantId },
+    select: { id: true, reviewStage: true },
+  });
+  if (!existing) return null;
+
+  const row = await prisma.newsArticle.update({
+    where: { id },
+    data: { reviewStage: "SUBMITTED" },
+    select: adminDetailSelect,
+  });
+  return row as unknown as NewsArticleAdminDetail;
+}
+
+export async function approveNewsArticle(
+  tenantId: string,
+  id: string,
+  reviewNotes?: string | null,
+): Promise<NewsArticleAdminDetail | null> {
+  const existing = await prisma.newsArticle.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const row = await prisma.newsArticle.update({
+    where: { id },
+    data: {
+      reviewStage: "APPROVED",
+      ...(reviewNotes !== undefined ? { reviewNotes } : {}),
+    },
+    select: adminDetailSelect,
+  });
+  return row as unknown as NewsArticleAdminDetail;
+}
+
+export async function rejectNewsArticle(
+  tenantId: string,
+  id: string,
+  reviewNotes?: string | null,
+): Promise<NewsArticleAdminDetail | null> {
+  const existing = await prisma.newsArticle.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const row = await prisma.newsArticle.update({
+    where: { id },
+    data: {
+      reviewStage: "REJECTED",
+      ...(reviewNotes !== undefined ? { reviewNotes } : {}),
+    },
+    select: adminDetailSelect,
+  });
+  return row as unknown as NewsArticleAdminDetail;
+}
+
+// ── Gallery CRUD ──────────────────────────────────────────────────────────────
+
+export async function addGalleryItem(
+  tenantId: string,
+  newsArticleId: string,
+  mediaAssetId: string,
+  caption?: string | null,
+): Promise<NewsArticleGalleryItem | null> {
+  // Verify article belongs to tenant
+  const article = await prisma.newsArticle.findFirst({
+    where: { id: newsArticleId, tenantId },
+    select: { id: true },
+  });
+  if (!article) return null;
+
+  // Verify media asset belongs to tenant
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: mediaAssetId, tenantId },
+    select: { id: true },
+  });
+  if (!asset) return null;
+
+  // Determine next orderIndex
+  const maxOrder = await prisma.newsArticleMedia.aggregate({
+    where: { newsArticleId },
+    _max: { orderIndex: true },
+  });
+  const nextOrder = (maxOrder._max.orderIndex ?? -1) + 1;
+
+  const item = await prisma.newsArticleMedia.upsert({
+    where: { newsArticleId_mediaAssetId: { newsArticleId, mediaAssetId } },
+    create: { newsArticleId, mediaAssetId, caption: caption ?? null, orderIndex: nextOrder },
+    update: { caption: caption ?? null },
+    select: galleryMediaSelect,
+  });
+
+  return item as unknown as NewsArticleGalleryItem;
+}
+
+export async function updateGalleryItemCaption(
+  tenantId: string,
+  newsArticleId: string,
+  galleryItemId: string,
+  caption: string | null,
+): Promise<boolean> {
+  const article = await prisma.newsArticle.findFirst({
+    where: { id: newsArticleId, tenantId },
+    select: { id: true },
+  });
+  if (!article) return false;
+
+  await prisma.newsArticleMedia.updateMany({
+    where: { id: galleryItemId, newsArticleId },
+    data: { caption },
+  });
+  return true;
+}
+
+export async function removeGalleryItem(
+  tenantId: string,
+  newsArticleId: string,
+  galleryItemId: string,
+): Promise<boolean> {
+  const article = await prisma.newsArticle.findFirst({
+    where: { id: newsArticleId, tenantId },
+    select: { id: true },
+  });
+  if (!article) return false;
+
+  await prisma.newsArticleMedia.deleteMany({
+    where: { id: galleryItemId, newsArticleId },
+  });
   return true;
 }
 
@@ -336,4 +539,15 @@ export function slugify(title: string): string {
       .replace(/^-+|-+$/g, "")
       .slice(0, 80) || "artikel"
   );
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+function deriveStatusFromScheduledAt(
+  scheduledAt: Date | null | undefined,
+  currentStatus: ArticleStatus,
+): ArticleStatus {
+  if (scheduledAt && scheduledAt > new Date()) return "SCHEDULED";
+  if (!scheduledAt && currentStatus === "SCHEDULED") return "DRAFT";
+  return currentStatus;
 }

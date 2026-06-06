@@ -82,6 +82,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     ...(body.scheduledAt !== undefined ? { scheduledAt: typeof body.scheduledAt === "string" ? new Date(body.scheduledAt) : null } : {}),
     ...(body.authorName !== undefined ? { authorName: typeof body.authorName === "string" ? body.authorName.trim() || null : null } : {}),
     ...(body.tags !== undefined ? { tags: Array.isArray(body.tags) ? (body.tags as string[]) : null } : {}),
+    ...(body.reviewStage !== undefined ? { reviewStage: body.reviewStage as import("@/lib/news/admin-queries").ArticleReviewStage } : {}),
+    ...(body.reviewNotes !== undefined ? { reviewNotes: typeof body.reviewNotes === "string" ? body.reviewNotes.trim() || null : null } : {}),
   });
 
   if (!updated) {

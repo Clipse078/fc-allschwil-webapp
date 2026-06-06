@@ -1283,8 +1283,9 @@ model MediaAsset {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  newsArticles NewsArticle[] @relation("NewsArticleHeroMedia")
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  newsArticles     NewsArticle[]      @relation("NewsArticleHeroMedia")
+  newsGalleryItems NewsArticleMedia[] @relation("NewsArticleGallery")
 
   @@index([tenantId])
   @@index([tenantId, type])
@@ -1330,16 +1331,45 @@ model NewsArticle {
   authorName   String?
   tags         Json?
 
+  // V2.1 extensions — review workflow + gallery
+  reviewStage  ReviewWorkflowStage @default(DRAFT)
+  reviewNotes  String?
+
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  heroMedia MediaAsset? @relation("NewsArticleHeroMedia", fields: [heroMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  heroMedia    MediaAsset?          @relation("NewsArticleHeroMedia", fields: [heroMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  galleryMedia NewsArticleMedia[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, status, publishedAt])
   @@index([tenantId, heroMediaId])
+  @@index([tenantId, reviewStage])
   @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// NewsArticleMedia — Article gallery / multiple media (News CMS V2.1)
+//
+// Many-to-many join table linking NewsArticle to MediaAsset for
+// article gallery images. Ordered by orderIndex. Caption is optional.
+// ---------------------------------------------------------------------------
+
+model NewsArticleMedia {
+  id            String   @id @default(cuid())
+  newsArticleId String
+  mediaAssetId  String
+  caption       String?
+  orderIndex    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  newsArticle NewsArticle @relation(fields: [newsArticleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  mediaAsset  MediaAsset  @relation("NewsArticleGallery", fields: [mediaAssetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([newsArticleId, mediaAssetId])
+  @@index([newsArticleId, orderIndex])
 }
