@@ -152,6 +152,15 @@ export default function NewsArticleForm({ article }: NewsArticleFormProps) {
   // ── Save ──────────────────────────────────────────────────────────────────
 
   function buildPayload() {
+    let scheduledAtIso: string | null = null;
+    if (scheduledAt) {
+      try {
+        const d = new Date(scheduledAt);
+        if (!isNaN(d.getTime())) scheduledAtIso = d.toISOString();
+      } catch {
+        // ignore invalid dates; treat as null
+      }
+    }
     return {
       title: title.trim(),
       slug: slug.trim(),
@@ -160,7 +169,7 @@ export default function NewsArticleForm({ article }: NewsArticleFormProps) {
       authorName: authorName.trim() || null,
       heroMediaId: heroMedia?.id ?? null,
       imageUrl: heroMedia?.url ?? null,
-      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      scheduledAt: scheduledAtIso,
     };
   }
 
