@@ -5,17 +5,26 @@ import { ImageIcon, Film, RefreshCw } from "lucide-react";
 import MediaAssetCard from "@/components/admin/media/MediaAssetCard";
 import MediaUploadButton from "@/components/admin/media/MediaUploadButton";
 import type { MediaAssetListItem } from "@/lib/media/types";
+import { SectionCard, EmptyState } from "@/components/ui/page";
 
 type FilterType = "ALL" | "IMAGE" | "VIDEO";
 
 type MediaLibraryGridProps = {
   onSelect?: (asset: MediaAssetListItem) => void;
   selectable?: boolean;
+  /**
+   * Increment this key from a parent component to trigger a grid re-fetch.
+   * Used by the page-level upload button to synchronise with the grid after
+   * an upload completes. Existing picker usages that don't pass this prop
+   * are unaffected.
+   */
+  refreshKey?: number;
 };
 
 export default function MediaLibraryGrid({
   onSelect,
   selectable = false,
+  refreshKey = 0,
 }: MediaLibraryGridProps) {
   const [assets, setAssets] = useState<MediaAssetListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -41,9 +50,10 @@ export default function MediaLibraryGrid({
     }
   }, [filter]);
 
+  // Re-fetch when filter changes or parent signals a new upload via refreshKey.
   useEffect(() => {
     loadAssets();
-  }, [loadAssets]);
+  }, [loadAssets, refreshKey]);
 
   function handleUploaded(asset: MediaAssetListItem) {
     setAssets((prev) => [asset, ...prev]);
@@ -59,9 +69,9 @@ export default function MediaLibraryGrid({
   }
 
   return (
-    <div className="space-y-4">
+    <SectionCard noPadding>
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
         {/* Filter tabs */}
         <div className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
           {(["ALL", "IMAGE", "VIDEO"] as FilterType[]).map((f) => (
@@ -78,14 +88,14 @@ export default function MediaLibraryGrid({
               {f === "IMAGE" && <ImageIcon className="h-3 w-3" />}
               {f === "VIDEO" && <Film className="h-3 w-3" />}
               {f === "ALL" ? "Alle" : f === "IMAGE" ? "Bilder" : "Videos"}
-              <span className="ml-0.5 text-[10px] text-[var(--muted)]">
-                {f === "ALL" ? total : ""}
-              </span>
+              {f === "ALL" && total > 0 && (
+                <span className="ml-0.5 text-[10px] text-[var(--muted)]">{total}</span>
+              )}
             </button>
           ))}
         </div>
 
-        {/* Actions */}
+        {/* Refresh + inline upload (for picker contexts and secondary action) */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -96,32 +106,47 @@ export default function MediaLibraryGrid({
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <MediaUploadButton onUploaded={handleUploaded} />
+          {/* Show upload button in toolbar when used as a standalone picker (no page-level PageActions) */}
+          {!onSelect && (
+            <MediaUploadButton onUploaded={handleUploaded} />
+          )}
         </div>
       </div>
 
-      {/* Error */}
+      {/* Error banner */}
       {error && (
-        <div className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
 
-      {/* Grid */}
+      {/* Content: skeleton → empty → grid */}
       {loading && assets.length === 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="aspect-video animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]" />
+            <div
+              key={i}
+              className="aspect-video animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]"
+            />
           ))}
         </div>
       ) : assets.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-[var(--muted)]">
-          <ImageIcon className="h-10 w-10 opacity-30" />
-          <p className="text-sm">Noch keine Medien vorhanden.</p>
-          <MediaUploadButton onUploaded={handleUploaded} label="Erste Datei hochladen" />
-        </div>
+        <EmptyState
+          icon={<ImageIcon className="h-10 w-10" />}
+          heading="Noch keine Medien vorhanden"
+          description="Lade Bilder oder Videos hoch, um sie in Artikeln und Seiten zu verwenden."
+          action={
+            !onSelect ? (
+              <MediaUploadButton
+                onUploaded={handleUploaded}
+                label="Erste Datei hochladen"
+                className="fca-button-primary"
+              />
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {assets.map((asset) => (
             <MediaAssetCard
               key={asset.id}
@@ -134,12 +159,14 @@ export default function MediaLibraryGrid({
         </div>
       )}
 
-      {/* Count */}
+      {/* Footer count */}
       {!loading && assets.length > 0 && (
-        <p className="text-[11px] text-[var(--muted)]">
-          {assets.length} von {total} Medien geladen
-        </p>
+        <div className="border-t border-[var(--border)] px-5 py-3">
+          <p className="text-[11px] text-[var(--muted)]">
+            {assets.length} von {total} Medien geladen
+          </p>
+        </div>
       )}
-    </div>
+    </SectionCard>
   );
 }
