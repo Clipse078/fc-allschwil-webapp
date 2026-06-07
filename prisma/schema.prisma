@@ -28,6 +28,17 @@ enum WebsitePageStatus {
   ARCHIVED
 }
 
+enum WebsiteNavKey {
+  MAIN
+  FOOTER
+}
+
+enum WebsiteNavItemType {
+  PAGE
+  CUSTOM_URL
+  EXTERNAL_URL
+}
+
 enum MediaAssetType {
   IMAGE
   VIDEO
@@ -369,6 +380,8 @@ model Tenant {
   mediaAssets            MediaAsset[]
   newsArticleMedia       NewsArticleMedia[]
   websitePages           WebsitePage[]
+  websiteNavigations     WebsiteNavigation[]
+  websiteNavigationItems WebsiteNavigationItem[]
 
   @@index([status])
   @@index([name])
@@ -1431,6 +1444,7 @@ model WebsitePage {
 
   tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   authorPerson Person? @relation("WebsitePageAuthorPerson", fields: [authorPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  navigationItems WebsiteNavigationItem[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -1439,4 +1453,68 @@ model WebsitePage {
   @@index([tenantId, status, scheduledAt])
   @@index([tenantId, authorPersonId])
   @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteNavigation — Tenant-managed navigation groups (Slice 2)
+//
+// Two groups per tenant: MAIN (top-bar navigation) and FOOTER.
+// Groups are auto-created on first access (upserted by the query layer).
+// Items are ordered by sortOrder, filtered by isVisible for public API.
+// ---------------------------------------------------------------------------
+
+model WebsiteNavigation {
+  id        String         @id @default(cuid())
+  tenantId  String
+  key       WebsiteNavKey
+  label     String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  tenant Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  items  WebsiteNavigationItem[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteNavigationItem — Single entry inside a WebsiteNavigation group.
+//
+// itemType drives how url / pageId are used:
+//   PAGE         → pageId required; public API resolves to page slug if PUBLISHED
+//   CUSTOM_URL   → url is a relative path (e.g. "/teams")
+//   EXTERNAL_URL → url is an absolute URL (e.g. "https://...")
+//
+// parentId enables one level of nesting (optional — null = top-level item).
+// isVisible = false items are filtered out on the public API.
+// opensInNewTab drives <a target="_blank"> on the public website.
+// ---------------------------------------------------------------------------
+
+model WebsiteNavigationItem {
+  id           String             @id @default(cuid())
+  tenantId     String
+  navigationId String
+  label        String
+  itemType     WebsiteNavItemType @default(CUSTOM_URL)
+  url          String?
+  pageId       String?
+  sortOrder    Int                @default(0)
+  parentId     String?
+  isVisible    Boolean            @default(true)
+  opensInNewTab Boolean           @default(false)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  navigation WebsiteNavigation @relation(fields: [navigationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  page       WebsitePage?      @relation(fields: [pageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  parent     WebsiteNavigationItem?  @relation("NavItemChildren", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children   WebsiteNavigationItem[] @relation("NavItemChildren")
+
+  @@index([tenantId])
+  @@index([navigationId])
+  @@index([navigationId, sortOrder])
+  @@index([tenantId, pageId])
+  @@index([parentId])
 }

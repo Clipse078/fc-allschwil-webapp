@@ -19,6 +19,7 @@ import {
   ImageIcon,
   Inbox,
   LayoutDashboard,
+  Menu,
   Monitor,
   Newspaper,
   Palette,
@@ -77,6 +78,7 @@ function getNavIcon(label: string) {
     case "Infoboard":       return Monitor;
     case "News":            return Newspaper;
     case "Medien":          return ImageIcon;
+    case "Navigation":      return Menu;
     case "Seiten":          return FileText;
     case "Website":         return Globe;
     default:                return LayoutDashboard;
