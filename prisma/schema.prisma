@@ -20,6 +20,14 @@ enum NewsArticleStatus {
   ARCHIVED
 }
 
+enum WebsitePageStatus {
+  DRAFT
+  IN_REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
 enum MediaAssetType {
   IMAGE
   VIDEO
@@ -360,6 +368,7 @@ model Tenant {
   newsArticles           NewsArticle[]
   mediaAssets            MediaAsset[]
   newsArticleMedia       NewsArticleMedia[]
+  websitePages           WebsitePage[]
 
   @@index([status])
   @@index([name])
@@ -565,6 +574,7 @@ model Person {
   trainerTeamMembers   TrainerTeamMember[]
   orgUnitMemberships   OrgUnitMembership[]
   authoredNewsArticles NewsArticle[]       @relation("NewsArticleAuthorPerson")
+  authoredWebsitePages WebsitePage[]       @relation("WebsitePageAuthorPerson")
 
   @@index([lastName, firstName])
   @@index([email])
@@ -1384,4 +1394,49 @@ model NewsArticleMedia {
   @@index([articleId])
   @@index([tenantId])
   @@index([articleId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// WebsitePage — Tenant-managed static/semi-static website pages (Slice 1)
+//
+// Supports the same editorial workflow as NewsArticle:
+//   - approvedDataOnly = false → direct publish/unpublish
+//   - approvedDataOnly = true  → DRAFT → IN_REVIEW → PUBLISHED (via reviewer)
+//
+// Public endpoint: GET /api/public/v1/website/pages/[slug]
+//   Only PUBLISHED pages are returned. Internal fields are never exposed.
+//
+// body: raw Markdown or plain-text content. Full page builder comes in later slices.
+// seoTitle / seoDescription: optional SEO overrides.
+// scheduledAt: UTC timestamp for deferred publication (SCHEDULED status).
+// authorPersonId: optional link to a Person record (FK, nullable).
+// reviewNotes: reviewer feedback surfaced when status returns to DRAFT.
+// ---------------------------------------------------------------------------
+
+model WebsitePage {
+  id             String            @id @default(cuid())
+  tenantId       String
+  slug           String
+  title          String
+  body           String            @default("")
+  status         WebsitePageStatus @default(DRAFT)
+  seoTitle       String?
+  seoDescription String?
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  authorPersonId String?
+  reviewNotes    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  authorPerson Person? @relation("WebsitePageAuthorPerson", fields: [authorPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, status, publishedAt])
+  @@index([tenantId, status, scheduledAt])
+  @@index([tenantId, authorPersonId])
+  @@index([slug])
 }

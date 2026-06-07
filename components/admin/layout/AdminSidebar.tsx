@@ -77,6 +77,7 @@ function getNavIcon(label: string) {
     case "Infoboard":       return Monitor;
     case "News":            return Newspaper;
     case "Medien":          return ImageIcon;
+    case "Seiten":          return FileText;
     case "Website":         return Globe;
     default:                return LayoutDashboard;
   }
