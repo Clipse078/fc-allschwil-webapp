@@ -14,6 +14,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   publishNewsArticle,
   unpublishNewsArticle,
+  archiveNewsArticle,
   submitNewsArticleForReview,
   approveNewsArticle,
   rejectNewsArticle,
@@ -49,6 +50,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     case "unpublish":
       article = await unpublishNewsArticle(tenantId, id);
       break;
+    case "archive": {
+      const ok = await archiveNewsArticle(tenantId, id);
+      if (!ok) {
+        return NextResponse.json({ error: "Artikel nicht gefunden." }, { status: 404 });
+      }
+      return NextResponse.json({ archived: true });
+    }
     case "submit":
       article = await submitNewsArticleForReview(tenantId, id);
       if (!article) {
