@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide-react";
+import { FileText, PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide-react";
 import WebsitePageStatusBadge from "@/components/admin/pages/WebsitePageStatusBadge";
 import type { PageStatus, WebsitePageAdminListItem } from "@/lib/pages/admin-queries";
+import { SectionCard, EmptyState } from "@/components/ui/page";
 
 type FilterStatus = "ALL" | PageStatus;
 
@@ -16,6 +17,15 @@ function formatDate(d: Date | null): string {
     year: "numeric",
   }).format(new Date(d));
 }
+
+const FILTERS: { label: string; value: FilterStatus }[] = [
+  { label: "Alle", value: "ALL" },
+  { label: "Entwurf", value: "DRAFT" },
+  { label: "In Prüfung", value: "IN_REVIEW" },
+  { label: "Geplant", value: "SCHEDULED" },
+  { label: "Veröffentlicht", value: "PUBLISHED" },
+  { label: "Archiviert", value: "ARCHIVED" },
+];
 
 export default function WebsitePageList() {
   const [pages, setPages] = useState<WebsitePageAdminListItem[]>([]);
@@ -80,21 +90,12 @@ export default function WebsitePageList() {
     }
   }
 
-  const filters: { label: string; value: FilterStatus }[] = [
-    { label: "Alle", value: "ALL" },
-    { label: "Entwurf", value: "DRAFT" },
-    { label: "In Prüfung", value: "IN_REVIEW" },
-    { label: "Geplant", value: "SCHEDULED" },
-    { label: "Veröffentlicht", value: "PUBLISHED" },
-    { label: "Archiviert", value: "ARCHIVED" },
-  ];
-
   return (
-    <div className="space-y-4">
+    <SectionCard noPadding>
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
         <div className="inline-flex flex-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
-          {filters.map((f) => (
+          {FILTERS.map((f) => (
             <button
               key={f.value}
               type="button"
@@ -110,33 +111,27 @@ export default function WebsitePageList() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading}
-            className="fca-button-secondary px-2.5"
-            title="Aktualisieren"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <Link href="/dashboard/website/pages/new" className="fca-button-primary">
-            <Plus className="h-4 w-4" />
-            Neue Seite
-          </Link>
-        </div>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="fca-button-secondary px-2.5"
+          title="Aktualisieren"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        </button>
       </div>
 
-      {/* Error */}
+      {/* Error banner */}
       {error && (
-        <div className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
 
-      {/* Table */}
+      {/* Content: skeleton → empty → table */}
       {loading && pages.length === 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-2 p-5">
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
@@ -145,15 +140,19 @@ export default function WebsitePageList() {
           ))}
         </div>
       ) : pages.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-[var(--muted)]">
-          <p className="text-sm">Keine Seiten vorhanden.</p>
-          <Link href="/dashboard/website/pages/new" className="fca-button-primary">
-            <Plus className="h-4 w-4" />
-            Erste Seite erstellen
-          </Link>
-        </div>
+        <EmptyState
+          icon={<FileText className="h-10 w-10" />}
+          heading="Keine Seiten vorhanden"
+          description="Erstelle die erste statische Seite für deine Website."
+          action={
+            <Link href="/dashboard/website/pages/new" className="fca-button-primary">
+              <Plus className="h-4 w-4" />
+              Erste Seite erstellen
+            </Link>
+          }
+        />
       ) : (
-        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)]">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-[var(--border)] bg-[var(--surface-2)]">
               <tr>
@@ -182,7 +181,7 @@ export default function WebsitePageList() {
                 >
                   <td className="px-4 py-3">
                     <div>
-                      <p className="font-medium text-[var(--foreground)] line-clamp-1">
+                      <p className="line-clamp-1 font-medium text-[var(--foreground)]">
                         {page.title}
                       </p>
                       <p className="text-[11px] text-[var(--muted)]">{page.slug}</p>
@@ -242,11 +241,14 @@ export default function WebsitePageList() {
         </div>
       )}
 
+      {/* Footer count */}
       {!loading && total > 0 && (
-        <p className="text-[11px] text-[var(--muted)]">
-          {pages.length} von {total} Seiten geladen
-        </p>
+        <div className="border-t border-[var(--border)] px-5 py-3">
+          <p className="text-[11px] text-[var(--muted)]">
+            {pages.length} von {total} Seiten geladen
+          </p>
+        </div>
       )}
-    </div>
+    </SectionCard>
   );
 }
