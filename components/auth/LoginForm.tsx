@@ -38,16 +38,16 @@ export default function LoginForm() {
       <div
         className="hidden lg:flex lg:w-[44%] xl:w-[40%] flex-col justify-between p-12 relative overflow-hidden"
         style={{
-          background: "linear-gradient(150deg, #0b4aa2 0%, #1a5bc4 45%, #0d3e8c 100%)",
+          background: "var(--tenant-primary)",
         }}
       >
-        {/* Subtle pattern overlay */}
+        {/* Subtle overlay for depth */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 20% 80%, rgba(255,255,255,0.06) 0%, transparent 50%), " +
-              "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.06) 0%, transparent 50%)",
+              "radial-gradient(circle at 20% 80%, rgba(255,255,255,0.07) 0%, transparent 55%), " +
+              "radial-gradient(circle at 80% 20%, rgba(0,0,0,0.08) 0%, transparent 55%)",
           }}
           aria-hidden="true"
         />
@@ -55,13 +55,14 @@ export default function LoginForm() {
         {/* Top: Logo + product name */}
         <div className="relative z-10 flex items-center gap-3">
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-white/15"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px]"
+            style={{ background: "rgba(255,255,255,0.15)" }}
             aria-hidden="true"
           >
             <Trophy className="h-5 w-5 text-white" />
           </div>
           <div>
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-blue-200">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-white/60">
               SportClubEvo
             </p>
             <p className="text-sm font-semibold text-white leading-tight">
@@ -72,7 +73,7 @@ export default function LoginForm() {
 
         {/* Center: headline copy */}
         <div className="relative z-10">
-          <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-blue-300">
+          <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-white/60">
             Club Management
           </p>
           <h1
@@ -80,18 +81,18 @@ export default function LoginForm() {
           >
             Willkommen
             <br />
-            <span className="text-blue-200">zurück.</span>
+            <span className="text-white/70">zurück.</span>
           </h1>
-          <p className="mt-5 max-w-[280px] text-sm leading-relaxed text-blue-100/80">
+          <p className="mt-5 max-w-[280px] text-sm leading-relaxed text-white/70">
             Der zentrale Arbeitsbereich für die Vereinsführung, Teams, Events und Planung.
           </p>
         </div>
 
         {/* Bottom: "Powered by" */}
         <div className="relative z-10">
-          <p className="text-[0.7rem] font-medium text-blue-200/60">
+          <p className="text-[0.7rem] font-medium text-white/40">
             Powered by{" "}
-            <span className="font-semibold text-blue-100/80">SportClubEvo</span>
+            <span className="font-semibold text-white/60">SportClubEvo</span>
           </p>
         </div>
       </div>
@@ -101,7 +102,8 @@ export default function LoginForm() {
         {/* Mobile header */}
         <div className="mb-8 flex flex-col items-center gap-3 lg:hidden">
           <div
-            className="flex h-14 w-14 items-center justify-center rounded-[12px] bg-[var(--blue)] text-white"
+            className="flex h-14 w-14 items-center justify-center rounded-[12px] text-white"
+            style={{ background: "var(--tenant-primary)" }}
             aria-hidden="true"
           >
             <Trophy className="h-7 w-7" />
@@ -179,10 +181,12 @@ export default function LoginForm() {
               disabled={isSubmitting}
               className={cn(
                 "w-full h-10 rounded-[var(--radius-lg)] font-semibold text-sm text-white transition",
-                "bg-[var(--blue)] hover:bg-[var(--blue-hover)]",
                 "disabled:cursor-not-allowed disabled:opacity-55",
-                "shadow-[0_2px_8px_rgba(11,74,162,0.20)]",
               )}
+              style={{
+                background: "var(--tenant-primary)",
+                boxShadow: "0 2px 8px color-mix(in srgb, var(--tenant-primary) 20%, transparent)",
+              }}
             >
               {isSubmitting ? "Anmeldung läuft…" : "Einloggen"}
             </button>

@@ -178,9 +178,10 @@ export default function OrgMembershipPicker({
           onClick={() => switchMode("user")}
           className={`rounded-full px-4 py-1.5 text-[12px] font-semibold transition ${
             mode === "user"
-              ? "bg-[var(--blue)] text-white shadow-sm"
+              ? "text-white shadow-sm"
               : "border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]"
           }`}
+          style={mode === "user" ? { background: "var(--tenant-primary)" } : undefined}
         >
           App-Benutzer
         </button>
@@ -190,9 +191,10 @@ export default function OrgMembershipPicker({
           onClick={() => switchMode("person")}
           className={`rounded-full px-4 py-1.5 text-[12px] font-semibold transition ${
             mode === "person"
-              ? "bg-[var(--blue)] text-white shadow-sm"
+              ? "text-white shadow-sm"
               : "border border-[var(--border-strong)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]"
           }`}
+          style={mode === "person" ? { background: "var(--tenant-primary)" } : undefined}
         >
           Person
         </button>

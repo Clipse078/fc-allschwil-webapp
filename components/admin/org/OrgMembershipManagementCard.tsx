@@ -330,7 +330,8 @@ export default function OrgMembershipManagementCard({
                           type="button"
                           onClick={() => handleRoleSave(m.id)}
                           disabled={roleEditSubmitting}
-                          className="inline-flex items-center gap-1 rounded bg-[var(--blue)] px-2 py-0.5 text-[10px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                          style={{ background: "var(--tenant-primary)" }}
                         >
                           {roleEditSubmitting ? (
                             <Loader2 className="h-2.5 w-2.5 animate-spin" />

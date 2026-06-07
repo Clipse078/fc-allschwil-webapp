@@ -395,7 +395,7 @@ export default function PublishingCenter() {
                 onClick={() => setTypeFilter(t.value)}
                 className={`rounded-md px-3 py-1.5 transition ${
                   typeFilter === t.value
-                    ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)]"
+                    ? "bg-[var(--surface)] shadow-sm sce-filter-tab-active"
                     : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
@@ -414,7 +414,7 @@ export default function PublishingCenter() {
                   onClick={() => setStatusFilter(f.value)}
                   className={`rounded-md px-3 py-1.5 transition ${
                     statusFilter === f.value
-                      ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)]"
+                      ? "bg-[var(--surface)] shadow-sm sce-filter-tab-active"
                       : "text-[var(--muted)] hover:text-[var(--foreground)]"
                   }`}
                 >
@@ -504,7 +504,7 @@ export default function PublishingCenter() {
                     </td>
                     <td className="px-4 py-3">
                       <Link href={item.editHref} className="group">
-                        <p className="line-clamp-1 font-medium text-[var(--foreground)] group-hover:underline">
+                        <p className="line-clamp-1 font-medium text-[var(--foreground)] group-hover:text-[var(--tenant-primary)] group-hover:underline">
                           {item.title}
                         </p>
                         <p className="text-[11px] text-[var(--muted)]">{item.slug}</p>

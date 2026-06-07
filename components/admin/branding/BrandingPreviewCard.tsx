@@ -104,6 +104,20 @@ export default function BrandingPreviewCard({
                 <p className="font-mono text-xs text-[var(--foreground)]">{resolved.secondaryColor}</p>
               </div>
             </div>
+            {/* Accent: auto-derived from primary — shown as CSS color-mix preview */}
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-block h-6 w-6 rounded-full border border-[var(--border)]"
+                style={{
+                  background: `color-mix(in srgb, ${resolved.primaryColor} 10%, white)`,
+                }}
+                title="Accent: auto-derived from primary"
+              />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Akzentfarbe</p>
+                <p className="text-xs text-[var(--muted)] italic">auto (10% primary)</p>
+              </div>
+            </div>
           </div>
 
           {/* Sample button + badge */}

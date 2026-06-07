@@ -1,5 +1,5 @@
 /**
- * Canonical Tenant Runtime Theme — Slice 10.6
+ * Canonical Tenant Runtime Theme — Sprint 4: Tenant Branding System
  *
  * Generates CSS custom property maps from resolved tenant branding.
  * All tenant-aware color injection in the application goes through this module.
@@ -16,20 +16,21 @@
  *
  * ─── CSS variable namespace ──────────────────────────────────────────────────
  *
- *   --tenant-primary    Primary brand color (hex)
- *   --tenant-secondary  Secondary/accent brand color (hex)
+ *   --tenant-primary    Primary brand color (hex). Directly set from DB.
+ *   --tenant-secondary  Secondary/accent brand color (hex). Directly set from DB.
+ *   --tenant-accent     Light tint of primary for subtle surface accents.
+ *                       Auto-derived in CSS via color-mix(); NOT set in JS.
+ *                       See globals.css :root for the derivation rule.
  *
  * These vars are additive: existing components continue using --blue / --red.
- * Future tenant-branded surfaces opt in to --tenant-primary / --tenant-secondary.
+ * All tenant-branded surfaces use ONLY these three vars — no inline hex values.
  *
  * ─── Usage ───────────────────────────────────────────────────────────────────
  *
  *   import { generateTenantCssVars } from "@/lib/tenant-runtime/theme";
- *   import { resolveTenantBranding } from "@/lib/tenant-runtime/branding";
  *
  *   // In a server component:
- *   const branding = resolveTenantBranding(ctx);
- *   const cssVars = generateTenantCssVars(branding);
+ *   const cssVars = generateTenantCssVars(ctx);
  *   // <div style={cssVars as React.CSSProperties}>
  *
  * ─── Client safety ──────────────────────────────────────────────────────────
@@ -48,10 +49,15 @@ import {
 /**
  * Canonical CSS custom property names for tenant branding.
  * All references to tenant theme CSS variables must use these constants.
+ *
+ * --tenant-accent is intentionally absent: it is CSS-derived from
+ * --tenant-primary via color-mix() in globals.css and requires no JS value.
  */
 export const TENANT_CSS_VARS = {
-  primary: "--tenant-primary",
+  primary:   "--tenant-primary",
   secondary: "--tenant-secondary",
+  /** Derived in CSS: color-mix(in srgb, var(--tenant-primary) 10%, white) */
+  accent:    "--tenant-accent",
 } as const;
 
 export type TenantCssVarName = (typeof TENANT_CSS_VARS)[keyof typeof TENANT_CSS_VARS];
@@ -61,11 +67,9 @@ export type TenantCssVarName = (typeof TENANT_CSS_VARS)[keyof typeof TENANT_CSS_
 /**
  * Generates a CSS custom property map from tenant branding config.
  *
- * Accepts a TenantBrandingConfig (with nullable fields) or null/undefined.
- * Falls back to PLATFORM_BRANDING via resolveTenantBranding() for any nulls.
- *
- * Returns a plain Record<string, string> suitable for:
- *   • React inline style prop: `style={vars as React.CSSProperties}`
+ * Sets --tenant-primary and --tenant-secondary from the resolved branding.
+ * --tenant-accent is NOT emitted here — it is computed by the CSS engine
+ * automatically via the color-mix() rule in globals.css :root.
  *
  * @example
  *   const vars = generateTenantCssVars(ctx);
@@ -76,7 +80,7 @@ export function generateTenantCssVars(
 ): Record<string, string> {
   const resolved = resolveTenantBranding(cfg);
   return {
-    [TENANT_CSS_VARS.primary]: resolved.primaryColor,
+    [TENANT_CSS_VARS.primary]:   resolved.primaryColor,
     [TENANT_CSS_VARS.secondary]: resolved.secondaryColor,
   };
 }

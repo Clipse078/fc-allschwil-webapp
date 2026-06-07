@@ -71,7 +71,7 @@ export default function MediaLibraryGrid({
               onClick={() => setFilter(f)}
               className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 transition ${
                 filter === f
-                  ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)]"
+                  ? "bg-[var(--surface)] shadow-sm sce-filter-tab-active"
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
@@ -96,7 +96,7 @@ export default function MediaLibraryGrid({
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <MediaUploadButton onUploaded={handleUploaded} />
+          <MediaUploadButton onUploaded={handleUploaded} className="fca-button-primary" />
         </div>
       </div>
 

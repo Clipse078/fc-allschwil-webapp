@@ -50,7 +50,10 @@ export function KpiCard({
           )}
         </div>
         {icon && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--blue-light)] text-[var(--blue)]">
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-lg)]"
+            style={{ background: "var(--tenant-accent)", color: "var(--tenant-primary)" }}
+          >
             {icon}
           </div>
         )}

@@ -90,7 +90,11 @@ function ModuleCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--blue-light)] text-[var(--blue)] transition-transform duration-150 group-hover:scale-105"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-lg)] transition-transform duration-150 group-hover:scale-105"
+          style={{
+            background: "var(--tenant-accent)",
+            color: "var(--tenant-primary)",
+          }}
         >
           <Icon style={{ width: 18, height: 18 }} />
         </div>
