@@ -2,8 +2,13 @@ import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantContextFromSession } from "@/lib/tenants/context";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import WebsiteSettingsForm from "@/components/admin/website/WebsiteSettingsForm";
+import {
+  PageShell,
+  PageBreadcrumbs,
+  PageHeader,
+  SectionCard,
+} from "@/components/ui/page";
 
 export default async function WebsiteSettingsPage() {
   const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
@@ -15,15 +20,24 @@ export default async function WebsiteSettingsPage() {
   if (!ctx) notFound();
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <PageShell fullWidth>
+      <PageBreadcrumbs
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Website" },
+          { label: "Einstellungen" },
+        ]}
+      />
+      <PageHeader
         eyebrow="Website"
         title="Einstellungen"
-        description="Website-Workflow und Veröffentlichungseinstellungen konfigurieren."
+        description="Website-Veröffentlichung und Vier-Augen-Prinzip konfigurieren."
       />
-      <WebsiteSettingsForm
-        defaultValues={{ approvedDataOnly: ctx.approvedDataOnly }}
-      />
-    </div>
+      <SectionCard>
+        <WebsiteSettingsForm
+          defaultValues={{ approvedDataOnly: ctx.approvedDataOnly }}
+        />
+      </SectionCard>
+    </PageShell>
   );
 }
