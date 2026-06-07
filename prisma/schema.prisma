@@ -28,6 +28,18 @@ enum WebsitePageStatus {
   ARCHIVED
 }
 
+enum HomepageBlockStatus {
+  DRAFT
+  IN_REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum HomepageBlockType {
+  HERO
+}
+
 enum MediaAssetType {
   IMAGE
   VIDEO
@@ -369,6 +381,7 @@ model Tenant {
   mediaAssets            MediaAsset[]
   newsArticleMedia       NewsArticleMedia[]
   websitePages           WebsitePage[]
+  homepageBlocks         HomepageBlock[]
 
   @@index([status])
   @@index([name])
@@ -1299,6 +1312,7 @@ model MediaAsset {
   tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   newsArticles     NewsArticle[]      @relation("NewsArticleHeroMedia")
   newsArticleMedia NewsArticleMedia[]
+  homepageBlocks   HomepageBlock[]    @relation("HomepageBlockHeroMedia")
 
   @@index([tenantId])
   @@index([tenantId, type])
@@ -1439,4 +1453,67 @@ model WebsitePage {
   @@index([tenantId, status, scheduledAt])
   @@index([tenantId, authorPersonId])
   @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// HomepageBlock — Composable homepage blocks (Website Builder V1)
+//
+// Foundation slice for the SportClubEvo Website Builder.
+// Supports the full editorial workflow (DRAFT → IN_REVIEW → PUBLISHED → ARCHIVED)
+// and mirrors the WebsitePage status model.
+//
+// Block types:
+//   HERO — full-width hero section with background image, overlay, gradient,
+//          headline, subheadline, and a CTA button.
+//   (Additional types will be added in future slices.)
+//
+// Data field: JSON containing block-type-specific content (headline, subheadline,
+//   ctaLabel, ctaUrl). Internal editor metadata is excluded from public API output.
+//
+// Styling fields (exposed in public API as a styling sub-object):
+//   overlayColor   — hex or keyword: "primary" | "secondary" | "black" | "white"
+//   overlayOpacity — integer 0–100
+//   gradientType   — "none" | "top-bottom" | "bottom-top" | "left-right" | "right-left" | "radial"
+//   gradientFrom   — hex or keyword
+//   gradientTo     — hex or keyword
+//   textColor      — hex or keyword: "light" | "dark"
+//
+// Public endpoint: GET /api/public/v1/website/homepage
+//   Only PUBLISHED blocks ordered by sortOrder are returned.
+//   Internal fields (status, tenantId, reviewNotes, etc.) are never exposed.
+//
+// Preview endpoint: GET /api/homepage-blocks/preview (authenticated, WEBSITE_MANAGE)
+//   Returns all non-ARCHIVED blocks including DRAFT and IN_REVIEW, ordered by sortOrder.
+//   Never exposed to the public.
+// ---------------------------------------------------------------------------
+
+model HomepageBlock {
+  id             String              @id @default(cuid())
+  tenantId       String
+  type           HomepageBlockType   @default(HERO)
+  sortOrder      Int                 @default(0)
+  status         HomepageBlockStatus @default(DRAFT)
+  title          String
+  data           Json                @default("{}")
+  heroMediaId    String?
+  overlayColor   String?
+  overlayOpacity Int?
+  gradientType   String?
+  gradientFrom   String?
+  gradientTo     String?
+  textColor      String?
+  publishedAt    DateTime?
+  scheduledAt    DateTime?
+  reviewNotes    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  heroMedia MediaAsset? @relation("HomepageBlockHeroMedia", fields: [heroMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, sortOrder])
+  @@index([tenantId, status, publishedAt])
+  @@index([tenantId, status, sortOrder])
 }

@@ -192,6 +192,26 @@ export const NAV_SECTIONS: NavSection[] = [
         permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
       },
       {
+        key: "website-homepage",
+        label: "Homepage",
+        href: "/dashboard/website/homepage",
+        permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+        children: [
+          {
+            key: "website-homepage-blocks",
+            label: "Blöcke",
+            href: "/dashboard/website/homepage",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
+            key: "website-homepage-preview",
+            label: "Vorschau",
+            href: "/dashboard/website/homepage/preview",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+        ],
+      },
+      {
         key: "website-pages",
         label: "Seiten",
         href: "/dashboard/website/pages",
