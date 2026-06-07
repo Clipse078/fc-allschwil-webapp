@@ -14,6 +14,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   publishWebsitePage,
   unpublishWebsitePage,
+  archiveWebsitePage,
   submitWebsitePageForReview,
   approveWebsitePage,
   rejectWebsitePage,
@@ -49,6 +50,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     case "unpublish":
       page = await unpublishWebsitePage(tenantId, id);
       break;
+    case "archive": {
+      const ok = await archiveWebsitePage(tenantId, id);
+      if (!ok) {
+        return NextResponse.json({ error: "Seite nicht gefunden." }, { status: 404 });
+      }
+      return NextResponse.json({ archived: true });
+    }
     case "submit":
       page = await submitWebsitePageForReview(tenantId, id);
       if (!page) {
