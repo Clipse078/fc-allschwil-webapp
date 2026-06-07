@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
+  Inbox,
   PenLine,
   RefreshCw,
   Send,
@@ -29,6 +30,7 @@ import {
   PUBLISHING_STATUS_CARD,
   PUBLISHING_STATUS_LABEL,
 } from "@/lib/publishing/types";
+import { SectionCard, EmptyState } from "@/components/ui/page";
 
 // ── Formatting ─────────────────────────────────────────────────────────────────
 
@@ -327,7 +329,6 @@ export default function PublishingCenter() {
   }
 
   const counts = data?.counts;
-  // Show counts for the current type filter
   const displayCounts: PublishingStatusCounts | null = counts
     ? typeFilter === "news"
       ? counts.news
@@ -341,22 +342,22 @@ export default function PublishingCenter() {
   const meta = data?.meta;
 
   return (
-    <div className="space-y-6">
-      {/* Error banner */}
+    <div className="space-y-5">
+      {/* Load error banner */}
       {error && (
         <div className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
 
-      {/* Action error */}
+      {/* Action error banner */}
       {actionError && (
         <div className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {actionError}
           <button
             type="button"
             onClick={() => setActionError(null)}
-            className="ml-3 text-rose-500 hover:text-rose-700 underline text-xs"
+            className="ml-3 text-xs text-rose-500 underline hover:text-rose-700"
           >
             Schliessen
           </button>
@@ -381,90 +382,90 @@ export default function PublishingCenter() {
         </div>
       )}
 
-      {/* Filters row */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Type tabs */}
-        <div className="inline-flex flex-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
-          {TYPE_TABS.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setTypeFilter(t.value)}
-              className={`rounded-md px-3 py-1.5 transition ${
-                typeFilter === t.value
-                  ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)]"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Status quick-filter pills */}
-          <div className="hidden md:inline-flex flex-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
-            {STATUS_FILTERS.map((f) => (
+      {/* Content section card: filters + table + footer */}
+      <SectionCard noPadding>
+        {/* Filters row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
+          {/* Type tabs */}
+          <div className="inline-flex flex-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
+            {TYPE_TABS.map((t) => (
               <button
-                key={f.value}
+                key={t.value}
                 type="button"
-                onClick={() => setStatusFilter(f.value)}
+                onClick={() => setTypeFilter(t.value)}
                 className={`rounded-md px-3 py-1.5 transition ${
-                  statusFilter === f.value
+                  typeFilter === t.value
                     ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)]"
                     : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
-                {f.label}
+                {t.label}
               </button>
             ))}
           </div>
 
-          {/* Mobile status select */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as FilterStatus)}
-            className="md:hidden fca-input text-xs py-1.5 px-2"
-          >
-            {STATUS_FILTERS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
+          <div className="flex items-center gap-2">
+            {/* Status quick-filter pills — desktop */}
+            <div className="hidden md:inline-flex flex-wrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5 text-xs font-medium">
+              {STATUS_FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setStatusFilter(f.value)}
+                  className={`rounded-md px-3 py-1.5 transition ${
+                    statusFilter === f.value
+                      ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)]"
+                      : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Status select — mobile */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as FilterStatus)}
+              className="md:hidden fca-input py-1.5 px-2 text-xs"
+            >
+              {STATUS_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Refresh */}
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              className="fca-button-secondary px-2.5"
+              title="Aktualisieren"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Table body */}
+        {loading && items.length === 0 ? (
+          <div className="space-y-2 p-5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]"
+              />
             ))}
-          </select>
-
-          {/* Refresh */}
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading}
-            className="fca-button-secondary px-2.5"
-            title="Aktualisieren"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Content table */}
-      {loading && items.length === 0 ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-14 animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]"
-            />
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-20 text-[var(--muted)]">
-          <p className="text-sm">Keine Inhalte in dieser Ansicht.</p>
-          <p className="text-xs text-[var(--muted)]">
-            Passen Sie die Filter an oder erstellen Sie neuen Inhalt.
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)]">
+          </div>
+        ) : items.length === 0 ? (
+          <EmptyState
+            icon={<Inbox className="h-10 w-10" />}
+            heading="Keine Inhalte in dieser Ansicht"
+            description="Passen Sie die Filter an oder erstellen Sie neuen Inhalt."
+          />
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-[var(--border)] bg-[var(--surface-2)]">
@@ -502,11 +503,8 @@ export default function PublishingCenter() {
                       <TypeChip type={item.type} />
                     </td>
                     <td className="px-4 py-3">
-                      <Link
-                        href={item.editHref}
-                        className="group"
-                      >
-                        <p className="font-medium text-[var(--foreground)] line-clamp-1 group-hover:underline">
+                      <Link href={item.editHref} className="group">
+                        <p className="line-clamp-1 font-medium text-[var(--foreground)] group-hover:underline">
                           {item.title}
                         </p>
                         <p className="text-[11px] text-[var(--muted)]">{item.slug}</p>
@@ -539,15 +537,17 @@ export default function PublishingCenter() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Count footer */}
-      {!loading && meta && meta.total > 0 && (
-        <p className="text-[11px] text-[var(--muted)]">
-          {items.length} von {meta.total} Einträgen geladen
-        </p>
-      )}
+        {/* Count footer */}
+        {!loading && meta && meta.total > 0 && (
+          <div className="border-t border-[var(--border)] px-5 py-3">
+            <p className="text-[11px] text-[var(--muted)]">
+              {items.length} von {meta.total} Einträgen geladen
+            </p>
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }
