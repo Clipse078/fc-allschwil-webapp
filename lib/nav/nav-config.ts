@@ -186,6 +186,12 @@ export const NAV_SECTIONS: NavSection[] = [
     sectionLabel: "Website",
     items: [
       {
+        key: "website-homepage",
+        label: "Homepage",
+        href: "/dashboard/website/homepage",
+        permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+      },
+      {
         key: "website-publishing",
         label: "Veröffentlichungen",
         href: "/dashboard/website/publishing",

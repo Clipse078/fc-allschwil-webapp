@@ -28,6 +28,31 @@ enum WebsitePageStatus {
   ARCHIVED
 }
 
+// ---------------------------------------------------------------------------
+// Homepage Blocks V1 — Slice 4
+// ---------------------------------------------------------------------------
+
+enum WebsiteBlockType {
+  HERO
+  RICH_TEXT
+  NEWS
+  UPCOMING_MATCHES
+  SPONSORS
+  CTA
+  GALLERY
+}
+
+enum WebsiteBlockStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum WebsitePageContext {
+  HOMEPAGE
+}
+
 enum MediaAssetType {
   IMAGE
   VIDEO
@@ -369,6 +394,8 @@ model Tenant {
   mediaAssets            MediaAsset[]
   newsArticleMedia       NewsArticleMedia[]
   websitePages           WebsitePage[]
+  websiteBlocks          WebsiteBlock[]
+  websiteBlockInstances  WebsiteBlockInstance[]
 
   @@index([status])
   @@index([name])
@@ -1439,4 +1466,59 @@ model WebsitePage {
   @@index([tenantId, status, scheduledAt])
   @@index([tenantId, authorPersonId])
   @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// Homepage Blocks V1 — Slice 4
+//
+// WebsiteBlock holds the content definition (type, config JSON, workflow status).
+// WebsiteBlockInstance holds the placement (which page context, sortOrder, enabled).
+//
+// This separation allows a block to be placed on multiple page contexts in the
+// future (Landing Page, About Page, Campaign Page …) without schema changes.
+// For MVP the only context is HOMEPAGE.
+//
+// config JSON is validated at the application layer against the block type.
+// Internal fields (tenantId, reviewNotes) are never exposed in public APIs.
+// ---------------------------------------------------------------------------
+
+model WebsiteBlock {
+  id          String             @id @default(cuid())
+  tenantId    String
+  type        WebsiteBlockType
+  status      WebsiteBlockStatus @default(DRAFT)
+  title       String
+  config      Json               @default("{}")
+  reviewNotes String?
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  instances WebsiteBlockInstance[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([tenantId, status, publishedAt])
+}
+
+model WebsiteBlockInstance {
+  id          String            @id @default(cuid())
+  tenantId    String
+  blockId     String
+  pageContext WebsitePageContext @default(HOMEPAGE)
+  enabled     Boolean           @default(true)
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  block  WebsiteBlock @relation(fields: [blockId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, blockId, pageContext])
+  @@index([tenantId, pageContext])
+  @@index([tenantId, pageContext, enabled])
+  @@index([tenantId, pageContext, sortOrder])
 }

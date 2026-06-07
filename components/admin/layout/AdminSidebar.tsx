@@ -16,6 +16,7 @@ import {
   FileText,
   Flag,
   Globe,
+  Home,
   ImageIcon,
   Inbox,
   Layers,
@@ -79,6 +80,7 @@ function getNavIcon(label: string) {
     case "News":            return Newspaper;
     case "Medien":          return ImageIcon;
     case "Seiten":          return FileText;
+    case "Homepage":        return Home;
     case "Veröffentlichungen": return Layers;
     case "Website":         return Globe;
     default:                return LayoutDashboard;
