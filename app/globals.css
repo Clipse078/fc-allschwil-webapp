@@ -89,9 +89,9 @@
   --sidebar-collapsed-width: 56px;
   --topnav-height:           52px;
 
-  /* Typography */
-  --font-body:    var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
-  --font-display: var(--font-display), "Barlow Condensed", Arial, sans-serif;
+  /* Typography — Geist primary, Inter fallback */
+  --font-body:    var(--font-geist-sans), var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-geist-sans), var(--font-inter), "Inter", system-ui, -apple-system, sans-serif;
 
   /* Transitions */
   --transition-fast:   120ms ease;
