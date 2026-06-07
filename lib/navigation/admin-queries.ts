@@ -3,6 +3,11 @@
  *
  * All queries are tenant-scoped. Two navigation groups exist per tenant:
  * MAIN and FOOTER. Groups are auto-created (upserted) on first access.
+ *
+ * V1.1: parentId is used for one level of nesting (parent → children).
+ *   - Children have parentId set to a top-level item's id.
+ *   - sortOrder is scoped per parent group (null = top-level, id = children of that parent).
+ *   - Max depth: 2 levels (parent + child). Children cannot have children.
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -35,6 +40,10 @@ export type NavItemAdminRow = {
   page: NavPageSnippet;
 };
 
+export type NavItemAdminRowWithChildren = NavItemAdminRow & {
+  children: NavItemAdminRow[];
+};
+
 export type NavGroupAdmin = {
   id: string;
   tenantId: string;
@@ -43,6 +52,10 @@ export type NavGroupAdmin = {
   createdAt: Date;
   updatedAt: Date;
   items: NavItemAdminRow[];
+};
+
+export type NavGroupAdminWithHierarchy = Omit<NavGroupAdmin, "items"> & {
+  topLevel: NavItemAdminRowWithChildren[];
 };
 
 // ── Select shapes ─────────────────────────────────────────────────────────────
@@ -116,6 +129,38 @@ export async function getNavGroupAdmin(
   return row as unknown as NavGroupAdmin;
 }
 
+/**
+ * Returns the navigation group with top-level items populated with their children.
+ * Top-level items have parentId = null.
+ * Children are sorted by sortOrder within the parent.
+ */
+export async function getNavGroupAdminWithHierarchy(
+  tenantId: string,
+  key: NavKey,
+): Promise<NavGroupAdminWithHierarchy> {
+  const group = await getNavGroupAdmin(tenantId, key);
+
+  const allItems = group.items as NavItemAdminRow[];
+  const topLevel = allItems
+    .filter((i) => i.parentId === null)
+    .map((parent) => ({
+      ...parent,
+      children: allItems
+        .filter((i) => i.parentId === parent.id)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.valueOf() - b.createdAt.valueOf()),
+    }));
+
+  return {
+    id: group.id,
+    tenantId: group.tenantId,
+    key: group.key,
+    label: group.label,
+    createdAt: group.createdAt,
+    updatedAt: group.updatedAt,
+    topLevel,
+  };
+}
+
 export async function getAllNavGroupsAdmin(
   tenantId: string,
 ): Promise<{ main: NavGroupAdmin; footer: NavGroupAdmin }> {
@@ -143,9 +188,12 @@ export type CreateNavItemInput = {
 export async function createNavItem(
   input: CreateNavItemInput,
 ): Promise<NavItemAdminRow> {
-  // Determine next sortOrder
+  // sortOrder is scoped to siblings (same parentId)
   const last = await prisma.websiteNavigationItem.findFirst({
-    where: { navigationId: input.navigationId },
+    where: {
+      navigationId: input.navigationId,
+      parentId: input.parentId ?? null,
+    },
     orderBy: { sortOrder: "desc" },
     select: { sortOrder: true },
   });
@@ -237,20 +285,25 @@ export async function deleteNavItem(
 // ── Reorder items ─────────────────────────────────────────────────────────────
 
 /**
- * Atomically reassigns sortOrder for all items in a navigation group.
- * orderedIds must contain exactly the IDs currently in the group (no extras, no gaps).
+ * Atomically reassigns sortOrder for a set of sibling items.
+ *
+ * @param tenantId   - Tenant scope
+ * @param navigationId - Navigation group scope
+ * @param orderedIds - IDs in new order; must all share the same parentId
+ * @param parentId   - null for top-level items, string for children of a parent
  */
 export async function reorderNavItems(
   tenantId: string,
   navigationId: string,
   orderedIds: string[],
+  parentId: string | null = null,
 ): Promise<void> {
-  // Verify all IDs belong to this tenant + navigation
+  // Verify all IDs belong to this tenant + navigation + same parent
   const existing = await prisma.websiteNavigationItem.findMany({
-    where: { navigationId, tenantId },
+    where: { navigationId, tenantId, parentId },
     select: { id: true },
   });
-  const existingIds = new Set(existing.map((r) => r.id));
+  const existingIds = new Set(existing.map((r: { id: string }) => r.id));
   const allValid = orderedIds.every((id) => existingIds.has(id));
   if (!allValid) return;
 

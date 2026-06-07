@@ -1,8 +1,11 @@
 /**
  * POST /api/website-navigation/[key]/items/reorder
- * Atomically reassigns sortOrder for all items in a navigation group.
+ * Atomically reassigns sortOrder for a set of sibling items.
  *
- * Body: { orderedIds: string[] }
+ * Body: { orderedIds: string[], parentId?: string | null }
+ *   - orderedIds: IDs in desired order; must all share the same parentId scope.
+ *   - parentId: null (or omitted) → reorder top-level items;
+ *               string → reorder children of that parent.
  *
  * Permission: WEBSITE_MANAGE
  */
@@ -54,8 +57,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     (id): id is string => typeof id === "string",
   );
 
+  // parentId scopes the reorder: null = top-level, string = children of that parent
+  const parentId =
+    typeof body.parentId === "string" ? body.parentId
+    : body.parentId === null ? null
+    : null;
+
   const navGroup = await getNavGroupAdmin(tenantId, navKey);
-  await reorderNavItems(tenantId, navGroup.id, orderedIds);
+  await reorderNavItems(tenantId, navGroup.id, orderedIds, parentId);
 
   const updated = await getNavGroupAdmin(tenantId, navKey);
   return NextResponse.json({ navigation: updated });

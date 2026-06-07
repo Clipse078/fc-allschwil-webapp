@@ -11,6 +11,16 @@ type NavItemFormProps = {
   pages: PageOption[];
   onSaved: () => void;
   onCancel: () => void;
+  /**
+   * When set, the item is created/updated as a child of this parent.
+   * Child items cannot be grouping-only.
+   */
+  parentId?: string;
+  /**
+   * Show the "Nur Gruppe (keine URL)" option for top-level items.
+   * Ignored when parentId is set.
+   */
+  allowGroupingOnly?: boolean;
   /** Populated when editing an existing item */
   initial?: {
     id: string;
@@ -20,6 +30,7 @@ type NavItemFormProps = {
     pageId: string | null;
     isVisible: boolean;
     opensInNewTab: boolean;
+    isGroupingOnly: boolean;
   };
 };
 
@@ -34,9 +45,12 @@ export default function NavItemForm({
   pages,
   onSaved,
   onCancel,
+  parentId,
+  allowGroupingOnly = false,
   initial,
 }: NavItemFormProps) {
   const isEdit = Boolean(initial);
+  const isChild = Boolean(parentId);
 
   const [label, setLabel] = useState(initial?.label ?? "");
   const [itemType, setItemType] = useState<NavItemType>(initial?.itemType ?? "CUSTOM_URL");
@@ -44,6 +58,9 @@ export default function NavItemForm({
   const [pageId, setPageId] = useState(initial?.pageId ?? "");
   const [isVisible, setIsVisible] = useState(initial?.isVisible ?? true);
   const [opensInNewTab, setOpensInNewTab] = useState(initial?.opensInNewTab ?? false);
+  const [groupingOnly, setGroupingOnly] = useState(
+    !isChild && (initial?.isGroupingOnly ?? false),
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,23 +68,51 @@ export default function NavItemForm({
   const labelClass =
     "block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] mb-1";
 
+  // When groupingOnly is toggled on, clear URL/page fields
+  function handleGroupingOnlyChange(val: boolean) {
+    setGroupingOnly(val);
+    if (val) {
+      setUrl("");
+      setPageId("");
+      setItemType("CUSTOM_URL");
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!label.trim()) { setError("Label ist erforderlich."); return; }
-    if (itemType === "PAGE" && !pageId) { setError("Bitte eine Seite auswählen."); return; }
-    if (itemType !== "PAGE" && !url.trim()) { setError("URL ist erforderlich."); return; }
+
+    if (!groupingOnly) {
+      if (itemType === "PAGE" && !pageId) { setError("Bitte eine Seite auswählen."); return; }
+      if (itemType !== "PAGE" && !url.trim()) { setError("URL ist erforderlich."); return; }
+    }
 
     setSaving(true);
     setError(null);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       label: label.trim(),
       itemType,
-      url: itemType !== "PAGE" ? url.trim() : null,
-      pageId: itemType === "PAGE" ? pageId : null,
       isVisible,
       opensInNewTab,
+      // parentId only sent for create (PATCH never changes parentId)
     };
+
+    if (groupingOnly) {
+      payload.url = null;
+      payload.pageId = null;
+      payload.itemType = "CUSTOM_URL";
+    } else if (itemType === "PAGE") {
+      payload.url = null;
+      payload.pageId = pageId;
+    } else {
+      payload.url = url.trim();
+      payload.pageId = null;
+    }
+
+    if (!isEdit && parentId) {
+      payload.parentId = parentId;
+    }
 
     try {
       const apiUrl = isEdit
@@ -95,6 +140,21 @@ export default function NavItemForm({
       onSubmit={handleSubmit}
       className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface-2)] p-4 space-y-4"
     >
+      {/* Grouping-only toggle — top-level only */}
+      {!isChild && (allowGroupingOnly || initial?.isGroupingOnly) && (
+        <label className="inline-flex items-center gap-2 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            checked={groupingOnly}
+            onChange={(e) => handleGroupingOnlyChange(e.target.checked)}
+            className="rounded"
+          />
+          <span className="text-xs text-[var(--foreground)]">
+            Nur Gruppe (keine URL — dient als übergeordnetes Menüelement)
+          </span>
+        </label>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Label */}
         <div>
@@ -103,77 +163,81 @@ export default function NavItemForm({
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="z. B. Über uns"
+            placeholder="z. B. Teams"
             className="fca-input"
             required
           />
         </div>
 
-        {/* Item type */}
-        <div>
-          <label className={labelClass}>Typ</label>
-          <select
-            value={itemType}
-            onChange={(e) => {
-              setItemType(e.target.value as NavItemType);
-              setUrl("");
-              setPageId("");
-            }}
-            className="fca-input"
-          >
-            {(Object.keys(ITEM_TYPE_LABELS) as NavItemType[]).map((t) => (
-              <option key={t} value={t}>
-                {ITEM_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* URL or page picker */}
-        {itemType === "PAGE" ? (
-          <div className="sm:col-span-2">
-            <label className={labelClass}>Seite *</label>
+        {/* Item type — hidden when grouping-only */}
+        {!groupingOnly && (
+          <div>
+            <label className={labelClass}>Typ</label>
             <select
-              value={pageId}
-              onChange={(e) => setPageId(e.target.value)}
+              value={itemType}
+              onChange={(e) => {
+                setItemType(e.target.value as NavItemType);
+                setUrl("");
+                setPageId("");
+              }}
               className="fca-input"
             >
-              <option value="">— Seite auswählen —</option>
-              {pages.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title} ({p.slug})
+              {(Object.keys(ITEM_TYPE_LABELS) as NavItemType[]).map((t) => (
+                <option key={t} value={t}>
+                  {ITEM_TYPE_LABELS[t]}
                 </option>
               ))}
             </select>
-            {pages.length === 0 && (
-              <p className="mt-1 text-[10px] text-amber-600">
-                Keine veröffentlichten Seiten vorhanden. Veröffentliche zuerst eine Seite.
-              </p>
-            )}
           </div>
-        ) : (
-          <div className="sm:col-span-2">
-            <label className={labelClass}>
-              {itemType === "EXTERNAL_URL" ? "Externe URL *" : "Interner Pfad *"}
-            </label>
-            <input
-              type={itemType === "EXTERNAL_URL" ? "url" : "text"}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder={
-                itemType === "EXTERNAL_URL"
-                  ? "https://example.com"
-                  : "/teams"
-              }
-              className="fca-input"
-              required
-            />
-            {itemType === "CUSTOM_URL" && (
-              <p className="mt-1 text-[10px] text-[var(--muted)]">
-                Relativer Pfad ab Root, z. B. <code className="bg-[var(--surface)] px-1 rounded">/teams</code>
-              </p>
-            )}
-          </div>
+        )}
+
+        {/* URL or page picker — hidden when grouping-only */}
+        {!groupingOnly && (
+          itemType === "PAGE" ? (
+            <div className="sm:col-span-2">
+              <label className={labelClass}>Seite *</label>
+              <select
+                value={pageId}
+                onChange={(e) => setPageId(e.target.value)}
+                className="fca-input"
+              >
+                <option value="">— Seite auswählen —</option>
+                {pages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title} ({p.slug})
+                  </option>
+                ))}
+              </select>
+              {pages.length === 0 && (
+                <p className="mt-1 text-[10px] text-amber-600">
+                  Keine veröffentlichten Seiten vorhanden. Veröffentliche zuerst eine Seite.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="sm:col-span-2">
+              <label className={labelClass}>
+                {itemType === "EXTERNAL_URL" ? "Externe URL *" : "Interner Pfad *"}
+              </label>
+              <input
+                type={itemType === "EXTERNAL_URL" ? "url" : "text"}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder={
+                  itemType === "EXTERNAL_URL"
+                    ? "https://example.com"
+                    : "/teams"
+                }
+                className="fca-input"
+                required
+              />
+              {itemType === "CUSTOM_URL" && (
+                <p className="mt-1 text-[10px] text-[var(--muted)]">
+                  Relativer Pfad ab Root, z. B. <code className="bg-[var(--surface)] px-1 rounded">/teams</code>
+                </p>
+              )}
+            </div>
+          )
         )}
       </div>
 
@@ -188,15 +252,17 @@ export default function NavItemForm({
           />
           <span className="text-xs text-[var(--foreground)]">Sichtbar</span>
         </label>
-        <label className="inline-flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={opensInNewTab}
-            onChange={(e) => setOpensInNewTab(e.target.checked)}
-            className="rounded"
-          />
-          <span className="text-xs text-[var(--foreground)]">In neuem Tab öffnen</span>
-        </label>
+        {!groupingOnly && (
+          <label className="inline-flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={opensInNewTab}
+              onChange={(e) => setOpensInNewTab(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-xs text-[var(--foreground)]">In neuem Tab öffnen</span>
+          </label>
+        )}
       </div>
 
       {error && (
@@ -206,7 +272,7 @@ export default function NavItemForm({
       <div className="flex items-center gap-2">
         <button type="submit" disabled={saving} className="fca-button-primary">
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-          {saving ? "Speichern…" : isEdit ? "Speichern" : "Hinzufügen"}
+          {saving ? "Speichern…" : isEdit ? "Speichern" : isChild ? "Unterelement hinzufügen" : "Hinzufügen"}
         </button>
         <button type="button" onClick={onCancel} className="fca-button-secondary">
           <X className="h-3.5 w-3.5" />
