@@ -197,6 +197,12 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/dashboard/website/media",
         permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
       },
+      {
+        key: "website-settings",
+        label: "Einstellungen",
+        href: "/dashboard/website/settings",
+        permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+      },
     ],
   },
   {
