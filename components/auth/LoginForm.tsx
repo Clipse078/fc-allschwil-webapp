@@ -1,33 +1,20 @@
 ﻿"use client";
 
+import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
-import { Trophy } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-// ── Inline platform wordmark (client-safe, no server dependency) ─────────────
-function ScePlatformWordmark({ size = 36 }: { size?: number }) {
+function ScePlatformWordmark({ size = 42 }: { size?: number }) {
   return (
-    <div className="flex items-center gap-3">
-      <div
-        style={{
-          width: size,
-          height: size,
-          borderRadius: 8,
-          background: "#FF6A00",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <Trophy style={{ width: size * 0.5, height: size * 0.5, color: "#fff" }} />
-      </div>
-      <span className="text-[1.1rem] font-bold tracking-tight leading-none">
-        <span style={{ color: "#111827" }}>SportClub</span>
-        <span style={{ color: "#FF6A00" }}>Evo</span>
-      </span>
-    </div>
+    <Image
+      src="/images/branding/sportclubevo_logo.png"
+      alt="SportClubEvo"
+      width={Math.round(size * 5.2)}
+      height={size}
+      priority
+      className="h-auto w-auto max-w-[320px] object-contain"
+    />
   );
 }
 
@@ -60,13 +47,10 @@ export default function LoginForm() {
 
   return (
     <main className="relative flex min-h-screen" style={{ background: "#F8FAFC" }}>
-
-      {/* ── Left panel — brand / marketing ──────────────────────────── */}
       <div
         className="hidden lg:flex lg:w-[48%] xl:w-[45%] flex-col justify-between p-12 relative overflow-hidden"
         style={{ background: "#ffffff", borderRight: "1px solid #E5E7EB" }}
       >
-        {/* Decorative background blobs */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden"
@@ -76,7 +60,8 @@ export default function LoginForm() {
             style={{
               width: 480,
               height: 480,
-              background: "radial-gradient(circle, rgba(255,106,0,0.08) 0%, transparent 70%)",
+              background:
+                "radial-gradient(circle, rgba(255,106,0,0.08) 0%, transparent 70%)",
             }}
           />
           <div
@@ -84,24 +69,24 @@ export default function LoginForm() {
             style={{
               width: 320,
               height: 320,
-              background: "radial-gradient(circle, rgba(255,106,0,0.06) 0%, transparent 70%)",
+              background:
+                "radial-gradient(circle, rgba(255,106,0,0.06) 0%, transparent 70%)",
             }}
           />
         </div>
 
-        {/* Top: SCE wordmark */}
         <div className="relative z-10">
           <ScePlatformWordmark size={36} />
         </div>
 
-        {/* Center: headline + tagline */}
         <div className="relative z-10">
           <p
             className="mb-4 text-[0.72rem] font-semibold uppercase tracking-[0.18em]"
             style={{ color: "#FF6A00" }}
           >
-            Club Management Platform
+            SportClubEvo Platform
           </p>
+
           <h1
             className="text-[2.75rem] font-bold leading-[1.1] tracking-[-0.025em]"
             style={{ color: "#111827" }}
@@ -112,6 +97,7 @@ export default function LoginForm() {
             <br />
             Sportvereine.
           </h1>
+
           <p
             className="mt-6 max-w-[320px] text-[0.9375rem] leading-relaxed"
             style={{ color: "#6B7280" }}
@@ -119,7 +105,6 @@ export default function LoginForm() {
             Teams, Events, News und Kommunikation — professionell verwaltet an einem Ort.
           </p>
 
-          {/* Feature bullets */}
           <ul className="mt-8 space-y-3">
             {[
               "Saisonplanung & Eventmanagement",
@@ -142,7 +127,6 @@ export default function LoginForm() {
           </ul>
         </div>
 
-        {/* Bottom */}
         <div className="relative z-10">
           <p className="text-[0.72rem]" style={{ color: "#9CA3AF" }}>
             © 2026 SportClubEvo — Alle Rechte vorbehalten.
@@ -150,26 +134,21 @@ export default function LoginForm() {
         </div>
       </div>
 
-      {/* ── Right panel — login form ─────────────────────────────────── */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-12">
-
-        {/* Mobile-only header */}
         <div className="mb-8 flex flex-col items-center gap-1 lg:hidden">
           <ScePlatformWordmark size={40} />
         </div>
 
         <div className="w-full max-w-[400px]">
-
-          {/* Form card */}
           <div
             className="rounded-2xl p-8"
             style={{
               background: "#ffffff",
               border: "1px solid #E5E7EB",
-              boxShadow: "0 4px 24px rgba(17,24,39,0.08), 0 1px 4px rgba(17,24,39,0.04)",
+              boxShadow:
+                "0 4px 24px rgba(17,24,39,0.08), 0 1px 4px rgba(17,24,39,0.04)",
             }}
           >
-            {/* Form header */}
             <div className="mb-6">
               <h2
                 className="text-[1.375rem] font-bold tracking-tight"
@@ -177,12 +156,12 @@ export default function LoginForm() {
               >
                 Einloggen
               </h2>
+
               <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
                 Bitte melde dich mit deinen Zugangsdaten an.
               </p>
             </div>
 
-            {/* Form body */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label
@@ -192,6 +171,7 @@ export default function LoginForm() {
                 >
                   E-Mail
                 </label>
+
                 <input
                   id="email"
                   type="email"
@@ -212,6 +192,7 @@ export default function LoginForm() {
                 >
                   Passwort
                 </label>
+
                 <input
                   id="password"
                   type="password"
@@ -235,7 +216,7 @@ export default function LoginForm() {
                 disabled={isSubmitting}
                 className={cn(
                   "w-full h-11 rounded-xl font-semibold text-[0.9375rem] text-white transition",
-                  "disabled:cursor-not-allowed disabled:opacity-55",
+                  "disabled:cursor-not-allowed disabled:opacity-55"
                 )}
                 style={{
                   background: isSubmitting
@@ -249,7 +230,6 @@ export default function LoginForm() {
             </form>
           </div>
 
-          {/* Footer attribution */}
           <p
             className="mt-6 text-center text-[0.72rem]"
             style={{ color: "#9CA3AF" }}
