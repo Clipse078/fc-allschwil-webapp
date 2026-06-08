@@ -508,7 +508,7 @@ export default function WochenplanRoomDayPlannerDialog({
                           Garderobe
                         </span>
 
-                        <p className={"mt-3 font-[var(--font-display)] text-[2rem] font-bold uppercase leading-none tracking-[-0.04em] " + roomTone.roomCodeClass}>
+                        <p className={"fca-heading mt-2 " + roomTone.roomCodeClass}>
                           {roomCode}
                         </p>
                       </div>

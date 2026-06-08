@@ -156,40 +156,56 @@ button {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   TYPOGRAPHY CLASSES
+   TYPOGRAPHY SYSTEM — Premium SaaS, Apple-like, consistent across all pages
+   Single source of truth for all page/section/card typography.
+   Components in components/ui/typography/ wrap these classes.
 ───────────────────────────────────────────────────────────────────────── */
+
+/* Eyebrow — small uppercase module label above page/section titles */
 .fca-eyebrow {
   color: var(--tenant-secondary);
-  font-family: var(--font-display);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.fca-heading {
-  color: var(--tenant-primary);
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 1.1rem + 1vw, 2.4rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   line-height: 1;
   text-transform: uppercase;
 }
 
+/* Page/section title — calm, bold, Inter — no display font, no uppercase */
+.fca-heading {
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+/* Sub-section title — slightly smaller variant of fca-heading */
 .fca-subheading {
   color: var(--foreground);
-  font-family: var(--font-display);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  text-transform: uppercase;
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
 }
 
+/* Muted description text below page/section titles */
 .fca-body-muted {
-  color: var(--muted);
+  color: var(--text-2);
   font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Section card title — used inside card/panel headers */
+.sce-section-card-title {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
 }
 
 /* Page title system for top navigation */
@@ -1084,7 +1100,7 @@ button {
   }
 
   .fca-heading {
-    font-size: 1.4rem;
+    font-size: 1.25rem;
   }
 
   :root {

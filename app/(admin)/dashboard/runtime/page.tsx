@@ -2,6 +2,7 @@
 import { getDeploymentMetadata } from "@/lib/server/deployment";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -13,19 +14,15 @@ export default async function DashboardRuntimePage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
-        <p className="fca-eyebrow">Deployment Diagnostics</p>
-        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[#0b4aa2] lg:text-[2.35rem]">
-          Runtime & Deployment
-        </h2>
-      </section>
+      <AdminSectionHeader
+        eyebrow="Deployment Diagnostics"
+        title="Runtime & Deployment"
+      />
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-          Deployment
-        </div>
+      <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-sm">
+        <p className="fca-eyebrow mb-3">Deployment</p>
 
-        <dl className="space-y-3 text-sm text-slate-700">
+        <dl className="space-y-3 text-sm text-[var(--text-2)]">
           <div className="flex justify-between">
             <dt>Environment</dt>
             <dd>{deployment.environment}</dd>
@@ -45,10 +42,8 @@ export default async function DashboardRuntimePage() {
         </dl>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-red-600">
-          Runtime Status
-        </div>
+      <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-sm">
+        <p className="fca-eyebrow mb-3">Runtime Status</p>
 
         <div
           className={

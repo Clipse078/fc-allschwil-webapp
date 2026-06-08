@@ -69,7 +69,7 @@ export function SectionCard({
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div className="min-w-0 flex-1">
             {title && (
-              <h2 className="text-sm font-semibold text-[var(--foreground)]">
+              <h2 className="sce-section-card-title">
                 {title}
               </h2>
             )}

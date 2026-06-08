@@ -21,10 +21,7 @@ export default function TeamsCategorySummary({
       {/* Total KPI */}
       <div className="sce-kpi-card sm:col-span-2 xl:col-span-1">
         <p className="sce-data-label">Teams gesamt</p>
-        <p
-          className="mt-1.5 text-3xl font-bold text-[var(--foreground)]"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <p className="mt-1.5 text-3xl font-bold text-[var(--foreground)]">
           {totalTeams}
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
@@ -44,10 +41,7 @@ export default function TeamsCategorySummary({
               {cat.label}
             </p>
           </div>
-          <span
-            className="text-lg font-bold"
-            style={{ fontFamily: "var(--font-display)", color: "var(--foreground)" }}
-          >
+          <span className="text-lg font-bold text-[var(--foreground)]">
             {cat.count}
           </span>
         </div>

@@ -166,8 +166,8 @@ function QuickActionCard({ href, icon, title, subtitle, iconBg, iconColor }: Qui
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-[0.875rem] font-semibold text-[#111827] leading-tight">{title}</p>
-        <p className="mt-0.5 text-[0.75rem] text-[#6B7280]">{subtitle}</p>
+        <p className="text-[0.875rem] font-semibold text-[var(--foreground)] leading-tight">{title}</p>
+        <p className="mt-0.5 text-[0.75rem] text-[var(--text-2)]">{subtitle}</p>
       </div>
     </Link>
   );
@@ -197,11 +197,11 @@ function ActivityItem({
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[0.875rem] font-medium text-[#111827]">{title}</p>
-        <p className="mt-0.5 truncate text-[0.75rem] text-[#6B7280]">{subtitle}</p>
+        <p className="truncate text-[0.875rem] font-medium text-[var(--foreground)]">{title}</p>
+        <p className="mt-0.5 truncate text-[0.75rem] text-[var(--text-2)]">{subtitle}</p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <span className="text-[0.72rem] text-[#9CA3AF]">{time}</span>
+        <span className="text-[0.72rem] text-[var(--muted)]">{time}</span>
         <span
           className="sce-tag-pill"
           style={{ background: tagBg, color: tagColor }}
@@ -225,8 +225,8 @@ function TaskItem({ title, subtitle, dueLabel, urgent = false }: TaskItemProps) 
     <div className="sce-task-item">
       <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#D1D5DB]" />
       <div className="min-w-0 flex-1">
-        <p className="text-[0.8125rem] font-medium text-[#111827] leading-tight">{title}</p>
-        <p className="mt-0.5 text-[0.72rem] text-[#6B7280] truncate">{subtitle}</p>
+        <p className="text-[0.8125rem] font-medium text-[var(--foreground)] leading-tight">{title}</p>
+        <p className="mt-0.5 text-[0.72rem] text-[var(--text-2)] truncate">{subtitle}</p>
       </div>
       <span
         className="shrink-0 text-[0.72rem] font-semibold"
@@ -250,14 +250,14 @@ function EventItem({ day, month, title, location, time }: EventItemProps) {
   return (
     <div className="sce-event-item">
       <div className="sce-date-chip">
-        <span className="text-[0.875rem] font-bold leading-none text-[#111827]">{day}</span>
-        <span className="mt-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-[#6B7280]">{month}</span>
+        <span className="text-[0.875rem] font-bold leading-none text-[var(--foreground)]">{day}</span>
+        <span className="mt-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">{month}</span>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[0.8125rem] font-semibold text-[#111827] leading-tight">{title}</p>
-        <p className="mt-0.5 truncate text-[0.72rem] text-[#6B7280]">{location}</p>
+        <p className="truncate text-[0.8125rem] font-semibold text-[var(--foreground)] leading-tight">{title}</p>
+        <p className="mt-0.5 truncate text-[0.72rem] text-[var(--text-2)]">{location}</p>
       </div>
-      <span className="shrink-0 text-[0.75rem] font-medium text-[#6B7280]">{time}</span>
+      <span className="shrink-0 text-[0.75rem] font-medium text-[var(--text-2)]">{time}</span>
     </div>
   );
 }
@@ -439,17 +439,17 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
       {/* ── Welcome Row ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[1.625rem] font-bold tracking-tight" style={{ color: "#111827" }}>
+          <h1 className="fca-heading">
             {greeting}
           </h1>
-          <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
+          <p className="fca-body-muted mt-1">
             Hier ist, was heute in deinem Verein ansteht.
           </p>
         </div>
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-[0.8125rem] font-medium text-[#374151] shadow-sm transition hover:bg-[#F9FAFB]"
+            className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-[0.8125rem] font-medium text-[var(--text-2)] shadow-sm transition hover:bg-[var(--surface-2)]"
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
             Dashboard anpassen
@@ -510,7 +510,7 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
           {/* Schnellaktionen */}
           <div className="sce-section-card-v3">
             <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Schnellaktionen</h2>
+              <h2 className="sce-section-card-title">Schnellaktionen</h2>
             </div>
             <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
               <QuickActionCard
@@ -551,7 +551,7 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
           {/* Aktuelle Aktivitäten */}
           <div className="sce-section-card-v3">
             <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Aktuelle Aktivitäten</h2>
+              <h2 className="sce-section-card-title">Aktuelle Aktivitäten</h2>
             </div>
             <div className="sce-section-card-v3-body">
               {activities.length > 0 ? (
@@ -571,9 +571,9 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
                 ))
               ) : (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <Globe className="h-7 w-7 text-[#9CA3AF]" />
-                  <p className="text-[0.875rem] text-[#6B7280]">Noch keine Aktivitäten</p>
-                  <p className="text-[0.75rem] text-[#9CA3AF]">Aktivitäten erscheinen hier sobald Inhalte erstellt werden.</p>
+                  <Globe className="h-7 w-7 text-[var(--muted)]" />
+                  <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">Noch keine Aktivitäten</p>
+                  <p className="text-sm text-[var(--text-2)]">Aktivitäten erscheinen hier sobald Inhalte erstellt werden.</p>
                 </div>
               )}
             </div>
@@ -596,8 +596,8 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
           {/* Meine Aufgaben */}
           <div className="sce-section-card-v3">
             <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Meine Aufgaben</h2>
-              <CheckSquare className="h-4 w-4 text-[#9CA3AF]" />
+              <h2 className="sce-section-card-title">Meine Aufgaben</h2>
+              <CheckSquare className="h-4 w-4 text-[var(--muted)]" />
             </div>
             <div className="sce-section-card-v3-body">
               {tasks.map((t, i) => (
@@ -624,8 +624,8 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
           {/* Nächste Termine */}
           <div className="sce-section-card-v3">
             <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Nächste Termine</h2>
-              <CalendarDays className="h-4 w-4 text-[#9CA3AF]" />
+              <h2 className="sce-section-card-title">Nächste Termine</h2>
+              <CalendarDays className="h-4 w-4 text-[var(--muted)]" />
             </div>
             <div className="sce-section-card-v3-body">
               {upcomingEntries.length > 0 ? (
@@ -641,8 +641,8 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
                 ))
               ) : (
                 <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <CalendarDays className="h-6 w-6 text-[#9CA3AF]" />
-                  <p className="text-[0.8125rem] text-[#6B7280]">Keine bevorstehenden Termine</p>
+                  <CalendarDays className="h-6 w-6 text-[var(--muted)]" />
+                  <p className="text-[0.9375rem] font-semibold text-[var(--foreground)]">Keine bevorstehenden Termine</p>
                 </div>
               )}
             </div>

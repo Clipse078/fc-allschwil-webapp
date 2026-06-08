@@ -1,4 +1,5 @@
 ﻿import type { ReactNode } from "react";
+import { PageEyebrow, PageSubtitle } from "@/components/ui/typography";
 
 type AdminSectionHeaderProps = {
   eyebrow?: string;
@@ -7,6 +8,12 @@ type AdminSectionHeaderProps = {
   actions?: ReactNode;
 };
 
+/**
+ * AdminSectionHeader
+ *
+ * Canonical page-level header for dashboard/admin pages.
+ * Uses shared typography primitives for consistent Premium SaaS look.
+ */
 export default function AdminSectionHeader({
   eyebrow,
   title,
@@ -16,10 +23,10 @@ export default function AdminSectionHeader({
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div>
-        {eyebrow ? <p className="fca-eyebrow">{eyebrow}</p> : null}
+        {eyebrow ? <PageEyebrow>{eyebrow}</PageEyebrow> : null}
         <h2 className="fca-heading mt-2">{title}</h2>
         {description ? (
-          <p className="fca-body-muted mt-3 max-w-2xl">{description}</p>
+          <PageSubtitle className="mt-2">{description}</PageSubtitle>
         ) : null}
       </div>
 

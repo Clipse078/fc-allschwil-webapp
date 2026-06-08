@@ -42,10 +42,10 @@ export default function DashboardModuleCards({
                 <div className="flex h-full flex-col">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <p className="fca-eyebrow">
                         Modul
                       </p>
-                      <h4 className="mt-3 font-[var(--font-display)] text-[1.35rem] font-bold uppercase leading-[0.96] tracking-[-0.02em] text-slate-900">
+                      <h4 className="fca-subheading mt-2">
                         {module.title}
                       </h4>
                     </div>
@@ -55,7 +55,7 @@ export default function DashboardModuleCards({
                     </span>
                   </div>
 
-                  <p className="mt-4 text-sm leading-6 text-slate-600">
+                  <p className="fca-body-muted mt-4">
                     {module.description}
                   </p>
 
@@ -77,15 +77,15 @@ export default function DashboardModuleCards({
 
       {hiddenModules.length > 0 ? (
         <AdminSurfaceCard className="p-5">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <p className="fca-eyebrow">
             Nicht freigeschaltet
           </p>
 
-          <h3 className="mt-3 font-[var(--font-display)] text-[1.2rem] font-bold uppercase leading-[0.96] tracking-[-0.02em] text-slate-900">
+          <h3 className="fca-subheading mt-2">
             Versteckte Bereiche für diese Rolle
           </h3>
 
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+          <p className="fca-body-muted mt-3 max-w-2xl">
             Diese Module sind im System vorgesehen, aktuell für den angemeldeten
             Benutzer aber noch nicht freigegeben.
           </p>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { EmptyStateTitle, EmptyStateText } from "@/components/ui/typography";
 
 type EmptyStateProps = {
   /**
@@ -29,9 +30,7 @@ type EmptyStateProps = {
  *     icon={<Users className="h-10 w-10" />}
  *     heading="Keine Teams vorhanden"
  *     description="Erstelle das erste Team für diese Saison."
- *     action={
- *       <button className="sce-btn-primary">Neues Team</button>
- *     }
+ *     action={<button className="fca-button-primary">Neues Team</button>}
  *   />
  */
 export function EmptyState({
@@ -61,9 +60,9 @@ export function EmptyState({
       )}
 
       <div className="max-w-sm space-y-1.5">
-        <p className="text-sm font-semibold text-[var(--foreground)]">{heading}</p>
+        <EmptyStateTitle>{heading}</EmptyStateTitle>
         {description && (
-          <p className="text-sm text-[var(--text-2)]">{description}</p>
+          <EmptyStateText>{description}</EmptyStateText>
         )}
       </div>
 

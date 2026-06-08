@@ -280,29 +280,29 @@ export default function EventImportUploader() {
       {preview ? (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-[24px] border border-[var(--border)] bg-white p-5 shadow-sm">
+              <p className="sce-data-label">
                 Aktive Saison
               </p>
-              <p className="mt-3 font-[var(--font-display)] text-[1.3rem] font-bold uppercase leading-[0.95] tracking-[-0.02em] text-slate-900">
+              <p className="fca-subheading mt-2">
                 {preview.activeSeason.name}
               </p>
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-[24px] border border-[var(--border)] bg-white p-5 shadow-sm">
+              <p className="sce-data-label">
                 Erkannte Zeilen
               </p>
-              <p className="mt-3 font-[var(--font-display)] text-[1.3rem] font-bold uppercase leading-[0.95] tracking-[-0.02em] text-slate-900">
+              <p className="fca-subheading mt-2">
                 {preview.rowsDetected}
               </p>
             </div>
 
-            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-[24px] border border-[var(--border)] bg-white p-5 shadow-sm">
+              <p className="sce-data-label">
                 Zeilen ohne Endzeit
               </p>
-              <p className="mt-3 font-[var(--font-display)] text-[1.3rem] font-bold uppercase leading-[0.95] tracking-[-0.02em] text-slate-900">
+              <p className="fca-subheading mt-2">
                 {rowsWithoutEndAt}
               </p>
             </div>

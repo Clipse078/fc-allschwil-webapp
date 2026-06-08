@@ -75,10 +75,10 @@ export default async function RolesPage() {
       <div className="sce-detail-section">
         <div className="sce-detail-section-header">
           <div className="min-w-0 flex-1">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+            <p className="sce-data-label">
               Systemrollen
             </p>
-            <p className="text-sm font-semibold text-[var(--foreground)]">
+            <p className="sce-section-card-title">
               Alle Rollen
             </p>
           </div>

@@ -63,10 +63,10 @@ export default async function RoleDetailPage({ params }: PageProps) {
               <Shield className="h-6 w-6 text-[var(--blue)]" />
             </div>
             <div>
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--red)] font-[var(--font-display)]">
+              <p className="fca-eyebrow">
                 Governance
               </p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-[var(--blue)] font-[var(--font-display)]">
+              <h2 className="fca-heading mt-2">
                 {role.name}
               </h2>
               <p className="mt-1 font-mono text-[0.78rem] text-[var(--muted)]">
@@ -94,7 +94,7 @@ export default async function RoleDetailPage({ params }: PageProps) {
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <div className="sce-kpi-card p-5">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+          <p className="sce-data-label">
             Benutzer
           </p>
           <p className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-[var(--foreground)]">
@@ -105,7 +105,7 @@ export default async function RoleDetailPage({ params }: PageProps) {
           </p>
         </div>
         <div className="sce-kpi-card p-5">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+          <p className="sce-data-label">
             Org-Einheiten
           </p>
           <p className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-[var(--foreground)]">
@@ -116,7 +116,7 @@ export default async function RoleDetailPage({ params }: PageProps) {
           </p>
         </div>
         <div className="sce-kpi-card p-5 col-span-2 lg:col-span-1">
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+          <p className="sce-data-label">
             Berechtigungen
           </p>
           <p className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-[var(--foreground)]">
@@ -137,10 +137,10 @@ export default async function RoleDetailPage({ params }: PageProps) {
           {role.description && (
             <div className="sce-detail-section">
               <div className="sce-detail-section-header">
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                <p className="sce-data-label">
                   Rolle
                 </p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">
+                <p className="sce-section-card-title">
                   Beschreibung
                 </p>
               </div>
@@ -158,10 +158,10 @@ export default async function RoleDetailPage({ params }: PageProps) {
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-[var(--muted)]" />
                 <div>
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                  <p className="sce-data-label">
                     Zuweisung
                   </p>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                  <p className="sce-section-card-title">
                     Benutzer mit dieser Rolle
                   </p>
                 </div>
@@ -249,10 +249,10 @@ export default async function RoleDetailPage({ params }: PageProps) {
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-[var(--muted)]" />
                 <div>
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                  <p className="sce-data-label">
                     Organisation
                   </p>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                  <p className="sce-section-card-title">
                     Verknüpfte Org-Einheiten
                   </p>
                 </div>
@@ -307,10 +307,10 @@ export default async function RoleDetailPage({ params }: PageProps) {
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div>
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                <p className="sce-data-label">
                   Metadaten
                 </p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">
+                <p className="sce-section-card-title">
                   Rollen-Details
                 </p>
               </div>

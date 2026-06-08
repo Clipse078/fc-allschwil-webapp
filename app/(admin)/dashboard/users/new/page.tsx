@@ -32,7 +32,7 @@ export default async function NewUserPage() {
       {/* Form section */}
       <div className="sce-detail-section">
         <div className="sce-detail-section-header">
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+          <p className="sce-data-label">
             Kontoinformationen
           </p>
         </div>
