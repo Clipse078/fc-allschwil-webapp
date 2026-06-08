@@ -56,23 +56,39 @@ export default function SportClubEvoLogo({
   const w = Math.round(h * (LOGO_NATURAL_WIDTH / LOGO_NATURAL_HEIGHT));
 
   if (iconOnly) {
-    // Clip to a square container showing only the left (aperture icon) portion
-    // of the horizontal lockup. The image renders at full proportional width
-    // and the container clips everything past the first `h` pixels.
+    // Zoom in on the aperture icon using CSS background-image for reliable cropping.
+    //
+    // Measured pixel positions in the 1536×1024 source image:
+    //   Icon x: 64–380 (center 222 = 14.45% of width)
+    //   Icon y: 333–631 (center 482 = 47.07% of height)
+    //   Text starts at x=400 (26.04% of width)
+    //
+    // ICON_SCALE=3.5 ensures the icon fills the container width and the text
+    // remains out of frame (≥3px safety margin at all sizes).
+    const ICON_SCALE = 3.5;
+    const ICON_CENTER_X_FRAC = 0.1445; // 222 / 1536
+    const ICON_CENTER_Y_FRAC = 0.4707; // 482 / 1024
+    const renderH = Math.round(h * ICON_SCALE);
+    const renderW = Math.round(renderH * (LOGO_NATURAL_WIDTH / LOGO_NATURAL_HEIGHT));
+    // Center the icon within the square container
+    const bgPosX = Math.round(h / 2 - renderW * ICON_CENTER_X_FRAC);
+    const bgPosY = Math.round(h / 2 - renderH * ICON_CENTER_Y_FRAC);
+
     return (
       <div
-        style={{ width: h, height: h, overflow: "hidden", flexShrink: 0 }}
+        role="img"
+        aria-label="SportClubEvo"
+        style={{
+          width: h,
+          height: h,
+          flexShrink: 0,
+          backgroundImage: "url('/images/branding/sportclubevo_logo.png')",
+          backgroundSize: `${renderW}px ${renderH}px`,
+          backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+          backgroundRepeat: "no-repeat",
+        }}
         className={className}
-      >
-        <Image
-          src="/images/branding/sportclubevo_logo.png"
-          alt="SportClubEvo"
-          width={LOGO_NATURAL_WIDTH}
-          height={LOGO_NATURAL_HEIGHT}
-          style={{ display: "block", height: h, width: w, maxWidth: "none" }}
-          priority
-        />
-      </div>
+      />
     );
   }
 
