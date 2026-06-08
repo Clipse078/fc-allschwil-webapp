@@ -1,39 +1,18 @@
 /**
- * SceWordmark — Sprint 4: Tenant Branding System
+ * SceWordmark — Sprint 7: Screen 3 Premium SaaS Branding
  *
- * Logo integration architecture for the SportClubEvo platform.
+ * Renders the SportClubEvo platform wordmark with the new two-tone typography:
+ *   [SCE Icon] SportClub(black) + Evo(orange)
  *
- * ─── Integration Points ──────────────────────────────────────────────────────
+ * ─── Modes ───────────────────────────────────────────────────────────────────
  *
- * Renders the [SCE Symbol] + SportClubEvo wordmark in two modes:
- *
- *   • platform — Shows the SportClubEvo platform icon + name (no tenant)
- *   • tenant   — Shows the tenant logo (via TenantLogo) + tenant name
- *                with a subtle "SportClubEvo" platform attribution below
- *
- * ─── Logo Asset Architecture ─────────────────────────────────────────────────
- *
- * When no tenant logo is configured:
- *   The SCE Symbol is rendered as a rounded square with the tenant primary
- *   color background and a Trophy icon. This is the canonical platform fallback.
- *
- * When a tenant logo URL is set:
- *   The <img> tag renders the tenant logo (via TenantLogo).
- *   A broken-image fallback reverts to the platform icon automatically.
- *
- * Future logo asset readiness:
- *   When a final SportClubEvo SVG logo becomes available, replace the Trophy
- *   fallback in TenantLogo with:
- *     <img src="/brand/sce-symbol.svg" alt="SportClubEvo" />
- *   No other code changes required — all surfaces share this component.
+ *   • platform — SCE icon + "SportClubEvo" wordmark only
+ *   • tenant   — SCE icon + "SportClubEvo" wordmark + tenant club selector row
  *
  * ─── Usage ───────────────────────────────────────────────────────────────────
  *
- *   // Platform mode (e.g. global login page, platform header)
  *   <SceWordmark size={32} />
- *
- *   // Tenant mode (e.g. admin sidebar brand header)
- *   <SceWordmark size={32} tenantName={ctx.name} logoUrl={ctx.logoUrl} collapsed={isCollapsed} />
+ *   <SceWordmark size={32} tenantName="FC Allschwil" logoUrl={ctx.logoUrl} collapsed={false} />
  */
 
 import TenantLogo from "./TenantLogo";
@@ -41,11 +20,11 @@ import TenantLogo from "./TenantLogo";
 type SceWordmarkProps = {
   /** Symbol/logo size in pixels. Default: 32 */
   size?: number;
-  /** Tenant display name. When provided, renders in tenant mode. */
+  /** Tenant display name. When provided, renders the club selector row. */
   tenantName?: string;
   /** Raw logoUrl from tenant config. Null/invalid → fallback icon. */
   logoUrl?: string | null;
-  /** When true, hides the text portion (collapsed sidebar state). */
+  /** When true, hides all text (collapsed sidebar state). */
   collapsed?: boolean;
 };
 
@@ -58,39 +37,59 @@ export default function SceWordmark({
   const hasTenant = !!tenantName;
 
   return (
-    <div className="flex items-center gap-2.5 min-w-0">
-      {/* Symbol: tenant logo OR platform icon */}
-      <TenantLogo
-        logoUrl={logoUrl}
-        size={size}
-        alt={tenantName ? `${tenantName} logo` : "SportClubEvo"}
-      />
+    <div className="flex flex-col gap-2 min-w-0 w-full">
+      {/* Platform wordmark row: [SCE icon] SportClubEvo */}
+      <div className="flex items-center gap-2 min-w-0">
+        {/* SCE Symbol — orange icon with aperture/leaf motif via TenantLogo fallback */}
+        <TenantLogo
+          logoUrl={logoUrl && !hasTenant ? logoUrl : null}
+          size={size}
+          alt="SportClubEvo"
+        />
 
-      {/* Text: platform label + tenant name */}
-      {!collapsed && (
-        <div className="min-w-0 flex-1">
-          <p
-            className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] leading-none"
-            style={{ color: "var(--muted)" }}
-          >
-            SportClubEvo
-          </p>
-          {hasTenant ? (
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            {/* Two-tone wordmark: SportClub (dark) + Evo (orange) */}
+            <p className="text-[0.95rem] font-bold leading-none tracking-tight">
+              <span className="text-[#111827]">SportClub</span>
+              <span style={{ color: "#FF6A00" }}>Evo</span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Club selector row — shown only in tenant mode when not collapsed */}
+      {hasTenant && !collapsed && (
+        <div
+          className="flex items-center gap-2 rounded-[10px] px-2 py-1.5 min-w-0"
+          style={{
+            background: "color-mix(in srgb, var(--tenant-primary) 6%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--tenant-primary) 12%, transparent)",
+          }}
+        >
+          <TenantLogo
+            logoUrl={logoUrl}
+            size={24}
+            alt={`${tenantName} logo`}
+          />
+          <div className="min-w-0 flex-1">
             <p
-              className="mt-0.5 truncate text-[0.88rem] font-bold leading-tight tracking-tight"
-              style={{ color: "var(--tenant-primary)" }}
+              className="truncate text-[0.8rem] font-semibold leading-tight"
+              style={{ color: "var(--foreground)" }}
             >
               {tenantName}
             </p>
-          ) : (
-            <p
-              className="mt-0.5 text-[0.88rem] font-semibold leading-tight tracking-tight"
-              style={{ color: "var(--foreground)" }}
-            >
-              Club Management
-            </p>
-          )}
+          </div>
         </div>
+      )}
+
+      {/* Collapsed tenant indicator */}
+      {hasTenant && collapsed && (
+        <TenantLogo
+          logoUrl={logoUrl}
+          size={size}
+          alt={`${tenantName} logo`}
+        />
       )}
     </div>
   );

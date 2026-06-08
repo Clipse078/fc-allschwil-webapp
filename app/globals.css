@@ -37,7 +37,7 @@
   --red-light:         #fef2f2;
 
   /* Backgrounds */
-  --background:        #f7f8fa;
+  --background:        #F8FAFC;
   --surface:           #ffffff;
   --surface-2:         #f1f3f7;
   --surface-3:         #e9ecf2;
@@ -262,26 +262,19 @@ button {
   border-color: var(--border-strong);
 }
 
-/* KPI card with subtle left accent */
+/* KPI card — Screen 3 premium style */
 .sce-kpi-card {
-  position: relative;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--card);
-  box-shadow: var(--shadow-xs);
-  overflow: hidden;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(17,24,39,0.07), 0 1px 2px rgba(17,24,39,0.04);
   padding: 20px 24px;
+  transition: box-shadow var(--transition-base), transform var(--transition-fast);
 }
 
-.sce-kpi-card::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 16px;
-  bottom: 16px;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: var(--tenant-primary);
+.sce-kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(17,24,39,0.10), 0 2px 4px rgba(17,24,39,0.05);
+  transform: translateY(-1px);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -951,6 +944,135 @@ button {
   opacity: 0.8;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SCREEN 3 — Dashboard premium cards
+───────────────────────────────────────────────────────────────────────── */
+
+/* Quick action card */
+.sce-quick-action-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(17,24,39,0.06);
+  text-decoration: none;
+  transition:
+    box-shadow var(--transition-base),
+    border-color var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.sce-quick-action-card:hover {
+  box-shadow: 0 4px 16px rgba(17,24,39,0.10);
+  border-color: #D1D5DB;
+  transform: translateY(-1px);
+}
+
+/* Activity item */
+.sce-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.sce-activity-item:last-child {
+  border-bottom: none;
+}
+
+/* Task item */
+.sce-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.sce-task-item:last-child {
+  border-bottom: none;
+}
+
+/* Event item */
+.sce-event-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.sce-event-item:last-child {
+  border-bottom: none;
+}
+
+/* Section card — Screen 3 style (rounded 16px, white, clean shadow) */
+.sce-section-card-v3 {
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(17,24,39,0.06);
+  overflow: hidden;
+}
+
+.sce-section-card-v3-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.sce-section-card-v3-body {
+  padding: 4px 20px 0;
+}
+
+.sce-section-card-v3-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #F3F4F6;
+}
+
+/* Date chip for events */
+.sce-date-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid #E5E7EB;
+  background: #F8FAFC;
+  flex-shrink: 0;
+}
+
+/* Activity icon bubble */
+.sce-activity-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* Tag pill */
+.sce-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

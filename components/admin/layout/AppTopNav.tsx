@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, HelpCircle, Menu, Search, Settings } from "lucide-react";
 import { Suspense } from "react";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 
@@ -10,7 +10,9 @@ type AppTopNavProps = {
   lastName: string;
 };
 
-function getPageMeta(pathname: string): { eyebrow: string; title: string } {
+type PageMeta = { eyebrow: string; title: string };
+
+function getPageMeta(pathname: string): PageMeta {
   if (pathname === "/dashboard") return { eyebrow: "Home", title: "Dashboard" };
   if (pathname.startsWith("/admin")) return { eyebrow: "Platform", title: "Admin" };
   if (pathname.startsWith("/dashboard/planner/week")) return { eyebrow: "Planner", title: "Wochenplanner" };
@@ -42,36 +44,65 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
 
   return (
     <header className="sce-topnav">
-      {/* Left: page title */}
+      {/* Left: hamburger + breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="min-w-0">
-          <p className="sce-page-eyebrow">{eyebrow}</p>
-          <p className="sce-page-title">{title}</p>
-        </div>
+        {/* Hamburger — decorative, sidebar toggle is in AdminSidebar */}
+        <button
+          type="button"
+          className="sce-icon-button shrink-0"
+          aria-label="Menü"
+          tabIndex={-1}
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+
+        {/* Breadcrumb */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[0.8rem] text-[var(--muted)]">{eyebrow}</span>
+          <span className="text-[var(--muted)] text-[0.8rem]">›</span>
+          <span className="text-[0.8rem] font-semibold text-[var(--foreground)]">{title}</span>
+        </nav>
       </div>
 
-      {/* Right: actions + user */}
-      <div className="flex shrink-0 items-center gap-1.5">
-        {/* Page-level actions */}
-        <div className="hidden xl:flex items-center gap-1.5">
+      {/* Center: search */}
+      <div className="hidden md:flex flex-1 max-w-xs justify-center">
+        <button
+          type="button"
+          className="sce-search-slot w-full flex items-center gap-2"
+          aria-label="Suche"
+          disabled
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1 text-left text-[var(--muted)]">Suche…</span>
+          <kbd className="shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-medium text-[var(--muted)] border border-[var(--border)] bg-[var(--surface-2)]">
+            ⌘K
+          </kbd>
+        </button>
+      </div>
+
+      {/* Right: page actions + icons */}
+      <div className="flex shrink-0 items-center gap-1">
+        <div className="hidden xl:flex items-center gap-1">
           <Suspense fallback={null}>
             <AdminPageActions />
           </Suspense>
         </div>
 
-        {/* Notification bell — placeholder, no dot until notifications are implemented */}
-        <button
-          type="button"
-          className="sce-icon-button"
-          aria-label="Benachrichtigungen"
-          disabled
-        >
+        <button type="button" className="sce-icon-button" aria-label="Benachrichtigungen" disabled>
           <Bell className="h-4 w-4" />
+        </button>
+
+        <button type="button" className="sce-icon-button" aria-label="Hilfe" disabled>
+          <HelpCircle className="h-4 w-4" />
+        </button>
+
+        <button type="button" className="sce-icon-button" aria-label="Einstellungen" disabled>
+          <Settings className="h-4 w-4" />
         </button>
 
         {/* User avatar */}
         <div
-          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none"
+          className="ml-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none"
           style={{ background: "var(--tenant-primary)" }}
           title={`${firstName} ${lastName}`}
           aria-label="Benutzerprofil"
