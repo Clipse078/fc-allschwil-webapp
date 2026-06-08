@@ -30,8 +30,43 @@ re-run of a fix script **cannot** silently overwrite an existing credential.
 
 ### Correct way to intentionally change a password in STAGE/PROD
 
+> **Important:** `bootstrap-admin.ts` only sets `passwordHash` on the **`create`
+> path** (user does not yet exist). For an existing user the bootstrap `update`
+> block intentionally omits `passwordHash`. To change a password for an existing
+> user you must use one of the paths below.
+
+**Path A — Use the application reset-password API (preferred)**
+
+While authenticated as any active super_admin, call:
+
+```
+POST /api/users/<userId>/reset-password
+{ "newPassword": "<new-secure-password>" }
+```
+
+This is the safest path: it is audited, requires an active session, and never
+requires direct database access.
+
+**Path B — Direct database update (DBA only, STAGE/PROD)**
+
+Only when no admin session is available. Requires explicit approval from the
+team lead. Generate the bcrypt hash out-of-band and apply:
+
+```sql
+UPDATE "User"
+SET "passwordHash" = crypt('<new-password>', gen_salt('bf', 12))
+WHERE email = 'admin@fcallschwil.ch';
+```
+
+Or use a one-off Node.js snippet to generate the hash safely, then apply it
+via the Vercel Postgres console or a DBA connection.
+
+**Path C — Bootstrap for a freshly wiped database only**
+
+If the STAGE database has been fully reset and the user does not exist yet:
+
 ```bash
-# Only proceed after explicit approval from the team lead / DBA.
+# Only with explicit approval. Creates user from scratch.
 ALLOW_PASSWORD_CHANGE=true \
   BOOTSTRAP_ADMIN_PASSWORD=<new-secure-password> \
   APP_ENV=stage \
@@ -147,7 +182,9 @@ intending to change the password.
   invariant confirming they never touch `User` rows.
 
 **Confirmation:** No password was changed as part of this fix. The existing
-`passwordHash` in the STAGE database is preserved.
+`passwordHash` in the STAGE database is preserved. To perform a controlled
+credential recovery for `admin@fcallschwil.ch`, see Section 2 Step D (confirm
+hash validity) and Section 1 Path A or B above.
 
 ---
 
