@@ -46,10 +46,15 @@ export type ModuleDefinition = {
 };
 
 // ── Navigation sections ───────────────────────────────────────────────────────
+//
+// Primary structure: Dashboard · Organisation · Website · Betrieb · Führung · System
+//
+// Vereinsleitung, Wochenplaner, and Tagesplaner are NOT top-level modules.
+// Their routes remain intact — only the sidebar presentation changes.
 
 export const NAV_SECTIONS: NavSection[] = [
+  // ── Dashboard ──────────────────────────────────────────────────────────────
   {
-    // No section label — Dashboard sits at the top without a divider.
     items: [
       {
         key: "dashboard",
@@ -59,32 +64,192 @@ export const NAV_SECTIONS: NavSection[] = [
       },
     ],
   },
+
+  // ── Core modules (Organisation + Website) ─────────────────────────────────
   {
-    sectionLabel: "Platform",
     items: [
       {
-        key: "admin",
-        label: "Admin",
-        href: "/admin",
-        permissionKeys: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE],
+        key: "organisation",
+        label: "Organisation",
+        href: "/dashboard/org-units",
+        permissionKeys: [
+          PERMISSIONS.ORG_VIEW,
+          PERMISSIONS.ORG_MANAGE,
+          PERMISSIONS.TEAMS_VIEW,
+          PERMISSIONS.TEAMS_MANAGE,
+          PERMISSIONS.PEOPLE_VIEW,
+          PERMISSIONS.PEOPLE_MANAGE,
+        ],
         children: [
           {
-            key: "admin-org-units",
-            label: "Organisation",
+            key: "org-units",
+            label: "Organisationseinheiten",
             href: "/dashboard/org-units",
             permissionKeys: [PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE],
           },
           {
-            key: "admin-target-groups",
+            key: "target-groups",
             label: "Zielgruppen",
             href: "/dashboard/target-groups",
             permissionKeys: [PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE],
           },
           {
+            key: "teams",
+            label: "Teams",
+            href: "/dashboard/teams",
+            permissionKeys: [PERMISSIONS.TEAMS_VIEW, PERMISSIONS.TEAMS_MANAGE],
+          },
+          {
+            key: "personen",
+            label: "Personen",
+            href: "/dashboard/persons",
+            permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
+          },
+        ],
+      },
+      {
+        key: "website",
+        label: "Website",
+        href: "/dashboard/website/publishing",
+        permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+        children: [
+          {
+            key: "website-news",
+            label: "News",
+            href: "/dashboard/website/news",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
+            key: "website-pages",
+            label: "Seiten",
+            href: "/dashboard/website/pages",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
+            key: "website-media",
+            label: "Medien",
+            href: "/dashboard/website/media",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
+            key: "website-publishing",
+            label: "Veröffentlichungen",
+            href: "/dashboard/website/publishing",
+            permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
+            key: "website-settings",
+            label: "Einstellungen",
+            href: "/dashboard/website/settings",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+        ],
+      },
+    ],
+  },
+
+  // ── Betrieb ────────────────────────────────────────────────────────────────
+  {
+    sectionLabel: "Betrieb",
+    items: [
+      {
+        key: "planung",
+        label: "Planung",
+        href: "/dashboard/planner",
+        carrySeason: true,
+        permissionKeys: [
+          PERMISSIONS.WOCHENPLAN_MANAGE,
+          PERMISSIONS.SEASONS_VIEW,
+          PERMISSIONS.SEASONS_MANAGE,
+          PERMISSIONS.EVENTS_VIEW,
+          PERMISSIONS.EVENTS_MANAGE,
+        ],
+        children: [
+          {
+            key: "saisons",
+            label: "Saisons",
+            href: "/dashboard/seasons",
+            permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
+          },
+          {
+            key: "saisonplanung",
+            label: "Saisonplanung",
+            href: "/dashboard/planner",
+            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+          },
+          {
+            key: "events",
+            label: "Events",
+            href: "/dashboard/events",
+            permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
+          },
+          {
+            key: "feldressourcen",
+            label: "Feld & Ressourcen",
+            href: "/dashboard/wochenplan",
+            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+          },
+        ],
+      },
+      {
+        key: "anmeldungen",
+        label: "Anmeldungen",
+        href: "/dashboard/registrations",
+        permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+      },
+      {
+        key: "infoboard",
+        label: "Infoboard",
+        href: "/dashboard/infoboard",
+        permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD],
+      },
+    ],
+  },
+
+  // ── Führung ────────────────────────────────────────────────────────────────
+  {
+    sectionLabel: "Führung",
+    items: [
+      {
+        key: "meetings",
+        label: "Meetings",
+        href: "/vereinsleitung/meetings",
+      },
+      {
+        key: "initiativen",
+        label: "Initiativen",
+        href: "/vereinsleitung/initiativen",
+      },
+    ],
+  },
+
+  // ── System ─────────────────────────────────────────────────────────────────
+  {
+    sectionLabel: "System",
+    items: [
+      {
+        key: "administration",
+        label: "Administration",
+        href: "/dashboard/admin/branding",
+        permissionKeys: [
+          PERMISSIONS.USERS_MANAGE,
+          PERMISSIONS.FACILITIES_VIEW,
+          PERMISSIONS.FACILITIES_MANAGE,
+          PERMISSIONS.TENANTS_VIEW,
+          PERMISSIONS.TENANTS_MANAGE,
+        ],
+        children: [
+          {
             key: "admin-branding",
             label: "Darstellung",
             href: "/dashboard/admin/branding",
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+          {
+            key: "admin-facilities",
+            label: "Anlagen & Ressourcen",
+            href: "/dashboard/admin/facilities",
+            permissionKeys: [PERMISSIONS.FACILITIES_VIEW, PERMISSIONS.FACILITIES_MANAGE],
           },
           {
             key: "admin-users",
@@ -99,167 +264,10 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
           {
-            key: "admin-permissions",
-            label: "Berechtigungen",
-            href: "/dashboard/permissions",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
-          },
-          {
             key: "admin-tenants",
             label: "Tenants",
             href: "/dashboard/admin/tenants",
             permissionKeys: [PERMISSIONS.TENANTS_VIEW, PERMISSIONS.TENANTS_MANAGE],
-          },
-          {
-            key: "admin-facilities",
-            label: "Anlagen & Ressourcen",
-            href: "/dashboard/admin/facilities",
-            permissionKeys: [PERMISSIONS.FACILITIES_VIEW, PERMISSIONS.FACILITIES_MANAGE],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    sectionLabel: "Vereinsführung",
-    items: [
-      {
-        key: "vereinsleitung",
-        label: "Vereinsleitung",
-        href: "/vereinsleitung",
-        children: [
-          { key: "meetings", label: "Meetings", href: "/vereinsleitung/meetings" },
-          { key: "initiativen", label: "Initiativen", href: "/vereinsleitung/initiativen" },
-          { key: "kpis", label: "KPIs", href: "/vereinsleitung/kpis" },
-          { key: "ziele", label: "Ziele", href: "/vereinsleitung/targets" },
-          { key: "vorlagen", label: "Vorlagen", href: "/vereinsleitung/templates" },
-        ],
-      },
-      {
-        key: "seasons",
-        label: "Saisons",
-        href: "/dashboard/seasons",
-        permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
-        carrySeason: true,
-      },
-      {
-        key: "saisonplanner",
-        label: "Saisonplanner",
-        href: "/dashboard/planner",
-        permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
-        carrySeason: true,
-        children: [
-          {
-            key: "wochenplanner",
-            label: "Wochenplanner",
-            href: "/dashboard/planner/week",
-            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
-          },
-          {
-            key: "tagesplanner",
-            label: "Tagesplanner",
-            href: "/dashboard/planner/day",
-            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
-          },
-          {
-            key: "feldplanung",
-            label: "Feld-/Garderobenplanung",
-            href: "/dashboard/wochenplan",
-            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    sectionLabel: "Vereinsverwaltung",
-    items: [
-      {
-        key: "registrations",
-        label: "Registrierungen",
-        href: "/dashboard/registrations",
-        permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
-      },
-    ],
-  },
-  {
-    sectionLabel: "Website",
-    items: [
-      {
-        key: "website-publishing",
-        label: "Veröffentlichungen",
-        href: "/dashboard/website/publishing",
-        permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
-      },
-      {
-        key: "website-pages",
-        label: "Seiten",
-        href: "/dashboard/website/pages",
-        permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
-      },
-      {
-        key: "website-news",
-        label: "News",
-        href: "/dashboard/website/news",
-        permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
-      },
-      {
-        key: "website-media",
-        label: "Medien",
-        href: "/dashboard/website/media",
-        permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
-      },
-      {
-        key: "website-settings",
-        label: "Einstellungen",
-        href: "/dashboard/website/settings",
-        permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
-      },
-    ],
-  },
-  {
-    sectionLabel: "Spielbetrieb",
-    items: [
-      {
-        key: "infoboard",
-        label: "Infoboard",
-        href: "/dashboard/infoboard",
-        permissionKeys: [
-          PERMISSIONS.INFOBOARD_MANAGE,
-          PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
-        ],
-      },
-      {
-        key: "teams",
-        label: "Teams",
-        href: "/dashboard/teams",
-        permissionKeys: [PERMISSIONS.TEAMS_VIEW, PERMISSIONS.TEAMS_MANAGE],
-        carrySeason: true,
-      },
-      {
-        key: "events",
-        label: "Events",
-        href: "/dashboard/events",
-        permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
-        carrySeason: true,
-      },
-      {
-        key: "personen",
-        label: "Personen",
-        href: "/dashboard/persons",
-        permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-        children: [
-          {
-            key: "spieler",
-            label: "Spieler",
-            href: "/dashboard/players",
-            permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
-          },
-          {
-            key: "trainer",
-            label: "Trainer",
-            href: "/dashboard/trainers",
-            permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
           },
         ],
       },

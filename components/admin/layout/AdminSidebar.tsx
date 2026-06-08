@@ -53,35 +53,52 @@ type AdminSidebarProps = {
 
 function getNavIcon(label: string) {
   switch (label) {
-    case "Dashboard":       return LayoutDashboard;
-    case "Admin":           return Settings2;
-    case "Vereinsleitung":  return Briefcase;
-    case "Meetings":        return ScrollText;
-    case "Initiativen":     return Flag;
-    case "KPIs":            return BarChart3;
-    case "Ziele":           return Target;
-    case "Vorlagen":        return FileText;
-    case "Saisons":         return CalendarRange;
-    case "Saisonplanner":   return ClipboardList;
-    case "Wochenplanner":   return CalendarDays;
-    case "Tagesplanner":    return CalendarDays;
-    case "Teams":           return Users;
-    case "Events":          return CalendarDays;
-    case "Personen":        return UserCircle2;
-    case "Spieler":         return UserRound;
-    case "Trainer":         return BadgeIcon;
-    case "Organisation":    return Building2;
-    case "Zielgruppen":     return Target;
-    case "Darstellung":     return Palette;
-    case "Benutzer":        return Shield;
-    case "Registrierungen": return Inbox;
-    case "Infoboard":       return Monitor;
-    case "News":            return Newspaper;
-    case "Medien":          return ImageIcon;
-    case "Seiten":          return FileText;
-    case "Veröffentlichungen": return Layers;
-    case "Website":         return Globe;
-    default:                return LayoutDashboard;
+    // Top-level primary modules
+    case "Dashboard":              return LayoutDashboard;
+    case "Organisation":           return Building2;
+    case "Website":                return Globe;
+    case "Planung":                return CalendarDays;
+    case "Anmeldungen":            return Inbox;
+    case "Meetings":               return ScrollText;
+    case "Initiativen":            return Flag;
+    case "Infoboard":              return Monitor;
+    case "Administration":         return Settings2;
+    // Organisation children
+    case "Organisationseinheiten": return Building2;
+    case "Zielgruppen":            return Target;
+    case "Teams":                  return Users;
+    case "Personen":               return UserCircle2;
+    // Website children
+    case "News":                   return Newspaper;
+    case "Seiten":                 return FileText;
+    case "Medien":                 return ImageIcon;
+    case "Veröffentlichungen":     return Layers;
+    case "Einstellungen":          return Settings2;
+    // Planung children
+    case "Saisons":                return CalendarRange;
+    case "Saisonplanung":          return ClipboardList;
+    case "Events":                 return CalendarDays;
+    case "Feld & Ressourcen":      return Layers;
+    // Administration children
+    case "Darstellung":            return Palette;
+    case "Anlagen & Ressourcen":   return Building2;
+    case "Benutzer":               return Shield;
+    case "Rollen":                 return Shield;
+    case "Tenants":                return Globe;
+    // Legacy / fallback (keep so any remaining references resolve cleanly)
+    case "Admin":                  return Settings2;
+    case "Vereinsleitung":         return Briefcase;
+    case "KPIs":                   return BarChart3;
+    case "Ziele":                  return Target;
+    case "Vorlagen":               return FileText;
+    case "Saisonplanner":          return ClipboardList;
+    case "Wochenplanner":          return CalendarDays;
+    case "Tagesplanner":           return CalendarDays;
+    case "Spieler":                return UserRound;
+    case "Trainer":                return BadgeIcon;
+    case "Registrierungen":        return Inbox;
+    case "Berechtigungen":         return Shield;
+    default:                       return LayoutDashboard;
   }
 }
 
