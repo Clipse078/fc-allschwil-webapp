@@ -1,6 +1,12 @@
 /**
  * Runtime validation script for Slice 11.5 — Hierarchy Management
  *
+ * SAFETY INVARIANT: This script NEVER creates, updates, or deletes User rows.
+ * It creates temporary Tenant and OrgUnit fixtures under well-known test keys
+ * ("tenant-a-test", "tenant-b-test") and removes them in the finally block.
+ * No credentials are touched. This invariant must be preserved in all future
+ * edits to this script.
+ *
  * Exercises all 9 validation scenarios directly against the Prisma client
  * (same client + helpers used by the API routes).
  *
@@ -660,6 +666,15 @@ async function main() {
       process.exit(1);
     }
   } finally {
+    // Always remove test fixtures regardless of pass/fail.
+    // This is the safety cleanup that ensures no test tenants persist.
+    try {
+      await prisma.tenant.deleteMany({
+        where: { key: { in: ["tenant-a-test", "tenant-b-test"] } },
+      });
+    } catch {
+      // Ignore cleanup errors — test data is prefixed to avoid collisions.
+    }
     await prisma.$disconnect();
   }
 }

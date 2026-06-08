@@ -1,6 +1,12 @@
 /**
  * Runtime validation script for Slice 4 — Public Website News Feed
  *
+ * SAFETY INVARIANT: This script NEVER creates, updates, or deletes User rows.
+ * It creates temporary Tenant and NewsArticle fixtures under well-known test
+ * keys ("news-feed-test-a", "news-feed-test-b") and removes them in the
+ * finally block. No credentials are touched. This invariant must be preserved
+ * in all future edits to this script.
+ *
  * Exercises the public news feed query layer directly against the Prisma client
  * (same client used by /api/public/v1/website/news routes) to verify:
  *
