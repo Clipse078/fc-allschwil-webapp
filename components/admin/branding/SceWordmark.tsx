@@ -1,13 +1,12 @@
 /**
  * SceWordmark — Sprint 7: Screen 3 Premium SaaS Branding
  *
- * Renders the SportClubEvo platform wordmark with the new two-tone typography:
- *   [SCE Icon] SportClub(black) + Evo(orange)
+ * Renders the SportClubEvo platform wordmark using the final logo asset.
  *
  * ─── Modes ───────────────────────────────────────────────────────────────────
  *
- *   • platform — SCE icon + "SportClubEvo" wordmark only
- *   • tenant   — SCE icon + "SportClubEvo" wordmark + tenant club selector row
+ *   • platform — SCE logo icon + "SportClubEvo" wordmark only
+ *   • tenant   — SCE logo icon + "SportClubEvo" wordmark + tenant club selector row
  *
  * ─── Usage ───────────────────────────────────────────────────────────────────
  *
@@ -15,6 +14,7 @@
  *   <SceWordmark size={32} tenantName="FC Allschwil" logoUrl={ctx.logoUrl} collapsed={false} />
  */
 
+import Image from "next/image";
 import TenantLogo from "./TenantLogo";
 
 type SceWordmarkProps = {
@@ -38,13 +38,16 @@ export default function SceWordmark({
 
   return (
     <div className="flex flex-col gap-2 min-w-0 w-full">
-      {/* Platform wordmark row: [SCE icon] SportClubEvo */}
+      {/* Platform wordmark row: [SCE logo] SportClubEvo */}
       <div className="flex items-center gap-2 min-w-0">
-        {/* SCE Symbol — orange icon with aperture/leaf motif via TenantLogo fallback */}
-        <TenantLogo
-          logoUrl={logoUrl && !hasTenant ? logoUrl : null}
-          size={size}
+        {/* SCE platform icon — real logo asset */}
+        <Image
+          src="/images/branding/sportclubevo_logo.png"
           alt="SportClubEvo"
+          width={size}
+          height={size}
+          style={{ width: size, height: size, objectFit: "contain", flexShrink: 0 }}
+          priority
         />
 
         {!collapsed && (

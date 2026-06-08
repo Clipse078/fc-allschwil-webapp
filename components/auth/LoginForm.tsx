@@ -1,28 +1,22 @@
 ﻿"use client";
 
+import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
-import { Trophy } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 // ── Inline platform wordmark (client-safe, no server dependency) ─────────────
 function ScePlatformWordmark({ size = 36 }: { size?: number }) {
   return (
     <div className="flex items-center gap-3">
-      <div
-        style={{
-          width: size,
-          height: size,
-          borderRadius: 8,
-          background: "#FF6A00",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <Trophy style={{ width: size * 0.5, height: size * 0.5, color: "#fff" }} />
-      </div>
+      <Image
+        src="/images/branding/sportclubevo_logo.png"
+        alt="SportClubEvo"
+        width={size}
+        height={size}
+        style={{ width: size, height: size, objectFit: "contain", flexShrink: 0 }}
+        priority
+      />
       <span className="text-[1.1rem] font-bold tracking-tight leading-none">
         <span style={{ color: "#111827" }}>SportClub</span>
         <span style={{ color: "#FF6A00" }}>Evo</span>
