@@ -186,6 +186,19 @@ intending to change the password.
 credential recovery for `admin@fcallschwil.ch`, see Section 2 Step D (confirm
 hash validity) and Section 1 Path A or B above.
 
+### Approved reset — 2026-06-08
+
+| Field | Value |
+|---|---|
+| Target user | `admin@fcallschwil.ch` |
+| Approved by | Operator (explicit written approval, 2026-06-08) |
+| Method | `scripts/restore-admin-hash.ts` (Path B — pre-computed hash, hash-in only) |
+| Scope | `passwordHash` on one row only; no other fields or users touched |
+| Recovery tool | `scripts/restore-admin-hash.ts` added for this operation |
+
+The plaintext password was generated in the agent environment and delivered
+to the operator out-of-band. It was not committed to the repository.
+
 ---
 
 ## 4. Rules for Future Scripts and Migrations
