@@ -16,6 +16,7 @@
  */
 
 import TenantLogo from "./TenantLogo";
+import SportClubEvoLogo from "@/components/shared/SportClubEvoLogo";
 
 type SceWordmarkProps = {
   /** Symbol/logo size in pixels. Default: 32 */
@@ -38,23 +39,14 @@ export default function SceWordmark({
 
   return (
     <div className="flex flex-col gap-2 min-w-0 w-full">
-      {/* Platform wordmark row: [SCE icon] SportClubEvo */}
-      <div className="flex items-center gap-2 min-w-0">
-        {/* SCE Symbol — orange icon with aperture/leaf motif via TenantLogo fallback */}
-        <TenantLogo
-          logoUrl={logoUrl && !hasTenant ? logoUrl : null}
-          size={size}
-          alt="SportClubEvo"
-        />
-
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            {/* Two-tone wordmark: SportClub (dark) + Evo (orange) */}
-            <p className="text-[0.95rem] font-bold leading-none tracking-tight">
-              <span className="text-[#111827]">SportClub</span>
-              <span style={{ color: "#FF6A00" }}>Evo</span>
-            </p>
+      {/* Platform logo row — PNG logo; in collapsed mode clip to icon-width only */}
+      <div className="flex items-center min-w-0">
+        {collapsed ? (
+          <div style={{ width: size, height: size, overflow: "hidden", flexShrink: 0 }}>
+            <SportClubEvoLogo height={size} />
           </div>
+        ) : (
+          <SportClubEvoLogo height={size} />
         )}
       </div>
 
