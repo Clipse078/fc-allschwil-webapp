@@ -51,11 +51,14 @@ if (process.env.ALLOW_PASSWORD_CHANGE !== "true") {
   process.exit(1);
 }
 
-const hash = process.env.ADMIN_PASSWORD_HASH;
-if (!hash) {
+const rawHash = process.env.ADMIN_PASSWORD_HASH;
+if (!rawHash) {
   console.error("[restore-admin-hash] ERROR: ADMIN_PASSWORD_HASH is not set.");
   process.exit(1);
 }
+// Explicitly typed as string so TypeScript carries the narrowed type into
+// async function closures — process.exit() above guarantees rawHash is set.
+const hash: string = rawHash;
 
 // Validate bcrypt hash format ($2b$12$... or $2a$12$..., length 60)
 if (!/^\$2[ab]\$\d{2}\$.{53}$/.test(hash)) {
