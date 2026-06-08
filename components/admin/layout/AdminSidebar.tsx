@@ -84,7 +84,9 @@ function getNavIcon(label: string) {
     case "Anlagen & Ressourcen":   return Building2;
     case "Benutzer":               return Shield;
     case "Rollen":                 return Shield;
+    case "Berechtigungen":         return Shield;
     case "Tenants":                return Globe;
+    case "Audit Logs":             return ScrollText;
     // Legacy / fallback (keep so any remaining references resolve cleanly)
     case "Admin":                  return Settings2;
     case "Vereinsleitung":         return Briefcase;
@@ -97,7 +99,6 @@ function getNavIcon(label: string) {
     case "Spieler":                return UserRound;
     case "Trainer":                return BadgeIcon;
     case "Registrierungen":        return Inbox;
-    case "Berechtigungen":         return Shield;
     default:                       return LayoutDashboard;
   }
 }
