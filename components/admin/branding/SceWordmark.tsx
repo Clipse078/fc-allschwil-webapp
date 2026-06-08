@@ -1,13 +1,12 @@
 /**
  * SceWordmark — Sprint 7: Screen 3 Premium SaaS Branding
  *
- * Renders the SportClubEvo platform wordmark with the new two-tone typography:
- *   [SCE Icon] SportClub(black) + Evo(orange)
+ * Renders the SportClubEvo platform logo plus an optional tenant selector row.
  *
  * ─── Modes ───────────────────────────────────────────────────────────────────
  *
- *   • platform — SCE icon + "SportClubEvo" wordmark only
- *   • tenant   — SCE icon + "SportClubEvo" wordmark + tenant club selector row
+ *   • platform — SportClubEvoLogo PNG only
+ *   • tenant   — SportClubEvoLogo PNG + tenant club selector row
  *
  * ─── Usage ───────────────────────────────────────────────────────────────────
  *
@@ -15,6 +14,7 @@
  *   <SceWordmark size={32} tenantName="FC Allschwil" logoUrl={ctx.logoUrl} collapsed={false} />
  */
 
+import SportClubEvoLogo from "@/components/branding/SportClubEvoLogo";
 import TenantLogo from "./TenantLogo";
 
 type SceWordmarkProps = {
@@ -38,24 +38,12 @@ export default function SceWordmark({
 
   return (
     <div className="flex flex-col gap-2 min-w-0 w-full">
-      {/* Platform wordmark row: [SCE icon] SportClubEvo */}
-      <div className="flex items-center gap-2 min-w-0">
-        {/* SCE Symbol — orange icon with aperture/leaf motif via TenantLogo fallback */}
-        <TenantLogo
-          logoUrl={logoUrl && !hasTenant ? logoUrl : null}
-          size={size}
-          alt="SportClubEvo"
+      {/* Platform wordmark row: SportClubEvo logo PNG */}
+      <div className="flex items-center min-w-0">
+        <SportClubEvoLogo
+          size="sm"
+          iconOnly={collapsed}
         />
-
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            {/* Two-tone wordmark: SportClub (dark) + Evo (orange) */}
-            <p className="text-[0.95rem] font-bold leading-none tracking-tight">
-              <span className="text-[#111827]">SportClub</span>
-              <span style={{ color: "#FF6A00" }}>Evo</span>
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Club selector row — shown only in tenant mode when not collapsed */}

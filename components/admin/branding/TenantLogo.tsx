@@ -6,7 +6,7 @@
  * ─── Rendering logic ─────────────────────────────────────────────────────────
  *
  * When logoUrl is a valid URL/path → renders <img> with the tenant logo.
- * Otherwise → renders the platform fallback (Trophy icon on --tenant-primary bg).
+ * Otherwise → renders a fallback initials badge using the first letter of alt.
  *
  * ─── No duplication ──────────────────────────────────────────────────────────
  *
@@ -21,25 +21,24 @@
 
 "use client";
 
-import { Trophy } from "lucide-react";
 import { isValidLogoUrl } from "@/lib/tenant-runtime/branding-validation";
 
 type TenantLogoProps = {
-  /** Raw logoUrl from tenant config. Null/invalid → fallback icon. */
+  /** Raw logoUrl from tenant config. Null/invalid → fallback initials badge. */
   logoUrl: string | null | undefined;
   /** Display size in pixels (applies to both width and height). Default: 32 */
   size?: number;
-  /** Alt text for the logo image. Default: "Club logo" */
+  /** Alt text for the logo image. Used for initials in the fallback. Default: "Club logo" */
   alt?: string;
   /** Additional className for the wrapper element. */
   className?: string;
 };
 
 /**
- * Renders the tenant logo when logoUrl is valid, otherwise the platform fallback icon.
+ * Renders the tenant logo when logoUrl is valid, otherwise an initials fallback badge.
  *
  * @example
- *   <TenantLogo logoUrl={ctx?.logoUrl} size={32} />
+ *   <TenantLogo logoUrl={ctx?.logoUrl} size={32} alt="FC Allschwil" />
  */
 export default function TenantLogo({
   logoUrl,
@@ -48,7 +47,8 @@ export default function TenantLogo({
   className,
 }: TenantLogoProps) {
   const hasLogo = isValidLogoUrl(logoUrl);
-  const iconSize = Math.round(size * 0.44); // scale inner icon proportionally
+  const initial = alt.trim().charAt(0).toUpperCase() || "C";
+  const fontSize = Math.round(size * 0.44);
 
   if (hasLogo) {
     return (
@@ -67,8 +67,6 @@ export default function TenantLogo({
           display: "block",
         }}
         onError={(e) => {
-          // On load failure, hide the broken image — parent can render fallback.
-          // We swap to a data URI transparent pixel rather than removing the element.
           (e.currentTarget as HTMLImageElement).style.display = "none";
         }}
       />
@@ -88,10 +86,14 @@ export default function TenantLogo({
         background: "var(--tenant-primary)",
         color: "#fff",
         flexShrink: 0,
+        fontSize,
+        fontWeight: 700,
+        lineHeight: 1,
+        userSelect: "none",
       }}
       aria-hidden="true"
     >
-      <Trophy style={{ width: iconSize, height: iconSize }} />
+      {initial}
     </div>
   );
 }

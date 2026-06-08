@@ -2,34 +2,8 @@
 
 import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
-import { Trophy } from "lucide-react";
 import { cn } from "@/lib/cn";
-
-// ── Inline platform wordmark (client-safe, no server dependency) ─────────────
-function ScePlatformWordmark({ size = 36 }: { size?: number }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div
-        style={{
-          width: size,
-          height: size,
-          borderRadius: 8,
-          background: "#FF6A00",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <Trophy style={{ width: size * 0.5, height: size * 0.5, color: "#fff" }} />
-      </div>
-      <span className="text-[1.1rem] font-bold tracking-tight leading-none">
-        <span style={{ color: "#111827" }}>SportClub</span>
-        <span style={{ color: "#FF6A00" }}>Evo</span>
-      </span>
-    </div>
-  );
-}
+import SportClubEvoLogo from "@/components/branding/SportClubEvoLogo";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -91,7 +65,7 @@ export default function LoginForm() {
 
         {/* Top: SCE wordmark */}
         <div className="relative z-10">
-          <ScePlatformWordmark size={36} />
+          <SportClubEvoLogo size="lg" />
         </div>
 
         {/* Center: headline + tagline */}
@@ -155,7 +129,7 @@ export default function LoginForm() {
 
         {/* Mobile-only header */}
         <div className="mb-8 flex flex-col items-center gap-1 lg:hidden">
-          <ScePlatformWordmark size={40} />
+          <SportClubEvoLogo size="md" />
         </div>
 
         <div className="w-full max-w-[400px]">
