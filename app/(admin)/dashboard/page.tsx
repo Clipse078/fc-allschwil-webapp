@@ -1,43 +1,56 @@
 ﻿import Link from "next/link";
 import {
-  ArrowRight,
-  CalendarClock,
+  CalendarDays,
   CalendarRange,
-  ClipboardList,
-  ExternalLink,
+  CheckSquare,
+  ChevronDown,
   FileText,
-  Flag,
   Globe,
   Inbox,
+  LayoutDashboard,
+  Layers,
+  Monitor,
   Newspaper,
   Plus,
   ScrollText,
-  UserCircle2,
   Users,
 } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getTenantContextFromSession } from "@/lib/tenants/context";
-import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import {
-  formatDate,
-  formatTodayDate,
-  getCurrentSeasonLabel,
   formatTime,
+  formatDate,
 } from "@/lib/tenant-runtime/formatters";
 import { KpiCard } from "@/components/admin/dashboard/KpiCard";
-import DashboardTodayAgenda from "@/components/admin/dashboard/DashboardTodayAgenda";
-import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
-import { DashboardActionTile } from "@/components/admin/dashboard/DashboardActionTile";
-import { SectionCard } from "@/components/ui/page/SectionCard";
-import { EmptyState } from "@/components/ui/page/EmptyState";
-import { PageShell, PageHeader } from "@/components/ui/page";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type DashboardPageProps = {
   searchParams?: Promise<{ season?: string }>;
 };
+
+// ── Greeting ──────────────────────────────────────────────────────────────────
+
+function getGreeting(firstName: string): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return `Good morning, ${firstName} 👋`;
+  if (hour >= 12 && hour < 18) return `Good afternoon, ${firstName} 👋`;
+  return `Good evening, ${firstName} 👋`;
+}
+
+// ── Activity helpers ──────────────────────────────────────────────────────────
+
+function timeAgo(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "Gerade eben";
+  if (diffMin < 60) return `Vor ${diffMin} Min.`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `Vor ${diffH} Std.`;
+  const diffD = Math.floor(diffH / 24);
+  return `Vor ${diffD} Tag${diffD === 1 ? "" : "en"}`;
+}
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
@@ -46,445 +59,606 @@ async function getDashboardData(tenantId: string | null) {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  // For tenant-scoped models (registrations, news, pages) filter when possible.
-  // For global models (seasons, teams, persons, meetings, initiatives) query all.
+  // Week boundaries (Mon–Sun)
+  const dayOfWeek = today.getDay();
+  const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const weekStart = new Date(todayStart);
+  weekStart.setDate(todayStart.getDate() + daysToMonday);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 7);
+
   const tWhere = tenantId ? { tenantId } : {};
 
   const [
     openRegistrationCount,
     newsInReviewCount,
-    pagesInReviewCount,
     scheduledNewsCount,
-    seasonCount,
-    teamCount,
-    personCount,
-    todayEvents,
-    draftNewsCount,
-    publishedNewsCount,
-    draftPagesCount,
-    publishedPagesCount,
+    weekEventsCount,
+    todayEventsCount,
+    recentNews,
+    recentRegistrations,
+    recentEvents,
+    recentMeetings,
     upcomingMeetings,
-    activeInitiativeCount,
+    upcomingEvents,
   ] = await Promise.all([
-    // Action center — actionable items
     prisma.registration.count({ where: { ...tWhere, status: { in: ["NEW", "REVIEWING"] } } }),
     prisma.newsArticle.count({ where: { ...tWhere, status: "IN_REVIEW" } }),
-    prisma.websitePage.count({ where: { ...tWhere, status: "IN_REVIEW" } }),
     prisma.newsArticle.count({ where: { ...tWhere, status: "SCHEDULED" } }),
+    prisma.event.count({ where: { startAt: { gte: weekStart, lt: weekEnd } } }),
+    prisma.event.count({ where: { startAt: { gte: todayStart, lt: todayEnd } } }),
 
-    // Org KPIs
-    prisma.season.count(),
-    prisma.team.count(),
-    prisma.person.count(),
-
-    // Today's operations
+    // Activity feed sources
+    prisma.newsArticle.findMany({
+      where: tWhere,
+      orderBy: { updatedAt: "desc" },
+      take: 2,
+      select: { id: true, title: true, updatedAt: true, status: true, authorName: true },
+    }),
+    prisma.registration.findMany({
+      where: tWhere,
+      orderBy: { createdAt: "desc" },
+      take: 2,
+      select: { id: true, firstName: true, lastName: true, createdAt: true, type: true },
+    }),
     prisma.event.findMany({
-      where: { startAt: { gte: todayStart, lt: todayEnd } },
-      select: { id: true, title: true, type: true, startAt: true, location: true },
-      orderBy: { startAt: "asc" },
-      take: 8,
+      where: { updatedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+      orderBy: { updatedAt: "desc" },
+      take: 1,
+      select: { id: true, title: true, updatedAt: true, type: true },
+    }),
+    prisma.meeting.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 1,
+      select: { id: true, title: true, createdAt: true, slug: true },
     }),
 
-    // Website activity
-    prisma.newsArticle.count({ where: { ...tWhere, status: "DRAFT" } }),
-    prisma.newsArticle.count({ where: { ...tWhere, status: "PUBLISHED" } }),
-    prisma.websitePage.count({ where: { ...tWhere, status: "DRAFT" } }),
-    prisma.websitePage.count({ where: { ...tWhere, status: "PUBLISHED" } }),
-
-    // Meetings & Initiatives
+    // Right sidebar — upcoming meetings
     prisma.meeting.findMany({
       where: { meetingDate: { gte: today }, status: "PLANNED" },
-      select: { id: true, slug: true, title: true, meetingDate: true, location: true },
       orderBy: { meetingDate: "asc" },
-      take: 4,
+      take: 3,
+      select: { id: true, slug: true, title: true, meetingDate: true, location: true },
     }),
-    prisma.initiative.count({ where: { status: { in: ["PLANNED", "IN_PROGRESS", "ON_TRACK"] } } }),
+
+    // Right sidebar — upcoming sport events
+    prisma.event.findMany({
+      where: { startAt: { gte: todayStart } },
+      orderBy: { startAt: "asc" },
+      take: 4,
+      select: { id: true, title: true, startAt: true, location: true, type: true },
+    }),
   ]);
 
   return {
     openRegistrationCount,
     newsInReviewCount,
-    pagesInReviewCount,
     scheduledNewsCount,
-    seasonCount,
-    teamCount,
-    personCount,
-    todayEvents,
-    draftNewsCount,
-    publishedNewsCount,
-    draftPagesCount,
-    publishedPagesCount,
+    weekEventsCount,
+    todayEventsCount,
+    recentNews,
+    recentRegistrations,
+    recentEvents,
+    recentMeetings,
     upcomingMeetings,
-    activeInitiativeCount,
+    upcomingEvents,
   };
 }
 
-function mapEventType(t: string): "training" | "match" | "meeting" | "other" {
-  if (t === "TRAINING") return "training";
-  if (t === "MATCH") return "match";
-  return "other";
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+type QuickActionCardProps = {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  iconBg: string;
+  iconColor: string;
+};
+
+function QuickActionCard({ href, icon, title, subtitle, iconBg, iconColor }: QuickActionCardProps) {
+  return (
+    <Link href={href} className="sce-quick-action-card">
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
+        style={{ background: iconBg, color: iconColor }}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[0.875rem] font-semibold text-[#111827] leading-tight">{title}</p>
+        <p className="mt-0.5 text-[0.75rem] text-[#6B7280]">{subtitle}</p>
+      </div>
+    </Link>
+  );
+}
+
+type ActivityItemProps = {
+  icon: React.ReactNode;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  time: string;
+  tag: string;
+  tagBg: string;
+  tagColor: string;
+};
+
+function ActivityItem({
+  icon, iconBg, iconColor, title, subtitle, time, tag, tagBg, tagColor,
+}: ActivityItemProps) {
+  return (
+    <div className="sce-activity-item">
+      <div
+        className="sce-activity-icon"
+        style={{ background: iconBg, color: iconColor }}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[0.875rem] font-medium text-[#111827]">{title}</p>
+        <p className="mt-0.5 truncate text-[0.75rem] text-[#6B7280]">{subtitle}</p>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <span className="text-[0.72rem] text-[#9CA3AF]">{time}</span>
+        <span
+          className="sce-tag-pill"
+          style={{ background: tagBg, color: tagColor }}
+        >
+          {tag}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+type TaskItemProps = {
+  title: string;
+  subtitle: string;
+  dueLabel: string;
+  urgent?: boolean;
+};
+
+function TaskItem({ title, subtitle, dueLabel, urgent = false }: TaskItemProps) {
+  return (
+    <div className="sce-task-item">
+      <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#D1D5DB]" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.8125rem] font-medium text-[#111827] leading-tight">{title}</p>
+        <p className="mt-0.5 text-[0.72rem] text-[#6B7280] truncate">{subtitle}</p>
+      </div>
+      <span
+        className="shrink-0 text-[0.72rem] font-semibold"
+        style={{ color: urgent ? "#FF6A00" : "#9CA3AF" }}
+      >
+        {dueLabel}
+      </span>
+    </div>
+  );
+}
+
+type EventItemProps = {
+  day: string;
+  month: string;
+  title: string;
+  location: string;
+  time: string;
+};
+
+function EventItem({ day, month, title, location, time }: EventItemProps) {
+  return (
+    <div className="sce-event-item">
+      <div className="sce-date-chip">
+        <span className="text-[0.875rem] font-bold leading-none text-[#111827]">{day}</span>
+        <span className="mt-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-[#6B7280]">{month}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[0.8125rem] font-semibold text-[#111827] leading-tight">{title}</p>
+        <p className="mt-0.5 truncate text-[0.72rem] text-[#6B7280]">{location}</p>
+      </div>
+      <span className="shrink-0 text-[0.75rem] font-medium text-[#6B7280]">{time}</span>
+    </div>
+  );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const params = (await searchParams) ?? {};
+export default async function DashboardPage({ searchParams: _sp }: DashboardPageProps) {
   const session = await auth();
   const tenantId = session?.user?.tenantId ?? null;
+  const firstName = session?.user?.firstName ?? "Admin";
 
-  const [seasonOptions, dash, ctx] = await Promise.all([
-    getSeasonOptionsData(),
+  const [dash, ctx] = await Promise.all([
     getDashboardData(tenantId),
     getTenantContextFromSession(tenantId),
   ]);
 
   const fmtCfg = { locale: ctx?.locale ?? "de-CH", timezone: ctx?.timezone ?? undefined };
-  const currentSeasonLabel = ctx ? getCurrentSeasonLabel(ctx) : null;
-  const todayLabel = formatTodayDate(fmtCfg);
-  const clubName = ctx?.name ?? "SportClubEvo";
 
-  const selectedSeason =
-    seasonOptions.find((s) => s.key === params.season) ??
-    seasonOptions.find((s) => s.isActive) ??
-    seasonOptions[0] ??
-    null;
-  const selectedSeasonKey = selectedSeason?.key ?? "";
+  // ── Activity feed ────────────────────────────────────────────────────────
 
-  const todayAgendaItems = dash.todayEvents.map((ev) => ({
-    time: formatTime(ev.startAt, fmtCfg),
-    title: ev.title,
-    type: mapEventType(ev.type),
-    location: ev.location ?? undefined,
-  }));
+  type ActivityEntry = {
+    key: string;
+    icon: React.ReactNode;
+    iconBg: string;
+    iconColor: string;
+    title: string;
+    subtitle: string;
+    date: Date;
+    tag: string;
+    tagBg: string;
+    tagColor: string;
+  };
 
-  const hasActionItems =
-    dash.openRegistrationCount > 0 ||
-    dash.newsInReviewCount > 0 ||
-    dash.pagesInReviewCount > 0 ||
-    dash.scheduledNewsCount > 0;
+  const activities: ActivityEntry[] = [
+    ...dash.recentNews.map((n) => ({
+      key: `news-${n.id}`,
+      icon: <Newspaper className="h-4 w-4" />,
+      iconBg: "rgba(59,130,246,0.10)",
+      iconColor: "#3B82F6",
+      title: n.title,
+      subtitle: n.authorName ? `von ${n.authorName}` : "Newsartikel",
+      date: n.updatedAt,
+      tag: "News",
+      tagBg: "rgba(59,130,246,0.10)",
+      tagColor: "#3B82F6",
+    })),
+    ...dash.recentRegistrations.map((r) => ({
+      key: `reg-${r.id}`,
+      icon: <Users className="h-4 w-4" />,
+      iconBg: "rgba(255,106,0,0.10)",
+      iconColor: "#FF6A00",
+      title: `Neue Anmeldung von ${r.firstName} ${r.lastName}`,
+      subtitle: r.type === "PROBETRAINING" ? "Probetraining" : "Spieleranmeldung",
+      date: r.createdAt,
+      tag: "Anmeldung",
+      tagBg: "rgba(255,106,0,0.10)",
+      tagColor: "#FF6A00",
+    })),
+    ...dash.recentEvents.map((e) => ({
+      key: `event-${e.id}`,
+      icon: <CalendarDays className="h-4 w-4" />,
+      iconBg: "rgba(16,185,129,0.10)",
+      iconColor: "#10B981",
+      title: `${e.title} wurde aktualisiert`,
+      subtitle: e.type === "TRAINING" ? "Training" : e.type === "MATCH" ? "Spiel" : "Event",
+      date: e.updatedAt,
+      tag: "Planung",
+      tagBg: "rgba(16,185,129,0.10)",
+      tagColor: "#10B981",
+    })),
+    ...dash.recentMeetings.map((m) => ({
+      key: `meeting-${m.id}`,
+      icon: <ScrollText className="h-4 w-4" />,
+      iconBg: "rgba(139,92,246,0.10)",
+      iconColor: "#8B5CF6",
+      title: `Meeting "${m.title}" erstellt`,
+      subtitle: "Neues Meeting geplant",
+      date: m.createdAt,
+      tag: "Meeting",
+      tagBg: "rgba(139,92,246,0.10)",
+      tagColor: "#8B5CF6",
+    })),
+  ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 5);
 
-  const hasMeetings = dash.upcomingMeetings.length > 0;
-  const hasInitiatives = dash.activeInitiativeCount > 0;
+  // ── Tasks panel ──────────────────────────────────────────────────────────
 
-  const hasWebsiteContent =
-    dash.draftNewsCount +
-      dash.publishedNewsCount +
-      dash.newsInReviewCount +
-      dash.scheduledNewsCount +
-      dash.draftPagesCount +
-      dash.publishedPagesCount +
-      dash.pagesInReviewCount >
-    0;
+  const tasks: { title: string; subtitle: string; dueLabel: string; urgent: boolean }[] = [];
+  if (dash.newsInReviewCount > 0) {
+    tasks.push({
+      title: `Newsartikel prüfen (${dash.newsInReviewCount})`,
+      subtitle: `${dash.newsInReviewCount > 1 ? "Mehrere Artikel" : "1 Artikel"} warten auf Freigabe`,
+      dueLabel: "Heute",
+      urgent: true,
+    });
+  }
+  if (dash.openRegistrationCount > 0) {
+    tasks.push({
+      title: `Anmeldungen bestätigen (${dash.openRegistrationCount})`,
+      subtitle: "Neue Anmeldungen prüfen",
+      dueLabel: "Heute",
+      urgent: true,
+    });
+  }
+  if (dash.scheduledNewsCount > 0) {
+    tasks.push({
+      title: "Veröffentlichungen freigeben",
+      subtitle: `${dash.scheduledNewsCount} geplante Artikel`,
+      dueLabel: "Diese Woche",
+      urgent: false,
+    });
+  }
+  // Filler tasks to show at least some items
+  if (tasks.length === 0) {
+    tasks.push(
+      {
+        title: "Homepage überprüfen",
+        subtitle: "Aktuelle Inhalte validieren",
+        dueLabel: "Morgen",
+        urgent: false,
+      },
+      {
+        title: "Saisonplanung aktualisieren",
+        subtitle: "Events für nächste Woche eintragen",
+        dueLabel: "12.06.",
+        urgent: false,
+      },
+    );
+  }
+
+  // ── Upcoming events (merge sport events + meetings) ───────────────────────
+
+  type UpcomingEntry = {
+    key: string;
+    day: string;
+    month: string;
+    title: string;
+    location: string;
+    time: string;
+  };
+
+  const MONTHS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+
+  const upcomingEntries: UpcomingEntry[] = [
+    ...dash.upcomingEvents.map((ev) => ({
+      key: `ev-${ev.id}`,
+      day: String(ev.startAt.getDate()),
+      month: MONTHS_DE[ev.startAt.getMonth()] ?? "",
+      title: ev.title,
+      location: ev.location ?? (ev.type === "TRAINING" ? "Sportanlage" : ""),
+      time: formatTime(ev.startAt, fmtCfg),
+    })),
+    ...dash.upcomingMeetings.map((m) => ({
+      key: `mt-${m.id}`,
+      day: String(m.meetingDate.getDate()),
+      month: MONTHS_DE[m.meetingDate.getMonth()] ?? "",
+      title: m.title,
+      location: m.location ?? "Sitzungszimmer",
+      time: formatTime(m.meetingDate, fmtCfg),
+    })),
+  ]
+    .sort((a, b) => {
+      const dateA = dash.upcomingEvents.find((e) => `ev-${e.id}` === a.key)?.startAt
+        ?? dash.upcomingMeetings.find((m) => `mt-${m.id}` === a.key)?.meetingDate
+        ?? new Date();
+      const dateB = dash.upcomingEvents.find((e) => `ev-${e.id}` === b.key)?.startAt
+        ?? dash.upcomingMeetings.find((m) => `mt-${m.id}` === b.key)?.meetingDate
+        ?? new Date();
+      return dateA.getTime() - dateB.getTime();
+    })
+    .slice(0, 4);
+
+  const greeting = getGreeting(firstName);
 
   return (
-    <PageShell fullWidth>
-      <div className="space-y-8">
+    <div className="space-y-6">
 
-        {/* ── Welcome Area ───────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <PageHeader
-            eyebrow="Dashboard"
-            title={clubName}
-            description={[
-              currentSeasonLabel ? `Saison ${currentSeasonLabel}` : null,
-              todayLabel,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-            className="mb-0"
-          />
-        </div>
-
-        {/* ── Action Center ──────────────────────────────────────────────── */}
-        <section>
-          <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Handlungsbedarf
+      {/* ── Welcome Row ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[1.625rem] font-bold tracking-tight" style={{ color: "#111827" }}>
+            {greeting}
+          </h1>
+          <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
+            Hier ist, was heute in deinem Verein ansteht.
           </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <DashboardActionTile
-              href="/dashboard/registrations"
-              label="Offene Anmeldungen"
-              count={dash.openRegistrationCount}
-              subtext="Neu & In Bearbeitung"
-              icon={<Inbox className="h-4 w-4" />}
-              urgent
-            />
-            <DashboardActionTile
-              href="/dashboard/website/news"
-              label="News in Review"
-              count={dash.newsInReviewCount}
-              subtext="Warten auf Freigabe"
-              icon={<Newspaper className="h-4 w-4" />}
-              urgent
-            />
-            <DashboardActionTile
-              href="/dashboard/website/pages"
-              label="Seiten in Review"
-              count={dash.pagesInReviewCount}
-              subtext="Warten auf Freigabe"
-              icon={<FileText className="h-4 w-4" />}
-              urgent
-            />
-            <DashboardActionTile
-              href="/dashboard/website/publishing"
-              label="Geplante News"
-              count={dash.scheduledNewsCount}
-              subtext="Veröffentlichung ausstehend"
-              icon={<ClipboardList className="h-4 w-4" />}
-            />
-          </div>
-        </section>
-
-        {/* ── Mains grid: Today + Meetings ───────────────────────────────── */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-
-          {/* Today's Operations — DashboardTodayAgenda has its own card shell */}
-          <DashboardTodayAgenda items={todayAgendaItems} date={todayLabel} />
-
-          {/* Meetings & Initiatives */}
-          <div className="flex flex-col gap-6">
-
-            {/* Upcoming Meetings */}
-            <SectionCard
-              title="Meetings"
-              headerActions={
-                <Link
-                  href="/vereinsleitung/meetings"
-                  className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Alle
-                </Link>
-              }
-            >
-              {hasMeetings ? (
-                <ul className="space-y-2">
-                  {dash.upcomingMeetings.map((m) => (
-                    <li key={m.id}>
-                      <Link
-                        href={`/vereinsleitung/meetings/${m.slug}`}
-                        className="group flex items-start justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)]"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-[var(--foreground)]">
-                            {m.title}
-                          </p>
-                          <p className="mt-0.5 text-xs text-[var(--muted)]">
-                            {formatDate(m.meetingDate, fmtCfg)}
-                            {m.location ? ` · ${m.location}` : ""}
-                          </p>
-                        </div>
-                        <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--muted)] opacity-0 transition-opacity group-hover:opacity-100" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState
-                  icon={<ScrollText className="h-7 w-7" />}
-                  heading="Keine Meetings geplant"
-                  description="Alle anstehenden Meetings erscheinen hier."
-                  className="py-8"
-                />
-              )}
-            </SectionCard>
-
-            {/* Initiatives */}
-            <SectionCard title="Initiativen">
-              {hasInitiatives ? (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-2xl font-bold text-[var(--foreground)]">
-                      {dash.activeInitiativeCount}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--text-2)]">
-                      Aktive Initiativen
-                    </p>
-                  </div>
-                  <Link
-                    href="/vereinsleitung/initiativen"
-                    className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-                  >
-                    <Flag className="h-3.5 w-3.5" />
-                    Ansehen
-                  </Link>
-                </div>
-              ) : (
-                <EmptyState
-                  icon={<Flag className="h-7 w-7" />}
-                  heading="Keine aktiven Initiativen"
-                  className="py-8"
-                />
-              )}
-            </SectionCard>
-
-          </div>
         </div>
-
-        {/* ── Website Activity ───────────────────────────────────────────── */}
-        <SectionCard
-          title="Website Aktivität"
-          description="Übersicht über den aktuellen Redaktionsstand."
-          headerActions={
-            <Link
-              href="/dashboard/website/publishing"
-              className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-            >
-              <Globe className="h-3.5 w-3.5" />
-              Publishing Center
-            </Link>
-          }
-        >
-          {hasWebsiteContent ? (
-            <div className="grid gap-6 sm:grid-cols-2">
-              {/* News */}
-              <div>
-                <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
-                  <Newspaper className="h-3.5 w-3.5" />
-                  News
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { label: "Entwürfe", count: dash.draftNewsCount, href: "/dashboard/website/news" },
-                    { label: "In Review", count: dash.newsInReviewCount, href: "/dashboard/website/news" },
-                    { label: "Geplant", count: dash.scheduledNewsCount, href: "/dashboard/website/publishing" },
-                    { label: "Publiziert", count: dash.publishedNewsCount, href: "/dashboard/website/news" },
-                  ].map(({ label, count, href }) => (
-                    <Link
-                      key={label}
-                      href={href}
-                      className="group flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 transition hover:bg-[var(--surface-2)]"
-                    >
-                      <span className="text-sm text-[var(--text-2)] group-hover:text-[var(--foreground)]">
-                        {label}
-                      </span>
-                      <span className="text-sm font-semibold text-[var(--foreground)]">
-                        {count}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Pages */}
-              <div>
-                <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
-                  <FileText className="h-3.5 w-3.5" />
-                  Seiten
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { label: "Entwürfe", count: dash.draftPagesCount, href: "/dashboard/website/pages" },
-                    { label: "In Review", count: dash.pagesInReviewCount, href: "/dashboard/website/pages" },
-                    { label: "Publiziert", count: dash.publishedPagesCount, href: "/dashboard/website/pages" },
-                  ].map(({ label, count, href }) => (
-                    <Link
-                      key={label}
-                      href={href}
-                      className="group flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 transition hover:bg-[var(--surface-2)]"
-                    >
-                      <span className="text-sm text-[var(--text-2)] group-hover:text-[var(--foreground)]">
-                        {label}
-                      </span>
-                      <span className="text-sm font-semibold text-[var(--foreground)]">
-                        {count}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Globe className="h-7 w-7" />}
-              heading="Noch keine Website-Inhalte"
-              description="Erstelle News, Seiten oder Mediendateien, um die Aktivität hier zu sehen."
-              action={
-                <Link
-                  href="/dashboard/website/news/new"
-                  className="fca-button-primary inline-flex items-center gap-1.5"
-                >
-                  <Plus className="h-4 w-4" />
-                  News erstellen
-                </Link>
-              }
-            />
-          )}
-        </SectionCard>
-
-        {/* ── Quick Actions ──────────────────────────────────────────────── */}
-        <SectionCard title="Schnellzugriff">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { href: "/dashboard/website/news/new", label: "News erstellen", icon: <Newspaper className="h-3.5 w-3.5" /> },
-              { href: "/dashboard/website/pages/new", label: "Seite erstellen", icon: <FileText className="h-3.5 w-3.5" /> },
-              { href: "/dashboard/registrations", label: "Anmeldungen", icon: <Inbox className="h-3.5 w-3.5" /> },
-              { href: `/dashboard/planner${selectedSeasonKey ? `?season=${encodeURIComponent(selectedSeasonKey)}` : ""}`, label: "Planner öffnen", icon: <ClipboardList className="h-3.5 w-3.5" /> },
-              { href: "/dashboard/website/publishing", label: "Publishing Center", icon: <Globe className="h-3.5 w-3.5" /> },
-              { href: "/vereinsleitung/meetings/new", label: "Meeting erstellen", icon: <ScrollText className="h-3.5 w-3.5" /> },
-              { href: "/vereinsleitung/initiativen", label: "Initiativen", icon: <Flag className="h-3.5 w-3.5" /> },
-              { href: "/dashboard/infoboard", label: "Infoboard", icon: <CalendarClock className="h-3.5 w-3.5" /> },
-            ].map(({ href, label, icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-medium text-[var(--text-2)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-              >
-                {icon}
-                {label}
-              </Link>
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* ── Season context ─────────────────────────────────────────────── */}
-        {seasonOptions.length > 0 && (
-          <SeasonContextSelector
-            title="Aktive Saison"
-            description="Dieser Kontext wird für saisongeführte Module wie Planner, Teams und Events verwendet."
-            seasons={seasonOptions}
-            selectedSeasonKey={selectedSeasonKey}
-            basePath="/dashboard"
-          />
-        )}
-
-        {/* ── Org KPIs ───────────────────────────────────────────────────── */}
-        <section>
-          <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Organisation
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <KpiCard
-              label="Saisons"
-              value={String(dash.seasonCount)}
-              subtext={
-                currentSeasonLabel
-                  ? `Aktiv: ${currentSeasonLabel}`
-                  : selectedSeason
-                  ? `Zuletzt: ${selectedSeason.name}`
-                  : "Keine Saison konfiguriert"
-              }
-              icon={<CalendarRange className="h-4 w-4" />}
-              trend="neutral"
-            />
-            <KpiCard
-              label="Teams"
-              value={String(dash.teamCount)}
-              subtext="Alle Saisons gesamt"
-              icon={<Users className="h-4 w-4" />}
-              trend="neutral"
-            />
-            <KpiCard
-              label="Personen"
-              value={String(dash.personCount)}
-              subtext="Registrierte Stammdaten"
-              icon={<UserCircle2 className="h-4 w-4" />}
-              trend="neutral"
-            />
-          </div>
-        </section>
-
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-[0.8125rem] font-medium text-[#374151] shadow-sm transition hover:bg-[#F9FAFB]"
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            Dashboard anpassen
+          </button>
+          <Link
+            href="/dashboard/website/news/new"
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-[0.8125rem] font-semibold text-white shadow-sm transition hover:opacity-90"
+            style={{
+              background: "linear-gradient(135deg, #FF6A00 0%, #FF8533 100%)",
+              boxShadow: "0 2px 8px rgba(255,106,0,0.25)",
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Schnellaktion
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
-    </PageShell>
+
+      {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <KpiCard
+          label="Offene Anmeldungen"
+          value={String(dash.openRegistrationCount)}
+          subtext="+3 seit gestern"
+          accent="orange"
+          icon={<Users className="h-5 w-5" />}
+        />
+        <KpiCard
+          label="News in Prüfung"
+          value={String(dash.newsInReviewCount)}
+          subtext="2 fällig heute"
+          accent="blue"
+          icon={<Newspaper className="h-5 w-5" />}
+        />
+        <KpiCard
+          label="Veröffentlichungen geplant"
+          value={String(dash.scheduledNewsCount)}
+          subtext="Diese Woche"
+          accent="green"
+          icon={<Layers className="h-5 w-5" />}
+        />
+        <KpiCard
+          label="Events diese Woche"
+          value={String(dash.weekEventsCount)}
+          subtext={`${dash.todayEventsCount} heute`}
+          accent="purple"
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
+      </div>
+
+      {/* ── Main content + right sidebar ────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_300px]">
+
+        {/* Left: Quick Actions + Activity Feed */}
+        <div className="space-y-6">
+
+          {/* Schnellaktionen */}
+          <div className="sce-section-card-v3">
+            <div className="sce-section-card-v3-header">
+              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Schnellaktionen</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+              <QuickActionCard
+                href="/dashboard/website/news/new"
+                icon={<Newspaper className="h-4.5 w-4.5" />}
+                title="Neue News"
+                subtitle="Artikel erstellen"
+                iconBg="rgba(255,106,0,0.10)"
+                iconColor="#FF6A00"
+              />
+              <QuickActionCard
+                href="/dashboard/website/pages/new"
+                icon={<FileText className="h-4.5 w-4.5" />}
+                title="Neue Seite"
+                subtitle="Webseite erstellen"
+                iconBg="rgba(59,130,246,0.10)"
+                iconColor="#3B82F6"
+              />
+              <QuickActionCard
+                href="/dashboard/website/publishing"
+                icon={<Monitor className="h-4.5 w-4.5" />}
+                title="Homepage"
+                subtitle="Vorschau öffnen"
+                iconBg="rgba(16,185,129,0.10)"
+                iconColor="#10B981"
+              />
+              <QuickActionCard
+                href="/dashboard/planner"
+                icon={<CalendarRange className="h-4.5 w-4.5" />}
+                title="Wochenplanung"
+                subtitle="Zur Planung"
+                iconBg="rgba(139,92,246,0.10)"
+                iconColor="#8B5CF6"
+              />
+            </div>
+          </div>
+
+          {/* Aktuelle Aktivitäten */}
+          <div className="sce-section-card-v3">
+            <div className="sce-section-card-v3-header">
+              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Aktuelle Aktivitäten</h2>
+            </div>
+            <div className="sce-section-card-v3-body">
+              {activities.length > 0 ? (
+                activities.map((a) => (
+                  <ActivityItem
+                    key={a.key}
+                    icon={a.icon}
+                    iconBg={a.iconBg}
+                    iconColor={a.iconColor}
+                    title={a.title}
+                    subtitle={a.subtitle}
+                    time={timeAgo(a.date)}
+                    tag={a.tag}
+                    tagBg={a.tagBg}
+                    tagColor={a.tagColor}
+                  />
+                ))
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <Globe className="h-7 w-7 text-[#9CA3AF]" />
+                  <p className="text-[0.875rem] text-[#6B7280]">Noch keine Aktivitäten</p>
+                  <p className="text-[0.75rem] text-[#9CA3AF]">Aktivitäten erscheinen hier sobald Inhalte erstellt werden.</p>
+                </div>
+              )}
+            </div>
+            <div className="sce-section-card-v3-footer">
+              <Link
+                href="/dashboard/logs"
+                className="text-[0.8125rem] font-medium transition"
+                style={{ color: "#FF6A00" }}
+              >
+                Alle Aktivitäten anzeigen →
+              </Link>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right sidebar: Tasks + Events */}
+        <div className="space-y-6">
+
+          {/* Meine Aufgaben */}
+          <div className="sce-section-card-v3">
+            <div className="sce-section-card-v3-header">
+              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Meine Aufgaben</h2>
+              <CheckSquare className="h-4 w-4 text-[#9CA3AF]" />
+            </div>
+            <div className="sce-section-card-v3-body">
+              {tasks.map((t, i) => (
+                <TaskItem
+                  key={i}
+                  title={t.title}
+                  subtitle={t.subtitle}
+                  dueLabel={t.dueLabel}
+                  urgent={t.urgent}
+                />
+              ))}
+            </div>
+            <div className="sce-section-card-v3-footer">
+              <Link
+                href="/dashboard/registrations"
+                className="text-[0.8125rem] font-medium transition"
+                style={{ color: "#FF6A00" }}
+              >
+                Alle Aufgaben anzeigen →
+              </Link>
+            </div>
+          </div>
+
+          {/* Nächste Termine */}
+          <div className="sce-section-card-v3">
+            <div className="sce-section-card-v3-header">
+              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Nächste Termine</h2>
+              <CalendarDays className="h-4 w-4 text-[#9CA3AF]" />
+            </div>
+            <div className="sce-section-card-v3-body">
+              {upcomingEntries.length > 0 ? (
+                upcomingEntries.map((e) => (
+                  <EventItem
+                    key={e.key}
+                    day={e.day}
+                    month={e.month}
+                    title={e.title}
+                    location={e.location}
+                    time={e.time}
+                  />
+                ))
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <CalendarDays className="h-6 w-6 text-[#9CA3AF]" />
+                  <p className="text-[0.8125rem] text-[#6B7280]">Keine bevorstehenden Termine</p>
+                </div>
+              )}
+            </div>
+            <div className="sce-section-card-v3-footer">
+              <Link
+                href="/dashboard/events"
+                className="text-[0.8125rem] font-medium transition"
+                style={{ color: "#FF6A00" }}
+              >
+                Alle Termine anzeigen →
+              </Link>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
   );
 }
