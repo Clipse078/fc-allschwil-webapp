@@ -98,16 +98,20 @@
   --transition-base:   180ms ease;
   --transition-slow:   280ms ease;
 
-  /* ── Tenant Branding — Slice 10.7 ─────────────────────────────────────────
+  /* ── Tenant Branding — Sprint 4: Centralized Branding System ──────────────
    * Global fallback to SportClubEvo platform palette.
-   * The admin layout (app/(admin)/layout.tsx) overrides these per-tenant via
-   * generateTenantCssVars(), scoping the override to all admin shell children.
+   * The admin layout (app/(admin)/layout.tsx) overrides --tenant-primary and
+   * --tenant-secondary per-tenant via generateTenantCssVars().
+   *
+   * --tenant-accent is ALWAYS CSS-derived from --tenant-primary: it is a 10%
+   * tint of the primary color on white. Never set --tenant-accent directly.
    *
    * All shared utility classes that carry brand accent use ONLY these vars.
    * No other file may introduce an alias or inline calc for tenant colors.
    * ─────────────────────────────────────────────────────────────────────── */
   --tenant-primary:   var(--blue);
   --tenant-secondary: var(--red);
+  --tenant-accent:    color-mix(in srgb, var(--tenant-primary) 10%, white);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -155,7 +159,7 @@ button {
    TYPOGRAPHY CLASSES
 ───────────────────────────────────────────────────────────────────────── */
 .fca-eyebrow {
-  color: var(--red);
+  color: var(--tenant-secondary);
   font-family: var(--font-display);
   font-size: 0.72rem;
   font-weight: 700;
@@ -222,7 +226,7 @@ button {
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--tenant-primary) 0%, color-mix(in srgb, white 30%, var(--tenant-primary)) 50%, var(--tenant-secondary) 100%);
+  background: var(--tenant-primary);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
 }
 
@@ -240,7 +244,7 @@ button {
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--tenant-primary) 80%, transparent) 0%, color-mix(in srgb, var(--tenant-primary) 60%, transparent) 50%, color-mix(in srgb, var(--tenant-secondary) 80%, transparent) 100%);
+  background: color-mix(in srgb, var(--tenant-primary) 70%, transparent);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
@@ -922,6 +926,31 @@ button {
   color: var(--tenant-primary);
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   FILTER TAB — Tenant-branded active state for segmented control tabs
+   Apply .sce-filter-tab-active to the active tab button inside a tab group.
+───────────────────────────────────────────────────────────────────────── */
+.sce-filter-tab-active {
+  color: var(--tenant-primary) !important;
+  font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PRIMARY ACTION LINK — Tenant-branded inline text link
+───────────────────────────────────────────────────────────────────────── */
+.sce-link-primary {
+  color: var(--tenant-primary);
+  font-weight: 500;
+  text-decoration: none;
+  transition: opacity var(--transition-fast);
+}
+
+.sce-link-primary:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -28,16 +28,16 @@ export default function SeasonContextSelector({
     null;
 
   return (
-    <section className="rounded-[30px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+    <section className="rounded-[var(--radius-2xl)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
             {title}
           </p>
-          <h3 className="mt-2 text-[1.15rem] font-semibold text-slate-900">
+          <h3 className="mt-2 text-[1.15rem] font-semibold text-[var(--foreground)]">
             {selectedSeason?.name ?? "Keine Saison verfügbar"}
           </h3>
-          <p className="mt-2 text-sm text-slate-600">{description}</p>
+          <p className="mt-2 text-sm text-[var(--text-2)]">{description}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -50,8 +50,8 @@ export default function SeasonContextSelector({
                 href={`${basePath}?season=${encodeURIComponent(season.key)}`}
                 className={
                   isSelected
-                    ? "rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#0b4aa2]"
-                    : "rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                    ? "fca-pill-year"
+                    : "rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
                 }
               >
                 {season.name}

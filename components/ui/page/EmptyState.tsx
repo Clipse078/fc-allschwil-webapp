@@ -52,8 +52,8 @@ export function EmptyState({
         <div
           className="flex h-16 w-16 items-center justify-center rounded-2xl"
           style={{
-            background: "color-mix(in srgb, var(--tenant-primary) 8%, transparent)",
-            color: "color-mix(in srgb, var(--tenant-primary) 70%, transparent)",
+            background: "var(--tenant-accent)",
+            color: "var(--tenant-primary)",
           }}
         >
           {icon}

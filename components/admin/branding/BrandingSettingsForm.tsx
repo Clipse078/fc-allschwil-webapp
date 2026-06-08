@@ -278,6 +278,38 @@ export default function BrandingSettingsForm({
           </div>
         </div>
 
+        {/* Accent color info */}
+        <div className="sce-detail-section">
+          <div className="sce-detail-section-header">
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+              Akzentfarbe
+            </p>
+          </div>
+          <div className="sce-detail-section-body">
+            <div className="flex items-center gap-3">
+              <span
+                className="inline-flex h-9 w-9 shrink-0 rounded-lg border border-[var(--border)]"
+                style={{
+                  background: `color-mix(in srgb, ${
+                    primaryColor && primaryColor.match(/^#[0-9a-fA-F]{6}$/) ? primaryColor : PLATFORM_BRANDING.primaryColor
+                  } 10%, white)`,
+                }}
+                aria-hidden="true"
+              />
+              <div>
+                <p className="text-[0.8125rem] font-medium text-[var(--foreground)]">
+                  Automatisch von Primärfarbe abgeleitet
+                </p>
+                <p className="mt-0.5 text-[0.72rem] text-[var(--muted)]">
+                  Die Akzentfarbe (<code className="font-mono">--tenant-accent</code>) wird immer
+                  als 10&thinsp;% Tönung der Primärfarbe berechnet. Sie wird für aktive Zustände,
+                  subtile Hintergründe und Hover-Flächen verwendet.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Status + submit */}
         {saveError ? (
           <div className="rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">

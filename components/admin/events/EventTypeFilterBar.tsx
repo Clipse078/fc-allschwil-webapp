@@ -37,9 +37,13 @@ export default function EventTypeFilterBar({
             href={href}
             className={
               isActive
-                ? "inline-flex h-8 items-center rounded-lg border border-[var(--border)] bg-[var(--blue-light)] px-3 text-xs font-semibold text-[var(--blue)]"
+                ? "inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold sce-filter-tab-active"
                 : "inline-flex h-8 items-center rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
             }
+            style={isActive ? {
+              background: "var(--tenant-accent)",
+              borderColor: "color-mix(in srgb, var(--tenant-primary) 25%, transparent)",
+            } : undefined}
           >
             {filter.label}
           </Link>

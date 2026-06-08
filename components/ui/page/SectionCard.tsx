@@ -22,6 +22,11 @@ type SectionCardProps = {
    * table, map, or image.
    */
   noPadding?: boolean;
+  /**
+   * Show a subtle left-border accent in the tenant primary color.
+   * Use for cards that represent a primary action or branded section.
+   */
+  accent?: boolean;
   className?: string;
   /** Additional className applied to the inner content area only. */
   bodyClassName?: string;
@@ -45,6 +50,7 @@ export function SectionCard({
   description,
   headerActions,
   noPadding = false,
+  accent = false,
   className,
   bodyClassName,
 }: SectionCardProps) {
@@ -53,9 +59,11 @@ export function SectionCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm",
+        "rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden",
+        accent && "border-l-2",
         className,
       )}
+      style={accent ? { borderLeftColor: "var(--tenant-primary)" } : undefined}
     >
       {hasHeader && (
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">

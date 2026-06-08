@@ -32,7 +32,7 @@ import {
   Users,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
-import TenantLogo from "@/components/admin/branding/TenantLogo";
+import SceWordmark from "@/components/admin/branding/SceWordmark";
 import { getVisibleNavSections } from "@/lib/nav/nav-config";
 import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
@@ -149,23 +149,12 @@ export default function AdminSidebar({
     >
       {/* Brand header */}
       <div className="sce-sidebar-brand">
-        {/* Tenant logo — falls back to platform Trophy icon when no logoUrl configured */}
-        <TenantLogo
-          logoUrl={logoUrl}
+        <SceWordmark
           size={isCollapsed ? 28 : 32}
-          alt={clubName ? `${clubName} logo` : "Club logo"}
+          tenantName={displayClubName}
+          logoUrl={logoUrl}
+          collapsed={isCollapsed}
         />
-
-        {!isCollapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-              SportClubEvo
-            </p>
-            <p className="truncate text-[0.9rem] font-700 leading-tight tracking-tight text-[var(--tenant-primary)] font-bold">
-              {displayClubName}
-            </p>
-          </div>
-        )}
 
         <button
           type="button"

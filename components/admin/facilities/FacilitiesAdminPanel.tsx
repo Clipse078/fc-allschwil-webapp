@@ -97,7 +97,7 @@ function InlineEditForm({
       <button
         type="submit"
         disabled={pending || !draft.trim()}
-        className="rounded-lg bg-[var(--blue)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+        className="fca-button-primary disabled:opacity-50"
       >
         Speichern
       </button>
@@ -183,14 +183,14 @@ function CreateFacilityForm({
         <button
           type="submit"
           disabled={pending || !name.trim()}
-          className="rounded-lg bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="fca-button-primary disabled:opacity-50"
         >
           {pending ? "Wird erstellt…" : "Anlage erstellen"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600"
+          className="fca-button-secondary"
         >
           Abbrechen
         </button>
@@ -282,14 +282,14 @@ function CreateResourceForm({
         <button
           type="submit"
           disabled={pending || !name.trim() || !code.trim()}
-          className="rounded-lg bg-[var(--blue)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          className="fca-button-primary disabled:opacity-50"
         >
           {pending ? "Wird hinzugefügt…" : "Hinzufügen"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600"
+          className="fca-button-secondary"
         >
           Abbrechen
         </button>
