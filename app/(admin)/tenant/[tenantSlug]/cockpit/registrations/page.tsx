@@ -1,11 +1,11 @@
-import RegistrationsInboxTable from "@/components/admin/registrations/RegistrationsInboxTable";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import RegistrationInbox from "@/components/admin/registrations/RegistrationInbox";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { listRegistrationsForTenant } from "@/lib/registrations/queries";
 import { getCurrentTenantContext } from "@/lib/tenants/context";
-import { getCurrentSeasonLabel } from "@/lib/tenant-runtime/formatters";
+import { requireTenant } from "@/lib/tenants/require-tenant";
+import { prisma } from "@/lib/db/prisma";
 
 type Props = {
   params: Promise<{
@@ -20,34 +20,39 @@ export default async function TenantRegistrationsPage({ params }: Props) {
   ]);
   const { tenantSlug } = await params;
 
-  const [registrations, ctx] = await Promise.all([
-    listRegistrationsForTenant(tenantSlug),
-    getCurrentTenantContext(tenantSlug),
-  ]);
+  const tenant = await requireTenant(tenantSlug);
+  const tenantId = tenant.id;
+
+  const [registrations, ctx, assignableUsers, targetGroups] =
+    await Promise.all([
+      listRegistrationsForTenant(tenantSlug),
+      getCurrentTenantContext(tenantSlug),
+      prisma.user.findMany({
+        where: { isActive: true, tenantId },
+        orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+        select: { id: true, firstName: true, lastName: true, email: true },
+      }),
+      prisma.targetGroup.findMany({
+        where: {
+          status: "ACTIVE",
+          OR: [{ tenantId }, { tenantId: null }],
+        },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, key: true },
+      }),
+    ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
 
-  // Build a context-aware description for the header.
-  const seasonLabel = ctx ? getCurrentSeasonLabel(ctx) : null;
-  const tenantLabel = ctx?.name ?? tenantSlug;
-  const description = seasonLabel
-    ? `${tenantLabel} — Saison ${seasonLabel} — Eingehende Anmeldungen, Anfragen und Probetrainings.`
-    : "Eingehende Anmeldungen, Anfragen und Probetrainings — nach Status gefiltert und mit automatischer Routing-Vorschau.";
-
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Cockpit"
-        title="Registration Inbox"
-        description={description}
-      />
-
-      <RegistrationsInboxTable
-        tenantSlug={tenantSlug}
-        initialRegistrations={registrations}
-        canEdit={canEdit}
-        locale={ctx?.locale ?? undefined}
-      />
-    </div>
+    <RegistrationInbox
+      tenantSlug={tenantSlug}
+      initialRegistrations={registrations}
+      canEdit={canEdit}
+      locale={ctx?.locale ?? undefined}
+      timezone={ctx?.timezone ?? undefined}
+      assignableUsers={assignableUsers}
+      targetGroups={targetGroups}
+    />
   );
 }
