@@ -24,18 +24,25 @@ export default async function WebsiteSettingsPage() {
       <PageBreadcrumbs
         items={[
           { label: "Dashboard", href: "/dashboard" },
-          { label: "Website" },
+          { label: "Website", href: "/dashboard/website" },
           { label: "Einstellungen" },
         ]}
       />
       <PageHeader
         eyebrow="Website"
-        title="Einstellungen"
-        description="Website-Veröffentlichung und Vier-Augen-Prinzip konfigurieren."
+        title="Website-Einstellungen"
+        description="Website-Veröffentlichung, Publish-Modus und Vier-Augen-Prinzip konfigurieren."
       />
       <SectionCard>
         <WebsiteSettingsForm
-          defaultValues={{ approvedDataOnly: ctx.approvedDataOnly }}
+          defaultValues={{
+            approvedDataOnly: ctx.approvedDataOnly,
+            websiteEnabled: ctx.websiteEnabled,
+            websiteBaseUrl: ctx.websiteBaseUrl ?? "",
+            websitePrimaryLanguage: ctx.websitePrimaryLanguage ?? "",
+            websitePublishMode: ctx.websitePublishMode,
+            websiteCacheStrategy: ctx.websiteCacheStrategy ?? "",
+          }}
         />
       </SectionCard>
     </PageShell>
