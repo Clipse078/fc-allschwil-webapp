@@ -37,6 +37,34 @@ export async function getOrgUnits(tenantId?: string) {
       level: true,
       sortOrder: true,
       description: true,
+      archivedAt: true,
+      _count: { select: { memberships: true, children: true } },
+    },
+  });
+}
+
+/**
+ * Returns all ARCHIVED org units for a tenant.
+ * Used in the archived view of the Organisation Builder to allow restore.
+ */
+export async function getArchivedOrgUnits(tenantId?: string) {
+  return prisma.orgUnit.findMany({
+    where: {
+      status: "ARCHIVED",
+      ...(tenantId ? { tenantId } : {}),
+    },
+    orderBy: [{ archivedAt: "desc" }, { name: "asc" }],
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      type: true,
+      status: true,
+      parentId: true,
+      level: true,
+      sortOrder: true,
+      description: true,
+      archivedAt: true,
       _count: { select: { memberships: true, children: true } },
     },
   });
@@ -58,6 +86,7 @@ export async function getOrgUnitById(id: string) {
       description: true,
       createdAt: true,
       updatedAt: true,
+      archivedAt: true,
       parent: { select: { id: true, name: true, key: true } },
       children: { select: { id: true, name: true, key: true, type: true, status: true }, orderBy: { sortOrder: "asc" } },
       // Slice 11.3: linked teams via Team.orgUnitId bridge.
@@ -161,6 +190,7 @@ export async function loadOrgUnitIds(
 }
 
 export type OrgUnitListItem = Awaited<ReturnType<typeof getOrgUnits>>[number];
+export type ArchivedOrgUnitListItem = Awaited<ReturnType<typeof getArchivedOrgUnits>>[number];
 
 /**
  * Phase B — Membership history: returns all memberships for an org unit,

@@ -32,7 +32,7 @@ The following foundations have been built on the `STAGE` branch and are in an ac
 | STAGE deployment workflow | Implemented | `STAGE` branch is source of truth; `StageEnvironmentBanner` in admin shell; `vercel.json` build config |
 | Anti-drift workflow | Implemented | AGENTS.md and branch conventions enforced; no uncommitted drift permitted |
 | Registration workflow | Largely implemented | `Registration` model, type variants (Probetraining, Spieleranmeldung, Traineranmeldung, Sponsoranfrage, Kontaktanfrage), admin pages, tenant cockpit |
-| Organisation Builder foundation | Largely implemented | `OrgUnit`, `OrgUnitMembership`, `TargetGroup` models; admin pages and APIs |
+| Organisation Builder foundation | **Foundation v1 complete** | `OrgUnit` (+ `archivedAt`), `OrgUnitMembership`, `TargetGroup` models; full admin CRUD at `/dashboard/org-units`; archived units view with restore; `POST /api/org-units/[id]/restore`; tenant-safe hierarchy management; membership management. Phase 2 (org-based permissions) pending. |
 | Admin governance foundation | Largely implemented | `AuditLog` model, audit log pages, `/api/audit-logs`, runtime diagnostics |
 | Meetings foundation | Largely implemented | `Meeting`, `MeetingAgendaItem`, `MeetingDecision`, `MeetingAction`, `MeetingParticipant` models; Vereinsleitung pages and APIs |
 | Initiatives foundation | Largely implemented | `Initiative` model; Vereinsleitung pages and APIs; visibility scopes (Organisation, Restricted, Private) |

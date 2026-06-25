@@ -21,6 +21,7 @@ import { prisma } from "@/lib/db/prisma";
 import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
 import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
 import OrgUnitArchiveButton from "@/components/admin/org/OrgUnitArchiveButton";
+import OrgUnitRestoreButton from "@/components/admin/org/OrgUnitRestoreButton";
 
 // Slice 11.2b: tenant resolved from session-carried tenantId.
 // Slice 11.5: sibling sort controls and parent breadcrumb added.
@@ -119,6 +120,7 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   const childCount = unit.children.length;
   const canManage = hasPermission(session, PERMISSIONS.ORG_MANAGE);
   const canArchive = canManage && unit.status !== "ARCHIVED" && childCount === 0;
+  const canRestore = canManage && unit.status === "ARCHIVED";
 
   return (
     <div className="space-y-6">
@@ -485,6 +487,18 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
                   })}
                 </span>
               </div>
+              {unit.archivedAt ? (
+                <div className="sce-data-field">
+                  <span className="sce-data-label">Archiviert</span>
+                  <span className="sce-data-value">
+                    {unit.archivedAt.toLocaleDateString("de-CH", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -509,6 +523,34 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
           {canManage && unit.status !== "ARCHIVED" && childCount > 0 ? (
             <div className="rounded-[var(--radius-xl)] border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
               Diese Einheit hat {childCount} untergeordnete{childCount === 1 ? " Einheit" : " Einheiten"}. Archiviere zuerst alle untergeordneten Einheiten.
+            </div>
+          ) : null}
+
+          {/* Restore zone — shown for archived units */}
+          {canRestore ? (
+            <div className="sce-detail-section border-emerald-100">
+              <div className="sce-detail-section-header">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-emerald-600">
+                  Wiederherstellung
+                </p>
+              </div>
+              <div className="sce-detail-section-body space-y-3">
+                {unit.archivedAt ? (
+                  <p className="text-[12px] text-[var(--muted)]">
+                    Archiviert am{" "}
+                    {unit.archivedAt.toLocaleDateString("de-CH", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                ) : null}
+                <OrgUnitRestoreButton
+                  orgUnitId={unit.id}
+                  orgUnitName={unit.name}
+                  redirectToList={false}
+                />
+              </div>
             </div>
           ) : null}
         </div>
