@@ -20,7 +20,7 @@ Items are not a source of shame. They are a sign of deliberate, tracked decision
 | Status | Area | Item | Priority | Impact | Notes |
 |---|---|---|---|---|---|
 | Open | Auth & Middleware | Auth route protection is enforced in `(admin)/layout.tsx`, not in `middleware.ts` | High | Security gap — non-HTML requests (e.g. direct API fetch to admin routes) may bypass layout-level auth | Should be resolved before go-live; evaluate whether `middleware.ts` protection is needed for all routes or only non-RSC paths |
-| Open | Organisation Builder | Phase 2 org-based permissions not yet wired | Medium | `ActorContext.orgUnitIds` is populated but permission guards do not yet enforce org-unit membership for route access. `visibleOrgUnitRefs` checks in `canSeeEntity()` are implemented but guards rely only on `permissionKeys`. See `TODO(Phase 2)` in `/dashboard/org-units/page.tsx` and `lib/org/queries.ts`. Resolve in Step 2: Organization-based Permissions. |
+| Resolved | Organisation Builder | Phase 2 org-based permissions | Medium | `ActorContext.orgUnitIds` now wired to real visibility and access rules. `loadOrgUnitIds()` filters out archived org units. `canAccessOrgUnit()`, `canManageOrgUnit()`, `canListOrgUnits()` added to `lib/visibility/org-unit-access.ts`. Org-unit detail and history pages grant read access to active org unit members. RESTRICTED visibility via `visibleOrgUnitRefs` fully active for Meetings, Initiatives, Targets. Resolved: 2026-06-25. |
 | Open | Tenant Isolation | Public API routes have known TODO comments for missing tenant filtering | Critical | A public API call without tenant context could leak cross-tenant data | Known in `app/api/public/events/route.ts` and related files; must be audited and fixed before go-live |
 | Open | Documentation | `README.md` at repository root is still the default Next.js boilerplate | Low | Poor first impression for new contributors; no project-specific onboarding | Replace with a SportClubEvo-specific README covering stack, setup, branch conventions, and docs index |
 | Open | Website Integration | Website cache/revalidation mechanism is undecided | High | Without a clear cache invalidation strategy, the public website may serve stale content after publish/unpublish | Choose between ISR tag-based revalidation and on-demand webhook; document in an ADR |
@@ -56,6 +56,7 @@ Items are not a source of shame. They are a sign of deliberate, tracked decision
 | 2026-06-25 | Deployment | No deployment documentation | Created `docs/deployment/` with Vercel project matrix, env entry sheets, runtime diagnostics, and runtime guards |
 | 2026-06-25 | Governance | No four-eye governance documentation | Created `docs/governance/four-eye-principle-events-foundation.md` |
 | 2026-06-25 | Planning | No product planning document | Created `docs/roadmap/` documentation set |
+| 2026-06-25 | Organisation Builder | Phase 2 org-based permissions not yet wired | `loadOrgUnitIds()` now excludes archived org units. `canAccessOrgUnit()`, `canManageOrgUnit()`, `canListOrgUnits()` added to `lib/visibility/org-unit-access.ts`. Org-unit detail and history pages grant read access to active unit members. RESTRICTED visibility (`visibleOrgUnitRefs`) fully active for Meetings, Initiatives, Targets via `canSeeEntity()`. |
 
 ---
 

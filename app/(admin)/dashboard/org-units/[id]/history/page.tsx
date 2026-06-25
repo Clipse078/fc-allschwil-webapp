@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight, Clock, Users } from "lucide-react";
-import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { auth } from "@/auth";
 import { getOrgUnitById, getOrgUnitMembershipHistory } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import { prisma } from "@/lib/db/prisma";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
+import { canAccessOrgUnit } from "@/lib/visibility/org-unit-access";
 import OrgMembershipHistoryView from "@/components/admin/org/OrgMembershipHistoryView";
 
 type PageProps = {
@@ -14,9 +15,17 @@ type PageProps = {
 };
 
 export default async function OrgUnitMembershipHistoryPage({ params, searchParams }: PageProps) {
-  const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+
   const { id } = await params;
   const { seasonId, status } = await searchParams;
+
+  // Phase 2: org-unit-aware access — same rule as the detail page.
+  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  if (!canAccessOrgUnit(id, actor)) {
+    redirect("/dashboard");
+  }
 
   const [unit, tenant] = await Promise.all([
     getOrgUnitById(id),

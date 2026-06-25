@@ -32,7 +32,7 @@ The following foundations have been built on the `STAGE` branch and are in an ac
 | STAGE deployment workflow | Implemented | `STAGE` branch is source of truth; `StageEnvironmentBanner` in admin shell; `vercel.json` build config |
 | Anti-drift workflow | Implemented | AGENTS.md and branch conventions enforced; no uncommitted drift permitted |
 | Registration workflow | Largely implemented | `Registration` model, type variants (Probetraining, Spieleranmeldung, Traineranmeldung, Sponsoranfrage, Kontaktanfrage), admin pages, tenant cockpit |
-| Organisation Builder foundation | **Foundation v1 complete** | `OrgUnit` (+ `archivedAt`), `OrgUnitMembership`, `TargetGroup` models; full admin CRUD at `/dashboard/org-units`; archived units view with restore; `POST /api/org-units/[id]/restore`; tenant-safe hierarchy management; membership management. Phase 2 (org-based permissions) pending. |
+| Organisation Builder foundation | **Foundation v1 + Phase 2 complete** | `OrgUnit` (+ `archivedAt`), `OrgUnitMembership`, `TargetGroup` models; full admin CRUD at `/dashboard/org-units`; archived units view with restore; `POST /api/org-units/[id]/restore`; tenant-safe hierarchy management; membership management. **Phase 2 complete (2026-06-25):** `loadOrgUnitIds()` excludes archived org units; `canAccessOrgUnit()`, `canManageOrgUnit()`, `canListOrgUnits()` helpers in `lib/visibility/org-unit-access.ts`; org-unit detail and history pages grant access to active unit members; RESTRICTED visibility via `visibleOrgUnitRefs` active for Meetings, Initiatives, Targets. |
 | Admin governance foundation | Largely implemented | `AuditLog` model, audit log pages, `/api/audit-logs`, runtime diagnostics |
 | Meetings foundation | Largely implemented | `Meeting`, `MeetingAgendaItem`, `MeetingDecision`, `MeetingAction`, `MeetingParticipant` models; Vereinsleitung pages and APIs |
 | Initiatives foundation | Largely implemented | `Initiative` model; Vereinsleitung pages and APIs; visibility scopes (Organisation, Restricted, Private) |
@@ -325,6 +325,7 @@ This table is the authoritative status register for all v1.0 features.
 | Done | Foundation | Audit logging | High | v1.0 |
 | Done | Foundation | Registration workflow | High | v1.0 |
 | Done | Foundation | Organisation Builder (OrgUnit, TargetGroup) | High | v1.0 |
+| Done | Foundation | Organisation-based Permissions Foundation | High | v1.0 |
 | Done | Foundation | Meetings (agenda, decisions, actions, participants) | High | v1.0 |
 | Done | Foundation | Initiatives | High | v1.0 |
 | Done | Foundation | People, Teams, Players, Trainers | High | v1.0 |
@@ -424,6 +425,7 @@ This checklist is the day-to-day progress tracker. Check items off as they reach
 - [x] Anti-drift workflow
 - [x] Registration workflow
 - [x] Organisation Builder foundation (OrgUnit, OrgUnitMembership, TargetGroup)
+- [x] Organisation-based Permissions Foundation (Phase 2: loadOrgUnitIds excludes archived units; canAccessOrgUnit helpers; RESTRICTED visibility via visibleOrgUnitRefs active for Meetings, Initiatives, Targets)
 - [x] Admin governance foundation (AuditLog, runtime diagnostics)
 - [x] Meetings foundation (agenda, decisions, actions, participants)
 - [x] Initiatives foundation

@@ -46,6 +46,7 @@ The following ordered phases define how v1.0 will be delivered. Each phase must 
 - Audit logging (`AuditLog` model)
 - Impersonation support
 - **Org Builder Foundation v1 (2026-06-25):** `archivedAt` timestamp on `OrgUnit`; archived units view with tab toggle; `OrgUnitRestoreButton`; `POST /api/org-units/[id]/restore` endpoint; `getArchivedOrgUnits` query; `EmptyActive`/`EmptyArchived` states. Migration: `20260625000000_org_unit_archived_at`.
+- **Organisation-based Permissions Foundation (2026-06-25):** `ActorContext.orgUnitIds` wired to real visibility and access rules; `loadOrgUnitIds()` now excludes archived org units; `canAccessOrgUnit()` / `canManageOrgUnit()` / `canListOrgUnits()` helpers in `lib/visibility/org-unit-access.ts`; org-unit detail and history pages grant read access to active members of each specific unit; RESTRICTED entity visibility checks (`canSeeEntity()`, `buildVisibilityWhere()`) fully activated for Meetings, Initiatives, Targets via `visibleOrgUnitRefs`.
 
 **Status:** Largely complete — see Current Platform Status in `sportclubevo-v1-master-backlog.md` for precise per-item status
 

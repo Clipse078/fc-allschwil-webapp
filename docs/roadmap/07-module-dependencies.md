@@ -41,7 +41,7 @@ Each layer depends on all layers above it being stable and multi-tenant-safe.
 
 **Provides:** `OrgUnit` (with `archivedAt`), `OrgUnitMembership`, `TargetGroup` — the structural backbone for all groupings within a club. Foundation v1 complete: CRUD, hierarchy management, archive/restore, tenant isolation, membership management.
 
-**Phase 2 (pending):** Organisation-based permission checks — `ActorContext.orgUnitIds` wired to permission guards; `visibleOrgUnitRefs` checks in `canSeeEntity()`. See `TODO(Phase 2)` comment in `/dashboard/org-units/page.tsx`.
+**Phase 2 complete (2026-06-25):** Organisation-based permission checks — `ActorContext.orgUnitIds` wired to permission guards; `canAccessOrgUnit()` checks org unit membership in `/dashboard/org-units/[id]/page.tsx` and `/history`; `visibleOrgUnitRefs` checks in `canSeeEntity()` fully active for Meetings, Initiatives, Targets; `loadOrgUnitIds()` excludes archived org units; `canAccessOrgUnit()`, `canManageOrgUnit()`, `canListOrgUnits()` helpers in `lib/visibility/org-unit-access.ts`.
 
 **Consumers:** People (person-to-org-unit membership), Vereinsleitung governance, Sponsor portal (post-v1), Volunteer management (post-v1)
 
