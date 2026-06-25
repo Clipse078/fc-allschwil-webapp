@@ -75,7 +75,7 @@ export default function OrgUnitArchiveButton({ orgUnitId, orgUnitName }: Props) 
   return (
     <div className="space-y-3 rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 p-4">
       <p className="text-[13px] font-semibold text-rose-800">
-        {`„${orgUnitName}“ wirklich archivieren?`}
+        {`${orgUnitName} wirklich archivieren?`}
       </p>
 
       <p className="text-[12px] text-rose-700">
