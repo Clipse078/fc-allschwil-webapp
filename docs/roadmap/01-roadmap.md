@@ -52,7 +52,7 @@ The following ordered phases define how v1.0 will be delivered. Each phase must 
 
 ---
 
-### Phase 3 — Website Management Foundation ✅ (largely)
+### Phase 3 — Website Management Foundation ✅
 
 **Goal:** The editorial content system is built and the content lifecycle (draft → review → published) is operational.
 
@@ -62,8 +62,9 @@ The following ordered phases define how v1.0 will be delivered. Each phase must 
 - Media asset storage (Vercel Blob)
 - Event model and import (CSV, Clubcorner)
 - Meetings, Initiatives (Vereinsleitung)
+- **Website Management Foundation (2026-06-25):** `WebsitePublishMode` enum (`DRAFT`, `STAGED`, `LIVE`) added to schema; `websiteBaseUrl`, `websitePrimaryLanguage`, `websitePublishMode`, `websiteLastPublishedAt`, `websiteCacheStrategy` fields on `Tenant`; `/dashboard/website` overview page with status, config, publishing controls, public API overview, content area cards; extended `WebsiteSettingsForm` with publish mode, base URL, language, cache strategy; updated sidebar "Website" nav to link to new overview page; `WEBSITE_MANAGE` is the access gate. Migration: `20260625100000_website_management_foundation`.
 
-**Status:** Largely complete
+**Status:** Complete
 
 ---
 

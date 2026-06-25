@@ -2,7 +2,7 @@
 
 > **Document type:** Technical debt register — living document  
 > **Status:** Active  
-> **Last updated:** 2026-06-25  
+> **Last updated:** 2026-06-25 (Website Management Foundation debt items added)  
 > **Maintained by:** SportClubEvo engineering team
 
 ---
@@ -23,7 +23,10 @@ Items are not a source of shame. They are a sign of deliberate, tracked decision
 | Resolved | Organisation Builder | Phase 2 org-based permissions | Medium | `ActorContext.orgUnitIds` now wired to real visibility and access rules. `loadOrgUnitIds()` filters out archived org units. `canAccessOrgUnit()`, `canManageOrgUnit()`, `canListOrgUnits()` added to `lib/visibility/org-unit-access.ts`. Org-unit detail and history pages grant read access to active org unit members. RESTRICTED visibility via `visibleOrgUnitRefs` fully active for Meetings, Initiatives, Targets. Resolved: 2026-06-25. |
 | Open | Tenant Isolation | Public API routes have known TODO comments for missing tenant filtering | Critical | A public API call without tenant context could leak cross-tenant data | Known in `app/api/public/events/route.ts` and related files; must be audited and fixed before go-live |
 | Open | Documentation | `README.md` at repository root is still the default Next.js boilerplate | Low | Poor first impression for new contributors; no project-specific onboarding | Replace with a SportClubEvo-specific README covering stack, setup, branch conventions, and docs index |
-| Open | Website Integration | Website cache/revalidation mechanism is undecided | High | Without a clear cache invalidation strategy, the public website may serve stale content after publish/unpublish | Choose between ISR tag-based revalidation and on-demand webhook; document in an ADR |
+| Open | Website Integration | Website cache/revalidation mechanism is undecided | High | Without a clear cache invalidation strategy, the public website may serve stale content after publish/unpublish | Choose between ISR tag-based revalidation and on-demand webhook; document in an ADR. `websiteCacheStrategy` field on `Tenant` is a placeholder for this configuration — wiring to actual cache invalidation is Phase 4. |
+| Open | Website Integration | `websitePublishMode` not yet enforced on public API routes | Medium | The `DRAFT`/`STAGED`/`LIVE` publish mode is stored but not enforced at the public API layer | Phase 4 task: check `websitePublishMode` in `resolveTenantFromRequest()` and reject or limit responses for non-LIVE tenants |
+| Open | Website Integration | `websiteLastPublishedAt` not yet updated automatically on publish actions | Medium | The field exists but is not written by the current publishing workflow | Phase 4: update `websiteLastPublishedAt` on every successful publish action across all content types |
+| Open | Website Integration | No dedicated `WEBSITE_MANAGE` permission assigned by default to admin roles in seed | Low | Currently relying on manually assigned roles; a default assignment should be in the seed | Add `WEBSITE_MANAGE` to the default admin role seed in `prisma/seed.ts` |
 | Open | Mobile Backend | Mobile auth token strategy is undecided | High | NextAuth cookie-based sessions are unsuitable for native mobile clients; a separate token flow (JWT + refresh) is needed | Decide before Epic 4 begins; document in an ADR |
 | Open | InfoBoard | Weather provider is undecided | Medium | InfoBoard weather tile cannot be implemented until a provider is chosen | Candidates: OpenWeatherMap, MeteoSwiss, Open-Meteo; decision needed before Phase 5 |
 | Open | Mobile App | Push notification provider is undecided | High | Cannot implement push infrastructure until provider is chosen | Candidates: Firebase FCM, Apple APNs direct, OneSignal, Expo Push; decision needed before Epic 4 |

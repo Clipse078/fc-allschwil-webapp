@@ -115,11 +115,18 @@ Each layer depends on all layers above it being stable and multi-tenant-safe.
 
 **Provides:** Approved, published content accessible via `/api/public/v1/**` — the content supply for the public website
 
+**Website Management Foundation complete (2026-06-25):**
+- `WebsitePublishMode` enum (`DRAFT`, `STAGED`, `LIVE`) on `Tenant`
+- Extended `Tenant` website configuration: `websiteBaseUrl`, `websitePrimaryLanguage`, `websitePublishMode`, `websiteLastPublishedAt`, `websiteCacheStrategy`
+- `/dashboard/website` overview page with status, publishing controls, public API overview, content area cards
+- Extended `WebsiteSettingsForm` and `/api/website-settings` (GET/PATCH) with all new fields
+- `WEBSITE_MANAGE` permission guards all settings mutations
+
 **Consumers:**
 - Public website (separate Next.js deployment)
 - InfoBoard (news and event data)
 
-**Key constraint:** Only content with `approvedDataOnly` flag respected and publishing status = Published may be delivered. Cache revalidation mechanism must be resolved (see `03-technical-debt.md`).
+**Key constraint:** Only content with `approvedDataOnly` flag respected and publishing status = Published may be delivered. Cache revalidation mechanism must be resolved (see `03-technical-debt.md`). `websitePublishMode` is stored but not yet enforced on public routes — Phase 4 task.
 
 ---
 

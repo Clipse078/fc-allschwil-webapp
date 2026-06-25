@@ -38,7 +38,7 @@ The following foundations have been built on the `STAGE` branch and are in an ac
 | Initiatives foundation | Largely implemented | `Initiative` model; Vereinsleitung pages and APIs; visibility scopes (Organisation, Restricted, Private) |
 | Tenant branding architecture | Largely implemented | `Tenant` model carries `logoUrl`, `primaryColor`, `secondaryColor`; CSS variables injected in admin shell layout; Vercel Blob asset storage |
 | Multi-tenant direction | Foundation in place | `tenantId` on `User`; tenant runtime (`lib/tenant-runtime/`); tenant cockpit; public feeds carry tenant context. **Assumption:** full cross-tenant isolation has not been independently verified on all public API routes — known TODO comments exist in `app/api/public/events/route.ts` and related files |
-| Website CMS foundation | Largely implemented | `NewsArticle`, `WebsitePage`, `MediaAsset` models; editorial workflow (Draft → In Review → Scheduled → Published → Archived); admin pages for news, pages, media, publishing, settings |
+| Website CMS foundation | **Foundation v1 + Website Management Foundation complete** | `NewsArticle`, `WebsitePage`, `MediaAsset` models; editorial workflow (Draft → In Review → Scheduled → Published → Archived); admin pages for news, pages, media, publishing, settings. **Website Management Foundation (2026-06-25):** `WebsitePublishMode` enum; `websiteBaseUrl`, `websitePrimaryLanguage`, `websitePublishMode`, `websiteLastPublishedAt`, `websiteCacheStrategy` on `Tenant`; `/dashboard/website` overview page; extended settings form and API. Migration: `20260625100000_website_management_foundation`. |
 | Planner foundation | Largely implemented | `Event`, `Facility`, `FacilityResource`, `WochenplanPublication` models; conflict engine (`lib/wochenplan/conflict-engine.ts`); wochenplan admin pages and public feed |
 | Infoboard foundation | Largely implemented | `InfoboardDisplay` component; public `/infoboard` route; admin infoboard pages; `/api/public/infoboard` |
 | Public API surface | Largely implemented | `/api/public/events`, `/api/public/infoboard`, `/api/public/wochenplan`, `/api/public/v1/website/news/**`, `/api/public/v1/website/pages/**` |
@@ -442,6 +442,7 @@ This checklist is the day-to-day progress tracker. Check items off as they reach
 - [x] Website CMS foundation (news, pages, media models & admin UI)
 - [x] Editorial workflow (Draft → In Review → Scheduled → Published → Archived)
 - [x] Public API v1 surface (news and pages feeds)
+- [x] Website Management Foundation (`/dashboard/website` overview; `WebsitePublishMode`; extended tenant settings; publishing controls; public API overview; content area cards)
 - [ ] Unified website data API
 - [ ] News publishing (full lifecycle, website-ready)
 - [ ] Team publishing
