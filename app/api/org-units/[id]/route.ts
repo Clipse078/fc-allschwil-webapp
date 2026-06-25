@@ -114,6 +114,11 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const validTypes = Object.values(OrgUnitType);
   const validStatuses = Object.values(OrgUnitStatus);
 
+  // Restore guard: when status changes away from ARCHIVED, clear archivedAt.
+  const newStatus: OrgUnitStatus | undefined = validStatuses.includes(body?.status)
+    ? body.status
+    : undefined;
+
   // parentId: undefined = body did not include it (no change), null = make root, string = set parent
   const parentIdInBody = body !== null && typeof body === "object" && "parentId" in body;
   const parentIdRaw = parentIdInBody ? body.parentId : undefined;
@@ -199,11 +204,17 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
         name: body?.name?.trim() || undefined,
         description: body?.description?.trim() || null,
         type: validTypes.includes(body?.type) ? body.type : undefined,
-        status: validStatuses.includes(body?.status) ? body.status : undefined,
+        status: newStatus,
+        // Clear archivedAt when restoring from ARCHIVED; set when archiving via status change.
+        ...(newStatus !== undefined && newStatus !== "ARCHIVED"
+          ? { archivedAt: null }
+          : newStatus === "ARCHIVED"
+            ? { archivedAt: new Date() }
+            : {}),
         sortOrder: body?.sortOrder !== undefined ? Number(body.sortOrder) : undefined,
         ...(newParentId !== undefined ? { parentId: newParentId, level: newLevel } : {}),
       },
-      select: { id: true, key: true, name: true, type: true, status: true, level: true, parentId: true },
+      select: { id: true, key: true, name: true, type: true, status: true, level: true, parentId: true, archivedAt: true },
     });
 
     // Cascade level update to all descendants when the level changed.
@@ -241,7 +252,10 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Organisationseinheiten mit Untereinheiten können nicht gelöscht werden. Bitte Untereinheiten zuerst entfernen oder archivieren." }, { status: 409 });
   }
 
-  await prisma.orgUnit.update({ where: { id }, data: { status: OrgUnitStatus.ARCHIVED } });
+  await prisma.orgUnit.update({
+    where: { id },
+    data: { status: OrgUnitStatus.ARCHIVED, archivedAt: new Date() },
+  });
   revalidatePath("/dashboard/org-units");
   return NextResponse.json({ message: "Organisationseinheit wurde archiviert." });
 }

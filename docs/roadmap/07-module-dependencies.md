@@ -39,7 +39,9 @@ Each layer depends on all layers above it being stable and multi-tenant-safe.
 
 **Depends on:** Authentication, Roles & Permissions (RBAC system)
 
-**Provides:** `OrgUnit`, `OrgUnitMembership`, `TargetGroup` — the structural backbone for all groupings within a club
+**Provides:** `OrgUnit` (with `archivedAt`), `OrgUnitMembership`, `TargetGroup` — the structural backbone for all groupings within a club. Foundation v1 complete: CRUD, hierarchy management, archive/restore, tenant isolation, membership management.
+
+**Phase 2 (pending):** Organisation-based permission checks — `ActorContext.orgUnitIds` wired to permission guards; `visibleOrgUnitRefs` checks in `canSeeEntity()`. See `TODO(Phase 2)` comment in `/dashboard/org-units/page.tsx`.
 
 **Consumers:** People (person-to-org-unit membership), Vereinsleitung governance, Sponsor portal (post-v1), Volunteer management (post-v1)
 

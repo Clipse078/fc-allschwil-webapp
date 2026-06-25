@@ -45,6 +45,7 @@ The following ordered phases define how v1.0 will be delivered. Each phase must 
 - Tenant branding architecture (`logoUrl`, `primaryColor`, `secondaryColor`, CSS variables)
 - Audit logging (`AuditLog` model)
 - Impersonation support
+- **Org Builder Foundation v1 (2026-06-25):** `archivedAt` timestamp on `OrgUnit`; archived units view with tab toggle; `OrgUnitRestoreButton`; `POST /api/org-units/[id]/restore` endpoint; `getArchivedOrgUnits` query; `EmptyActive`/`EmptyArchived` states. Migration: `20260625000000_org_unit_archived_at`.
 
 **Status:** Largely complete — see Current Platform Status in `sportclubevo-v1-master-backlog.md` for precise per-item status
 

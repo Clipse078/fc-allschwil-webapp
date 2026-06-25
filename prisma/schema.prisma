@@ -934,6 +934,9 @@ model OrgUnit {
   description String?
   sortOrder   Int           @default(0)
   level       Int           @default(0)
+  // Org Builder Foundation v1: archivedAt records when a unit was archived.
+  // Null when not archived. Set by the archive action; cleared on restore.
+  archivedAt  DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
