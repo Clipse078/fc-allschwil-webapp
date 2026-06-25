@@ -1,3 +1,8 @@
+> **Part of the SportClubEvo roadmap documentation set.**  
+> Start with [`docs/roadmap/README.md`](./README.md) for the full index, or [`docs/roadmap/00-product-blueprint.md`](./00-product-blueprint.md) for the product vision and locked decisions.
+
+---
+
 # SportClubEvo v1.0 Master Backlog
 
 > **Document type:** Living planning document  
