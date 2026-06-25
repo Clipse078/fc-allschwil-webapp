@@ -14,6 +14,10 @@
  * Phase 1 Core: person-based memberships — when personId is provided, org
  * unit memberships linked via personId are also included in orgUnitIds.
  *
+ * Phase 2 (org-based permissions): archived org unit filter — memberships
+ * pointing to archived org units are excluded from ActorContext so archived
+ * units never grant visibility or access.
+ *
  * TODO: cache orgUnitIds in JWT at login time to avoid a DB query on every
  *   request. Until then, this is called lazily in routes that need it.
  */
@@ -156,6 +160,12 @@ export async function getOrgUnitById(id: string) {
  *   memberships do not grant visibility access.
  * - Includes person-based memberships when personId is provided.
  *
+ * Phase 2 (org-based permissions):
+ * - Excludes memberships pointing to archived org units. When an OrgUnit is
+ *   archived (status: "ARCHIVED"), it must no longer grant visibility or access
+ *   to any entity via visibleOrgUnitRefs. Only non-archived org units propagate
+ *   membership into ActorContext.
+ *
  * When tenantId is provided, only memberships for that tenant are returned,
  * preventing cross-tenant memberships from entering ActorContext.
  * When tenantId is omitted, all active memberships are returned (safe for
@@ -169,15 +179,17 @@ export async function loadOrgUnitIds(
   const now = new Date();
   const tenantFilter = tenantId !== undefined ? { tenantId } : {};
   const expiryFilter = { OR: [{ endsAt: null }, { endsAt: { gt: now } }] };
+  // Exclude memberships for archived org units — archived units must not grant visibility.
+  const activeOrgUnitFilter = { orgUnit: { status: { not: "ARCHIVED" as const } } };
 
   const [userMemberships, personMemberships] = await Promise.all([
     prisma.orgUnitMembership.findMany({
-      where: { userId, status: "ACTIVE", ...tenantFilter, ...expiryFilter },
+      where: { userId, status: "ACTIVE", ...tenantFilter, ...expiryFilter, ...activeOrgUnitFilter },
       select: { orgUnitId: true },
     }),
     personId
       ? prisma.orgUnitMembership.findMany({
-          where: { personId, status: "ACTIVE", ...tenantFilter, ...expiryFilter },
+          where: { personId, status: "ACTIVE", ...tenantFilter, ...expiryFilter, ...activeOrgUnitFilter },
           select: { orgUnitId: true },
         })
       : Promise.resolve([]),

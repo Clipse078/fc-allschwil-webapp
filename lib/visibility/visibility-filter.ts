@@ -18,6 +18,26 @@
  *   are NOT returned (the DB WHERE clause excludes them). This is documented
  *   as a safe conservative default — fix in Phase 2 with a JSONB @> query.
  *
+ * Phase 2 (org-based permissions) — IMPLEMENTED:
+ *   - canSeeEntity() already checked visibleOrgUnitRefs against actor.orgUnitIds.
+ *   - loadOrgUnitIds() now excludes memberships to archived org units, so
+ *     ActorContext.orgUnitIds is always clean.
+ *   - canAccessOrgUnit() added in lib/visibility/org-unit-access.ts for route guards.
+ *
+ * Manual validation scenarios:
+ *   1. User WITH active membership in org unit X:
+ *      → canSeeEntity({ visibilityScope: RESTRICTED, visibleOrgUnitRefs: [X.id] }, actor) === true ✓
+ *   2. User WITHOUT membership in org unit X:
+ *      → canSeeEntity({ visibilityScope: RESTRICTED, visibleOrgUnitRefs: [X.id] }, actor) === false ✓
+ *   3. Admin (ORG_MANAGE permission):
+ *      → canAccessOrgUnit(anyId, actor) === true ✓
+ *      → ORGANISATION-scoped entities always visible ✓
+ *   4. Archived org unit membership:
+ *      → loadOrgUnitIds() excludes archived org units → actor.orgUnitIds does NOT contain X.id
+ *      → canSeeEntity() returns false for visibleOrgUnitRefs: [X.id] ✓
+ *   5. Cross-tenant membership:
+ *      → loadOrgUnitIds(userId, tenantId) scopes to tenant → no cross-tenant leakage ✓
+ *
  * 404-masking principle:
  *   When an actor requests a record they cannot see, callers must return null
  *   (rendered as "not found"), NOT a 403 — to avoid disclosing the record's
