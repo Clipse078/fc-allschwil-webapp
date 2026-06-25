@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import {
   ArrowLeft,
   Building2,
@@ -12,12 +12,12 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
-import { hasPermission } from "@/lib/permissions/has-permission";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { auth } from "@/auth";
 import { getOrgUnitById } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import { prisma } from "@/lib/db/prisma";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
+import { canAccessOrgUnit, canManageOrgUnit } from "@/lib/visibility/org-unit-access";
 import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
 import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
 import OrgUnitArchiveButton from "@/components/admin/org/OrgUnitArchiveButton";
@@ -26,6 +26,9 @@ import OrgUnitRestoreButton from "@/components/admin/org/OrgUnitRestoreButton";
 // Slice 11.2b: tenant resolved from session-carried tenantId.
 // Slice 11.5: sibling sort controls and parent breadcrumb added.
 // Slice 12.3: archive button added to danger zone in sidebar.
+// Phase 2 (org-based permissions): access now granted to ORG_VIEW/ORG_MANAGE holders
+// OR to active members of this specific org unit (canAccessOrgUnit). Write actions
+// (edit, archive, restore) still require ORG_MANAGE.
 
 const TYPE_LABELS: Record<string, string> = {
   CLUB: "Verein",
@@ -67,8 +70,20 @@ function getInitials(name: string): string {
 }
 
 export default async function OrgUnitDetailPage({ params }: PageProps) {
-  const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+
   const { id } = await params;
+
+  // Phase 2: build actor context to check org-unit membership in addition to permissions.
+  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+
+  // Access check: global ORG_VIEW/ORG_MANAGE permission OR active member of this specific unit.
+  // canAccessOrgUnit() is narrow: belonging to unit X never grants access to unit Y.
+  if (!canAccessOrgUnit(id, actor)) {
+    redirect("/dashboard");
+  }
+
   const [unit, tenant, roles, seasons] = await Promise.all([
     getOrgUnitById(id),
     getTenantFromSession(session.user?.tenantId),
@@ -118,7 +133,8 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   const initials = getInitials(unit.name);
   const memberCount = unit.memberships.length;
   const childCount = unit.children.length;
-  const canManage = hasPermission(session, PERMISSIONS.ORG_MANAGE);
+  // Write access requires ORG_MANAGE — membership-based access is read-only.
+  const canManage = canManageOrgUnit(actor);
   const canArchive = canManage && unit.status !== "ARCHIVED" && childCount === 0;
   const canRestore = canManage && unit.status === "ARCHIVED";
 

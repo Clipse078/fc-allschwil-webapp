@@ -44,9 +44,10 @@ export default async function OrgUnitsPage({ searchParams }: PageProps) {
         }
       />
 
-      {/* TODO(Phase 2): Replace with organization-based permission checks once
-          the permission system is linked to org unit membership. Currently uses
-          the existing admin/authorized access pattern (ORG_VIEW / ORG_MANAGE). */}
+      {/* Phase 2 (org-based permissions) implemented: the detail page now grants
+          access to active members of each org unit via canAccessOrgUnit().
+          This list page retains ORG_VIEW / ORG_MANAGE as the module-level gate
+          (browsing the full list is an admin operation, not a member operation). */}
 
       <OrgUnitSearchableList
         orgUnits={orgUnits}
