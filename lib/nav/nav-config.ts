@@ -110,7 +110,7 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         key: "website",
         label: "Website",
-        href: "/dashboard/website/publishing",
+        href: "/dashboard/website",
         permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
         children: [
           {
