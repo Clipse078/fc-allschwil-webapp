@@ -12,6 +12,16 @@ enum TenantStatus {
   ARCHIVED
 }
 
+// Website Management Foundation — publish mode for the tenant's public website.
+// DRAFT  = website content is not yet promoted to public.
+// STAGED = content is ready for review / QA; not fully live to all visitors.
+// LIVE   = website is fully live and public.
+enum WebsitePublishMode {
+  DRAFT
+  STAGED
+  LIVE
+}
+
 enum NewsArticleStatus {
   DRAFT
   IN_REVIEW
@@ -358,6 +368,19 @@ model Tenant {
   //   is surfaced on the public website feed. Defaults false for backward-compat.
   websiteEnabled   Boolean @default(true)
   approvedDataOnly Boolean @default(false)
+
+  // Website Management Foundation — extended configuration fields.
+  // websiteBaseUrl: public-facing base URL for the tenant's website (e.g. "https://fc-allschwil.ch").
+  // websitePrimaryLanguage: BCP 47 language tag for the website default language (e.g. "de", "fr").
+  // websitePublishMode: current publish mode — DRAFT / STAGED / LIVE.
+  // websiteLastPublishedAt: timestamp of the most recent publish action (any content type).
+  // websiteCacheStrategy: hint for cache/revalidation strategy (e.g. "ISR", "on-demand", "disabled").
+  //   Placeholder — not enforced at the API layer yet; reserved for Phase 4 cache integration.
+  websiteBaseUrl            String?             @db.VarChar(2048)
+  websitePrimaryLanguage    String?             @db.VarChar(10)
+  websitePublishMode        WebsitePublishMode  @default(DRAFT)
+  websiteLastPublishedAt    DateTime?
+  websiteCacheStrategy      String?             @db.VarChar(64)
 
   registrations          Registration[]
   users                  User[]

@@ -39,6 +39,13 @@ const tenantContextSelect = {
   secondaryColor: true,
   // Website feature flags
   approvedDataOnly: true,
+  websiteEnabled: true,
+  // Website Management Foundation — extended website configuration.
+  websiteBaseUrl: true,
+  websitePrimaryLanguage: true,
+  websitePublishMode: true,
+  websiteLastPublishedAt: true,
+  websiteCacheStrategy: true,
 } as const;
 
 export type TenantContext = {
@@ -60,8 +67,15 @@ export type TenantContext = {
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
-  // Website flags — false by default (backward-compatible).
+  // Website flags — false / default by default (backward-compatible).
+  websiteEnabled: boolean;
   approvedDataOnly: boolean;
+  // Website Management Foundation — extended website configuration.
+  websiteBaseUrl: string | null;
+  websitePrimaryLanguage: string | null;
+  websitePublishMode: "DRAFT" | "STAGED" | "LIVE";
+  websiteLastPublishedAt: Date | null;
+  websiteCacheStrategy: string | null;
 };
 
 /**
