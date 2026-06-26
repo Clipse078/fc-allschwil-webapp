@@ -11,6 +11,12 @@ export type PublicEventSurface =
 
 export type GetPublicEventsInput = {
   surface: PublicEventSurface;
+  /**
+   * When provided, restricts results to events belonging to this tenant.
+   * New website endpoints MUST always supply this. Legacy routes may omit it
+   * for backward compatibility (single-tenant fallback path).
+   */
+  tenantId?: string | null;
   seasonKey?: string | null;
   teamSlug?: string | null;
   dateFrom?: string | null;
@@ -179,6 +185,10 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
     },
   };
 
+  if (input.tenantId) {
+    where.tenantId = input.tenantId;
+  }
+
   if (input.seasonKey) {
     where.season = {
       key: input.seasonKey,
@@ -313,10 +323,9 @@ export async function getGroupedWochenplan(input: Omit<GetPublicEventsInput, "su
   return Array.from(grouped.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export type GetInfoboardFeedInput = Omit<GetPublicEventsInput, "surface"> & {
-  /** Tenant ID for facility/resource label resolution. Falls back to static FCA registry when absent. */
-  tenantId?: string | null;
-};
+// tenantId is inherited from GetPublicEventsInput and is used both for event
+// scoping and for facility/resource label resolution via batchGetEventAllocationDisplayForTenant.
+export type GetInfoboardFeedInput = Omit<GetPublicEventsInput, "surface">;
 
 export async function getInfoboardFeed(input: GetInfoboardFeedInput) {
   const events = await getPublicEvents({

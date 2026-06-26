@@ -80,6 +80,19 @@ export async function resolveTenantFromRequest(
   return getDefaultTenantForWebsiteFeed();
 }
 
+/**
+ * Resolves the active tenant for a public website feed request using a
+ * path-segment tenant slug (e.g. from `/api/public/[tenant]/website/*` routes).
+ *
+ * Returns null when the tenant does not exist or is not ACTIVE.
+ * Callers MUST return 404 when this returns null.
+ */
+export async function resolveTenantFromParams(
+  tenantSlug: string,
+): Promise<WebsiteFeedTenant | null> {
+  return getActiveTenantForWebsiteFeed(tenantSlug);
+}
+
 // ---------------------------------------------------------------------------
 // Website-enabled guard
 // ---------------------------------------------------------------------------
