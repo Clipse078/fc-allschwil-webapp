@@ -28,6 +28,9 @@ export const CMS_ROUTES = {
   // ── Review ─────────────────────────────────────────────────────────────────
   review: "/dashboard/website/review",
 
+  // ── Structure ──────────────────────────────────────────────────────────────
+  navigation: "/dashboard/website/navigation",
+
   // ── Configuration ──────────────────────────────────────────────────────────
   settings: "/dashboard/website/settings",
 } as const;

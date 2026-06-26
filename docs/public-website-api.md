@@ -28,6 +28,7 @@
    - [GET /api/public/[tenant]/website/teams/[slug]](#get-apipublictenantwebsiteteamsslug)
    - [GET /api/public/[tenant]/website/weekplan](#get-apipublictenantwebsiteweekplan)
    - [GET /api/public/[tenant]/website/homepage](#get-apipublictenantwebsitehomepage)
+   - [GET /api/public/[tenant]/website/navigation](#get-apipublictenantwebsitenavigation)
 9. [Endpoints (v1 — header-based tenant, legacy)](#endpoints-v1--header-based-tenant-legacy)
 10. [Type Reference](#type-reference)
 11. [Duplication Audit](#duplication-audit)
@@ -1136,9 +1137,106 @@ AND (publishStatus = "PUBLISHED" OR scheduledPublishAt <= now())
 - Email/push notifications for review/approval events
 - Full role-based reviewer assignment workflow
 - Background scheduler worker for scheduled publishing
-- Navigation management
+- Navigation management (implemented in CMS V2 Slice 7 — see below)
 - Redirect management
 - Block version history
+
+---
+
+## Navigation API (CMS V2 Slice 7)
+
+### GET /api/public/[tenant]/website/navigation
+
+Returns the visible navigation tree for the tenant, grouped by area.
+
+**URL**: `GET /api/public/{tenant}/website/navigation`
+
+**Example**: `GET /api/public/fc-allschwil/website/navigation`
+
+**Authentication**: None (public, read-only).
+
+**Error responses**:
+- `404` — tenant not found or not ACTIVE
+- `403` — `websiteEnabled = false` for this tenant
+
+**Response envelope**: Standard `WebsiteResponseEnvelope<NavigationData>`.
+
+**Response example**:
+
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-06-26T20:00:00.000Z",
+  "data": {
+    "areas": {
+      "header": [
+        {
+          "id": "clxxx...",
+          "parentId": null,
+          "area": "HEADER",
+          "label": "Startseite",
+          "linkType": "INTERNAL",
+          "href": "/",
+          "target": "SELF",
+          "sortOrder": 0,
+          "children": []
+        },
+        {
+          "id": "clyyy...",
+          "parentId": null,
+          "area": "HEADER",
+          "label": "Teams",
+          "linkType": "INTERNAL",
+          "href": "/teams",
+          "target": "SELF",
+          "sortOrder": 2,
+          "children": [
+            {
+              "id": "clzzz...",
+              "parentId": "clyyy...",
+              "area": "HEADER",
+              "label": "1. Mannschaft",
+              "linkType": "INTERNAL",
+              "href": "/teams/1-mannschaft",
+              "target": "SELF",
+              "sortOrder": 0,
+              "children": []
+            }
+          ]
+        }
+      ],
+      "footer": [
+        {
+          "id": "claaa...",
+          "parentId": null,
+          "area": "FOOTER",
+          "label": "Impressum",
+          "linkType": "INTERNAL",
+          "href": "/impressum",
+          "target": "SELF",
+          "sortOrder": 3,
+          "children": []
+        }
+      ],
+      "utility": []
+    }
+  },
+  "meta": { "total": 8 }
+}
+```
+
+**Privacy invariants**:
+- `tenantId` — **never** exposed
+- `createdAt` / `updatedAt` — **never** exposed
+- `visibilityMode` — **never** exposed (admin-only)
+- Only `isVisible=true` items are returned
+- `parentId` is intentionally included for client-side hierarchy reconstruction
+
+**Filter rules**:
+- `isVisible = true` only
+- All areas (HEADER, FOOTER, UTILITY) always present in response (may be empty arrays)
+- Items ordered by `sortOrder ASC` within each parent/area group
 
 ---
 

@@ -14,6 +14,7 @@ import {
   PenLine,
   Plus,
   Blocks,
+  Menu,
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -279,6 +280,14 @@ export default async function WebsiteCmsOverviewPage() {
               sub: `${BLOCK_REGISTRY.length} Block-Typen`,
               color: "#0EA5E9",
               bg: "rgba(14,165,233,0.08)",
+            },
+            canManageWebsite && {
+              href: CMS_ROUTES.navigation,
+              icon: <Menu className="h-5 w-5" />,
+              label: "Navigation",
+              sub: "Menüstruktur verwalten",
+              color: "#0EA5E9",
+              bg: "rgba(14,165,233,0.06)",
             },
             (canManageNews || canManageWebsite) && {
               href: CMS_ROUTES.media,

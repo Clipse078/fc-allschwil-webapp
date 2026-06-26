@@ -138,6 +138,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
           },
           {
+            key: "website-navigation",
+            label: "Navigation",
+            href: "/dashboard/website/navigation",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
             key: "website-blocks",
             label: "Block-Bibliothek",
             href: "/dashboard/website/blocks",

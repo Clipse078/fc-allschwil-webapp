@@ -108,7 +108,8 @@ export const CMS_SECTIONS: CmsSection[] = [
         key: "navigation",
         label: "Navigation",
         description: "Menüstruktur und Seitenbaum der Website konfigurieren.",
-        status: "coming_next",
+        status: "foundation",
+        href: CMS_ROUTES.navigation,
         requiredPermissions: ["website.manage"],
       },
       {

@@ -371,6 +371,7 @@ model Tenant {
   newsArticleMedia       NewsArticleMedia[]
   websitePages           WebsitePage[]
   homepageSections       HomepageSection[]
+  websiteNavItems        WebsiteNavItem[]
 
   @@index([status])
   @@index([name])
@@ -1575,4 +1576,75 @@ model HomepageSection {
   @@index([tenantId, isEnabled, publishStatus])
   @@index([scheduledPublishAt])
   @@index([tenantId, approvalStatus])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteNavItem — Tenant-managed website navigation items (CMS V2 Slice 7)
+//
+// Each tenant owns an ordered set of navigation items that define the structure
+// of their website menus. Items are organised by:
+//   - area:     HEADER | FOOTER | UTILITY — which menu area the item belongs to
+//   - parentId: nullable self-reference for multi-level hierarchy
+//   - sortOrder: display position within the same parent/area
+//
+// Link types:
+//   - INTERNAL  — WebApp-relative path (e.g. /news)
+//   - EXTERNAL  — Fully-qualified URL (https://...)
+//   - CUSTOM    — Arbitrary string (anchor, fragment, etc.)
+//
+// Visibility:
+//   - isVisible: primary gate — false means hidden from public API
+//   - visibilityMode: ALWAYS | AUTHENTICATED | ANONYMOUS
+//     Default ALWAYS. AUTHENTICATED/ANONYMOUS modes are foundation-level;
+//     the public API currently respects only isVisible=true.
+//
+// Circular reference prevention and cross-tenant parent checks are enforced
+// at the application layer (admin-queries.ts), not the DB layer.
+//
+// Public endpoint: GET /api/public/[tenant]/website/navigation
+//   Returns only items where isVisible=true, ordered by area + parent + sortOrder.
+//   Admin fields (createdAt, updatedAt, tenantId, visibilityMode) are never exposed.
+//
+// Future deferred work:
+//   - ROLE_BASED visibility with requiredPermission
+//   - pageId FK to WebsitePage
+//   - Drag-and-drop reordering
+//   - Mega menu / visual menu builder
+// ---------------------------------------------------------------------------
+
+model WebsiteNavItem {
+  id             String    @id @default(cuid())
+  tenantId       String
+  /// Nullable self-reference: null = top-level item in its area.
+  parentId       String?
+  /// Menu area. One of: "HEADER" | "FOOTER" | "UTILITY"
+  area           String
+  /// Display label for this navigation item.
+  label          String
+  /// Link type. One of: "INTERNAL" | "EXTERNAL" | "CUSTOM"
+  linkType       String    @default("INTERNAL")
+  /// URL or path for this item. Null for non-linking parent items.
+  href           String?
+  /// Link target. One of: "SELF" | "BLANK". Default SELF.
+  target         String    @default("SELF")
+  /// Display order within the same parent/area (ascending, 0-based).
+  sortOrder      Int       @default(0)
+  /// Primary visibility gate. false = hidden from public API.
+  isVisible      Boolean   @default(true)
+  /// Visibility mode. One of: "ALWAYS" | "AUTHENTICATED" | "ANONYMOUS".
+  /// Foundation-level: public API currently only filters by isVisible.
+  visibilityMode String    @default("ALWAYS")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  parent   WebsiteNavItem?  @relation("NavItemChildren", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children WebsiteNavItem[] @relation("NavItemChildren")
+
+  @@index([tenantId])
+  @@index([tenantId, area])
+  @@index([tenantId, area, parentId])
+  @@index([tenantId, area, parentId, sortOrder])
+  @@index([tenantId, isVisible])
+  @@index([parentId])
 }
