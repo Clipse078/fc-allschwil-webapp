@@ -14,6 +14,8 @@ export type NavItemChild = {
   label: string;
   href: string;
   permissionKeys?: PermissionKey[];
+  /** One-line description used in overview/hub pages. Not rendered in the sidebar. */
+  description?: string;
 };
 
 export type NavItem = {
@@ -118,30 +120,35 @@ export const NAV_SECTIONS: NavSection[] = [
             label: "News",
             href: "/dashboard/website/news",
             permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+            description: "Newsartikel erstellen, prüfen und veröffentlichen.",
           },
           {
             key: "website-pages",
             label: "Seiten",
             href: "/dashboard/website/pages",
             permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+            description: "Statische Website-Seiten erstellen und bearbeiten.",
           },
           {
             key: "website-media",
             label: "Medien",
             href: "/dashboard/website/media",
             permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+            description: "Bilder und Videos hochladen und verwalten.",
           },
           {
             key: "website-publishing",
             label: "Veröffentlichungen",
             href: "/dashboard/website/publishing",
             permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
+            description: "Inhalte prüfen, freigeben, planen und publizieren.",
           },
           {
             key: "website-settings",
             label: "Einstellungen",
             href: "/dashboard/website/settings",
             permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+            description: "Website-Konfiguration und Veröffentlichungsmodus.",
           },
         ],
       },
