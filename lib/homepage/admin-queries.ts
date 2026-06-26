@@ -18,6 +18,18 @@ import {
 } from "@/lib/homepage/section-types";
 
 // ---------------------------------------------------------------------------
+// Publishing constants
+// ---------------------------------------------------------------------------
+
+/** Valid publish status values for HomepageSection. */
+export const PUBLISH_STATUS = {
+  DRAFT: "DRAFT",
+  PUBLISHED: "PUBLISHED",
+} as const;
+
+export type PublishStatus = (typeof PUBLISH_STATUS)[keyof typeof PUBLISH_STATUS];
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -29,6 +41,11 @@ export type HomepageSectionAdminItem = {
   sortOrder: number;
   isEnabled: boolean;
   config: HomepageSectionConfig;
+  publishStatus: PublishStatus;
+  publishedAt: Date | null;
+  unpublishedAt: Date | null;
+  lastPublishedAt: Date | null;
+  scheduledPublishAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -45,6 +62,11 @@ const adminSelect = {
   sortOrder: true,
   isEnabled: true,
   config: true,
+  publishStatus: true,
+  publishedAt: true,
+  unpublishedAt: true,
+  lastPublishedAt: true,
+  scheduledPublishAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -97,6 +119,9 @@ export async function bootstrapDefaultSections(
       sortOrder: s.sortOrder,
       isEnabled: s.isEnabled,
       config: s.config,
+      // New sections bootstrapped via admin start as DRAFT to require explicit
+      // publish action, giving admins a chance to configure before going live.
+      publishStatus: PUBLISH_STATUS.DRAFT,
     })),
     skipDuplicates: true,
   });
@@ -233,4 +258,104 @@ export async function getHomepageSectionById(
     select: adminSelect,
   });
   return row as HomepageSectionAdminItem | null;
+}
+
+// ---------------------------------------------------------------------------
+// Publish / Unpublish / Schedule
+// ---------------------------------------------------------------------------
+
+/**
+ * Publishes a homepage section.
+ * Sets publishStatus=PUBLISHED, records publishedAt and lastPublishedAt.
+ * Clears any pending scheduledPublishAt (the section is already live).
+ *
+ * Returns the updated section, or null if not found / different tenant.
+ */
+export async function publishHomepageSection(
+  tenantId: string,
+  id: string,
+): Promise<HomepageSectionAdminItem | null> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const now = new Date();
+  const updated = await prisma.homepageSection.update({
+    where: { id },
+    data: {
+      publishStatus: PUBLISH_STATUS.PUBLISHED,
+      publishedAt: now,
+      lastPublishedAt: now,
+      // Clear any pending scheduled publish since we're publishing immediately
+      scheduledPublishAt: null,
+    },
+    select: adminSelect,
+  });
+  return updated as HomepageSectionAdminItem;
+}
+
+/**
+ * Unpublishes a homepage section.
+ * Sets publishStatus=DRAFT, records unpublishedAt.
+ * Retains lastPublishedAt for the audit trail.
+ *
+ * Returns the updated section, or null if not found / different tenant.
+ */
+export async function unpublishHomepageSection(
+  tenantId: string,
+  id: string,
+): Promise<HomepageSectionAdminItem | null> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.homepageSection.update({
+    where: { id },
+    data: {
+      publishStatus: PUBLISH_STATUS.DRAFT,
+      unpublishedAt: new Date(),
+      // Clear any pending scheduled publish when explicitly unpublishing
+      scheduledPublishAt: null,
+      // lastPublishedAt intentionally NOT cleared — preserved for audit trail
+    },
+    select: adminSelect,
+  });
+  return updated as HomepageSectionAdminItem;
+}
+
+/**
+ * Schedules a future publish for a homepage section.
+ * Sets publishStatus=DRAFT and scheduledPublishAt to the given future date.
+ * The public API will treat the section as published once scheduledPublishAt <= now().
+ *
+ * Constraints:
+ *   - scheduledPublishAt must be in the future (caller should validate).
+ *   - Section remains DRAFT until the scheduled time (or until manually published).
+ *
+ * Returns the updated section, or null if not found / different tenant.
+ */
+export async function scheduleHomepageSectionPublish(
+  tenantId: string,
+  id: string,
+  scheduledPublishAt: Date,
+): Promise<HomepageSectionAdminItem | null> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.homepageSection.update({
+    where: { id },
+    data: {
+      publishStatus: PUBLISH_STATUS.DRAFT,
+      scheduledPublishAt,
+    },
+    select: adminSelect,
+  });
+  return updated as HomepageSectionAdminItem;
 }

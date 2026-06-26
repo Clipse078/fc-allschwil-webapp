@@ -1077,18 +1077,39 @@ Returns the ordered list of enabled homepage sections for the tenant.
 - Config validation per block type (Zod strict schemas, `.strict()` mode)
 - See `docs/cms-block-library.md` for the full admin API and field reference.
 
+### Implemented in CMS V2 Slice 5
+
+- Publishing workflow foundation: `publishStatus` (DRAFT | PUBLISHED), `publishedAt`, `unpublishedAt`, `lastPublishedAt`, `scheduledPublishAt`
+- Public API now filters by `publishStatus = "PUBLISHED"` in addition to `isEnabled = true`
+- Scheduled publishing: sections with `scheduledPublishAt <= now()` treated as published
+- Admin publish/unpublish/schedule endpoints: `PATCH .../publish`, `.../unpublish`, `.../schedule`
+- Admin preview endpoint: `GET /api/homepage-sections/preview` (requires `WEBSITE_MANAGE`)
+- Backwards compatible: migration default `publishStatus = "PUBLISHED"` preserves existing visibility
+
+### Public API filtering (Slice 5 — updated)
+
+A section appears in `GET /api/public/[tenant]/website/homepage` if and only if:
+
+```
+isEnabled = true
+AND (publishStatus = "PUBLISHED" OR scheduledPublishAt <= now())
+```
+
+**Fields never exposed in public API** (Slice 5 additions):
+- `publishStatus`
+- `publishedAt`, `unpublishedAt`, `lastPublishedAt`, `scheduledPublishAt`
+
 ### Deferred work (intentionally out of scope)
 
 - Visual drag-and-drop builder
 - Rich text for `callToAction.body` (plain text only)
 - Sponsor model (backing the `sponsorsTeaser` type)
 - Block-based rich content editor (backing the `customContentPlaceholder` type)
-- Per-section scheduling / expiry
-- Preview / staging workflow for homepage sections
+- Review/approval workflow (four-eyes, assignment, `reviewStatus` field)
+- Background scheduler worker for scheduled publishing
 - Navigation management
 - Redirect management
 - Block version history
-- Per-block config schema validation (Zod)
 
 ---
 
@@ -1109,14 +1130,15 @@ All public website endpoints have full DB-level tenant isolation.
 | `/teams` | ✅ DB-scoped (`tenantId`) | ✅ `isActive=true`, `websiteVisible=true` | ✅ Yes |
 | `/teams/[slug]` | ✅ DB-scoped (`tenantId` in Team, Event, FacilityResource) | ✅ `isActive=true`, `websiteVisible=true`, `TeamSeason.status=ACTIVE` | ✅ Yes |
 | `/weekplan` | ✅ DB-scoped (`tenantId`) | ✅ `wochenplanVisible`, `websiteVisible` | ✅ Yes |
-| `/homepage` | ✅ DB-scoped (`tenantId`) | ✅ `isEnabled=true`, ordered by `sortOrder` | ✅ Yes |
+| `/homepage` | ✅ DB-scoped (`tenantId`) | ✅ `isEnabled=true`, `publishStatus=PUBLISHED` or `scheduledPublishAt<=now`, ordered by `sortOrder` | ✅ Yes |
 
-### Deploy checklist
+### Deploy checklist (Slice 5 — updated)
 
-1. Run `prisma migrate deploy` in STAGE (migration `20260626120000_homepage_sections`)
-2. Verify `GET /api/public/fc-allschwil/website/homepage` returns `{ sections: [] }` (empty until sections are bootstrapped via admin)
-3. Navigate to `/dashboard/website/homepage` and create default sections
-4. Re-verify `/api/public/fc-allschwil/website/homepage` returns enabled sections
+1. Run `prisma migrate deploy` in STAGE (migrations `20260626120000_homepage_sections` and `20260626150000_homepage_section_publish_workflow`)
+2. Verify `GET /api/public/fc-allschwil/website/homepage` returns only enabled+published sections
+3. Navigate to `/dashboard/website/homepage` and verify publish status badges are visible
+4. Test publish/unpublish actions on a section
 5. Verify unknown tenant returns 404
 6. Verify disabled sections are excluded
-7. Deploy to PROD, repeat verification
+7. Verify draft sections are excluded from public API
+8. Deploy to PROD, repeat verification

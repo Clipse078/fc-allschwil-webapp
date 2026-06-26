@@ -46,22 +46,27 @@ export default async function HomepageBuilderPage() {
               Homepage Builder Foundation
             </p>
             <p className="mt-1 text-xs text-[var(--text-2)]">
-              Diese Foundation stellt das Datenmodell, die Admin-Verwaltung und die
-              öffentliche API für konfigurierbare Homepage-Sektionen bereit.
-              Sektionen sind typisiert (Hero, News-Teaser, Events, Teams, Wochenplan,
-              CTA, Sponsoren) und können aktiviert, deaktiviert und umsortiert werden.
+              Homepage-Sektionen verwalten: aktivieren/deaktivieren, sortieren,
+              konfigurieren und veröffentlichen. Sektionen erscheinen in der
+              öffentlichen API, sobald sie <strong>aktiviert</strong> und{" "}
+              <strong>veröffentlicht</strong> sind.
             </p>
             <p className="mt-2 text-xs text-[var(--muted)]">
               Öffentliche API:{" "}
               <code className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-[11px]">
                 GET /api/public/[tenant]/website/homepage
               </code>
+              {" "}·{" "}
+              Admin-Vorschau:{" "}
+              <code className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-[11px]">
+                GET /api/homepage-sections/preview
+              </code>
             </p>
             <p className="mt-1.5 text-xs text-[var(--muted)]">
               Deferred:{" "}
               <span className="text-amber-600">
                 Visueller Editor · Drag-and-Drop · Rich-Config-Editor ·
-                Sponsor-Modell · Vorschau-Workflow
+                Sponsor-Modell · Vierstufige Freigabe · Zuweisung
               </span>
             </p>
           </div>

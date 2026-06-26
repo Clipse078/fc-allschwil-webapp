@@ -2,16 +2,21 @@
 
 ## CMS V2 Slice 3 — Homepage Block Library Foundation
 ## CMS V2 Slice 4 — Block Config Editor
+## CMS V2 Slice 5 — Publishing Workflow Foundation
 
 **Registry**: `lib/homepage/block-registry.ts`  
 **Config schemas**: `lib/homepage/config-schemas.ts`  
-**Admin config endpoint**: `PATCH /api/homepage-sections/[id]/config`
+**Admin config endpoint**: `PATCH /api/homepage-sections/[id]/config`  
+**Admin publish endpoint**: `PATCH /api/homepage-sections/[id]/publish`  
+**Admin unpublish endpoint**: `PATCH /api/homepage-sections/[id]/unpublish`  
+**Admin schedule endpoint**: `PATCH /api/homepage-sections/[id]/schedule`  
+**Admin preview endpoint**: `GET /api/homepage-sections/preview`
 
 ---
 
 ## Table of Contents
 
-1. [Architecture (Slice 3 + 4)](#architecture-slice-3--4)
+1. [Architecture (Slices 3–5)](#architecture-slices-35)
 2. [Block Registry Design](#block-registry-design)
 3. [Block Categories](#block-categories)
 4. [Block Status Values](#block-status-values)
@@ -26,30 +31,37 @@
    - [sponsorsTeaser](#sponsorsteaser-foundation-ready)
    - [customContentPlaceholder](#customcontentplaceholder-coming-next)
 7. [Admin API — Config Editor (Slice 4)](#admin-api--config-editor-slice-4)
-8. [Validation Rules](#validation-rules)
-9. [Config Validation Strategy](#config-validation-strategy)
-10. [Public Serialisation Strategy](#public-serialisation-strategy)
-11. [Admin Block Library UI (Slice 3)](#admin-block-library-ui-slice-3)
-12. [Navigation](#navigation)
-13. [Duplication Audit](#duplication-audit)
-14. [Deferred Future Work](#deferred-future-work)
+8. [Admin API — Publishing Workflow (Slice 5)](#admin-api--publishing-workflow-slice-5)
+9. [Validation Rules](#validation-rules)
+10. [Config Validation Strategy](#config-validation-strategy)
+11. [Public Serialisation Strategy](#public-serialisation-strategy)
+12. [Publishing Workflow Model](#publishing-workflow-model)
+13. [Preview Safety Model](#preview-safety-model)
+14. [Admin Block Library UI (Slice 3)](#admin-block-library-ui-slice-3)
+15. [Navigation](#navigation)
+16. [Duplication Audit](#duplication-audit)
+17. [Deferred Future Work](#deferred-future-work)
 
 ---
 
-## Architecture (Slice 3 + 4)
+## Architecture (Slices 3–5)
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | **Block registry** | `lib/homepage/block-registry.ts` | Single source of truth for all block metadata, configKeys, public projection |
 | **Config schemas** | `lib/homepage/config-schemas.ts` | Zod strict schemas per block type; `validateSectionConfig()` dispatch |
 | **Section types** | `lib/homepage/section-types.ts` | Thin adapter: DB type key constants + TS config shapes; derives arrays from registry |
-| **Admin queries** | `lib/homepage/admin-queries.ts` | Tenant-scoped CRUD for HomepageSection rows; `updateHomepageSection()` |
-| **Public feed** | `lib/homepage/public-homepage-feed.ts` | Enabled sections only; enriches with block metadata; projects config |
+| **Admin queries** | `lib/homepage/admin-queries.ts` | Tenant-scoped CRUD; publish/unpublish/schedule functions (Slice 5) |
+| **Public feed** | `lib/homepage/public-homepage-feed.ts` | Published+enabled sections only; enriches with block metadata; projects config |
 | **Admin API — list/bootstrap** | `/api/homepage-sections` | GET list, POST bootstrap |
 | **Admin API — toggle/move** | `/api/homepage-sections/[id]/toggle`, `.../move` | Toggle enabled, reorder |
 | **Admin API — config editor** | `/api/homepage-sections/[id]/config` | PATCH label + config (Slice 4) |
-| **Public API** | `/api/public/[tenant]/website/homepage` | Returns sections + block metadata |
-| **Admin UI — builder** | `/dashboard/website/homepage` | Toggle / reorder / inline config edit sections |
+| **Admin API — publish** | `/api/homepage-sections/[id]/publish` | PATCH publish section (Slice 5) |
+| **Admin API — unpublish** | `/api/homepage-sections/[id]/unpublish` | PATCH unpublish section (Slice 5) |
+| **Admin API — schedule** | `/api/homepage-sections/[id]/schedule` | PATCH schedule future publish (Slice 5) |
+| **Admin API — preview** | `/api/homepage-sections/preview` | GET all sections including drafts (admin-only, Slice 5) |
+| **Public API** | `/api/public/[tenant]/website/homepage` | Returns published+enabled sections + block metadata |
+| **Admin UI — builder** | `/dashboard/website/homepage` | Toggle / reorder / config edit / publish / unpublish / schedule sections |
 | **Admin UI — library** | `/dashboard/website/blocks` | Read-only block library overview |
 | **CMS hub** | `/dashboard/website` | Links to all CMS areas |
 | **Nav** | `lib/nav/nav-config.ts` | Sidebar entries |
@@ -429,6 +441,90 @@ Website
 
 ---
 
+## Admin API — Publishing Workflow (Slice 5)
+
+### `PATCH /api/homepage-sections/[id]/publish`
+
+Sets `publishStatus = "PUBLISHED"`, records `publishedAt` and `lastPublishedAt`, clears `scheduledPublishAt`.
+
+**Authentication**: Session cookie (`WEBSITE_MANAGE` required).  
+**Tenant isolation**: `tenantId` from session only.
+
+### `PATCH /api/homepage-sections/[id]/unpublish`
+
+Sets `publishStatus = "DRAFT"`, records `unpublishedAt`, retains `lastPublishedAt`, clears `scheduledPublishAt`.
+
+### `PATCH /api/homepage-sections/[id]/schedule`
+
+Sets `scheduledPublishAt` to a future date. Section remains `DRAFT` but the public API treats it as published once `scheduledPublishAt <= now()`.
+
+**Request body**: `{ "scheduledPublishAt": "<ISO 8601 datetime>" }`  
+**Constraint**: `scheduledPublishAt` must be in the future.
+
+### `GET /api/homepage-sections/preview`
+
+Returns ALL sections for the tenant regardless of `publishStatus` or `isEnabled`. Includes `isDraft`, `isDisabled`, and `scheduledPublishAt` fields.
+
+**Authentication**: Session cookie (`WEBSITE_MANAGE` required). NOT publicly accessible.
+
+---
+
+## Publishing Workflow Model
+
+### Status values
+
+| `publishStatus` | Meaning |
+|-----------------|---------|
+| `DRAFT` | Section is not published; excluded from public API unless `scheduledPublishAt <= now()` |
+| `PUBLISHED` | Section is published; visible in public API if also `isEnabled = true` |
+
+### Public API visibility rule (gate combination)
+
+A section appears in `GET /api/public/[tenant]/website/homepage` if and only if:
+
+```
+isEnabled = true
+AND (publishStatus = "PUBLISHED" OR scheduledPublishAt <= now())
+```
+
+### Backwards compatibility
+
+- Migration default: `publishStatus = "PUBLISHED"` — all pre-Slice-5 rows retain their current public visibility.
+- No manual action required after migration.
+
+### Audit fields
+
+| Field | Written by | Purpose |
+|-------|-----------|---------|
+| `publishedAt` | Publish action | Most recent publish timestamp |
+| `unpublishedAt` | Unpublish action | Most recent unpublish timestamp |
+| `lastPublishedAt` | Publish action | Most recent publish (not cleared on unpublish) |
+| `scheduledPublishAt` | Schedule action | Future publish date; cleared on publish/unpublish |
+
+### Governance — coming next
+
+Full review/approval workflow (four-eyes, assignment, `reviewStatus`) is deferred to a future CMS slice. The `publishStatus` field and admin actions form the foundation.
+
+---
+
+## Preview Safety Model
+
+The admin preview endpoint (`GET /api/homepage-sections/preview`) is:
+
+- **Not publicly accessible** — requires `WEBSITE_MANAGE` session permission.
+- **Tenant-isolated** — `tenantId` sourced from session only.
+- Returns draft sections with `isDraft: true` indicator so UI can visually mark them.
+
+The **public homepage API** (`GET /api/public/[tenant]/website/homepage`) **never** returns:
+
+- Sections with `publishStatus = "DRAFT"` (unless `scheduledPublishAt <= now()`)
+- `publishStatus` field
+- `publishedAt`, `unpublishedAt`, `lastPublishedAt`, `scheduledPublishAt` fields
+- `isEnabled` field
+- `tenantId`, `createdAt`, `updatedAt` fields
+
+---
+
 ## Deferred Future Work
 
 | Feature | Notes |
@@ -436,8 +532,8 @@ Website
 | Sponsor model | `sponsorsTeaser` foundation-ready; full impl needs `Sponsor` DB model |
 | Rich text for `callToAction.body` | Plain text only; no HTML/Markdown |
 | Block-based content | `customContentPlaceholder` coming-next; needs block model + visual editor |
-| Per-section scheduling / expiry | Needs `scheduledAt` / `expiresAt` fields on `HomepageSection` |
-| Preview / staging workflow | Needs draft/published states per section |
+| Review/approval workflow | Four-eyes approval, `reviewStatus` field, assignment workflow — Slice 6+ |
+| Background scheduler worker | Pro-active `publishStatus` flip at `scheduledPublishAt`; currently handled at query time |
 | Navigation management | Separate CMS feature |
 | Redirect management | Separate CMS feature |
 | Drag-and-drop reorder | Currently up/down buttons only |

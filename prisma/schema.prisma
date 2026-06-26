@@ -1453,7 +1453,7 @@ model WebsitePage {
 }
 
 // ---------------------------------------------------------------------------
-// HomepageSection — Configurable homepage layout sections (CMS V2 Slice 2)
+// HomepageSection — Configurable homepage layout sections (CMS V2 Slices 2–5)
 //
 // Each tenant has an ordered set of named sections that define the layout of
 // their public homepage. Sections are typed (see HomepageSectionType enum-like
@@ -1463,21 +1463,30 @@ model WebsitePage {
 // Design invariants:
 //   - One HomepageSection row per logical homepage block.
 //   - sortOrder controls display order (ascending, 0-based).
-//   - isEnabled gates visibility: only enabled sections appear in the public API.
+//   - isEnabled gates visibility gate 1: only enabled sections appear in public API.
+//   - publishStatus gates visibility gate 2: only PUBLISHED sections appear in public API.
+//   - scheduledPublishAt: if set and <= now(), the section is treated as published.
 //   - config is free-form JSON; validated by section-type-specific helpers.
-//   - No editorial approval workflow for this foundation slice — sections are
-//     immediately visible when isEnabled = true. Full publish workflow is deferred.
+//
+// Publishing workflow (CMS V2 Slice 5):
+//   - publishStatus: "DRAFT" | "PUBLISHED"
+//     Default "PUBLISHED" ensures all sections created before Slice 5 remain public.
+//   - publishedAt: when the section was last published (nullable).
+//   - unpublishedAt: when the section was last unpublished (nullable).
+//   - lastPublishedAt: most recent publish timestamp for audit trail (nullable).
+//   - scheduledPublishAt: if not null and <= now(), treated as published (nullable).
 //
 // Public endpoint: GET /api/public/[tenant]/website/homepage
-//   Returns enabled sections ordered by sortOrder.
+//   Returns only sections where isEnabled=true AND publishStatus=PUBLISHED AND
+//   (scheduledPublishAt IS NULL OR scheduledPublishAt <= now()).
 //   Internal admin fields (createdAt, updatedAt, tenantId) are never exposed.
 //
 // Future deferred work (document-only):
-//   - Rich config editor per section type
+//   - Review/approval workflow (reviewStatus field)
+//   - Four-eyes approval / assignment workflow
 //   - Drag-and-drop reordering
 //   - Sponsor section backed by a real Sponsor model
-//   - Preview / staging workflow
-//   - Per-section scheduling / expiry
+//   - Background scheduler worker for scheduled publishing
 // ---------------------------------------------------------------------------
 
 model HomepageSection {
@@ -1489,11 +1498,25 @@ model HomepageSection {
   label     String
   /// Display order (ascending). Lower values render first.
   sortOrder Int      @default(0)
-  /// When false the section is hidden from the public API.
+  /// When false the section is hidden from the public API (gate 1).
   isEnabled Boolean  @default(true)
   /// Type-specific configuration stored as a JSON object.
   /// Validated at the application layer via section-type helpers.
   config    Json     @default("{}")
+  // ── Publishing workflow fields (CMS V2 Slice 5) ──────────────────────────
+  /// Publish status gate 2 — "DRAFT" | "PUBLISHED".
+  /// Default "PUBLISHED" preserves backwards compatibility for all pre-Slice-5 rows.
+  publishStatus      String   @default("PUBLISHED")
+  /// Timestamp of the most recent publish action.
+  publishedAt        DateTime?
+  /// Timestamp of the most recent unpublish action.
+  unpublishedAt      DateTime?
+  /// Timestamp of the most recent publish action (audit trail duplicate of publishedAt,
+  /// retained so unpublish does not erase the last-known publish time).
+  lastPublishedAt    DateTime?
+  /// Optional future publish date. If set and <= now(), section is treated as published.
+  /// Null means no scheduled publication.
+  scheduledPublishAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1503,4 +1526,7 @@ model HomepageSection {
   @@index([tenantId, isEnabled])
   @@index([tenantId, sortOrder])
   @@index([tenantId, isEnabled, sortOrder])
+  @@index([tenantId, publishStatus])
+  @@index([tenantId, isEnabled, publishStatus])
+  @@index([scheduledPublishAt])
 }
