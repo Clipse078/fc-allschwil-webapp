@@ -13,12 +13,14 @@ import {
   Clock,
   PenLine,
   Plus,
+  Blocks,
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getCmsOverviewStats } from "@/lib/cms/overview-stats";
 import { CMS_SECTIONS } from "@/lib/cms/sections";
 import { CMS_ROUTES } from "@/lib/cms/routes";
+import { BLOCK_REGISTRY } from "@/lib/homepage/block-registry";
 import { CmsSectionCard } from "@/components/admin/cms/CmsSectionCard";
 import { CmsStatCard } from "@/components/admin/cms/CmsStatCard";
 import { CmsLegend } from "@/components/admin/cms/CmsLegend";
@@ -269,6 +271,14 @@ export default async function WebsiteCmsOverviewPage() {
               sub: "Sektionen verwalten",
               color: "#8B5CF6",
               bg: "rgba(139,92,246,0.06)",
+            },
+            canManageWebsite && {
+              href: CMS_ROUTES.blocks,
+              icon: <Blocks className="h-5 w-5" />,
+              label: "Block-Bibliothek",
+              sub: `${BLOCK_REGISTRY.length} Block-Typen`,
+              color: "#0EA5E9",
+              bg: "rgba(14,165,233,0.08)",
             },
             (canManageNews || canManageWebsite) && {
               href: CMS_ROUTES.media,
