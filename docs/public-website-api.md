@@ -932,7 +932,7 @@ Returns the ordered list of enabled homepage sections for the tenant.
 
 **Response envelope**: Standard `WebsiteResponseEnvelope<HomepageData>`.
 
-**Response example**:
+**Response example** (updated in CMS V2 Slice 3 — `block` field added, backwards-compatible):
 
 ```json
 {
@@ -946,21 +946,24 @@ Returns the ordered list of enabled homepage sections for the tenant.
         "type": "hero",
         "label": "Hero-Bereich",
         "sortOrder": 0,
-        "config": {}
+        "config": {},
+        "block": { "category": "Header", "datadriven": false }
       },
       {
         "id": "clyyy...",
         "type": "newsTeaser",
         "label": "News-Teaser",
         "sortOrder": 10,
-        "config": { "itemCount": 3 }
+        "config": { "itemCount": 3 },
+        "block": { "category": "Content", "datadriven": true }
       },
       {
         "id": "clzzz...",
         "type": "eventsTeaser",
         "label": "Veranstaltungs-Teaser",
         "sortOrder": 20,
-        "config": { "itemCount": 5, "surface": "homepage" }
+        "config": { "itemCount": 5, "surface": "homepage" },
+        "block": { "category": "Data-driven", "datadriven": true }
       }
     ]
   },
@@ -978,32 +981,44 @@ Returns the ordered list of enabled homepage sections for the tenant.
 | `type` | string | Section type key (see registry below) |
 | `label` | string | Admin-configured display label |
 | `sortOrder` | integer | Display order (ascending, 0-based) |
-| `config` | object | Type-specific configuration |
+| `config` | object | Type-specific configuration (public-safe projection) |
+| `block` | object \| null | Block library metadata (added in Slice 3 — see below) |
+
+**`block` field** (added in CMS V2 Slice 3, backwards-compatible):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `block.category` | string | Block category: `"Header"` \| `"Content"` \| `"Data-driven"` \| `"Club"` \| `"Sponsors"` \| `"Conversion"` \| `"Utility"` |
+| `block.datadriven` | boolean | `true` if block auto-fetches from a data source; `false` if manually configured |
+
+`block` is `null` for unregistered type keys (safe fallback). Existing consumers that don't use `block` can safely ignore the field.
 
 **Privacy invariants**:
 - `tenantId` never exposed
 - `createdAt` / `updatedAt` never exposed
 - `isEnabled` never exposed (only enabled sections are returned)
-- No admin-only fields
+- `block` field contains only public-safe metadata (category, datadriven) — no admin labels, internal status, or admin-only fields
+- Section config is projected through the block registry's public-safe projection before serialisation
 
 ---
 
-### Section Type Registry
+### Section Type Registry (CMS V2 Slice 3 — updated)
 
-| Type key | Label | Implementation | Default config |
-|----------|-------|---------------|----------------|
-| `hero` | Hero-Bereich | available | `{}` |
-| `newsTeaser` | News-Teaser | available | `{ "itemCount": 3 }` |
-| `eventsTeaser` | Veranstaltungs-Teaser | available | `{ "itemCount": 5, "surface": "homepage" }` |
-| `teamsTeaser` | Teams-Übersicht | available | `{ "itemCount": 6 }` |
-| `weekplanTeaser` | Wochenplan-Teaser | available | `{}` |
-| `callToAction` | Call-to-Action | available | `{}` |
-| `sponsorsTeaser` | Sponsoren | **placeholder** | `{}` |
-| `customContentPlaceholder` | Benutzerdefinierter Inhalt | **placeholder** | `{}` |
+| Type key | Label | Category | Status | Data-driven | Default config |
+|----------|-------|----------|--------|-------------|----------------|
+| `hero` | Hero-Bereich | Header | available | No | `{}` |
+| `newsTeaser` | News-Teaser | Content | available | Yes | `{ "itemCount": 3 }` |
+| `eventsTeaser` | Veranstaltungs-Teaser | Data-driven | available | Yes | `{ "itemCount": 5, "surface": "homepage" }` |
+| `teamsTeaser` | Teams-Übersicht | Club | available | Yes | `{ "itemCount": 6 }` |
+| `weekplanTeaser` | Wochenplan-Teaser | Data-driven | available | Yes | `{}` |
+| `callToAction` | Call-to-Action | Conversion | available | No | `{}` |
+| `sponsorsTeaser` | Sponsoren | Sponsors | **foundation-ready** | Yes | `{}` |
+| `customContentPlaceholder` | Benutzerdefinierter Inhalt | Utility | **coming-next** | No | `{}` |
 
-**Implementation status**:
-- `available` — type has a corresponding public data source in the WebApp API
-- `placeholder` — type is registered but no backing DB model exists yet (Sponsor model TBD)
+**Status definitions** (Slice 3 — extended):
+- `available` — type has a live data source in the WebApp API
+- `foundation-ready` — type is registered and API-ready; backing DB model not yet built (Sponsor model TBD)
+- `coming-next` — planned for the next roadmap slice
 
 ---
 
@@ -1054,16 +1069,18 @@ Returns the ordered list of enabled homepage sections for the tenant.
 
 ---
 
-### Deferred work (intentionally out of scope for this slice)
+### Deferred work (intentionally out of scope)
 
 - Visual drag-and-drop builder
-- Rich config editor per section type
+- Rich config editor per section type (Zod validation, per-field UI)
 - Sponsor model (backing the `sponsorsTeaser` type)
-- Block-based rich content (backing the `customContentPlaceholder` type)
+- Block-based rich content editor (backing the `customContentPlaceholder` type)
 - Per-section scheduling / expiry
 - Preview / staging workflow for homepage sections
 - Navigation management
 - Redirect management
+- Block version history
+- Per-block config schema validation (Zod)
 
 ---
 
