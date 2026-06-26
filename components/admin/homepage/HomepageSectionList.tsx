@@ -17,11 +17,24 @@ import {
   GlobeLock,
   Clock,
   Info,
+  CheckCircle2,
+  XCircle,
+  FileEdit,
+  UserCheck,
+  ClipboardCheck,
 } from "lucide-react";
+import Link from "next/link";
 import { SectionCard, EmptyState } from "@/components/ui/page";
 import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
+import {
+  APPROVAL_STATUS,
+  APPROVAL_STATUS_LABELS,
+  APPROVAL_PUBLISH_ALLOWED,
+  type ApprovalStatus,
+} from "@/lib/homepage/approval-constants";
 import { getHomepageSectionType } from "@/lib/homepage/section-types";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
+import { CMS_ROUTES } from "@/lib/cms/routes";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,6 +69,56 @@ function EnabledBadge({ isEnabled }: { isEnabled: boolean }) {
         className={`h-1.5 w-1.5 rounded-full ${isEnabled ? "bg-emerald-500" : "bg-gray-300"}`}
       />
       {isEnabled ? "Aktiv" : "Deaktiviert"}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Approval status badge (CMS V2 Slice 6)
+// ---------------------------------------------------------------------------
+
+const APPROVAL_BADGE_CONFIG: Record<
+  ApprovalStatus,
+  { icon: React.ElementType; colorClass: string; bgClass: string }
+> = {
+  NOT_REQUIRED: {
+    icon: CheckCircle2,
+    colorClass: "text-[var(--text-2)]",
+    bgClass: "bg-[var(--surface-2)]",
+  },
+  DRAFT: {
+    icon: FileEdit,
+    colorClass: "text-amber-600",
+    bgClass: "bg-amber-50",
+  },
+  IN_REVIEW: {
+    icon: Clock,
+    colorClass: "text-blue-600",
+    bgClass: "bg-blue-50",
+  },
+  APPROVED: {
+    icon: CheckCircle2,
+    colorClass: "text-emerald-600",
+    bgClass: "bg-emerald-50",
+  },
+  CHANGES_REQUESTED: {
+    icon: XCircle,
+    colorClass: "text-red-600",
+    bgClass: "bg-red-50",
+  },
+};
+
+function ApprovalStatusBadge({ approvalStatus }: { approvalStatus: string }) {
+  const status = approvalStatus as ApprovalStatus;
+  const cfg = APPROVAL_BADGE_CONFIG[status] ?? APPROVAL_BADGE_CONFIG.NOT_REQUIRED;
+  const Icon = cfg.icon;
+  const label = APPROVAL_STATUS_LABELS[status] ?? status;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${cfg.bgClass} ${cfg.colorClass}`}
+    >
+      <Icon className="h-3 w-3" />
+      {label}
     </span>
   );
 }
@@ -549,6 +612,16 @@ export default function HomepageSectionList() {
   const [schedulePending, setSchedulePending] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
+  // ── Approval review modal state (CMS V2 Slice 6) ─────────────────────────
+  const [reviewModal, setReviewModal] = useState<{
+    id: string;
+    label: string;
+    action: "approve" | "reject";
+  } | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewPending, setReviewPending] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -768,6 +841,66 @@ export default function HomepageSectionList() {
     }
   }
 
+  // ── Approval handlers (CMS V2 Slice 6) ──────────────────────────────────
+
+  async function handleRequestReview(id: string) {
+    setActionPending(`${id}-request-review`);
+    try {
+      const res = await fetch(`/api/homepage-sections/${id}/request-review`, {
+        method: "PATCH",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Fehler bei der Überprüfungsanfrage");
+        return;
+      }
+      setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  function handleOpenReviewModal(
+    id: string,
+    label: string,
+    action: "approve" | "reject",
+  ) {
+    setReviewModal({ id, label, action });
+    setReviewNote("");
+    setReviewError(null);
+  }
+
+  function handleCloseReviewModal() {
+    if (reviewPending) return;
+    setReviewModal(null);
+    setReviewNote("");
+    setReviewError(null);
+  }
+
+  async function handleConfirmReview() {
+    if (!reviewModal) return;
+    setReviewPending(true);
+    setReviewError(null);
+    const { id, action } = reviewModal;
+    try {
+      const res = await fetch(`/api/homepage-sections/${id}/${action}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: reviewNote.trim() || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setReviewError(data?.error ?? "Aktion fehlgeschlagen");
+        return;
+      }
+      setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
+      setReviewModal(null);
+      setReviewNote("");
+    } finally {
+      setReviewPending(false);
+    }
+  }
+
   const isAnyActionPending = actionPending !== null || bootstrapping;
 
   const publishedCount = sections.filter(
@@ -776,6 +909,85 @@ export default function HomepageSectionList() {
 
   return (
     <>
+      {/* Approval review modal (CMS V2 Slice 6) */}
+      {reviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl">
+            <div className="mb-3 flex items-center gap-2">
+              {reviewModal.action === "approve" ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              ) : (
+                <XCircle className="h-4 w-4 text-red-600" />
+              )}
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                {reviewModal.action === "approve"
+                  ? "Sektion freigeben"
+                  : "Änderungen anfordern"}
+              </p>
+            </div>
+            <p className="mb-3 text-xs text-[var(--text-2)]">
+              <strong>{reviewModal.label}</strong>
+              {reviewModal.action === "approve"
+                ? " wird zur Veröffentlichung freigegeben."
+                : " wird zur Überarbeitung zurückgegeben."}
+            </p>
+            <div className="mb-4">
+              <label className="fca-label mb-1 block">
+                {reviewModal.action === "approve"
+                  ? "Freigabenotiz (optional)"
+                  : "Begründung (empfohlen)"}
+              </label>
+              <textarea
+                className="fca-textarea min-h-[80px] resize-y"
+                placeholder={
+                  reviewModal.action === "approve"
+                    ? "Optionale Notiz…"
+                    : "Beschreibe die erforderlichen Änderungen…"
+                }
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+                disabled={reviewPending}
+                rows={3}
+                maxLength={1000}
+              />
+            </div>
+            {reviewError && (
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {reviewError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleConfirmReview}
+                disabled={reviewPending}
+                className="fca-button-primary"
+              >
+                {reviewModal.action === "approve" ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <XCircle className="h-3.5 w-3.5" />
+                )}
+                {reviewPending
+                  ? "Wird verarbeitet…"
+                  : reviewModal.action === "approve"
+                    ? "Freigeben"
+                    : "Ablehnen"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseReviewModal}
+                disabled={reviewPending}
+                className="fca-button-secondary"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Schedule modal */}
       {schedulingId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -851,14 +1063,25 @@ export default function HomepageSectionList() {
         </div>
 
         {/* Governance info banner */}
-        <div className="flex items-start gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-3 text-xs text-[var(--text-2)]">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-          <span>
-            <span className="font-medium text-[var(--foreground)]">Veröffentlichungs-Workflow:</span>{" "}
-            Sektionen müssen sowohl <span className="font-medium">aktiviert</span> als auch{" "}
-            <span className="font-medium">veröffentlicht</span> sein, um in der öffentlichen API zu erscheinen.
-            {" "}Vierstufige Freigabe und Zuweisung sind für einen späteren CMS-Slice geplant.
-          </span>
+        <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-3 text-xs text-[var(--text-2)]">
+          <div className="flex items-start gap-2">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+            <span>
+              <span className="font-medium text-[var(--foreground)]">Freigabe-Workflow (Slice 6):</span>{" "}
+              Sektionen benötigen Status{" "}
+              <span className="font-medium">Freigegeben</span> oder{" "}
+              <span className="font-medium">Keine Freigabe erforderlich</span>, bevor sie veröffentlicht werden können.
+              Nutze{" "}
+              <span className="font-medium">Überprüfung anfordern</span> → <span className="font-medium">Freigeben</span> für den Approval-Workflow.
+            </span>
+          </div>
+          <Link
+            href={CMS_ROUTES.review}
+            className="fca-button-secondary shrink-0 px-2 py-1 text-[10px]"
+          >
+            <ClipboardCheck className="h-3 w-3" />
+            Review-Queue
+          </Link>
         </div>
 
         {/* Error banner */}
@@ -914,6 +1137,9 @@ export default function HomepageSectionList() {
                     Aktiv
                   </th>
                   <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Freigabe
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
                     Publikation
                   </th>
                   <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
@@ -931,9 +1157,13 @@ export default function HomepageSectionList() {
                     actionPending === `${section.id}-up` ||
                     actionPending === `${section.id}-down` ||
                     actionPending === `${section.id}-publish` ||
-                    actionPending === `${section.id}-unpublish`;
+                    actionPending === `${section.id}-unpublish` ||
+                    actionPending === `${section.id}-request-review`;
                   const isEditing = editingId === section.id;
                   const isPublished = section.publishStatus === "PUBLISHED";
+                  const approvalStatus = section.approvalStatus as ApprovalStatus;
+                  const canPublish = APPROVAL_PUBLISH_ALLOWED.has(approvalStatus);
+                  const isInReview = approvalStatus === APPROVAL_STATUS.IN_REVIEW;
 
                   return (
                     <Fragment key={section.id}>
@@ -978,6 +1208,21 @@ export default function HomepageSectionList() {
                         {/* Enabled badge */}
                         <td className="px-4 py-3">
                           <EnabledBadge isEnabled={section.isEnabled} />
+                        </td>
+
+                        {/* Approval status badge (CMS V2 Slice 6) */}
+                        <td className="px-4 py-3">
+                          <div>
+                            <ApprovalStatusBadge approvalStatus={section.approvalStatus} />
+                            {section.approvalNote && (
+                              <p
+                                className="mt-0.5 text-[10px] text-[var(--muted)] line-clamp-1"
+                                title={section.approvalNote}
+                              >
+                                {section.approvalNote}
+                              </p>
+                            )}
+                          </div>
                         </td>
 
                         {/* Publish status badge */}
@@ -1047,9 +1292,13 @@ export default function HomepageSectionList() {
                               <button
                                 type="button"
                                 onClick={() => handlePublish(section.id)}
-                                disabled={isThisPending || isAnyActionPending || isEditing}
-                                className="sce-icon-button text-[var(--muted)] hover:text-blue-600"
-                                title="Veröffentlichen"
+                                disabled={isThisPending || isAnyActionPending || isEditing || !canPublish}
+                                className={`sce-icon-button ${canPublish ? "text-[var(--muted)] hover:text-blue-600" : "text-rose-300 cursor-not-allowed"}`}
+                                title={
+                                  !canPublish
+                                    ? `Veröffentlichung blockiert: ${APPROVAL_STATUS_LABELS[approvalStatus]}`
+                                    : "Veröffentlichen"
+                                }
                               >
                                 <Globe className="h-3.5 w-3.5" />
                               </button>
@@ -1060,11 +1309,59 @@ export default function HomepageSectionList() {
                               <button
                                 type="button"
                                 onClick={() => handleStartSchedule(section.id)}
-                                disabled={isThisPending || isAnyActionPending || isEditing}
-                                className="sce-icon-button text-[var(--muted)] hover:text-amber-600"
-                                title="Veröffentlichung planen"
+                                disabled={isThisPending || isAnyActionPending || isEditing || !canPublish}
+                                className={`sce-icon-button ${canPublish ? "text-[var(--muted)] hover:text-amber-600" : "text-rose-300 cursor-not-allowed"}`}
+                                title={
+                                  !canPublish
+                                    ? `Planung blockiert: ${APPROVAL_STATUS_LABELS[approvalStatus]}`
+                                    : "Veröffentlichung planen"
+                                }
                               >
                                 <Clock className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+
+                            {/* Approval actions (CMS V2 Slice 6) */}
+                            {/* Request review — available from DRAFT, NOT_REQUIRED, CHANGES_REQUESTED, APPROVED */}
+                            {approvalStatus !== APPROVAL_STATUS.IN_REVIEW && (
+                              <button
+                                type="button"
+                                onClick={() => handleRequestReview(section.id)}
+                                disabled={isThisPending || isAnyActionPending || isEditing}
+                                className="sce-icon-button text-[var(--muted)] hover:text-blue-600"
+                                title="Überprüfung anfordern"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+
+                            {/* Approve — available from IN_REVIEW */}
+                            {isInReview && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenReviewModal(section.id, section.label, "approve")
+                                }
+                                disabled={isThisPending || isAnyActionPending || isEditing}
+                                className="sce-icon-button text-emerald-600 hover:text-emerald-800"
+                                title="Freigeben"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+
+                            {/* Reject — available from IN_REVIEW */}
+                            {isInReview && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenReviewModal(section.id, section.label, "reject")
+                                }
+                                disabled={isThisPending || isAnyActionPending || isEditing}
+                                className="sce-icon-button text-red-500 hover:text-red-700"
+                                title="Ablehnen / Änderungen anfordern"
+                              >
+                                <XCircle className="h-3.5 w-3.5" />
                               </button>
                             )}
 
@@ -1096,7 +1393,7 @@ export default function HomepageSectionList() {
                       {isEditing && (
                         <tr key={`${section.id}-edit`}>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="border-b border-blue-100 bg-blue-50 px-5 py-4"
                           >
                             <div className="space-y-4">
@@ -1174,11 +1471,18 @@ export default function HomepageSectionList() {
 
         {/* Footer count */}
         {!loading && sections.length > 0 && (
-          <div className="border-t border-[var(--border)] px-5 py-3">
+          <div className="border-t border-[var(--border)] px-5 py-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] text-[var(--muted)]">
               {publishedCount} von {sections.length} Sektionen aktiv &amp; veröffentlicht
               · sichtbar in der öffentlichen Homepage-API
             </p>
+            <Link
+              href={CMS_ROUTES.review}
+              className="fca-button-secondary px-2 py-1 text-[10px]"
+            >
+              <ClipboardCheck className="h-3 w-3" />
+              Review-Queue
+            </Link>
           </div>
         )}
       </SectionCard>

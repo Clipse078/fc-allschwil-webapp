@@ -154,8 +154,9 @@ export const CMS_SECTIONS: CmsSection[] = [
       {
         key: "approval_workflow",
         label: "Freigabe-Dashboard",
-        description: "Dediziertes Dashboard für Redakteure und Freigeber.",
-        status: "coming_next",
+        description: "Redaktionelle Freigabe-Queue für Homepage-Sektionen.",
+        status: "available",
+        href: CMS_ROUTES.review,
         requiredPermissions: ["website.manage"],
       },
       {
