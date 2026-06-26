@@ -1,20 +1,29 @@
 /**
  * lib/homepage/section-types.ts
  *
- * Canonical registry of all supported homepage section types.
+ * Type definitions and derived registries for HomepageSection.
  *
- * This is the authoritative source of truth for:
- *   - Section type keys (used in HomepageSection.type DB column)
- *   - Human-readable labels (German, for the admin UI)
- *   - Descriptions (informational, admin UI only)
- *   - Default config shape per type
- *   - Default sort order when bootstrapping a tenant's section set
+ * IMPORTANT: This file is intentionally a thin adapter layer.
+ * The canonical source of truth for block labels, descriptions, default configs,
+ * categories, statuses, and all block metadata lives in:
+ *   → lib/homepage/block-registry.ts
+ *
+ * This file owns:
+ *   - HOMEPAGE_SECTION_TYPE_KEYS  — stable DB column values
+ *   - HomepageSectionTypeKey      — TypeScript type for the DB key union
+ *   - Per-type config TypeScript shapes (HeroSectionConfig, etc.)
+ *   - HomepageSectionConfig       — union type
+ *   - HomepageSectionTypeDefinition — admin query/UI type (derived from registry)
+ *   - HOMEPAGE_SECTION_TYPES      — array derived from BLOCK_REGISTRY (no duplication)
+ *   - getHomepageSectionType()    — lookup helper
+ *   - isValidSectionTypeKey()     — key validator
+ *   - DefaultSectionSeed          — bootstrap seed type
+ *   - DEFAULT_HOMEPAGE_SECTIONS   — array derived from BLOCK_REGISTRY (no duplication)
  *
  * Rules:
- *   - Never duplicate section type keys or labels elsewhere.
+ *   - Never add labels, descriptions, or default configs here — add them to block-registry.ts.
  *   - Type keys are stable DB values — rename only with a data migration.
- *   - Config shapes are informational contracts; validation is additive.
- *   - Add new types here first, then update the registry default set.
+ *   - Config shapes are TypeScript contracts; runtime validation is additive.
  *
  * Deferred (not implemented in this foundation slice):
  *   - Rich config editors per type
@@ -23,13 +32,16 @@
  *   - Per-section scheduling or expiry
  */
 
+import { BLOCK_REGISTRY } from "@/lib/homepage/block-registry";
+
 // ---------------------------------------------------------------------------
-// Type key enum
+// Type key enum (DB contract — must match HomepageSection.type values)
 // ---------------------------------------------------------------------------
 
 /**
  * All valid homepage section type keys.
  * Must match HomepageSection.type values stored in the database.
+ * Each key must have a corresponding entry in BLOCK_REGISTRY.
  */
 export const HOMEPAGE_SECTION_TYPE_KEYS = [
   "hero",
@@ -46,7 +58,7 @@ export type HomepageSectionTypeKey =
   (typeof HOMEPAGE_SECTION_TYPE_KEYS)[number];
 
 // ---------------------------------------------------------------------------
-// Config shapes (informational — validated at application layer)
+// Config shapes (TypeScript contracts — validated at application layer)
 // ---------------------------------------------------------------------------
 
 /** hero: full-width banner with title, subtitle, optional CTA. */
@@ -140,98 +152,51 @@ export type HomepageSectionConfig =
   | CustomContentPlaceholderSectionConfig;
 
 // ---------------------------------------------------------------------------
-// Registry entry
+// Registry entry type (admin UI / query layer shape)
 // ---------------------------------------------------------------------------
 
 export type HomepageSectionTypeDefinition = {
   /** Stable key stored in HomepageSection.type. */
   key: HomepageSectionTypeKey;
-  /** German label for admin UI display. */
+  /** Human-readable label (German) — sourced from BLOCK_REGISTRY.displayName. */
   label: string;
-  /** German description for admin UI tooltips/cards. */
+  /** Description (German) — sourced from BLOCK_REGISTRY.description. */
   description: string;
-  /** Default config for new sections of this type. */
+  /** Default config — sourced from BLOCK_REGISTRY.defaultConfig. */
   defaultConfig: HomepageSectionConfig;
   /**
-   * Whether this type is fully implemented end-to-end.
-   * "available" — backed by a data source today.
-   * "placeholder" — registered but data source not yet built.
+   * Implementation status for the admin UI.
+   * Derived from BLOCK_REGISTRY.status:
+   *   "available"        → "available"
+   *   "foundation-ready" → "placeholder"
+   *   "coming-next"      → "placeholder"
    */
   implementation: "available" | "placeholder";
 };
 
 // ---------------------------------------------------------------------------
-// Registry
+// HOMEPAGE_SECTION_TYPES — derived from BLOCK_REGISTRY (no duplication)
 // ---------------------------------------------------------------------------
 
 /**
- * Canonical registry of all homepage section types.
- * Used by the admin UI, default section bootstrap, and public API mapper.
+ * Array of all homepage section type definitions for the admin UI.
+ *
+ * Labels, descriptions, and default configs are sourced exclusively from
+ * BLOCK_REGISTRY — never duplicated here.
  */
-export const HOMEPAGE_SECTION_TYPES: HomepageSectionTypeDefinition[] = [
-  {
-    key: "hero",
-    label: "Hero-Bereich",
-    description:
-      "Vollbreites Banner mit Titel, Untertitel und optionalem Call-to-Action.",
-    defaultConfig: {} satisfies HeroSectionConfig,
-    implementation: "available",
-  },
-  {
-    key: "newsTeaser",
-    label: "News-Teaser",
-    description: "Zeigt die neuesten veröffentlichten News-Artikel.",
-    defaultConfig: { itemCount: 3 } satisfies NewsTeaserSectionConfig,
-    implementation: "available",
-  },
-  {
-    key: "eventsTeaser",
-    label: "Veranstaltungs-Teaser",
-    description: "Kommende Spiele und Veranstaltungen mit Homepage-Sichtbarkeit.",
-    defaultConfig: {
-      itemCount: 5,
-      surface: "homepage",
-    } satisfies EventsTeaserSectionConfig,
-    implementation: "available",
-  },
-  {
-    key: "teamsTeaser",
-    label: "Teams-Übersicht",
-    description: "Raster der aktiven, websichtbaren Mannschaften.",
-    defaultConfig: { itemCount: 6 } satisfies TeamsTeaserSectionConfig,
-    implementation: "available",
-  },
-  {
-    key: "sponsorsTeaser",
-    label: "Sponsoren",
-    description:
-      "Sponsor-Showcase. Hinweis: Sponsor-Datenmodell noch nicht implementiert (Platzhalter).",
-    defaultConfig: {} satisfies SponsorsTeaserSectionConfig,
-    implementation: "placeholder",
-  },
-  {
-    key: "weekplanTeaser",
-    label: "Wochenplan-Teaser",
-    description: "Zusammenfassung des aktuellen Wochenplans.",
-    defaultConfig: {} satisfies WeekplanTeaserSectionConfig,
-    implementation: "available",
-  },
-  {
-    key: "callToAction",
-    label: "Call-to-Action",
-    description: "Konfigurierbares CTA-Banner mit Überschrift, Text und Buttons.",
-    defaultConfig: {} satisfies CallToActionSectionConfig,
-    implementation: "available",
-  },
-  {
-    key: "customContentPlaceholder",
-    label: "Benutzerdefinierter Inhalt",
-    description:
-      "Platzhalter für zukünftige Block-basierte Inhalte (visueller Editor).",
-    defaultConfig: {} satisfies CustomContentPlaceholderSectionConfig,
-    implementation: "placeholder",
-  },
-];
+export const HOMEPAGE_SECTION_TYPES: HomepageSectionTypeDefinition[] =
+  BLOCK_REGISTRY.filter(
+    (block): block is (typeof BLOCK_REGISTRY)[number] =>
+      HOMEPAGE_SECTION_TYPE_KEYS.includes(
+        block.type as HomepageSectionTypeKey,
+      ),
+  ).map((block) => ({
+    key: block.type as HomepageSectionTypeKey,
+    label: block.displayName,
+    description: block.description,
+    defaultConfig: block.defaultConfig as HomepageSectionConfig,
+    implementation: block.status === "available" ? "available" : "placeholder",
+  }));
 
 // ---------------------------------------------------------------------------
 // Lookup helpers
@@ -245,19 +210,19 @@ export function getHomepageSectionType(
 }
 
 /** Returns true if the given string is a known section type key. */
-export function isValidSectionTypeKey(key: string): key is HomepageSectionTypeKey {
+export function isValidSectionTypeKey(
+  key: string,
+): key is HomepageSectionTypeKey {
   return HOMEPAGE_SECTION_TYPE_KEYS.includes(key as HomepageSectionTypeKey);
 }
 
 // ---------------------------------------------------------------------------
 // Default section set for tenant bootstrap
-//
-// Called when a tenant has no sections yet and an admin triggers
-// "Create Default Sections". Ordered by intended homepage display order.
 // ---------------------------------------------------------------------------
 
 export type DefaultSectionSeed = {
   type: HomepageSectionTypeKey;
+  /** Display label — sourced from BLOCK_REGISTRY.displayName. */
   label: string;
   sortOrder: number;
   isEnabled: boolean;
@@ -266,64 +231,19 @@ export type DefaultSectionSeed = {
 
 /**
  * Default set of sections created when bootstrapping a new tenant homepage.
- * Only "available" types are included by default; placeholder types start
- * disabled so they don't appear in the public API.
+ *
+ * Derived from BLOCK_REGISTRY — labels and configs are not duplicated here.
+ * Sorted by defaultSortOrder ascending to match the intended homepage display order.
  */
-export const DEFAULT_HOMEPAGE_SECTIONS: DefaultSectionSeed[] = [
-  {
-    type: "hero",
-    label: "Hero-Bereich",
-    sortOrder: 0,
-    isEnabled: true,
-    config: {} satisfies HeroSectionConfig,
-  },
-  {
-    type: "newsTeaser",
-    label: "News-Teaser",
-    sortOrder: 10,
-    isEnabled: true,
-    config: { itemCount: 3 } satisfies NewsTeaserSectionConfig,
-  },
-  {
-    type: "eventsTeaser",
-    label: "Veranstaltungs-Teaser",
-    sortOrder: 20,
-    isEnabled: true,
-    config: { itemCount: 5, surface: "homepage" } satisfies EventsTeaserSectionConfig,
-  },
-  {
-    type: "teamsTeaser",
-    label: "Teams-Übersicht",
-    sortOrder: 30,
-    isEnabled: true,
-    config: { itemCount: 6 } satisfies TeamsTeaserSectionConfig,
-  },
-  {
-    type: "weekplanTeaser",
-    label: "Wochenplan-Teaser",
-    sortOrder: 40,
-    isEnabled: true,
-    config: {} satisfies WeekplanTeaserSectionConfig,
-  },
-  {
-    type: "callToAction",
-    label: "Call-to-Action",
-    sortOrder: 50,
-    isEnabled: false,
-    config: {} satisfies CallToActionSectionConfig,
-  },
-  {
-    type: "sponsorsTeaser",
-    label: "Sponsoren",
-    sortOrder: 60,
-    isEnabled: false,
-    config: {} satisfies SponsorsTeaserSectionConfig,
-  },
-  {
-    type: "customContentPlaceholder",
-    label: "Benutzerdefinierter Inhalt",
-    sortOrder: 70,
-    isEnabled: false,
-    config: {} satisfies CustomContentPlaceholderSectionConfig,
-  },
-];
+export const DEFAULT_HOMEPAGE_SECTIONS: DefaultSectionSeed[] = [...BLOCK_REGISTRY]
+  .filter((block) =>
+    HOMEPAGE_SECTION_TYPE_KEYS.includes(block.type as HomepageSectionTypeKey),
+  )
+  .sort((a, b) => a.defaultSortOrder - b.defaultSortOrder)
+  .map((block) => ({
+    type: block.type as HomepageSectionTypeKey,
+    label: block.displayName,
+    sortOrder: block.defaultSortOrder,
+    isEnabled: block.defaultEnabled,
+    config: block.defaultConfig as HomepageSectionConfig,
+  }));
