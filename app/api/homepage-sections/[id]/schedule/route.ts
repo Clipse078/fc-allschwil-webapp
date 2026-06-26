@@ -12,6 +12,11 @@
  * To cancel a pending schedule, unpublish the section via PATCH .../unpublish,
  * which clears scheduledPublishAt along with setting publishStatus = "DRAFT".
  *
+ * Approval gate (CMS V2 Slice 6):
+ *   Only sections with approvalStatus APPROVED or NOT_REQUIRED may be scheduled.
+ *   DRAFT, IN_REVIEW, and CHANGES_REQUESTED sections are blocked.
+ *   Returns HTTP 422 with a descriptive error if the gate is not satisfied.
+ *
  * Constraints:
  *   - scheduledPublishAt must be a valid ISO 8601 datetime string.
  *   - scheduledPublishAt must be in the future.
@@ -30,7 +35,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { scheduleHomepageSectionPublish } from "@/lib/homepage/admin-queries";
+import {
+  scheduleHomepageSectionPublish,
+  APPROVAL_STATUS_LABELS,
+} from "@/lib/homepage/admin-queries";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -87,13 +95,25 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   // ── Persist ───────────────────────────────────────────────────────────────
   const { id } = await params;
 
-  const updated = await scheduleHomepageSectionPublish(tenantId, id, scheduledAt);
-  if (!updated) {
+  const result = await scheduleHomepageSectionPublish(tenantId, id, scheduledAt);
+
+  if (result === null) {
     return NextResponse.json(
       { error: "Sektion nicht gefunden oder kein Zugriff." },
       { status: 404 },
     );
   }
 
-  return NextResponse.json({ section: updated });
+  if ("blocked" in result) {
+    const label = APPROVAL_STATUS_LABELS[result.approvalStatus];
+    return NextResponse.json(
+      {
+        error: `Planung blockiert: Freigabestatus ist «${label}». Nur freigegebene oder freigabefreie Sektionen können geplant werden.`,
+        approvalStatus: result.approvalStatus,
+      },
+      { status: 422 },
+    );
+  }
+
+  return NextResponse.json({ section: result });
 }

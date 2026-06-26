@@ -25,6 +25,9 @@ export const CMS_ROUTES = {
   // ── Publishing ─────────────────────────────────────────────────────────────
   publishing: "/dashboard/website/publishing",
 
+  // ── Review ─────────────────────────────────────────────────────────────────
+  review: "/dashboard/website/review",
+
   // ── Configuration ──────────────────────────────────────────────────────────
   settings: "/dashboard/website/settings",
 } as const;

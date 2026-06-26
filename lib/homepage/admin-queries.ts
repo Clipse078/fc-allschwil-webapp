@@ -12,10 +12,25 @@
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { logAction } from "@/lib/audit/log-action";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   type HomepageSectionConfig,
 } from "@/lib/homepage/section-types";
+import {
+  APPROVAL_STATUS,
+  APPROVAL_PUBLISH_ALLOWED,
+  APPROVAL_STATUS_LABELS,
+  type ApprovalStatus,
+} from "@/lib/homepage/approval-constants";
+
+// Re-export so callers can import everything from admin-queries
+export {
+  APPROVAL_STATUS,
+  APPROVAL_PUBLISH_ALLOWED,
+  APPROVAL_STATUS_LABELS,
+  type ApprovalStatus,
+};
 
 // ---------------------------------------------------------------------------
 // Publishing constants
@@ -46,6 +61,16 @@ export type HomepageSectionAdminItem = {
   unpublishedAt: Date | null;
   lastPublishedAt: Date | null;
   scheduledPublishAt: Date | null;
+  // ── Approval workflow fields (CMS V2 Slice 6) ──────────────────────────
+  approvalStatus: ApprovalStatus;
+  reviewerUserId: string | null;
+  reviewRequestedAt: Date | null;
+  reviewedAt: Date | null;
+  approvedAt: Date | null;
+  rejectedAt: Date | null;
+  approvalNote: string | null;
+  approvedByUserId: string | null;
+  rejectedByUserId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -67,6 +92,15 @@ const adminSelect = {
   unpublishedAt: true,
   lastPublishedAt: true,
   scheduledPublishAt: true,
+  approvalStatus: true,
+  reviewerUserId: true,
+  reviewRequestedAt: true,
+  reviewedAt: true,
+  approvedAt: true,
+  rejectedAt: true,
+  approvalNote: true,
+  approvedByUserId: true,
+  rejectedByUserId: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -119,9 +153,10 @@ export async function bootstrapDefaultSections(
       sortOrder: s.sortOrder,
       isEnabled: s.isEnabled,
       config: s.config,
-      // New sections bootstrapped via admin start as DRAFT to require explicit
-      // publish action, giving admins a chance to configure before going live.
+      // New sections bootstrapped via admin start as DRAFT (publish) and
+      // DRAFT (approval) to require explicit review before going live.
       publishStatus: PUBLISH_STATUS.DRAFT,
+      approvalStatus: APPROVAL_STATUS.DRAFT,
     })),
     skipDuplicates: true,
   });
@@ -265,21 +300,37 @@ export async function getHomepageSectionById(
 // ---------------------------------------------------------------------------
 
 /**
+ * Error returned when publishing is blocked by the approval gate.
+ */
+export type ApprovalGateError = {
+  blocked: true;
+  approvalStatus: ApprovalStatus;
+};
+
+/**
  * Publishes a homepage section.
  * Sets publishStatus=PUBLISHED, records publishedAt and lastPublishedAt.
  * Clears any pending scheduledPublishAt (the section is already live).
  *
- * Returns the updated section, or null if not found / different tenant.
+ * Approval gate: only sections with approvalStatus APPROVED or NOT_REQUIRED
+ * may be published. Returns { blocked: true, approvalStatus } if blocked.
+ *
+ * Returns the updated section, null if not found, or an ApprovalGateError.
  */
 export async function publishHomepageSection(
   tenantId: string,
   id: string,
-): Promise<HomepageSectionAdminItem | null> {
+): Promise<HomepageSectionAdminItem | null | ApprovalGateError> {
   const existing = await prisma.homepageSection.findFirst({
     where: { id, tenantId },
-    select: { id: true },
+    select: { id: true, approvalStatus: true },
   });
   if (!existing) return null;
+
+  const approvalStatus = existing.approvalStatus as ApprovalStatus;
+  if (!APPROVAL_PUBLISH_ALLOWED.has(approvalStatus)) {
+    return { blocked: true, approvalStatus };
+  }
 
   const now = new Date();
   const updated = await prisma.homepageSection.update({
@@ -300,6 +351,8 @@ export async function publishHomepageSection(
  * Unpublishes a homepage section.
  * Sets publishStatus=DRAFT, records unpublishedAt.
  * Retains lastPublishedAt for the audit trail.
+ *
+ * No approval gate on unpublish — always allowed.
  *
  * Returns the updated section, or null if not found / different tenant.
  */
@@ -332,22 +385,30 @@ export async function unpublishHomepageSection(
  * Sets publishStatus=DRAFT and scheduledPublishAt to the given future date.
  * The public API will treat the section as published once scheduledPublishAt <= now().
  *
+ * Approval gate: only sections with approvalStatus APPROVED or NOT_REQUIRED
+ * may be scheduled. Returns { blocked: true, approvalStatus } if blocked.
+ *
  * Constraints:
  *   - scheduledPublishAt must be in the future (caller should validate).
  *   - Section remains DRAFT until the scheduled time (or until manually published).
  *
- * Returns the updated section, or null if not found / different tenant.
+ * Returns the updated section, null if not found, or an ApprovalGateError.
  */
 export async function scheduleHomepageSectionPublish(
   tenantId: string,
   id: string,
   scheduledPublishAt: Date,
-): Promise<HomepageSectionAdminItem | null> {
+): Promise<HomepageSectionAdminItem | null | ApprovalGateError> {
   const existing = await prisma.homepageSection.findFirst({
     where: { id, tenantId },
-    select: { id: true },
+    select: { id: true, approvalStatus: true },
   });
   if (!existing) return null;
+
+  const approvalStatus = existing.approvalStatus as ApprovalStatus;
+  if (!APPROVAL_PUBLISH_ALLOWED.has(approvalStatus)) {
+    return { blocked: true, approvalStatus };
+  }
 
   const updated = await prisma.homepageSection.update({
     where: { id },
@@ -358,4 +419,261 @@ export async function scheduleHomepageSectionPublish(
     select: adminSelect,
   });
   return updated as HomepageSectionAdminItem;
+}
+
+// ---------------------------------------------------------------------------
+// Approval workflow (CMS V2 Slice 6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Requests editorial review for a section.
+ *
+ * Allowed from: NOT_REQUIRED, DRAFT, APPROVED, CHANGES_REQUESTED.
+ * Blocked from: IN_REVIEW (already in review — idempotent guard).
+ *
+ * Optionally assigns a reviewer user. Reviewer must belong to the same tenant.
+ * Audit trail: written to AuditLog (best-effort, never throws).
+ *
+ * Returns the updated section, null if not found, or "already_in_review" if blocked.
+ */
+export async function requestReviewHomepageSection(
+  tenantId: string,
+  id: string,
+  actorUserId: string,
+  reviewerUserId?: string | null,
+): Promise<HomepageSectionAdminItem | null | "already_in_review"> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true, approvalStatus: true, label: true },
+  });
+  if (!existing) return null;
+
+  if (existing.approvalStatus === APPROVAL_STATUS.IN_REVIEW) {
+    return "already_in_review";
+  }
+
+  const prevStatus = existing.approvalStatus as ApprovalStatus;
+  const now = new Date();
+
+  // If a reviewerUserId is provided, verify it belongs to the same tenant
+  if (reviewerUserId) {
+    const reviewerExists = await prisma.user.findFirst({
+      where: { id: reviewerUserId, tenantId },
+      select: { id: true },
+    });
+    if (!reviewerExists) reviewerUserId = undefined;
+  }
+
+  const updated = await prisma.homepageSection.update({
+    where: { id },
+    data: {
+      approvalStatus: APPROVAL_STATUS.IN_REVIEW,
+      reviewRequestedAt: now,
+      // Only update reviewerUserId if explicitly provided
+      ...(reviewerUserId !== undefined
+        ? { reviewerUserId: reviewerUserId ?? null }
+        : {}),
+      // Clear previous rejection timestamp when re-submitting
+      rejectedAt: null,
+      rejectedByUserId: null,
+    },
+    select: adminSelect,
+  });
+
+  void logAction({
+    actorUserId,
+    moduleKey: "homepage",
+    entityType: "HomepageSection",
+    entityId: id,
+    action: "APPROVAL_REQUEST",
+    beforeJson: { approvalStatus: prevStatus },
+    afterJson: { approvalStatus: APPROVAL_STATUS.IN_REVIEW },
+    metadataJson: {
+      tenantId,
+      label: existing.label,
+      reviewerUserId: reviewerUserId ?? null,
+    },
+  });
+
+  return updated as HomepageSectionAdminItem;
+}
+
+/**
+ * Approves a homepage section.
+ *
+ * Allowed from: IN_REVIEW only.
+ * Transitions approvalStatus to APPROVED.
+ * Records approvedAt, approvedByUserId, reviewedAt, optional approvalNote.
+ * Audit trail: written to AuditLog (best-effort, never throws).
+ *
+ * Returns the updated section, null if not found, or
+ * "not_in_review" if the section is not currently in review.
+ */
+export async function approveHomepageSection(
+  tenantId: string,
+  id: string,
+  actorUserId: string,
+  note?: string | null,
+): Promise<HomepageSectionAdminItem | null | "not_in_review"> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true, approvalStatus: true, label: true },
+  });
+  if (!existing) return null;
+
+  if (existing.approvalStatus !== APPROVAL_STATUS.IN_REVIEW) {
+    return "not_in_review";
+  }
+
+  const now = new Date();
+  const updated = await prisma.homepageSection.update({
+    where: { id },
+    data: {
+      approvalStatus: APPROVAL_STATUS.APPROVED,
+      approvedAt: now,
+      reviewedAt: now,
+      approvedByUserId: actorUserId,
+      approvalNote: note ?? null,
+      // Clear any rejection data from a previous cycle
+      rejectedAt: null,
+      rejectedByUserId: null,
+    },
+    select: adminSelect,
+  });
+
+  void logAction({
+    actorUserId,
+    moduleKey: "homepage",
+    entityType: "HomepageSection",
+    entityId: id,
+    action: "APPROVE",
+    beforeJson: { approvalStatus: APPROVAL_STATUS.IN_REVIEW },
+    afterJson: { approvalStatus: APPROVAL_STATUS.APPROVED },
+    metadataJson: { tenantId, label: existing.label, note: note ?? null },
+  });
+
+  return updated as HomepageSectionAdminItem;
+}
+
+/**
+ * Rejects (requests changes for) a homepage section.
+ *
+ * Allowed from: IN_REVIEW only.
+ * Transitions approvalStatus to CHANGES_REQUESTED.
+ * Records rejectedAt, rejectedByUserId, reviewedAt, optional approvalNote.
+ * Audit trail: written to AuditLog (best-effort, never throws).
+ *
+ * Returns the updated section, null if not found, or
+ * "not_in_review" if the section is not currently in review.
+ */
+export async function rejectHomepageSection(
+  tenantId: string,
+  id: string,
+  actorUserId: string,
+  note?: string | null,
+): Promise<HomepageSectionAdminItem | null | "not_in_review"> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true, approvalStatus: true, label: true },
+  });
+  if (!existing) return null;
+
+  if (existing.approvalStatus !== APPROVAL_STATUS.IN_REVIEW) {
+    return "not_in_review";
+  }
+
+  const now = new Date();
+  const updated = await prisma.homepageSection.update({
+    where: { id },
+    data: {
+      approvalStatus: APPROVAL_STATUS.CHANGES_REQUESTED,
+      rejectedAt: now,
+      reviewedAt: now,
+      rejectedByUserId: actorUserId,
+      approvalNote: note ?? null,
+      // Clear any previous approval data
+      approvedAt: null,
+      approvedByUserId: null,
+    },
+    select: adminSelect,
+  });
+
+  void logAction({
+    actorUserId,
+    moduleKey: "homepage",
+    entityType: "HomepageSection",
+    entityId: id,
+    action: "REJECT",
+    beforeJson: { approvalStatus: APPROVAL_STATUS.IN_REVIEW },
+    afterJson: { approvalStatus: APPROVAL_STATUS.CHANGES_REQUESTED },
+    metadataJson: { tenantId, label: existing.label, note: note ?? null },
+  });
+
+  return updated as HomepageSectionAdminItem;
+}
+
+// ---------------------------------------------------------------------------
+// Review queue (CMS V2 Slice 6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all sections in the review queue for a tenant.
+ * Includes: IN_REVIEW, CHANGES_REQUESTED, DRAFT sections.
+ * Ordered by: reviewRequestedAt desc (most recently submitted first),
+ *             then createdAt asc as tiebreaker.
+ */
+export async function listSectionsForReview(
+  tenantId: string,
+): Promise<HomepageSectionAdminItem[]> {
+  const rows = await prisma.homepageSection.findMany({
+    where: {
+      tenantId,
+      approvalStatus: {
+        in: [
+          APPROVAL_STATUS.IN_REVIEW,
+          APPROVAL_STATUS.CHANGES_REQUESTED,
+          APPROVAL_STATUS.DRAFT,
+        ],
+      },
+    },
+    orderBy: [{ reviewRequestedAt: "desc" }, { createdAt: "asc" }],
+    select: adminSelect,
+  });
+  return rows as HomepageSectionAdminItem[];
+}
+
+/**
+ * Returns recently approved sections for a tenant (up to 10).
+ * Used by the review queue to show the approved history.
+ */
+export async function listRecentlyApprovedSections(
+  tenantId: string,
+  limit = 10,
+): Promise<HomepageSectionAdminItem[]> {
+  const rows = await prisma.homepageSection.findMany({
+    where: {
+      tenantId,
+      approvalStatus: APPROVAL_STATUS.APPROVED,
+    },
+    orderBy: [{ approvedAt: "desc" }],
+    take: limit,
+    select: adminSelect,
+  });
+  return rows as HomepageSectionAdminItem[];
+}
+
+/**
+ * Returns reviewer info (firstName, lastName) for a user ID.
+ * Used by the review queue UI to display reviewer names.
+ * Returns null if userId is null or user not found.
+ */
+export async function getReviewerInfo(
+  userId: string | null,
+): Promise<{ firstName: string; lastName: string } | null> {
+  if (!userId) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { firstName: true, lastName: true },
+  });
+  return user ?? null;
 }

@@ -397,6 +397,9 @@ model User {
   auditLogs             AuditLog[]      @relation("AuditActor")
   assignedRegistrations Registration[]  @relation("RegistrationAssignedUser")
   orgUnitMemberships    OrgUnitMembership[]
+  reviewedHomepageSections  HomepageSection[] @relation("HomepageSectionReviewer")
+  approvedHomepageSections  HomepageSection[] @relation("HomepageSectionApprovedBy")
+  rejectedHomepageSections  HomepageSection[] @relation("HomepageSectionRejectedBy")
 
   @@index([isActive])
   @@index([tenantId])
@@ -1453,7 +1456,7 @@ model WebsitePage {
 }
 
 // ---------------------------------------------------------------------------
-// HomepageSection — Configurable homepage layout sections (CMS V2 Slices 2–5)
+// HomepageSection — Configurable homepage layout sections (CMS V2 Slices 2–6)
 //
 // Each tenant has an ordered set of named sections that define the layout of
 // their public homepage. Sections are typed (see HomepageSectionType enum-like
@@ -1476,14 +1479,32 @@ model WebsitePage {
 //   - lastPublishedAt: most recent publish timestamp for audit trail (nullable).
 //   - scheduledPublishAt: if not null and <= now(), treated as published (nullable).
 //
+// Editorial approval workflow (CMS V2 Slice 6):
+//   - approvalStatus: NOT_REQUIRED | DRAFT | IN_REVIEW | APPROVED | CHANGES_REQUESTED
+//     Default "NOT_REQUIRED" preserves backwards compatibility for all pre-Slice-6 rows.
+//     Sections with NOT_REQUIRED or APPROVED may be published/scheduled.
+//     Sections with DRAFT, IN_REVIEW, or CHANGES_REQUESTED are blocked from publishing.
+//   - reviewerUserId: nullable FK to User assigned as reviewer (foundation-level).
+//   - reviewRequestedAt: when review was last requested.
+//   - reviewedAt: when the most recent review action was taken (approve or reject).
+//   - approvedAt: when the section was most recently approved.
+//   - rejectedAt: when the section was most recently rejected.
+//   - approvalNote: reviewer's note from the most recent approve/reject action.
+//   - approvedByUserId: nullable FK to User who approved.
+//   - rejectedByUserId: nullable FK to User who rejected.
+//   Audit trail: all approval state transitions are recorded in AuditLog
+//   (moduleKey="homepage", entityType="HomepageSection") via logAction().
+//
 // Public endpoint: GET /api/public/[tenant]/website/homepage
 //   Returns only sections where isEnabled=true AND publishStatus=PUBLISHED AND
 //   (scheduledPublishAt IS NULL OR scheduledPublishAt <= now()).
 //   Internal admin fields (createdAt, updatedAt, tenantId) are never exposed.
+//   Approval fields are NEVER exposed on the public endpoint.
 //
 // Future deferred work (document-only):
-//   - Review/approval workflow (reviewStatus field)
-//   - Four-eyes approval / assignment workflow
+//   - Full four-eyes policy engine
+//   - Email/push notification system
+//   - Full reviewer assignment workflow (role-based)
 //   - Drag-and-drop reordering
 //   - Sponsor section backed by a real Sponsor model
 //   - Background scheduler worker for scheduled publishing
@@ -1517,10 +1538,34 @@ model HomepageSection {
   /// Optional future publish date. If set and <= now(), section is treated as published.
   /// Null means no scheduled publication.
   scheduledPublishAt DateTime?
+  // ── Editorial approval workflow fields (CMS V2 Slice 6) ──────────────────
+  /// Approval status — "NOT_REQUIRED" | "DRAFT" | "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED".
+  /// Default "NOT_REQUIRED" preserves backwards compatibility for all pre-Slice-6 rows.
+  /// Only APPROVED and NOT_REQUIRED sections may be published or scheduled.
+  approvalStatus     String    @default("NOT_REQUIRED")
+  /// Nullable FK to the User assigned as reviewer (foundation-level assignment).
+  reviewerUserId     String?
+  /// When review was most recently requested (set by request-review action).
+  reviewRequestedAt  DateTime?
+  /// When the most recent review action was taken (approve or reject).
+  reviewedAt         DateTime?
+  /// When the section was most recently approved.
+  approvedAt         DateTime?
+  /// When the section was most recently rejected.
+  rejectedAt         DateTime?
+  /// Note left by the reviewer during approve or reject (most recent action).
+  approvalNote       String?
+  /// Nullable FK to the User who most recently approved this section.
+  approvedByUserId   String?
+  /// Nullable FK to the User who most recently rejected this section.
+  rejectedByUserId   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant           Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewerUser     User?   @relation("HomepageSectionReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedByUser   User?   @relation("HomepageSectionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  rejectedByUser   User?   @relation("HomepageSectionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([tenantId])
   @@index([tenantId, isEnabled])
@@ -1529,4 +1574,5 @@ model HomepageSection {
   @@index([tenantId, publishStatus])
   @@index([tenantId, isEnabled, publishStatus])
   @@index([scheduledPublishAt])
+  @@index([tenantId, approvalStatus])
 }
