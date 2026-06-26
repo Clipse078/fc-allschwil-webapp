@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import {
   LayoutTemplate,
   Eye,
@@ -13,6 +13,10 @@ import {
   Pencil,
   X,
   Check,
+  Globe,
+  GlobeLock,
+  Clock,
+  Info,
 } from "lucide-react";
 import { SectionCard, EmptyState } from "@/components/ui/page";
 import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
@@ -52,6 +56,48 @@ function EnabledBadge({ isEnabled }: { isEnabled: boolean }) {
         className={`h-1.5 w-1.5 rounded-full ${isEnabled ? "bg-emerald-500" : "bg-gray-300"}`}
       />
       {isEnabled ? "Aktiv" : "Deaktiviert"}
+    </span>
+  );
+}
+
+function PublishStatusBadge({
+  publishStatus,
+  scheduledPublishAt,
+}: {
+  publishStatus: string;
+  scheduledPublishAt: Date | string | null;
+}) {
+  const isPublished = publishStatus === "PUBLISHED";
+  const scheduledDate =
+    scheduledPublishAt != null ? new Date(scheduledPublishAt) : null;
+  const isScheduled =
+    !isPublished && scheduledDate !== null && scheduledDate > new Date();
+
+  if (isPublished) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+        <Globe className="h-3 w-3" />
+        Veröffentlicht
+      </span>
+    );
+  }
+
+  if (isScheduled) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+        title={`Geplant für: ${scheduledDate!.toLocaleString("de-CH")}`}
+      >
+        <Clock className="h-3 w-3" />
+        Geplant
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--muted)]">
+      <GlobeLock className="h-3 w-3" />
+      Entwurf
     </span>
   );
 }
@@ -497,6 +543,12 @@ export default function HomepageSectionList() {
   const [editPending, setEditPending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // ── Schedule modal state ─────────────────────────────────────────────────
+  const [schedulingId, setSchedulingId] = useState<string | null>(null);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [schedulePending, setSchedulePending] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -553,6 +605,90 @@ export default function HomepageSectionList() {
       setSections(data.sections ?? []);
     } finally {
       setActionPending(null);
+    }
+  }
+
+  async function handlePublish(id: string) {
+    setActionPending(`${id}-publish`);
+    try {
+      const res = await fetch(`/api/homepage-sections/${id}/publish`, {
+        method: "PATCH",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Fehler beim Veröffentlichen");
+        return;
+      }
+      setSections((prev) =>
+        prev.map((s) => (s.id === id ? data.section : s)),
+      );
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  async function handleUnpublish(id: string) {
+    setActionPending(`${id}-unpublish`);
+    try {
+      const res = await fetch(`/api/homepage-sections/${id}/unpublish`, {
+        method: "PATCH",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Fehler beim Zurückziehen");
+        return;
+      }
+      setSections((prev) =>
+        prev.map((s) => (s.id === id ? data.section : s)),
+      );
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  function handleStartSchedule(id: string) {
+    setSchedulingId(id);
+    // Default to tomorrow at 09:00 local time
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    // datetime-local input expects "YYYY-MM-DDTHH:MM"
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const localStr = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
+    setScheduleDate(localStr);
+    setScheduleError(null);
+  }
+
+  async function handleConfirmSchedule() {
+    if (!schedulingId) return;
+    setSchedulePending(true);
+    setScheduleError(null);
+    try {
+      const dt = new Date(scheduleDate);
+      if (isNaN(dt.getTime())) {
+        setScheduleError("Ungültiges Datum.");
+        return;
+      }
+      if (dt <= new Date()) {
+        setScheduleError("Das Datum muss in der Zukunft liegen.");
+        return;
+      }
+      const res = await fetch(`/api/homepage-sections/${schedulingId}/schedule`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledPublishAt: dt.toISOString() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setScheduleError(data?.error ?? "Fehler beim Planen");
+        return;
+      }
+      setSections((prev) =>
+        prev.map((s) => (s.id === schedulingId ? data.section : s)),
+      );
+      setSchedulingId(null);
+    } finally {
+      setSchedulePending(false);
     }
   }
 
@@ -634,293 +770,418 @@ export default function HomepageSectionList() {
 
   const isAnyActionPending = actionPending !== null || bootstrapping;
 
-  return (
-    <SectionCard noPadding>
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
-        <div className="flex items-center gap-2">
-          <p className="text-xs text-[var(--muted)]">
-            {loading
-              ? "Wird geladen…"
-              : `${sections.length} Sektion${sections.length !== 1 ? "en" : ""} konfiguriert`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading || isAnyActionPending}
-          className="fca-button-secondary px-2.5"
-          title="Aktualisieren"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </div>
+  const publishedCount = sections.filter(
+    (s) => s.isEnabled && s.publishStatus === "PUBLISHED",
+  ).length;
 
-      {/* Error banner */}
-      {error && (
-        <div className="flex items-start gap-2 border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
+  return (
+    <>
+      {/* Schedule modal */}
+      {schedulingId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xl">
+            <div className="mb-4 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-600" />
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                Veröffentlichung planen
+              </p>
+            </div>
+            <p className="mb-3 text-xs text-[var(--text-2)]">
+              Die Sektion wird ab diesem Zeitpunkt automatisch in der
+              öffentlichen Homepage-API erscheinen.
+            </p>
+            <div className="mb-4">
+              <label className="fca-label mb-1 block">Datum und Uhrzeit</label>
+              <input
+                type="datetime-local"
+                className="fca-input"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                disabled={schedulePending}
+              />
+            </div>
+            {scheduleError && (
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {scheduleError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleConfirmSchedule}
+                disabled={schedulePending}
+                className="fca-button-primary"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                {schedulePending ? "Wird geplant…" : "Planen"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSchedulingId(null)}
+                disabled={schedulePending}
+                className="fca-button-secondary"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Content */}
-      {loading && sections.length === 0 ? (
-        <div className="space-y-2 p-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-14 animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]"
-            />
-          ))}
+      <SectionCard noPadding>
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-[var(--muted)]">
+              {loading
+                ? "Wird geladen…"
+                : `${sections.length} Sektion${sections.length !== 1 ? "en" : ""} konfiguriert`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading || isAnyActionPending}
+            className="fca-button-secondary px-2.5"
+            title="Aktualisieren"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          </button>
         </div>
-      ) : sections.length === 0 ? (
-        <EmptyState
-          icon={<LayoutTemplate className="h-10 w-10" />}
-          heading="Keine Sektionen konfiguriert"
-          description="Erstelle die Standard-Sektionen, um mit dem Homepage Builder zu starten."
-          action={
-            <button
-              type="button"
-              onClick={handleBootstrap}
-              disabled={bootstrapping}
-              className="fca-button-primary"
-            >
-              <Sparkles className="h-4 w-4" />
-              {bootstrapping ? "Wird erstellt…" : "Standard-Sektionen erstellen"}
-            </button>
-          }
-        />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <tr>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Reihenfolge
-                </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Sektion
-                </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Typ
-                </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Status
-                </th>
-                <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Aktionen
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {sections.map((section, idx) => {
-                const def = getHomepageSectionType(section.type);
-                const isFirst = idx === 0;
-                const isLast = idx === sections.length - 1;
-                const isThisPending =
-                  actionPending === section.id ||
-                  actionPending === `${section.id}-up` ||
-                  actionPending === `${section.id}-down`;
-                const isEditing = editingId === section.id;
 
-                return (
-                  <>
-                    <tr
-                      key={section.id}
-                      className={`bg-[var(--surface)] transition hover:bg-[var(--surface-2)] ${
-                        !section.isEnabled ? "opacity-60" : ""
-                      } ${isEditing ? "bg-blue-50 hover:bg-blue-50" : ""}`}
-                    >
-                      {/* Sort position */}
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-xs text-[var(--muted)]">
-                          {String(section.sortOrder).padStart(2, "0")}
-                        </span>
-                      </td>
+        {/* Governance info banner */}
+        <div className="flex items-start gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-3 text-xs text-[var(--text-2)]">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+          <span>
+            <span className="font-medium text-[var(--foreground)]">Veröffentlichungs-Workflow:</span>{" "}
+            Sektionen müssen sowohl <span className="font-medium">aktiviert</span> als auch{" "}
+            <span className="font-medium">veröffentlicht</span> sein, um in der öffentlichen API zu erscheinen.
+            {" "}Vierstufige Freigabe und Zuweisung sind für einen späteren CMS-Slice geplant.
+          </span>
+        </div>
 
-                      {/* Label + description */}
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium text-[var(--foreground)]">
-                            {section.label}
-                          </p>
-                          {def && (
-                            <p className="mt-0.5 text-[11px] text-[var(--muted)] line-clamp-1">
-                              {def.description}
+        {/* Error banner */}
+        {error && (
+          <div className="flex items-start gap-2 border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {/* Content */}
+        {loading && sections.length === 0 ? (
+          <div className="space-y-2 p-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]"
+              />
+            ))}
+          </div>
+        ) : sections.length === 0 ? (
+          <EmptyState
+            icon={<LayoutTemplate className="h-10 w-10" />}
+            heading="Keine Sektionen konfiguriert"
+            description="Erstelle die Standard-Sektionen, um mit dem Homepage Builder zu starten."
+            action={
+              <button
+                type="button"
+                onClick={handleBootstrap}
+                disabled={bootstrapping}
+                className="fca-button-primary"
+              >
+                <Sparkles className="h-4 w-4" />
+                {bootstrapping ? "Wird erstellt…" : "Standard-Sektionen erstellen"}
+              </button>
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Reihenfolge
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Sektion
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Typ
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Aktiv
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Publikation
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Aktionen
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {sections.map((section, idx) => {
+                  const def = getHomepageSectionType(section.type);
+                  const isFirst = idx === 0;
+                  const isLast = idx === sections.length - 1;
+                  const isThisPending =
+                    actionPending === section.id ||
+                    actionPending === `${section.id}-up` ||
+                    actionPending === `${section.id}-down` ||
+                    actionPending === `${section.id}-publish` ||
+                    actionPending === `${section.id}-unpublish`;
+                  const isEditing = editingId === section.id;
+                  const isPublished = section.publishStatus === "PUBLISHED";
+
+                  return (
+                    <Fragment key={section.id}>
+                      <tr
+                        className={`bg-[var(--surface)] transition hover:bg-[var(--surface-2)] ${
+                          !section.isEnabled ? "opacity-60" : ""
+                        } ${isEditing ? "bg-blue-50 hover:bg-blue-50" : ""}`}
+                      >
+                        {/* Sort position */}
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-xs text-[var(--muted)]">
+                            {String(section.sortOrder).padStart(2, "0")}
+                          </span>
+                        </td>
+
+                        {/* Label + description */}
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="font-medium text-[var(--foreground)]">
+                              {section.label}
                             </p>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Type badge */}
-                      <td className="px-4 py-3">
-                        <SectionTypeBadge type={section.type} />
-                      </td>
-
-                      {/* Enabled badge */}
-                      <td className="px-4 py-3">
-                        <EnabledBadge isEnabled={section.isEnabled} />
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Move up */}
-                          <button
-                            type="button"
-                            onClick={() => handleMove(section.id, "up")}
-                            disabled={isFirst || isAnyActionPending || isEditing}
-                            className="sce-icon-button disabled:opacity-30"
-                            title="Nach oben"
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </button>
-
-                          {/* Move down */}
-                          <button
-                            type="button"
-                            onClick={() => handleMove(section.id, "down")}
-                            disabled={isLast || isAnyActionPending || isEditing}
-                            className="sce-icon-button disabled:opacity-30"
-                            title="Nach unten"
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </button>
-
-                          {/* Toggle enable/disable */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggle(section.id)}
-                            disabled={isThisPending || isAnyActionPending || isEditing}
-                            className={`sce-icon-button ${
-                              section.isEnabled
-                                ? "text-emerald-600 hover:text-emerald-800"
-                                : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                            }`}
-                            title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
-                          >
-                            {section.isEnabled ? (
-                              <Eye className="h-3.5 w-3.5" />
-                            ) : (
-                              <EyeOff className="h-3.5 w-3.5" />
+                            {def && (
+                              <p className="mt-0.5 text-[11px] text-[var(--muted)] line-clamp-1">
+                                {def.description}
+                              </p>
                             )}
-                          </button>
+                            {section.scheduledPublishAt &&
+                              section.publishStatus !== "PUBLISHED" && (
+                                <p className="mt-0.5 text-[11px] text-amber-600">
+                                  Geplant:{" "}
+                                  {new Date(section.scheduledPublishAt).toLocaleString("de-CH")}
+                                </p>
+                              )}
+                          </div>
+                        </td>
 
-                          {/* Edit / cancel edit */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              isEditing ? handleCancelEdit() : handleStartEdit(section)
-                            }
-                            disabled={isAnyActionPending}
-                            className={`sce-icon-button ${
-                              isEditing
-                                ? "text-blue-600 hover:text-blue-800"
-                                : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                            }`}
-                            title={isEditing ? "Bearbeitung abbrechen" : "Bearbeiten"}
-                          >
-                            {isEditing ? (
-                              <X className="h-3.5 w-3.5" />
-                            ) : (
-                              <Pencil className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                        {/* Type badge */}
+                        <td className="px-4 py-3">
+                          <SectionTypeBadge type={section.type} />
+                        </td>
 
-                    {/* Inline edit panel */}
-                    {isEditing && (
-                      <tr key={`${section.id}-edit`}>
-                        <td
-                          colSpan={5}
-                          className="border-b border-blue-100 bg-blue-50 px-5 py-4"
-                        >
-                          <div className="space-y-4">
-                            {/* Panel header */}
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-600">
-                              Sektion bearbeiten
-                            </p>
+                        {/* Enabled badge */}
+                        <td className="px-4 py-3">
+                          <EnabledBadge isEnabled={section.isEnabled} />
+                        </td>
 
-                            {/* Label field */}
-                            <div className="max-w-sm">
-                              <label className="fca-label mb-1 block">Bezeichnung</label>
-                              <input
-                                type="text"
-                                className="fca-input"
-                                value={editLabel}
-                                onChange={(e) => setEditLabel(e.target.value)}
-                                placeholder="Sektionsbezeichnung"
-                                maxLength={200}
-                                disabled={editPending}
-                              />
-                            </div>
+                        {/* Publish status badge */}
+                        <td className="px-4 py-3">
+                          <PublishStatusBadge
+                            publishStatus={section.publishStatus}
+                            scheduledPublishAt={section.scheduledPublishAt}
+                          />
+                        </td>
 
-                            {/* Per-type config fields */}
-                            {(getBlockDefinition(section.type)?.configKeys.length ?? 0) > 0 && (
-                              <div>
-                                <p className="fca-label mb-2 block">Konfiguration</p>
-                                <ConfigFields
-                                  type={section.type}
-                                  config={editConfig}
-                                  onChange={handleConfigFieldChange}
-                                  disabled={editPending}
-                                />
-                              </div>
-                            )}
+                        {/* Actions */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Move up */}
+                            <button
+                              type="button"
+                              onClick={() => handleMove(section.id, "up")}
+                              disabled={isFirst || isAnyActionPending || isEditing}
+                              className="sce-icon-button disabled:opacity-30"
+                              title="Nach oben"
+                            >
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </button>
 
-                            {/* Edit error */}
-                            {editError && (
-                              <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                {editError}
-                              </div>
-                            )}
+                            {/* Move down */}
+                            <button
+                              type="button"
+                              onClick={() => handleMove(section.id, "down")}
+                              disabled={isLast || isAnyActionPending || isEditing}
+                              className="sce-icon-button disabled:opacity-30"
+                              title="Nach unten"
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
 
-                            {/* Save / cancel */}
-                            <div className="flex items-center gap-2">
+                            {/* Toggle enable/disable */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggle(section.id)}
+                              disabled={isThisPending || isAnyActionPending || isEditing}
+                              className={`sce-icon-button ${
+                                section.isEnabled
+                                  ? "text-emerald-600 hover:text-emerald-800"
+                                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                              }`}
+                              title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
+                            >
+                              {section.isEnabled ? (
+                                <Eye className="h-3.5 w-3.5" />
+                              ) : (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+
+                            {/* Publish / Unpublish */}
+                            {isPublished ? (
                               <button
                                 type="button"
-                                onClick={() => handleSaveEdit(section)}
-                                disabled={editPending || editLabel.trim().length === 0}
-                                className="fca-button-primary"
+                                onClick={() => handleUnpublish(section.id)}
+                                disabled={isThisPending || isAnyActionPending || isEditing}
+                                className="sce-icon-button text-blue-600 hover:text-blue-800"
+                                title="Aus Publikation zurückziehen (Entwurf)"
                               >
-                                <Check className="h-3.5 w-3.5" />
-                                {editPending ? "Wird gespeichert…" : "Speichern"}
+                                <GlobeLock className="h-3.5 w-3.5" />
                               </button>
+                            ) : (
                               <button
                                 type="button"
-                                onClick={handleCancelEdit}
-                                disabled={editPending}
-                                className="fca-button-secondary"
+                                onClick={() => handlePublish(section.id)}
+                                disabled={isThisPending || isAnyActionPending || isEditing}
+                                className="sce-icon-button text-[var(--muted)] hover:text-blue-600"
+                                title="Veröffentlichen"
                               >
-                                Abbrechen
+                                <Globe className="h-3.5 w-3.5" />
                               </button>
-                            </div>
+                            )}
+
+                            {/* Schedule publish */}
+                            {!isPublished && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartSchedule(section.id)}
+                                disabled={isThisPending || isAnyActionPending || isEditing}
+                                className="sce-icon-button text-[var(--muted)] hover:text-amber-600"
+                                title="Veröffentlichung planen"
+                              >
+                                <Clock className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+
+                            {/* Edit / cancel edit */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                isEditing ? handleCancelEdit() : handleStartEdit(section)
+                              }
+                              disabled={isAnyActionPending}
+                              className={`sce-icon-button ${
+                                isEditing
+                                  ? "text-blue-600 hover:text-blue-800"
+                                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                              }`}
+                              title={isEditing ? "Bearbeitung abbrechen" : "Bearbeiten"}
+                            >
+                              {isEditing ? (
+                                <X className="h-3.5 w-3.5" />
+                              ) : (
+                                <Pencil className="h-3.5 w-3.5" />
+                              )}
+                            </button>
                           </div>
                         </td>
                       </tr>
-                    )}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* Footer count */}
-      {!loading && sections.length > 0 && (
-        <div className="border-t border-[var(--border)] px-5 py-3">
-          <p className="text-[11px] text-[var(--muted)]">
-            {sections.filter((s) => s.isEnabled).length} von{" "}
-            {sections.length} Sektionen aktiv · sichtbar in der öffentlichen
-            Homepage-API
-          </p>
-        </div>
-      )}
-    </SectionCard>
+                      {/* Inline edit panel */}
+                      {isEditing && (
+                        <tr key={`${section.id}-edit`}>
+                          <td
+                            colSpan={6}
+                            className="border-b border-blue-100 bg-blue-50 px-5 py-4"
+                          >
+                            <div className="space-y-4">
+                              {/* Panel header */}
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-600">
+                                Sektion bearbeiten
+                              </p>
+
+                              {/* Label field */}
+                              <div className="max-w-sm">
+                                <label className="fca-label mb-1 block">Bezeichnung</label>
+                                <input
+                                  type="text"
+                                  className="fca-input"
+                                  value={editLabel}
+                                  onChange={(e) => setEditLabel(e.target.value)}
+                                  placeholder="Sektionsbezeichnung"
+                                  maxLength={200}
+                                  disabled={editPending}
+                                />
+                              </div>
+
+                              {/* Per-type config fields */}
+                              {(getBlockDefinition(section.type)?.configKeys.length ?? 0) > 0 && (
+                                <div>
+                                  <p className="fca-label mb-2 block">Konfiguration</p>
+                                  <ConfigFields
+                                    type={section.type}
+                                    config={editConfig}
+                                    onChange={handleConfigFieldChange}
+                                    disabled={editPending}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Edit error */}
+                              {editError && (
+                                <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                  {editError}
+                                </div>
+                              )}
+
+                              {/* Save / cancel */}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(section)}
+                                  disabled={editPending || editLabel.trim().length === 0}
+                                  className="fca-button-primary"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  {editPending ? "Wird gespeichert…" : "Speichern"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEdit}
+                                  disabled={editPending}
+                                  className="fca-button-secondary"
+                                >
+                                  Abbrechen
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Footer count */}
+        {!loading && sections.length > 0 && (
+          <div className="border-t border-[var(--border)] px-5 py-3">
+            <p className="text-[11px] text-[var(--muted)]">
+              {publishedCount} von {sections.length} Sektionen aktiv &amp; veröffentlicht
+              · sichtbar in der öffentlichen Homepage-API
+            </p>
+          </div>
+        )}
+      </SectionCard>
+    </>
   );
 }

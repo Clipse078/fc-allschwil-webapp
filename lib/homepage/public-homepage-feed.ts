@@ -3,9 +3,18 @@
  *
  * Server-side loader for the public homepage layout API.
  *
- * Returns only enabled sections, ordered by sortOrder ascending.
- * Never exposes tenantId, createdAt, or updatedAt — only fields safe for
- * public consumption.
+ * Returns only sections that pass ALL of the following gates:
+ *   1. isEnabled = true
+ *   2. publishStatus = "PUBLISHED" OR scheduledPublishAt <= now()
+ *
+ * These two gates together mean:
+ *   - Drafts are never exposed publicly.
+ *   - Disabled sections are never exposed publicly.
+ *   - Scheduled sections become live automatically once their scheduled time passes.
+ *
+ * Never exposes: tenantId, createdAt, updatedAt, isEnabled, publishStatus,
+ * publishedAt, unpublishedAt, lastPublishedAt, scheduledPublishAt.
+ * Only fields safe for public consumption are returned.
  *
  * Each section item includes a `block` field with public-safe block metadata
  * from the block registry (category and datadriven flag). Backwards-compatible
@@ -33,7 +42,8 @@ import {
 /**
  * Single homepage section safe for public API exposure.
  *
- * Intentionally omits: tenantId, createdAt, updatedAt, isEnabled.
+ * Intentionally omits: tenantId, createdAt, updatedAt, isEnabled,
+ * publishStatus, publishedAt, unpublishedAt, lastPublishedAt, scheduledPublishAt.
  * Config is projected through the block registry's public-safe projection.
  *
  * The `block` field carries public-safe block metadata from the registry.
@@ -64,14 +74,31 @@ export type PublicHomepageSectionItem = {
 /**
  * Loads the public homepage section list for a tenant.
  *
- * Filters: isEnabled = true only.
+ * Filtering:
+ *   - isEnabled = true (gate 1)
+ *   - publishStatus = "PUBLISHED" OR scheduledPublishAt <= now() (gate 2 — added Slice 5)
+ *
  * Order: sortOrder ascending, then createdAt ascending as tiebreaker.
+ *
+ * Note on backwards compatibility: the publishStatus default is "PUBLISHED"
+ * for all pre-Slice-5 rows, so no existing public section is ever hidden by
+ * the migration alone.
  */
 export async function getPublicHomepageSections(
   tenantId: string,
 ): Promise<PublicHomepageSectionItem[]> {
+  const now = new Date();
+
   const rows = await prisma.homepageSection.findMany({
-    where: { tenantId, isEnabled: true },
+    where: {
+      tenantId,
+      isEnabled: true,
+      OR: [
+        { publishStatus: "PUBLISHED" },
+        // Treat scheduled sections as published once their scheduled time passes
+        { scheduledPublishAt: { lte: now } },
+      ],
+    },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -79,6 +106,7 @@ export async function getPublicHomepageSections(
       label: true,
       sortOrder: true,
       config: true,
+      // Publishing fields intentionally not selected — never exposed publicly
     },
   });
 
@@ -95,6 +123,74 @@ export async function getPublicHomepageSections(
       sortOrder: row.sortOrder,
       config: projectBlockPublicConfig(row.type, rawConfig),
       block: getPublicBlockMeta(row.type),
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin preview loader (all non-deleted sections regardless of publish status)
+// ---------------------------------------------------------------------------
+
+/**
+ * Loads ALL homepage sections for a tenant regardless of isEnabled or publishStatus.
+ * Used by the admin preview endpoint — caller must verify WEBSITE_MANAGE permission.
+ *
+ * Returns sections ordered by sortOrder ascending, with an extra `isDraft` flag
+ * so the preview UI can visually distinguish draft sections.
+ *
+ * This function intentionally exposes more fields than the public loader because
+ * it is called only from authenticated admin endpoints.
+ */
+export type PreviewHomepageSectionItem = PublicHomepageSectionItem & {
+  /** True if the section is not yet published (publishStatus = "DRAFT" and no active schedule). */
+  isDraft: boolean;
+  /** True if the section is disabled (isEnabled = false). */
+  isDisabled: boolean;
+  /** Scheduled publish time, if any. */
+  scheduledPublishAt: Date | null;
+};
+
+export async function getPreviewHomepageSections(
+  tenantId: string,
+): Promise<PreviewHomepageSectionItem[]> {
+  const now = new Date();
+
+  const rows = await prisma.homepageSection.findMany({
+    where: { tenantId },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      type: true,
+      label: true,
+      sortOrder: true,
+      config: true,
+      isEnabled: true,
+      publishStatus: true,
+      scheduledPublishAt: true,
+    },
+  });
+
+  return rows.map((row) => {
+    const rawConfig =
+      row.config !== null && typeof row.config === "object"
+        ? (row.config as Record<string, unknown>)
+        : {};
+
+    const isScheduledAndLive =
+      row.scheduledPublishAt !== null && row.scheduledPublishAt <= now;
+    const isDraft =
+      row.publishStatus !== "PUBLISHED" && !isScheduledAndLive;
+
+    return {
+      id: row.id,
+      type: row.type,
+      label: row.label,
+      sortOrder: row.sortOrder,
+      config: projectBlockPublicConfig(row.type, rawConfig),
+      block: getPublicBlockMeta(row.type),
+      isDraft,
+      isDisabled: !row.isEnabled,
+      scheduledPublishAt: row.scheduledPublishAt,
     };
   });
 }
