@@ -34,7 +34,6 @@ import {
 import {
   APPROVAL_STATUS,
   APPROVAL_STATUS_LABELS,
-  type ApprovalStatus,
 } from "@/lib/homepage/approval-constants";
 import {
   PageShell,
@@ -44,47 +43,10 @@ import {
 import { ReviewQueueClient } from "@/components/admin/homepage/ReviewQueueClient";
 
 // ---------------------------------------------------------------------------
-// Approval status badge config
-// ---------------------------------------------------------------------------
-
-const STATUS_CONFIG: Record<
-  ApprovalStatus,
-  { icon: React.ElementType; colorClass: string; bgClass: string }
-> = {
-  NOT_REQUIRED: {
-    icon: CheckCircle2,
-    colorClass: "text-[var(--text-2)]",
-    bgClass: "bg-[var(--surface-2)]",
-  },
-  DRAFT: {
-    icon: FileEdit,
-    colorClass: "text-amber-600",
-    bgClass: "bg-amber-50",
-  },
-  IN_REVIEW: {
-    icon: Clock,
-    colorClass: "text-blue-600",
-    bgClass: "bg-blue-50",
-  },
-  APPROVED: {
-    icon: CheckCircle2,
-    colorClass: "text-emerald-600",
-    bgClass: "bg-emerald-50",
-  },
-  CHANGES_REQUESTED: {
-    icon: XCircle,
-    colorClass: "text-red-600",
-    bgClass: "bg-red-50",
-  },
-};
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default async function ReviewQueuePage() {
-  await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
-
   const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
   const tenantId = session.user?.tenantId;
   if (!tenantId) notFound();
@@ -201,7 +163,6 @@ export default async function ReviewQueuePage() {
       <ReviewQueueClient
         queue={queue}
         recentlyApproved={recentlyApproved}
-        statusConfig={STATUS_CONFIG}
         approvalStatusLabels={APPROVAL_STATUS_LABELS}
       />
     </PageShell>
@@ -209,7 +170,7 @@ export default async function ReviewQueuePage() {
 }
 
 // ---------------------------------------------------------------------------
-// SummaryCard
+// SummaryCard (server-side helper — fine to pass icon components here)
 // ---------------------------------------------------------------------------
 
 function SummaryCard({

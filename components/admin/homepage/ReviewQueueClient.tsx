@@ -33,16 +33,47 @@ import { CMS_ROUTES } from "@/lib/cms/routes";
 // Props
 // ---------------------------------------------------------------------------
 
+type Props = {
+  queue: HomepageSectionAdminItem[];
+  recentlyApproved: HomepageSectionAdminItem[];
+  approvalStatusLabels: Record<ApprovalStatus, string>;
+};
+
+// ---------------------------------------------------------------------------
+// Approval status config (client-only: contains React components)
+// ---------------------------------------------------------------------------
+
 type StatusConfig = Record<
   ApprovalStatus,
   { icon: React.ElementType; colorClass: string; bgClass: string }
 >;
 
-type Props = {
-  queue: HomepageSectionAdminItem[];
-  recentlyApproved: HomepageSectionAdminItem[];
-  statusConfig: StatusConfig;
-  approvalStatusLabels: Record<ApprovalStatus, string>;
+const STATUS_CONFIG: StatusConfig = {
+  NOT_REQUIRED: {
+    icon: CheckCircle2,
+    colorClass: "text-[var(--text-2)]",
+    bgClass: "bg-[var(--surface-2)]",
+  },
+  DRAFT: {
+    icon: FileEdit,
+    colorClass: "text-amber-600",
+    bgClass: "bg-amber-50",
+  },
+  IN_REVIEW: {
+    icon: Clock,
+    colorClass: "text-blue-600",
+    bgClass: "bg-blue-50",
+  },
+  APPROVED: {
+    icon: CheckCircle2,
+    colorClass: "text-emerald-600",
+    bgClass: "bg-emerald-50",
+  },
+  CHANGES_REQUESTED: {
+    icon: XCircle,
+    colorClass: "text-red-600",
+    bgClass: "bg-red-50",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -51,14 +82,12 @@ type Props = {
 
 function ApprovalBadge({
   status,
-  statusConfig,
   labels,
 }: {
   status: ApprovalStatus;
-  statusConfig: StatusConfig;
   labels: Record<ApprovalStatus, string>;
 }) {
-  const cfg = statusConfig[status];
+  const cfg = STATUS_CONFIG[status];
   const Icon = cfg.icon;
   return (
     <span
@@ -77,7 +106,6 @@ function ApprovalBadge({
 export function ReviewQueueClient({
   queue: initialQueue,
   recentlyApproved: initialApproved,
-  statusConfig,
   approvalStatusLabels,
 }: Props) {
   const [queue, setQueue] = useState(initialQueue);
@@ -293,7 +321,6 @@ export function ReviewQueueClient({
             <QueueRow
               key={s.id}
               section={s}
-              statusConfig={statusConfig}
               approvalStatusLabels={approvalStatusLabels}
               actionPending={actionPending}
               showApprove
@@ -318,7 +345,6 @@ export function ReviewQueueClient({
             <QueueRow
               key={s.id}
               section={s}
-              statusConfig={statusConfig}
               approvalStatusLabels={approvalStatusLabels}
               actionPending={actionPending}
               showRequestReview
@@ -341,7 +367,6 @@ export function ReviewQueueClient({
             <QueueRow
               key={s.id}
               section={s}
-              statusConfig={statusConfig}
               approvalStatusLabels={approvalStatusLabels}
               actionPending={actionPending}
               showRequestReview
@@ -376,7 +401,6 @@ export function ReviewQueueClient({
               <QueueRow
                 key={s.id}
                 section={s}
-                statusConfig={statusConfig}
                 approvalStatusLabels={approvalStatusLabels}
                 actionPending={actionPending}
               />
@@ -432,7 +456,6 @@ function Section({
 
 function QueueRow({
   section,
-  statusConfig,
   approvalStatusLabels,
   actionPending,
   showApprove,
@@ -443,7 +466,6 @@ function QueueRow({
   onRequestReview,
 }: {
   section: HomepageSectionAdminItem;
-  statusConfig: StatusConfig;
   approvalStatusLabels: Record<ApprovalStatus, string>;
   actionPending: string | null;
   showApprove?: boolean;
@@ -470,7 +492,6 @@ function QueueRow({
           </p>
           <ApprovalBadge
             status={approvalStatus}
-            statusConfig={statusConfig}
             labels={approvalStatusLabels}
           />
         </div>
