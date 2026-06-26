@@ -14,6 +14,8 @@
  *
  * Never exposes: tenantId, createdAt, updatedAt, isEnabled, publishStatus,
  * publishedAt, unpublishedAt, lastPublishedAt, scheduledPublishAt.
+ * Approval fields (approvalStatus, reviewerUserId, approvalNote, approvedAt,
+ * rejectedAt, etc.) are NEVER exposed on the public endpoint.
  * Only fields safe for public consumption are returned.
  *
  * Each section item includes a `block` field with public-safe block metadata
@@ -135,8 +137,11 @@ export async function getPublicHomepageSections(
  * Loads ALL homepage sections for a tenant regardless of isEnabled or publishStatus.
  * Used by the admin preview endpoint — caller must verify WEBSITE_MANAGE permission.
  *
- * Returns sections ordered by sortOrder ascending, with an extra `isDraft` flag
- * so the preview UI can visually distinguish draft sections.
+ * Returns sections ordered by sortOrder ascending, with extra admin-only flags
+ * so the preview UI can visually distinguish draft and pending-review sections.
+ *
+ * Approval fields are intentionally included here because this is an admin-only
+ * function gated behind WEBSITE_MANAGE. They MUST NOT appear on the public API.
  *
  * This function intentionally exposes more fields than the public loader because
  * it is called only from authenticated admin endpoints.
@@ -148,6 +153,19 @@ export type PreviewHomepageSectionItem = PublicHomepageSectionItem & {
   isDisabled: boolean;
   /** Scheduled publish time, if any. */
   scheduledPublishAt: Date | null;
+  // ── Approval metadata (admin-only, never on public endpoint) ──────────────
+  /** Editorial approval status. Never exposed on public API. */
+  approvalStatus: string;
+  /** Reviewer user ID if assigned. Never exposed on public API. */
+  reviewerUserId: string | null;
+  /** Most recent review note left by the reviewer. Never exposed on public API. */
+  approvalNote: string | null;
+  /** When review was most recently requested. Never exposed on public API. */
+  reviewRequestedAt: Date | null;
+  /** When the most recent review action was taken. Never exposed on public API. */
+  reviewedAt: Date | null;
+  /** When most recently approved. Never exposed on public API. */
+  approvedAt: Date | null;
 };
 
 export async function getPreviewHomepageSections(
@@ -167,6 +185,12 @@ export async function getPreviewHomepageSections(
       isEnabled: true,
       publishStatus: true,
       scheduledPublishAt: true,
+      approvalStatus: true,
+      reviewerUserId: true,
+      approvalNote: true,
+      reviewRequestedAt: true,
+      reviewedAt: true,
+      approvedAt: true,
     },
   });
 
@@ -191,6 +215,12 @@ export async function getPreviewHomepageSections(
       isDraft,
       isDisabled: !row.isEnabled,
       scheduledPublishAt: row.scheduledPublishAt,
+      approvalStatus: row.approvalStatus,
+      reviewerUserId: row.reviewerUserId,
+      approvalNote: row.approvalNote,
+      reviewRequestedAt: row.reviewRequestedAt,
+      reviewedAt: row.reviewedAt,
+      approvedAt: row.approvedAt,
     };
   });
 }

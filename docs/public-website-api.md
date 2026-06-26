@@ -1086,7 +1086,19 @@ Returns the ordered list of enabled homepage sections for the tenant.
 - Admin preview endpoint: `GET /api/homepage-sections/preview` (requires `WEBSITE_MANAGE`)
 - Backwards compatible: migration default `publishStatus = "PUBLISHED"` preserves existing visibility
 
-### Public API filtering (Slice 5 — updated)
+### Implemented in CMS V2 Slice 6
+
+- Editorial approval workflow: `approvalStatus` (NOT_REQUIRED | DRAFT | IN_REVIEW | APPROVED | CHANGES_REQUESTED)
+- Reviewer assignment foundation: `reviewerUserId` nullable FK to User
+- Approval audit trail via existing `AuditLog` model (moduleKey="homepage", actions: APPROVAL_REQUEST, APPROVE, REJECT)
+- Publish/schedule gate: only `APPROVED` or `NOT_REQUIRED` sections may be published or scheduled
+- Admin approval endpoints: `PATCH .../request-review`, `.../approve`, `.../reject`
+- Admin review-queue endpoint: `GET /api/homepage-sections/review-queue`
+- Review queue UI: `/dashboard/website/review`
+- Backwards compatible: migration default `approvalStatus = "NOT_REQUIRED"` preserves all existing publishing behavior
+- Approval metadata **never** exposed on public API (privacy guaranteed)
+
+### Public API filtering (Slices 5–6 — current)
 
 A section appears in `GET /api/public/[tenant]/website/homepage` if and only if:
 
@@ -1095,9 +1107,24 @@ isEnabled = true
 AND (publishStatus = "PUBLISHED" OR scheduledPublishAt <= now())
 ```
 
-**Fields never exposed in public API** (Slice 5 additions):
+**Note:** `approvalStatus` is NOT part of the public filter — publishing is the public gate. Approval is an editorial workflow gate on the admin side only.
+
+**Fields never exposed in public API** (Slices 5–6 cumulative):
 - `publishStatus`
 - `publishedAt`, `unpublishedAt`, `lastPublishedAt`, `scheduledPublishAt`
+- `approvalStatus`, `reviewerUserId`, `approvalNote`
+- `reviewRequestedAt`, `reviewedAt`, `approvedAt`, `rejectedAt`
+- `approvedByUserId`, `rejectedByUserId`
+
+### Approval Status Values
+
+| Status | Meaning | Publish/Schedule |
+|--------|---------|-----------------|
+| `NOT_REQUIRED` | Approval not needed (default for pre-Slice-6 rows) | ✅ Allowed |
+| `DRAFT` | Editorial draft, not yet submitted | ❌ Blocked |
+| `IN_REVIEW` | Awaiting reviewer decision | ❌ Blocked |
+| `APPROVED` | Reviewer approved | ✅ Allowed |
+| `CHANGES_REQUESTED` | Reviewer requested changes | ❌ Blocked |
 
 ### Deferred work (intentionally out of scope)
 
@@ -1105,7 +1132,9 @@ AND (publishStatus = "PUBLISHED" OR scheduledPublishAt <= now())
 - Rich text for `callToAction.body` (plain text only)
 - Sponsor model (backing the `sponsorsTeaser` type)
 - Block-based rich content editor (backing the `customContentPlaceholder` type)
-- Review/approval workflow (four-eyes, assignment, `reviewStatus` field)
+- Full four-eyes policy engine (self-approval prevention, role-based enforcement)
+- Email/push notifications for review/approval events
+- Full role-based reviewer assignment workflow
 - Background scheduler worker for scheduled publishing
 - Navigation management
 - Redirect management
@@ -1132,11 +1161,14 @@ All public website endpoints have full DB-level tenant isolation.
 | `/weekplan` | ✅ DB-scoped (`tenantId`) | ✅ `wochenplanVisible`, `websiteVisible` | ✅ Yes |
 | `/homepage` | ✅ DB-scoped (`tenantId`) | ✅ `isEnabled=true`, `publishStatus=PUBLISHED` or `scheduledPublishAt<=now`, ordered by `sortOrder` | ✅ Yes |
 
-### Deploy checklist (Slice 5 — updated)
+### Deploy checklist (Slice 6 — updated)
 
-1. Run `prisma migrate deploy` in STAGE (migrations `20260626120000_homepage_sections` and `20260626150000_homepage_section_publish_workflow`)
-2. Verify `GET /api/public/fc-allschwil/website/homepage` returns only enabled+published sections
-3. Navigate to `/dashboard/website/homepage` and verify publish status badges are visible
+1. Run `prisma migrate deploy` in STAGE (migrations `20260626120000_homepage_sections`, `20260626150000_homepage_section_publish_workflow`, `20260626200000_homepage_section_approval_workflow`)
+2. Verify `GET /api/public/fc-allschwil/website/homepage` returns only enabled+published sections, no approval fields
+3. Navigate to `/dashboard/website/homepage` and verify approval status badges are visible
+4. Navigate to `/dashboard/website/review` and verify review queue renders
+5. Test request-review → approve flow: section moves to IN_REVIEW, then APPROVED
+6. Test that DRAFT sections cannot be published (returns 422)
 4. Test publish/unpublish actions on a section
 5. Verify unknown tenant returns 404
 6. Verify disabled sections are excluded
