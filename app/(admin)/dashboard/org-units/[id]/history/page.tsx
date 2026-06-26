@@ -42,22 +42,24 @@ export default async function OrgUnitMembershipHistoryPage({ params, searchParam
     }),
   ]);
 
-  // Ancestor chain for breadcrumb
+  // Ancestor chain for breadcrumb — built using scalar parentId so the logic
+  // works regardless of whether the Prisma client includes the parent relation.
   const ancestors: Array<{ id: string; name: string }> = [];
-  if (unit.parent) {
-    if (unit.level === 2) {
-      const grandparent = await prisma.orgUnit
-        .findUnique({ where: { id: unit.parent.id }, select: { parentId: true } })
-        .then(async (p: { parentId: string | null } | null) => {
-          if (!p?.parentId) return null;
-          return prisma.orgUnit.findUnique({
-            where: { id: p.parentId },
-            select: { id: true, name: true },
-          });
+  if (unit.parentId) {
+    const parent = await prisma.orgUnit.findUnique({
+      where: { id: unit.parentId },
+      select: { id: true, name: true, parentId: true },
+    });
+    if (parent) {
+      if (unit.level === 2 && parent.parentId) {
+        const grandparent = await prisma.orgUnit.findUnique({
+          where: { id: parent.parentId },
+          select: { id: true, name: true },
         });
-      if (grandparent) ancestors.push(grandparent);
+        if (grandparent) ancestors.push(grandparent);
+      }
+      ancestors.push({ id: parent.id, name: parent.name });
     }
-    ancestors.push({ id: unit.parent.id, name: unit.parent.name });
   }
 
   return (
