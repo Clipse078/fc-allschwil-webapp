@@ -7,9 +7,13 @@
 --   1. Teams with orgUnitId: inherit tenantId from the linked OrgUnit.
 --   2. Remaining null teams: assign the fc-allschwil tenant (single-tenant/demo-safe).
 --      A guarded SELECT ensures the tenant exists and is ACTIVE before assigning.
+--
+-- Idempotency: all steps use IF NOT EXISTS / exception-safe guards so this
+-- migration is safe to apply in environments where a prior (orphaned) migration
+-- already created the column, FK, or index.
 
--- AlterTable
-ALTER TABLE "Team" ADD COLUMN "tenantId" TEXT;
+-- AlterTable: IF NOT EXISTS guard makes this idempotent.
+ALTER TABLE "Team" ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
 
 -- Backfill step 1: inherit from OrgUnit.tenantId where orgUnitId is set
 UPDATE "Team" t
@@ -39,11 +43,15 @@ WHERE "tenantId" IS NULL
 -- those teams will simply be excluded from the public teams endpoint.
 -- Run after deploy to verify: SELECT id, name FROM "Team" WHERE "tenantId" IS NULL;
 
--- AddForeignKey
-ALTER TABLE "Team"
-  ADD CONSTRAINT "Team_tenantId_fkey"
-  FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+-- AddForeignKey: exception-safe guard; no-op if constraint already exists.
+DO $$ BEGIN
+  ALTER TABLE "Team"
+    ADD CONSTRAINT "Team_tenantId_fkey"
+    FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
+    ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
 
--- CreateIndex
-CREATE INDEX "Team_tenantId_idx" ON "Team"("tenantId");
+-- CreateIndex: IF NOT EXISTS guard makes this idempotent.
+CREATE INDEX IF NOT EXISTS "Team_tenantId_idx" ON "Team"("tenantId");
