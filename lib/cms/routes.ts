@@ -20,6 +20,7 @@ export const CMS_ROUTES = {
   pagesNew: "/dashboard/website/pages/new",
   media: "/dashboard/website/media",
   homepage: "/dashboard/website/homepage",
+  blocks: "/dashboard/website/blocks",
 
   // ── Publishing ─────────────────────────────────────────────────────────────
   publishing: "/dashboard/website/publishing",

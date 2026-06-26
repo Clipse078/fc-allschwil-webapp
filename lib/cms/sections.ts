@@ -115,7 +115,8 @@ export const CMS_SECTIONS: CmsSection[] = [
         key: "blocks",
         label: "Block-Bibliothek",
         description: "Wiederverwendbare Inhaltsblöcke definieren und verwalten.",
-        status: "coming_next",
+        status: "foundation",
+        href: CMS_ROUTES.blocks,
         requiredPermissions: ["website.manage"],
       },
       {
