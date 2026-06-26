@@ -370,6 +370,7 @@ model Tenant {
   mediaAssets            MediaAsset[]
   newsArticleMedia       NewsArticleMedia[]
   websitePages           WebsitePage[]
+  homepageSections       HomepageSection[]
 
   @@index([status])
   @@index([name])
@@ -1449,4 +1450,57 @@ model WebsitePage {
   @@index([tenantId, status, scheduledAt])
   @@index([tenantId, authorPersonId])
   @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// HomepageSection — Configurable homepage layout sections (CMS V2 Slice 2)
+//
+// Each tenant has an ordered set of named sections that define the layout of
+// their public homepage. Sections are typed (see HomepageSectionType enum-like
+// registry in lib/homepage/section-types.ts) and carry a JSON config blob for
+// type-specific parameters (e.g. item count, label overrides).
+//
+// Design invariants:
+//   - One HomepageSection row per logical homepage block.
+//   - sortOrder controls display order (ascending, 0-based).
+//   - isEnabled gates visibility: only enabled sections appear in the public API.
+//   - config is free-form JSON; validated by section-type-specific helpers.
+//   - No editorial approval workflow for this foundation slice — sections are
+//     immediately visible when isEnabled = true. Full publish workflow is deferred.
+//
+// Public endpoint: GET /api/public/[tenant]/website/homepage
+//   Returns enabled sections ordered by sortOrder.
+//   Internal admin fields (createdAt, updatedAt, tenantId) are never exposed.
+//
+// Future deferred work (document-only):
+//   - Rich config editor per section type
+//   - Drag-and-drop reordering
+//   - Sponsor section backed by a real Sponsor model
+//   - Preview / staging workflow
+//   - Per-section scheduling / expiry
+// ---------------------------------------------------------------------------
+
+model HomepageSection {
+  id        String   @id @default(cuid())
+  tenantId  String
+  /// Section type key — must match a key in HOMEPAGE_SECTION_TYPES registry.
+  type      String
+  /// Human-readable admin label (editable by the tenant admin).
+  label     String
+  /// Display order (ascending). Lower values render first.
+  sortOrder Int      @default(0)
+  /// When false the section is hidden from the public API.
+  isEnabled Boolean  @default(true)
+  /// Type-specific configuration stored as a JSON object.
+  /// Validated at the application layer via section-type helpers.
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, isEnabled])
+  @@index([tenantId, sortOrder])
+  @@index([tenantId, isEnabled, sortOrder])
 }

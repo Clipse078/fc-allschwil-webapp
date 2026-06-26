@@ -312,3 +312,29 @@ export type WeekplanData = {
   publication: PublicWochenplanPublication | null;
   days: PublicWochenplanDay[];
 };
+
+// ---------------------------------------------------------------------------
+// Public homepage — website-safe section shape
+//
+// Intentionally omits: tenantId, createdAt, updatedAt, isEnabled (only
+// enabled sections are returned), and any internal admin flags.
+//
+// config carries type-specific display parameters (e.g. itemCount, heading).
+// Consumers should treat unknown keys inside config as ignorable extras.
+// ---------------------------------------------------------------------------
+
+export type PublicHomepageSectionItem = {
+  id: string;
+  /** Section type key, e.g. "hero", "newsTeaser". See section-types registry. */
+  type: string;
+  /** Admin-configured human-readable label. */
+  label: string;
+  /** Display order (ascending, 0-based). */
+  sortOrder: number;
+  /** Type-specific display configuration. */
+  config: Record<string, unknown>;
+};
+
+export type HomepageData = {
+  sections: PublicHomepageSectionItem[];
+};

@@ -4,6 +4,7 @@ import {
   Newspaper,
   FileText,
   ImageIcon,
+  LayoutTemplate,
   Send,
   Globe,
   Settings,
@@ -260,6 +261,14 @@ export default async function WebsiteCmsOverviewPage() {
               sub: `${stats.pages.total} Seiten`,
               color: "#8B5CF6",
               bg: "rgba(139,92,246,0.08)",
+            },
+            canManageWebsite && {
+              href: CMS_ROUTES.homepage,
+              icon: <LayoutTemplate className="h-5 w-5" />,
+              label: "Homepage",
+              sub: "Sektionen verwalten",
+              color: "#8B5CF6",
+              bg: "rgba(139,92,246,0.06)",
             },
             (canManageNews || canManageWebsite) && {
               href: CMS_ROUTES.media,
