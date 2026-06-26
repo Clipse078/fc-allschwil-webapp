@@ -1,37 +1,58 @@
-# CMS Block Library Architecture
+# CMS Block Library
 
 ## CMS V2 Slice 3 — Homepage Block Library Foundation
+## CMS V2 Slice 4 — Block Config Editor
 
-**Status**: Foundation implemented  
-**Route**: `/dashboard/website/blocks`  
-**Registry**: `lib/homepage/block-registry.ts`
-
----
-
-## Overview
-
-The Homepage Block Library Foundation introduces a canonical, reusable block architecture for homepage sections. All block type metadata (labels, descriptions, categories, statuses, default configs, and public config projection) are centralised in a single registry — `lib/homepage/block-registry.ts`. No duplication exists in any other module.
-
-This slice establishes the architecture and admin overview without implementing the full visual block editor (deferred).
+**Registry**: `lib/homepage/block-registry.ts`  
+**Config schemas**: `lib/homepage/config-schemas.ts`  
+**Admin config endpoint**: `PATCH /api/homepage-sections/[id]/config`
 
 ---
 
-## Current State After Slice 3
+## Table of Contents
+
+1. [Architecture (Slice 3 + 4)](#architecture-slice-3--4)
+2. [Block Registry Design](#block-registry-design)
+3. [Block Categories](#block-categories)
+4. [Block Status Values](#block-status-values)
+5. [Block Definitions](#block-definitions)
+6. [Config Field Reference](#config-field-reference)
+   - [hero](#hero)
+   - [newsTeaser](#newsteaser)
+   - [eventsTeaser](#eventsteaser)
+   - [teamsTeaser](#teamsteaser)
+   - [weekplanTeaser](#weekplanteaser)
+   - [callToAction](#calltoaction)
+   - [sponsorsTeaser](#sponsorsteaser-foundation-ready)
+   - [customContentPlaceholder](#customcontentplaceholder-coming-next)
+7. [Admin API — Config Editor (Slice 4)](#admin-api--config-editor-slice-4)
+8. [Validation Rules](#validation-rules)
+9. [Config Validation Strategy](#config-validation-strategy)
+10. [Public Serialisation Strategy](#public-serialisation-strategy)
+11. [Admin Block Library UI (Slice 3)](#admin-block-library-ui-slice-3)
+12. [Navigation](#navigation)
+13. [Duplication Audit](#duplication-audit)
+14. [Deferred Future Work](#deferred-future-work)
+
+---
+
+## Architecture (Slice 3 + 4)
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| **Block registry** | `lib/homepage/block-registry.ts` | Single source of truth for all block metadata |
+| **Block registry** | `lib/homepage/block-registry.ts` | Single source of truth for all block metadata, configKeys, public projection |
+| **Config schemas** | `lib/homepage/config-schemas.ts` | Zod strict schemas per block type; `validateSectionConfig()` dispatch |
 | **Section types** | `lib/homepage/section-types.ts` | Thin adapter: DB type key constants + TS config shapes; derives arrays from registry |
-| **Admin queries** | `lib/homepage/admin-queries.ts` | Tenant-scoped CRUD for HomepageSection rows |
+| **Admin queries** | `lib/homepage/admin-queries.ts` | Tenant-scoped CRUD for HomepageSection rows; `updateHomepageSection()` |
 | **Public feed** | `lib/homepage/public-homepage-feed.ts` | Enabled sections only; enriches with block metadata; projects config |
-| **Admin API** | `/api/homepage-sections` | List, bootstrap, toggle, move |
+| **Admin API — list/bootstrap** | `/api/homepage-sections` | GET list, POST bootstrap |
+| **Admin API — toggle/move** | `/api/homepage-sections/[id]/toggle`, `.../move` | Toggle enabled, reorder |
+| **Admin API — config editor** | `/api/homepage-sections/[id]/config` | PATCH label + config (Slice 4) |
 | **Public API** | `/api/public/[tenant]/website/homepage` | Returns sections + block metadata |
-| **Admin UI — builder** | `/dashboard/website/homepage` | Toggle / reorder sections |
+| **Admin UI — builder** | `/dashboard/website/homepage` | Toggle / reorder / inline config edit sections |
 | **Admin UI — library** | `/dashboard/website/blocks` | Read-only block library overview |
-| **CMS hub** | `/dashboard/website` | Links to all CMS areas including blocks |
-| **CMS routes** | `lib/cms/routes.ts` | Route constants (added `blocks`) |
-| **CMS sections** | `lib/cms/sections.ts` | Feature map (blocks promoted to `foundation`) |
-| **Nav** | `lib/nav/nav-config.ts` | Sidebar (added Homepage Builder + Block-Bibliothek entries) |
+| **CMS hub** | `/dashboard/website` | Links to all CMS areas |
+| **Nav** | `lib/nav/nav-config.ts` | Sidebar entries |
 
 ---
 
@@ -39,14 +60,14 @@ This slice establishes the architecture and admin overview without implementing 
 
 ### File: `lib/homepage/block-registry.ts`
 
-The registry exports:
+The registry is the **single source of truth**. It exports:
 
 - `BLOCK_CATEGORIES` — ordered array of category labels
 - `BlockCategory` — TypeScript union type
 - `BLOCK_STATUSES` — ordered array of status values
 - `BlockStatus` — TypeScript union type
-- `PublicBlockMeta` — public-safe block metadata for the API (`category`, `datadriven`)
-- `BlockDefinition` — full block definition type
+- `PublicBlockMeta` — public-safe block metadata (`category`, `datadriven`)
+- `BlockDefinition` — full block definition type (includes `configKeys`)
 - `BLOCK_REGISTRY` — array of all `BlockDefinition` objects (sorted by `defaultSortOrder`)
 - `getBlockDefinition(type)` — lookup by type key
 - `getPublicBlockMeta(type)` — returns `PublicBlockMeta | null`
@@ -55,10 +76,11 @@ The registry exports:
 
 ### Single source of truth rule
 
-> **Never add block labels, descriptions, or default configs outside `lib/homepage/block-registry.ts`.**
+> **Never add block labels, descriptions, configKeys, or default configs outside `lib/homepage/block-registry.ts`.**
 
-- `lib/homepage/section-types.ts` derives `HOMEPAGE_SECTION_TYPES` and `DEFAULT_HOMEPAGE_SECTIONS` by iterating `BLOCK_REGISTRY`.
-- `HomepageSectionList.tsx` calls `getHomepageSectionType()` from `section-types.ts`, which is backed by the registry.
+- `lib/homepage/section-types.ts` derives `HOMEPAGE_SECTION_TYPES` and `DEFAULT_HOMEPAGE_SECTIONS` by iterating `BLOCK_REGISTRY`. It does **not** re-expose `configKeys`.
+- `lib/homepage/config-schemas.ts` defines Zod schemas aligned with each block's `configKeys`. The `CONFIG_SCHEMAS` map keys must match `HomepageSectionTypeKey`.
+- `HomepageSectionList.tsx` calls `getBlockDefinition(section.type)?.configKeys` directly from the registry for the config editor field rendering.
 - The public API calls `getPublicBlockMeta()` and `projectBlockPublicConfig()` from the registry.
 
 ---
@@ -87,8 +109,6 @@ The registry exports:
 
 ### Mapping to `HomepageSectionTypeDefinition.implementation`
 
-For backwards compatibility with `HomepageSectionList.tsx`:
-
 | Block status | `implementation` |
 |--------------|-----------------|
 | `available` | `"available"` |
@@ -112,11 +132,227 @@ For backwards compatibility with `HomepageSectionList.tsx`:
 
 ---
 
+## Config Field Reference
+
+All config fields are optional. The public website renderer must use sensible
+defaults when a field is absent.
+
+### `hero`
+
+Full-width banner with headline, subtitle, and optional CTA button.
+
+| Key | Type | Max | Description |
+|-----|------|-----|-------------|
+| `title` | `string?` | 200 | Main hero headline. Falls back to tenant name when absent. |
+| `subtitle` | `string?` | 500 | Supporting subtitle text. |
+| `ctaLabel` | `string?` | 100 | CTA button label. |
+| `ctaUrl` | `string?` | 2000 | CTA button URL (absolute or site-relative). |
+
+**Example**:
+```json
+{
+  "title": "Willkommen beim FC Allschwil",
+  "subtitle": "Leidenschaft für Fussball seit 1921.",
+  "ctaLabel": "Jetzt Mitglied werden",
+  "ctaUrl": "https://fcallschwil.ch/mitgliedschaft"
+}
+```
+
+---
+
+### `newsTeaser`
+
+Grid of the latest published news articles.
+
+| Key | Type | Range | Description |
+|-----|------|-------|-------------|
+| `itemCount` | `number?` | 1–10 | Articles to display. Default: `3`. |
+| `heading` | `string?` | max 200 | Section heading override. |
+
+**Example**:
+```json
+{ "itemCount": 4, "heading": "Aktuelles" }
+```
+
+---
+
+### `eventsTeaser`
+
+Upcoming events and matches with website visibility.
+
+| Key | Type | Values / Range | Description |
+|-----|------|----------------|-------------|
+| `itemCount` | `number?` | 1–20 | Events to display. Default: `5`. |
+| `surface` | `string?` | `"homepage"` \| `"all"` | Surface filter. Default: `"homepage"`. |
+| `heading` | `string?` | max 200 | Section heading override. |
+
+**Example**:
+```json
+{ "itemCount": 6, "surface": "all", "heading": "Spielplan" }
+```
+
+---
+
+### `teamsTeaser`
+
+Grid of active, website-visible teams.
+
+| Key | Type | Range | Description |
+|-----|------|-------|-------------|
+| `itemCount` | `number?` | 1–20 | Teams to display. Default: `6`. |
+| `seasonKey` | `string?` | max 100 | Season key override. Defaults to active season. |
+| `heading` | `string?` | max 200 | Section heading override. |
+
+**Example**:
+```json
+{ "itemCount": 8, "heading": "Unsere Mannschaften" }
+```
+
+---
+
+### `weekplanTeaser`
+
+Summary of the current week's training and match schedule.
+
+| Key | Type | Max | Description |
+|-----|------|-----|-------------|
+| `heading` | `string?` | 200 | Section heading override. |
+
+**Example**:
+```json
+{ "heading": "Diese Woche" }
+```
+
+---
+
+### `callToAction`
+
+Configurable CTA banner with headline, body text, and up to two buttons.
+
+| Key | Type | Max | Description |
+|-----|------|-----|-------------|
+| `title` | `string?` | 200 | CTA headline. |
+| `body` | `string?` | 2000 | CTA body text (no HTML). |
+| `primaryLabel` | `string?` | 100 | Primary button label. |
+| `primaryUrl` | `string?` | 2000 | Primary button URL. |
+| `secondaryLabel` | `string?` | 100 | Optional secondary button label. |
+| `secondaryUrl` | `string?` | 2000 | Optional secondary button URL. |
+
+**Example**:
+```json
+{
+  "title": "Werde Mitglied",
+  "body": "Tritt dem FC Allschwil bei und sei dabei.",
+  "primaryLabel": "Jetzt anmelden",
+  "primaryUrl": "/anmeldung",
+  "secondaryLabel": "Mehr erfahren",
+  "secondaryUrl": "/verein"
+}
+```
+
+---
+
+### `sponsorsTeaser` (foundation-ready)
+
+Sponsor showcase. **No Sponsor DB model exists yet.** Config is editable but
+the section will not render meaningful content until the Sponsor model is
+introduced in a future slice.
+
+| Key | Type | Max | Description |
+|-----|------|-----|-------------|
+| `heading` | `string?` | 200 | Section heading override. |
+
+---
+
+### `customContentPlaceholder` (coming-next)
+
+Reserved for future block-based rich content. **No config fields.** Any
+submitted config will be rejected (`z.object({}).strict()` — all keys unknown).
+
+---
+
+## Admin API — Config Editor (Slice 4)
+
+### `PATCH /api/homepage-sections/[id]/config`
+
+Updates the **label** and/or **config** of a single homepage section.
+
+**Authentication**: Session cookie (`WEBSITE_MANAGE` permission required).  
+**Tenant isolation**: `tenantId` sourced from session — never from request body.
+
+**Request body** (all fields optional; at least one required):
+
+```json
+{
+  "label": "Updated Label",
+  "config": { "itemCount": 5, "heading": "Aktuelles" }
+}
+```
+
+**Response** (`200 OK`):
+
+```json
+{
+  "section": {
+    "id": "clxxx...",
+    "tenantId": "...",
+    "type": "newsTeaser",
+    "label": "Updated Label",
+    "sortOrder": 10,
+    "isEnabled": true,
+    "config": { "itemCount": 5, "heading": "Aktuelles" },
+    "createdAt": "...",
+    "updatedAt": "..."
+  }
+}
+```
+
+**Error responses**:
+
+| Status | When |
+|--------|------|
+| `400` | Missing both `label` and `config`; non-object `config`; empty `label`; `label` > 200 chars |
+| `401` | No session / no `tenantId` in session |
+| `403` | Session missing `WEBSITE_MANAGE` permission |
+| `404` | Section not found or belongs to different tenant |
+| `422` | Config validation failed (unknown keys, wrong type, out-of-range value) |
+
+**422 example** (unknown key):
+```json
+{ "error": "Ungültige Konfiguration.", "details": ["Unrecognized key: \"unknownField\""] }
+```
+
+**422 example** (out-of-range value):
+```json
+{ "error": "Ungültige Konfiguration.", "details": ["itemCount: Number must be less than or equal to 10"] }
+```
+
+---
+
+## Validation Rules
+
+All config updates are validated by `lib/homepage/config-schemas.ts` using Zod **strict mode**:
+
+1. **Unknown keys are rejected** — any key not in the block's `configKeys` list → `422` with `"Unrecognized key"`.
+2. **No type coercion** — `"itemCount": "3"` (string) fails; must be `"itemCount": 3` (number).
+3. **Range enforcement** — number fields enforce documented min/max per type.
+4. **Enum enforcement** — `surface` must be `"homepage"` or `"all"`.
+5. **Empty strings are safe** — serialiser strips them; not stored in DB.
+6. **Full-replace semantics** — `config` is replaced entirely (not merged). Omitting a key removes it.
+7. **`customContentPlaceholder` config must be `{}`** — any key is rejected.
+
+---
+
 ## Config Validation Strategy
 
-**Current (Slice 3):** Config shapes are TypeScript interfaces in `lib/homepage/section-types.ts` (informational, no runtime enforcement). The `projectPublicConfig` function in each block definition is an identity pass-through (all current config is public-safe).
+**Slice 3 foundation:** Config shapes were TypeScript interfaces only (informational, no runtime enforcement).
 
-**Deferred:** Full Zod schema validation per block type (to be added in a future slice when the config editor UI is introduced).
+**Slice 4 implementation:** Full Zod validation added in `lib/homepage/config-schemas.ts`:
+- Per-type schemas (`heroConfigSchema`, `newsTeaserConfigSchema`, …)
+- `CONFIG_SCHEMAS` map keyed by `HomepageSectionTypeKey`
+- `validateSectionConfig(type, rawConfig)` dispatch helper
+- All schemas use `.strict()` — unknown keys rejected with clear error messages
+- `configKeys` in `block-registry.ts` are the authoritative list; schemas are aligned with them
 
 ---
 
@@ -137,21 +373,21 @@ The public homepage API (`GET /api/public/[tenant]/website/homepage`) enriches e
 
 **Privacy guarantees:**
 - `tenantId`, `createdAt`, `updatedAt`, `isEnabled` never exposed.
-- `block` field contains only `category` and `datadriven` — no admin labels, internal status, internal IDs, or admin-only metadata.
-- Section `config` is routed through `projectBlockPublicConfig()` before serialisation, ensuring future types with admin-only config keys can filter them.
-- `block` is `null` for unregistered type keys (safe fallback — no crash).
+- `block` field contains only `category` and `datadriven` — no admin labels, internal status, or admin-only metadata.
+- Section `config` is routed through `projectBlockPublicConfig()` before serialisation.
+- `block` is `null` for unregistered type keys (safe fallback).
 
-**Backwards compatibility:** `block` is a new field in Slice 3. Existing consumers that don't reference `block` will safely ignore it.
+**Backwards compatibility:** `block` field added in Slice 3. Existing consumers that don't reference `block` safely ignore it.
 
 ---
 
-## Admin Block Library UI
+## Admin Block Library UI (Slice 3)
 
 **Route:** `/dashboard/website/blocks`  
 **Permission:** `WEBSITE_MANAGE`  
 **Type:** Server component (read-only, no client state)
 
-The page renders all blocks from `BLOCK_REGISTRY` grouped by category. For each block:
+Renders all blocks from `BLOCK_REGISTRY` grouped by category. For each block:
 - Display name and type key (monospace)
 - Status badge (available / foundation-ready / coming-next)
 - Category badge
@@ -165,7 +401,7 @@ Navigation links to CMS overview and Homepage Builder.
 
 ## Navigation
 
-Both `Homepage Builder` and `Block-Bibliothek` are now in the Website sidebar:
+Both `Homepage Builder` and `Block-Bibliothek` are in the Website sidebar:
 
 ```
 Website
@@ -185,37 +421,26 @@ Website
 
 | Previously duplicated | Resolution |
 |-----------------------|------------|
-| Block labels in `section-types.ts` + `DEFAULT_HOMEPAGE_SECTIONS` | Derived from `BLOCK_REGISTRY.displayName` |
-| Default configs in `HOMEPAGE_SECTION_TYPES` + `DEFAULT_HOMEPAGE_SECTIONS` | Derived from `BLOCK_REGISTRY.defaultConfig` |
-| Implementation status | Derived from `BLOCK_REGISTRY.status` |
-| Sort order + enabled flag in `DEFAULT_HOMEPAGE_SECTIONS` | Derived from `BLOCK_REGISTRY.defaultSortOrder` / `defaultEnabled` |
+| Block labels in `section-types.ts` + `DEFAULT_HOMEPAGE_SECTIONS` | Derived from `BLOCK_REGISTRY.displayName` (Slice 3) |
+| Default configs in `HOMEPAGE_SECTION_TYPES` + `DEFAULT_HOMEPAGE_SECTIONS` | Derived from `BLOCK_REGISTRY.defaultConfig` (Slice 3) |
+| `configKeys` in `section-types.ts` (Slice 4 initial) | Removed; sourced from `BLOCK_REGISTRY.configKeys` only (Slice 4 rebase) |
+| Implementation status | Derived from `BLOCK_REGISTRY.status` (Slice 3) |
+| Sort order + enabled flag | Derived from `BLOCK_REGISTRY.defaultSortOrder` / `defaultEnabled` (Slice 3) |
 
 ---
 
 ## Deferred Future Work
 
-The following are intentionally out of scope for this foundation slice:
-
-1. **Visual block editor** — drag-and-drop block composer with live preview
-2. **Per-block config editor UI** — form per block type with field validation
-3. **Zod config schemas** — runtime validation of block config objects
-4. **Sponsor model** — DB model backing `sponsorsTeaser` (currently foundation-ready)
-5. **Rich content editor** — backing `customContentPlaceholder` (currently coming-next)
-6. **Block preview rendering** — live preview of block in admin UI
-7. **Block version history** — track config changes over time
-8. **Per-block scheduling** — show/hide blocks on a schedule
-9. **Block preview / staging workflow** — preview blocks before publishing
-10. **Additional block types** — social feed, gallery, contact form, map, etc.
-
----
-
-## Recommended Next CMS Slice (Slice 4)
-
-**Goal:** Block Config Editor — allow admins to edit block config (label, heading, itemCount, CTA fields) from the Homepage Builder.
-
-**Scope:**
-- `PATCH /api/homepage-sections/[id]/config` — update config + label for a section
-- Per-type config form UI in `HomepageSectionList` (inline or slide-out panel)
-- Zod validation per block type
-- No visual drag-and-drop (deferred)
-- No rich text editor (deferred)
+| Feature | Notes |
+|---------|-------|
+| Sponsor model | `sponsorsTeaser` foundation-ready; full impl needs `Sponsor` DB model |
+| Rich text for `callToAction.body` | Plain text only; no HTML/Markdown |
+| Block-based content | `customContentPlaceholder` coming-next; needs block model + visual editor |
+| Per-section scheduling / expiry | Needs `scheduledAt` / `expiresAt` fields on `HomepageSection` |
+| Preview / staging workflow | Needs draft/published states per section |
+| Navigation management | Separate CMS feature |
+| Redirect management | Separate CMS feature |
+| Drag-and-drop reorder | Currently up/down buttons only |
+| Block preview rendering | Live preview of block in admin UI |
+| Block version history | Track config changes over time |
+| Additional block types | Social feed, gallery, contact form, map, etc. |

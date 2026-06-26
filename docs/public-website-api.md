@@ -1069,10 +1069,18 @@ Returns the ordered list of enabled homepage sections for the tenant.
 
 ---
 
+### Implemented in CMS V2 Slice 4
+
+- Inline config editor per section type in the admin Homepage Builder
+  (`PATCH /api/homepage-sections/[id]/config`)
+- Section label editing
+- Config validation per block type (Zod strict schemas, `.strict()` mode)
+- See `docs/cms-block-library.md` for the full admin API and field reference.
+
 ### Deferred work (intentionally out of scope)
 
 - Visual drag-and-drop builder
-- Rich config editor per section type (Zod validation, per-field UI)
+- Rich text for `callToAction.body` (plain text only)
 - Sponsor model (backing the `sponsorsTeaser` type)
 - Block-based rich content editor (backing the `customContentPlaceholder` type)
 - Per-section scheduling / expiry

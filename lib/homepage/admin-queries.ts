@@ -10,6 +10,7 @@
  * that is the responsibility of the API layer (route handlers).
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
@@ -170,6 +171,53 @@ export async function moveHomepageSection(
   ]);
 
   return listHomepageSections(tenantId);
+}
+
+// ---------------------------------------------------------------------------
+// Update label and/or config
+// ---------------------------------------------------------------------------
+
+export type HomepageSectionUpdateInput = {
+  /** New admin label. Must be non-empty after trimming. */
+  label?: string;
+  /**
+   * Replacement config object. Must have been validated by the caller
+   * against the appropriate Zod schema before passing here.
+   * Only provided keys are written; existing keys not in the update are
+   * replaced entirely (full-replace semantics — no deep merge).
+   */
+  config?: Record<string, unknown>;
+};
+
+/**
+ * Updates the label and/or config of a homepage section.
+ * Both fields are optional; at least one must be provided.
+ *
+ * Returns the updated section, or null if the section does not exist
+ * or belongs to a different tenant.
+ */
+export async function updateHomepageSection(
+  tenantId: string,
+  id: string,
+  input: HomepageSectionUpdateInput,
+): Promise<HomepageSectionAdminItem | null> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.homepageSection.update({
+    where: { id },
+    data: {
+      ...(input.label !== undefined ? { label: input.label } : {}),
+      ...(input.config !== undefined
+        ? { config: input.config as Prisma.InputJsonValue }
+        : {}),
+    },
+    select: adminSelect,
+  });
+  return updated as HomepageSectionAdminItem;
 }
 
 // ---------------------------------------------------------------------------
