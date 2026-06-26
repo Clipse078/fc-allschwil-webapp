@@ -126,10 +126,32 @@ export type GetPublicTeamDetailInput = {
  * and upcoming training sessions. Returns null when no matching team exists
  * for the given tenant (caller MUST return 404).
  *
+ * Two-phase query design — DB-level enforcement at both visibility layers:
+ *
+ *   Phase 1 — Team + TeamSeason metadata only (no member rows).
+ *              Filters: Team.tenantId, Team.isActive, Team.websiteVisible,
+ *                       TeamSeason.status = ACTIVE, TeamSeason.websiteVisible.
+ *
+ *   Phase 2a — Squad (PlayerSquadMember).
+ *              Executed ONLY when TeamSeason.squadWebsiteVisible = true.
+ *              When false: zero DB round-trips, zero rows loaded.
+ *              Filters: teamSeasonId, status = ACTIVE, isWebsiteVisible = true.
+ *
+ *   Phase 2b — Trainer staff (TrainerTeamMember).
+ *              Executed ONLY when TeamSeason.trainerTeamWebsiteVisible = true.
+ *              When false: zero DB round-trips, zero rows loaded.
+ *              Filters: teamSeasonId, status = ACTIVE, isWebsiteVisible = true.
+ *
+ *   Phase 3  — Upcoming TRAINING events (next 28 days).
+ *              Filters: teamId, tenantId, type = TRAINING, websiteVisible = true,
+ *                       status not CANCELLED/ARCHIVED, startAt in window.
+ *
  * Privacy guarantees:
  * - personId, email, phone, dateOfBirth, remarks: never selected.
  * - pitchCode: selected internally for name resolution, never returned.
- * - Squad/trainer lists are empty when respective visibility flags are false.
+ * - Hidden members (isWebsiteVisible = false): excluded by DB WHERE — never loaded.
+ * - Season-hidden squad (squadWebsiteVisible = false): query skipped entirely.
+ * - Season-hidden trainers (trainerTeamWebsiteVisible = false): query skipped entirely.
  */
 export async function getPublicTeamDetail(
   input: GetPublicTeamDetailInput,
@@ -138,6 +160,11 @@ export async function getPublicTeamDetail(
     ? { season: { key: input.seasonKey } }
     : { season: { isActive: true } };
 
+  // ── Phase 1: Team + TeamSeason metadata ─────────────────────────────────
+  // Member relations (playerSquadMembers / trainerTeamMembers) are intentionally
+  // NOT fetched here. They are conditionally loaded in Phase 2 based on the
+  // TeamSeason visibility flags, ensuring zero records leave the DB when the
+  // season-level flag is false.
   const team = await prisma.team.findFirst({
     where: {
       slug: input.slug,
@@ -161,45 +188,12 @@ export async function getPublicTeamDetail(
         orderBy: { createdAt: "desc" },
         take: 1,
         select: {
+          id: true,
           displayName: true,
           shortName: true,
           squadWebsiteVisible: true,
           trainerTeamWebsiteVisible: true,
           season: { select: { key: true, name: true } },
-          playerSquadMembers: {
-            where: { status: "ACTIVE", isWebsiteVisible: true },
-            orderBy: [
-              { sortOrder: "asc" },
-              { shirtNumber: "asc" },
-              { person: { lastName: "asc" } },
-              { person: { firstName: "asc" } },
-            ],
-            select: {
-              shirtNumber: true,
-              positionLabel: true,
-              isCaptain: true,
-              isViceCaptain: true,
-              person: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-            },
-          },
-          trainerTeamMembers: {
-            where: { status: "ACTIVE", isWebsiteVisible: true },
-            orderBy: [{ sortOrder: "asc" }, { person: { lastName: "asc" } }],
-            select: {
-              roleLabel: true,
-              person: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-            },
-          },
         },
       },
     },
@@ -209,7 +203,86 @@ export async function getPublicTeamDetail(
 
   const teamSeason = team.teamSeasons[0] ?? null;
 
-  // Upcoming TRAINING events for this team (next 28 days, website-visible).
+  // ── Phase 2a: Squad ──────────────────────────────────────────────────────
+  // Query is skipped entirely when squadWebsiteVisible = false.
+  // Both filters (isWebsiteVisible, status) are in the Prisma WHERE clause:
+  // hidden members never leave the database, even when the season flag is true.
+  const squad: PublicSquadMember[] = teamSeason?.squadWebsiteVisible
+    ? await prisma.playerSquadMember
+        .findMany({
+          where: {
+            teamSeasonId: teamSeason.id,
+            status: "ACTIVE",
+            isWebsiteVisible: true,
+          },
+          orderBy: [
+            { sortOrder: "asc" },
+            { shirtNumber: "asc" },
+            { person: { lastName: "asc" } },
+            { person: { firstName: "asc" } },
+          ],
+          select: {
+            shirtNumber: true,
+            positionLabel: true,
+            isCaptain: true,
+            isViceCaptain: true,
+            person: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        })
+        .then((rows) =>
+          rows.map((m) => ({
+            firstName: m.person.firstName,
+            lastName: m.person.lastName,
+            shirtNumber: m.shirtNumber ?? null,
+            positionLabel: m.positionLabel ?? null,
+            captain: m.isCaptain,
+            viceCaptain: m.isViceCaptain,
+            photo: null,
+          })),
+        )
+    : [];
+
+  // ── Phase 2b: Trainer staff ──────────────────────────────────────────────
+  // Query is skipped entirely when trainerTeamWebsiteVisible = false.
+  // Both filters (isWebsiteVisible, status) are in the Prisma WHERE clause:
+  // hidden members never leave the database, even when the season flag is true.
+  const trainers: PublicTrainerMember[] = teamSeason?.trainerTeamWebsiteVisible
+    ? await prisma.trainerTeamMember
+        .findMany({
+          where: {
+            teamSeasonId: teamSeason.id,
+            status: "ACTIVE",
+            isWebsiteVisible: true,
+          },
+          orderBy: [{ sortOrder: "asc" }, { person: { lastName: "asc" } }],
+          select: {
+            roleLabel: true,
+            person: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        })
+        .then((rows) =>
+          rows.map((t) => ({
+            firstName: t.person.firstName,
+            lastName: t.person.lastName,
+            roleLabel: t.roleLabel ?? null,
+            photo: null,
+          })),
+        )
+    : [];
+
+  // ── Phase 3: Upcoming training sessions ─────────────────────────────────
+  // Scoped by teamId + tenantId (double tenant guard).
+  // pitchCode is fetched only for internal name resolution; never returned.
   const now = new Date();
   const windowEnd = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
 
@@ -256,29 +329,6 @@ export async function getPublicTeamDetail(
       pitchNameMap.set(r.code, r.name);
     }
   }
-
-  // Map squad — only when TeamSeason allows it.
-  const squad: PublicSquadMember[] = teamSeason?.squadWebsiteVisible
-    ? (teamSeason.playerSquadMembers ?? []).map((m) => ({
-        firstName: m.person.firstName,
-        lastName: m.person.lastName,
-        shirtNumber: m.shirtNumber ?? null,
-        positionLabel: m.positionLabel ?? null,
-        captain: m.isCaptain,
-        viceCaptain: m.isViceCaptain,
-        photo: null,
-      }))
-    : [];
-
-  // Map trainer staff — only when TeamSeason allows it.
-  const trainers: PublicTrainerMember[] = teamSeason?.trainerTeamWebsiteVisible
-    ? (teamSeason.trainerTeamMembers ?? []).map((t) => ({
-        firstName: t.person.firstName,
-        lastName: t.person.lastName,
-        roleLabel: t.roleLabel ?? null,
-        photo: null,
-      }))
-    : [];
 
   // Map training sessions — derive weekday from startAt using de-CH locale.
   const training: PublicTeamTrainingSession[] = rawTrainingEvents.map((e) => ({
