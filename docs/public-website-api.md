@@ -364,7 +364,12 @@ Response items use the same shape as `data.events[]` above.
 
 ### GET /api/public/[tenant]/website/teams
 
-Returns active, website-visible teams with their season display names.
+> **⚠️ PENDING MIGRATION — currently returns `{ "teams": [] }`**
+>
+> This endpoint is active and responds correctly (200 OK, valid envelope, empty array),
+> but will not return team data until the `Team.tenantId` schema migration is applied.
+> See the [Team Tenant Isolation Gap](#team-tenant-isolation-gap) section below for
+> the full analysis and required migration SQL.
 
 #### Query parameters
 
@@ -378,7 +383,25 @@ Returns active, website-visible teams with their season display names.
 GET /api/public/fc-allschwil/website/teams
 ```
 
-#### Example response (200)
+#### Current response (200) — pending migration
+
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-06-26T14:30:00.000Z",
+  "data": {
+    "teams": []
+  },
+  "meta": {
+    "total": 0,
+    "seasonKey": null,
+    "pendingMigration": "Team.tenantId — see docs/public-website-api.md"
+  }
+}
+```
+
+#### Post-migration response (200) — after `Team.tenantId` is deployed
 
 ```json
 {
@@ -397,25 +420,14 @@ GET /api/public/fc-allschwil/website/teams
         "displayName": "1. Mannschaft 2025/26",
         "shortName": "1M",
         "season": { "key": "2025-26", "name": "Saison 2025/26" }
-      },
-      {
-        "id": "clteam2",
-        "name": "U16",
-        "slug": "u16",
-        "category": "JUNIOREN",
-        "genderGroup": null,
-        "ageGroup": "U16",
-        "displayName": "U16 2025/26",
-        "shortName": null,
-        "season": { "key": "2025-26", "name": "Saison 2025/26" }
       }
     ]
   },
-  "meta": { "total": 2, "seasonKey": null }
+  "meta": { "total": 1, "seasonKey": null }
 }
 ```
 
-#### Data shape — `data.teams[]`
+#### Data shape — `data.teams[]` (post-migration)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -430,12 +442,6 @@ GET /api/public/fc-allschwil/website/teams
 | `season` | object \| null | Active season info, null if no matching TeamSeason. |
 | `season.key` | string | Season key. |
 | `season.name` | string | Season display name. |
-
-> **Note**: Teams are not currently tenant-scoped at the DB level. The tenant slug
-> is validated and `websiteEnabled` is checked, but the team list itself covers all
-> active website-visible teams. For the FC Allschwil single-tenant deployment this
-> is correct. Multi-tenant team isolation requires a schema migration (out of scope
-> for this slice).
 
 ---
 
@@ -642,18 +648,96 @@ type PublicWochenplanPublication = {
 
 ## Tenant Isolation Audit
 
-| Endpoint | Tenant check | Data isolation |
-|----------|-------------|---------------|
-| `[tenant]/website/news` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` in all DB where clauses |
-| `[tenant]/website/events` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` |
-| `[tenant]/website/matches` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` |
-| `[tenant]/website/teams` | `resolveTenantFromParams` + `assertWebsiteEnabled` | Not DB-scoped (Team has no tenantId); gated by enabled check |
-| `[tenant]/website/weekplan` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getGroupedWochenplan()` + `getWochenplanPublication()` |
-| `v1/website/news` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses |
-| `v1/website/news/[slug]` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses |
-| `v1/website/pages/[slug]` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses |
+| Endpoint | Tenant check | DB isolation | Status |
+|----------|-------------|--------------|--------|
+| `[tenant]/website/news` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` in all Prisma WHERE clauses | ✅ Safe |
+| `[tenant]/website/events` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` | ✅ Safe |
+| `[tenant]/website/matches` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` | ✅ Safe |
+| `[tenant]/website/teams` | `resolveTenantFromParams` + `assertWebsiteEnabled` | Returns `[]` — no DB query until migration | ⚠️ Pending migration |
+| `[tenant]/website/weekplan` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getGroupedWochenplan()` + `getWochenplanPublication()` | ✅ Safe |
+| `v1/website/news` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses | ✅ Safe |
+| `v1/website/news/[slug]` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses | ✅ Safe |
+| `v1/website/pages/[slug]` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses | ✅ Safe |
 
-**Known limitation**: Teams are global (no `tenantId` on the `Team` model). A future migration adding `tenantId` to `Team` will enable full tenant isolation on the teams endpoint. Tracked as a future schema change.
+---
+
+## Team Tenant Isolation Gap
+
+### Root cause
+
+The `Team` model does not carry a `tenantId` FK. All investigated indirect paths
+are structurally unreliable:
+
+| Indirect path | Problem |
+|--------------|---------|
+| `Team.orgUnitId → OrgUnit.tenantId` | `orgUnitId` is nullable — teams created without OrgUnit assignment are silently excluded (false negatives, not false positives) |
+| `Team → Event.tenantId` | `Event.tenantId` is nullable (legacy/seeded events = null); new teams with no events are fully excluded |
+| `TeamSeason → Season` | `Season` has no `tenantId` — dead end |
+
+**Verdict**: No reliable indirect path exists. The `[tenant]/website/teams` endpoint
+currently returns `{ "teams": [] }` to satisfy the invariant that every public query
+is tenant-scoped at the DB level. Route-level tenant validation + `websiteEnabled`
+guard is applied, but data is withheld until DB-level isolation is available.
+
+### Required migration
+
+This is the smallest, safest migration to fix the gap. It mirrors the exact same
+pattern used for `Event.tenantId` (migration `20260604110000_event_tenant_isolation`).
+
+```sql
+-- Migration: add_team_tenant_isolation
+-- Adds nullable tenantId to Team for DB-level multi-tenant isolation.
+-- Pattern: identical to Event.tenantId (20260604110000_event_tenant_isolation).
+-- Nullable for backward compatibility; backfill covers all existing teams.
+
+ALTER TABLE "Team" ADD COLUMN "tenantId" TEXT;
+
+-- Backfill: assign all existing teams to the fc-allschwil tenant.
+UPDATE "Team" SET "tenantId" = (
+  SELECT "id" FROM "Tenant" WHERE "key" = 'fc-allschwil' AND "status" = 'ACTIVE'
+) WHERE "tenantId" IS NULL;
+
+ALTER TABLE "Team"
+  ADD CONSTRAINT "Team_tenantId_fkey"
+  FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;
+
+CREATE INDEX "Team_tenantId_idx" ON "Team"("tenantId");
+```
+
+**Prisma schema changes** (additive, non-breaking):
+
+```prisma
+// In model Team — add two lines:
+tenantId String?
+tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+// In model Tenant — add one line to the relations list:
+teams Team[]
+```
+
+### Code changes after migration
+
+In `lib/website/public-teams-feed.ts`, update the `where` clause:
+
+```typescript
+where: {
+  tenantId: input.tenantId,   // ADD THIS after migration
+  isActive: true,
+  websiteVisible: true,
+},
+```
+
+In `app/api/public/[tenant]/website/teams/route.ts`, remove the early-return
+guard and un-comment the `getPublicTeams({ tenantId: tenant.id, seasonKey })` call.
+
+### Properties of this migration
+
+- **Additive**: adds a nullable column — no existing data is changed or deleted
+- **Non-destructive**: `SET NULL` on tenant delete — no cascading deletes
+- **Backfill-safe**: single UPDATE statement scoped to `WHERE tenantId IS NULL`
+- **Standard pattern**: identical to Event.tenantId, OrgUnit.tenantId, TargetGroup.tenantId
+- **Zero breaking changes**: all existing API routes and admin queries unaffected
 
 ---
 
@@ -682,13 +766,13 @@ type PublicWochenplanPublication = {
 
 ### Caching recommendations
 
-| Endpoint | Recommended TTL |
-|----------|----------------|
-| `/news` list | 60 seconds |
-| `/events` | 60 seconds |
-| `/matches` | 60 seconds |
-| `/teams` | 300 seconds |
-| `/weekplan` | 60 seconds |
+| Endpoint | Recommended TTL | Notes |
+|----------|----------------|-------|
+| `/news` list | 60 seconds | |
+| `/events` | 60 seconds | |
+| `/matches` | 60 seconds | |
+| `/teams` | — | Returns `[]` pending `Team.tenantId` migration. Do not cache. |
+| `/weekplan` | 60 seconds | |
 
 ---
 
@@ -718,3 +802,35 @@ The natural next integration slice after this foundation is:
 - Only expose: `firstName`, `lastName`, `displayName`, `shirtNumber`, `positionLabel`, `isCaptain`, `roleLabel`
 
 **Schema note**: No schema changes needed — `PlayerSquadMember.isWebsiteVisible` and `TrainerTeamMember.isWebsiteVisible` already exist.
+
+> **Note**: The Team Detail + Squad API depends on the `Team.tenantId` migration
+> being completed first (required for the parent `/teams` list endpoint).
+
+---
+
+## Merge Recommendation
+
+### Status: READY TO MERGE — with one named blocker
+
+**Blocker**: `GET /api/public/[tenant]/website/teams` returns `{ "teams": [] }` pending
+the `add_team_tenant_isolation` migration (adds `Team.tenantId`). The website team must
+implement the teams page to gracefully handle an empty teams list in the interim.
+
+### What is safe to merge now
+
+| Endpoint | Isolation | Publish filter | Merge-safe? |
+|----------|-----------|---------------|-------------|
+| `/news` | ✅ DB-scoped (`tenantId`) | ✅ `status=PUBLISHED`, `publishedAt≤now` | ✅ Yes |
+| `/events` | ✅ DB-scoped (`tenantId`) | ✅ `status IN (SCHEDULED,LIVE,COMPLETED,POSTPONED)`, `websiteVisible` | ✅ Yes |
+| `/matches` | ✅ DB-scoped (`tenantId`) | ✅ Same as events + `type=MATCH` | ✅ Yes |
+| `/teams` | ⚠️ Returns `[]` (no DB query) | — | ✅ Yes (safely empty) |
+| `/weekplan` | ✅ DB-scoped (`tenantId`) | ✅ `wochenplanVisible`, `websiteVisible` | ✅ Yes |
+
+### Unblock teams in a follow-up
+
+Apply migration `add_team_tenant_isolation` in a separate PR:
+1. Create the migration file with the SQL documented in [Team Tenant Isolation Gap](#team-tenant-isolation-gap)
+2. Update `prisma/schema.prisma` (add `tenantId` + `tenant` to `model Team`, add `teams` to `model Tenant`)
+3. Remove the early-return guard in `app/api/public/[tenant]/website/teams/route.ts`
+4. Update `lib/website/public-teams-feed.ts` `where` clause to include `tenantId: input.tenantId`
+5. Run `prisma migrate deploy` in STAGE, verify, then deploy to PROD
