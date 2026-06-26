@@ -5,7 +5,7 @@
  *
  * IMPORTANT: This file is intentionally a thin adapter layer.
  * The canonical source of truth for block labels, descriptions, default configs,
- * categories, statuses, and all block metadata lives in:
+ * categories, statuses, configKeys, and all block metadata lives in:
  *   → lib/homepage/block-registry.ts
  *
  * This file owns:
@@ -21,12 +21,12 @@
  *   - DEFAULT_HOMEPAGE_SECTIONS   — array derived from BLOCK_REGISTRY (no duplication)
  *
  * Rules:
- *   - Never add labels, descriptions, or default configs here — add them to block-registry.ts.
+ *   - Never add labels, descriptions, configKeys, or default configs here —
+ *     add them to block-registry.ts.
  *   - Type keys are stable DB values — rename only with a data migration.
  *   - Config shapes are TypeScript contracts; runtime validation is additive.
  *
- * Deferred (not implemented in this foundation slice):
- *   - Rich config editors per type
+ * Deferred:
  *   - Sponsor model (sponsorsTeaser type is registered but has no DB backing)
  *   - Preview / staging workflow per section
  *   - Per-section scheduling or expiry
@@ -183,6 +183,9 @@ export type HomepageSectionTypeDefinition = {
  *
  * Labels, descriptions, and default configs are sourced exclusively from
  * BLOCK_REGISTRY — never duplicated here.
+ *
+ * For configKeys, use getBlockDefinition(key)?.configKeys from block-registry.ts
+ * directly — they are not re-exposed here to avoid duplication.
  */
 export const HOMEPAGE_SECTION_TYPES: HomepageSectionTypeDefinition[] =
   BLOCK_REGISTRY.filter(
