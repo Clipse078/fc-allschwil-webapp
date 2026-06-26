@@ -27,6 +27,7 @@
    - [GET /api/public/[tenant]/website/teams](#get-apipublictenantwebsiteteams)
    - [GET /api/public/[tenant]/website/teams/[slug]](#get-apipublictenantwebsiteteamsslug)
    - [GET /api/public/[tenant]/website/weekplan](#get-apipublictenantwebsiteweekplan)
+   - [GET /api/public/[tenant]/website/homepage](#get-apipublictenantwebsitehomepage)
 9. [Endpoints (v1 — header-based tenant, legacy)](#endpoints-v1--header-based-tenant-legacy)
 10. [Type Reference](#type-reference)
 11. [Duplication Audit](#duplication-audit)
@@ -913,6 +914,159 @@ Implemented in this slice. See [GET /api/public/[tenant]/website/teams/[slug]](#
 
 ---
 
+## Homepage Builder API (CMS V2 Slice 2)
+
+### GET /api/public/[tenant]/website/homepage
+
+Returns the ordered list of enabled homepage sections for the tenant.
+
+**URL**: `GET /api/public/{tenant}/website/homepage`
+
+**Example**: `GET /api/public/fc-allschwil/website/homepage`
+
+**Authentication**: None (public, read-only).
+
+**Error responses**:
+- `404` — tenant not found or not ACTIVE
+- `403` — `websiteEnabled = false` for this tenant
+
+**Response envelope**: Standard `WebsiteResponseEnvelope<HomepageData>`.
+
+**Response example**:
+
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-06-26T12:00:00.000Z",
+  "data": {
+    "sections": [
+      {
+        "id": "clxxx...",
+        "type": "hero",
+        "label": "Hero-Bereich",
+        "sortOrder": 0,
+        "config": {}
+      },
+      {
+        "id": "clyyy...",
+        "type": "newsTeaser",
+        "label": "News-Teaser",
+        "sortOrder": 10,
+        "config": { "itemCount": 3 }
+      },
+      {
+        "id": "clzzz...",
+        "type": "eventsTeaser",
+        "label": "Veranstaltungs-Teaser",
+        "sortOrder": 20,
+        "config": { "itemCount": 5, "surface": "homepage" }
+      }
+    ]
+  },
+  "meta": {
+    "total": 3
+  }
+}
+```
+
+**Field reference**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Stable section ID (CUID) |
+| `type` | string | Section type key (see registry below) |
+| `label` | string | Admin-configured display label |
+| `sortOrder` | integer | Display order (ascending, 0-based) |
+| `config` | object | Type-specific configuration |
+
+**Privacy invariants**:
+- `tenantId` never exposed
+- `createdAt` / `updatedAt` never exposed
+- `isEnabled` never exposed (only enabled sections are returned)
+- No admin-only fields
+
+---
+
+### Section Type Registry
+
+| Type key | Label | Implementation | Default config |
+|----------|-------|---------------|----------------|
+| `hero` | Hero-Bereich | available | `{}` |
+| `newsTeaser` | News-Teaser | available | `{ "itemCount": 3 }` |
+| `eventsTeaser` | Veranstaltungs-Teaser | available | `{ "itemCount": 5, "surface": "homepage" }` |
+| `teamsTeaser` | Teams-Übersicht | available | `{ "itemCount": 6 }` |
+| `weekplanTeaser` | Wochenplan-Teaser | available | `{}` |
+| `callToAction` | Call-to-Action | available | `{}` |
+| `sponsorsTeaser` | Sponsoren | **placeholder** | `{}` |
+| `customContentPlaceholder` | Benutzerdefinierter Inhalt | **placeholder** | `{}` |
+
+**Implementation status**:
+- `available` — type has a corresponding public data source in the WebApp API
+- `placeholder` — type is registered but no backing DB model exists yet (Sponsor model TBD)
+
+---
+
+### Config field reference by type
+
+#### `hero`
+| Key | Type | Description |
+|-----|------|-------------|
+| `title` | string? | Main hero headline |
+| `subtitle` | string? | Supporting subtitle |
+| `ctaLabel` | string? | CTA button label |
+| `ctaUrl` | string? | CTA button URL |
+
+#### `newsTeaser`
+| Key | Type | Description |
+|-----|------|-------------|
+| `itemCount` | number? | Articles to display (1–10, default 3) |
+| `heading` | string? | Section heading override |
+
+#### `eventsTeaser`
+| Key | Type | Description |
+|-----|------|-------------|
+| `itemCount` | number? | Events to display (1–20, default 5) |
+| `surface` | `"homepage"` \| `"all"` | Event surface filter (default `"homepage"`) |
+| `heading` | string? | Section heading override |
+
+#### `teamsTeaser`
+| Key | Type | Description |
+|-----|------|-------------|
+| `itemCount` | number? | Teams to display (1–20, default 6) |
+| `seasonKey` | string? | Season key override (default active season) |
+| `heading` | string? | Section heading override |
+
+#### `weekplanTeaser`
+| Key | Type | Description |
+|-----|------|-------------|
+| `heading` | string? | Section heading override |
+
+#### `callToAction`
+| Key | Type | Description |
+|-----|------|-------------|
+| `title` | string? | CTA headline |
+| `body` | string? | CTA body text |
+| `primaryLabel` | string? | Primary button label |
+| `primaryUrl` | string? | Primary button URL |
+| `secondaryLabel` | string? | Secondary button label |
+| `secondaryUrl` | string? | Secondary button URL |
+
+---
+
+### Deferred work (intentionally out of scope for this slice)
+
+- Visual drag-and-drop builder
+- Rich config editor per section type
+- Sponsor model (backing the `sponsorsTeaser` type)
+- Block-based rich content (backing the `customContentPlaceholder` type)
+- Per-section scheduling / expiry
+- Preview / staging workflow for homepage sections
+- Navigation management
+- Redirect management
+
+---
+
 ## Merge Recommendation
 
 ### Status: READY TO MERGE — all blockers resolved
@@ -930,11 +1084,14 @@ All public website endpoints have full DB-level tenant isolation.
 | `/teams` | ✅ DB-scoped (`tenantId`) | ✅ `isActive=true`, `websiteVisible=true` | ✅ Yes |
 | `/teams/[slug]` | ✅ DB-scoped (`tenantId` in Team, Event, FacilityResource) | ✅ `isActive=true`, `websiteVisible=true`, `TeamSeason.status=ACTIVE` | ✅ Yes |
 | `/weekplan` | ✅ DB-scoped (`tenantId`) | ✅ `wochenplanVisible`, `websiteVisible` | ✅ Yes |
+| `/homepage` | ✅ DB-scoped (`tenantId`) | ✅ `isEnabled=true`, ordered by `sortOrder` | ✅ Yes |
 
 ### Deploy checklist
 
-1. Run `prisma migrate deploy` in STAGE (no new migrations for this slice)
-2. Verify `GET /api/public/fc-allschwil/website/teams` returns real tenant-scoped teams
-3. Verify `GET /api/public/fc-allschwil/website/teams/[slug]` returns team detail with squad and trainers
-4. Verify unknown slug returns 404
-5. Deploy to PROD, repeat verification
+1. Run `prisma migrate deploy` in STAGE (migration `20260626120000_homepage_sections`)
+2. Verify `GET /api/public/fc-allschwil/website/homepage` returns `{ sections: [] }` (empty until sections are bootstrapped via admin)
+3. Navigate to `/dashboard/website/homepage` and create default sections
+4. Re-verify `/api/public/fc-allschwil/website/homepage` returns enabled sections
+5. Verify unknown tenant returns 404
+6. Verify disabled sections are excluded
+7. Deploy to PROD, repeat verification

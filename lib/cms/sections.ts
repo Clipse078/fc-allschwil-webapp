@@ -50,8 +50,9 @@ export const CMS_SECTIONS: CmsSection[] = [
       {
         key: "homepage_builder",
         label: "Homepage Builder",
-        description: "Visueller Builder für die Homepage mit konfigurierbaren Sektionen.",
-        status: "coming_next",
+        description: "Konfigurierbare Homepage-Sektionen verwalten und für die öffentliche API bereitstellen.",
+        status: "foundation",
+        href: CMS_ROUTES.homepage,
         requiredPermissions: ["website.manage"],
       },
     ],
