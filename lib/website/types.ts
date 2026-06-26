@@ -159,7 +159,7 @@ export type MatchesData = {
 };
 
 // ---------------------------------------------------------------------------
-// Public team — website-safe shape
+// Public team — website-safe shapes
 //
 // Intentionally omits: isActive, websiteVisible, infoboardVisible, orgUnitId,
 // sortOrder, tenantId, createdAt, updatedAt, internal squad detail.
@@ -181,6 +181,108 @@ export type PublicTeamListItem = {
 
 export type TeamsData = {
   teams: PublicTeamListItem[];
+};
+
+// ---------------------------------------------------------------------------
+// Public team detail — squad member (player)
+//
+// Privacy: NEVER expose personId, dateOfBirth, email, phone, address, remarks,
+// player ratings, medical information, or any internal admin fields.
+// photo is reserved for future schema addition (always null today).
+// ---------------------------------------------------------------------------
+
+export type PublicSquadMember = {
+  firstName: string;
+  lastName: string;
+  shirtNumber: number | null;
+  positionLabel: string | null;
+  captain: boolean;
+  viceCaptain: boolean;
+  /** Reserved: no photo field in current schema. Always null. */
+  photo: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Public team detail — trainer staff member
+//
+// Privacy: NEVER expose personId, email, phone, internal notes, or remarks.
+// photo is reserved for future schema addition (always null today).
+// ---------------------------------------------------------------------------
+
+export type PublicTrainerMember = {
+  firstName: string;
+  lastName: string;
+  roleLabel: string | null;
+  /** Reserved: no photo field in current schema. Always null. */
+  photo: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Public team detail — training session
+//
+// pitchName is resolved from FacilityResource (tenantId + pitchCode → name).
+// pitchCode (internal allocation code) is NEVER exposed.
+// ---------------------------------------------------------------------------
+
+export type PublicTeamTrainingSession = {
+  /** Day of week in German (e.g. "Dienstag"), derived from startTime. */
+  weekday: string;
+  /** ISO 8601 UTC start timestamp. */
+  startTime: string;
+  /** ISO 8601 UTC end timestamp, null when not set. */
+  endTime: string | null;
+  location: string | null;
+  /** Human-readable pitch name from facility registry, null when unresolvable. */
+  pitchName: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Public team detail — full team shape
+//
+// Privacy: description and heroImage are reserved for a future schema addition.
+// All currently null. Squad/trainer visibility is gated by TeamSeason flags.
+// ---------------------------------------------------------------------------
+
+export type PublicTeamDetail = {
+  name: string;
+  displayName: string;
+  slug: string;
+  /** TeamCategory enum value */
+  category: string;
+  ageGroup: string | null;
+  genderGroup: string | null;
+  shortName: string | null;
+  /** Active or requested season info; null when no matching TeamSeason exists. */
+  season: { key: string; name: string } | null;
+  /**
+   * Reserved for future schema addition. Always null today.
+   * Will carry Markdown description when Team.description field is added.
+   */
+  description: null;
+  /**
+   * Reserved for future schema addition. Always null today.
+   * Will carry hero image URL when Team.heroMediaId FK is added.
+   */
+  heroImage: null;
+  /**
+   * Website-visible squad players for the requested season.
+   * Empty when TeamSeason.squadWebsiteVisible = false.
+   */
+  squad: PublicSquadMember[];
+  /**
+   * Website-visible trainer staff for the requested season.
+   * Empty when TeamSeason.trainerTeamWebsiteVisible = false.
+   */
+  trainers: PublicTrainerMember[];
+  /**
+   * Upcoming TRAINING events for the team (next 4 weeks, website-visible).
+   * Ordered by startTime ascending.
+   */
+  training: PublicTeamTrainingSession[];
+};
+
+export type TeamDetailData = {
+  team: PublicTeamDetail;
 };
 
 // ---------------------------------------------------------------------------

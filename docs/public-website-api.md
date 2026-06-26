@@ -25,6 +25,7 @@
    - [GET /api/public/[tenant]/website/events](#get-apipublictenantwebsiteevents)
    - [GET /api/public/[tenant]/website/matches](#get-apipublictenantwebsitematches)
    - [GET /api/public/[tenant]/website/teams](#get-apipublictenantwebsiteteams)
+   - [GET /api/public/[tenant]/website/teams/[slug]](#get-apipublictenantwebsiteteamsslug)
    - [GET /api/public/[tenant]/website/weekplan](#get-apipublictenantwebsiteweekplan)
 9. [Endpoints (v1 — header-based tenant, legacy)](#endpoints-v1--header-based-tenant-legacy)
 10. [Type Reference](#type-reference)
@@ -423,6 +424,139 @@ GET /api/public/fc-allschwil/website/teams
 
 ---
 
+### GET /api/public/[tenant]/website/teams/[slug]
+
+Returns the full public team detail for a single team, including squad, trainer staff, and upcoming training sessions. The `slug` is the URL-safe team identifier (e.g. `e4`, `1-mannschaft`).
+
+#### Query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seasonKey` | string | — | Resolve squad/trainers from this season (e.g. `"2025-26"`). Default: active season. |
+
+#### Example request
+
+```
+GET /api/public/fc-allschwil/website/teams/e4
+```
+
+#### Example response (200)
+
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-06-26T14:30:00.000Z",
+  "data": {
+    "team": {
+      "name": "E4",
+      "displayName": "E4 2025/26",
+      "slug": "e4",
+      "category": "JUNIOREN",
+      "ageGroup": "E",
+      "genderGroup": null,
+      "shortName": "E4",
+      "season": { "key": "2025-26", "name": "Saison 2025/26" },
+      "description": null,
+      "heroImage": null,
+      "squad": [
+        {
+          "firstName": "Max",
+          "lastName": "Müller",
+          "shirtNumber": 10,
+          "positionLabel": "Mittelfeld",
+          "captain": true,
+          "viceCaptain": false,
+          "photo": null
+        }
+      ],
+      "trainers": [
+        {
+          "firstName": "Hans",
+          "lastName": "Trainer",
+          "roleLabel": "Haupttrainer",
+          "photo": null
+        }
+      ],
+      "training": [
+        {
+          "weekday": "Dienstag",
+          "startTime": "2026-07-01T17:15:00.000Z",
+          "endTime": "2026-07-01T18:45:00.000Z",
+          "location": "Kunstrasen 2",
+          "pitchName": "Kunstrasen 2"
+        }
+      ]
+    }
+  },
+  "meta": { "seasonKey": null }
+}
+```
+
+#### Error responses
+
+| Scenario | HTTP | Body |
+|----------|------|------|
+| Tenant not found or inactive | 404 | `{ "error": "Tenant not found." }` |
+| Website integration disabled | 403 | `{ "error": "Website integration is not enabled for this tenant." }` |
+| Team slug not found, inactive, or not website-visible | 404 | `{ "error": "Team not found." }` |
+
+#### Data shape — `data.team`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Base team name. |
+| `displayName` | string | Season display name from TeamSeason, or `name` as fallback. |
+| `slug` | string | URL-safe team slug. |
+| `category` | string | `AKTIVE` \| `JUNIOREN` \| `FRAUEN` \| `KINDERFUSSBALL` \| `SENIOREN` \| `TRAININGSGRUPPE` |
+| `ageGroup` | string \| null | Age group label (e.g. `"E"`, `"U16"`). |
+| `genderGroup` | string \| null | Gender group label. |
+| `shortName` | string \| null | Short label, e.g. `"E4"`. |
+| `season` | object \| null | Active season info. null when no matching TeamSeason. |
+| `season.key` | string | Season key. |
+| `season.name` | string | Season display name. |
+| `description` | null | Reserved. Will carry Markdown description when schema adds `Team.description`. |
+| `heroImage` | null | Reserved. Will carry hero image URL when schema adds `Team.heroMediaId`. |
+
+#### Data shape — `data.team.squad[]`
+
+Privacy: `personId`, `dateOfBirth`, `email`, `phone`, `address`, `remarks`, `sortOrder` are **never** returned. Squad is empty when `TeamSeason.squadWebsiteVisible = false`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `firstName` | string | |
+| `lastName` | string | |
+| `shirtNumber` | number \| null | |
+| `positionLabel` | string \| null | |
+| `captain` | boolean | |
+| `viceCaptain` | boolean | |
+| `photo` | null | Reserved. Always null until `Person.photoUrl` is added to schema. |
+
+#### Data shape — `data.team.trainers[]`
+
+Privacy: `personId`, `email`, `phone`, `remarks`, `sortOrder` are **never** returned. Trainer list is empty when `TeamSeason.trainerTeamWebsiteVisible = false`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `firstName` | string | |
+| `lastName` | string | |
+| `roleLabel` | string \| null | |
+| `photo` | null | Reserved. Always null until `Person.photoUrl` is added to schema. |
+
+#### Data shape — `data.team.training[]`
+
+Upcoming TRAINING events for this team (next 28 days, `websiteVisible = true`), ordered by `startTime`. `pitchCode` (internal allocation code) is **never** returned — it is resolved to `pitchName` via `FacilityResource`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `weekday` | string | Day name in German, e.g. `"Dienstag"`. |
+| `startTime` | string (ISO 8601) | Training start UTC. |
+| `endTime` | string \| null | Training end UTC. |
+| `location` | string \| null | Venue or location string. |
+| `pitchName` | string \| null | Human-readable pitch name from facility registry. null when unresolvable. |
+
+---
+
 ### GET /api/public/[tenant]/website/weekplan
 
 Returns the Wochenplan (week plan) grouped by calendar day. Optionally includes the active publication state for a specific week.
@@ -611,7 +745,8 @@ type PublicWochenplanPublication = {
 | News query logic | `lib/news/public-news-feed.ts` | v1 news route, v2 `[tenant]/website/news` route |
 | Event query + filtering | `lib/events/public-event-feed.ts` | All event/match/weekplan routes |
 | Event → website mapper | `lib/website/public-events-mapper.ts` | events route, matches route, weekplan route |
-| Team query logic | `lib/website/public-teams-feed.ts` | teams route |
+| Team list query | `lib/website/public-teams-feed.ts` (`getPublicTeams`) | teams list route |
+| Team detail query | `lib/website/public-teams-feed.ts` (`getPublicTeamDetail`) | team detail route |
 | Envelope builder | `lib/website/response-helpers.ts` (`buildWebsiteEnvelope`) | All v2 routes |
 | Tenant resolution (path) | `lib/website/response-helpers.ts` (`resolveTenantFromParams`) | All v2 routes |
 | Tenant resolution (header) | `lib/website/response-helpers.ts` (`resolveTenantFromRequest`) | All v1 routes |
@@ -632,6 +767,7 @@ type PublicWochenplanPublication = {
 | `[tenant]/website/events` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` | ✅ Safe |
 | `[tenant]/website/matches` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` | ✅ Safe |
 | `[tenant]/website/teams` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicTeams()` | ✅ Safe |
+| `[tenant]/website/teams/[slug]` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` in Team, Event, FacilityResource WHERE clauses | ✅ Safe |
 | `[tenant]/website/weekplan` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getGroupedWochenplan()` + `getWochenplanPublication()` | ✅ Safe |
 | `v1/website/news` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses | ✅ Safe |
 | `v1/website/news/[slug]` | `resolveTenantFromRequest` + `assertWebsiteEnabled` | `tenantId` in DB where clauses | ✅ Safe |
@@ -751,33 +887,29 @@ teams Team[]
 
 ## Recommended Next Slice
 
-The natural next integration slice after this foundation is:
-
-### Slice 2: Team Detail + Squad API
+### Slice 2: Team Detail + Squad API — ✅ COMPLETED
 
 **Endpoint**: `GET /api/public/[tenant]/website/teams/[slug]`
 
-**Returns**:
-- Full team details
-- Active squad (players with `isWebsiteVisible = true`)
-- Active trainer team (trainers with `isWebsiteVisible = true`)
-- Season history (past team seasons)
+Implemented in this slice. See [GET /api/public/[tenant]/website/teams/[slug]](#get-apipublictenantwebsiteteamsslug) above.
 
-**Query params**: `seasonKey` to select season-specific squad
+**Files created/modified**:
+- `app/api/public/[tenant]/website/teams/[slug]/route.ts` — new route handler
+- `lib/website/public-teams-feed.ts` — added `getPublicTeamDetail()` and `GetPublicTeamDetailInput`
+- `lib/website/types.ts` — added `PublicSquadMember`, `PublicTrainerMember`, `PublicTeamTrainingSession`, `PublicTeamDetail`, `TeamDetailData`
 
-**Required library changes**:
-- `lib/website/public-teams-feed.ts` — add `getPublicTeamDetail()` + `getPublicTeamSquad()`
-- `lib/website/types.ts` — add `PublicTeamDetail`, `PublicSquadMember`, `PublicTrainerMember`
-- New route: `app/api/public/[tenant]/website/teams/[slug]/route.ts`
+**Privacy invariants upheld**:
+- `personId`, `dateOfBirth`, `email`, `phone`, `remarks` never selected
+- `pitchCode` resolved to `pitchName` internally; raw code never returned
+- Squad/trainer lists gated by `TeamSeason.squadWebsiteVisible` / `trainerTeamWebsiteVisible`
 
-**Privacy guards needed**:
-- Never expose: `dateOfBirth`, `email`, `phone`, `notes`, `personId` (internal FK), `remarks`
-- Only expose: `firstName`, `lastName`, `displayName`, `shirtNumber`, `positionLabel`, `isCaptain`, `roleLabel`
+**Schema note**: No schema changes. `description` and `heroImage` fields are reserved as `null` in the DTO pending future `Team.description` / `Team.heroMediaId` additions.
 
-**Schema note**: No schema changes needed — `PlayerSquadMember.isWebsiteVisible` and `TrainerTeamMember.isWebsiteVisible` already exist.
+### Slice 3: Potential Next Steps
 
-> **Note**: The Team Detail + Squad API depends on the `Team.tenantId` migration
-> being completed first (required for the parent `/teams` list endpoint).
+- Add `Team.description` and `Team.heroMediaId` to schema → populate `description` and `heroImage` in the team detail DTO
+- Add `Person.photoUrl` to schema → populate `photo` for squad members and trainers
+- Team contact section (requires a `TeamContact` model with `isPublic` flag)
 
 ---
 
@@ -796,11 +928,13 @@ All public website endpoints have full DB-level tenant isolation.
 | `/events` | ✅ DB-scoped (`tenantId`) | ✅ `status IN (SCHEDULED,LIVE,COMPLETED,POSTPONED)`, `websiteVisible` | ✅ Yes |
 | `/matches` | ✅ DB-scoped (`tenantId`) | ✅ Same as events + `type=MATCH` | ✅ Yes |
 | `/teams` | ✅ DB-scoped (`tenantId`) | ✅ `isActive=true`, `websiteVisible=true` | ✅ Yes |
+| `/teams/[slug]` | ✅ DB-scoped (`tenantId` in Team, Event, FacilityResource) | ✅ `isActive=true`, `websiteVisible=true`, `TeamSeason.status=ACTIVE` | ✅ Yes |
 | `/weekplan` | ✅ DB-scoped (`tenantId`) | ✅ `wochenplanVisible`, `websiteVisible` | ✅ Yes |
 
 ### Deploy checklist
 
-1. Run `prisma migrate deploy` in STAGE
-2. Verify audit query: `SELECT id, name FROM "Team" WHERE "tenantId" IS NULL;` returns 0 rows
-3. Verify `GET /api/public/fc-allschwil/website/teams` returns real tenant-scoped teams
-4. Deploy to PROD, repeat verification
+1. Run `prisma migrate deploy` in STAGE (no new migrations for this slice)
+2. Verify `GET /api/public/fc-allschwil/website/teams` returns real tenant-scoped teams
+3. Verify `GET /api/public/fc-allschwil/website/teams/[slug]` returns team detail with squad and trainers
+4. Verify unknown slug returns 404
+5. Deploy to PROD, repeat verification
