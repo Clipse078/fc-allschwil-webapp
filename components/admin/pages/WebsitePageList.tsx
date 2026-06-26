@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { FileText, PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide-react";
+import { FileText, PenLine, Blocks, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide-react";
 import WebsitePageStatusBadge from "@/components/admin/pages/WebsitePageStatusBadge";
 import type { PageStatus, WebsitePageAdminListItem } from "@/lib/pages/admin-queries";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -198,6 +198,13 @@ export default function WebsitePageList() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={`/dashboard/website/pages/${page.id}/builder`}
+                        className="sce-icon-button"
+                        title="Page Builder"
+                      >
+                        <Blocks className="h-3.5 w-3.5" />
+                      </Link>
                       <Link
                         href={`/dashboard/website/pages/${page.id}/edit`}
                         className="sce-icon-button"

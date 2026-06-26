@@ -35,4 +35,12 @@ export const CMS_ROUTES = {
   settings: "/dashboard/website/settings",
 } as const;
 
+/**
+ * Generates the Page Builder URL for a given page ID.
+ * Used wherever a "Builder" action link is needed for a page.
+ */
+export function pageBuilderHref(pageId: string): string {
+  return `/dashboard/website/pages/${pageId}/builder`;
+}
+
 export type CmsRouteKey = keyof typeof CMS_ROUTES;

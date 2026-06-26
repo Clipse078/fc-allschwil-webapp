@@ -1,11 +1,13 @@
 /**
  * lib/homepage/block-registry.ts
  *
- * Canonical block library registry for the Homepage Block Library Foundation
- * (CMS V2 Slice 3).
+ * Canonical block library registry for the CMS V2 block system.
+ * Originally introduced in CMS V2 Slice 3 (Homepage Block Library Foundation);
+ * extended to serve as the SHARED CMS block registry in CMS V2 Slice 8
+ * (Page Builder Foundation) — now used by both HomepageSection and WebsitePageSection.
  *
  * This is the SINGLE SOURCE OF TRUTH for:
- *   - Block type keys (must match HomepageSection.type DB column)
+ *   - Block type keys (must match HomepageSection.type and WebsitePageSection.type DB columns)
  *   - Human-readable display names and descriptions (German)
  *   - Block categories (Header / Content / Data-driven / Club / Sponsors / Conversion / Utility)
  *   - Block availability status for the admin Block Library overview
@@ -21,7 +23,8 @@
  *   - Block type keys are stable DB values — rename only with a data migration.
  *   - lib/homepage/section-types.ts derives HOMEPAGE_SECTION_TYPES from this registry.
  *   - DEFAULT_HOMEPAGE_SECTIONS in section-types.ts is derived from this registry.
- *   - Add new block types here first; section-types.ts picks them up automatically.
+ *   - lib/page-sections/admin-queries.ts uses this registry for WebsitePageSection.
+ *   - Add new block types here first; all consumers pick them up automatically.
  *
  * Deferred future work (intentionally out of scope for this foundation slice):
  *   - Full config schema validation with Zod

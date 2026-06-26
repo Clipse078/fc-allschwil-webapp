@@ -55,6 +55,14 @@ export const CMS_SECTIONS: CmsSection[] = [
         href: CMS_ROUTES.homepage,
         requiredPermissions: ["website.manage"],
       },
+      {
+        key: "page_builder",
+        label: "Page Builder",
+        description: "Block-basierter Page Builder für Website-Seiten. Seiten mit wiederverwendbaren CMS-Blöcken zusammenstellen.",
+        status: "foundation",
+        href: CMS_ROUTES.pages,
+        requiredPermissions: ["website.manage"],
+      },
     ],
   },
 

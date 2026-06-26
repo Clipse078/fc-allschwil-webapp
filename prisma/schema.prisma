@@ -370,6 +370,7 @@ model Tenant {
   mediaAssets            MediaAsset[]
   newsArticleMedia       NewsArticleMedia[]
   websitePages           WebsitePage[]
+  websitePageSections    WebsitePageSection[]
   homepageSections       HomepageSection[]
   websiteNavItems        WebsiteNavItem[]
 
@@ -1444,8 +1445,9 @@ model WebsitePage {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  authorPerson Person? @relation("WebsitePageAuthorPerson", fields: [authorPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  authorPerson Person?              @relation("WebsitePageAuthorPerson", fields: [authorPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sections     WebsitePageSection[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -1454,6 +1456,62 @@ model WebsitePage {
   @@index([tenantId, status, scheduledAt])
   @@index([tenantId, authorPersonId])
   @@index([slug])
+}
+
+// ---------------------------------------------------------------------------
+// WebsitePageSection — Block-based page layout sections (CMS V2 Slice 8)
+//
+// Each WebsitePage can have an ordered set of typed content sections that
+// define its block-based layout. This mirrors the HomepageSection model but
+// is scoped to a specific page via pageId.
+//
+// Design invariants:
+//   - One WebsitePageSection row per logical page block.
+//   - sortOrder controls display order (ascending, 0-based).
+//   - isEnabled gates public visibility: only enabled sections appear in the
+//     public layout API when the parent page is PUBLISHED.
+//   - config is free-form JSON; validated by the shared block registry helpers.
+//   - type must match a key in the shared block registry (lib/homepage/block-registry.ts).
+//
+// Publishing strategy (CMS V2 Slice 8 — foundation):
+//   Section visibility on the public API requires BOTH:
+//     1. isEnabled = true (section gate)
+//     2. parent WebsitePage.status = "PUBLISHED" AND publishedAt <= now() (page gate)
+//   Full section-level publish/approval workflow is deferred to a future slice.
+//   Sections do not carry their own publishStatus; they inherit the page's status.
+//
+// Future deferred work:
+//   - Section-level publish workflow (publishStatus, scheduledPublishAt)
+//   - Section-level approval workflow (approvalStatus, reviewerUserId, etc.)
+//   - Drag-and-drop reordering
+//   - Section version history / change tracking
+// ---------------------------------------------------------------------------
+
+model WebsitePageSection {
+  id        String   @id @default(cuid())
+  tenantId  String
+  pageId    String
+  /// Section type key — must match a key in the shared block registry.
+  type      String
+  /// Human-readable admin label (editable by the tenant admin).
+  label     String
+  /// Display order (ascending). Lower values render first.
+  sortOrder Int      @default(0)
+  /// When false the section is hidden from the public layout API.
+  isEnabled Boolean  @default(true)
+  /// Type-specific configuration stored as a JSON object.
+  /// Validated at the application layer via the shared block registry helpers.
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  page   WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, pageId])
+  @@index([tenantId, pageId, sortOrder])
+  @@index([tenantId, pageId, isEnabled])
 }
 
 // ---------------------------------------------------------------------------

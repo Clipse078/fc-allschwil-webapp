@@ -1240,6 +1240,81 @@ Returns the visible navigation tree for the tenant, grouped by area.
 
 ---
 
+---
+
+## GET /api/public/[tenant]/website/pages/[slug]/layout
+
+> Added in CMS V2 Slice 8 (Page Builder Foundation).
+> **Does not replace** `GET /api/public/v1/website/pages/[slug]` (Markdown body endpoint).
+> Both endpoints coexist for backward compatibility.
+
+Returns the block-based layout of a published page for a given tenant and slug.
+
+**Tenant resolution:** Path segment `[tenant]` (same as all v2 endpoints).
+
+**Public visibility rules:**
+- Page must be `status=PUBLISHED` AND `publishedAt <= now()`
+- Only sections with `isEnabled=true` are returned
+- Section config is projected through the block registry's `projectPublicConfig()`
+
+**Privacy invariants:**
+- `tenantId` — **never** exposed
+- `createdAt` / `updatedAt` — **never** exposed
+- Approval metadata — **never** exposed
+- Section `isEnabled` flag — **never** exposed
+- Config is projected through the block registry's public-safe projection
+
+**Response shape:**
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-06-26T20:00:00.000Z",
+  "data": {
+    "page": {
+      "id": "clxxx",
+      "slug": "ueber-uns",
+      "title": "Über uns",
+      "seoTitle": "FC Allschwil — Über uns",
+      "seoDescription": "Erfahre mehr über den FC Allschwil.",
+      "publishedAt": "2026-06-25T10:00:00.000Z"
+    },
+    "sections": [
+      {
+        "id": "clyyy",
+        "type": "hero",
+        "label": "Hero-Bereich",
+        "sortOrder": 0,
+        "config": { "title": "Willkommen beim FC Allschwil" },
+        "block": { "category": "Header", "datadriven": false }
+      },
+      {
+        "id": "clzzz",
+        "type": "newsTeaser",
+        "label": "Aktuelle News",
+        "sortOrder": 10,
+        "config": { "itemCount": 3, "heading": "Neuigkeiten" },
+        "block": { "category": "Content", "datadriven": true }
+      }
+    ]
+  },
+  "meta": { "sectionCount": 2 }
+}
+```
+
+**Error responses:**
+- `404` — unknown tenant
+- `403` — website not enabled for tenant
+- `404` — page not found or not published
+
+**Relation to existing page endpoint:**
+```
+GET /api/public/v1/website/pages/[slug]         → Markdown body (old, still works)
+GET /api/public/[tenant]/website/pages/[slug]/layout → Block layout (new, Slice 8)
+```
+
+---
+
 ## Merge Recommendation
 
 ### Status: READY TO MERGE — all blockers resolved
