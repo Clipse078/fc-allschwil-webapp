@@ -156,6 +156,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
           },
           {
+            key: "website-editorial",
+            label: "Redaktion",
+            href: "/dashboard/website/editorial",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
             key: "website-publishing",
             label: "Veröffentlichungen",
             href: "/dashboard/website/publishing",
