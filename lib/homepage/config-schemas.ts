@@ -82,6 +82,71 @@ export const callToActionConfigSchema = z
 export const customContentPlaceholderConfigSchema = z.object({}).strict();
 
 // ---------------------------------------------------------------------------
+// splitContentCards schema
+// ---------------------------------------------------------------------------
+
+const richTextValueSchema = z
+  .object({
+    type: z.literal("doc"),
+    content: z.array(z.unknown()),
+  })
+  .nullable()
+  .optional();
+
+const splitContentCardSchema = z.object({
+  id: z.string().max(100),
+  title: z.string().max(200),
+  body: z.string().max(2000),
+  variant: z.enum(["orange", "blue", "red", "neutral"]),
+  icon: z.string().max(50).optional(),
+});
+
+const splitContentImageRefSchema = z.object({
+  mediaAssetId: z.string().max(200),
+  alt: z.string().max(300).optional(),
+  caption: z.string().max(500).optional(),
+});
+
+const splitContentStyleSchema = z
+  .object({
+    theme: z.enum(["light", "soft", "dark", "club"]).optional(),
+    spacingTop: z.enum(["none", "sm", "md", "lg", "xl"]).optional(),
+    spacingBottom: z.enum(["none", "sm", "md", "lg", "xl"]).optional(),
+    width: z.enum(["narrow", "normal", "wide", "full"]).optional(),
+    alignment: z.enum(["left", "center"]).optional(),
+  })
+  .optional();
+
+const splitContentBackgroundSchema = z
+  .discriminatedUnion("type", [
+    z.object({ type: z.literal("none") }),
+    z.object({ type: z.literal("solid"), color: z.string().max(50) }),
+    z.object({ type: z.literal("gradient"), gradientPreset: z.string().max(100) }),
+    z.object({
+      type: z.literal("image"),
+      mediaAssetId: z.string().max(200),
+      overlay: z.enum(["none", "light", "dark"]),
+    }),
+  ])
+  .optional();
+
+export const splitContentCardsConfigSchema = z.object({
+  eyebrow: z.string().max(200).optional(),
+  headline: z.string().max(300).optional(),
+  bodyRichText: richTextValueSchema,
+  layout: z
+    .enum(["TEXT_LEFT_CARDS_RIGHT", "CARDS_LEFT_TEXT_RIGHT"])
+    .optional(),
+  mediaPlacement: z
+    .enum(["NONE", "WITH_TEXT", "WITH_CARDS", "OPPOSITE_TEXT"])
+    .optional(),
+  images: z.array(splitContentImageRefSchema).max(10).optional(),
+  cards: z.array(splitContentCardSchema).max(20).optional(),
+  style: splitContentStyleSchema,
+  background: splitContentBackgroundSchema,
+});
+
+// ---------------------------------------------------------------------------
 // Schema map by type key
 // ---------------------------------------------------------------------------
 
@@ -93,6 +158,7 @@ export const CONFIG_SCHEMAS = {
   sponsorsTeaser: sponsorsTeaserConfigSchema,
   weekplanTeaser: weekplanTeaserConfigSchema,
   callToAction: callToActionConfigSchema,
+  splitContentCards: splitContentCardsConfigSchema,
   customContentPlaceholder: customContentPlaceholderConfigSchema,
 } as const satisfies Record<HomepageSectionTypeKey, z.ZodTypeAny>;
 

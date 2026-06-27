@@ -33,6 +33,7 @@
  */
 
 import { BLOCK_REGISTRY } from "@/lib/homepage/block-registry";
+import type { RichTextValue } from "@/lib/cms/rich-text";
 
 // ---------------------------------------------------------------------------
 // Type key enum (DB contract — must match HomepageSection.type values)
@@ -51,6 +52,7 @@ export const HOMEPAGE_SECTION_TYPE_KEYS = [
   "sponsorsTeaser",
   "weekplanTeaser",
   "callToAction",
+  "splitContentCards",
   "customContentPlaceholder",
 ] as const;
 
@@ -140,6 +142,67 @@ export type CallToActionSectionConfig = {
  */
 export type CustomContentPlaceholderSectionConfig = Record<string, never>;
 
+// ---------------------------------------------------------------------------
+// SplitContentCards config types
+// ---------------------------------------------------------------------------
+
+export type SplitContentCardsLayout =
+  | "TEXT_LEFT_CARDS_RIGHT"
+  | "CARDS_LEFT_TEXT_RIGHT";
+
+export type SplitContentCardsMediaPlacement =
+  | "NONE"
+  | "WITH_TEXT"
+  | "WITH_CARDS"
+  | "OPPOSITE_TEXT";
+
+export type SplitContentCardVariant = "orange" | "blue" | "red" | "neutral";
+
+export type SplitContentCard = {
+  id: string;
+  title: string;
+  body: string;
+  variant: SplitContentCardVariant;
+  icon?: string;
+};
+
+export type SplitContentImageRef = {
+  mediaAssetId: string;
+  alt?: string;
+  caption?: string;
+};
+
+export type SplitContentStyle = {
+  theme: "light" | "soft" | "dark" | "club";
+  spacingTop: "none" | "sm" | "md" | "lg" | "xl";
+  spacingBottom: "none" | "sm" | "md" | "lg" | "xl";
+  width: "narrow" | "normal" | "wide" | "full";
+  alignment: "left" | "center";
+};
+
+export type SplitContentBackground =
+  | { type: "none" }
+  | { type: "solid"; color: string }
+  | { type: "gradient"; gradientPreset: string }
+  | { type: "image"; mediaAssetId: string; overlay: "none" | "light" | "dark" };
+
+/**
+ * splitContentCards: two-column premium content block.
+ * Left/right columns hold text (eyebrow + headline + rich text) and stacked
+ * text cards respectively. Fully configurable layout, images, and styles.
+ */
+export type SplitContentCardsSectionConfig = {
+  eyebrow?: string;
+  headline?: string;
+  bodyRichText?: RichTextValue | null;
+  layout?: SplitContentCardsLayout;
+  mediaPlacement?: SplitContentCardsMediaPlacement;
+  images?: SplitContentImageRef[];
+  cards?: SplitContentCard[];
+  style?: SplitContentStyle;
+  background?: SplitContentBackground;
+};
+
 /** Union of all known config shapes. */
 export type HomepageSectionConfig =
   | HeroSectionConfig
@@ -149,6 +212,7 @@ export type HomepageSectionConfig =
   | SponsorsTeaserSectionConfig
   | WeekplanTeaserSectionConfig
   | CallToActionSectionConfig
+  | SplitContentCardsSectionConfig
   | CustomContentPlaceholderSectionConfig;
 
 // ---------------------------------------------------------------------------

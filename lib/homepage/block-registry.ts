@@ -289,6 +289,51 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     projectPublicConfig: (config) => config,
   },
 
+  // ── Content (Premium) ──────────────────────────────────────────────────────
+  {
+    type: "splitContentCards",
+    displayName: "Split Content Cards",
+    description:
+      "Zweispaltiger Inhalt: Links Eyebrow/Headline/Fliesstext, rechts gestapelte Karten. Layout, Bilder und Stile vollständig konfigurierbar.",
+    category: "Content",
+    status: "available",
+    datadriven: false,
+    defaultConfig: {
+      eyebrow: "",
+      headline: "",
+      bodyRichText: null,
+      layout: "TEXT_LEFT_CARDS_RIGHT",
+      mediaPlacement: "NONE",
+      images: [],
+      cards: [],
+      style: {
+        theme: "light",
+        spacingTop: "md",
+        spacingBottom: "md",
+        width: "normal",
+        alignment: "left",
+      },
+      background: {
+        type: "none",
+      },
+    },
+    configKeys: [
+      "eyebrow",
+      "headline",
+      "bodyRichText",
+      "layout",
+      "mediaPlacement",
+      "images",
+      "cards",
+      "style",
+      "background",
+    ],
+    icon: "LayoutPanelLeft",
+    defaultSortOrder: 65,
+    defaultEnabled: false,
+    projectPublicConfig: (config) => config,
+  },
+
   // ── Utility ────────────────────────────────────────────────────────────────
   {
     type: "customContentPlaceholder",

@@ -27,6 +27,7 @@ import {
   useMemo,
   useRef,
   Fragment,
+  Suspense,
 } from "react";
 import {
   ChevronUp,
@@ -54,7 +55,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Save,
+  LayoutPanelLeft,
+  Layers,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
 import type { PageSectionAdminItem } from "@/lib/page-sections/admin-queries";
 import {
@@ -68,6 +72,33 @@ import {
   SECTION_PUBLISH_STATUS,
   SECTION_APPROVAL_STATUS,
 } from "@/lib/cms/section-publishing";
+import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
+
+// Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
+const SplitContentCardsConfigForm = dynamic(
+  () => import("@/components/admin/page-builder/block-forms/SplitContentCardsConfigForm"),
+  { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
+
+// Lazy-load the shared block renderer for live preview
+const SplitContentCardsRenderer = dynamic(
+  () => import("@/components/website/blocks/SplitContentCardsRenderer"),
+  { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
+
+// Registry of block types that have a premium property panel
+const PREMIUM_BLOCK_TYPES = new Set(["splitContentCards"]);
+
+/**
+ * Renders a visual preview for a known block type.
+ * Falls back to JSON config summary for generic blocks.
+ */
+function BlockVisualPreview({ type, config }: { type: string; config: Record<string, unknown> }) {
+  if (type === "splitContentCards") {
+    return <SplitContentCardsRenderer config={config} previewMode />;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -188,9 +219,13 @@ type ConfigEditorProps = {
 function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: ConfigEditorProps) {
   const def = getBlockDefinition(section.type);
   const configKeys = useMemo(() => def?.configKeys ?? [], [def]);
+  const isPremium = PREMIUM_BLOCK_TYPES.has(section.type);
 
   const [label, setLabel] = useState(section.label);
+
+  // Generic block state (string values per configKey)
   const [values, setValues] = useState<Record<string, string>>(() => {
+    if (isPremium) return {};
     const init: Record<string, string> = {};
     for (const k of configKeys) {
       const v = section.config[k];
@@ -198,10 +233,19 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
     }
     return init;
   });
+
+  // Premium block state (full config object)
+  const [premiumConfig, setPremiumConfig] = useState<Record<string, unknown>>(() =>
+    isPremium ? { ...section.config } : {},
+  );
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Live preview toggle for premium blocks
+  const [showLivePreview, setShowLivePreview] = useState(false);
 
   const buildConfig = useCallback((): Record<string, unknown> => {
+    if (isPremium) return premiumConfig;
     const config: Record<string, unknown> = {};
     for (const k of configKeys) {
       const raw = values[k];
@@ -210,7 +254,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
       config[k] = !isNaN(num) && raw.trim() !== "" ? num : raw;
     }
     return config;
-  }, [configKeys, values]);
+  }, [isPremium, premiumConfig, configKeys, values]);
 
   async function handleSave() {
     const trimmed = label.trim();
@@ -248,7 +292,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
             Label
           </label>
-            <input
+          <input
             className="fca-input w-full"
             value={label}
             onChange={(e) => { setLabel(e.target.value); onChanged?.(); }}
@@ -256,7 +300,50 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
           />
         </div>
 
-        {configKeys.length > 0 && (
+        {/* Premium block: dispatch to specialized config form */}
+        {isPremium && section.type === "splitContentCards" && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Konfiguration
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowLivePreview((v) => !v)}
+                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
+                  showLivePreview
+                    ? "border-blue-400 bg-blue-50 text-blue-700"
+                    : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                <LayoutPanelLeft className="h-3 w-3" />
+                {showLivePreview ? "Vorschau ausblenden" : "Live-Vorschau"}
+              </button>
+            </div>
+            <SplitContentCardsConfigForm
+              config={premiumConfig}
+              onChange={(updated) => {
+                setPremiumConfig(updated);
+                onChanged?.();
+              }}
+            />
+            {showLivePreview && (
+              <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
+                <p className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Live-Vorschau
+                </p>
+                <div className="overflow-auto">
+                  <Suspense fallback={<div className="h-32 animate-pulse bg-gray-100" />}>
+                    <SplitContentCardsRenderer config={premiumConfig} previewMode />
+                  </Suspense>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Generic block: key-value editor */}
+        {!isPremium && configKeys.length > 0 && (
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
               Konfiguration
@@ -275,7 +362,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
           </div>
         )}
 
-        {configKeys.length === 0 && (
+        {!isPremium && configKeys.length === 0 && (
           <p className="text-xs text-[var(--muted)] italic">
             Dieser Blocktyp hat keine konfigurierbaren Felder.
           </p>
@@ -501,50 +588,59 @@ function PreviewPanel({
         ) : error ? (
           <div className="flex items-center justify-center h-32 text-rose-600 text-sm">{error}</div>
         ) : (
-          <div
-            className="mx-auto transition-all duration-300 rounded-lg border border-[var(--border)] bg-white overflow-hidden"
-            style={{ maxWidth: vc.width }}
-          >
-            {sections.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-[var(--muted)]">
-                <Blocks className="h-8 w-8 mb-2 opacity-40" />
-                <p className="text-sm">Keine Sektionen vorhanden</p>
-              </div>
-            ) : (
-              <div>
-                {sections.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`border-b border-[var(--border)] last:border-0 p-4 ${
-                      !s.isEnabled || s.publishStatus !== "PUBLISHED" ? "opacity-50 bg-gray-50" : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[var(--foreground)]">{s.label}</span>
-                        <SectionTypeBadge type={s.type} />
+            <div className="mx-auto transition-all duration-300 rounded-lg border border-[var(--border)] bg-white overflow-hidden"
+              style={{ maxWidth: vc.width }}
+            >
+              {sections.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-[var(--muted)]">
+                  <Blocks className="h-8 w-8 mb-2 opacity-40" />
+                  <p className="text-sm">Keine Sektionen vorhanden</p>
+                </div>
+              ) : (
+                <div>
+                  {sections.map((s) => (
+                    <div
+                      key={s.id}
+                      className={`border-b border-[var(--border)] last:border-0 ${
+                        !s.isEnabled || s.publishStatus !== "PUBLISHED" ? "opacity-50" : ""
+                      }`}
+                    >
+                      {/* Section status strip */}
+                      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-2)]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[var(--foreground)]">{s.label}</span>
+                          <SectionTypeBadge type={s.type} />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <EnabledBadge isEnabled={s.isEnabled} />
+                          <PublishBadge status={s.publishStatus} />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <EnabledBadge isEnabled={s.isEnabled} />
-                        <PublishBadge status={s.publishStatus} />
-                      </div>
+
+                      {/* Visual block render (if renderer available) */}
+                      <Suspense fallback={<div className="h-16 animate-pulse bg-gray-50" />}>
+                        <BlockVisualPreview type={s.type} config={s.config} />
+                      </Suspense>
+
+                      {/* Fallback: JSON config for non-premium blocks */}
+                      {!PREMIUM_BLOCK_TYPES.has(s.type) && Object.keys(s.config).length > 0 && (
+                        <div className="px-4 pb-3">
+                          <div className="rounded bg-[var(--surface-2)] px-2 py-1.5">
+                            <p className="text-[10px] font-mono text-[var(--muted)]">
+                              {JSON.stringify(s.config, null, 2).slice(0, 200)}
+                              {JSON.stringify(s.config).length > 200 ? "…" : ""}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {!PREMIUM_BLOCK_TYPES.has(s.type) && s.block && (
+                        <p className="px-4 pb-3 text-[11px] text-[var(--muted)]">{s.block.description}</p>
+                      )}
                     </div>
-                    {Object.keys(s.config).length > 0 && (
-                      <div className="mt-1 rounded bg-[var(--surface-2)] px-2 py-1.5">
-                        <p className="text-[10px] font-mono text-[var(--muted)]">
-                          {JSON.stringify(s.config, null, 2).slice(0, 200)}
-                          {JSON.stringify(s.config).length > 200 ? "…" : ""}
-                        </p>
-                      </div>
-                    )}
-                    {s.block && (
-                      <p className="mt-1.5 text-[11px] text-[var(--muted)]">{s.block.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
         )}
       </div>
 
@@ -832,6 +928,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // Autosave state
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -1054,6 +1151,15 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
         />
       )}
 
+      {showTemplates && (
+        <PageTemplatesPicker
+          open={showTemplates}
+          pageId={pageId}
+          onClose={() => setShowTemplates(false)}
+          onApplied={() => { void load(); }}
+        />
+      )}
+
       <div className="space-y-4">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1064,6 +1170,15 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             <SaveIndicator state={saveState} lastSaved={lastSaved} />
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowTemplates(true)}
+              className="fca-button-secondary px-2.5"
+              title="Seitenvorlage anwenden"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">Vorlage</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowPreview(true)}
