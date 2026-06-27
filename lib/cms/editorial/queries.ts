@@ -11,6 +11,8 @@
  *   - HomepageSection / WebsitePageSection section publishing engine
  *   - ContentRevision for activity signals
  *   - AuditLog for editorial activity feed
+ *   - lib/publishing/types PUBLISHING_STATUS_LABEL (no duplicate label map)
+ *   - lib/cms/routes CMS_ROUTES / pageBuilderHref / newsEditHref (no hardcoded URLs)
  *
  * Design:
  *   - Each adapter function normalizes one entity type into the shared shape.
@@ -25,6 +27,8 @@ import {
   SECTION_APPROVAL_STATUS_LABELS,
   SECTION_PUBLISH_STATUS_LABELS,
 } from "@/lib/cms/section-publishing";
+import { PUBLISHING_STATUS_LABEL } from "@/lib/publishing/types";
+import { CMS_ROUTES, pageBuilderHref, newsEditHref } from "@/lib/cms/routes";
 import {
   EDITORIAL_ENTITY_LABEL,
   getActionLabel,
@@ -41,32 +45,18 @@ import {
   type EditorialHealthData,
 } from "./types";
 
-// ── Status label helpers (reuse existing label maps) ─────────────────────────
-
-const PAGE_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "Entwurf",
-  IN_REVIEW: "In Prüfung",
-  SCHEDULED: "Geplant",
-  PUBLISHED: "Veröffentlicht",
-  ARCHIVED: "Archiviert",
-};
-
-// ── Edit URL helpers ──────────────────────────────────────────────────────────
+// ── Edit URL helpers — use shared CMS_ROUTES and route helpers ────────────────
 
 function homepageSectionEditUrl(): string {
-  return "/dashboard/website/homepage";
+  return CMS_ROUTES.homepage;
 }
 
 function websitePageEditUrl(pageId: string): string {
-  return `/dashboard/website/pages/${pageId}/builder`;
-}
-
-function newsEditUrl(newsId: string): string {
-  return `/dashboard/website/news/${newsId}/edit`;
+  return pageBuilderHref(pageId);
 }
 
 function pageSectionEditUrl(pageId: string): string {
-  return `/dashboard/website/pages/${pageId}/builder`;
+  return pageBuilderHref(pageId);
 }
 
 // ── KPI queries ───────────────────────────────────────────────────────────────
@@ -317,9 +307,9 @@ export async function getEditorialReviewQueue(
       entityType: "WebsitePage",
       title: p.title,
       workflowStatus: p.status,
-      workflowStatusLabel: PAGE_STATUS_LABEL[p.status] ?? p.status,
+      workflowStatusLabel: PUBLISHING_STATUS_LABEL[p.status as keyof typeof PUBLISHING_STATUS_LABEL] ?? p.status,
       publishStatus: p.status,
-      publishStatusLabel: PAGE_STATUS_LABEL[p.status] ?? p.status,
+      publishStatusLabel: PUBLISHING_STATUS_LABEL[p.status as keyof typeof PUBLISHING_STATUS_LABEL] ?? p.status,
       updatedAt: p.updatedAt.toISOString(),
       reviewRequestedAt: null,
       sourceLocation: null,
@@ -459,7 +449,7 @@ export async function getScheduledPublications(
       scheduledAt: p.scheduledAt ? p.scheduledAt.toISOString() : null,
       expiresAt: null,
       publishStatus: p.status,
-      publishStatusLabel: PAGE_STATUS_LABEL[p.status] ?? p.status,
+      publishStatusLabel: PUBLISHING_STATUS_LABEL[p.status as keyof typeof PUBLISHING_STATUS_LABEL] ?? p.status,
       sourceLocation: null,
       editUrl: websitePageEditUrl(p.id),
     });
@@ -473,13 +463,13 @@ export async function getScheduledPublications(
       scheduledAt: n.scheduledAt ? n.scheduledAt.toISOString() : null,
       expiresAt: null,
       publishStatus: n.status,
-      publishStatusLabel: PAGE_STATUS_LABEL[n.status] ?? n.status,
+      publishStatusLabel: PUBLISHING_STATUS_LABEL[n.status as keyof typeof PUBLISHING_STATUS_LABEL] ?? n.status,
       sourceLocation: null,
-      editUrl: newsEditUrl(n.id),
+      editUrl: newsEditHref(n.id),
     });
   }
 
-  // Sort by scheduled date ascending (soonest first), then by type
+  // Sort by scheduled date ascending (soonest first)
   return items
     .sort((a, b) => {
       const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Infinity;
@@ -606,7 +596,7 @@ export async function getDraftOverview(
       ageInDays,
       isOld: n.updatedAt < thirtyDaysAgo,
       sourceLocation: null,
-      editUrl: newsEditUrl(n.id),
+      editUrl: newsEditHref(n.id),
     });
   }
 
@@ -620,23 +610,24 @@ export async function getDraftOverview(
 }
 
 // ── Recently changed ──────────────────────────────────────────────────────────
+//
+// Uses ContentRevision as source, de-duplicates per entity, then batch-fetches
+// entity details grouped by type (avoids N+1 query pattern).
 
 export async function getRecentlyChanged(
   tenantId: string,
   limit = 20,
 ): Promise<EditorialRecentItem[]> {
-  // Use ContentRevision as primary source (captures all CMS edits)
   const revisions = await prisma.contentRevision.findMany({
     where: { tenantId },
     orderBy: { createdAt: "desc" },
-    take: limit * 3, // Fetch extra to de-duplicate by entityId
+    // Fetch extra to account for de-duplication across entity types
+    take: limit * 3,
     select: {
       id: true,
       entityType: true,
       entityId: true,
       createdAt: true,
-      createdByUserId: true,
-      isRestore: true,
       createdByUser: { select: { firstName: true, lastName: true } },
     },
   });
@@ -648,22 +639,57 @@ export async function getRecentlyChanged(
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).slice(0, limit);
 
-  // Fetch entity details for each unique entity
+  // Group entity IDs by type for batch fetching (avoids N+1)
+  const hpIds = deduped
+    .filter((r) => r.entityType === "HomepageSection")
+    .map((r) => r.entityId);
+  const psIds = deduped
+    .filter((r) => r.entityType === "WebsitePageSection")
+    .map((r) => r.entityId);
+  const pageIds = deduped
+    .filter((r) => r.entityType === "WebsitePage")
+    .map((r) => r.entityId);
+
+  // Batch fetch all needed entities in parallel
+  const [hpSections, psSections, pages] = await Promise.all([
+    hpIds.length > 0
+      ? prisma.homepageSection.findMany({
+          where: { id: { in: hpIds }, tenantId },
+          select: { id: true, label: true, publishStatus: true },
+        })
+      : Promise.resolve([]),
+    psIds.length > 0
+      ? prisma.websitePageSection.findMany({
+          where: { id: { in: psIds }, tenantId },
+          select: { id: true, label: true, pageId: true, publishStatus: true },
+        })
+      : Promise.resolve([]),
+    pageIds.length > 0
+      ? prisma.websitePage.findMany({
+          where: { id: { in: pageIds }, tenantId },
+          select: { id: true, title: true, status: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  // Build O(1) lookup maps
+  const hpMap = new Map(hpSections.map((s) => [s.id, s]));
+  const psMap = new Map(psSections.map((s) => [s.id, s]));
+  const pageMap = new Map(pages.map((p) => [p.id, p]));
+
+  // Map revisions to normalized items
   const items: EditorialRecentItem[] = [];
 
-  for (const rev of deduped.slice(0, limit)) {
+  for (const rev of deduped) {
     const entityKey = `${rev.entityType}:${rev.entityId}`;
     const actorName = rev.createdByUser
       ? `${rev.createdByUser.firstName} ${rev.createdByUser.lastName}`.trim()
       : null;
 
     if (rev.entityType === "HomepageSection") {
-      const section = await prisma.homepageSection.findFirst({
-        where: { id: rev.entityId, tenantId },
-        select: { id: true, label: true, publishStatus: true },
-      });
+      const section = hpMap.get(rev.entityId);
       if (section) {
         items.push({
           id: entityKey,
@@ -680,15 +706,7 @@ export async function getRecentlyChanged(
         });
       }
     } else if (rev.entityType === "WebsitePageSection") {
-      const section = await prisma.websitePageSection.findFirst({
-        where: { id: rev.entityId, tenantId },
-        select: {
-          id: true,
-          label: true,
-          pageId: true,
-          publishStatus: true,
-        },
-      });
+      const section = psMap.get(rev.entityId);
       if (section) {
         items.push({
           id: entityKey,
@@ -705,17 +723,16 @@ export async function getRecentlyChanged(
         });
       }
     } else if (rev.entityType === "WebsitePage") {
-      const page = await prisma.websitePage.findFirst({
-        where: { id: rev.entityId, tenantId },
-        select: { id: true, title: true, status: true },
-      });
+      const page = pageMap.get(rev.entityId);
       if (page) {
         items.push({
           id: entityKey,
           entityType: "WebsitePage",
           title: page.title,
           publishStatus: page.status,
-          publishStatusLabel: PAGE_STATUS_LABEL[page.status] ?? page.status,
+          publishStatusLabel:
+            PUBLISHING_STATUS_LABEL[page.status as keyof typeof PUBLISHING_STATUS_LABEL] ??
+            page.status,
           changedAt: rev.createdAt.toISOString(),
           actorName,
           editUrl: websitePageEditUrl(page.id),
@@ -729,12 +746,12 @@ export async function getRecentlyChanged(
 
 // ── Activity feed ─────────────────────────────────────────────────────────────
 
-/** Entity-type to edit URL builder */
+/** Resolve edit URL from entity type and ID using shared CMS route helpers */
 function resolveEditUrl(entityType: string, entityId: string): string | null {
   if (entityType === "HomepageSection") return homepageSectionEditUrl();
-  if (entityType === "WebsitePageSection") return null; // Would need pageId from metadataJson
+  if (entityType === "WebsitePageSection") return null; // pageId resolved from metadataJson
   if (entityType === "WebsitePage") return websitePageEditUrl(entityId);
-  if (entityType === "NewsArticle") return newsEditUrl(entityId);
+  if (entityType === "NewsArticle") return newsEditHref(entityId);
   return null;
 }
 
@@ -765,7 +782,7 @@ export async function getEditorialActivity(
       ? `${log.actorUser.firstName} ${log.actorUser.lastName}`.trim()
       : null;
 
-    // Try to resolve editUrl — page sections need pageId from metadata
+    // Try to resolve editUrl — page sections need pageId from metadataJson
     let editUrl = resolveEditUrl(log.entityType, log.entityId);
     if (!editUrl && log.entityType === "WebsitePageSection") {
       const meta = log.metadataJson as Record<string, unknown> | null;
@@ -787,6 +804,9 @@ export async function getEditorialActivity(
 }
 
 // ── Content health checks ─────────────────────────────────────────────────────
+//
+// All checks are read-only aggregations of existing fields.
+// No data is written. No new tables or cached counters are used.
 
 export async function getContentHealthIssues(
   tenantId: string,
@@ -817,7 +837,7 @@ export async function getContentHealthIssues(
       select: { id: true, title: true, updatedAt: true },
       take: 20,
     }),
-    // Sections disabled but still published (HomepageSection)
+    // Sections disabled but still marked published (HomepageSection)
     prisma.homepageSection.findMany({
       where: {
         tenantId,
@@ -827,7 +847,7 @@ export async function getContentHealthIssues(
       select: { id: true, label: true },
       take: 20,
     }),
-    // Sections disabled but still published (WebsitePageSection)
+    // Sections disabled but still marked published (WebsitePageSection)
     prisma.websitePageSection.findMany({
       where: {
         tenantId,
@@ -842,7 +862,7 @@ export async function getContentHealthIssues(
       },
       take: 20,
     }),
-    // Expired sections still enabled (WebsitePageSection only has publishUntil)
+    // Sections past their publishUntil date but still enabled
     prisma.websitePageSection.findMany({
       where: {
         tenantId,
@@ -864,13 +884,13 @@ export async function getContentHealthIssues(
       select: { id: true, title: true, status: true },
       take: 20,
     }),
-    // Sections with empty labels (HomepageSection)
+    // Homepage sections with empty label
     prisma.homepageSection.findMany({
       where: { tenantId, label: "" },
       select: { id: true, label: true },
       take: 10,
     }),
-    // Recently restored content (last 7 days)
+    // Recently restored revisions (last 7 days) from existing ContentRevision engine
     prisma.contentRevision.findMany({
       where: {
         tenantId,
@@ -904,7 +924,7 @@ export async function getContentHealthIssues(
       entityType: "NewsArticle" as EditorialEntityType,
       title: n.title,
       detail: `Entwurf seit ${Math.floor((now.getTime() - n.updatedAt.getTime()) / (24 * 60 * 60 * 1000))} Tagen unverändert`,
-      editUrl: newsEditUrl(n.id),
+      editUrl: newsEditHref(n.id),
     })),
   ];
 
@@ -977,7 +997,7 @@ export async function getContentHealthIssues(
         id: p.id,
         entityType: "WebsitePage" as EditorialEntityType,
         title: p.title,
-        detail: `Status: ${PAGE_STATUS_LABEL[p.status] ?? p.status}`,
+        detail: `Status: ${PUBLISHING_STATUS_LABEL[p.status as keyof typeof PUBLISHING_STATUS_LABEL] ?? p.status}`,
         editUrl: websitePageEditUrl(p.id),
       })),
     });
@@ -1000,7 +1020,7 @@ export async function getContentHealthIssues(
     });
   }
 
-  // 6. Recently restored content
+  // 6. Recently restored content (from ContentRevision engine)
   if (recentlyRestoredRevisions.length > 0) {
     issues.push({
       type: "recently_restored",
@@ -1027,7 +1047,7 @@ export async function getContentHealthIssues(
   };
 }
 
-// ── Full editorial overview (single API call) ─────────────────────────────────
+// ── Full editorial overview (single consolidated server-side API call) ─────────
 
 export async function getEditorialOverview(
   tenantId: string,

@@ -46,4 +46,11 @@ export function pageBuilderHref(pageId: string): string {
   return `/dashboard/website/pages/${pageId}/builder`;
 }
 
+/**
+ * Generates the News article edit URL for a given article ID.
+ */
+export function newsEditHref(newsId: string): string {
+  return `/dashboard/website/news/${newsId}/edit`;
+}
+
 export type CmsRouteKey = keyof typeof CMS_ROUTES;

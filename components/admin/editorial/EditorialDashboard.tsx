@@ -40,6 +40,7 @@ import {
   Activity,
 } from "lucide-react";
 import { SectionCard, EmptyState } from "@/components/ui/page";
+import { PUBLISHING_STATUS_BADGE_CLASS } from "@/lib/publishing/types";
 import type {
   EditorialOverviewData,
   EditorialHealthData,
@@ -109,16 +110,17 @@ function EntityChip({ type }: { type: EditorialEntityType | string }) {
 }
 
 // ── Workflow status badge ─────────────────────────────────────────────────────
+//
+// Extends PUBLISHING_STATUS_BADGE_CLASS (shared constant from lib/publishing/types)
+// with section-specific approval states that are not part of the publishing status set.
 
 const WORKFLOW_BADGE_CLASS: Record<string, string> = {
-  IN_REVIEW: "bg-blue-50 text-blue-700 border-blue-200",
-  CHANGES_REQUESTED: "bg-red-50 text-red-700 border-red-200",
-  DRAFT: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]",
+  // Reuse existing publish-status badge classes — single source of truth
+  ...PUBLISHING_STATUS_BADGE_CLASS,
+  // Extend with section approval states not covered by publishing status
   APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  CHANGES_REQUESTED: "bg-red-50 text-red-700 border-red-200",
   NOT_REQUIRED: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]",
-  PUBLISHED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  SCHEDULED: "bg-amber-50 text-amber-700 border-amber-200",
-  ARCHIVED: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] opacity-70",
 };
 
 function WorkflowBadge({

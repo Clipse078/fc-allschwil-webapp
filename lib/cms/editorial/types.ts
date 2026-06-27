@@ -133,7 +133,6 @@ export type ContentHealthIssueType =
   | "disabled_published"
   | "expired_enabled"
   | "page_no_sections"
-  | "page_all_disabled"
   | "section_missing_label"
   | "recently_restored";
 
