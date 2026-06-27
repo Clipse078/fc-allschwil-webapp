@@ -159,21 +159,18 @@ export default function ReusableComponentsLibrary() {
   }, []);
 
   async function loadUsageCounts(ids: string[]) {
-    const counts: Record<string, number> = {};
-    await Promise.all(
-      ids.map(async (id) => {
-        try {
-          const res = await fetch(`/api/reusable-components/${id}/usage`);
-          if (res.ok) {
-            const data = await res.json();
-            counts[id] = data.meta?.total ?? 0;
-          }
-        } catch {
-          // best-effort
-        }
-      }),
-    );
-    setUsageCounts(counts);
+    if (ids.length === 0) return;
+    try {
+      const res = await fetch(
+        `/api/reusable-components/usage-counts?ids=${ids.join(",")}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setUsageCounts(data.counts ?? {});
+      }
+    } catch {
+      // best-effort
+    }
   }
 
   useEffect(() => {

@@ -143,11 +143,13 @@ export const COMPONENT_DEFAULT_CONFIGS: Record<ReusableComponentType, Record<str
     secondaryLabel: "",
     secondaryUrl: "",
     icon: "",
-    imageUrl: "",
     stylePreset: "default",
   },
   SPONSOR_BANNER: {
     sponsorName: "",
+    // DAM reference — set via SharedMediaPicker
+    logoMediaAssetId: null,
+    // Resolved URL from the DAM asset (populated when asset is selected)
     logoUrl: "",
     headline: "",
     text: "",
@@ -160,6 +162,9 @@ export const COMPONENT_DEFAULT_CONFIGS: Record<ReusableComponentType, Record<str
   CONTACT_CARD: {
     personName: "",
     role: "",
+    // DAM reference — set via SharedMediaPicker
+    imageMediaAssetId: null,
+    // Resolved URL from the DAM asset (populated when asset is selected)
     imageUrl: "",
     phone: "",
     email: "",
@@ -174,6 +179,9 @@ export const COMPONENT_DEFAULT_CONFIGS: Record<ReusableComponentType, Record<str
     quote: "",
     author: "",
     organisation: "",
+    // DAM reference — set via SharedMediaPicker
+    imageMediaAssetId: null,
+    // Resolved URL from the DAM asset (populated when asset is selected)
     imageUrl: "",
     stylePreset: "default",
   },
