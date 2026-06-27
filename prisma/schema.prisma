@@ -373,6 +373,7 @@ model Tenant {
   websitePageSections    WebsitePageSection[]
   homepageSections       HomepageSection[]
   websiteNavItems        WebsiteNavItem[]
+  contentRevisions       ContentRevision[]
 
   @@index([status])
   @@index([name])
@@ -402,6 +403,10 @@ model User {
   reviewedHomepageSections  HomepageSection[] @relation("HomepageSectionReviewer")
   approvedHomepageSections  HomepageSection[] @relation("HomepageSectionApprovedBy")
   rejectedHomepageSections  HomepageSection[] @relation("HomepageSectionRejectedBy")
+  reviewedPageSections  WebsitePageSection[] @relation("PageSectionReviewer")
+  approvedPageSections  WebsitePageSection[] @relation("PageSectionApprovedBy")
+  rejectedPageSections  WebsitePageSection[] @relation("PageSectionRejectedBy")
+  contentRevisions      ContentRevision[]
 
   @@index([isActive])
   @@index([tenantId])
@@ -1480,11 +1485,10 @@ model WebsitePage {
 //   Full section-level publish/approval workflow is deferred to a future slice.
 //   Sections do not carry their own publishStatus; they inherit the page's status.
 //
-// Future deferred work:
-//   - Section-level publish workflow (publishStatus, scheduledPublishAt)
-//   - Section-level approval workflow (approvalStatus, reviewerUserId, etc.)
-//   - Drag-and-drop reordering
-//   - Section version history / change tracking
+// CMS V2 Slice 9 — Section Lifecycle:
+//   Full section-level publish/approval workflow implemented.
+//   Mirrors HomepageSection workflow pattern for architectural consistency.
+//   Reusable publishing engine in lib/cms/section-publishing.ts.
 // ---------------------------------------------------------------------------
 
 model WebsitePageSection {
@@ -1502,16 +1506,48 @@ model WebsitePageSection {
   /// Type-specific configuration stored as a JSON object.
   /// Validated at the application layer via the shared block registry helpers.
   config    Json     @default("{}")
+  // ── Publishing workflow fields (CMS V2 Slice 9) ──────────────────────────
+  /// Publish status gate — "DRAFT" | "PUBLISHED".
+  /// Default "PUBLISHED" preserves backwards compatibility for all pre-Slice-9 rows.
+  publishStatus      String    @default("PUBLISHED")
+  /// Timestamp of the most recent publish action.
+  publishedAt        DateTime?
+  /// Timestamp of the most recent unpublish action.
+  unpublishedAt      DateTime?
+  /// Retained after unpublish for audit trail.
+  lastPublishedAt    DateTime?
+  /// Optional future publish date. If set and <= now(), treated as published.
+  scheduledPublishAt DateTime?
+  /// Optional expiry date. If set and <= now(), section is hidden from public API.
+  publishUntil       DateTime?
+  // ── Approval workflow fields (CMS V2 Slice 9) ──────────────────────────
+  /// Approval status — "NOT_REQUIRED" | "DRAFT" | "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED".
+  /// Default "NOT_REQUIRED" preserves backwards compatibility for all pre-Slice-9 rows.
+  approvalStatus     String    @default("NOT_REQUIRED")
+  reviewerUserId     String?
+  reviewRequestedAt  DateTime?
+  reviewedAt         DateTime?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  approvalNote       String?
+  approvedByUserId   String?
+  rejectedByUserId   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  page   WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant           Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  page             WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewerUser     User?       @relation("PageSectionReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedByUser   User?       @relation("PageSectionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  rejectedByUser   User?       @relation("PageSectionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([tenantId])
   @@index([tenantId, pageId])
   @@index([tenantId, pageId, sortOrder])
   @@index([tenantId, pageId, isEnabled])
+  @@index([tenantId, publishStatus])
+  @@index([tenantId, approvalStatus])
+  @@index([scheduledPublishAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -1705,4 +1741,60 @@ model WebsiteNavItem {
   @@index([tenantId, area, parentId, sortOrder])
   @@index([tenantId, isVisible])
   @@index([parentId])
+}
+
+// ---------------------------------------------------------------------------
+// ContentRevision — Append-only version history for CMS content (CMS V2 Slice 9)
+//
+// Every significant edit to a CMS entity (WebsitePageSection, WebsitePage,
+// HomepageSection) creates an immutable revision record capturing the full
+// entity state at that point in time.
+//
+// Design invariants:
+//   - Append-only: revisions are never updated or deleted.
+//   - versionNumber: auto-incremented per (entityType, entityId) pair.
+//   - snapshot: full JSON representation of the entity at save time.
+//   - Restoring a revision creates a NEW revision (never overwrites history).
+//
+// Audit trail: every revision records who made the change (createdByUserId)
+// and optionally what changed (changeNote). Future compliance features
+// can query this table for a complete history of any CMS entity.
+// ---------------------------------------------------------------------------
+
+model ContentRevision {
+  id              String   @id @default(cuid())
+  tenantId        String
+  /// Entity type key: "WebsitePageSection" | "WebsitePage" | "HomepageSection"
+  /// Future: "NewsArticle" | "Event" | "LandingPage" — no schema change needed.
+  entityType      String
+  /// ID of the entity this revision belongs to.
+  entityId        String
+  /// Monotonically increasing version number per (entityType, entityId).
+  versionNumber   Int
+  /// User who created this revision (nullable for system-generated revisions).
+  createdByUserId String?
+  /// Optional human-readable note describing what changed.
+  changeNote      String?
+  /// Full JSON snapshot of the entity at this revision.
+  snapshot        Json
+  /// When true, this revision was created by a restore action.
+  /// Makes restored revisions easy to identify for diffing and rollback chains.
+  isRestore       Boolean  @default(false)
+  /// FK to the source revision this was restored from (nullable).
+  /// Enables: visual diffing, rollback chains, branching, merge history.
+  /// Set when isRestore = true; null for normal edits.
+  parentRevisionId String?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser   User?            @relation(fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  parentRevision  ContentRevision? @relation("RevisionParent", fields: [parentRevisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  childRevisions  ContentRevision[] @relation("RevisionParent")
+
+  @@unique([entityType, entityId, versionNumber])
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([tenantId, entityType])
+  @@index([createdAt])
+  @@index([isRestore])
 }

@@ -23,6 +23,10 @@ import {
   APPROVAL_STATUS_LABELS,
   type ApprovalStatus,
 } from "@/lib/homepage/approval-constants";
+import {
+  SECTION_PUBLISH_STATUS,
+  type SectionPublishStatus,
+} from "@/lib/cms/section-publishing";
 
 // Re-export so callers can import everything from admin-queries
 export {
@@ -33,16 +37,17 @@ export {
 };
 
 // ---------------------------------------------------------------------------
-// Publishing constants
+// Publishing constants — re-exported from the shared engine
 // ---------------------------------------------------------------------------
 
-/** Valid publish status values for HomepageSection. */
-export const PUBLISH_STATUS = {
-  DRAFT: "DRAFT",
-  PUBLISHED: "PUBLISHED",
-} as const;
+/**
+ * Valid publish status values for HomepageSection.
+ * Alias for SECTION_PUBLISH_STATUS from lib/cms/section-publishing.ts.
+ */
+export const PUBLISH_STATUS = SECTION_PUBLISH_STATUS;
 
-export type PublishStatus = (typeof PUBLISH_STATUS)[keyof typeof PUBLISH_STATUS];
+/** Publish status type — alias for SectionPublishStatus. */
+export type PublishStatus = SectionPublishStatus;
 
 // ---------------------------------------------------------------------------
 // Types

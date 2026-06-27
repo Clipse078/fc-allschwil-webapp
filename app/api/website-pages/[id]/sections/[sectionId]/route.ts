@@ -45,7 +45,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Ungültiger JSON-Body." }, { status: 400 });
   }
 
-  const input: { label?: string; config?: Record<string, unknown> } = {};
+  const actorUserId = access.session.user?.id ?? null;
+  const input: { label?: string; config?: Record<string, unknown>; actorUserId?: string | null } = {
+    actorUserId,
+  };
 
   if (typeof body.label === "string") {
     const trimmed = body.label.trim();
@@ -105,7 +108,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Seite nicht gefunden." }, { status: 404 });
   }
 
-  const ok = await deletePageSection(tenantId, pageId, sectionId);
+  const actorId = access.session.user?.id ?? null;
+  const ok = await deletePageSection(tenantId, pageId, sectionId, actorId);
   if (!ok) {
     return NextResponse.json({ error: "Sektion nicht gefunden." }, { status: 404 });
   }
