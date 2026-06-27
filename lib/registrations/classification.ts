@@ -181,6 +181,42 @@ const DEFAULT_TYPE_OVERRIDES: Record<string, ClassificationResult> = {
     reasoning: "Kontaktanfrage",
     colorToken: "slate",
   },
+  // Website-integration type overrides
+  MITGLIEDSCHAFT: {
+    targetGroupKey: "MITGLIED",
+    targetGroupLabel: "Mitglied",
+    coordinatorRole: "Sekretariat / Vorstand",
+    reasoning: "Mitgliedschaftsanfrage",
+    colorToken: "blue",
+  },
+  FREIWILLIGENMELDUNG: {
+    targetGroupKey: "FREIWILLIG",
+    targetGroupLabel: "Freiwillige/r",
+    coordinatorRole: "Vorstand",
+    reasoning: "Freiwilligenmeldung",
+    colorToken: "green",
+  },
+  SCHIEDSRICHTERANMELDUNG: {
+    targetGroupKey: "SCHIEDSRICHTER",
+    targetGroupLabel: "Schiedsrichter",
+    coordinatorRole: "Schiedsrichterkoordinator",
+    reasoning: "Schiedsrichteranmeldung",
+    colorToken: "amber",
+  },
+  CAMP_ANMELDUNG: {
+    targetGroupKey: "CAMP",
+    targetGroupLabel: "Camp",
+    coordinatorRole: "Camp-Koordinator",
+    reasoning: "Camp-Anmeldung",
+    colorToken: "violet",
+  },
+  VERANSTALTUNGSANMELDUNG: {
+    targetGroupKey: "VERANSTALTUNG",
+    targetGroupLabel: "Veranstaltung",
+    coordinatorRole: "Event-Koordinator",
+    reasoning: "Veranstaltungsanmeldung",
+    colorToken: "slate",
+  },
 };
 
 export const DEFAULT_CLASSIFICATION_CONFIG: ClassificationConfig = {
