@@ -1,19 +1,21 @@
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import MediaLibraryGrid from "@/components/admin/media/MediaLibraryGrid";
+import MediaLibraryDAM from "@/components/admin/media/MediaLibraryDAM";
 
 export default async function MediaLibraryPage() {
   await requireAnyPermission([PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE]);
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Website"
-        title="Mediathek"
-        description="Bilder und Videos hochladen und verwalten. Medien können in News-Artikeln als Headerbild oder eingebettete Inhalte verwendet werden."
-      />
-      <MediaLibraryGrid />
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
+          Medienbibliothek
+        </h1>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Digitale Asset-Verwaltung — Bilder und Videos hochladen, organisieren und wiederverwenden.
+        </p>
+      </div>
+      <MediaLibraryDAM />
     </div>
   );
 }

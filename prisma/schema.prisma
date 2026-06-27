@@ -368,6 +368,10 @@ model Tenant {
   wochenplanPublications WochenplanPublication[]
   newsArticles           NewsArticle[]
   mediaAssets            MediaAsset[]
+  mediaFolders           MediaFolder[]
+  mediaTags              MediaTag[]
+  mediaAssetTags         MediaAssetTag[]
+  mediaAssetUsages       MediaAssetUsage[]
   newsArticleMedia       NewsArticleMedia[]
   websitePages           WebsitePage[]
   websitePageSections    WebsitePageSection[]
@@ -1317,14 +1321,26 @@ model MediaAsset {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  // DAM V1 extensions — additive, all nullable for backward compatibility
+  description  String?   // Long description / notes
+  copyright    String?   // © copyright / rights information
+  photographer String?   // Photographer / creator name
+  folderId     String?   // Optional folder placement
+  archivedAt   DateTime? // Set when status → ARCHIVED; null when active
+  storageKey   String?   // Blob storage key for lifecycle management
+
   tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  folder           MediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   newsArticles     NewsArticle[]      @relation("NewsArticleHeroMedia")
   newsArticleMedia NewsArticleMedia[]
+  tags             MediaAssetTag[]
+  usages           MediaAssetUsage[]
 
   @@index([tenantId])
   @@index([tenantId, type])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+  @@index([tenantId, folderId])
 }
 
 // ---------------------------------------------------------------------------
@@ -1797,4 +1813,109 @@ model ContentRevision {
   @@index([tenantId, entityType])
   @@index([createdAt])
   @@index([isRestore])
+}
+
+// ---------------------------------------------------------------------------
+// MediaFolder — DAM folder hierarchy (CMS V2 Slice 11)
+//
+// Tenant-scoped folder tree for organising MediaAssets.
+// Nested folders are supported via self-referencing parentId.
+// Folder names are unique within the same parent scope (enforced at app layer).
+//
+// Deletion policy: prefer archive via archivedAt; hard-delete only when
+// the folder has no children and no assigned assets.
+// ---------------------------------------------------------------------------
+
+model MediaFolder {
+  id         String    @id @default(cuid())
+  tenantId   String
+  parentId   String?
+  name       String
+  sortOrder  Int       @default(0)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  parent   MediaFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children MediaFolder[] @relation("FolderHierarchy")
+  assets   MediaAsset[]
+
+  @@index([tenantId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// MediaTag — Reusable DAM tags (CMS V2 Slice 11)
+//
+// Tenant-scoped controlled tag vocabulary. Tag names are unique per tenant.
+// Tags can be attached to any number of MediaAssets via MediaAssetTag.
+// ---------------------------------------------------------------------------
+
+model MediaTag {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assets MediaAssetTag[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// MediaAssetTag — Asset ↔ Tag join (CMS V2 Slice 11)
+// ---------------------------------------------------------------------------
+
+model MediaAssetTag {
+  id           String   @id @default(cuid())
+  tenantId     String
+  mediaAssetId String
+  tagId        String
+  createdAt    DateTime @default(now())
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tag        MediaTag   @relation(fields: [tagId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([mediaAssetId, tagId])
+  @@index([tagId])
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// MediaAssetUsage — Generic cross-module usage tracking (CMS V2 Slice 11)
+//
+// Tracks where each MediaAsset is referenced, across any entity type.
+// Records are upserted when an entity is saved and removed when the
+// reference is removed.
+//
+// entityType: "NewsArticle" | "HomepageSection" | "WebsitePageSection" | …
+// fieldPath:  dot-path to the field holding the asset ID, e.g. "heroMediaId"
+//             or "config.imageUrl". Null for join-table relationships.
+//
+// Future entity types can plug in without schema changes.
+// ---------------------------------------------------------------------------
+
+model MediaAssetUsage {
+  id           String   @id @default(cuid())
+  tenantId     String
+  mediaAssetId String
+  entityType   String
+  entityId     String
+  fieldPath    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([mediaAssetId, entityType, entityId, fieldPath])
+  @@index([tenantId])
+  @@index([mediaAssetId])
+  @@index([entityType, entityId])
 }
