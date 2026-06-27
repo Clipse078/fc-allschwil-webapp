@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * MediaLibraryGrid — lightweight grid for embedding in pickers.
+ *
+ * For the full premium DAM experience, use MediaLibraryDAM.
+ * For a modal picker, use SharedMediaPicker.
+ * This component is kept for backward compatibility with NewsHeroMediaPicker.
+ */
+
 import { useEffect, useState, useCallback } from "react";
 import { ImageIcon, Film, RefreshCw } from "lucide-react";
 import MediaAssetCard from "@/components/admin/media/MediaAssetCard";

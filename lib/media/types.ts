@@ -91,12 +91,61 @@ export type MediaAssetListItem = {
   height: number | null;
   durationSec: number | null;
   createdAt: Date;
+  // DAM V1 extensions
+  description: string | null;
+  copyright: string | null;
+  photographer: string | null;
+  folderId: string | null;
+  tags: MediaTagItem[];
 };
 
 export type MediaAssetDetail = MediaAssetListItem & {
   status: string;
   createdByUserId: string | null;
   updatedAt: Date;
+  archivedAt: Date | null;
+  storageKey: string | null;
+};
+
+// ── Folder types ─────────────────────────────────────────────────────────────
+
+export type MediaFolderItem = {
+  id: string;
+  tenantId: string;
+  parentId: string | null;
+  name: string;
+  sortOrder: number;
+  archivedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  _count?: { assets: number; children: number };
+};
+
+export type MediaFolderTree = MediaFolderItem & {
+  children: MediaFolderTree[];
+};
+
+// ── Tag types ─────────────────────────────────────────────────────────────────
+
+export type MediaTagItem = {
+  id: string;
+  tenantId: string;
+  name: string;
+  createdAt: Date;
+  _count?: { assets: number };
+};
+
+// ── Usage types ───────────────────────────────────────────────────────────────
+
+export type MediaAssetUsageItem = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  fieldPath: string | null;
+  createdAt: Date;
+  // Resolved display info
+  label?: string;
+  href?: string;
 };
 
 // ── Upload validation ─────────────────────────────────────────────────────────

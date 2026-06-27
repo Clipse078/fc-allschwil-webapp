@@ -2,22 +2,24 @@
  * GET  /api/media  — list media assets for the session tenant.
  * POST /api/media  — upload a new media asset (multipart/form-data, field "file").
  *
- * Permission: NEWS_MANAGE
+ * Permission: NEWS_MANAGE or WEBSITE_MANAGE
  * Isolation:  tenantId resolved from session — never from request body.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import { validateMediaUploadFile } from "@/lib/media/types";
 import { uploadMediaAsset } from "@/lib/media/upload";
 import { listMediaAssets, countMediaAssets, createMediaAsset } from "@/lib/media/queries";
 
+const MEDIA_PERMISSIONS = [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE];
+
 // ── GET /api/media ────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const access = await requireApiPermission(PERMISSIONS.NEWS_MANAGE);
+  const access = await requireApiAnyPermission(MEDIA_PERMISSIONS);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -32,10 +34,19 @@ export async function GET(request: NextRequest) {
   const type = rawType === "IMAGE" || rawType === "VIDEO" ? rawType : undefined;
   const limit = Math.min(Number(searchParams.get("limit") ?? "50"), 200);
   const offset = Math.max(Number(searchParams.get("offset") ?? "0"), 0);
+  const folderId = searchParams.has("folderId")
+    ? (searchParams.get("folderId") ?? undefined)
+    : undefined;
+  const rawTagIds = searchParams.get("tagIds");
+  const tagIds = rawTagIds ? rawTagIds.split(",").filter(Boolean) : undefined;
+  const search = searchParams.get("q") ?? undefined;
+  const showArchived = searchParams.get("archived") === "1";
+
+  const input = { tenantId, type: type as "IMAGE" | "VIDEO" | undefined, folderId, tagIds, search, showArchived, limit, offset };
 
   const [assets, total] = await Promise.all([
-    listMediaAssets({ tenantId, type, limit, offset }),
-    countMediaAssets(tenantId, type),
+    listMediaAssets(input),
+    countMediaAssets(tenantId, { type, folderId, tagIds, search, showArchived }),
   ]);
 
   return NextResponse.json({ assets, meta: { total, limit, offset } });
@@ -44,7 +55,7 @@ export async function GET(request: NextRequest) {
 // ── POST /api/media ───────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const access = await requireApiPermission(PERMISSIONS.NEWS_MANAGE);
+  const access = await requireApiAnyPermission(MEDIA_PERMISSIONS);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -82,12 +93,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const altText = typeof formData.get("altText") === "string"
-    ? (formData.get("altText") as string).trim() || null
-    : null;
-  const caption = typeof formData.get("caption") === "string"
-    ? (formData.get("caption") as string).trim() || null
-    : null;
+  const getString = (key: string) => {
+    const v = formData.get(key);
+    return typeof v === "string" ? v.trim() || null : null;
+  };
+
+  const altText     = getString("altText");
+  const caption     = getString("caption");
+  const description = getString("description");
+  const copyright   = getString("copyright");
+  const photographer = getString("photographer");
+  const folderId    = getString("folderId");
 
   const assetId = crypto.randomUUID().replace(/-/g, "");
   const arrayBuffer = await fileEntry.arrayBuffer();
@@ -104,6 +120,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: uploadResult.error }, { status: uploadResult.status });
   }
 
+  const storageKey = `media/${tenant.key}/${assetId}.${uploadResult.ext}`;
+
   const asset = await createMediaAsset({
     id: assetId,
     tenantId: tenant.id,
@@ -114,6 +132,11 @@ export async function POST(request: NextRequest) {
     url: uploadResult.publicUrl,
     altText,
     caption,
+    description,
+    copyright,
+    photographer,
+    folderId,
+    storageKey,
     createdByUserId: access.session.user?.id ?? null,
   });
 
