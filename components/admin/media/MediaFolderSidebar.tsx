@@ -182,7 +182,11 @@ function FolderTreeNode({
       onFoldersChange();
     } else {
       const data = await res.json().catch(() => ({}));
-      alert(data?.error ?? "Ordner konnte nicht gelöscht werden.");
+      const msg = data?.error ??
+        (res.status === 409
+          ? "Ordner enthält noch Medien oder Unterordner. Bitte zuerst entleeren."
+          : "Ordner konnte nicht gelöscht werden.");
+      alert(msg);
     }
   }
 

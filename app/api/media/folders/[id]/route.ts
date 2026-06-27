@@ -65,10 +65,24 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   }
 
   const { id } = await params;
+
+  // archiveMediaFolder returns false for two distinct reasons:
+  //   1. Folder not found (or already archived) → 404
+  //   2. Folder has active children or active assets → 409
+  // We distinguish by checking existence first.
+  const { prisma } = await import("@/lib/db/prisma");
+  const exists = await prisma.mediaFolder.findFirst({
+    where: { id, tenantId, archivedAt: null },
+    select: { id: true },
+  });
+  if (!exists) {
+    return NextResponse.json({ error: "Ordner nicht gefunden." }, { status: 404 });
+  }
+
   const ok = await archiveMediaFolder(tenantId, id);
   if (!ok) {
     return NextResponse.json(
-      { error: "Ordner nicht gefunden oder nicht leer." },
+      { error: "Ordner kann nicht gelöscht werden: er enthält noch aktive Medien oder Unterordner." },
       { status: 409 },
     );
   }

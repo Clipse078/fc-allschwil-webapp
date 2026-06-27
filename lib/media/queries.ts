@@ -2,7 +2,13 @@
  * Media Library DB queries — DAM V1 (CMS V2 Slice 11).
  *
  * All queries are tenant-scoped. No cross-tenant access possible.
- * Callers must verify tenantId from the authenticated session.
+ * Callers MUST supply tenantId from the authenticated session.
+ *
+ * Defense-in-depth pattern:
+ *   1. findFirst verifies { id, tenantId } before any mutation.
+ *   2. Mutations also scope by tenantId where the API supports it
+ *      (updateMany / deleteMany), so a mid-flight tenant change cannot
+ *      affect another tenant's data.
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -10,12 +16,11 @@ import type {
   MediaAssetListItem,
   MediaAssetDetail,
   MediaFolderItem,
-  MediaFolderTree,
   MediaTagItem,
   MediaAssetUsageItem,
 } from "@/lib/media/types";
 
-// Re-export for server-side consumers
+// Re-export for server-side consumers that prefer a single import
 export { buildFolderTree } from "@/lib/media/utils";
 
 // ── Select shapes ─────────────────────────────────────────────────────────────
@@ -245,9 +250,11 @@ export async function updateMediaAsset(
   if (input.photographer !== undefined) data.photographer = input.photographer;
   if (input.folderId !== undefined) data.folderId = input.folderId;
 
-  // Handle tag replacement if tagIds provided
+  // Replace tag set: delete all current tags for this asset+tenant, then insert new ones.
+  // tenantId in deleteMany adds defense-in-depth even though mediaAssetId already
+  // uniquely identifies the asset after findFirst verified tenant ownership.
   if (input.tagIds !== undefined) {
-    await prisma.mediaAssetTag.deleteMany({ where: { mediaAssetId: id } });
+    await prisma.mediaAssetTag.deleteMany({ where: { mediaAssetId: id, tenantId } });
     if (input.tagIds.length > 0) {
       await prisma.mediaAssetTag.createMany({
         data: input.tagIds.map((tagId) => ({
@@ -269,14 +276,20 @@ export async function updateMediaAsset(
   return shapeAssetDetail(row);
 }
 
-// ── Soft-delete ───────────────────────────────────────────────────────────────
+// ── Soft-delete / archive ─────────────────────────────────────────────────────
 
+/**
+ * Archives an ACTIVE asset. Returns false if not found or already archived.
+ * Does NOT delete the underlying blob — archive is always non-destructive.
+ * MediaAssetUsage rows are preserved so usage context survives archive/restore.
+ */
 export async function archiveMediaAsset(
   tenantId: string,
   id: string,
 ): Promise<boolean> {
+  // Status check is intentional: archiving an already-archived asset is a no-op.
   const existing = await prisma.mediaAsset.findFirst({
-    where: { id, tenantId },
+    where: { id, tenantId, status: "ACTIVE" },
     select: { id: true },
   });
   if (!existing) return false;
@@ -288,6 +301,11 @@ export async function archiveMediaAsset(
   return true;
 }
 
+/**
+ * Restores an ARCHIVED asset to ACTIVE. Returns false if not found or already active.
+ * The underlying blob URL remains unchanged — restore is always safe.
+ * MediaAssetUsage rows are untouched; all usage links immediately become valid again.
+ */
 export async function restoreMediaAsset(
   tenantId: string,
   id: string,
@@ -312,6 +330,17 @@ export function resolveMediaUrl(asset: { url: string } | null | undefined): stri
 }
 
 // ── Usage tracking ────────────────────────────────────────────────────────────
+//
+// MediaAssetUsage is a generic cross-module tracking table. entityType and
+// entityId are free-form strings — no FK constraints on those columns.
+//
+// Supported today:  NewsArticle, HomepageSection, WebsitePageSection, WebsitePage
+// Future (no schema change needed): Event, Sponsor, ClubDocument, InfoBoardItem, MobileAppContent
+//
+// formatUsageLabel / formatUsageHref are PRESENTATION-LAYER ADAPTERS only.
+// They translate entityType strings into human-readable labels and admin links.
+// These functions are intentionally NOT part of the data model — they may be
+// extended without any DB migration as new module types are added.
 
 export type UpsertMediaUsageInput = {
   tenantId: string;
@@ -321,6 +350,14 @@ export type UpsertMediaUsageInput = {
   fieldPath?: string | null;
 };
 
+/**
+ * Creates or refreshes a usage record.
+ *
+ * PostgreSQL NULL semantics: two rows with fieldPath=null for the same
+ * (mediaAssetId, entityType, entityId) are considered different by the DB
+ * unique constraint. This function uses findFirst+create/update to deduplicate
+ * at the application layer instead of relying on the DB constraint for null rows.
+ */
 export async function upsertMediaAssetUsage(input: UpsertMediaUsageInput): Promise<void> {
   const fieldPath = input.fieldPath ?? null;
   const existing = await prisma.mediaAssetUsage.findFirst({
@@ -352,6 +389,10 @@ export async function upsertMediaAssetUsage(input: UpsertMediaUsageInput): Promi
   }
 }
 
+/**
+ * Removes a specific usage record. Used when an entity is saved with the
+ * asset reference cleared (e.g. hero image removed from a news article).
+ */
 export async function deleteMediaAssetUsage(
   mediaAssetId: string,
   entityType: string,
@@ -382,16 +423,21 @@ export async function getMediaAssetUsages(
   }));
 }
 
+// Presentation adapter — maps entityType strings to German admin labels.
+// Add new entries here when wiring new modules; no DB change required.
 function formatUsageLabel(entityType: string, entityId: string): string {
   const labels: Record<string, string> = {
-    NewsArticle: "News-Artikel",
-    HomepageSection: "Homepage-Sektion",
+    NewsArticle:        "News-Artikel",
+    HomepageSection:    "Homepage-Sektion",
     WebsitePageSection: "Seitenbereich",
-    WebsitePage: "Website-Seite",
+    WebsitePage:        "Website-Seite",
+    // Future: Event, Sponsor, ClubDocument, InfoBoardItem, MobileAppContent
   };
   return `${labels[entityType] ?? entityType} (${entityId.slice(0, 8)}…)`;
 }
 
+// Presentation adapter — maps entityType strings to admin-UI deep links.
+// Returns undefined when no direct edit link is available.
 function formatUsageHref(entityType: string, entityId: string): string | undefined {
   if (entityType === "NewsArticle") return `/dashboard/website/news/${entityId}/edit`;
   if (entityType === "HomepageSection") return `/dashboard/website/homepage`;
@@ -412,7 +458,6 @@ export async function listMediaFolders(tenantId: string): Promise<MediaFolderIte
   });
   return rows as MediaFolderItem[];
 }
-
 
 export type CreateFolderInput = {
   tenantId: string;
@@ -451,16 +496,39 @@ export async function updateMediaFolder(
   return row as MediaFolderItem;
 }
 
+/**
+ * Archives an empty folder. Returns false if:
+ * - folder not found for this tenant, or
+ * - folder has active (non-archived) assets, or
+ * - folder has active (non-archived) child folders.
+ *
+ * Archived child folders and archived assets do NOT block deletion —
+ * they are already invisible to editors and pose no data-loss risk.
+ */
 export async function archiveMediaFolder(tenantId: string, id: string): Promise<boolean> {
   const folder = await prisma.mediaFolder.findFirst({
     where: { id, tenantId, archivedAt: null },
-    include: { _count: { select: { assets: true, children: true } } },
+    include: {
+      _count: {
+        select: {
+          // Count only active (non-archived) assets in this folder
+          assets: { where: { status: "ACTIVE" } },
+          // Count only non-archived child folders
+          children: { where: { archivedAt: null } },
+        },
+      },
+    },
   });
   if (!folder) return false;
-  const counts = (folder as MediaFolderItem & { _count: { assets: number; children: number } })._count;
+
+  const counts = (folder as MediaFolderItem & {
+    _count: { assets: number; children: number };
+  })._count;
+
   if (counts && (counts.assets > 0 || counts.children > 0)) {
     return false;
   }
+
   await prisma.mediaFolder.update({ where: { id }, data: { archivedAt: new Date() } });
   return true;
 }
