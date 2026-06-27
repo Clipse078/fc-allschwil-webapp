@@ -1765,6 +1765,7 @@ model ContentRevision {
   id              String   @id @default(cuid())
   tenantId        String
   /// Entity type key: "WebsitePageSection" | "WebsitePage" | "HomepageSection"
+  /// Future: "NewsArticle" | "Event" | "LandingPage" — no schema change needed.
   entityType      String
   /// ID of the entity this revision belongs to.
   entityId        String
@@ -1776,14 +1777,24 @@ model ContentRevision {
   changeNote      String?
   /// Full JSON snapshot of the entity at this revision.
   snapshot        Json
+  /// When true, this revision was created by a restore action.
+  /// Makes restored revisions easy to identify for diffing and rollback chains.
+  isRestore       Boolean  @default(false)
+  /// FK to the source revision this was restored from (nullable).
+  /// Enables: visual diffing, rollback chains, branching, merge history.
+  /// Set when isRestore = true; null for normal edits.
+  parentRevisionId String?
   createdAt       DateTime @default(now())
 
-  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  createdByUser User?  @relation(fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser   User?            @relation(fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  parentRevision  ContentRevision? @relation("RevisionParent", fields: [parentRevisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  childRevisions  ContentRevision[] @relation("RevisionParent")
 
   @@unique([entityType, entityId, versionNumber])
   @@index([tenantId])
   @@index([entityType, entityId])
   @@index([tenantId, entityType])
   @@index([createdAt])
+  @@index([isRestore])
 }

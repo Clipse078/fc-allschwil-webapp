@@ -6,6 +6,10 @@
  * Restoring creates a NEW revision (the restored state becomes the latest version).
  * History is never overwritten or deleted.
  *
+ * The new revision records:
+ *   - isRestore = true     — marks it as a restore action
+ *   - parentRevisionId     — links back to the source revision
+ *
  * Permission: WEBSITE_MANAGE
  */
 
@@ -37,19 +41,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const revision = await getRevisionById(tenantId, revId);
-  if (!revision || revision.entityId !== sectionId || revision.entityType !== "WebsitePageSection") {
+  if (
+    !revision ||
+    revision.entityId !== sectionId ||
+    revision.entityType !== "WebsitePageSection"
+  ) {
     return NextResponse.json({ error: "Version nicht gefunden." }, { status: 404 });
   }
 
-  const snapshot = revision.snapshot;
-
-  const { label, config } = snapshot as { label?: string; config?: Record<string, unknown> };
+  const snapshot = revision.snapshot as {
+    label?: string;
+    config?: Record<string, unknown>;
+  };
 
   const updated = await updatePageSection(tenantId, pageId, sectionId, {
-    label: typeof label === "string" ? label : undefined,
-    config: config && typeof config === "object" ? (config as Record<string, unknown>) : undefined,
+    label: typeof snapshot.label === "string" ? snapshot.label : undefined,
+    config:
+      snapshot.config && typeof snapshot.config === "object"
+        ? (snapshot.config as Record<string, unknown>)
+        : undefined,
     actorUserId,
     changeNote: `Wiederhergestellt aus Version ${revision.versionNumber}`,
+    // Mark this revision as a restore and link to the source
+    isRestore: true,
+    parentRevisionId: revId,
   });
 
   if (!updated) {

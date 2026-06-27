@@ -1,17 +1,27 @@
 /**
  * lib/page-sections/public-page-layout-feed.ts
  *
- * Server-side loader for the public page layout API (CMS V2 Slice 8).
+ * Server-side loader for the public page layout API (CMS V2 Slice 8+9).
  *
- * Returns a published page together with its enabled sections.
+ * Returns a published page together with its publicly-visible sections.
  *
- * Public visibility rules:
- *   Page gate:    WebsitePage.status = "PUBLISHED" AND publishedAt <= now()
- *   Section gate: WebsitePageSection.isEnabled = true
+ * Section visibility gate (state-driven, no background job required):
+ *   A section is visible when ALL of the following are true:
+ *     1. isEnabled = true
+ *     2. publishStatus = "PUBLISHED"
+ *        OR scheduledPublishAt IS NOT NULL AND scheduledPublishAt <= now()
+ *     3. publishUntil IS NULL OR publishUntil > now()
  *
- * Never exposes: tenantId, createdAt, updatedAt, isEnabled, status.
+ * This matches the HomepageSection public feed pattern for consistency.
+ * Scheduled content appears automatically at scheduledPublishAt.
+ * Expired content disappears automatically at publishUntil.
+ * No background worker is required for either behaviour.
+ *
+ * Page gate:  WebsitePage.status = "PUBLISHED" AND publishedAt <= now()
+ *
+ * Never exposes: tenantId, createdAt, updatedAt, isEnabled, publishStatus,
+ *                approvalStatus, or any admin-only workflow fields.
  * Config is projected through the block registry's public-safe projection.
- * Approval / workflow fields are never on public DTOs.
  *
  * Called by: GET /api/public/[tenant]/website/pages/[slug]/layout
  */
@@ -55,10 +65,14 @@ export type PublicPageLayout = {
 // ---------------------------------------------------------------------------
 
 /**
- * Loads a published page with its enabled sections for a tenant.
+ * Loads a published page with its publicly-visible sections for a tenant.
  *
  * Returns null if the page does not exist, belongs to a different tenant,
  * or is not published.
+ *
+ * Section visibility is state-driven:
+ *   - publishStatus = "PUBLISHED" OR scheduledPublishAt <= now()
+ *   - publishUntil IS NULL OR publishUntil > now()
  */
 export async function getPublicPageLayout(
   tenantId: string,
@@ -83,10 +97,19 @@ export async function getPublicPageLayout(
       sections: {
         where: {
           isEnabled: true,
-          publishStatus: "PUBLISHED",
+          // Publish gate: explicitly published OR scheduled time has arrived
           OR: [
-            { publishUntil: null },
-            { publishUntil: { gt: new Date() } },
+            { publishStatus: "PUBLISHED" },
+            { scheduledPublishAt: { lte: now } },
+          ],
+          // Expiry gate: not yet expired (or no expiry set)
+          AND: [
+            {
+              OR: [
+                { publishUntil: null },
+                { publishUntil: { gt: now } },
+              ],
+            },
           ],
         },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],

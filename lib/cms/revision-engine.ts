@@ -10,12 +10,13 @@
  *   - Revisions are NEVER updated or deleted.
  *   - Version numbers are monotonically increasing per (entityType, entityId).
  *   - Restoring a revision creates a NEW revision; history is never overwritten.
+ *   - isRestore = true marks restore-created revisions.
+ *   - parentRevisionId links a restore revision to its source for rollback chains.
  *   - All writes are best-effort (errors are logged, never thrown to callers).
  *
- * Supported entityTypes: "WebsitePageSection" | "WebsitePage" | "HomepageSection"
- *
- * Future CMS content types (News, Events, Landing Pages) can use the same engine
- * without any changes — just pass the appropriate entityType string.
+ * Supported entityTypes (generic — no schema change required for new types):
+ *   "WebsitePageSection" | "WebsitePage" | "HomepageSection"
+ *   Future: "NewsArticle" | "Event" | "LandingPage" | any future CMS entity
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -33,6 +34,8 @@ export type ContentRevisionItem = {
   createdByUserId: string | null;
   changeNote: string | null;
   snapshot: Record<string, unknown>;
+  isRestore: boolean;
+  parentRevisionId: string | null;
   createdAt: Date;
   createdByUser?: { firstName: string; lastName: string } | null;
 };
@@ -44,6 +47,8 @@ export type CaptureRevisionInput = {
   snapshot: Record<string, unknown>;
   createdByUserId?: string | null;
   changeNote?: string | null;
+  isRestore?: boolean;
+  parentRevisionId?: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +67,6 @@ export async function captureRevision(
   input: CaptureRevisionInput,
 ): Promise<ContentRevisionItem | null> {
   try {
-    // Determine next version number in a serialisable transaction
     const result = await prisma.$transaction(async (tx) => {
       const last = await tx.contentRevision.findFirst({
         where: { entityType: input.entityType, entityId: input.entityId },
@@ -80,6 +84,8 @@ export async function captureRevision(
           createdByUserId: input.createdByUserId ?? null,
           changeNote: input.changeNote ?? null,
           snapshot: input.snapshot as never,
+          isRestore: input.isRestore ?? false,
+          parentRevisionId: input.parentRevisionId ?? null,
         },
         select: revisionSelect,
       });
@@ -98,7 +104,6 @@ export async function captureRevision(
 
 /**
  * Lists all revisions for an entity, newest first.
- *
  * Tenant-scoped: only revisions matching tenantId are returned.
  */
 export async function listRevisions(
@@ -157,6 +162,8 @@ const revisionSelect = {
   createdByUserId: true,
   changeNote: true,
   snapshot: true,
+  isRestore: true,
+  parentRevisionId: true,
   createdAt: true,
 } as const;
 
@@ -176,6 +183,8 @@ type RawRevision = {
   createdByUserId: string | null;
   changeNote: string | null;
   snapshot: unknown;
+  isRestore: boolean;
+  parentRevisionId: string | null;
   createdAt: Date;
 };
 

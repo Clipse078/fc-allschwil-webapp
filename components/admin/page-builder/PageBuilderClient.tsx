@@ -631,13 +631,18 @@ function RevisionHistoryPanel({
       {!loading && revisions.length > 0 && (
         <div className="space-y-1 max-h-72 overflow-y-auto">
           {revisions.map((rev) => (
-            <div
+              <div
               key={rev.id}
               className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 font-medium text-[var(--foreground)]">
+                <div className="flex flex-wrap items-center gap-1.5 font-medium text-[var(--foreground)]">
                   <span className="text-[var(--muted)]">v{rev.versionNumber}</span>
+                  {rev.isRestore && (
+                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                      Wiederherstellung
+                    </span>
+                  )}
                   {rev.changeNote && (
                     <span className="truncate">{rev.changeNote}</span>
                   )}

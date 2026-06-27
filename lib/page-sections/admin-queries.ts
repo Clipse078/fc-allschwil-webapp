@@ -245,6 +245,10 @@ export type UpdatePageSectionInput = {
   config?: Record<string, unknown>;
   actorUserId?: string | null;
   changeNote?: string | null;
+  /** True when this update was triggered by a revision restore action. */
+  isRestore?: boolean;
+  /** ID of the source revision when isRestore = true. */
+  parentRevisionId?: string | null;
 };
 
 export async function updatePageSection(
@@ -278,6 +282,8 @@ export async function updatePageSection(
     snapshot: sectionSnapshot(updated),
     createdByUserId: input.actorUserId ?? null,
     changeNote: input.changeNote ?? "Konfiguration aktualisiert",
+    isRestore: input.isRestore ?? false,
+    parentRevisionId: input.parentRevisionId ?? null,
   });
 
   return updated;
@@ -374,7 +380,11 @@ export async function reorderPageSections(
   });
 
   const existingIds = new Set(existing.map((s) => s.id));
+  // Reject any unknown IDs (protects tenant + page isolation)
   if (orderedIds.some((id) => !existingIds.has(id))) return null;
+  // Reject duplicates within the ordered list
+  if (new Set(orderedIds).size !== orderedIds.length) return null;
+  // Reject if not exactly the same count as existing sections
   if (orderedIds.length !== existingIds.size) return null;
 
   await prisma.$transaction(

@@ -10,8 +10,11 @@
  *   - Human-readable labels (German)
  *
  * Used by:
- *   - lib/page-sections/admin-queries.ts (WebsitePageSection)
- *   - lib/homepage/admin-queries.ts (HomepageSection) — imports via approval-constants.ts
+ *   - lib/page-sections/admin-queries.ts (WebsitePageSection) — directly
+ *   - lib/homepage/admin-queries.ts (HomepageSection) — via approval-constants.ts re-export layer
+ *   - lib/homepage/approval-constants.ts — re-exports from here for backwards compatibility
+ *   - components/admin/page-builder/PageBuilderClient.tsx — client component
+ *   - components/admin/homepage/HomepageSectionList.tsx — via approval-constants.ts
  *
  * This file has NO server-side imports so it is safe in both Server and
  * Client Components (import only constants/types from here on the client).
