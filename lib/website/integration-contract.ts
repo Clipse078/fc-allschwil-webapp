@@ -36,9 +36,34 @@
  * GET /api/public/{tenantSlug}/website/teams/{slug}
  * GET /api/public/{tenantSlug}/website/weekplan
  * GET /api/public/{tenantSlug}/website/pages/{slug}/layout
+ * GET /api/public/{tenantSlug}/website/components/{id}
+ * GET /api/public/{tenantSlug}/website/media/{id}
+ * GET /api/public/{tenantSlug}/website/sponsors
  *
  * All content endpoints return only published, tenant-safe, non-archived content.
  * Draft and unpublished content never leaks publicly.
+ *
+ * REUSABLE COMPONENTS
+ *   GET /api/public/{tenantSlug}/website/components/{id}
+ *   Returns a single published reusable component by id.
+ *   Visibility: publishStatus=PUBLISHED or scheduledPublishAt<=now(), archivedAt=null.
+ *   ANNOUNCEMENT type: also enforces config.publishFrom / config.publishUntil window.
+ *   Response: { version, tenant, generatedAt, data: { component }, meta }
+ *   component: { id, type, title, config, updatedAt }
+ *
+ * DAM MEDIA
+ *   GET /api/public/{tenantSlug}/website/media/{id}
+ *   Returns public-safe metadata for a single ACTIVE media asset.
+ *   storageKey and all admin-only fields are never exposed.
+ *   Response: { version, tenant, generatedAt, data: { asset }, meta }
+ *   asset: { id, url, altText, caption, width, height, mimeType }
+ *
+ * SPONSORS
+ *   GET /api/public/{tenantSlug}/website/sponsors
+ *   Placeholder — no Sponsor entity exists yet.
+ *   Returns { sponsors: [] } with _contract metadata explaining the status.
+ *   Individual sponsor blocks are available via SPONSOR_BANNER ReusableComponents.
+ *   Response shape is forward-compatible: will be populated once Sponsor model is added.
  */
 
 // ---------------------------------------------------------------------------
@@ -217,6 +242,89 @@ export type WebsiteContentEnvelope<T = unknown> = {
   generatedAt: string;
   data: T;
   meta: Record<string, unknown>;
+};
+
+// ---------------------------------------------------------------------------
+// Reusable Component — public shape
+// ---------------------------------------------------------------------------
+
+/**
+ * Public-safe reusable component shape.
+ * Returned by GET /api/public/{tenantSlug}/website/components/{id}.
+ *
+ * Intentionally omits: publishStatus, scheduledPublishAt, archivedAt,
+ * approvalStatus, reviewerUserId, approvalNote, createdByUserId, slug,
+ * description, and all other admin-only workflow fields.
+ */
+export type WebsitePublicComponent = {
+  id: string;
+  /** Component type key, e.g. "CTA", "SPONSOR_BANNER", "ANNOUNCEMENT". */
+  type: string;
+  /** Admin-configured human-readable title. */
+  title: string;
+  /** Type-specific configuration. Keys vary by type — treat unknown keys as extras. */
+  config: Record<string, unknown>;
+  /** ISO 8601 timestamp of the last admin update. */
+  updatedAt: string;
+};
+
+export type WebsiteComponentData = {
+  component: WebsitePublicComponent;
+};
+
+// ---------------------------------------------------------------------------
+// DAM Media Asset — public shape
+// ---------------------------------------------------------------------------
+
+/**
+ * Public-safe media asset shape.
+ * Returned by GET /api/public/{tenantSlug}/website/media/{id}.
+ *
+ * Intentionally omits: storageKey, createdByUserId, tenantId, folderId,
+ * tags, copyright, photographer, description, sizeBytes, type (asset type),
+ * filename, durationSec, createdAt, updatedAt, archivedAt.
+ */
+export type WebsitePublicMediaAsset = {
+  id: string;
+  /** Publicly accessible CDN / blob URL. */
+  url: string;
+  /** Alt text for accessibility. Null when not set by editor. */
+  altText: string | null;
+  /** Editorial caption. Null when not set. */
+  caption: string | null;
+  /** Image width in pixels. Null for videos or when not stored. */
+  width: number | null;
+  /** Image height in pixels. Null for videos or when not stored. */
+  height: number | null;
+  /** MIME type, e.g. "image/webp", "video/mp4". */
+  mimeType: string;
+};
+
+export type WebsiteMediaData = {
+  asset: WebsitePublicMediaAsset;
+};
+
+// ---------------------------------------------------------------------------
+// Sponsors — public shape (placeholder, no Sponsor model yet)
+// ---------------------------------------------------------------------------
+
+/**
+ * Placeholder sponsor shape. Populated once the Sponsor entity is implemented.
+ *
+ * Today GET /api/public/{tenantSlug}/website/sponsors returns an empty list.
+ * For individual sponsor blocks, use SPONSOR_BANNER ReusableComponents via
+ * GET /api/public/{tenantSlug}/website/components/{id}.
+ */
+export type WebsitePublicSponsor = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  tier: string | null;
+};
+
+export type WebsiteSponsorsData = {
+  sponsors: WebsitePublicSponsor[];
 };
 
 // ---------------------------------------------------------------------------

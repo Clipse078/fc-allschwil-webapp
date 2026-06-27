@@ -37,13 +37,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     const sections = await getPublicHomepageSections(tenant.id);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       buildWebsiteEnvelope(
         tenant,
         { sections },
         { total: sections.length },
       ),
     );
+    response.headers.set(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300",
+    );
+    return response;
   } catch (error) {
     console.error("[public/[tenant]/website/homepage] GET failed:", error);
     return NextResponse.json(

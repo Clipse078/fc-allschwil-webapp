@@ -55,13 +55,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Page not found." }, { status: 404 });
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       buildWebsiteEnvelope(
         tenant,
         { page: layout.page, sections: layout.sections },
         { sectionCount: layout.sections.length },
       ),
     );
+    response.headers.set(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=300",
+    );
+    return response;
   } catch (error) {
     console.error(
       "[public/[tenant]/website/pages/[slug]/layout] GET failed:",
