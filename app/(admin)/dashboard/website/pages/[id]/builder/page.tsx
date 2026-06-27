@@ -99,6 +99,8 @@ export default async function PageBuilderPage({
 
       <PageBuilderClient
         pageId={id}
+        pageTitle={page.title}
+        pageSlug={page.slug}
       />
     </PageShell>
   );

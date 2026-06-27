@@ -104,12 +104,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  const actorUserId = access.session.user?.id ?? null;
   const section = await createPageSection({
     tenantId,
     pageId,
     type,
     label,
     config: configResult.data,
+    actorUserId,
   });
 
   return NextResponse.json({ section }, { status: 201 });

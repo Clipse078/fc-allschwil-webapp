@@ -81,7 +81,14 @@ export async function getPublicPageLayout(
       seoDescription: true,
       publishedAt: true,
       sections: {
-        where: { isEnabled: true },
+        where: {
+          isEnabled: true,
+          publishStatus: "PUBLISHED",
+          OR: [
+            { publishUntil: null },
+            { publishUntil: { gt: new Date() } },
+          ],
+        },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         select: {
           id: true,
