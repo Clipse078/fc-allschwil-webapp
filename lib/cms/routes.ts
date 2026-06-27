@@ -25,6 +25,9 @@ export const CMS_ROUTES = {
   // ── Publishing ─────────────────────────────────────────────────────────────
   publishing: "/dashboard/website/publishing",
 
+  // ── Editorial Center ───────────────────────────────────────────────────────
+  editorial: "/dashboard/website/editorial",
+
   // ── Review ─────────────────────────────────────────────────────────────────
   review: "/dashboard/website/review",
 
@@ -41,6 +44,13 @@ export const CMS_ROUTES = {
  */
 export function pageBuilderHref(pageId: string): string {
   return `/dashboard/website/pages/${pageId}/builder`;
+}
+
+/**
+ * Generates the News article edit URL for a given article ID.
+ */
+export function newsEditHref(newsId: string): string {
+  return `/dashboard/website/news/${newsId}/edit`;
 }
 
 export type CmsRouteKey = keyof typeof CMS_ROUTES;
