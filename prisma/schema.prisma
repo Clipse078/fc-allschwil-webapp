@@ -87,6 +87,12 @@ enum RegistrationType {
   SPONSORANFRAGE
   KONTAKTANFRAGE
   OTHER
+  // Website-integration additions (Slice: website-registration-integration)
+  MITGLIEDSCHAFT
+  FREIWILLIGENMELDUNG
+  SCHIEDSRICHTERANMELDUNG
+  CAMP_ANMELDUNG
+  VERANSTALTUNGSANMELDUNG
 }
 
 enum RegistrationStatus {
@@ -458,6 +464,7 @@ model Registration {
   @@index([tenantId, createdAt])
   @@index([assignedToUserId])
   @@index([targetGroupId])
+  @@index([tenantId, source])
 }
 
 model Role {

@@ -17,6 +17,13 @@ import {
   Handshake,
   ClipboardList,
   Lightbulb,
+  Globe,
+  Shield,
+  Flag,
+  CalendarDays,
+  AlertTriangle,
+  CheckCircle,
+  Baby,
 } from "lucide-react";
 import { RegistrationStatus } from "@prisma/client";
 import { cn } from "@/lib/cn";
@@ -29,6 +36,7 @@ import {
 import { formatDate, formatDateTime } from "@/lib/tenant-runtime/formatters";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import { getInitials } from "@/lib/inbox/types";
+import { WEBSITE_SOURCE } from "@/lib/registrations/constants";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -96,6 +104,32 @@ const TYPE_CONFIG: Record<string, TypeCfg> = {
     label: "Andere",
     colorClass: "border-slate-200 bg-slate-50 text-slate-400",
   },
+  // Website-integration types
+  MITGLIEDSCHAFT: {
+    Icon: Users,
+    label: "Mitgliedschaft",
+    colorClass: "border-teal-200 bg-teal-50 text-teal-700",
+  },
+  FREIWILLIGENMELDUNG: {
+    Icon: UserCheck,
+    label: "Freiwillig",
+    colorClass: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  },
+  SCHIEDSRICHTERANMELDUNG: {
+    Icon: Flag,
+    label: "Schiedsrichter",
+    colorClass: "border-yellow-200 bg-yellow-50 text-yellow-700",
+  },
+  CAMP_ANMELDUNG: {
+    Icon: Shield,
+    label: "Camp",
+    colorClass: "border-purple-200 bg-purple-50 text-purple-700",
+  },
+  VERANSTALTUNGSANMELDUNG: {
+    Icon: CalendarDays,
+    label: "Veranstaltung",
+    colorClass: "border-pink-200 bg-pink-50 text-pink-700",
+  },
 };
 
 const STATUS_OPTIONS = Object.values(RegistrationStatus);
@@ -162,6 +196,38 @@ function getContactName(payloadJson: unknown): string | null {
   return typeof contactName === "string" && contactName.trim()
     ? contactName
     : null;
+}
+
+type WebsitePayload = {
+  parentOrGuardian?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  };
+  consent?: {
+    privacyAccepted?: boolean;
+    communicationAccepted?: boolean;
+    photoConsent?: boolean;
+  };
+  football?: {
+    currentClub?: string;
+    previousClub?: string;
+    desiredTeam?: string;
+    position?: string;
+    preferredTrainingDay?: string;
+  };
+  event?: { eventId?: string; eventName?: string };
+  sponsor?: { companyName?: string; contactPerson?: string; website?: string };
+  address?: { street?: string; postalCode?: string; city?: string; country?: string };
+  possibleDuplicate?: boolean;
+  possibleDuplicateOf?: string;
+};
+
+function getWebsitePayload(payloadJson: unknown): WebsitePayload | null {
+  if (!payloadJson || typeof payloadJson !== "object" || Array.isArray(payloadJson))
+    return null;
+  return payloadJson as WebsitePayload;
 }
 
 // ── Classification section ────────────────────────────────────────────────────
@@ -322,6 +388,10 @@ export default function RegistrationDetailDrawer({
   const contactName = getContactName(registration.payloadJson);
   const detailHref = `/tenant/${tenantSlug}/cockpit/registrations/${registration.id}`;
 
+  const isWebsiteSource = registration.source === WEBSITE_SOURCE;
+  const websitePayload = isWebsiteSource ? getWebsitePayload(registration.payloadJson) : null;
+  const isPossibleDuplicate = websitePayload?.possibleDuplicate === true;
+
   return (
     <>
       {/* Backdrop — subtle on desktop, dark on mobile */}
@@ -382,6 +452,12 @@ export default function RegistrationDetailDrawer({
               >
                 {STATUS_LABELS[registration.status]}
               </span>
+              {isWebsiteSource && (
+                <span className="inline-flex items-center gap-1.5 h-6 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-[0.7rem] font-semibold text-indigo-700">
+                  <Globe className="h-3.5 w-3.5" aria-hidden />
+                  Website
+                </span>
+              )}
             </div>
             <p className="mt-1 text-xs text-[var(--muted)]">
               {registration.email}
@@ -413,6 +489,43 @@ export default function RegistrationDetailDrawer({
 
           {/* Classification / routing suggestion */}
           <ClassificationSection registration={registration} />
+
+          {/* Website source banner + possible duplicate warning */}
+          {isWebsiteSource && (
+            <div className="px-6 pt-4 pb-4 border-b border-[var(--border)] bg-indigo-50/50">
+              <div className="flex items-start gap-2.5">
+                <Globe className="h-4 w-4 text-indigo-600 flex-shrink-0 mt-0.5" aria-hidden />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[0.78rem] font-semibold text-indigo-800">
+                    Website-Anmeldung
+                  </p>
+                  <p className="text-[0.72rem] text-indigo-600 mt-0.5">
+                    Eingegangen über das öffentliche Kontaktformular (FC Allschwil Website)
+                  </p>
+                </div>
+              </div>
+              {isPossibleDuplicate && (
+                <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden />
+                  <div>
+                    <p className="text-[0.75rem] font-semibold text-amber-800">
+                      Mögliches Duplikat erkannt
+                    </p>
+                    <p className="text-[0.7rem] text-amber-700 mt-0.5">
+                      Eine ähnliche Anmeldung mit dieser E-Mail-Adresse wurde bereits innerhalb
+                      der letzten 24 Stunden eingereicht. Bitte prüfe, ob es sich um eine
+                      Doppeleinsendung handelt.
+                      {websitePayload?.possibleDuplicateOf && (
+                        <span className="block mt-1 font-mono text-[0.65rem] text-amber-600">
+                          Referenz-ID: {websitePayload.possibleDuplicateOf}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Status + workflow */}
           <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
@@ -593,6 +706,139 @@ export default function RegistrationDetailDrawer({
               </p>
             )}
           </div>
+
+          {/* Parent / guardian — website submissions only */}
+          {websitePayload?.parentOrGuardian &&
+            (websitePayload.parentOrGuardian.firstName ||
+              websitePayload.parentOrGuardian.lastName ||
+              websitePayload.parentOrGuardian.email ||
+              websitePayload.parentOrGuardian.phone) && (
+              <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+                <SectionLabel icon={Baby}>Erziehungsberechtigte/r</SectionLabel>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {(websitePayload.parentOrGuardian.firstName ||
+                    websitePayload.parentOrGuardian.lastName) && (
+                    <DataRow label="Name">
+                      <span className="sce-data-value text-sm">
+                        {[
+                          websitePayload.parentOrGuardian.firstName,
+                          websitePayload.parentOrGuardian.lastName,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      </span>
+                    </DataRow>
+                  )}
+                  {websitePayload.parentOrGuardian.email && (
+                    <DataRow label="E-Mail">
+                      <a
+                        href={`mailto:${websitePayload.parentOrGuardian.email}`}
+                        className="sce-link-primary flex items-center gap-1.5 text-sm"
+                      >
+                        <Mail className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                        {websitePayload.parentOrGuardian.email}
+                      </a>
+                    </DataRow>
+                  )}
+                  {websitePayload.parentOrGuardian.phone && (
+                    <DataRow label="Telefon">
+                      <a
+                        href={`tel:${websitePayload.parentOrGuardian.phone}`}
+                        className="sce-link-primary flex items-center gap-1.5 text-sm"
+                      >
+                        <Phone className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                        {websitePayload.parentOrGuardian.phone}
+                      </a>
+                    </DataRow>
+                  )}
+                </div>
+              </div>
+            )}
+
+          {/* Consent — website submissions only */}
+          {websitePayload?.consent && (
+            <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+              <SectionLabel icon={CheckCircle}>Einwilligungen</SectionLabel>
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-4 w-4 flex-shrink-0 rounded-full flex items-center justify-center text-[0.6rem]",
+                      websitePayload.consent.privacyAccepted
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-red-100 text-red-700",
+                    )}
+                    aria-hidden
+                  >
+                    {websitePayload.consent.privacyAccepted ? "✓" : "✗"}
+                  </span>
+                  <span className="text-sm text-[var(--text-2)]">Datenschutzerklärung</span>
+                  <span
+                    className={cn(
+                      "text-[0.65rem] font-semibold",
+                      websitePayload.consent.privacyAccepted
+                        ? "text-emerald-600"
+                        : "text-red-600",
+                    )}
+                  >
+                    {websitePayload.consent.privacyAccepted ? "Akzeptiert" : "Nicht akzeptiert"}
+                  </span>
+                </div>
+                {websitePayload.consent.communicationAccepted !== undefined && (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "h-4 w-4 flex-shrink-0 rounded-full flex items-center justify-center text-[0.6rem]",
+                        websitePayload.consent.communicationAccepted
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-500",
+                      )}
+                      aria-hidden
+                    >
+                      {websitePayload.consent.communicationAccepted ? "✓" : "—"}
+                    </span>
+                    <span className="text-sm text-[var(--text-2)]">Kommunikation / Newsletter</span>
+                    <span
+                      className={cn(
+                        "text-[0.65rem] font-semibold",
+                        websitePayload.consent.communicationAccepted
+                          ? "text-emerald-600"
+                          : "text-slate-500",
+                      )}
+                    >
+                      {websitePayload.consent.communicationAccepted ? "Ja" : "Nein"}
+                    </span>
+                  </div>
+                )}
+                {websitePayload.consent.photoConsent !== undefined && (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "h-4 w-4 flex-shrink-0 rounded-full flex items-center justify-center text-[0.6rem]",
+                        websitePayload.consent.photoConsent
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-500",
+                      )}
+                      aria-hidden
+                    >
+                      {websitePayload.consent.photoConsent ? "✓" : "—"}
+                    </span>
+                    <span className="text-sm text-[var(--text-2)]">Fotofreigabe</span>
+                    <span
+                      className={cn(
+                        "text-[0.65rem] font-semibold",
+                        websitePayload.consent.photoConsent
+                          ? "text-emerald-600"
+                          : "text-slate-500",
+                      )}
+                    >
+                      {websitePayload.consent.photoConsent ? "Ja" : "Nein"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* System metadata */}
           <div className="px-6 pt-5 pb-8">

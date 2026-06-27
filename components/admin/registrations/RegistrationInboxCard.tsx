@@ -9,6 +9,12 @@ import {
   Handshake,
   MessageSquare,
   ClipboardList,
+  Globe,
+  Users,
+  Shield,
+  Flag,
+  CalendarDays,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
@@ -19,6 +25,7 @@ import {
   TARGET_GROUP_COLORS,
 } from "@/lib/registrations/classification";
 import { getUrgencyInfo, getInitials } from "@/lib/inbox/types";
+import { WEBSITE_SOURCE } from "@/lib/registrations/constants";
 
 // ── Type visual config (icons replace emojis) ─────────────────────────────────
 
@@ -58,6 +65,32 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     Icon: ClipboardList,
     label: "Andere",
     colorClass: "border-slate-200 bg-slate-50 text-slate-400",
+  },
+  // Website-integration types
+  MITGLIEDSCHAFT: {
+    Icon: Users,
+    label: "Mitgliedschaft",
+    colorClass: "border-teal-200 bg-teal-50 text-teal-700",
+  },
+  FREIWILLIGENMELDUNG: {
+    Icon: UserCheck,
+    label: "Freiwillig",
+    colorClass: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  },
+  SCHIEDSRICHTERANMELDUNG: {
+    Icon: Flag,
+    label: "Schiedsrichter",
+    colorClass: "border-yellow-200 bg-yellow-50 text-yellow-700",
+  },
+  CAMP_ANMELDUNG: {
+    Icon: Shield,
+    label: "Camp",
+    colorClass: "border-purple-200 bg-purple-50 text-purple-700",
+  },
+  VERANSTALTUNGSANMELDUNG: {
+    Icon: CalendarDays,
+    label: "Veranstaltung",
+    colorClass: "border-pink-200 bg-pink-50 text-pink-700",
   },
 };
 
@@ -140,6 +173,13 @@ export default function RegistrationInboxCard({
     : false;
   const genderLabel = getGenderLabel(gender, isAdult);
 
+  const isWebsiteSource = registration.source === WEBSITE_SOURCE;
+  const isPossibleDuplicate =
+    registration.payloadJson &&
+    typeof registration.payloadJson === "object" &&
+    !Array.isArray(registration.payloadJson) &&
+    (registration.payloadJson as Record<string, unknown>).possibleDuplicate === true;
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -172,7 +212,7 @@ export default function RegistrationInboxCard({
 
         {/* Main content */}
         <div className="min-w-0 flex-1">
-          {/* Row 1: name + type badge + status badge */}
+          {/* Row 1: name + type badge + status badge + source badge */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[0.875rem] font-semibold text-[var(--foreground)] group-hover/card:text-[var(--blue)] transition-colors">
               {registration.firstName} {registration.lastName}
@@ -194,6 +234,12 @@ export default function RegistrationInboxCard({
             >
               {statusLabel}
             </span>
+            {isWebsiteSource && (
+              <span className="inline-flex items-center gap-1 h-5 rounded-full border border-indigo-200 bg-indigo-50 px-2 text-[0.65rem] font-semibold text-indigo-700">
+                <Globe className="h-3 w-3" aria-hidden />
+                Website
+              </span>
+            )}
           </div>
 
           {/* Row 2: classification metadata — Jahrgang · Geschlecht · Suggested group */}
@@ -242,6 +288,14 @@ export default function RegistrationInboxCard({
               </span>
             )}
           </div>
+
+          {/* Possible duplicate warning */}
+          {isPossibleDuplicate && (
+            <div className="mt-1.5 flex items-center gap-1 text-[0.65rem] font-medium text-amber-600">
+              <AlertTriangle className="h-3 w-3 flex-shrink-0" aria-hidden />
+              Mögliches Duplikat
+            </div>
+          )}
 
           {/* Quick actions — hover only on desktop */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:opacity-0 sm:group-hover/card:opacity-100 sm:transition-opacity sm:duration-150">

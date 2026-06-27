@@ -54,6 +54,12 @@ const TYPE_LABELS: Record<string, string> = {
   SPONSORANFRAGE: "Sponsoranfrage",
   KONTAKTANFRAGE: "Kontaktanfrage",
   OTHER: "Andere",
+  // Website-integration types
+  MITGLIEDSCHAFT: "Mitgliedschaft",
+  FREIWILLIGENMELDUNG: "Freiwilligenmeldung",
+  SCHIEDSRICHTERANMELDUNG: "Schiedsrichteranmeldung",
+  CAMP_ANMELDUNG: "Camp-Anmeldung",
+  VERANSTALTUNGSANMELDUNG: "Veranstaltungsanmeldung",
 };
 
 const STATUS_LABELS: Record<RegistrationStatus, string> = {
