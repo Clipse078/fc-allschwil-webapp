@@ -378,6 +378,8 @@ model Tenant {
   homepageSections       HomepageSection[]
   websiteNavItems        WebsiteNavItem[]
   contentRevisions       ContentRevision[]
+  reusableComponents     ReusableComponent[]
+  reusableComponentUsages ReusableComponentUsage[]
 
   @@index([status])
   @@index([name])
@@ -411,6 +413,10 @@ model User {
   approvedPageSections  WebsitePageSection[] @relation("PageSectionApprovedBy")
   rejectedPageSections  WebsitePageSection[] @relation("PageSectionRejectedBy")
   contentRevisions      ContentRevision[]
+  createdReusableComponents  ReusableComponent[] @relation("ReusableComponentCreatedBy")
+  reviewedReusableComponents ReusableComponent[] @relation("ReusableComponentReviewer")
+  approvedReusableComponents ReusableComponent[] @relation("ReusableComponentApprovedBy")
+  rejectedReusableComponents ReusableComponent[] @relation("ReusableComponentRejectedBy")
 
   @@index([isActive])
   @@index([tenantId])
@@ -1917,5 +1923,107 @@ model MediaAssetUsage {
   @@unique([mediaAssetId, entityType, entityId, fieldPath])
   @@index([tenantId])
   @@index([mediaAssetId])
+  @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// ReusableComponent — Centralised reusable content library (CMS V2 Slice 12)
+//
+// One generic model for all reusable content types:
+//   CTA | SPONSOR_BANNER | CONTACT_CARD | FAQ | QUOTE | STATISTICS |
+//   ANNOUNCEMENT | RICH_TEXT
+//
+// The `config` JSON field holds the type-specific payload.
+// No separate tables per type — all types share this model.
+//
+// Publishing mirrors HomepageSection / WebsitePageSection patterns.
+// Revisions are tracked via ContentRevision (entityType = "ReusableComponent").
+// Usage is tracked via ReusableComponentUsage.
+// Audit events use moduleKey = "reusable-components".
+// ---------------------------------------------------------------------------
+
+model ReusableComponent {
+  id          String    @id @default(cuid())
+  tenantId    String
+  /// Component type key — one of the REUSABLE_COMPONENT_TYPES registry keys.
+  type        String
+  /// Human-readable admin title.
+  title       String
+  /// URL-safe unique identifier within the tenant (auto-generated from title).
+  slug        String
+  /// Optional description shown in the picker and library view.
+  description String?
+  /// Type-specific configuration stored as a JSON object.
+  config      Json      @default("{}")
+
+  // ── Publishing workflow (mirrors HomepageSection / WebsitePageSection) ──────
+  /// Publish status — "DRAFT" | "PUBLISHED".
+  publishStatus      String    @default("DRAFT")
+  publishedAt        DateTime?
+  unpublishedAt      DateTime?
+  lastPublishedAt    DateTime?
+  scheduledPublishAt DateTime?
+
+  // ── Editorial approval workflow ─────────────────────────────────────────────
+  /// Approval status — "NOT_REQUIRED" | "DRAFT" | "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED".
+  approvalStatus     String    @default("NOT_REQUIRED")
+  reviewerUserId     String?
+  reviewRequestedAt  DateTime?
+  reviewedAt         DateTime?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  approvalNote       String?
+  approvedByUserId   String?
+  rejectedByUserId   String?
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  createdByUserId String?
+  archivedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser  User?   @relation("ReusableComponentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  reviewerUser   User?   @relation("ReusableComponentReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedByUser User?   @relation("ReusableComponentApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  rejectedByUser User?   @relation("ReusableComponentRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  usages ReusableComponentUsage[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, publishStatus])
+  @@index([tenantId, archivedAt])
+  @@index([tenantId, updatedAt])
+}
+
+// ---------------------------------------------------------------------------
+// ReusableComponentUsage — Cross-module usage tracking (CMS V2 Slice 12)
+//
+// Records where each ReusableComponent is referenced.
+// Mirrors the MediaAssetUsage pattern — future entity types can plug in
+// without schema changes.
+//
+// entityType: "HomepageSection" | "WebsitePageSection" | "NewsArticle" | …
+// fieldPath:  dot-path within the entity, e.g. "config.componentId"
+// ---------------------------------------------------------------------------
+
+model ReusableComponentUsage {
+  id          String   @id @default(cuid())
+  tenantId    String
+  componentId String
+  entityType  String
+  entityId    String
+  fieldPath   String   @default("config")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  component ReusableComponent @relation(fields: [componentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([componentId, entityType, entityId, fieldPath])
+  @@index([tenantId])
+  @@index([componentId])
   @@index([entityType, entityId])
 }

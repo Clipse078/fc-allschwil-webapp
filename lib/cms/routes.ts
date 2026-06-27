@@ -34,9 +34,20 @@ export const CMS_ROUTES = {
   // ── Structure ──────────────────────────────────────────────────────────────
   navigation: "/dashboard/website/navigation",
 
+  // ── Reusable Components ────────────────────────────────────────────────────
+  components: "/dashboard/website/components",
+  componentsNew: "/dashboard/website/components/new",
+
   // ── Configuration ──────────────────────────────────────────────────────────
   settings: "/dashboard/website/settings",
 } as const;
+
+/**
+ * Generates the edit URL for a reusable component.
+ */
+export function componentEditHref(componentId: string): string {
+  return `/dashboard/website/components/${componentId}/edit`;
+}
 
 /**
  * Generates the Page Builder URL for a given page ID.
