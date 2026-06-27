@@ -168,6 +168,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE],
           },
           {
+            key: "website-components",
+            label: "Wiederverwendbare Inhalte",
+            href: "/dashboard/website/components",
+            permissionKeys: [PERMISSIONS.WEBSITE_MANAGE],
+          },
+          {
             key: "website-settings",
             label: "Einstellungen",
             href: "/dashboard/website/settings",

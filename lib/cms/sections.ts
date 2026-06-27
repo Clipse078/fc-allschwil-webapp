@@ -129,6 +129,14 @@ export const CMS_SECTIONS: CmsSection[] = [
         requiredPermissions: ["website.manage"],
       },
       {
+        key: "reusable_components",
+        label: "Wiederverwendbare Inhalte",
+        description: "CTAs, Zitate, FAQ, Kontaktkarten und weitere Inhalte einmal erstellen — überall verwenden.",
+        status: "available",
+        href: CMS_ROUTES.components,
+        requiredPermissions: ["website.manage"],
+      },
+      {
         key: "redirects",
         label: "Weiterleitungen",
         description: "URL-Redirects pflegen und bestehende Verlinkungen absichern.",
