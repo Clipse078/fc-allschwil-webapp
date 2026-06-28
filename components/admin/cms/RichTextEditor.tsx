@@ -220,7 +220,7 @@ export default function RichTextEditor({
     ],
     content: value ?? { type: "doc", content: [{ type: "paragraph" }] },
     editable: !disabled,
-    onUpdate({ editor: ed }) {
+    onUpdate({ editor: ed }: { editor: Editor }) {
       const json = ed.getJSON() as RichTextValue;
       onChange(json);
     },
