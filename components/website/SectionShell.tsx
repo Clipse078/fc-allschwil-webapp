@@ -5,26 +5,56 @@
  *
  * Flexible Layout System — shared section wrapper for every CMS block renderer.
  *
- * SectionShell consumes a SectionLayout and renders the outer <section>
- * element with all layout-related styles applied:
- *   - Background (solid / gradient / DAM image with overlay)
- *   - Theme (bg colour, text colour tokens applied via CSS class)
- *   - Vertical spacing (padding top/bottom)
- *   - Container width (max-width)
- *   - Horizontal padding
+ * PURPOSE
+ *   SectionShell is the single rendering path for all CMS section layout.
+ *   It consumes a `SectionLayout` (from `config._layout`) and renders the
+ *   outer `<section>` element with all layout-related styles applied:
+ *     - Background (solid / gradient / DAM image with overlay)
+ *     - Theme (bg colour, text colour tokens via THEME_TOKENS)
+ *     - Vertical spacing (padding top/bottom from SPACING_TOP/BOTTOM_MAP)
+ *     - Container width (max-width from WIDTH_MAP)
+ *     - Horizontal padding (responsive px-* utilities)
  *
- * Block-specific renderers receive children that fill the inner content area.
- * They are responsible only for their own column/grid/content layout — not
- * for spacing, background, or theme.
+ *   Block-specific renderers fill the inner content area. They are responsible
+ *   only for column/grid/content layout — NOT for spacing, background, or theme.
  *
- * One rendering path for: Homepage, Pages, Preview, Website.
+ * ONE RENDERING PATH
+ *   Used identically for: Homepage, Pages, Admin Preview, Public Website.
+ *   No separate layout implementations exist per surface.
  *
- * Usage:
- *   import SectionShell from "@/components/website/SectionShell";
+ * PUBLIC WEBSITE USAGE
+ *   This component is part of the public-website integration surface.
+ *   The public website (separate Next.js project) MUST copy or import this
+ *   component and use it to wrap every rendered CMS section.
  *
- *   <SectionShell layout={cfg._layout} previewMode blockType="splitContentCards">
- *     {innerContent}
- *   </SectionShell>
+ *   Rendering pattern for the public website:
+ *
+ *     import SectionShell from "@/components/website/SectionShell";
+ *     import { resolveLayout } from "@/lib/website/integration-contract";
+ *
+ *     function CmsSection({ section }) {
+ *       const layout = resolveLayout(section.config._layout);
+ *       return (
+ *         <SectionShell layout={layout} blockType={section.type}>
+ *           <YourBlockContent config={section.config} />
+ *         </SectionShell>
+ *       );
+ *     }
+ *
+ * BACKWARD COMPATIBILITY
+ *   `splitContentCards` sections without `_layout` (pre-migration data) are
+ *   handled by `resolveBlockLayout()` in SplitContentCardsRenderer, which
+ *   reads legacy `config.style` + `config.background` and converts them.
+ *   SectionShell itself is not aware of legacy fields — it only consumes
+ *   SectionLayout. Resolving the fallback is the block renderer's responsibility.
+ *
+ * PROPS
+ *   layout      — SectionLayout from `config._layout` (use resolveLayout() to
+ *                 apply defaults before passing here).
+ *   previewMode — adds admin border + block-type label overlay.
+ *   blockType   — block type key string for the preview label.
+ *   children    — inner section content rendered inside the container.
+ *   className   — extra className applied to the outer <section>.
  */
 
 import type { ReactNode } from "react";
