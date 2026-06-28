@@ -982,7 +982,7 @@ Returns the ordered list of enabled homepage sections for the tenant.
 | `type` | string | Section type key (see registry below) |
 | `label` | string | Admin-configured display label |
 | `sortOrder` | integer | Display order (ascending, 0-based) |
-| `config` | object | Type-specific configuration (public-safe projection) |
+| `config` | object | Type-specific configuration (public-safe projection). May include `_layout` (see below). |
 | `block` | object \| null | Block library metadata (added in Slice 3 — see below) |
 
 **`block` field** (added in CMS V2 Slice 3, backwards-compatible):
@@ -993,6 +993,66 @@ Returns the ordered list of enabled homepage sections for the tenant.
 | `block.datadriven` | boolean | `true` if block auto-fetches from a data source; `false` if manually configured |
 
 `block` is `null` for unregistered type keys (safe fallback). Existing consumers that don't use `block` can safely ignore the field.
+
+---
+
+### Flexible Layout System — `config._layout` (added in CMS V2 Flexible Layout slice)
+
+Every section may include a `config._layout` field of type `SectionLayout`. This field is **optional** — sections without it should render with defaults (see `DEFAULT_SECTION_LAYOUT` in the integration contract).
+
+`_layout` drives all cross-cutting layout concerns so the public website never needs block-specific layout logic:
+
+| `_layout` key | Type | Default | Description |
+|---------------|------|---------|-------------|
+| `width` | `"narrow"` \| `"normal"` \| `"wide"` \| `"full"` | `"normal"` | Container max-width |
+| `spacingTop` | `"none"` \| `"sm"` \| `"md"` \| `"lg"` \| `"xl"` | `"md"` | Vertical padding above section |
+| `spacingBottom` | `"none"` \| `"sm"` \| `"md"` \| `"lg"` \| `"xl"` | `"md"` | Vertical padding below section |
+| `paddingX` | `"none"` \| `"sm"` \| `"md"` \| `"lg"` \| `"xl"` | `"md"` | Horizontal padding inside container |
+| `theme` | `"light"` \| `"soft"` \| `"dark"` \| `"club"` | `"light"` | Colour scheme / tenant branding |
+| `hAlign` | `"left"` \| `"center"` \| `"right"` | `"left"` | Horizontal text alignment |
+| `vAlign` | `"top"` \| `"center"` \| `"bottom"` \| `"stretch"` | `"top"` | Vertical column alignment |
+| `columns` | `"single"` \| `"50/50"` \| `"33/66"` \| `"66/33"` \| `"25/75"` \| `"75/25"` | `"50/50"` | Column grid preset |
+| `background` | object | `{ type: "none" }` | Background layer (see below) |
+| `responsive` | object | `{ stackOnMobile: true }` | Responsive stacking rules |
+
+**`background` variants:**
+
+| `background.type` | Additional fields | Description |
+|-------------------|------------------|-------------|
+| `"none"` | — | Transparent / inherits page background |
+| `"solid"` | `color: string` | Flat CSS colour (hex, rgb, etc.) |
+| `"gradient"` | `gradientPreset: string` | One of: `club-warm`, `club-cool`, `dark-slate`, `soft-sand`, `evening-sky` |
+| `"image"` | `mediaAssetId: string`, `overlay: "none" \| "light" \| "dark"` | DAM image — resolve URL via `GET /api/public/[tenant]/website/media/[id]` |
+
+**`responsive` fields:**
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `stackOnMobile` | boolean | `true` | Stack columns vertically on small screens |
+| `reverseStackOnMobile` | boolean | `false` | Reverse column order when stacked |
+| `hideImageOnMobile` | boolean | `false` | Hide media column on mobile |
+| `equalHeights` | boolean | `false` | Force equal-height columns |
+
+**Rendering contract for the public website:**
+
+```typescript
+import type { WebsitePublicSection } from "@/lib/website/integration-contract";
+import { resolveLayout, THEME_TOKENS, SPACING_TOP_MAP, SPACING_BOTTOM_MAP, WIDTH_MAP } from "@/lib/website/integration-contract";
+
+function renderSection(section: WebsitePublicSection) {
+  const layout = resolveLayout(section.config._layout);
+  // layout is now fully populated with defaults for any absent fields.
+  // Use layout.theme, layout.width, layout.spacingTop, layout.background, etc.
+}
+```
+
+**Reference implementation:** `components/website/SectionShell.tsx` in the WebApp repository.
+Copy or adapt it for the public website to apply `_layout` to the outer `<section>` wrapper.
+
+**Backward compatibility (splitContentCards only):**
+Pre-migration `splitContentCards` sections store layout under `config.style` and `config.background`.
+When `config._layout` is absent, fall back to those legacy fields. See `resolveBlockLayout()` in
+`components/website/blocks/SplitContentCardsRenderer.tsx`.
 
 **Privacy invariants**:
 - `tenantId` never exposed
@@ -1285,22 +1345,48 @@ Returns the block-based layout of a published page for a given tenant and slug.
         "type": "hero",
         "label": "Hero-Bereich",
         "sortOrder": 0,
-        "config": { "title": "Willkommen beim FC Allschwil" },
+        "config": {
+          "title": "Willkommen beim FC Allschwil",
+          "_layout": {
+            "width": "full",
+            "spacingTop": "md",
+            "spacingBottom": "md",
+            "theme": "light",
+            "hAlign": "left",
+            "background": { "type": "none" }
+          }
+        },
         "block": { "category": "Header", "datadriven": false }
       },
       {
         "id": "clzzz",
-        "type": "newsTeaser",
-        "label": "Aktuelle News",
+        "type": "splitContentCards",
+        "label": "Über uns — Inhalt",
         "sortOrder": 10,
-        "config": { "itemCount": 3, "heading": "Neuigkeiten" },
-        "block": { "category": "Content", "datadriven": true }
+        "config": {
+          "eyebrow": "Über uns",
+          "headline": "Der FC Allschwil",
+          "cards": [],
+          "layout": "TEXT_LEFT_CARDS_RIGHT",
+          "_layout": {
+            "width": "normal",
+            "spacingTop": "lg",
+            "spacingBottom": "lg",
+            "theme": "soft",
+            "hAlign": "left",
+            "background": { "type": "gradient", "gradientPreset": "soft-sand" },
+            "responsive": { "stackOnMobile": true, "reverseStackOnMobile": false }
+          }
+        },
+        "block": { "category": "Content", "datadriven": false }
       }
     ]
   },
   "meta": { "sectionCount": 2 }
 }
 ```
+
+Section `config._layout` is the Flexible Layout System field. See the [Flexible Layout System](#flexible-layout-system----config_layout-added-in-cms-v2-flexible-layout-slice) section above for the full field reference and rendering contract.
 
 **Error responses:**
 - `404` — unknown tenant

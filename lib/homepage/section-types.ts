@@ -34,6 +34,7 @@
 
 import { BLOCK_REGISTRY } from "@/lib/homepage/block-registry";
 import type { RichTextValue } from "@/lib/cms/rich-text";
+import type { SectionLayout } from "@/lib/cms/layout-types";
 
 // ---------------------------------------------------------------------------
 // Type key enum (DB contract — must match HomepageSection.type values)
@@ -73,6 +74,8 @@ export type HeroSectionConfig = {
   ctaLabel?: string;
   /** CTA button URL (absolute or site-relative). */
   ctaUrl?: string;
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
 };
 
 /** newsTeaser: latest published news articles. */
@@ -81,6 +84,8 @@ export type NewsTeaserSectionConfig = {
   itemCount?: number;
   /** Section heading override. */
   heading?: string;
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
 };
 
 /** eventsTeaser: upcoming events and matches. */
@@ -91,6 +96,8 @@ export type EventsTeaserSectionConfig = {
   surface?: "homepage" | "all";
   /** Section heading override. */
   heading?: string;
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
 };
 
 /** teamsTeaser: grid of active website-visible teams. */
@@ -101,6 +108,8 @@ export type TeamsTeaserSectionConfig = {
   seasonKey?: string;
   /** Section heading override. */
   heading?: string;
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
 };
 
 /**
@@ -112,12 +121,16 @@ export type TeamsTeaserSectionConfig = {
 export type SponsorsTeaserSectionConfig = {
   /** Section heading override. */
   heading?: string;
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
 };
 
 /** weekplanTeaser: current week plan summary. */
 export type WeekplanTeaserSectionConfig = {
   /** Section heading override. */
   heading?: string;
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
 };
 
 /** callToAction: configurable CTA banner. */
@@ -134,13 +147,18 @@ export type CallToActionSectionConfig = {
   secondaryLabel?: string;
   /** Optional secondary button URL. */
   secondaryUrl?: string;
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
 };
 
 /**
  * customContentPlaceholder: reserved for future block-based rich content.
  * Config is intentionally empty in this foundation slice.
  */
-export type CustomContentPlaceholderSectionConfig = Record<string, never>;
+export type CustomContentPlaceholderSectionConfig = {
+  /** Shared layout configuration. See lib/cms/layout-types.ts. */
+  _layout?: SectionLayout;
+};
 
 // ---------------------------------------------------------------------------
 // SplitContentCards config types
@@ -190,6 +208,11 @@ export type SplitContentBackground =
  * splitContentCards: two-column premium content block.
  * Left/right columns hold text (eyebrow + headline + rich text) and stacked
  * text cards respectively. Fully configurable layout, images, and styles.
+ *
+ * Migration note:
+ *   `style` and `background` are legacy fields kept for backward compatibility.
+ *   New config written by the editor uses `_layout` (SectionLayout) instead.
+ *   The renderer falls back to `style`/`background` when `_layout` is absent.
  */
 export type SplitContentCardsSectionConfig = {
   eyebrow?: string;
@@ -199,8 +222,12 @@ export type SplitContentCardsSectionConfig = {
   mediaPlacement?: SplitContentCardsMediaPlacement;
   images?: SplitContentImageRef[];
   cards?: SplitContentCard[];
+  /** @deprecated Use _layout instead. Kept for backward compatibility. */
   style?: SplitContentStyle;
+  /** @deprecated Use _layout.background instead. Kept for backward compatibility. */
   background?: SplitContentBackground;
+  /** Shared layout configuration (replaces style + background). */
+  _layout?: SectionLayout;
 };
 
 /** Union of all known config shapes. */

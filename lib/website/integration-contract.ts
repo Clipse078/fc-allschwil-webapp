@@ -10,6 +10,43 @@
  * Do not duplicate this contract on the website side — import it or copy it verbatim.
  *
  * ─────────────────────────────────────────────────────────────────────────────
+ * FLEXIBLE LAYOUT SYSTEM (CMS V2 → V3)
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Every section returned by the homepage and page-layout endpoints may include
+ * a `config._layout` field of type `SectionLayout`. This field drives:
+ *   - Container width (narrow / normal / wide / full)
+ *   - Vertical spacing (padding top / bottom)
+ *   - Colour scheme / tenant theme (light / soft / dark / club)
+ *   - Horizontal alignment (left / center / right)
+ *   - Column grid (single / 50-50 / 33-66 / 66-33 / 25-75 / 75-25)
+ *   - Background (none / solid colour / gradient / DAM image + overlay)
+ *   - Responsive stacking rules
+ *
+ * The `_layout` field is OPTIONAL — sections without it should render with the
+ * defaults from DEFAULT_SECTION_LAYOUT (see below). This ensures backward
+ * compatibility with pre-migration data.
+ *
+ * RENDERING IMPLEMENTATION
+ *   Reference implementation: `components/website/SectionShell.tsx` in the
+ *   WebApp repository. Copy or adapt this component for the public website.
+ *   It consumes `SectionLayout` and renders the outer <section> wrapper with
+ *   all layout styles applied. Block-specific renderers (e.g.
+ *   `components/website/blocks/SplitContentCardsRenderer.tsx`) use SectionShell
+ *   as their outermost wrapper.
+ *
+ *   `resolveLayout(partial?)` merges a (possibly undefined or partial)
+ *   SectionLayout with DEFAULT_SECTION_LAYOUT and returns a fully-populated
+ *   layout object safe to use in a renderer.
+ *
+ * BACKWARD COMPATIBILITY
+ *   `splitContentCards` sections created before the Flexible Layout System
+ *   store their layout under `config.style` and `config.background` (legacy).
+ *   Both the WebApp renderer and any public website renderer MUST fall back to
+ *   those fields when `config._layout` is absent. See `resolveBlockLayout()`
+ *   in `components/website/blocks/SplitContentCardsRenderer.tsx`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
  * REGISTRATION INTAKE
  * ─────────────────────────────────────────────────────────────────────────────
  *
@@ -363,3 +400,126 @@ export type WebsiteSponsorsData = {
  *   tenant-scoped content. Drafts and scheduled-but-not-yet-due items
  *   are never returned.
  */
+
+// ---------------------------------------------------------------------------
+// Flexible Layout System — SectionLayout types
+// ---------------------------------------------------------------------------
+// Re-exported from lib/cms/layout-types.ts for public-website consumption.
+// Copy these types verbatim into the public website project.
+// ---------------------------------------------------------------------------
+
+export type {
+  SectionLayout,
+  SectionWidth,
+  SectionSpacing,
+  SectionTheme,
+  SectionHAlign,
+  SectionVAlign,
+  SectionColumns,
+  SectionBackground,
+  SectionResponsive,
+  ThemeTokens,
+} from "@/lib/cms/layout-types";
+
+export {
+  DEFAULT_SECTION_LAYOUT,
+  resolveLayout,
+  GRADIENT_PRESETS,
+  THEME_TOKENS,
+  SPACING_TOP_MAP,
+  SPACING_BOTTOM_MAP,
+  WIDTH_MAP,
+} from "@/lib/cms/layout-types";
+
+// ---------------------------------------------------------------------------
+// CMS section shapes — returned by /homepage and /pages/[slug]/layout
+// ---------------------------------------------------------------------------
+
+/**
+ * Public-safe block metadata attached to each section.
+ * Null for unregistered block types.
+ */
+export type WebsitePublicBlockMeta = {
+  /** Block category for rendering decisions. */
+  category:
+    | "Header"
+    | "Content"
+    | "Data-driven"
+    | "Club"
+    | "Sponsors"
+    | "Conversion"
+    | "Utility";
+  /**
+   * Whether this block auto-fetches its own data.
+   * false → uses config values only (hero, callToAction, splitContentCards)
+   * true  → fetches live data (newsTeaser, eventsTeaser, teamsTeaser, …)
+   */
+  datadriven: boolean;
+};
+
+/**
+ * Single CMS section as returned by the public homepage and page-layout APIs.
+ *
+ * The `config` object contains block-specific fields AND may contain a
+ * `_layout` field of type SectionLayout (Flexible Layout System).
+ *
+ * Rendering contract:
+ *   1. Read `config._layout` (may be absent for pre-migration data).
+ *   2. Pass it to `resolveLayout()` to get a fully-populated layout.
+ *   3. Apply the resolved layout to the outer section wrapper.
+ *   4. Render block-specific content inside.
+ *
+ * For the reference implementation, see:
+ *   WebApp: components/website/SectionShell.tsx (outer wrapper)
+ *   WebApp: components/website/blocks/SplitContentCardsRenderer.tsx (block example)
+ */
+export type WebsitePublicSection = {
+  /** Stable section ID (CUID). */
+  id: string;
+  /** Block type key (e.g. "hero", "splitContentCards", "newsTeaser"). */
+  type: string;
+  /** Admin-configured display label. */
+  label: string;
+  /** Display order ascending (0-based). */
+  sortOrder: number;
+  /**
+   * Block-specific config including the optional shared layout field.
+   *
+   * Always check for unknown keys gracefully — new fields may be added.
+   * Known cross-cutting key:
+   *   config._layout  — SectionLayout (Flexible Layout System). Optional;
+   *                     use resolveLayout(config._layout) to get defaults.
+   */
+  config: Record<string, unknown> & { _layout?: import("@/lib/cms/layout-types").SectionLayout };
+  /** Block metadata from the registry. Null for unregistered types. */
+  block: WebsitePublicBlockMeta | null;
+};
+
+/**
+ * Response shape for GET /api/public/[tenant]/website/homepage
+ * Access via: envelope.data.sections
+ */
+export type WebsiteHomepageData = {
+  sections: WebsitePublicSection[];
+};
+
+/**
+ * Page metadata included in the page-layout response.
+ */
+export type WebsitePublicPageMeta = {
+  id: string;
+  slug: string;
+  title: string;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  publishedAt: string | null;
+};
+
+/**
+ * Response shape for GET /api/public/[tenant]/website/pages/[slug]/layout
+ * Access via: envelope.data.page and envelope.data.sections
+ */
+export type WebsitePageLayoutData = {
+  page: WebsitePublicPageMeta;
+  sections: WebsitePublicSection[];
+};

@@ -19,6 +19,7 @@
 
 import { z } from "zod";
 import type { HomepageSectionTypeKey } from "@/lib/homepage/section-types";
+import { sectionLayoutSchema } from "@/lib/cms/layout-schemas";
 
 // ---------------------------------------------------------------------------
 // Per-type config schemas
@@ -30,6 +31,7 @@ export const heroConfigSchema = z
     subtitle: z.string().max(500).optional(),
     ctaLabel: z.string().max(100).optional(),
     ctaUrl: z.string().max(2000).optional(),
+    _layout: sectionLayoutSchema,
   })
   .strict();
 
@@ -37,6 +39,7 @@ export const newsTeaserConfigSchema = z
   .object({
     itemCount: z.number().int().min(1).max(10).optional(),
     heading: z.string().max(200).optional(),
+    _layout: sectionLayoutSchema,
   })
   .strict();
 
@@ -45,6 +48,7 @@ export const eventsTeaserConfigSchema = z
     itemCount: z.number().int().min(1).max(20).optional(),
     surface: z.enum(["homepage", "all"]).optional(),
     heading: z.string().max(200).optional(),
+    _layout: sectionLayoutSchema,
   })
   .strict();
 
@@ -53,18 +57,21 @@ export const teamsTeaserConfigSchema = z
     itemCount: z.number().int().min(1).max(20).optional(),
     seasonKey: z.string().max(100).optional(),
     heading: z.string().max(200).optional(),
+    _layout: sectionLayoutSchema,
   })
   .strict();
 
 export const sponsorsTeaserConfigSchema = z
   .object({
     heading: z.string().max(200).optional(),
+    _layout: sectionLayoutSchema,
   })
   .strict();
 
 export const weekplanTeaserConfigSchema = z
   .object({
     heading: z.string().max(200).optional(),
+    _layout: sectionLayoutSchema,
   })
   .strict();
 
@@ -76,10 +83,15 @@ export const callToActionConfigSchema = z
     primaryUrl: z.string().max(2000).optional(),
     secondaryLabel: z.string().max(100).optional(),
     secondaryUrl: z.string().max(2000).optional(),
+    _layout: sectionLayoutSchema,
   })
   .strict();
 
-export const customContentPlaceholderConfigSchema = z.object({}).strict();
+export const customContentPlaceholderConfigSchema = z
+  .object({
+    _layout: sectionLayoutSchema,
+  })
+  .strict();
 
 // ---------------------------------------------------------------------------
 // splitContentCards schema
@@ -142,8 +154,12 @@ export const splitContentCardsConfigSchema = z.object({
     .optional(),
   images: z.array(splitContentImageRefSchema).max(10).optional(),
   cards: z.array(splitContentCardSchema).max(20).optional(),
+  /** @deprecated Use _layout instead. Kept for backward compatibility. */
   style: splitContentStyleSchema,
+  /** @deprecated Use _layout.background instead. Kept for backward compatibility. */
   background: splitContentBackgroundSchema,
+  /** Shared layout configuration (Flexible Layout System). */
+  _layout: sectionLayoutSchema,
 });
 
 // ---------------------------------------------------------------------------
