@@ -57,6 +57,7 @@ import {
   Save,
   LayoutPanelLeft,
   Layers,
+  LayoutTemplate,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -80,6 +81,12 @@ import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
 const SplitContentCardsConfigForm = dynamic(
   () => import("@/components/admin/page-builder/block-forms/SplitContentCardsConfigForm"),
   { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
+
+// Lazy-load Visual Canvas Panel (CMS V3 inline editing)
+const VisualCanvasPanel = dynamic(
+  () => import("@/components/admin/visual-builder/VisualCanvasPanel"),
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
 );
 
 // Lazy-load the shared block renderer for live preview
@@ -978,6 +985,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [showAdd, setShowAdd] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  // CMS V3: Visual Canvas Mode
+  const [canvasMode, setCanvasMode] = useState(false);
 
   // Autosave state
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -1021,7 +1030,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   useEffect(() => { load(); }, [load]);
 
   // ---------------------------------------------------------------------------
-  // Autosave trigger
+  // Autosave trigger (list mode — driven by ConfigEditor ref)
   // ---------------------------------------------------------------------------
 
   const triggerAutosave = useCallback(() => {
@@ -1036,6 +1045,11 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           .catch(() => setSaveState("error"));
       }
     }, AUTOSAVE_DELAY_MS);
+  }, []);
+
+  // Canvas mode dirty marker — canvas manages its own debounced save
+  const markCanvasDirty = useCallback(() => {
+    setIsDirty(true);
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -1219,6 +1233,18 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             <SaveIndicator state={saveState} lastSaved={lastSaved} />
           </div>
           <div className="flex items-center gap-2">
+            {/* CMS V3: Visual Canvas toggle */}
+            <button
+              type="button"
+              onClick={() => setCanvasMode((v) => !v)}
+              className={`fca-button-secondary px-2.5 ${canvasMode ? "border-blue-400 bg-blue-50 text-blue-700" : ""}`}
+              title={canvasMode ? "Listenansicht" : "Visual Canvas (Direktbearbeitung)"}
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">
+                {canvasMode ? "Liste" : "Canvas"}
+              </span>
+            </button>
             <button
               type="button"
               onClick={() => setShowTemplates(true)}
@@ -1283,8 +1309,21 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           />
         )}
 
-        {/* Section list */}
-        <SectionCard noPadding>
+        {/* CMS V3: Visual Canvas Mode */}
+        {canvasMode && sections.length > 0 && (
+          <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-[var(--surface-2)]" />}>
+            <VisualCanvasPanel
+              sections={sections}
+              onSaveConfig={(id, label, config) =>
+                handleSaveConfig(id, label, config)
+              }
+              onDirty={markCanvasDirty}
+            />
+          </Suspense>
+        )}
+
+        {/* Section list (list mode only) */}
+        {!canvasMode && <SectionCard noPadding>
           {loading && sections.length === 0 ? (
             <div className="space-y-2 p-5">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -1495,21 +1534,23 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               })}
             </div>
           )}
-        </SectionCard>
+        </SectionCard>}
 
         {/* Info footer */}
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 space-y-1">
-          <p className="text-xs text-[var(--muted)]">
-            <strong className="text-[var(--text-2)]">Drag & Drop:</strong>{" "}
-            Sektionen können per Ziehen und Ablegen neu geordnet werden.
-          </p>
-          <p className="text-xs text-[var(--muted)]">
-            <strong className="text-[var(--text-2)]">Publishing:</strong>{" "}
-            Sektionen sind öffentlich sichtbar wenn die übergeordnete Seite{" "}
-            <strong>veröffentlicht</strong> ist, die Sektion{" "}
-            <strong>aktiv</strong> und <strong>veröffentlicht</strong> ist.
-          </p>
-        </div>
+        {!canvasMode && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 space-y-1">
+            <p className="text-xs text-[var(--muted)]">
+              <strong className="text-[var(--text-2)]">Drag & Drop:</strong>{" "}
+              Sektionen können per Ziehen und Ablegen neu geordnet werden.
+            </p>
+            <p className="text-xs text-[var(--muted)]">
+              <strong className="text-[var(--text-2)]">Publishing:</strong>{" "}
+              Sektionen sind öffentlich sichtbar wenn die übergeordnete Seite{" "}
+              <strong>veröffentlicht</strong> ist, die Sektion{" "}
+              <strong>aktiv</strong> und <strong>veröffentlicht</strong> ist.
+            </p>
+          </div>
+        )}
       </div>
     </>
   );
