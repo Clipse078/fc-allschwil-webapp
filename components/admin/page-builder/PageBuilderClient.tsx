@@ -57,6 +57,8 @@ import {
   Save,
   LayoutPanelLeft,
   Layers,
+  LayoutPanelTop,
+  List,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -75,6 +77,7 @@ import {
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
 import type { SectionLayout } from "@/lib/cms/layout-types";
 import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
+import VisualCanvas, { type CanvasSection } from "@/components/admin/visual-builder/VisualCanvas";
 
 // Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
 const SplitContentCardsConfigForm = dynamic(
@@ -978,6 +981,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [showAdd, setShowAdd] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  // CMS V3: Visual canvas mode
+  const [viewMode, setViewMode] = useState<"list" | "canvas">("list");
 
   // Autosave state
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -1127,6 +1132,25 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     setShowAdd(false);
   }
 
+  // CMS V3: Inline canvas text update — patches a config field and autosaves
+  async function handleCanvasInlineUpdate(sectionId: string, patch: Record<string, unknown>) {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const updatedConfig = { ...section.config, ...patch };
+    await handleSaveConfig(sectionId, section.label, updatedConfig);
+  }
+
+  // CMS V3: Open editor for a section from canvas mode
+  function handleCanvasEdit(sectionId: string) {
+    setViewMode("list");
+    setEditingId(sectionId);
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(sectionId);
+      return next;
+    });
+  }
+
   function handleToggleCollapse(id: string) {
     setCollapsedIds((prev) => {
       const next = new Set(prev);
@@ -1219,6 +1243,36 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             <SaveIndicator state={saveState} lastSaved={lastSaved} />
           </div>
           <div className="flex items-center gap-2">
+            {/* CMS V3: View mode toggle */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                title="Listenansicht"
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition-all ${
+                  viewMode === "list"
+                    ? "bg-[var(--surface)] font-medium text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Listenansicht</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("canvas")}
+                title="Visueller Editor"
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition-all ${
+                  viewMode === "canvas"
+                    ? "bg-[var(--surface)] font-medium text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                <LayoutPanelTop className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Visueller Editor</span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => setShowTemplates(true)}
@@ -1246,7 +1300,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
-            {!showAdd && (
+            {!showAdd && viewMode === "list" && (
               <button
                 type="button"
                 onClick={() => { setShowAdd(true); setEditingId(null); }}
@@ -1283,8 +1337,47 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           />
         )}
 
-        {/* Section list */}
-        <SectionCard noPadding>
+        {/* CMS V3: Visual canvas mode */}
+        {viewMode === "canvas" && !loading && (
+          <div className="space-y-3">
+            <VisualCanvas
+              sections={sections.map(
+                (s): CanvasSection => ({
+                  id: s.id,
+                  type: s.type,
+                  label: s.label,
+                  sortOrder: s.sortOrder,
+                  isEnabled: s.isEnabled,
+                  publishStatus: s.publishStatus,
+                  approvalStatus: s.approvalStatus,
+                  config: s.config,
+                }),
+              )}
+              actionPending={actionPending}
+              canvasActions={{
+                onEdit: handleCanvasEdit,
+                onMoveUp: (id) => handleMove(id, "up"),
+                onMoveDown: (id) => handleMove(id, "down"),
+                onDuplicate: handleDuplicate,
+                onDelete: handleDelete,
+                onInsertAt: () => {
+                  setViewMode("list");
+                  setShowAdd(true);
+                  setEditingId(null);
+                },
+                onInlineUpdate: handleCanvasInlineUpdate,
+              }}
+            />
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2.5 text-xs text-[var(--muted)]">
+              <strong className="text-[var(--text-2)]">Tipp:</strong>{" "}
+              Klicke einen Abschnitt an, um ihn auszuwählen. Mit dem Toolbar kannst du ihn bearbeiten, duplizieren, verschieben oder löschen.
+              Klicke <em>Block hinzufügen</em> zwischen zwei Abschnitten, um einen neuen Block einzufügen.
+            </div>
+          </div>
+        )}
+
+        {/* Section list (list mode) */}
+        {viewMode === "list" && <SectionCard noPadding>
           {loading && sections.length === 0 ? (
             <div className="space-y-2 p-5">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -1495,7 +1588,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               })}
             </div>
           )}
-        </SectionCard>
+        </SectionCard>}
 
         {/* Info footer */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 space-y-1">

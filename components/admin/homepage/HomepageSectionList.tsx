@@ -23,6 +23,8 @@ import {
   FileEdit,
   UserCheck,
   ClipboardCheck,
+  List,
+  LayoutPanelTop,
 } from "lucide-react";
 import Link from "next/link";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -36,6 +38,7 @@ import {
 import { getHomepageSectionType } from "@/lib/homepage/section-types";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
 import { CMS_ROUTES } from "@/lib/cms/routes";
+import VisualCanvas, { type CanvasSection } from "@/components/admin/visual-builder/VisualCanvas";
 
 const SplitContentCardsConfigForm = dynamic(
   () => import("@/components/admin/page-builder/block-forms/SplitContentCardsConfigForm"),
@@ -620,6 +623,9 @@ export default function HomepageSectionList() {
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [bootstrapping, setBootstrapping] = useState(false);
 
+  // CMS V3: Visual canvas mode
+  const [viewMode, setViewMode] = useState<"list" | "canvas">("list");
+
   // ── Inline edit state ───────────────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -862,6 +868,38 @@ export default function HomepageSectionList() {
     }
   }
 
+  // CMS V3: Canvas inline update — patches config and saves via homepage API
+  async function handleCanvasInlineUpdate(sectionId: string, patch: Record<string, unknown>) {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const updatedConfig = { ...section.config, ...patch };
+    setActionPending(sectionId);
+    try {
+      const res = await fetch(`/api/homepage-sections/${sectionId}/config`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: section.label, config: updatedConfig }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Speichern fehlgeschlagen");
+        return;
+      }
+      setSections((prev) => prev.map((s) => (s.id === sectionId ? data.section : s)));
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  // CMS V3: Open editor from canvas — switch to list mode and expand that row
+  function handleCanvasEdit(sectionId: string) {
+    setViewMode("list");
+    const section = sections.find((s) => s.id === sectionId);
+    if (section) {
+      handleStartEdit(section);
+    }
+  }
+
   // ── Approval handlers (CMS V2 Slice 6) ──────────────────────────────────
 
   async function handleRequestReview(id: string) {
@@ -1072,16 +1110,88 @@ export default function HomepageSectionList() {
                 : `${sections.length} Sektion${sections.length !== 1 ? "en" : ""} konfiguriert`}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading || isAnyActionPending}
-            className="fca-button-secondary px-2.5"
-            title="Aktualisieren"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* CMS V3: View mode toggle */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                title="Listenansicht"
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition-all ${
+                  viewMode === "list"
+                    ? "bg-[var(--surface)] font-medium text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Listenansicht</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("canvas")}
+                title="Visueller Editor"
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition-all ${
+                  viewMode === "canvas"
+                    ? "bg-[var(--surface)] font-medium text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                <LayoutPanelTop className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Visueller Editor</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading || isAnyActionPending}
+              className="fca-button-secondary px-2.5"
+              title="Aktualisieren"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
+
+        {/* CMS V3: Visual canvas */}
+        {viewMode === "canvas" && !loading && (
+          <div className="p-4 space-y-3">
+            <VisualCanvas
+              sections={sections.map(
+                (s): CanvasSection => ({
+                  id: s.id,
+                  type: s.type,
+                  label: s.label,
+                  sortOrder: s.sortOrder,
+                  isEnabled: s.isEnabled,
+                  publishStatus: s.publishStatus,
+                  approvalStatus: s.approvalStatus,
+                  config: s.config as Record<string, unknown>,
+                }),
+              )}
+              actionPending={actionPending}
+              canvasActions={{
+                onEdit: handleCanvasEdit,
+                onMoveUp: (id) => handleMove(id, "up"),
+                onMoveDown: (id) => handleMove(id, "down"),
+                onDelete: () => {
+                  alert("Homepage-Sektionen können nicht gelöscht werden. Deaktiviere die Sektion stattdessen.");
+                },
+                onInsertAt: () => {
+                  setViewMode("list");
+                },
+                onInlineUpdate: handleCanvasInlineUpdate,
+              }}
+            />
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2.5 text-xs text-[var(--muted)]">
+              <strong className="text-[var(--text-2)]">Tipp:</strong>{" "}
+              Klicke einen Abschnitt an, um ihn auszuwählen. Homepage-Sektionen können nicht gelöscht werden — deaktiviere sie stattdessen über die Listenansicht.
+            </div>
+          </div>
+        )}
+
+        {/* List mode content */}
+        {viewMode === "list" && <>
 
         {/* Governance info banner */}
         <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-3 text-xs text-[var(--text-2)]">
@@ -1507,6 +1617,8 @@ export default function HomepageSectionList() {
             </Link>
           </div>
         )}
+
+        </>}
       </SectionCard>
     </>
   );
