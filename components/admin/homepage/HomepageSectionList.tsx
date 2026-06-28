@@ -23,6 +23,7 @@ import {
   FileEdit,
   UserCheck,
   ClipboardCheck,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -36,10 +37,16 @@ import {
 import { getHomepageSectionType } from "@/lib/homepage/section-types";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
 import { CMS_ROUTES } from "@/lib/cms/routes";
+import type { BlockTemplate } from "@/lib/cms/block-template-registry";
 
 const SplitContentCardsConfigForm = dynamic(
   () => import("@/components/admin/page-builder/block-forms/SplitContentCardsConfigForm"),
   { ssr: false, loading: () => <div className="h-20 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
+
+const BlockGalleryModal = dynamic(
+  () => import("@/components/admin/cms/BlockGalleryModal"),
+  { ssr: false },
 );
 
 // ---------------------------------------------------------------------------
@@ -643,6 +650,11 @@ export default function HomepageSectionList() {
   const [reviewPending, setReviewPending] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
+  // ── Block Gallery state ──────────────────────────────────────────────────
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryInserting, setGalleryInserting] = useState(false);
+  const [galleryInsertError, setGalleryInsertError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -808,6 +820,39 @@ export default function HomepageSectionList() {
     }
   }
 
+  // ── Block Gallery insert ──────────────────────────────────────────────────
+
+  async function handleInsertFromGallery(template: BlockTemplate) {
+    setGalleryInserting(true);
+    setGalleryInsertError(null);
+    try {
+      const res = await fetch("/api/homepage-sections/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: template.blockType,
+          label: template.label,
+          config: template.defaultConfig,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Fehler beim Einfügen");
+      const newSection = data.section as HomepageSectionAdminItem;
+      setSections((prev) => [...prev, newSection]);
+      setShowGallery(false);
+      setGalleryInsertError(null);
+      // Auto-open editing panel for the newly inserted section
+      setEditingId(newSection.id);
+      setEditLabel(newSection.label);
+      setEditConfig(initConfigDraft(newSection.config));
+      setEditError(null);
+    } catch (err) {
+      setGalleryInsertError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setGalleryInserting(false);
+    }
+  }
+
   // ── Edit handlers ─────────────────────────────────────────────────────────
 
   function handleStartEdit(section: HomepageSectionAdminItem) {
@@ -930,6 +975,19 @@ export default function HomepageSectionList() {
 
   return (
     <>
+      {/* Block Gallery modal */}
+      <BlockGalleryModal
+        open={showGallery}
+        target="homepage"
+        onClose={() => {
+          setShowGallery(false);
+          setGalleryInsertError(null);
+        }}
+        onInsert={handleInsertFromGallery}
+        inserting={galleryInserting}
+        insertError={galleryInsertError}
+      />
+
       {/* Approval review modal (CMS V2 Slice 6) */}
       {reviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -1081,6 +1139,15 @@ export default function HomepageSectionList() {
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
+          <button
+            type="button"
+            onClick={() => setShowGallery(true)}
+            disabled={loading || isAnyActionPending}
+            className="fca-button-primary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Block hinzufügen
+          </button>
         </div>
 
         {/* Governance info banner */}
@@ -1127,17 +1194,27 @@ export default function HomepageSectionList() {
           <EmptyState
             icon={<LayoutTemplate className="h-10 w-10" />}
             heading="Keine Sektionen konfiguriert"
-            description="Erstelle die Standard-Sektionen, um mit dem Homepage Builder zu starten."
+            description="Erstelle die Standard-Sektionen oder füge deinen ersten Block aus der Galerie hinzu."
             action={
-              <button
-                type="button"
-                onClick={handleBootstrap}
-                disabled={bootstrapping}
-                className="fca-button-primary"
-              >
-                <Sparkles className="h-4 w-4" />
-                {bootstrapping ? "Wird erstellt…" : "Standard-Sektionen erstellen"}
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGallery(true)}
+                  className="fca-button-primary"
+                >
+                  <Plus className="h-4 w-4" />
+                  Block hinzufügen
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBootstrap}
+                  disabled={bootstrapping}
+                  className="fca-button-secondary"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {bootstrapping ? "Wird erstellt…" : "Standard-Sektionen erstellen"}
+                </button>
+              </div>
             }
           />
         ) : (
@@ -1498,13 +1575,23 @@ export default function HomepageSectionList() {
               {publishedCount} von {sections.length} Sektionen aktiv &amp; veröffentlicht
               · sichtbar in der öffentlichen Homepage-API
             </p>
-            <Link
-              href={CMS_ROUTES.review}
-              className="fca-button-secondary px-2 py-1 text-[10px]"
-            >
-              <ClipboardCheck className="h-3 w-3" />
-              Review-Queue
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowGallery(true)}
+                className="fca-button-primary px-2 py-1 text-[10px]"
+              >
+                <Plus className="h-3 w-3" />
+                Block hinzufügen
+              </button>
+              <Link
+                href={CMS_ROUTES.review}
+                className="fca-button-secondary px-2 py-1 text-[10px]"
+              >
+                <ClipboardCheck className="h-3 w-3" />
+                Review-Queue
+              </Link>
+            </div>
           </div>
         )}
       </SectionCard>

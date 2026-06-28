@@ -73,6 +73,7 @@ import {
   SECTION_APPROVAL_STATUS,
 } from "@/lib/cms/section-publishing";
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
+import type { BlockTemplate } from "@/lib/cms/block-template-registry";
 
 // Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
 const SplitContentCardsConfigForm = dynamic(
@@ -84,6 +85,12 @@ const SplitContentCardsConfigForm = dynamic(
 const SplitContentCardsRenderer = dynamic(
   () => import("@/components/website/blocks/SplitContentCardsRenderer"),
   { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
+
+// Lazy-load the shared Block Gallery modal
+const BlockGalleryModal = dynamic(
+  () => import("@/components/admin/cms/BlockGalleryModal"),
+  { ssr: false },
 );
 
 // Registry of block types that have a premium property panel
@@ -930,6 +937,11 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // Block Gallery state
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryInserting, setGalleryInserting] = useState(false);
+  const [galleryInsertError, setGalleryInsertError] = useState<string | null>(null);
+
   // Autosave state
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -1078,6 +1090,36 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     setShowAdd(false);
   }
 
+  async function handleInsertFromGallery(template: BlockTemplate) {
+    setGalleryInserting(true);
+    setGalleryInsertError(null);
+    try {
+      const res = await fetch(`/api/website-pages/${pageId}/sections`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: template.blockType,
+          label: template.label,
+          config: template.defaultConfig,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Fehler beim Einfügen");
+      const newSection = data.section as PageSectionAdminItem;
+      setSections((prev) => [...prev, newSection]);
+      setShowGallery(false);
+      setGalleryInsertError(null);
+      // Auto-open the editing panel for the newly inserted section
+      setEditingId(newSection.id);
+      setWorkflowId(null);
+      setHistoryId(null);
+    } catch (err) {
+      setGalleryInsertError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setGalleryInserting(false);
+    }
+  }
+
   function handleToggleCollapse(id: string) {
     setCollapsedIds((prev) => {
       const next = new Set(prev);
@@ -1160,6 +1202,18 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
         />
       )}
 
+      <BlockGalleryModal
+        open={showGallery}
+        target="page"
+        onClose={() => {
+          setShowGallery(false);
+          setGalleryInsertError(null);
+        }}
+        onInsert={handleInsertFromGallery}
+        inserting={galleryInserting}
+        insertError={galleryInsertError}
+      />
+
       <div className="space-y-4">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1197,16 +1251,14 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
-            {!showAdd && (
-              <button
-                type="button"
-                onClick={() => { setShowAdd(true); setEditingId(null); }}
-                className="fca-button-primary"
-              >
-                <Plus className="h-4 w-4" />
-                Sektion hinzufügen
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => { setShowGallery(true); setShowAdd(false); }}
+              className="fca-button-primary"
+            >
+              <Plus className="h-4 w-4" />
+              Block hinzufügen
+            </button>
           </div>
         </div>
 
@@ -1248,12 +1300,10 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               heading="Keine Sektionen vorhanden"
               description="Füge die erste Sektion hinzu, um diese Seite mit Blöcken zu befüllen."
               action={
-                !showAdd ? (
-                  <button type="button" onClick={() => setShowAdd(true)} className="fca-button-primary">
-                    <Plus className="h-4 w-4" />
-                    Erste Sektion hinzufügen
-                  </button>
-                ) : undefined
+                <button type="button" onClick={() => setShowGallery(true)} className="fca-button-primary">
+                  <Plus className="h-4 w-4" />
+                  Ersten Block hinzufügen
+                </button>
               }
             />
           ) : (

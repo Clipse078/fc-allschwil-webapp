@@ -170,6 +170,52 @@ export async function bootstrapDefaultSections(
 }
 
 // ---------------------------------------------------------------------------
+// Create single section
+// ---------------------------------------------------------------------------
+
+export type HomepageSectionCreateInput = {
+  type: string;
+  label: string;
+  config: Record<string, unknown>;
+  actorUserId?: string | null;
+};
+
+/**
+ * Creates a single homepage section for a tenant.
+ * Appends at the end (max(sortOrder) + 10).
+ * Starts disabled, DRAFT publish status, DRAFT approval status.
+ */
+export async function createHomepageSection(
+  tenantId: string,
+  input: HomepageSectionCreateInput,
+): Promise<HomepageSectionAdminItem> {
+  const existing = await prisma.homepageSection.findMany({
+    where: { tenantId },
+    select: { sortOrder: true },
+    orderBy: { sortOrder: "desc" },
+    take: 1,
+  });
+  const maxSort = existing.length > 0 ? existing[0].sortOrder : -10;
+  const sortOrder = maxSort + 10;
+
+  const created = await prisma.homepageSection.create({
+    data: {
+      tenantId,
+      type: input.type,
+      label: input.label,
+      sortOrder,
+      isEnabled: false,
+      config: input.config as Prisma.InputJsonValue,
+      publishStatus: PUBLISH_STATUS.DRAFT,
+      approvalStatus: APPROVAL_STATUS.DRAFT,
+    },
+    select: adminSelect,
+  });
+
+  return created as HomepageSectionAdminItem;
+}
+
+// ---------------------------------------------------------------------------
 // Toggle enabled/disabled
 // ---------------------------------------------------------------------------
 
