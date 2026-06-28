@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
   LayoutTemplate,
   Eye,
@@ -35,6 +36,11 @@ import {
 import { getHomepageSectionType } from "@/lib/homepage/section-types";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
 import { CMS_ROUTES } from "@/lib/cms/routes";
+
+const SplitContentCardsConfigForm = dynamic(
+  () => import("@/components/admin/page-builder/block-forms/SplitContentCardsConfigForm"),
+  { ssr: false, loading: () => <div className="h-20 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -319,10 +325,11 @@ type ConfigFieldsProps = {
   type: string;
   config: ConfigDraft;
   onChange: (key: string, value: string) => void;
+  onChangeFull?: (config: Record<string, unknown>) => void;
   disabled?: boolean;
 };
 
-function ConfigFields({ type, config, onChange, disabled }: ConfigFieldsProps) {
+function ConfigFields({ type, config, onChange, onChangeFull, disabled }: ConfigFieldsProps) {
   const str = (key: string) => (typeof config[key] === "string" ? (config[key] as string) : "");
   const num = (key: string) =>
     config[key] !== undefined && config[key] !== "" ? String(config[key]) : "";
@@ -529,6 +536,15 @@ function ConfigFields({ type, config, onChange, disabled }: ConfigFieldsProps) {
     );
   }
 
+  if (type === "splitContentCards") {
+    return (
+      <SplitContentCardsConfigForm
+        config={config as Record<string, unknown>}
+        onChange={(updated) => onChangeFull?.(updated)}
+      />
+    );
+  }
+
   // customContentPlaceholder or unknown type — no config fields
   return (
     <p className="text-xs text-[var(--muted)]">
@@ -565,6 +581,11 @@ function serialiseConfigDraft(
   type: string,
   draft: ConfigDraft,
 ): Record<string, unknown> {
+  // Premium blocks store full structured config — return as-is
+  if (type === "splitContentCards") {
+    return draft as Record<string, unknown>;
+  }
+
   const numberFields: Record<string, true> = {};
   if (
     type === "newsTeaser" ||
@@ -1424,6 +1445,7 @@ export default function HomepageSectionList() {
                                     type={section.type}
                                     config={editConfig}
                                     onChange={handleConfigFieldChange}
+                                    onChangeFull={(fullConfig) => setEditConfig(fullConfig)}
                                     disabled={editPending}
                                   />
                                 </div>
