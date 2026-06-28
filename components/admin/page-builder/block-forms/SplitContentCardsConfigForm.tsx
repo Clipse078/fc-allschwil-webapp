@@ -6,19 +6,23 @@
  * Premium property panel for the splitContentCards block.
  *
  * Tabs:
- *   Content  — eyebrow, headline, rich text, cards CRUD, images (DAM)
- *   Layout   — column layout, image placement, alignment, width
- *   Style    — theme, spacing, card variants
- *   Background — solid / gradient / image-with-overlay
+ *   Content  — eyebrow, headline, rich text, cards CRUD + DnD, images (DAM)
+ *   Kolumnen — column arrangement (TEXT_LEFT_CARDS_RIGHT / CARDS_LEFT_TEXT_RIGHT),
+ *              image placement, responsive column behaviour
+ *   Layout   — shared LayoutConfigPanel (width, spacing, theme, alignment,
+ *              background) — same UI as every other block type
  *
  * Rules:
  *   - Images are always stored as mediaAssetId (DAM reference), never raw URL.
  *   - Rich text stored as TipTap JSON (RichTextValue).
  *   - Cards are reordered via drag-and-drop using native HTML5 DnD.
  *   - No publishing logic here — handled by PageBuilderClient WorkflowPanel.
+ *   - Layout (spacing, theme, background) is now stored in `_layout` via the
+ *     shared LayoutConfigPanel. Legacy `style` and `background` keys are
+ *     migrated on first render for backward compatibility.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Trash2,
@@ -28,10 +32,9 @@ import {
   Image as ImageIcon,
   X,
   MoveHorizontal,
-  Palette,
   AlignLeft,
   LayoutPanelLeft,
-  Layers,
+  Layout,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import SharedMediaPicker from "@/components/admin/media/SharedMediaPicker";
@@ -41,12 +44,12 @@ import type {
   SplitContentCard,
   SplitContentImageRef,
   SplitContentCardVariant,
-  SplitContentStyle,
-  SplitContentBackground,
   SplitContentCardsLayout,
   SplitContentCardsMediaPlacement,
 } from "@/lib/homepage/section-types";
 import type { RichTextValue } from "@/lib/cms/rich-text";
+import type { SectionLayout } from "@/lib/cms/layout-types";
+import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
 
 // Lazy-load rich text editor to avoid SSR hydration issues
 const RichTextEditor = dynamic(() => import("@/components/admin/cms/RichTextEditor"), {
@@ -66,6 +69,33 @@ type Props = {
 };
 
 // ---------------------------------------------------------------------------
+// Legacy migration: convert old style + background → _layout
+// ---------------------------------------------------------------------------
+
+function migrateToLayout(raw: Record<string, unknown>): SectionLayout {
+  if (raw._layout) return raw._layout as SectionLayout;
+
+  const style = raw.style as {
+    theme?: string;
+    spacingTop?: string;
+    spacingBottom?: string;
+    width?: string;
+    alignment?: string;
+  } | undefined;
+
+  const bg = raw.background as { type?: string } | undefined;
+
+  return {
+    width: (style?.width as SectionLayout["width"]) ?? "normal",
+    spacingTop: (style?.spacingTop as SectionLayout["spacingTop"]) ?? "md",
+    spacingBottom: (style?.spacingBottom as SectionLayout["spacingBottom"]) ?? "md",
+    theme: (style?.theme as SectionLayout["theme"]) ?? "light",
+    hAlign: style?.alignment === "center" ? "center" : "left",
+    background: (bg ?? { type: "none" }) as SectionLayout["background"],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -82,14 +112,6 @@ const CARD_VARIANTS: { value: SplitContentCardVariant; label: string; color: str
   { value: "blue", label: "Blau", color: "bg-blue-600" },
   { value: "red", label: "Rot", color: "bg-red-600" },
   { value: "neutral", label: "Neutral", color: "bg-gray-500" },
-];
-
-const GRADIENT_PRESETS = [
-  { value: "club-warm", label: "Club Warm (Orange → Rot)" },
-  { value: "club-cool", label: "Club Cool (Blau → Violett)" },
-  { value: "dark-slate", label: "Dark Slate (Dunkel)" },
-  { value: "soft-sand", label: "Soft Sand (Hell)" },
-  { value: "evening-sky", label: "Evening Sky (Blau → Dunkel)" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -135,13 +157,12 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 // Tab bar
 // ---------------------------------------------------------------------------
 
-type Tab = "content" | "layout" | "style" | "background";
+type Tab = "content" | "columns" | "layout";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "content", label: "Inhalt", icon: <AlignLeft className="h-3.5 w-3.5" /> },
-  { id: "layout", label: "Layout", icon: <LayoutPanelLeft className="h-3.5 w-3.5" /> },
-  { id: "style", label: "Stil", icon: <Palette className="h-3.5 w-3.5" /> },
-  { id: "background", label: "Hintergrund", icon: <Layers className="h-3.5 w-3.5" /> },
+  { id: "columns", label: "Kolumnen", icon: <LayoutPanelLeft className="h-3.5 w-3.5" /> },
+  { id: "layout", label: "Layout", icon: <Layout className="h-3.5 w-3.5" /> },
 ];
 
 // ---------------------------------------------------------------------------
@@ -329,7 +350,6 @@ function ContentTab({
   update: (patch: Partial<SplitContentCardsSectionConfig>) => void;
 }) {
   const [mediaPicker, setMediaPicker] = useState(false);
-  const [bgMediaPicker, setBgMediaPicker] = useState(false);
   const [cardDragSrc, setCardDragSrc] = useState<number | null>(null);
   const [cardDragOver, setCardDragOver] = useState<number | null>(null);
 
@@ -480,7 +500,7 @@ function ContentTab({
         </div>
 
         <p className="mb-2 text-[11px] text-[var(--muted)]">
-          Bilder werden als DAM-Referenz gespeichert. Platzierung im Layout-Tab konfigurierbar.
+          Bilder werden als DAM-Referenz gespeichert. Platzierung im Kolumnen-Tab konfigurierbar.
         </p>
 
         {images.length === 0 && (
@@ -510,28 +530,15 @@ function ContentTab({
         filterType="IMAGE"
         title="Bild aus Mediathek auswählen"
       />
-      <SharedMediaPicker
-        open={bgMediaPicker}
-        onClose={() => setBgMediaPicker(false)}
-        onSelect={(asset) => {
-          const bg = cfg.background ?? { type: "none" };
-          if (bg.type === "image") {
-            update({ background: { ...bg, mediaAssetId: asset.id } });
-          }
-          setBgMediaPicker(false);
-        }}
-        filterType="IMAGE"
-        title="Hintergrundbild auswählen"
-      />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Layout tab
+// Columns tab (block-specific layout — column arrangement and image placement)
 // ---------------------------------------------------------------------------
 
-function LayoutTab({
+function ColumnsTab({
   cfg,
   update,
 }: {
@@ -540,13 +547,6 @@ function LayoutTab({
 }) {
   const layout = cfg.layout ?? "TEXT_LEFT_CARDS_RIGHT";
   const mediaPlacement = cfg.mediaPlacement ?? "NONE";
-  const style = cfg.style ?? ({} as SplitContentStyle);
-  const alignment = style.alignment ?? "left";
-  const width = style.width ?? "normal";
-
-  function updateStyle(patch: Partial<SplitContentStyle>) {
-    update({ style: { ...style, ...patch } });
-  }
 
   const LAYOUT_OPTIONS: { value: SplitContentCardsLayout; label: string; desc: string }[] = [
     {
@@ -572,17 +572,12 @@ function LayoutTab({
     },
   ];
 
-  const WIDTH_OPTIONS: { value: SplitContentStyle["width"]; label: string }[] = [
-    { value: "narrow", label: "Schmal" },
-    { value: "normal", label: "Normal" },
-    { value: "wide", label: "Breit" },
-    { value: "full", label: "Vollbreite" },
-  ];
-
   return (
     <div className="space-y-5">
       <div>
-        <SectionHeading>Spaltenanordnung</SectionHeading>
+        <p className="pt-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          Spaltenanordnung
+        </p>
         <div className="mt-2 space-y-2">
           {LAYOUT_OPTIONS.map((opt) => (
             <button
@@ -606,7 +601,9 @@ function LayoutTab({
       </div>
 
       <div>
-        <SectionHeading>Bildplatzierung</SectionHeading>
+        <p className="pt-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          Bildplatzierung
+        </p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {PLACEMENT_OPTIONS.map((opt) => (
             <button
@@ -619,161 +616,18 @@ function LayoutTab({
                   : "border-[var(--border)] hover:border-[var(--brand-primary,#f97316)]"
               }`}
             >
-              <p className="font-medium">{opt.label}</p>
+              <p className="font-medium text-[var(--foreground)]">{opt.label}</p>
               <p className="mt-0.5 text-[11px] text-[var(--muted)]">{opt.desc}</p>
             </button>
           ))}
         </div>
       </div>
 
+      {/* Card colour reference */}
       <div>
-        <SectionHeading>Inhaltsbreite</SectionHeading>
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {WIDTH_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => updateStyle({ width: opt.value })}
-              className={`rounded-md border px-2 py-1.5 text-center text-xs transition ${
-                width === opt.value
-                  ? "border-[var(--brand-primary,#f97316)] bg-orange-50 font-medium text-orange-700"
-                  : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--brand-primary,#f97316)]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionHeading>Textausrichtung</SectionHeading>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {(["left", "center"] as const).map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => updateStyle({ alignment: a })}
-              className={`rounded-md border py-1.5 text-xs transition ${
-                alignment === a
-                  ? "border-[var(--brand-primary,#f97316)] bg-orange-50 font-medium text-orange-700"
-                  : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--brand-primary,#f97316)]"
-              }`}
-            >
-              {a === "left" ? "Links" : "Zentriert"}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Style tab
-// ---------------------------------------------------------------------------
-
-function StyleTab({
-  cfg,
-  update,
-}: {
-  cfg: SplitContentCardsSectionConfig;
-  update: (patch: Partial<SplitContentCardsSectionConfig>) => void;
-}) {
-  const style = cfg.style ?? ({} as SplitContentStyle);
-
-  function updateStyle(patch: Partial<SplitContentStyle>) {
-    update({ style: { ...style, ...patch } });
-  }
-
-  const theme = style.theme ?? "light";
-  const spacingTop = style.spacingTop ?? "md";
-  const spacingBottom = style.spacingBottom ?? "md";
-
-  const THEMES: { value: SplitContentStyle["theme"]; label: string; desc: string; preview: string }[] = [
-    { value: "light", label: "Hell", desc: "Weißer Hintergrund, dunkler Text.", preview: "bg-white border" },
-    { value: "soft", label: "Soft", desc: "Helles Grau, weiche Optik.", preview: "bg-gray-50 border" },
-    { value: "dark", label: "Dunkel", desc: "Dunkler Hintergrund, heller Text.", preview: "bg-gray-900" },
-    { value: "club", label: "Vereinsfarbe", desc: "Primärfarbe des Vereins.", preview: "bg-orange-500" },
-  ];
-
-  const SPACING_OPTIONS: { value: SplitContentStyle["spacingTop"]; label: string }[] = [
-    { value: "none", label: "Kein" },
-    { value: "sm", label: "Klein" },
-    { value: "md", label: "Mittel" },
-    { value: "lg", label: "Groß" },
-    { value: "xl", label: "Sehr groß" },
-  ];
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <SectionHeading>Farbschema</SectionHeading>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {THEMES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => updateStyle({ theme: t.value })}
-              className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition ${
-                theme === t.value
-                  ? "border-[var(--brand-primary,#f97316)] ring-1 ring-[var(--brand-primary,#f97316)]"
-                  : "border-[var(--border)] hover:border-[var(--brand-primary,#f97316)]"
-              }`}
-            >
-              <div className={`h-8 w-8 flex-shrink-0 rounded ${t.preview}`} />
-              <div>
-                <p className="text-xs font-medium">{t.label}</p>
-                <p className="text-[10px] text-[var(--muted)]">{t.desc}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionHeading>Abstand oben</SectionHeading>
-        <div className="mt-2 grid grid-cols-5 gap-1.5">
-          {SPACING_OPTIONS.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              onClick={() => updateStyle({ spacingTop: s.value })}
-              className={`rounded-md border py-1.5 text-center text-xs transition ${
-                spacingTop === s.value
-                  ? "border-[var(--brand-primary,#f97316)] bg-orange-50 font-medium text-orange-700"
-                  : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--brand-primary,#f97316)]"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionHeading>Abstand unten</SectionHeading>
-        <div className="mt-2 grid grid-cols-5 gap-1.5">
-          {SPACING_OPTIONS.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              onClick={() => updateStyle({ spacingBottom: s.value })}
-              className={`rounded-md border py-1.5 text-center text-xs transition ${
-                spacingBottom === s.value
-                  ? "border-[var(--brand-primary,#f97316)] bg-orange-50 font-medium text-orange-700"
-                  : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--brand-primary,#f97316)]"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Card variants overview */}
-      <div>
-        <SectionHeading>Kartenfarben-Referenz</SectionHeading>
+        <p className="pt-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          Kartenfarben-Referenz
+        </p>
         <p className="mt-1.5 text-[11px] text-[var(--muted)]">
           Kartenvarianten werden pro Karte im Inhalt-Tab gesetzt.
         </p>
@@ -791,200 +645,6 @@ function StyleTab({
 }
 
 // ---------------------------------------------------------------------------
-// Background tab
-// ---------------------------------------------------------------------------
-
-function BackgroundTab({
-  cfg,
-  update,
-}: {
-  cfg: SplitContentCardsSectionConfig;
-  update: (patch: Partial<SplitContentCardsSectionConfig>) => void;
-}) {
-  const [bgMediaPicker, setBgMediaPicker] = useState(false);
-  const bg = (cfg.background ?? { type: "none" }) as SplitContentBackground;
-
-  function setBgType(type: SplitContentBackground["type"]) {
-    switch (type) {
-      case "none":
-        update({ background: { type: "none" } });
-        break;
-      case "solid":
-        update({ background: { type: "solid", color: "#f3f4f6" } });
-        break;
-      case "gradient":
-        update({ background: { type: "gradient", gradientPreset: "club-warm" } });
-        break;
-      case "image":
-        update({ background: { type: "image", mediaAssetId: "", overlay: "dark" } });
-        break;
-    }
-  }
-
-  const BG_TYPES: { value: SplitContentBackground["type"]; label: string; desc: string }[] = [
-    { value: "none", label: "Kein Hintergrund", desc: "Standard-Seitenhintergrund." },
-    { value: "solid", label: "Vollton", desc: "Einfarbige Hintergrundfläche." },
-    { value: "gradient", label: "Verlauf", desc: "Vordefinierter Farbverlauf." },
-    { value: "image", label: "Hintergrundbild", desc: "DAM-Bild mit optionalem Overlay." },
-  ];
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <SectionHeading>Hintergrundtyp</SectionHeading>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {BG_TYPES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setBgType(t.value)}
-              className={`rounded-lg border p-2.5 text-left transition ${
-                bg.type === t.value
-                  ? "border-[var(--brand-primary,#f97316)] bg-orange-50"
-                  : "border-[var(--border)] hover:border-[var(--brand-primary,#f97316)]"
-              }`}
-            >
-              <p className="text-xs font-semibold text-[var(--foreground)]">{t.label}</p>
-              <p className="mt-0.5 text-[11px] text-[var(--muted)]">{t.desc}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Solid color picker */}
-      {bg.type === "solid" && (
-        <div>
-          <SectionHeading>Hintergrundfarbe</SectionHeading>
-          <div className="mt-2 flex items-center gap-3">
-            <input
-              type="color"
-              value={bg.color ?? "#f3f4f6"}
-              onChange={(e) =>
-                update({ background: { ...bg, type: "solid", color: e.target.value } })
-              }
-              className="h-9 w-12 cursor-pointer rounded border border-[var(--border)] p-0.5"
-            />
-            <input
-              type="text"
-              value={bg.color ?? "#f3f4f6"}
-              onChange={(e) =>
-                update({ background: { ...bg, type: "solid", color: e.target.value } })
-              }
-              placeholder="#f3f4f6"
-              className="fca-input flex-1 font-mono text-xs"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Gradient preset */}
-      {bg.type === "gradient" && (
-        <div>
-          <SectionHeading>Verlauf-Preset</SectionHeading>
-          <div className="mt-2 space-y-1.5">
-            {GRADIENT_PRESETS.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                onClick={() =>
-                  update({
-                    background: { ...bg, type: "gradient", gradientPreset: p.value },
-                  })
-                }
-                className={`w-full rounded-md border px-3 py-2 text-left text-xs transition ${
-                  bg.type === "gradient" && bg.gradientPreset === p.value
-                    ? "border-[var(--brand-primary,#f97316)] bg-orange-50 font-medium"
-                    : "border-[var(--border)] hover:border-[var(--brand-primary,#f97316)]"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Image background */}
-      {bg.type === "image" && (
-        <>
-          <div>
-            <SectionHeading>Hintergrundbild</SectionHeading>
-            <div className="mt-2 flex items-center gap-2">
-              {bg.mediaAssetId ? (
-                <>
-                  <span className="flex-1 truncate text-[11px] font-mono text-[var(--muted)]">
-                    {bg.mediaAssetId}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      update({ background: { ...bg, type: "image", mediaAssetId: "" } })
-                    }
-                    className="sce-icon-button text-rose-500"
-                    title="Bild entfernen"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              ) : (
-                <p className="text-[11px] text-[var(--muted)]">Kein Bild ausgewählt.</p>
-              )}
-              <button
-                type="button"
-                onClick={() => setBgMediaPicker(true)}
-                className="flex items-center gap-1 rounded-md border border-[var(--border)] px-2.5 py-1.5 text-xs hover:bg-[var(--surface-2)] transition"
-              >
-                <ImageIcon className="h-3.5 w-3.5" />
-                Auswählen
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <SectionHeading>Overlay</SectionHeading>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
-              {(["none", "light", "dark"] as const).map((o) => (
-                <button
-                  key={o}
-                  type="button"
-                  onClick={() =>
-                    update({ background: { ...bg, type: "image", overlay: o } })
-                  }
-                  className={`rounded-md border py-1.5 text-center text-xs transition ${
-                    bg.type === "image" && bg.overlay === o
-                      ? "border-[var(--brand-primary,#f97316)] bg-orange-50 font-medium text-orange-700"
-                      : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--brand-primary,#f97316)]"
-                  }`}
-                >
-                  {o === "none" ? "Kein" : o === "light" ? "Hell" : "Dunkel"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <SharedMediaPicker
-            open={bgMediaPicker}
-            onClose={() => setBgMediaPicker(false)}
-            onSelect={(asset) => {
-              update({
-                background: {
-                  ...bg,
-                  type: "image",
-                  mediaAssetId: asset.id,
-                },
-              });
-              setBgMediaPicker(false);
-            }}
-            filterType="IMAGE"
-            title="Hintergrundbild auswählen"
-          />
-        </>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main SplitContentCardsConfigForm
 // ---------------------------------------------------------------------------
 
@@ -993,9 +653,20 @@ export default function SplitContentCardsConfigForm({ config, onChange }: Props)
 
   const cfg = getConfig(config);
 
+  // On first render, migrate legacy style + background → _layout
+  useEffect(() => {
+    if (!config._layout && (config.style || config.background)) {
+      const migratedLayout = migrateToLayout(config);
+      onChange({ ...config, _layout: migratedLayout });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function update(patch: Partial<SplitContentCardsSectionConfig>) {
     onChange({ ...config, ...patch });
   }
+
+  const currentLayout = migrateToLayout(config);
 
   return (
     <div className="space-y-0">
@@ -1020,9 +691,14 @@ export default function SplitContentCardsConfigForm({ config, onChange }: Props)
 
       {/* Tab content */}
       {activeTab === "content" && <ContentTab cfg={cfg} update={update} />}
-      {activeTab === "layout" && <LayoutTab cfg={cfg} update={update} />}
-      {activeTab === "style" && <StyleTab cfg={cfg} update={update} />}
-      {activeTab === "background" && <BackgroundTab cfg={cfg} update={update} />}
+      {activeTab === "columns" && <ColumnsTab cfg={cfg} update={update} />}
+      {activeTab === "layout" && (
+        <LayoutConfigPanel
+          layout={currentLayout}
+          onChange={(layout) => update({ _layout: layout })}
+          features={{ responsive: true }}
+        />
+      )}
     </div>
   );
 }

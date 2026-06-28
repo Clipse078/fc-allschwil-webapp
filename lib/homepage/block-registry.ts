@@ -147,6 +147,14 @@ export type BlockDefinition = {
   defaultEnabled: boolean;
 
   /**
+   * Whether this block supports the shared Flexible Layout System.
+   * When true, the admin editor shows the shared LayoutConfigPanel for this block.
+   * The _layout key is included in defaultConfig and validated by sectionLayoutSchema.
+   * All blocks support layout; this flag can be set false only for utility/placeholder blocks.
+   */
+  supportsLayout: boolean;
+
+  /**
    * Projects a section's config to the public-safe subset for the public homepage API.
    *
    * All current block types use an identity projection (all config is public-safe).
@@ -159,6 +167,17 @@ export type BlockDefinition = {
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
+
+/** Default _layout config injected into every new block section. */
+const DEFAULT_LAYOUT_CONFIG = {
+  width: "normal",
+  spacingTop: "md",
+  spacingBottom: "md",
+  theme: "light",
+  hAlign: "left",
+  background: { type: "none" },
+  responsive: { stackOnMobile: true, reverseStackOnMobile: false },
+};
 
 /**
  * Canonical block library registry.
@@ -175,11 +194,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Header",
     status: "available",
     datadriven: false,
-    defaultConfig: {},
-    configKeys: ["title", "subtitle", "ctaLabel", "ctaUrl"],
+    defaultConfig: { _layout: { ...DEFAULT_LAYOUT_CONFIG, width: "full" } },
+    configKeys: ["title", "subtitle", "ctaLabel", "ctaUrl", "_layout"],
     icon: "LayoutTemplate",
     defaultSortOrder: 0,
     defaultEnabled: true,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -191,11 +211,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Content",
     status: "available",
     datadriven: true,
-    defaultConfig: { itemCount: 3 },
-    configKeys: ["itemCount", "heading"],
+    defaultConfig: { itemCount: 3, _layout: DEFAULT_LAYOUT_CONFIG },
+    configKeys: ["itemCount", "heading", "_layout"],
     icon: "Newspaper",
     defaultSortOrder: 10,
     defaultEnabled: true,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -208,11 +229,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Data-driven",
     status: "available",
     datadriven: true,
-    defaultConfig: { itemCount: 5, surface: "homepage" },
-    configKeys: ["itemCount", "surface", "heading"],
+    defaultConfig: { itemCount: 5, surface: "homepage", _layout: DEFAULT_LAYOUT_CONFIG },
+    configKeys: ["itemCount", "surface", "heading", "_layout"],
     icon: "Calendar",
     defaultSortOrder: 20,
     defaultEnabled: true,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -224,11 +246,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Club",
     status: "available",
     datadriven: true,
-    defaultConfig: { itemCount: 6 },
-    configKeys: ["itemCount", "seasonKey", "heading"],
+    defaultConfig: { itemCount: 6, _layout: DEFAULT_LAYOUT_CONFIG },
+    configKeys: ["itemCount", "seasonKey", "heading", "_layout"],
     icon: "Users",
     defaultSortOrder: 30,
     defaultEnabled: true,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -240,11 +263,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Data-driven",
     status: "available",
     datadriven: true,
-    defaultConfig: {},
-    configKeys: ["heading"],
+    defaultConfig: { _layout: DEFAULT_LAYOUT_CONFIG },
+    configKeys: ["heading", "_layout"],
     icon: "CalendarDays",
     defaultSortOrder: 40,
     defaultEnabled: true,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -257,7 +281,9 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Conversion",
     status: "available",
     datadriven: false,
-    defaultConfig: {},
+    defaultConfig: {
+      _layout: { ...DEFAULT_LAYOUT_CONFIG, theme: "club" },
+    },
     configKeys: [
       "title",
       "body",
@@ -265,10 +291,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       "primaryUrl",
       "secondaryLabel",
       "secondaryUrl",
+      "_layout",
     ],
     icon: "MousePointerClick",
     defaultSortOrder: 50,
     defaultEnabled: false,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -281,11 +309,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Sponsors",
     status: "foundation-ready",
     datadriven: true,
-    defaultConfig: {},
-    configKeys: ["heading"],
+    defaultConfig: { _layout: DEFAULT_LAYOUT_CONFIG },
+    configKeys: ["heading", "_layout"],
     icon: "Award",
     defaultSortOrder: 60,
     defaultEnabled: false,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -306,15 +335,10 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       mediaPlacement: "NONE",
       images: [],
       cards: [],
-      style: {
-        theme: "light",
-        spacingTop: "md",
-        spacingBottom: "md",
-        width: "normal",
-        alignment: "left",
-      },
-      background: {
-        type: "none",
+      _layout: {
+        ...DEFAULT_LAYOUT_CONFIG,
+        columns: "50/50",
+        responsive: { stackOnMobile: true, reverseStackOnMobile: false },
       },
     },
     configKeys: [
@@ -325,12 +349,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
       "mediaPlacement",
       "images",
       "cards",
-      "style",
-      "background",
+      "_layout",
     ],
     icon: "LayoutPanelLeft",
     defaultSortOrder: 65,
     defaultEnabled: false,
+    supportsLayout: true,
     projectPublicConfig: (config) => config,
   },
 
@@ -343,11 +367,12 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     category: "Utility",
     status: "coming-next",
     datadriven: false,
-    defaultConfig: {},
-    configKeys: [],
+    defaultConfig: { _layout: DEFAULT_LAYOUT_CONFIG },
+    configKeys: ["_layout"],
     icon: "Blocks",
     defaultSortOrder: 70,
     defaultEnabled: false,
+    supportsLayout: false,
     projectPublicConfig: (config) => config,
   },
 ];

@@ -73,6 +73,8 @@ import {
   SECTION_APPROVAL_STATUS,
 } from "@/lib/cms/section-publishing";
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
+import type { SectionLayout } from "@/lib/cms/layout-types";
+import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
 
 // Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
 const SplitContentCardsConfigForm = dynamic(
@@ -218,12 +220,17 @@ type ConfigEditorProps = {
 
 function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: ConfigEditorProps) {
   const def = getBlockDefinition(section.type);
-  const configKeys = useMemo(() => def?.configKeys ?? [], [def]);
+  // Exclude _layout from the generic key-value editor — it is handled by LayoutConfigPanel
+  const configKeys = useMemo(
+    () => (def?.configKeys ?? []).filter((k) => k !== "_layout"),
+    [def],
+  );
   const isPremium = PREMIUM_BLOCK_TYPES.has(section.type);
+  const supportsLayout = def?.supportsLayout ?? false;
 
   const [label, setLabel] = useState(section.label);
 
-  // Generic block state (string values per configKey)
+  // Generic block state (string values per configKey, excluding _layout)
   const [values, setValues] = useState<Record<string, string>>(() => {
     if (isPremium) return {};
     const init: Record<string, string> = {};
@@ -234,6 +241,11 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
     return init;
   });
 
+  // Generic block layout state (shared _layout object)
+  const [genericLayout, setGenericLayout] = useState<SectionLayout>(
+    () => (section.config._layout as SectionLayout | undefined) ?? {},
+  );
+
   // Premium block state (full config object)
   const [premiumConfig, setPremiumConfig] = useState<Record<string, unknown>>(() =>
     isPremium ? { ...section.config } : {},
@@ -243,6 +255,8 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
   const [error, setError] = useState<string | null>(null);
   // Live preview toggle for premium blocks
   const [showLivePreview, setShowLivePreview] = useState(false);
+  // Layout panel visibility for generic blocks
+  const [showLayoutPanel, setShowLayoutPanel] = useState(false);
 
   const buildConfig = useCallback((): Record<string, unknown> => {
     if (isPremium) return premiumConfig;
@@ -253,8 +267,11 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
       const num = Number(raw);
       config[k] = !isNaN(num) && raw.trim() !== "" ? num : raw;
     }
+    if (supportsLayout) {
+      config._layout = genericLayout;
+    }
     return config;
-  }, [isPremium, premiumConfig, configKeys, values]);
+  }, [isPremium, premiumConfig, configKeys, values, supportsLayout, genericLayout]);
 
   async function handleSave() {
     const trimmed = label.trim();
@@ -366,6 +383,38 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
           <p className="text-xs text-[var(--muted)] italic">
             Dieser Blocktyp hat keine konfigurierbaren Felder.
           </p>
+        )}
+
+        {/* Shared Layout panel — shown for ALL blocks that support layout */}
+        {!isPremium && supportsLayout && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+            <button
+              type="button"
+              onClick={() => setShowLayoutPanel((v) => !v)}
+              className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Layers className="h-3.5 w-3.5 text-[var(--text-2)]" />
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Layout
+                </span>
+              </div>
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-[var(--muted)] transition-transform ${showLayoutPanel ? "rotate-180" : ""}`}
+              />
+            </button>
+            {showLayoutPanel && (
+              <div className="border-t border-[var(--border)] p-3">
+                <LayoutConfigPanel
+                  layout={genericLayout}
+                  onChange={(layout) => {
+                    setGenericLayout(layout);
+                    onChanged?.();
+                  }}
+                />
+              </div>
+            )}
+          </div>
         )}
 
         {error && <p className="text-xs text-rose-600">{error}</p>}
