@@ -43,6 +43,8 @@ export type NavItemAdminRow = {
   sortOrder: number;
   isVisible: boolean;
   visibilityMode: NavVisibilityMode;
+  visibleFrom: Date | null;   // CMS V4.2 scheduling
+  visibleUntil: Date | null;  // CMS V4.2 scheduling
   createdAt: Date;
   updatedAt: Date;
 };
@@ -68,6 +70,8 @@ const adminSelect = {
   sortOrder: true,
   isVisible: true,
   visibilityMode: true,
+  visibleFrom: true,  // CMS V4.2 scheduling
+  visibleUntil: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -261,6 +265,8 @@ export type UpdateNavItemInput = {
   sortOrder?: number;
   isVisible?: boolean;
   visibilityMode?: string;
+  visibleFrom?: Date | null;   // CMS V4.2 scheduling
+  visibleUntil?: Date | null;  // CMS V4.2 scheduling
 };
 
 export type UpdateNavItemError =
@@ -367,6 +373,8 @@ export async function updateNavItem(
       ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
       ...(input.isVisible !== undefined ? { isVisible: input.isVisible } : {}),
       ...(input.visibilityMode !== undefined ? { visibilityMode: input.visibilityMode } : {}),
+      ...("visibleFrom" in input ? { visibleFrom: input.visibleFrom ?? null } : {}),
+      ...("visibleUntil" in input ? { visibleUntil: input.visibleUntil ?? null } : {}),
       ...(newParentId !== undefined ? { parentId: newParentId } : {}),
     },
     select: adminSelect,

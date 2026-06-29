@@ -16,7 +16,8 @@ export type PageStatus =
   | "IN_REVIEW"
   | "SCHEDULED"
   | "PUBLISHED"
-  | "ARCHIVED";
+  | "ARCHIVED"
+  | "EXPIRED"; // CMS V4.2
 
 export type WebsitePageAuthorPersonSnippet = {
   id: string;

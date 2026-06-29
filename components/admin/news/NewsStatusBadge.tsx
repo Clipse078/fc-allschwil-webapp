@@ -21,6 +21,10 @@ const STATUS_STYLES: Record<ArticleStatus, { label: string; className: string }>
     label: "Archiviert",
     className: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] opacity-60",
   },
+  EXPIRED: { // CMS V4.2
+    label: "Abgelaufen",
+    className: "bg-rose-50 text-rose-700 border-rose-200",
+  },
 };
 
 type NewsStatusBadgeProps = {

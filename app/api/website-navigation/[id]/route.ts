@@ -49,6 +49,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if ("isVisible" in body) input.isVisible = Boolean(body.isVisible);
   if ("visibilityMode" in body) input.visibilityMode = body.visibilityMode as string;
   if ("parentId" in body) input.parentId = body.parentId as string | null;
+  // CMS V4.2: scheduling window
+  if ("visibleFrom" in body) {
+    input.visibleFrom = typeof body.visibleFrom === "string" && body.visibleFrom
+      ? new Date(body.visibleFrom)
+      : null;
+  }
+  if ("visibleUntil" in body) {
+    input.visibleUntil = typeof body.visibleUntil === "string" && body.visibleUntil
+      ? new Date(body.visibleUntil)
+      : null;
+  }
 
   const result = await updateNavItem(tenantId, id, input);
 

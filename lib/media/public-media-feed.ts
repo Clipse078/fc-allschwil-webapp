@@ -35,6 +35,13 @@ export type PublicMediaAsset = {
   height: number | null;
   /** MIME type, e.g. "image/webp" or "video/mp4". */
   mimeType: string;
+  /**
+   * CMS V4.2 focal point for smart image cropping.
+   * Normalised [0,1] from top-left. Null = use renderer default (centre).
+   * Safe to expose publicly — it is a rendering hint, not admin metadata.
+   */
+  focusX: number | null;
+  focusY: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -67,6 +74,8 @@ export async function getPublicMediaAsset(
       width: true,
       height: true,
       mimeType: true,
+      focusX: true, // CMS V4.2 focal point — safe rendering hint
+      focusY: true,
       // Intentionally excluded: storageKey, createdByUserId, tenantId,
       // folderId, tags, copyright, photographer, description, sizeBytes,
       // type, filename, durationSec, createdAt, updatedAt, archivedAt.
@@ -83,5 +92,7 @@ export async function getPublicMediaAsset(
     width: row.width,
     height: row.height,
     mimeType: row.mimeType,
+    focusX: row.focusX ?? null,
+    focusY: row.focusY ?? null,
   };
 }

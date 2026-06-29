@@ -59,9 +59,13 @@ export default function MediaAssetDetailDrawer({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [usages, setUsages] = useState<MediaAssetUsageItem[]>([]);
   const [usagesLoading, setUsagesLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"meta" | "usage">("meta");
+  // CMS V4.2: added "focal" tab for focal point editing
+  const [activeTab, setActiveTab] = useState<"meta" | "focal" | "usage">("meta");
   const [newTagName, setNewTagName] = useState("");
   const [creatingTag, setCreatingTag] = useState(false);
+  // CMS V4.2: focal point state
+  const [focusX, setFocusX] = useState<number | null>(null);
+  const [focusY, setFocusY] = useState<number | null>(null);
 
   useEffect(() => {
     if (!asset) return;
@@ -74,6 +78,8 @@ export default function MediaAssetDetailDrawer({
       folderId: asset.folderId ?? null,
     });
     setSelectedTagIds(asset.tags?.map((t) => t.id) ?? []);
+    setFocusX(asset.focusX ?? null); // CMS V4.2
+    setFocusY(asset.focusY ?? null);
     setSaveError(null);
     setActiveTab("meta");
   }, [asset?.id]);
@@ -104,6 +110,9 @@ export default function MediaAssetDetailDrawer({
           photographer: form.photographer || null,
           folderId: form.folderId || null,
           tagIds: selectedTagIds,
+          // CMS V4.2: focal point (always include current values)
+          focusX,
+          focusY,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -242,9 +251,9 @@ export default function MediaAssetDetailDrawer({
         </p>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — CMS V4.2 adds "Fokuspunkt" tab for IMAGE assets */}
       <div className="flex border-b border-[var(--border)]">
-        {(["meta", "usage"] as const).map((tab) => (
+        {(["meta", ...(asset?.type === "IMAGE" ? ["focal"] : []), "usage"] as ("meta" | "focal" | "usage")[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -258,6 +267,10 @@ export default function MediaAssetDetailDrawer({
             {tab === "meta" ? (
               <span className="flex items-center justify-center gap-1">
                 <Info className="h-3 w-3" /> Metadaten
+              </span>
+            ) : tab === "focal" ? (
+              <span className="flex items-center justify-center gap-1">
+                <MapPin className="h-3 w-3" /> Fokuspunkt
               </span>
             ) : (
               <span className="flex items-center justify-center gap-1">
@@ -404,6 +417,97 @@ export default function MediaAssetDetailDrawer({
                 "Änderungen speichern"
               )}
             </button>
+          </div>
+        )}
+
+        {/* ── CMS V4.2: Focal Point tab ────────────────────────────────── */}
+        {activeTab === "focal" && (
+          <div className="px-5 py-4 space-y-4">
+            <p className="text-xs text-[var(--muted)]">
+              Klicke auf das Bild, um den Fokuspunkt zu setzen. Der Fokuspunkt
+              steuert, welcher Bereich beim Zuschneiden sichtbar bleibt.
+              Null = Mitte (Standard).
+            </p>
+
+            {/* Interactive focal point picker */}
+            {asset?.url && (
+              <div className="relative overflow-hidden rounded-lg border border-[var(--border)]">
+                <img
+                  src={asset.url}
+                  alt={asset.altText ?? ""}
+                  className="w-full object-contain cursor-crosshair select-none"
+                  style={{ maxHeight: 240 }}
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                    setFocusX(parseFloat(x.toFixed(3)));
+                    setFocusY(parseFloat(y.toFixed(3)));
+                  }}
+                  draggable={false}
+                />
+                {focusX !== null && focusY !== null && (
+                  <div
+                    className="pointer-events-none absolute flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                    style={{ left: `${(focusX ?? 0.5) * 100}%`, top: `${(focusY ?? 0.5) * 100}%` }}
+                  >
+                    <div className="h-4 w-4 rounded-full border-2 border-white bg-[var(--accent)] shadow-lg ring-2 ring-[var(--accent)]" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Manual coordinate inputs */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] mb-1">
+                  X (0 = links, 1 = rechts)
+                </label>
+                <input
+                  type="number"
+                  min={0} max={1} step={0.01}
+                  value={focusX ?? ""}
+                  onChange={(e) => setFocusX(e.target.value ? parseFloat(e.target.value) : null)}
+                  className="fca-input text-xs"
+                  placeholder="0.5"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] mb-1">
+                  Y (0 = oben, 1 = unten)
+                </label>
+                <input
+                  type="number"
+                  min={0} max={1} step={0.01}
+                  value={focusY ?? ""}
+                  onChange={(e) => setFocusY(e.target.value ? parseFloat(e.target.value) : null)}
+                  className="fca-input text-xs"
+                  placeholder="0.5"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setFocusX(null); setFocusY(null); }}
+                className="fca-button-secondary text-xs"
+              >
+                Zurücksetzen (Mitte)
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="fca-button-primary text-xs"
+              >
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Fokuspunkt speichern
+              </button>
+            </div>
+            {saveError && (
+              <p className="text-xs text-rose-600">{saveError}</p>
+            )}
           </div>
         )}
 

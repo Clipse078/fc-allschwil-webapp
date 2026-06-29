@@ -68,6 +68,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         ? null
         : undefined;
 
+  // Focal point: clamp to [0, 1] or null (CMS V4.2)
+  const getFloat = (key: string): number | null | undefined => {
+    if (body[key] === null) return null;
+    if (typeof body[key] === "number") return Math.max(0, Math.min(1, body[key] as number));
+    return undefined;
+  };
+
   const updated = await updateMediaAsset(tenantId, id, {
     altText:      getString("altText"),
     caption:      getString("caption"),
@@ -79,6 +86,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     tagIds: Array.isArray(body.tagIds)
       ? (body.tagIds as unknown[]).filter((t): t is string => typeof t === "string")
       : undefined,
+    focusX: getFloat("focusX"),
+    focusY: getFloat("focusY"),
   });
 
   if (!updated) {

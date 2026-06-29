@@ -63,6 +63,8 @@ const mediaDetailSelect = {
   updatedAt: true,
   archivedAt: true,
   storageKey: true,
+  focusX: true, // CMS V4.2 focal point
+  focusY: true,
 } as const;
 
 // Shape the raw Prisma result into the public type
@@ -228,6 +230,8 @@ export type UpdateMediaAssetInput = {
   photographer?: string | null;
   folderId?: string | null;
   tagIds?: string[];
+  focusX?: number | null; // CMS V4.2 focal point, clamped [0,1]
+  focusY?: number | null;
 };
 
 export async function updateMediaAsset(
@@ -249,6 +253,8 @@ export async function updateMediaAsset(
   if (input.copyright !== undefined) data.copyright = input.copyright;
   if (input.photographer !== undefined) data.photographer = input.photographer;
   if (input.folderId !== undefined) data.folderId = input.folderId;
+  if (input.focusX !== undefined) data.focusX = input.focusX;
+  if (input.focusY !== undefined) data.focusY = input.focusY;
 
   // Replace tag set: delete all current tags for this asset+tenant, then insert new ones.
   // tenantId in deleteMany adds defense-in-depth even though mediaAssetId already

@@ -78,6 +78,7 @@ const STATUS_ORDER: PublishingStatus[] = [
   "SCHEDULED",
   "PUBLISHED",
   "ARCHIVED",
+  "EXPIRED", // CMS V4.2
 ];
 
 function StatusCards({
@@ -90,7 +91,7 @@ function StatusCards({
   onSelect: (s: FilterStatus) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {STATUS_ORDER.map((s) => {
         const { cardBg, countColor, borderColor } = PUBLISHING_STATUS_CARD[s];
         const isActive = activeStatus === s;
@@ -258,6 +259,7 @@ const STATUS_FILTERS: { label: string; value: FilterStatus }[] = [
   { label: "Geplant", value: "SCHEDULED" },
   { label: "Veröffentlicht", value: "PUBLISHED" },
   { label: "Archiviert", value: "ARCHIVED" },
+  { label: "Abgelaufen", value: "EXPIRED" }, // CMS V4.2
 ];
 
 export default function PublishingCenter() {

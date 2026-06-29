@@ -105,6 +105,8 @@ export type MediaAssetDetail = MediaAssetListItem & {
   updatedAt: Date;
   archivedAt: Date | null;
   storageKey: string | null;
+  focusX: number | null; // CMS V4.2 focal point
+  focusY: number | null;
 };
 
 // ── Folder types ─────────────────────────────────────────────────────────────

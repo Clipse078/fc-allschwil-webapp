@@ -25,6 +25,7 @@ const FILTERS: { label: string; value: FilterStatus }[] = [
   { label: "Geplant", value: "SCHEDULED" },
   { label: "Veröffentlicht", value: "PUBLISHED" },
   { label: "Archiviert", value: "ARCHIVED" },
+  { label: "Abgelaufen", value: "EXPIRED" }, // CMS V4.2
 ];
 
 export default function NewsArticleList() {

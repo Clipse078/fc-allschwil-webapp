@@ -17,7 +17,7 @@ import type {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function emptyStatusCounts(): PublishingStatusCounts {
-  return { DRAFT: 0, IN_REVIEW: 0, SCHEDULED: 0, PUBLISHED: 0, ARCHIVED: 0, total: 0 };
+  return { DRAFT: 0, IN_REVIEW: 0, SCHEDULED: 0, PUBLISHED: 0, ARCHIVED: 0, EXPIRED: 0, total: 0 };
 }
 
 function resolveNewsAuthor(
@@ -79,6 +79,7 @@ function mergeCounts(
     SCHEDULED: a.SCHEDULED + b.SCHEDULED,
     PUBLISHED: a.PUBLISHED + b.PUBLISHED,
     ARCHIVED: a.ARCHIVED + b.ARCHIVED,
+    EXPIRED: (a.EXPIRED ?? 0) + (b.EXPIRED ?? 0), // CMS V4.2
     total: a.total + b.total,
   };
 }

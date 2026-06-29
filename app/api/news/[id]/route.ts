@@ -78,6 +78,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       ? { excerpt: typeof body.excerpt === "string" ? body.excerpt.trim() || null : null }
       : {}),
     ...(typeof body.content === "string" ? { content: body.content } : {}),
+    // CMS V4.2: accept richContent (TipTap JSON) alongside legacy content
+    ...(body.richContent !== undefined ? { richContent: body.richContent ?? null } : {}),
     ...(body.imageUrl !== undefined
       ? { imageUrl: typeof body.imageUrl === "string" ? body.imageUrl.trim() || null : null }
       : {}),

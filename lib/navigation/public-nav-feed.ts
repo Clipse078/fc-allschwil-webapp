@@ -59,8 +59,19 @@ export type PublicNavAreaData = {
  * are also excluded.
  */
 export async function getPublicNavigation(tenantId: string): Promise<PublicNavAreaData> {
+  const now = new Date();
+
   const rows = await prisma.websiteNavItem.findMany({
-    where: { tenantId, isVisible: true },
+    where: {
+      tenantId,
+      isVisible: true,
+      // CMS V4.2 scheduling window: only include items whose window, if set, contains now.
+      // Items with null visibleFrom/visibleUntil are always shown (no restriction).
+      AND: [
+        { OR: [{ visibleFrom: null }, { visibleFrom: { lte: now } }] },
+        { OR: [{ visibleUntil: null }, { visibleUntil: { gte: now } }] },
+      ],
+    },
     orderBy: [{ area: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -71,7 +82,8 @@ export async function getPublicNavigation(tenantId: string): Promise<PublicNavAr
       href: true,
       target: true,
       sortOrder: true,
-      // Privacy: intentionally NOT selecting tenantId, createdAt, updatedAt, visibilityMode
+      // Privacy: intentionally NOT selecting tenantId, createdAt, updatedAt,
+      // visibilityMode, visibleFrom, visibleUntil (scheduling metadata is admin-only).
     },
   });
 
@@ -118,7 +130,15 @@ export async function getPublicNavigation(tenantId: string): Promise<PublicNavAr
  * Returns the flat count of visible navigation items for a tenant.
  */
 export async function countPublicNavItems(tenantId: string): Promise<number> {
+  const now = new Date();
   return prisma.websiteNavItem.count({
-    where: { tenantId, isVisible: true },
+    where: {
+      tenantId,
+      isVisible: true,
+      AND: [
+        { OR: [{ visibleFrom: null }, { visibleFrom: { lte: now } }] },
+        { OR: [{ visibleUntil: null }, { visibleUntil: { gte: now } }] },
+      ],
+    },
   });
 }

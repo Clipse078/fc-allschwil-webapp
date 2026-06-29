@@ -13,7 +13,8 @@ export type PublishingStatus =
   | "IN_REVIEW"
   | "SCHEDULED"
   | "PUBLISHED"
-  | "ARCHIVED";
+  | "ARCHIVED"
+  | "EXPIRED"; // CMS V4.2
 
 export type FilterContentType = "ALL" | PublishableContentType;
 export type FilterStatus = "ALL" | PublishingStatus;
@@ -40,6 +41,7 @@ export type PublishingStatusCounts = {
   SCHEDULED: number;
   PUBLISHED: number;
   ARCHIVED: number;
+  EXPIRED: number; // CMS V4.2
   total: number;
 };
 
@@ -70,6 +72,7 @@ export const PUBLISHING_STATUS_LABEL: Record<PublishingStatus, string> = {
   SCHEDULED: "Geplant",
   PUBLISHED: "Veröffentlicht",
   ARCHIVED: "Archiviert",
+  EXPIRED: "Abgelaufen", // CMS V4.2
 };
 
 export const PUBLISHING_STATUS_BADGE_CLASS: Record<PublishingStatus, string> = {
@@ -78,6 +81,7 @@ export const PUBLISHING_STATUS_BADGE_CLASS: Record<PublishingStatus, string> = {
   SCHEDULED: "bg-amber-50 text-amber-700 border-amber-200",
   PUBLISHED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   ARCHIVED: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] opacity-60",
+  EXPIRED: "bg-rose-50 text-rose-700 border-rose-200", // CMS V4.2
 };
 
 export const PUBLISHING_STATUS_CARD: Record<
@@ -108,6 +112,11 @@ export const PUBLISHING_STATUS_CARD: Record<
     cardBg: "bg-[var(--surface-2)]",
     countColor: "text-[var(--muted)]",
     borderColor: "border-[var(--border)]",
+  },
+  EXPIRED: { // CMS V4.2
+    cardBg: "bg-rose-50",
+    countColor: "text-rose-700",
+    borderColor: "border-rose-200",
   },
 };
 

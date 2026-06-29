@@ -18,6 +18,9 @@ enum NewsArticleStatus {
   SCHEDULED
   PUBLISHED
   ARCHIVED
+  // CMS V4.2: time-based expiry for scheduled content past its window.
+  // Set automatically when scheduledUntil passes; never set by the editor directly.
+  EXPIRED
 }
 
 enum WebsitePageStatus {
@@ -26,6 +29,8 @@ enum WebsitePageStatus {
   SCHEDULED
   PUBLISHED
   ARCHIVED
+  // CMS V4.2: mirrors NewsArticleStatus.EXPIRED for page expiry.
+  EXPIRED
 }
 
 enum MediaAssetType {
@@ -384,8 +389,11 @@ model Tenant {
   homepageSections       HomepageSection[]
   websiteNavItems        WebsiteNavItem[]
   contentRevisions       ContentRevision[]
-  reusableComponents     ReusableComponent[]
+  reusableComponents      ReusableComponent[]
   reusableComponentUsages ReusableComponentUsage[]
+  // CMS V4.2
+  websiteConfig           WebsiteConfig?
+  websiteRedirects        WebsiteRedirect[]
 
   @@index([status])
   @@index([name])
@@ -1342,6 +1350,13 @@ model MediaAsset {
   archivedAt   DateTime? // Set when status → ARCHIVED; null when active
   storageKey   String?   // Blob storage key for lifecycle management
 
+  // DAM V2 / CMS V4.2: focal point for smart image cropping.
+  // Normalised coordinates in [0, 1] from top-left.
+  // Null = no explicit focal point; renderers fall back to centre (0.5, 0.5).
+  // Only valid for IMAGE assets; ignored (null) for VIDEO.
+  focusX Float? // Horizontal focal offset: 0.0 = left edge, 1.0 = right edge
+  focusY Float? // Vertical focal offset:   0.0 = top edge,  1.0 = bottom edge
+
   tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   folder           MediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   newsArticles     NewsArticle[]      @relation("NewsArticleHeroMedia")
@@ -1397,6 +1412,11 @@ model NewsArticle {
   // V2.1 extensions
   authorPersonId String?
   reviewNotes    String?
+
+  // CMS V4.2: rich text body (TipTap JSON). Nullable for backward compatibility.
+  // When set, this supersedes the legacy `content` (Markdown) field for rendering.
+  // Existing articles retain `content`; new articles use both fields in parallel.
+  richContent Json?
 
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -1757,6 +1777,10 @@ model WebsiteNavItem {
   /// Visibility mode. One of: "ALWAYS" | "AUTHENTICATED" | "ANONYMOUS".
   /// Foundation-level: public API currently only filters by isVisible.
   visibilityMode String    @default("ALWAYS")
+  /// CMS V4.2: optional scheduling window. Null = no restriction.
+  /// Public API hides item when now() < visibleFrom or now() > visibleUntil.
+  visibleFrom    DateTime? // Start of visibility window (inclusive)
+  visibleUntil   DateTime? // End of visibility window (inclusive)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -2033,4 +2057,100 @@ model ReusableComponentUsage {
   @@index([tenantId])
   @@index([componentId])
   @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteConfig — Per-tenant website configuration (CMS V4.2)
+//
+// One record per tenant. Created lazily on first GET/PATCH (upsert pattern).
+// Holds structured config for all 7 settings tabs: General, SEO, Social,
+// Analytics, Technical, PWA, Cookie.
+//
+// All fields are nullable: safe defaults are applied at the API / UI layer.
+// tenantId has a @unique constraint enforcing the one-per-tenant invariant.
+// ---------------------------------------------------------------------------
+
+model WebsiteConfig {
+  id       String @id @default(cuid())
+  tenantId String @unique
+
+  // General
+  siteName        String?
+  siteDescription String?
+  siteUrl         String?
+  contactEmail    String?
+
+  // SEO
+  seoTitle          String?
+  seoDescription    String?
+  seoKeywords       String?
+  robotsIndex       Boolean @default(true)
+  robotsFollow      Boolean @default(true)
+  canonicalUrl      String?
+
+  // Social
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
+  twitterHandle String?
+  twitterCard   String? @default("summary_large_image")
+
+  // Analytics
+  googleAnalyticsId   String?
+  googleTagManagerId  String?
+  facebookPixelId     String?
+  plausibleDomain     String?
+
+  // Technical
+  customHeadHtml   String? @db.Text
+  customBodyHtml   String? @db.Text
+  maintenanceMode  Boolean @default(false)
+  maintenanceMsg   String?
+
+  // PWA
+  pwaEnabled    Boolean @default(false)
+  pwaName       String?
+  pwaShortName  String?
+  pwaThemeColor String?
+
+  // Cookie consent
+  cookieEnabled    Boolean @default(false)
+  cookieBannerText String?
+  cookiePolicyUrl  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteRedirect — Tenant-scoped HTTP redirects (CMS V4.2)
+//
+// Managed via Website Settings → Redirects tab.
+// Applied server-side in middleware or a dedicated redirect-check route.
+//
+// fromPath: absolute path, e.g. "/alt-seite".
+// toPath:   absolute path or external URL, e.g. "/neue-seite" or "https://…".
+// isPermanent: 301 (true) vs 302 (false).
+// isActive:    soft-disable without deleting.
+// ---------------------------------------------------------------------------
+
+model WebsiteRedirect {
+  id          String  @id @default(cuid())
+  tenantId    String
+  fromPath    String
+  toPath      String
+  isPermanent Boolean @default(true)
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, fromPath])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
 }

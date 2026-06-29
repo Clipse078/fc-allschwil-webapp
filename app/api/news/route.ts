@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     slug: finalSlug,
     title,
     content,
+    richContent: body.richContent ?? null, // CMS V4.2
     excerpt: typeof body.excerpt === "string" ? body.excerpt.trim() || null : null,
     imageUrl: typeof body.imageUrl === "string" ? body.imageUrl.trim() || null : null,
     heroMediaId: typeof body.heroMediaId === "string" ? body.heroMediaId : null,

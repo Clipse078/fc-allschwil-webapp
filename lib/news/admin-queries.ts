@@ -17,7 +17,8 @@ export type ArticleStatus =
   | "IN_REVIEW"
   | "SCHEDULED"
   | "PUBLISHED"
-  | "ARCHIVED";
+  | "ARCHIVED"
+  | "EXPIRED"; // CMS V4.2
 
 export type NewsArticleHeroMediaSnippet = {
   id: string;
@@ -74,6 +75,7 @@ export type NewsArticleAdminListItem = {
 
 export type NewsArticleAdminDetail = NewsArticleAdminListItem & {
   content: string;
+  richContent: unknown | null; // CMS V4.2: TipTap JSON (RichTextValue), null for legacy articles
   additionalMedia: NewsArticleMediaItem[];
 };
 
@@ -137,6 +139,7 @@ const adminListSelect = {
 const adminDetailSelect = {
   ...adminListSelect,
   content: true,
+  richContent: true, // CMS V4.2
   additionalMedia: {
     select: additionalMediaSelect,
     orderBy: { sortOrder: "asc" as const },
@@ -233,6 +236,7 @@ export type CreateNewsArticleInput = {
   title: string;
   excerpt?: string | null;
   content: string;
+  richContent?: unknown | null; // CMS V4.2: TipTap JSON
   imageUrl?: string | null;
   heroMediaId?: string | null;
   channels?: string[] | null;
@@ -252,6 +256,7 @@ export async function createNewsArticle(
     title: input.title,
     excerpt: input.excerpt ?? null,
     content: input.content,
+    richContent: input.richContent ?? null, // CMS V4.2
     imageUrl: input.imageUrl ?? null,
     heroMediaId: input.heroMediaId ?? null,
     channels: input.channels ?? null,
@@ -273,6 +278,7 @@ export type UpdateNewsArticleInput = {
   title?: string;
   excerpt?: string | null;
   content?: string;
+  richContent?: unknown | null; // CMS V4.2: TipTap JSON
   imageUrl?: string | null;
   heroMediaId?: string | null;
   channels?: string[] | null;
@@ -301,6 +307,7 @@ export async function updateNewsArticle(
   if (input.title !== undefined) data.title = input.title;
   if (input.excerpt !== undefined) data.excerpt = input.excerpt;
   if (input.content !== undefined) data.content = input.content;
+  if (input.richContent !== undefined) data.richContent = input.richContent; // CMS V4.2
   if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl;
   if (input.heroMediaId !== undefined) {
     data.heroMedia = input.heroMediaId
