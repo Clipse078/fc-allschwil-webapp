@@ -15,6 +15,7 @@ import {
   Plus,
   Blocks,
   Menu,
+  Palette,
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -67,6 +68,7 @@ export default async function WebsiteCmsOverviewPage() {
     accessibleFeatureKeys.add("approval_workflow");
     accessibleFeatureKeys.add("permissions");
     accessibleFeatureKeys.add("website_settings");
+    accessibleFeatureKeys.add("design_system");
     accessibleFeatureKeys.add("seo");
     accessibleFeatureKeys.add("seo_global");
   }
@@ -315,6 +317,14 @@ export default async function WebsiteCmsOverviewPage() {
               sub: stats.approvedDataOnly ? "4-Augen aktiv" : "Standard",
               color: "#6B7280",
               bg: "rgba(107,114,128,0.08)",
+            },
+            canManageWebsite && {
+              href: CMS_ROUTES.designSystem,
+              icon: <Palette className="h-5 w-5" />,
+              label: "Design System",
+              sub: "Globale Designsprache",
+              color: "#7C3AED",
+              bg: "rgba(124,58,237,0.08)",
             },
             {
               href: CMS_ROUTES.overview,

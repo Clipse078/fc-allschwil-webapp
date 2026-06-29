@@ -113,6 +113,7 @@
  * GET /api/public/{tenantSlug}/website/components/{id}
  * GET /api/public/{tenantSlug}/website/media/{id}
  * GET /api/public/{tenantSlug}/website/sponsors
+ * GET /api/public/{tenantSlug}/website/design-system
  *
  * All content endpoints return only published, tenant-safe, non-archived content.
  * Draft and unpublished content never leaks publicly.
@@ -470,37 +471,39 @@ export {
 } from "@/lib/cms/layout-types";
 
 // ---------------------------------------------------------------------------
-// Design System — CMS V4.1 token exports
+// Design System — CMS V4.1 Tailwind token layer (internal renderer tokens)
 // ---------------------------------------------------------------------------
-// The Design System is the single source of visual truth for all renderers.
-// Re-exported for public-website consumption.
+// Re-exported from lib/cms/design-system and lib/cms/token-resolver.
+// These are Tailwind class-string tokens used by internal block renderers.
+// Names that conflict with the CMS V4 website types below are exported with
+// a "Cms" prefix to avoid duplicate identifier errors.
 // ---------------------------------------------------------------------------
 
 export type {
   DesignSystemTokens,
   TypographyTokens,
   TypographyTokenKey,
-  ButtonTokens,
+  ButtonTokens as CmsButtonTokens,
   ButtonVariantKey,
   ButtonShapeKey,
-  CardTokens,
+  CardTokens as CmsCardTokens,
   CardStyleKey,
   ColorTokens,
   ColorTokenKey,
   SpacingTokens,
   SpacingTokenKey,
-  ShadowTokens,
+  ShadowTokens as CmsShadowTokens,
   ShadowTokenKey,
-  RadiusTokens,
+  RadiusTokens as CmsRadiusTokens,
   RadiusTokenKey,
-  SectionWidthTokens,
+  SectionWidthTokens as CmsSectionWidthTokens,
   SectionWidthTokenKey,
 } from "@/lib/cms/design-system";
 
 export type { DesignSystemOverrides } from "@/lib/cms/token-resolver";
 
 export {
-  DEFAULT_DESIGN_SYSTEM,
+  DEFAULT_DESIGN_SYSTEM as CMS_DEFAULT_DESIGN_SYSTEM,
   TYPOGRAPHY_TOKENS,
   BUTTON_TOKENS,
   CARD_TOKENS,
@@ -511,7 +514,39 @@ export {
   SECTION_WIDTH_TOKENS,
 } from "@/lib/cms/design-system";
 
-export { resolveDesignSystem } from "@/lib/cms/token-resolver";
+export { resolveDesignSystem as cmsResolveDesignSystem } from "@/lib/cms/token-resolver";
+
+// ---------------------------------------------------------------------------
+// Design System — CMS V4 Design System Manager (tenant-configurable CSS tokens)
+// ---------------------------------------------------------------------------
+// Re-exported from lib/website/design-system-types.ts for public-website consumption.
+// These are CSS raw-value tokens returned by the /website/design-system endpoint
+// and consumed by SectionShell and the public website renderer.
+// Copy these types verbatim into the public website project.
+// ---------------------------------------------------------------------------
+
+export type {
+  TenantDesignSystem,
+  ResolvedDesignSystem,
+  TypographyToken,
+  TypographyScale,
+  ColourTokens,
+  ButtonTokenStyle,
+  ButtonTokens,
+  CardTokenStyle,
+  CardTokens,
+  SpacingScale,
+  ShadowTokens,
+  RadiusTokens,
+  SectionWidthTokens,
+  AnimationTokens,
+  AnimationPreference,
+} from "@/lib/website/design-system-types";
+
+export {
+  DEFAULT_DESIGN_SYSTEM,
+  resolveDesignSystem,
+} from "@/lib/website/design-system-types";
 
 // ---------------------------------------------------------------------------
 // CMS section shapes — returned by /homepage and /pages/[slug]/layout
@@ -604,4 +639,31 @@ export type WebsitePublicPageMeta = {
 export type WebsitePageLayoutData = {
   page: WebsitePublicPageMeta;
   sections: WebsitePublicSection[];
+};
+
+// ---------------------------------------------------------------------------
+// Design System — CMS V4
+// ---------------------------------------------------------------------------
+
+/**
+ * Response shape for GET /api/public/[tenant]/website/design-system
+ * Access via: envelope.data.designSystem
+ *
+ * Returns the fully-resolved tenant design system tokens. The response is:
+ *   - Always fully populated (DEFAULT_DESIGN_SYSTEM applied for any null fields).
+ *   - Colour tokens primary/secondary are sourced from the existing branding system.
+ *   - Cacheable (s-maxage=120, stale-while-revalidate=600).
+ *   - Safe for public consumption (no admin metadata).
+ *
+ * The public website SHOULD:
+ *   1. Fetch this endpoint once at build time / layout level.
+ *   2. Apply sectionWidths tokens to the SectionShell width container.
+ *   3. Apply typography tokens to global CSS or rendered headings/text.
+ *   4. Apply button/card tokens to the corresponding components.
+ *   5. Pass the resolved design system to SectionShell via the `designSystem` prop.
+ *
+ * See: lib/website/design-system-types.ts for the full ResolvedDesignSystem type.
+ */
+export type WebsiteDesignSystemData = {
+  designSystem: import("@/lib/website/design-system-types").ResolvedDesignSystem;
 };

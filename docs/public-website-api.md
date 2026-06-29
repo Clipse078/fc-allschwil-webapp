@@ -1503,6 +1503,77 @@ GET /api/public/[tenant]/website/pages/[slug]/layout → Block layout (new, Slic
 
 ---
 
+## Design System Endpoint (CMS V4)
+
+### `GET /api/public/[tenant]/website/design-system`
+
+Returns the fully-resolved tenant design system tokens.
+
+**Purpose:**
+- Provides the global visual design language (typography, colours, buttons, cards, spacing, shadows, radius, section widths, animations) for the tenant.
+- Colour tokens `primary` and `secondary` are sourced from the existing branding system (`Tenant.primaryColor`/`secondaryColor`) — no duplication.
+- All tokens are always fully resolved (platform defaults applied for any unconfigured values).
+- Future templates consume this endpoint to inherit the club's visual identity automatically.
+
+**Response envelope:**
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-06-29T12:00:00.000Z",
+  "data": {
+    "designSystem": {
+      "typography": {
+        "h1": { "preset": "premium", "fontSize": "3rem", "lineHeight": "1.15", "fontWeight": "800", "letterSpacing": "-0.025em", "textTransform": "none" },
+        "h2": { "fontSize": "2rem", "fontWeight": "700" },
+        "h3": { "fontSize": "1.5rem", "fontWeight": "600" },
+        "body": { "fontSize": "1rem", "lineHeight": "1.625" },
+        "small": { "fontSize": "0.875rem" },
+        "quote": { "fontSize": "1.25rem", "fontWeight": "500" }
+      },
+      "colors": {
+        "primary": "#0b4aa2",
+        "secondary": "#c7332c",
+        "accent": "#e8eef8",
+        "success": "#16a34a",
+        "warning": "#d97706",
+        "danger": "#dc2626",
+        "neutral": "#6b7280"
+      },
+      "buttons": {
+        "primary": { "background": "#0b4aa2", "color": "#ffffff", "borderRadius": "0.5rem", "paddingX": "1.25rem", "paddingY": "0.625rem" }
+      },
+      "cards": {
+        "default": { "background": "#ffffff", "border": "1px solid #e5e7eb", "borderRadius": "0.75rem", "shadow": "0 1px 3px 0 rgb(0 0 0 / 0.1)", "padding": "1.5rem" }
+      },
+      "spacing": { "xs": "0.25rem", "sm": "0.5rem", "md": "1rem", "lg": "1.5rem", "xl": "2.5rem", "xxl": "4rem" },
+      "shadows": { "none": "none", "sm": "...", "md": "...", "lg": "..." },
+      "radius": { "sm": "0.25rem", "md": "0.5rem", "lg": "0.75rem", "xl": "1rem" },
+      "sectionWidths": { "narrow": "56rem", "normal": "72rem", "wide": "80rem", "full": "none" },
+      "animations": { "default": "none" }
+    }
+  },
+  "meta": { "source": "stored" }
+}
+```
+
+**Cache:** `public, s-maxage=120, stale-while-revalidate=600`
+
+**Public website integration:**
+1. Fetch at build time or layout level: `GET /api/public/fc-allschwil/website/design-system`
+2. Apply `sectionWidths` tokens by passing `designSystem` to `SectionShell`.
+3. Apply `typography` tokens to global CSS variables or heading components.
+4. Apply `colors.primary`/`colors.secondary` for tenant branding.
+5. Apply `buttons` and `cards` tokens to the corresponding components.
+
+**Error responses:**
+- `404` — unknown tenant
+- `403` — website not enabled for tenant
+
+**Admin UI:** `/dashboard/website/design-system`
+
+---
+
 ## Merge Recommendation
 
 ### Status: READY TO MERGE — all blockers resolved

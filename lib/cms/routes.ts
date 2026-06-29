@@ -40,6 +40,9 @@ export const CMS_ROUTES = {
 
   // ── Configuration ──────────────────────────────────────────────────────────
   settings: "/dashboard/website/settings",
+
+  // ── Design System — CMS V4 ─────────────────────────────────────────────────
+  designSystem: "/dashboard/website/design-system",
 } as const;
 
 /**
