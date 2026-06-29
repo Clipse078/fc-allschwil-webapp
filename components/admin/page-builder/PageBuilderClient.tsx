@@ -88,6 +88,12 @@ const SplitContentCardsRenderer = dynamic(
   { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
 );
 
+// Lazy-load the admin-only WYSIWYG canvas (splitContentCards)
+const SplitContentCardsEditableCanvas = dynamic(
+  () => import("@/components/admin/page-builder/SplitContentCardsEditableCanvas"),
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
+
 // Registry of block types that have a premium property panel
 const PREMIUM_BLOCK_TYPES = new Set(["splitContentCards"]);
 
@@ -253,8 +259,8 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Live preview toggle for premium blocks
-  const [showLivePreview, setShowLivePreview] = useState(false);
+  // WYSIWYG canvas / Inspector tab for premium blocks
+  const [editorTab, setEditorTab] = useState<"canvas" | "inspector">("canvas");
   // Layout panel visibility for generic blocks
   const [showLayoutPanel, setShowLayoutPanel] = useState(false);
 
@@ -317,44 +323,61 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
           />
         </div>
 
-        {/* Premium block: dispatch to specialized config form */}
+        {/* Premium block: WYSIWYG canvas + inspector tabs */}
         {isPremium && section.type === "splitContentCards" && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Konfiguration
-              </p>
+            {/* Tab bar: Canvas ↔ Inspektor */}
+            <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
               <button
                 type="button"
-                onClick={() => setShowLivePreview((v) => !v)}
-                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
-                  showLivePreview
-                    ? "border-blue-400 bg-blue-50 text-blue-700"
-                    : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                onClick={() => setEditorTab("canvas")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-xs transition ${
+                  editorTab === "canvas"
+                    ? "bg-white font-semibold text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
-                <LayoutPanelLeft className="h-3 w-3" />
-                {showLivePreview ? "Vorschau ausblenden" : "Live-Vorschau"}
+                <LayoutPanelLeft className="h-3.5 w-3.5" />
+                Canvas
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditorTab("inspector")}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-xs transition ${
+                  editorTab === "inspector"
+                    ? "bg-white font-semibold text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Inspektor
               </button>
             </div>
-            <SplitContentCardsConfigForm
-              config={premiumConfig}
-              onChange={(updated) => {
-                setPremiumConfig(updated);
-                onChanged?.();
-              }}
-            />
-            {showLivePreview && (
-              <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
-                <p className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Live-Vorschau
-                </p>
-                <div className="overflow-auto">
-                  <Suspense fallback={<div className="h-32 animate-pulse bg-gray-100" />}>
-                    <SplitContentCardsRenderer config={premiumConfig} previewMode />
-                  </Suspense>
-                </div>
+
+            {/* Canvas tab: WYSIWYG direct editing */}
+            {editorTab === "canvas" && (
+              <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-white">
+                <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100" />}>
+                  <SplitContentCardsEditableCanvas
+                    config={premiumConfig}
+                    onConfigChange={(updated) => {
+                      setPremiumConfig(updated);
+                      onChanged?.();
+                    }}
+                  />
+                </Suspense>
               </div>
+            )}
+
+            {/* Inspector tab: full property panel */}
+            {editorTab === "inspector" && (
+              <SplitContentCardsConfigForm
+                config={premiumConfig}
+                onChange={(updated) => {
+                  setPremiumConfig(updated);
+                  onChanged?.();
+                }}
+              />
             )}
           </div>
         )}
