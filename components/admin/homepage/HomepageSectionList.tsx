@@ -613,7 +613,26 @@ function serialiseConfigDraft(
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function HomepageSectionList() {
+type HomepageSectionListProps = {
+  /** Called after any successful save/update (section saved, toggled, moved, etc.) */
+  onSaved?: () => void;
+  /** Called on every edit config change with the live draft config. */
+  onDraftChange?: (sectionId: string, config: Record<string, unknown>) => void;
+  /** Called when editing starts/stops. null = editing stopped. */
+  onEditingChange?: (sectionId: string | null) => void;
+  /** When set, this section will be selected/highlighted in the inspector. */
+  canvasSelectedId?: string | null;
+  /** Called whenever the sections array changes (for canvas sync). */
+  onSectionsChange?: (sections: HomepageSectionAdminItem[]) => void;
+};
+
+export default function HomepageSectionList({
+  onSaved,
+  onDraftChange,
+  onEditingChange,
+  canvasSelectedId,
+  onSectionsChange,
+}: HomepageSectionListProps = {}) {
   const [sections, setSections] = useState<HomepageSectionAdminItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -661,6 +680,37 @@ export default function HomepageSectionList() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Notify parent when editing changes (for canvas selection sync)
+  useEffect(() => {
+    onEditingChange?.(editingId);
+  }, [editingId, onEditingChange]);
+
+  // Notify parent when sections change (for canvas sync)
+  useEffect(() => {
+    onSectionsChange?.(sections);
+  }, [sections, onSectionsChange]);
+
+  // Propagate live draft config to canvas on every edit config change
+  useEffect(() => {
+    if (!editingId || !onDraftChange) return;
+    const section = sections.find((s) => s.id === editingId);
+    if (!section) return;
+    const config = serialiseConfigDraft(section.type, editConfig);
+    onDraftChange(editingId, config);
+  }, [editingId, editConfig, sections, onDraftChange]);
+
+  // When canvasSelectedId changes (user clicked a section on the canvas),
+  // auto-open that section in the inspector
+  useEffect(() => {
+    if (!canvasSelectedId || canvasSelectedId === editingId) return;
+    const section = sections.find((s) => s.id === canvasSelectedId);
+    if (!section) return;
+    setEditingId(section.id);
+    setEditLabel(section.label);
+    setEditConfig(initConfigDraft(section.config));
+    setEditError(null);
+  }, [canvasSelectedId, editingId, sections]);
 
   async function handleToggle(id: string) {
     setActionPending(id);
@@ -857,6 +907,7 @@ export default function HomepageSectionList() {
       setEditingId(null);
       setEditLabel("");
       setEditConfig({});
+      onSaved?.();
     } finally {
       setEditPending(false);
     }

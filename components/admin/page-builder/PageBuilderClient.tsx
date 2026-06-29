@@ -3,17 +3,20 @@
 /**
  * components/admin/page-builder/PageBuilderClient.tsx
  *
- * Premium Page Builder — CMS V2 Slice 9.
+ * Live Visual Page Builder — CMS V3.
  *
  * Features:
+ *   - Split-pane layout: Visual Preview Canvas (left) | Inspector Panel (right)
+ *   - Live preview: every Inspector change updates the canvas instantly
+ *   - Section selection: click section on canvas → highlights + opens inspector
+ *   - Responsive viewport controls: Desktop / Laptop / Tablet / Mobile
  *   - Drag-and-drop reordering (native HTML5 DnD)
  *   - Move Up / Move Down
  *   - Duplicate Block
  *   - Delete Block (with confirmation)
- *   - Collapse / Expand blocks
+ *   - Collapse / Expand blocks in inspector
  *   - Inline config editor with autosave (debounced 1.5s)
  *   - Unsaved changes detection (beforeunload warning)
- *   - Responsive preview panel (Desktop / Tablet / Mobile)
  *   - Section-level publish/approval status badges
  *   - Publishing workflow actions (publish, unpublish, schedule, request-review)
  *   - Version history panel
@@ -49,14 +52,13 @@ import {
   Clock,
   History,
   Monitor,
-  Tablet,
-  Smartphone,
   Send,
   CheckCircle2,
   AlertCircle,
   Save,
-  LayoutPanelLeft,
   Layers,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -75,6 +77,11 @@ import {
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
 import type { SectionLayout } from "@/lib/cms/layout-types";
 import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
+import LivePreviewCanvas, {
+  ViewportToolbar,
+  type ViewportMode,
+  type CanvasSection,
+} from "@/components/admin/page-builder/LivePreviewCanvas";
 
 // Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
 const SplitContentCardsConfigForm = dynamic(
@@ -82,25 +89,8 @@ const SplitContentCardsConfigForm = dynamic(
   { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
 );
 
-// Lazy-load the shared block renderer for live preview
-const SplitContentCardsRenderer = dynamic(
-  () => import("@/components/website/blocks/SplitContentCardsRenderer"),
-  { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
-);
-
 // Registry of block types that have a premium property panel
 const PREMIUM_BLOCK_TYPES = new Set(["splitContentCards"]);
-
-/**
- * Renders a visual preview for a known block type.
- * Falls back to JSON config summary for generic blocks.
- */
-function BlockVisualPreview({ type, config }: { type: string; config: Record<string, unknown> }) {
-  if (type === "splitContentCards") {
-    return <SplitContentCardsRenderer config={config} previewMode />;
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -215,12 +205,12 @@ type ConfigEditorProps = {
   onSave: (label: string, config: Record<string, unknown>) => Promise<void>;
   onCancel: () => void;
   onChanged?: () => void;
+  onDraftChange?: (config: Record<string, unknown>) => void;
   autoSaveRef?: React.MutableRefObject<(() => void) | null>;
 };
 
-function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: ConfigEditorProps) {
+function ConfigEditor({ section, onSave, onCancel, onChanged, onDraftChange, autoSaveRef }: ConfigEditorProps) {
   const def = getBlockDefinition(section.type);
-  // Exclude _layout from the generic key-value editor — it is handled by LayoutConfigPanel
   const configKeys = useMemo(
     () => (def?.configKeys ?? []).filter((k) => k !== "_layout"),
     [def],
@@ -230,7 +220,6 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
 
   const [label, setLabel] = useState(section.label);
 
-  // Generic block state (string values per configKey, excluding _layout)
   const [values, setValues] = useState<Record<string, string>>(() => {
     if (isPremium) return {};
     const init: Record<string, string> = {};
@@ -241,21 +230,16 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
     return init;
   });
 
-  // Generic block layout state (shared _layout object)
   const [genericLayout, setGenericLayout] = useState<SectionLayout>(
     () => (section.config._layout as SectionLayout | undefined) ?? {},
   );
 
-  // Premium block state (full config object)
   const [premiumConfig, setPremiumConfig] = useState<Record<string, unknown>>(() =>
     isPremium ? { ...section.config } : {},
   );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Live preview toggle for premium blocks
-  const [showLivePreview, setShowLivePreview] = useState(false);
-  // Layout panel visibility for generic blocks
   const [showLayoutPanel, setShowLayoutPanel] = useState(false);
 
   const buildConfig = useCallback((): Record<string, unknown> => {
@@ -273,6 +257,11 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
     return config;
   }, [isPremium, premiumConfig, configKeys, values, supportsLayout, genericLayout]);
 
+  // Propagate draft config to canvas on every change
+  useEffect(() => {
+    onDraftChange?.(buildConfig());
+  }, [buildConfig, onDraftChange]);
+
   async function handleSave() {
     const trimmed = label.trim();
     if (!trimmed) { setError("Label darf nicht leer sein."); return; }
@@ -287,7 +276,6 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
     }
   }
 
-  // Expose trigger for autosave
   useEffect(() => {
     if (autoSaveRef) {
       autoSaveRef.current = () => {
@@ -303,132 +291,104 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
   }, [label, buildConfig, onSave, autoSaveRef]);
 
   return (
-    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <div className="space-y-3">
-        <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
-            Label
-          </label>
-          <input
-            className="fca-input w-full"
-            value={label}
-            onChange={(e) => { setLabel(e.target.value); onChanged?.(); }}
-            placeholder="Sektionsbezeichnung"
+    <div className="space-y-3">
+      <div>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
+          Label
+        </label>
+        <input
+          className="fca-input w-full"
+          value={label}
+          onChange={(e) => { setLabel(e.target.value); onChanged?.(); }}
+          placeholder="Sektionsbezeichnung"
+        />
+      </div>
+
+      {/* Premium block: dispatch to specialized config form */}
+      {isPremium && section.type === "splitContentCards" && (
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Konfiguration
+          </p>
+          <SplitContentCardsConfigForm
+            config={premiumConfig}
+            onChange={(updated) => {
+              setPremiumConfig(updated);
+              onChanged?.();
+            }}
           />
         </div>
+      )}
 
-        {/* Premium block: dispatch to specialized config form */}
-        {isPremium && section.type === "splitContentCards" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Konfiguration
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowLivePreview((v) => !v)}
-                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
-                  showLivePreview
-                    ? "border-blue-400 bg-blue-50 text-blue-700"
-                    : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                <LayoutPanelLeft className="h-3 w-3" />
-                {showLivePreview ? "Vorschau ausblenden" : "Live-Vorschau"}
-              </button>
-            </div>
-            <SplitContentCardsConfigForm
-              config={premiumConfig}
-              onChange={(updated) => {
-                setPremiumConfig(updated);
-                onChanged?.();
-              }}
-            />
-            {showLivePreview && (
-              <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
-                <p className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Live-Vorschau
-                </p>
-                <div className="overflow-auto">
-                  <Suspense fallback={<div className="h-32 animate-pulse bg-gray-100" />}>
-                    <SplitContentCardsRenderer config={premiumConfig} previewMode />
-                  </Suspense>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Generic block: key-value editor */}
-        {!isPremium && configKeys.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-              Konfiguration
-            </p>
-            {configKeys.map((k) => (
-              <div key={k} className="flex items-center gap-2">
-                <label className="w-36 flex-shrink-0 text-xs text-[var(--text-2)]">{k}</label>
-                <input
-                  className="fca-input flex-1"
-                  value={values[k] ?? ""}
-                  onChange={(e) => { setValues((prev) => ({ ...prev, [k]: e.target.value })); onChanged?.(); }}
-                  placeholder={`${k}…`}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!isPremium && configKeys.length === 0 && (
-          <p className="text-xs text-[var(--muted)] italic">
-            Dieser Blocktyp hat keine konfigurierbaren Felder.
+      {/* Generic block: key-value editor */}
+      {!isPremium && configKeys.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Konfiguration
           </p>
-        )}
-
-        {/* Shared Layout panel — shown for ALL blocks that support layout */}
-        {!isPremium && supportsLayout && (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-            <button
-              type="button"
-              onClick={() => setShowLayoutPanel((v) => !v)}
-              className="flex w-full items-center justify-between px-3 py-2.5 text-left"
-            >
-              <div className="flex items-center gap-2">
-                <Layers className="h-3.5 w-3.5 text-[var(--text-2)]" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Layout
-                </span>
-              </div>
-              <ChevronDown
-                className={`h-3.5 w-3.5 text-[var(--muted)] transition-transform ${showLayoutPanel ? "rotate-180" : ""}`}
+          {configKeys.map((k) => (
+            <div key={k} className="flex items-center gap-2">
+              <label className="w-28 flex-shrink-0 text-xs text-[var(--text-2)]">{k}</label>
+              <input
+                className="fca-input flex-1"
+                value={values[k] ?? ""}
+                onChange={(e) => { setValues((prev) => ({ ...prev, [k]: e.target.value })); onChanged?.(); }}
+                placeholder={`${k}…`}
               />
-            </button>
-            {showLayoutPanel && (
-              <div className="border-t border-[var(--border)] p-3">
-                <LayoutConfigPanel
-                  layout={genericLayout}
-                  onChange={(layout) => {
-                    setGenericLayout(layout);
-                    onChanged?.();
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {error && <p className="text-xs text-rose-600">{error}</p>}
-
-        <div className="flex items-center gap-2 pt-1">
-          <button type="button" onClick={handleSave} disabled={saving} className="fca-button-primary py-1.5 text-xs">
-            <Check className="h-3.5 w-3.5" />
-            {saving ? "Speichern…" : "Speichern"}
-          </button>
-          <button type="button" onClick={onCancel} disabled={saving} className="fca-button-secondary py-1.5 text-xs">
-            <X className="h-3.5 w-3.5" />
-            Abbrechen
-          </button>
+            </div>
+          ))}
         </div>
+      )}
+
+      {!isPremium && configKeys.length === 0 && (
+        <p className="text-xs text-[var(--muted)] italic">
+          Dieser Blocktyp hat keine konfigurierbaren Felder.
+        </p>
+      )}
+
+      {/* Shared Layout panel */}
+      {!isPremium && supportsLayout && (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+          <button
+            type="button"
+            onClick={() => setShowLayoutPanel((v) => !v)}
+            className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="h-3.5 w-3.5 text-[var(--text-2)]" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Layout
+              </span>
+            </div>
+            <ChevronDown
+              className={`h-3.5 w-3.5 text-[var(--muted)] transition-transform ${showLayoutPanel ? "rotate-180" : ""}`}
+            />
+          </button>
+          {showLayoutPanel && (
+            <div className="border-t border-[var(--border)] p-3">
+              <LayoutConfigPanel
+                layout={genericLayout}
+                onChange={(layout) => {
+                  setGenericLayout(layout);
+                  onChanged?.();
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-rose-600">{error}</p>}
+
+      <div className="flex items-center gap-2 pt-1 sticky bottom-0 bg-[var(--surface)] py-2">
+        <button type="button" onClick={handleSave} disabled={saving} className="fca-button-primary py-1.5 text-xs">
+          <Check className="h-3.5 w-3.5" />
+          {saving ? "Speichern…" : "Speichern"}
+        </button>
+        <button type="button" onClick={onCancel} disabled={saving} className="fca-button-secondary py-1.5 text-xs">
+          <X className="h-3.5 w-3.5" />
+          Schliessen
+        </button>
       </div>
     </div>
   );
@@ -484,220 +444,37 @@ function AddSectionPanel({
   }
 
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <p className="text-sm font-semibold text-[var(--foreground)] mb-3">Neue Sektion hinzufügen</p>
-      <div className="space-y-3">
-        <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
-            Blocktyp
-          </label>
-          <select
-            className="fca-input w-full"
-            value={selectedType}
-            onChange={(e) => { setSelectedType(e.target.value); setLabel(""); }}
-          >
-            {AVAILABLE_BLOCKS.map((b) => (
-              <option key={b.type} value={b.type}>
-                {b.displayName} — {b.category}
-                {b.status === "foundation-ready" ? " (foundation-ready)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        {def && <p className="text-xs text-[var(--muted)]">{def.description}</p>}
-        <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
-            Label (optional)
-          </label>
-          <input
-            className="fca-input w-full"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder={def?.displayName ?? selectedType}
-          />
-        </div>
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+      <p className="text-xs font-semibold text-[var(--foreground)] mb-2">Neue Sektion</p>
+      <div className="space-y-2">
+        <select
+          className="fca-input w-full text-xs"
+          value={selectedType}
+          onChange={(e) => { setSelectedType(e.target.value); setLabel(""); }}
+        >
+          {AVAILABLE_BLOCKS.map((b) => (
+            <option key={b.type} value={b.type}>
+              {b.displayName} — {b.category}
+            </option>
+          ))}
+        </select>
+        {def && <p className="text-[11px] text-[var(--muted)]">{def.description}</p>}
+        <input
+          className="fca-input w-full text-xs"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder={def?.displayName ?? "Label"}
+        />
         {error && <p className="text-xs text-rose-600">{error}</p>}
         <div className="flex items-center gap-2">
           <button type="button" onClick={handleCreate} disabled={saving || !selectedType} className="fca-button-primary py-1.5 text-xs">
             <Plus className="h-3.5 w-3.5" />
-            {saving ? "Erstelle…" : "Sektion erstellen"}
+            {saving ? "Erstelle…" : "Erstellen"}
           </button>
           <button type="button" onClick={onCancel} disabled={saving} className="fca-button-secondary py-1.5 text-xs">
             <X className="h-3.5 w-3.5" />
-            Abbrechen
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Preview panel
-// ---------------------------------------------------------------------------
-
-type ViewportMode = "desktop" | "tablet" | "mobile";
-
-const VIEWPORT_CONFIG: Record<ViewportMode, { label: string; icon: React.ElementType; width: string }> = {
-  desktop: { label: "Desktop", icon: Monitor, width: "100%" },
-  tablet: { label: "Tablet", icon: Tablet, width: "768px" },
-  mobile: { label: "Mobile", icon: Smartphone, width: "375px" },
-};
-
-type PreviewSection = {
-  id: string;
-  type: string;
-  label: string;
-  sortOrder: number;
-  isEnabled: boolean;
-  publishStatus: string;
-  approvalStatus: string;
-  config: Record<string, unknown>;
-  block: { displayName: string; description: string; category: string } | null;
-};
-
-function PreviewPanel({
-  pageId,
-  pageTitle,
-  pageSlug,
-  onClose,
-}: {
-  pageId: string;
-  pageTitle: string;
-  pageSlug: string;
-  onClose: () => void;
-}) {
-  const [viewport, setViewport] = useState<ViewportMode>("desktop");
-  const [loading, setLoading] = useState(true);
-  const [sections, setSections] = useState<PreviewSection[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/website-pages/${pageId}/preview`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled) { setSections(d.sections ?? []); setLoading(false); }
-      })
-      .catch(() => {
-        if (!cancelled) { setError("Vorschau konnte nicht geladen werden."); setLoading(false); }
-      });
-    return () => { cancelled = true; };
-  }, [pageId]);
-
-  const vc = VIEWPORT_CONFIG[viewport];
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Eye className="h-4 w-4 text-[var(--text-2)]" />
-          <div>
-            <p className="text-sm font-semibold">{pageTitle}</p>
-            <p className="text-[11px] text-[var(--muted)]">/{pageSlug}</p>
-          </div>
-        </div>
-
-        {/* Viewport selector */}
-        <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
-          {(["desktop", "tablet", "mobile"] as ViewportMode[]).map((v) => {
-            const vc2 = VIEWPORT_CONFIG[v];
-            const Icon = vc2.icon;
-            return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setViewport(v)}
-                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition ${
-                  viewport === v
-                    ? "bg-white text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{vc2.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <button type="button" onClick={onClose} className="fca-button-secondary px-2.5">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Preview area */}
-      <div className="flex-1 overflow-auto bg-[var(--surface-2)] p-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-32 text-[var(--muted)]">
-            <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-            Lädt Vorschau…
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-32 text-rose-600 text-sm">{error}</div>
-        ) : (
-            <div className="mx-auto transition-all duration-300 rounded-lg border border-[var(--border)] bg-white overflow-hidden"
-              style={{ maxWidth: vc.width }}
-            >
-              {sections.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-[var(--muted)]">
-                  <Blocks className="h-8 w-8 mb-2 opacity-40" />
-                  <p className="text-sm">Keine Sektionen vorhanden</p>
-                </div>
-              ) : (
-                <div>
-                  {sections.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`border-b border-[var(--border)] last:border-0 ${
-                        !s.isEnabled || s.publishStatus !== "PUBLISHED" ? "opacity-50" : ""
-                      }`}
-                    >
-                      {/* Section status strip */}
-                      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-2)]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-[var(--foreground)]">{s.label}</span>
-                          <SectionTypeBadge type={s.type} />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <EnabledBadge isEnabled={s.isEnabled} />
-                          <PublishBadge status={s.publishStatus} />
-                        </div>
-                      </div>
-
-                      {/* Visual block render (if renderer available) */}
-                      <Suspense fallback={<div className="h-16 animate-pulse bg-gray-50" />}>
-                        <BlockVisualPreview type={s.type} config={s.config} />
-                      </Suspense>
-
-                      {/* Fallback: JSON config for non-premium blocks */}
-                      {!PREMIUM_BLOCK_TYPES.has(s.type) && Object.keys(s.config).length > 0 && (
-                        <div className="px-4 pb-3">
-                          <div className="rounded bg-[var(--surface-2)] px-2 py-1.5">
-                            <p className="text-[10px] font-mono text-[var(--muted)]">
-                              {JSON.stringify(s.config, null, 2).slice(0, 200)}
-                              {JSON.stringify(s.config).length > 200 ? "…" : ""}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      {!PREMIUM_BLOCK_TYPES.has(s.type) && s.block && (
-                        <p className="px-4 pb-3 text-[11px] text-[var(--muted)]">{s.block.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center gap-3 text-xs text-[var(--muted)]">
-        <span>{sections.length} Sektion{sections.length !== 1 ? "en" : ""} (inkl. Entwürfe)</span>
-        <span>·</span>
-        <span>{sections.filter((s) => s.publishStatus === "PUBLISHED" && s.isEnabled).length} öffentlich sichtbar</span>
       </div>
     </div>
   );
@@ -751,51 +528,47 @@ function RevisionHistoryPanel({
   }
 
   return (
-    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-[var(--text-2)]" />
-          <p className="text-sm font-semibold">Versionshistorie</p>
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <History className="h-3.5 w-3.5 text-[var(--text-2)]" />
+          <p className="text-xs font-semibold">Versionshistorie</p>
         </div>
         <button type="button" onClick={onClose} className="text-[var(--muted)] hover:text-[var(--foreground)]">
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {loading && (
-        <div className="flex items-center gap-2 py-4 text-sm text-[var(--muted)]">
-          <RefreshCw className="h-4 w-4 animate-spin" /> Lädt…
+        <div className="flex items-center gap-2 py-3 text-xs text-[var(--muted)]">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Lädt…
         </div>
       )}
       {error && <p className="text-xs text-rose-600 py-2">{error}</p>}
 
       {!loading && !error && revisions.length === 0 && (
-        <p className="text-xs text-[var(--muted)] py-2">Noch keine Versionen vorhanden.</p>
+        <p className="text-xs text-[var(--muted)] py-2">Noch keine Versionen.</p>
       )}
 
       {!loading && revisions.length > 0 && (
-        <div className="space-y-1 max-h-72 overflow-y-auto">
+        <div className="space-y-1 max-h-56 overflow-y-auto">
           {revisions.map((rev) => (
-              <div
+            <div
               key={rev.id}
-              className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs"
+              className="flex items-start justify-between gap-2 rounded border border-[var(--border)] bg-white px-2 py-1.5 text-[11px]"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5 font-medium text-[var(--foreground)]">
+                <div className="flex flex-wrap items-center gap-1 font-medium text-[var(--foreground)]">
                   <span className="text-[var(--muted)]">v{rev.versionNumber}</span>
                   {rev.isRestore && (
-                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                    <span className="rounded bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-700">
                       Wiederherstellung
                     </span>
                   )}
-                  {rev.changeNote && (
-                    <span className="truncate">{rev.changeNote}</span>
-                  )}
+                  {rev.changeNote && <span className="truncate">{rev.changeNote}</span>}
                 </div>
                 <div className="text-[var(--muted)] mt-0.5">
-                  {rev.createdByUser
-                    ? `${rev.createdByUser.firstName} ${rev.createdByUser.lastName} · `
-                    : ""}
+                  {rev.createdByUser ? `${rev.createdByUser.firstName} ${rev.createdByUser.lastName} · ` : ""}
                   {new Date(rev.createdAt).toLocaleString("de-CH")}
                 </div>
               </div>
@@ -803,9 +576,9 @@ function RevisionHistoryPanel({
                 type="button"
                 onClick={() => handleRestore(rev.id, rev.versionNumber)}
                 disabled={restoring === rev.id}
-                className="shrink-0 rounded border border-[var(--border)] px-2 py-1 text-[11px] font-medium hover:bg-[var(--surface-2)] disabled:opacity-50 transition"
+                className="shrink-0 rounded border border-[var(--border)] px-1.5 py-0.5 text-[11px] hover:bg-[var(--surface-2)] disabled:opacity-50 transition"
               >
-                {restoring === rev.id ? "…" : "Wiederherstellen"}
+                {restoring === rev.id ? "…" : "Restore"}
               </button>
             </div>
           ))}
@@ -862,76 +635,50 @@ function WorkflowPanel({
   const canPublish = as === SECTION_APPROVAL_STATUS.NOT_REQUIRED || as === SECTION_APPROVAL_STATUS.APPROVED;
 
   return (
-    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold">Workflow</p>
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold">Workflow</p>
         <button type="button" onClick={onClose} className="text-[var(--muted)] hover:text-[var(--foreground)]">
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {ps === SECTION_PUBLISH_STATUS.DRAFT && canPublish && (
-          <button
-            type="button"
-            onClick={() => doAction("publish")}
-            disabled={pending}
-            className="fca-button-primary py-1.5 text-xs"
-          >
-            <Globe className="h-3.5 w-3.5" />
+          <button type="button" onClick={() => doAction("publish")} disabled={pending} className="fca-button-primary py-1 text-xs">
+            <Globe className="h-3 w-3" />
             Veröffentlichen
           </button>
         )}
         {ps === SECTION_PUBLISH_STATUS.PUBLISHED && (
-          <button
-            type="button"
-            onClick={() => doAction("unpublish")}
-            disabled={pending}
-            className="fca-button-secondary py-1.5 text-xs"
-          >
-            <GlobeLock className="h-3.5 w-3.5" />
+          <button type="button" onClick={() => doAction("unpublish")} disabled={pending} className="fca-button-secondary py-1 text-xs">
+            <GlobeLock className="h-3 w-3" />
             Zurückziehen
           </button>
         )}
         {as !== SECTION_APPROVAL_STATUS.IN_REVIEW && (
-          <button
-            type="button"
-            onClick={() => doAction("request-review")}
-            disabled={pending}
-            className="fca-button-secondary py-1.5 text-xs"
-          >
-            <Send className="h-3.5 w-3.5" />
+          <button type="button" onClick={() => doAction("request-review")} disabled={pending} className="fca-button-secondary py-1 text-xs">
+            <Send className="h-3 w-3" />
             Zur Überprüfung
           </button>
         )}
         {as === SECTION_APPROVAL_STATUS.IN_REVIEW && (
           <>
-            <button
-              type="button"
-              onClick={() => doAction("approve")}
-              disabled={pending}
-              className="fca-button-primary py-1.5 text-xs"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
+            <button type="button" onClick={() => doAction("approve")} disabled={pending} className="fca-button-primary py-1 text-xs">
+              <CheckCircle2 className="h-3 w-3" />
               Freigeben
             </button>
-            <button
-              type="button"
-              onClick={() => doAction("reject")}
-              disabled={pending}
-              className="fca-button-secondary py-1.5 text-xs text-rose-600"
-            >
-              <X className="h-3.5 w-3.5" />
+            <button type="button" onClick={() => doAction("reject")} disabled={pending} className="fca-button-secondary py-1 text-xs text-rose-600">
+              <X className="h-3 w-3" />
               Ablehnen
             </button>
           </>
         )}
       </div>
 
-      {/* Schedule */}
       {canPublish && (
-        <div className="mt-3 flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" />
+        <div className="mt-2 flex items-center gap-1.5">
+          <Clock className="h-3 w-3 text-[var(--muted)] shrink-0" />
           <input
             type="datetime-local"
             className="fca-input flex-1 text-xs"
@@ -942,14 +689,182 @@ function WorkflowPanel({
             type="button"
             disabled={pending || !scheduledAt}
             onClick={() => doAction("schedule", { scheduledAt: new Date(scheduledAt).toISOString() })}
-            className="fca-button-secondary py-1.5 text-xs shrink-0"
+            className="fca-button-secondary py-1 text-xs shrink-0"
           >
             Planen
           </button>
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-rose-600">{error}</p>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inspector section row (compact)
+// ---------------------------------------------------------------------------
+
+type InspectorSectionRowProps = {
+  section: PageSectionAdminItem;
+  idx: number;
+  isSelected: boolean;
+  isEditing: boolean;
+  isCollapsed: boolean;
+  isDragging: boolean;
+  isDragTarget: boolean;
+  actionPending: string | null;
+  sectionsLength: number;
+  onSelect: () => void;
+  onToggleCollapse: () => void;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onWorkflow: () => void;
+  onHistory: () => void;
+  onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+};
+
+function InspectorSectionRow({
+  section,
+  idx,
+  isSelected,
+  isEditing,
+  isCollapsed,
+  isDragging,
+  isDragTarget,
+  actionPending,
+  sectionsLength,
+  onSelect,
+  onToggleCollapse,
+  onToggle,
+  onEdit,
+  onDuplicate,
+  onWorkflow,
+  onHistory,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}: InspectorSectionRowProps) {
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={`border-b border-[var(--border)] last:border-0 transition-colors ${
+        isDragging ? "opacity-40" : ""
+      } ${isDragTarget && !isDragging ? "bg-blue-50" : ""} ${
+        isSelected ? "bg-blue-50/50" : ""
+      }`}
+    >
+      {/* Compact row */}
+      <div
+        className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+        onClick={onSelect}
+      >
+        {/* Drag handle */}
+        <div
+          className="cursor-grab text-[var(--muted)] shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </div>
+
+        {/* Index + label */}
+        <span className="text-[11px] text-[var(--muted)] w-4 text-right shrink-0">{idx + 1}.</span>
+        <div className="min-w-0 flex-1">
+          <p className={`text-xs font-medium truncate ${isSelected ? "text-blue-700" : "text-[var(--foreground)]"}`}>
+            {section.label}
+          </p>
+          <p className="text-[10px] text-[var(--muted)] truncate">
+            {getBlockDefinition(section.type)?.displayName ?? section.type}
+          </p>
+        </div>
+
+        {/* Status dots */}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className={`h-1.5 w-1.5 rounded-full ${section.isEnabled ? "bg-emerald-400" : "bg-gray-300"}`} />
+          <span className={`h-1.5 w-1.5 rounded-full ${section.publishStatus === "PUBLISHED" ? "bg-blue-400" : "bg-amber-300"}`} />
+        </div>
+
+        {/* Mini actions */}
+        <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={onEdit}
+            className={`rounded p-1 transition hover:bg-[var(--surface-2)] ${isEditing ? "text-blue-600 bg-blue-50" : "text-[var(--muted)]"}`}
+            title="Bearbeiten"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={actionPending === section.id}
+            className="rounded p-1 text-[var(--muted)] transition hover:bg-[var(--surface-2)]"
+            title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
+          >
+            {section.isEnabled ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={actionPending === section.id}
+            className="rounded p-1 text-rose-400 transition hover:bg-rose-50 hover:text-rose-600"
+            title="Löschen"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded: config editor + workflow + history */}
+      {!isCollapsed && isEditing && (
+        <div className="px-3 pb-3 border-t border-[var(--border)] bg-[var(--surface)] space-y-2 pt-2">
+          {/* Move/duplicate/workflow/history actions */}
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={actionPending === section.id || idx === 0}
+              className="sce-icon-button disabled:opacity-30"
+              title="Nach oben"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={actionPending === section.id || idx === sectionsLength - 1}
+              className="sce-icon-button disabled:opacity-30"
+              title="Nach unten"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={onDuplicate} disabled={actionPending === section.id} className="sce-icon-button" title="Duplizieren">
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={onWorkflow} className="sce-icon-button" title="Workflow">
+              <Globe className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={onHistory} className="sce-icon-button" title="Versionshistorie">
+              <History className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -970,14 +885,19 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
 
-  // UI state
+  // Inspector UI state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+
+  // Live preview state
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftConfigs, setDraftConfigs] = useState<Map<string, Record<string, unknown>>>(new Map());
+  const [viewport, setViewport] = useState<ViewportMode>("desktop");
 
   // Autosave state
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -989,6 +909,10 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   // Drag-and-drop state
   const [dragSrcId, setDragSrcId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  // Ref to scroll inspector to the config editor
+  const configEditorRef = useRef<HTMLDivElement | null>(null);
+  const inspectorRef = useRef<HTMLDivElement | null>(null);
 
   // Unsaved changes warning
   useEffect(() => {
@@ -1003,6 +927,15 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
 
+  // When editingId changes, scroll the config editor into view
+  useEffect(() => {
+    if (editingId && configEditorRef.current) {
+      setTimeout(() => {
+        configEditorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
+  }, [editingId]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -1011,6 +944,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "Ladefehler");
       setSections(data.sections ?? []);
+      // Clear draft configs when reloading
+      setDraftConfigs(new Map());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
@@ -1036,6 +971,32 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           .catch(() => setSaveState("error"));
       }
     }, AUTOSAVE_DELAY_MS);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Draft config handler (live preview updates)
+  // ---------------------------------------------------------------------------
+
+  const handleDraftChange = useCallback((sectionId: string, config: Record<string, unknown>) => {
+    setDraftConfigs((prev) => {
+      const next = new Map(prev);
+      next.set(sectionId, config);
+      return next;
+    });
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Canvas selection handler
+  // ---------------------------------------------------------------------------
+
+  const handleCanvasSelectSection = useCallback((id: string) => {
+    setSelectedId(id);
+    setEditingId(id);
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -1078,8 +1039,10 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       if (res.ok || res.status === 204) {
         setSections((prev) => prev.filter((s) => s.id !== id));
         if (editingId === id) setEditingId(null);
+        if (selectedId === id) setSelectedId(null);
         if (historyId === id) setHistoryId(null);
         if (workflowId === id) setWorkflowId(null);
+        setDraftConfigs((prev) => { const next = new Map(prev); next.delete(id); return next; });
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data?.error ?? "Löschen fehlgeschlagen");
@@ -1112,6 +1075,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "Speichern fehlgeschlagen");
       setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
+      // Clear draft after save (saved state is now canonical)
+      setDraftConfigs((prev) => { const next = new Map(prev); next.delete(id); return next; });
       setSaveState("saved");
       setLastSaved(new Date());
       setIsDirty(false);
@@ -1125,6 +1090,9 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   function handleCreated(section: PageSectionAdminItem) {
     setSections((prev) => [...prev, section]);
     setShowAdd(false);
+    // Auto-select newly created section
+    setSelectedId(section.id);
+    setEditingId(section.id);
   }
 
   function handleToggleCollapse(id: string) {
@@ -1139,9 +1107,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   // Drag-and-drop handlers
   // ---------------------------------------------------------------------------
 
-  function handleDragStart(id: string) {
-    setDragSrcId(id);
-  }
+  function handleDragStart(id: string) { setDragSrcId(id); }
 
   function handleDragOver(e: React.DragEvent, id: string) {
     e.preventDefault();
@@ -1151,22 +1117,16 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   async function handleDrop(e: React.DragEvent, targetId: string) {
     e.preventDefault();
     if (!dragSrcId || dragSrcId === targetId) {
-      setDragSrcId(null);
-      setDragOverId(null);
-      return;
+      setDragSrcId(null); setDragOverId(null); return;
     }
-
     const srcIdx = sections.findIndex((s) => s.id === dragSrcId);
     const tgtIdx = sections.findIndex((s) => s.id === targetId);
     if (srcIdx === -1 || tgtIdx === -1) { setDragSrcId(null); setDragOverId(null); return; }
-
     const reordered = [...sections];
     const [moved] = reordered.splice(srcIdx, 1);
     reordered.splice(tgtIdx, 0, moved);
     setSections(reordered);
-    setDragSrcId(null);
-    setDragOverId(null);
-
+    setDragSrcId(null); setDragOverId(null);
     try {
       const res = await fetch(`/api/website-pages/${pageId}/sections/reorder`, {
         method: "PATCH",
@@ -1175,15 +1135,33 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) setSections(data.sections ?? reordered);
-    } catch {
-      // Optimistic update already applied; server sync failed silently
-    }
+    } catch { /* optimistic update remains */ }
   }
 
-  function handleDragEnd() {
-    setDragSrcId(null);
-    setDragOverId(null);
-  }
+  function handleDragEnd() { setDragSrcId(null); setDragOverId(null); }
+
+  // ---------------------------------------------------------------------------
+  // Canvas sections (merge saved state + draft state)
+  // ---------------------------------------------------------------------------
+
+  const canvasSections = useMemo(
+    (): CanvasSection[] =>
+      sections.map((s) => ({
+        id: s.id,
+        type: s.type,
+        label: s.label,
+        isEnabled: s.isEnabled,
+        publishStatus: s.publishStatus,
+        config: s.config,
+      })),
+    [sections],
+  );
+
+  // Active editing section
+  const editingSection = useMemo(
+    () => sections.find((s) => s.id === editingId) ?? null,
+    [sections, editingId],
+  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -1191,15 +1169,6 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
 
   return (
     <>
-      {showPreview && (
-        <PreviewPanel
-          pageId={pageId}
-          pageTitle={pageTitle}
-          pageSlug={pageSlug}
-          onClose={() => setShowPreview(false)}
-        />
-      )}
-
       {showTemplates && (
         <PageTemplatesPicker
           open={showTemplates}
@@ -1209,264 +1178,171 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
         />
       )}
 
-      <div className="space-y-4">
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-[var(--muted)]">
-              {loading ? "Lädt…" : `${sections.length} Sektion${sections.length !== 1 ? "en" : ""}`}
-            </p>
-            <SaveIndicator state={saveState} lastSaved={lastSaved} />
-          </div>
+      <div className="flex flex-col gap-0 rounded-xl border border-[var(--border)] overflow-hidden bg-[var(--background)]">
+
+        {/* ── Unified Toolbar ─────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+          {/* Left: inspector toggle + page info */}
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setInspectorCollapsed((v) => !v)}
+              className="sce-icon-button"
+              title={inspectorCollapsed ? "Inspector öffnen" : "Inspector schliessen"}
+            >
+              {inspectorCollapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </button>
+            <div className="hidden sm:block">
+              <p className="text-xs font-semibold text-[var(--foreground)] truncate">{pageTitle}</p>
+              {pageSlug && <p className="text-[10px] text-[var(--muted)]">/{pageSlug}</p>}
+            </div>
+            <SaveIndicator state={saveState} lastSaved={lastSaved} />
+            {isDirty && saveState !== "saving" && (
+              <span className="flex items-center gap-1 text-[11px] text-amber-600">
+                <Save className="h-3 w-3" />
+                Ungespeichert
+              </span>
+            )}
+          </div>
+
+          {/* Center: viewport controls */}
+          <ViewportToolbar viewport={viewport} onChange={setViewport} />
+
+          {/* Right: add section + templates + refresh */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
               onClick={() => setShowTemplates(true)}
-              className="fca-button-secondary px-2.5"
+              className="fca-button-secondary px-2 py-1.5 text-xs"
               title="Seitenvorlage anwenden"
             >
               <Layers className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline ml-1 text-xs">Vorlage</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPreview(true)}
-              className="fca-button-secondary px-2.5"
-              title="Vorschau"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline ml-1 text-xs">Vorschau</span>
+              <span className="hidden md:inline ml-1">Vorlage</span>
             </button>
             <button
               type="button"
               onClick={load}
               disabled={loading}
-              className="fca-button-secondary px-2.5"
+              className="fca-button-secondary px-2 py-1.5 text-xs"
               title="Aktualisieren"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
-            {!showAdd && (
-              <button
-                type="button"
-                onClick={() => { setShowAdd(true); setEditingId(null); }}
-                className="fca-button-primary"
-              >
-                <Plus className="h-4 w-4" />
-                Sektion hinzufügen
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => { setShowAdd(true); setEditingId(null); }}
+              className="fca-button-primary px-2.5 py-1.5 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline ml-1">Sektion</span>
+            </button>
           </div>
         </div>
 
-        {/* Unsaved changes warning */}
-        {isDirty && saveState !== "saving" && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <Save className="h-3.5 w-3.5 shrink-0" />
-            Ungespeicherte Änderungen — wird automatisch gespeichert…
-          </div>
-        )}
-
         {/* Error banner */}
         {error && (
-          <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="rounded border border-rose-100 bg-rose-50 mx-3 mt-2 px-4 py-3 text-sm text-rose-700">
             {error}
           </div>
         )}
 
-        {/* Add section panel */}
-        {showAdd && (
-          <AddSectionPanel
-            pageId={pageId}
-            onCreated={handleCreated}
-            onCancel={() => setShowAdd(false)}
-          />
-        )}
+        {/* ── Split-pane: Inspector | Canvas ──────────────────────────────── */}
+        <div className="flex overflow-hidden" style={{ height: "calc(100vh - 14rem)" }}>
 
-        {/* Section list */}
-        <SectionCard noPadding>
-          {loading && sections.length === 0 ? (
-            <div className="space-y-2 p-5">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-[var(--surface-2)]" />
-              ))}
-            </div>
-          ) : sections.length === 0 ? (
-            <EmptyState
-              icon={<Blocks className="h-10 w-10" />}
-              heading="Keine Sektionen vorhanden"
-              description="Füge die erste Sektion hinzu, um diese Seite mit Blöcken zu befüllen."
-              action={
-                !showAdd ? (
-                  <button type="button" onClick={() => setShowAdd(true)} className="fca-button-primary">
-                    <Plus className="h-4 w-4" />
-                    Erste Sektion hinzufügen
-                  </button>
-                ) : undefined
-              }
-            />
-          ) : (
-            <div className="divide-y divide-[var(--border)]">
-              {sections.map((section, idx) => {
-                const isCollapsed = collapsedIds.has(section.id);
-                const isDragging = dragSrcId === section.id;
-                const isDragTarget = dragOverId === section.id;
+          {/* Inspector Panel */}
+          {!inspectorCollapsed && (
+            <div
+              ref={inspectorRef}
+              className="w-[380px] shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--surface)] overflow-y-auto"
+            >
+              {/* Inspector header */}
+              <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)]">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Sektionen — {sections.length}
+                </p>
+              </div>
 
-                return (
-                  <Fragment key={section.id}>
-                    <div
-                      draggable
-                      onDragStart={() => handleDragStart(section.id)}
-                      onDragOver={(e) => handleDragOver(e, section.id)}
-                      onDrop={(e) => handleDrop(e, section.id)}
-                      onDragEnd={handleDragEnd}
-                      className={`px-5 py-4 transition-colors ${
-                        isDragging ? "opacity-40" : ""
-                      } ${isDragTarget && !isDragging ? "bg-blue-50" : ""}`}
+              {/* Add section panel */}
+              {showAdd && (
+                <div className="p-3 border-b border-[var(--border)]">
+                  <AddSectionPanel
+                    pageId={pageId}
+                    onCreated={handleCreated}
+                    onCancel={() => setShowAdd(false)}
+                  />
+                </div>
+              )}
+
+              {/* Section list */}
+              {loading && sections.length === 0 ? (
+                <div className="p-3 space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-10 animate-pulse rounded bg-[var(--surface-2)]" />
+                  ))}
+                </div>
+              ) : sections.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                  <Blocks className="h-8 w-8 mb-2 text-[var(--muted)] opacity-30" />
+                  <p className="text-xs text-[var(--muted)]">Noch keine Sektionen</p>
+                  {!showAdd && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdd(true)}
+                      className="mt-2 fca-button-primary py-1.5 text-xs"
                     >
-                      {/* Row: drag handle + info + actions */}
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        {/* Drag handle + info */}
-                        <div className="min-w-0 flex-1 flex items-start gap-2">
-                          <div className="mt-1 cursor-grab text-[var(--muted)] hover:text-[var(--text-2)] transition shrink-0">
-                            <GripVertical className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-[var(--muted)] w-5 text-right shrink-0">
-                                {idx + 1}.
-                              </span>
-                              <span className="font-medium text-sm text-[var(--foreground)] truncate">
-                                {section.label}
-                              </span>
-                              <EnabledBadge isEnabled={section.isEnabled} />
-                              <PublishBadge status={section.publishStatus} />
-                              <ApprovalBadge status={section.approvalStatus} />
-                            </div>
-                            <div className="ml-7 flex flex-wrap items-center gap-2">
-                              <SectionTypeBadge type={section.type} />
-                              {section.scheduledPublishAt && (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted)]">
-                                  <Clock className="h-3 w-3" />
-                                  {new Date(section.scheduledPublishAt).toLocaleString("de-CH")}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                      <Plus className="h-3.5 w-3.5" />
+                      Erste Sektion
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex-1">
+                  {sections.map((section, idx) => {
+                    const isCollapsed = collapsedIds.has(section.id);
+                    const isDragging = dragSrcId === section.id;
+                    const isDragTarget = dragOverId === section.id;
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          {/* Collapse/expand */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCollapse(section.id)}
-                            className="sce-icon-button"
-                            title={isCollapsed ? "Aufklappen" : "Einklappen"}
-                          >
-                            <ChevronRight
-                              className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
-                            />
-                          </button>
-                          {/* Move up */}
-                          <button
-                            type="button"
-                            onClick={() => handleMove(section.id, "up")}
-                            disabled={actionPending === section.id || idx === 0}
-                            className="sce-icon-button disabled:opacity-30"
-                            title="Nach oben"
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Move down */}
-                          <button
-                            type="button"
-                            onClick={() => handleMove(section.id, "down")}
-                            disabled={actionPending === section.id || idx === sections.length - 1}
-                            className="sce-icon-button disabled:opacity-30"
-                            title="Nach unten"
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Toggle visible */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggle(section.id)}
-                            disabled={actionPending === section.id}
-                            className="sce-icon-button"
-                            title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
-                          >
-                            {section.isEnabled ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                          </button>
-                          {/* Edit config */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingId(editingId === section.id ? null : section.id)
-                            }
-                            className={`sce-icon-button ${editingId === section.id ? "text-blue-600" : ""}`}
-                            title="Konfigurieren"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Duplicate */}
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicate(section.id)}
-                            disabled={actionPending === section.id}
-                            className="sce-icon-button"
-                            title="Duplizieren"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Workflow */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setWorkflowId(workflowId === section.id ? null : section.id)
-                            }
-                            className={`sce-icon-button ${workflowId === section.id ? "text-emerald-600" : ""}`}
-                            title="Workflow"
-                          >
-                            <Globe className="h-3.5 w-3.5" />
-                          </button>
-                          {/* History */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setHistoryId(historyId === section.id ? null : section.id)
-                            }
-                            className={`sce-icon-button ${historyId === section.id ? "text-blue-600" : ""}`}
-                            title="Versionshistorie"
-                          >
-                            <History className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Delete */}
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(section.id)}
-                            disabled={actionPending === section.id}
-                            className="sce-icon-button text-rose-500 hover:text-rose-700"
-                            title="Löschen"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                    return (
+                      <Fragment key={section.id}>
+                        <InspectorSectionRow
+                          section={section}
+                          idx={idx}
+                          isSelected={selectedId === section.id}
+                          isEditing={editingId === section.id}
+                          isCollapsed={isCollapsed}
+                          isDragging={isDragging}
+                          isDragTarget={isDragTarget}
+                          actionPending={actionPending}
+                          sectionsLength={sections.length}
+                          onSelect={() => {
+                            setSelectedId(section.id);
+                            setEditingId(editingId === section.id ? null : section.id);
+                          }}
+                          onToggleCollapse={() => handleToggleCollapse(section.id)}
+                          onToggle={() => handleToggle(section.id)}
+                          onEdit={() => {
+                            setEditingId(editingId === section.id ? null : section.id);
+                            setSelectedId(section.id);
+                          }}
+                          onDuplicate={() => handleDuplicate(section.id)}
+                          onWorkflow={() => setWorkflowId(workflowId === section.id ? null : section.id)}
+                          onHistory={() => setHistoryId(historyId === section.id ? null : section.id)}
+                          onDelete={() => handleDelete(section.id)}
+                          onMoveUp={() => handleMove(section.id, "up")}
+                          onMoveDown={() => handleMove(section.id, "down")}
+                          onDragStart={() => handleDragStart(section.id)}
+                          onDragOver={(e) => handleDragOver(e, section.id)}
+                          onDrop={(e) => handleDrop(e, section.id)}
+                          onDragEnd={handleDragEnd}
+                        />
 
-                      {/* Expandable content */}
-                      {!isCollapsed && (
-                        <>
-                          {editingId === section.id && (
-                            <ConfigEditor
-                              section={section}
-                              onSave={(label, config) => handleSaveConfig(section.id, label, config)}
-                              onCancel={() => setEditingId(null)}
-                              onChanged={triggerAutosave}
-                              autoSaveRef={autosaveFnRef}
-                            />
-                          )}
-                          {workflowId === section.id && (
+                        {/* Workflow panel */}
+                        {workflowId === section.id && (
+                          <div className="px-3 pb-2">
                             <WorkflowPanel
                               pageId={pageId}
                               section={section}
@@ -1475,8 +1351,12 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                               }
                               onClose={() => setWorkflowId(null)}
                             />
-                          )}
-                          {historyId === section.id && (
+                          </div>
+                        )}
+
+                        {/* History panel */}
+                        {historyId === section.id && (
+                          <div className="px-3 pb-2">
                             <RevisionHistoryPanel
                               pageId={pageId}
                               section={section}
@@ -1486,29 +1366,67 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                                 setHistoryId(null);
                               }}
                             />
-                          )}
-                        </>
-                      )}
+                          </div>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Config editor for selected section */}
+              {editingSection && (
+                <div
+                  ref={configEditorRef}
+                  className="border-t border-[var(--border)] p-3 bg-[var(--surface)]"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--foreground)]">
+                        {editingSection.label}
+                      </p>
+                      <p className="text-[10px] text-[var(--muted)]">
+                        {getBlockDefinition(editingSection.type)?.displayName ?? editingSection.type}
+                      </p>
                     </div>
-                  </Fragment>
-                );
-              })}
+                    <div className="flex items-center gap-1">
+                      <EnabledBadge isEnabled={editingSection.isEnabled} />
+                      <PublishBadge status={editingSection.publishStatus} />
+                      <ApprovalBadge status={editingSection.approvalStatus} />
+                    </div>
+                  </div>
+
+                  <ConfigEditor
+                    key={editingSection.id}
+                    section={editingSection}
+                    onSave={(label, config) => handleSaveConfig(editingSection.id, label, config)}
+                    onCancel={() => setEditingId(null)}
+                    onChanged={triggerAutosave}
+                    onDraftChange={(config) => handleDraftChange(editingSection.id, config)}
+                    autoSaveRef={autosaveFnRef}
+                  />
+                </div>
+              )}
+
+              {/* Inspector footer hint */}
+              <div className="mt-auto px-3 py-2 border-t border-[var(--border)] bg-[var(--surface-2)]">
+                <p className="text-[10px] text-[var(--muted)]">
+                  Sektion auf Canvas klicken oder Stift-Icon tippen zum Bearbeiten
+                </p>
+              </div>
             </div>
           )}
-        </SectionCard>
 
-        {/* Info footer */}
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 space-y-1">
-          <p className="text-xs text-[var(--muted)]">
-            <strong className="text-[var(--text-2)]">Drag & Drop:</strong>{" "}
-            Sektionen können per Ziehen und Ablegen neu geordnet werden.
-          </p>
-          <p className="text-xs text-[var(--muted)]">
-            <strong className="text-[var(--text-2)]">Publishing:</strong>{" "}
-            Sektionen sind öffentlich sichtbar wenn die übergeordnete Seite{" "}
-            <strong>veröffentlicht</strong> ist, die Sektion{" "}
-            <strong>aktiv</strong> und <strong>veröffentlicht</strong> ist.
-          </p>
+          {/* Live Preview Canvas */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-[var(--surface-2)]">
+            <LivePreviewCanvas
+              sections={canvasSections}
+              draftConfigs={draftConfigs}
+              selectedId={selectedId}
+              onSelectSection={handleCanvasSelectSection}
+              viewport={viewport}
+            />
+          </div>
         </div>
       </div>
     </>
