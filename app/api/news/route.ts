@@ -81,6 +81,12 @@ export async function POST(request: NextRequest) {
   }
 
   const content = typeof body.content === "string" ? body.content : "";
+  const contentJson =
+    body.contentJson !== null &&
+    typeof body.contentJson === "object" &&
+    (body.contentJson as Record<string, unknown>).type === "doc"
+      ? body.contentJson
+      : undefined;
 
   let slug = typeof body.slug === "string" ? body.slug.trim() : "";
   if (!slug) slug = slugify(title);
@@ -96,6 +102,7 @@ export async function POST(request: NextRequest) {
     slug: finalSlug,
     title,
     content,
+    contentJson,
     excerpt: typeof body.excerpt === "string" ? body.excerpt.trim() || null : null,
     imageUrl: typeof body.imageUrl === "string" ? body.imageUrl.trim() || null : null,
     heroMediaId: typeof body.heroMediaId === "string" ? body.heroMediaId : null,

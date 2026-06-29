@@ -84,13 +84,25 @@ export type PublicNewsArticleListItem = {
  * Safe article fields exposed on the detail endpoint.
  * Includes content/body, hero media, and additional gallery media.
  * Only returned for PUBLISHED articles with publishedAt <= now.
+ *
+ * Rendering priority for consumers:
+ *   1. contentJson (structured TipTap/ProseMirror JSON) — render via rich text renderer
+ *   2. content     (legacy Markdown / plain-text string) — render as Markdown
+ *   3. empty
  */
 export type PublicNewsArticleDetail = {
   id: string;
   slug: string;
   title: string;
   excerpt: string | null;
+  /** Legacy Markdown / plain-text content. Populated for all articles. */
   content: string;
+  /**
+   * Structured TipTap/ProseMirror JSON content (CMS V4.2+).
+   * Present only for articles edited through the rich text editor.
+   * When present, consumers should prefer this over `content`.
+   */
+  contentJson: unknown | null;
   imageUrl: string | null;
   publishedAt: Date;
   heroMedia: PublicMediaSnippet | null;
