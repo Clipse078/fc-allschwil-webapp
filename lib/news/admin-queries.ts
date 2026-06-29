@@ -9,6 +9,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { isRichTextValue, type RichTextValue } from "@/lib/cms/rich-text";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,10 +75,34 @@ export type NewsArticleAdminListItem = {
 
 export type NewsArticleAdminDetail = NewsArticleAdminListItem & {
   content: string;
-  /** Structured TipTap/ProseMirror JSON from the shared RichTextEditor. Null for legacy articles. */
-  contentJson: unknown;
+  /**
+   * Structured TipTap/ProseMirror JSON from the shared RichTextEditor.
+   * Null for legacy articles or when contentJson has not been set.
+   * Validated against RichTextValue shape on the way out of every query
+   * so it is safe to pass across the RSC server→client boundary.
+   */
+  contentJson: RichTextValue | null;
   additionalMedia: NewsArticleMediaItem[];
 };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Coerces the raw Prisma Json? field value to RichTextValue | null.
+ *
+ * Prisma can return several non-plain-object representations for nullable
+ * JSON columns (e.g. Prisma.JsonNull, Prisma.DbNull, raw tagged objects).
+ * Those values are NOT serialisable across the RSC server→client boundary
+ * and will cause Next.js to throw "Classes or null prototypes are not
+ * supported" at the RSC serialisation step.
+ *
+ * Running the value through isRichTextValue() ensures:
+ *  - SQL-NULL or any non-doc value  → returns JavaScript null (serialisable)
+ *  - Valid { type:"doc", content:[] } → returns the object as RichTextValue
+ */
+function sanitizeContentJson(raw: unknown): RichTextValue | null {
+  return isRichTextValue(raw) ? (raw as RichTextValue) : null;
+}
 
 // ── Select shapes ─────────────────────────────────────────────────────────────
 
@@ -195,7 +220,10 @@ export async function getNewsArticleAdminById(
     select: adminDetailSelect,
   });
   if (!row) return null;
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 export async function getNewsArticleAdminBySlug(
@@ -207,7 +235,10 @@ export async function getNewsArticleAdminBySlug(
     select: adminDetailSelect,
   });
   if (!row) return null;
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 // ── Slug availability ─────────────────────────────────────────────────────────
@@ -269,7 +300,10 @@ export async function createNewsArticle(
   };
 
   const row = await prisma.newsArticle.create({ data, select: adminDetailSelect });
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 // ── Update ────────────────────────────────────────────────────────────────────
@@ -350,7 +384,10 @@ export async function updateNewsArticle(
     data,
     select: adminDetailSelect,
   });
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 // ── Publish / Unpublish / Archive ─────────────────────────────────────────────
@@ -380,7 +417,10 @@ export async function publishNewsArticle(
     },
     select: adminDetailSelect,
   });
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 export async function unpublishNewsArticle(
@@ -398,7 +438,10 @@ export async function unpublishNewsArticle(
     data: { status: "DRAFT" },
     select: adminDetailSelect,
   });
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 export async function archiveNewsArticle(
@@ -432,7 +475,10 @@ export async function submitNewsArticleForReview(
     data: { status: "IN_REVIEW", reviewNotes: null },
     select: adminDetailSelect,
   });
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 export async function approveNewsArticle(
@@ -458,7 +504,10 @@ export async function approveNewsArticle(
     },
     select: adminDetailSelect,
   });
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 export async function rejectNewsArticle(
@@ -480,7 +529,10 @@ export async function rejectNewsArticle(
     },
     select: adminDetailSelect,
   });
-  return row as unknown as NewsArticleAdminDetail;
+  return {
+    ...(row as unknown as NewsArticleAdminDetail),
+    contentJson: sanitizeContentJson(row.contentJson),
+  };
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────

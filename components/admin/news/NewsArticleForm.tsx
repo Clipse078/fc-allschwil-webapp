@@ -22,7 +22,7 @@ import type {
   ArticleStatus,
   NewsArticleMediaItem,
 } from "@/lib/news/admin-queries";
-import { isRichTextValue, richTextToHtml, type RichTextValue } from "@/lib/cms/rich-text";
+import { richTextToHtml, type RichTextValue } from "@/lib/cms/rich-text";
 
 const RichTextEditor = dynamic(
   () => import("@/components/admin/cms/RichTextEditor"),
@@ -78,7 +78,7 @@ export default function NewsArticleForm({
   const [excerpt, setExcerpt] = useState(article?.excerpt ?? "");
   const [content] = useState(article?.content ?? "");
   const [contentJson, setContentJson] = useState<RichTextValue | null>(
-    isRichTextValue(article?.contentJson) ? (article.contentJson as RichTextValue) : null,
+    article?.contentJson ?? null,
   );
   const [heroMedia, setHeroMedia] = useState<HeroMediaValue>(
     article?.heroMedia ?? null,

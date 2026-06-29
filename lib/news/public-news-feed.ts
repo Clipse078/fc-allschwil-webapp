@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { isRichTextValue, type RichTextValue } from "@/lib/cms/rich-text";
 import type {
   PublicNewsArticleListItem,
   PublicNewsArticleDetail,
@@ -161,7 +162,7 @@ export async function getPublicNewsArticleBySlug(
     title: row.title,
     excerpt: row.excerpt,
     content: row.content,
-    contentJson: row.contentJson ?? null,
+    contentJson: isRichTextValue(row.contentJson) ? (row.contentJson as RichTextValue) : null,
     imageUrl: row.imageUrl,
     publishedAt: row.publishedAt!,
     heroMedia: row.heroMedia

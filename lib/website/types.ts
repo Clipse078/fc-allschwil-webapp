@@ -8,6 +8,8 @@
  * - Workflow/review fields (status, reviewNotes, etc.) are never exposed publicly.
  */
 
+import type { RichTextValue } from "@/lib/cms/rich-text";
+
 // ---------------------------------------------------------------------------
 // Envelope
 // ---------------------------------------------------------------------------
@@ -102,7 +104,7 @@ export type PublicNewsArticleDetail = {
    * Present only for articles edited through the rich text editor.
    * When present, consumers should prefer this over `content`.
    */
-  contentJson: unknown | null;
+  contentJson: RichTextValue | null;
   imageUrl: string | null;
   publishedAt: Date;
   heroMedia: PublicMediaSnippet | null;
