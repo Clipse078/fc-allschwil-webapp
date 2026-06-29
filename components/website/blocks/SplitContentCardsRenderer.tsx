@@ -201,11 +201,27 @@ export default function SplitContentCardsRenderer({
     </div>
   );
 
-  // Responsive stacking classes from shared layout
-  const stackClass =
-    resolved.responsive?.reverseStackOnMobile
-      ? "grid grid-cols-1 gap-10 md:grid-cols-2 flex-col-reverse"
-      : "grid grid-cols-1 gap-10 md:grid-cols-2";
+  // ---------------------------------------------------------------------------
+  // Column ratio → CSS custom property for .scc-grid
+  // ---------------------------------------------------------------------------
+
+  /**
+   * SectionColumns maps to fractional grid column widths.
+   * The CSS variable --scc-cols is consumed by .scc-grid (globals.css).
+   * On mobile, .scc-grid always uses a single column regardless of this value.
+   *
+   * "single" is treated as equal columns since splitContentCards is a
+   * two-column block.
+   */
+  const colsMap: Partial<Record<string, string>> = {
+    "33/66": "1fr 2fr",
+    "66/33": "2fr 1fr",
+    "25/75": "1fr 3fr",
+    "75/25": "3fr 1fr",
+    "50/50": "1fr 1fr",
+    single: "1fr 1fr",
+  };
+  const gridColsValue = colsMap[resolved.columns] ?? "1fr 1fr";
 
   return (
     <SectionShell
@@ -213,7 +229,10 @@ export default function SplitContentCardsRenderer({
       previewMode={previewMode}
       blockType="splitContentCards"
     >
-      <div className={stackClass}>
+      <div
+        className="scc-grid gap-10"
+        style={{ "--scc-cols": gridColsValue } as React.CSSProperties}
+      >
         {isCardsLeft ? (
           <>
             {cardsColumn}

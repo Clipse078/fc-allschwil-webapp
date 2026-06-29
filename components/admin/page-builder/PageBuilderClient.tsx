@@ -3,7 +3,7 @@
 /**
  * components/admin/page-builder/PageBuilderClient.tsx
  *
- * Premium Page Builder — CMS V2 Slice 9.
+ * Premium Page Builder — CMS V2 Slice 9 + Visual Layout Manipulation.
  *
  * Features:
  *   - Drag-and-drop reordering (native HTML5 DnD)
@@ -18,6 +18,8 @@
  *   - Publishing workflow actions (publish, unpublish, schedule, request-review)
  *   - Version history panel
  *   - Visual save indicator (Autosaving… / Gespeichert / Fehler)
+ *   - Visual Layout Canvas with column resize + card reorder + undo/redo
+ *   - Insertion zones between sections (+ Block hinzufügen)
  */
 
 import {
@@ -57,6 +59,7 @@ import {
   Save,
   LayoutPanelLeft,
   Layers,
+  PanelLeft,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -75,6 +78,8 @@ import {
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
 import type { SectionLayout } from "@/lib/cms/layout-types";
 import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
+import { useEditorHistory } from "@/lib/cms/use-editor-history";
+import CanvasInsertionZone from "@/components/admin/visual-builder/CanvasInsertionZone";
 
 // Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
 const SplitContentCardsConfigForm = dynamic(
@@ -86,6 +91,12 @@ const SplitContentCardsConfigForm = dynamic(
 const SplitContentCardsRenderer = dynamic(
   () => import("@/components/website/blocks/SplitContentCardsRenderer"),
   { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+);
+
+// Lazy-load the visual layout canvas (visual editor mode)
+const SplitContentCardsEditableCanvas = dynamic(
+  () => import("@/components/admin/visual-builder/SplitContentCardsEditableCanvas"),
+  { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-blue-50" /> },
 );
 
 // Registry of block types that have a premium property panel
@@ -255,8 +266,50 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
   const [error, setError] = useState<string | null>(null);
   // Live preview toggle for premium blocks
   const [showLivePreview, setShowLivePreview] = useState(false);
+  // Visual canvas toggle for premium blocks (replaces live preview when active)
+  const [showVisualCanvas, setShowVisualCanvas] = useState(false);
   // Layout panel visibility for generic blocks
   const [showLayoutPanel, setShowLayoutPanel] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // In-session undo / redo for the visual canvas
+  // ---------------------------------------------------------------------------
+  const history = useEditorHistory<Record<string, unknown>>();
+
+  // Reset history when a different section is opened
+  const prevSectionId = useRef<string>(section.id);
+  useEffect(() => {
+    if (prevSectionId.current !== section.id) {
+      prevSectionId.current = section.id;
+      history.reset();
+    }
+  });
+
+  // Keyboard shortcuts: Ctrl+Z / Ctrl+Y for undo/redo when canvas is active
+  useEffect(() => {
+    if (!showVisualCanvas) return;
+    function onKeyDown(e: KeyboardEvent) {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        const prev = history.undo(premiumConfig);
+        if (prev !== null) {
+          setPremiumConfig(prev);
+          onChanged?.();
+        }
+      }
+      if (ctrl && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        const next = history.redo(premiumConfig);
+        if (next !== null) {
+          setPremiumConfig(next);
+          onChanged?.();
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showVisualCanvas, history, premiumConfig, onChanged]);
 
   const buildConfig = useCallback((): Record<string, unknown> => {
     if (isPremium) return premiumConfig;
@@ -324,37 +377,97 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
                 Konfiguration
               </p>
-              <button
-                type="button"
-                onClick={() => setShowLivePreview((v) => !v)}
-                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
-                  showLivePreview
-                    ? "border-blue-400 bg-blue-50 text-blue-700"
-                    : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                <LayoutPanelLeft className="h-3 w-3" />
-                {showLivePreview ? "Vorschau ausblenden" : "Live-Vorschau"}
-              </button>
-            </div>
-            <SplitContentCardsConfigForm
-              config={premiumConfig}
-              onChange={(updated) => {
-                setPremiumConfig(updated);
-                onChanged?.();
-              }}
-            />
-            {showLivePreview && (
-              <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
-                <p className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Live-Vorschau
-                </p>
-                <div className="overflow-auto">
-                  <Suspense fallback={<div className="h-32 animate-pulse bg-gray-100" />}>
-                    <SplitContentCardsRenderer config={premiumConfig} previewMode />
-                  </Suspense>
-                </div>
+              <div className="flex items-center gap-1.5">
+                {/* Visual Canvas toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVisualCanvas((v) => !v);
+                    if (!showVisualCanvas) setShowLivePreview(false);
+                  }}
+                  className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
+                    showVisualCanvas
+                      ? "border-blue-400 bg-blue-50 text-blue-700"
+                      : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                  }`}
+                  title="Visueller Layout-Editor"
+                >
+                  <PanelLeft className="h-3 w-3" />
+                  {showVisualCanvas ? "Canvas aus" : "Visual Canvas"}
+                </button>
+                {/* Live preview toggle (disabled when canvas is active) */}
+                {!showVisualCanvas && (
+                  <button
+                    type="button"
+                    onClick={() => setShowLivePreview((v) => !v)}
+                    className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
+                      showLivePreview
+                        ? "border-blue-400 bg-blue-50 text-blue-700"
+                        : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    <LayoutPanelLeft className="h-3 w-3" />
+                    {showLivePreview ? "Vorschau ausblenden" : "Live-Vorschau"}
+                  </button>
+                )}
               </div>
+            </div>
+
+            {/* Visual Canvas — shown instead of the form when active */}
+            {showVisualCanvas ? (
+              <div className="space-y-3">
+                {/* Undo/Redo keyboard hint */}
+                <p className="text-[10px] text-[var(--muted)]">
+                  Ctrl+Z Rückgängig · Ctrl+Y Wiederholen · Änderungen werden automatisch gespeichert
+                </p>
+                <Suspense fallback={<div className="h-48 animate-pulse rounded-lg bg-blue-50" />}>
+                  <SplitContentCardsEditableCanvas
+                    config={premiumConfig}
+                    onChange={(updated) => {
+                      setPremiumConfig(updated);
+                      onChanged?.();
+                    }}
+                    history={history}
+                  />
+                </Suspense>
+                {/* Inspector still accessible below the canvas */}
+                <details className="rounded-lg border border-[var(--border)]">
+                  <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] hover:text-[var(--foreground)] select-none">
+                    Inspector (Formular)
+                  </summary>
+                  <div className="border-t border-[var(--border)] p-3">
+                    <SplitContentCardsConfigForm
+                      config={premiumConfig}
+                      onChange={(updated) => {
+                        setPremiumConfig(updated);
+                        onChanged?.();
+                      }}
+                    />
+                  </div>
+                </details>
+              </div>
+            ) : (
+              <>
+                <SplitContentCardsConfigForm
+                  config={premiumConfig}
+                  onChange={(updated) => {
+                    setPremiumConfig(updated);
+                    onChanged?.();
+                  }}
+                />
+                {showLivePreview && (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
+                    <p className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                      Live-Vorschau
+                    </p>
+                    <div className="overflow-auto">
+                      <Suspense fallback={<div className="h-32 animate-pulse bg-gray-100" />}>
+                        <SplitContentCardsRenderer config={premiumConfig} previewMode />
+                      </Suspense>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -449,10 +562,13 @@ function AddSectionPanel({
   pageId,
   onCreated,
   onCancel,
+  insertAfterIndex,
 }: {
   pageId: string;
-  onCreated: (section: PageSectionAdminItem) => void;
+  onCreated: (section: PageSectionAdminItem, insertAfterIndex?: number) => void;
   onCancel: () => void;
+  /** When set, the new section should be inserted after this index (0-based). */
+  insertAfterIndex?: number;
 }) {
   const [selectedType, setSelectedType] = useState<string>(AVAILABLE_BLOCKS[0]?.type ?? "");
   const [label, setLabel] = useState("");
@@ -475,7 +591,7 @@ function AddSectionPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "Fehler beim Erstellen");
-      onCreated(data.section);
+      onCreated(data.section, insertAfterIndex);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
@@ -485,7 +601,11 @@ function AddSectionPanel({
 
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <p className="text-sm font-semibold text-[var(--foreground)] mb-3">Neue Sektion hinzufügen</p>
+      <p className="text-sm font-semibold text-[var(--foreground)] mb-3">
+        {insertAfterIndex !== undefined
+          ? `Neue Sektion nach Position ${insertAfterIndex + 1} einfügen`
+          : "Neue Sektion hinzufügen"}
+      </p>
       <div className="space-y-3">
         <div>
           <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
@@ -990,6 +1110,9 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [dragSrcId, setDragSrcId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  // Insertion zone state: index after which to insert, or null = append
+  const [insertAfterIndex, setInsertAfterIndex] = useState<number | undefined>(undefined);
+
   // Unsaved changes warning
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -1122,9 +1245,36 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     }
   }
 
-  function handleCreated(section: PageSectionAdminItem) {
-    setSections((prev) => [...prev, section]);
+  function handleCreated(section: PageSectionAdminItem, afterIndex?: number) {
+    if (afterIndex !== undefined) {
+      // Insert at the requested position and trigger a reorder
+      setSections((prev) => {
+        const withNew = [...prev, section];
+        // Move new section from end to afterIndex + 1
+        const newIdx = withNew.length - 1;
+        const targetIdx = afterIndex + 1;
+        if (newIdx === targetIdx) return withNew;
+        const reordered = [...withNew];
+        const [moved] = reordered.splice(newIdx, 1);
+        reordered.splice(targetIdx, 0, moved);
+        // Fire reorder API in background (optimistic update already applied)
+        void fetch(`/api/website-pages/${pageId}/sections/reorder`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedIds: reordered.map((s) => s.id) }),
+        }).then(async (r) => {
+          if (r.ok) {
+            const d = await r.json().catch(() => ({}));
+            setSections(d.sections ?? reordered);
+          }
+        });
+        return reordered;
+      });
+    } else {
+      setSections((prev) => [...prev, section]);
+    }
     setShowAdd(false);
+    setInsertAfterIndex(undefined);
   }
 
   function handleToggleCollapse(id: string) {
@@ -1279,7 +1429,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           <AddSectionPanel
             pageId={pageId}
             onCreated={handleCreated}
-            onCancel={() => setShowAdd(false)}
+            onCancel={() => { setShowAdd(false); setInsertAfterIndex(undefined); }}
+            insertAfterIndex={insertAfterIndex}
           />
         )}
 
@@ -1306,7 +1457,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               }
             />
           ) : (
-            <div className="divide-y divide-[var(--border)]">
+          <div className="divide-y divide-[var(--border)]">
               {sections.map((section, idx) => {
                 const isCollapsed = collapsedIds.has(section.id);
                 const isDragging = dragSrcId === section.id;
@@ -1314,6 +1465,19 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
 
                 return (
                   <Fragment key={section.id}>
+                    {/* Insertion zone BEFORE first section */}
+                    {idx === 0 && !showAdd && (
+                      <div className="px-5 pt-2 pb-1">
+                        <CanvasInsertionZone
+                          onInsert={() => {
+                            setInsertAfterIndex(-1);
+                            setShowAdd(true);
+                            setEditingId(null);
+                          }}
+                          ariaLabel="Block vor erster Sektion einfügen"
+                        />
+                      </div>
+                    )}
                     <div
                       draggable
                       onDragStart={() => handleDragStart(section.id)}
@@ -1490,6 +1654,19 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                         </>
                       )}
                     </div>
+                    {/* Insertion zone AFTER each section */}
+                    {!showAdd && (
+                      <div className="px-5 py-1">
+                        <CanvasInsertionZone
+                          onInsert={() => {
+                            setInsertAfterIndex(idx);
+                            setShowAdd(true);
+                            setEditingId(null);
+                          }}
+                          ariaLabel={`Block nach Sektion ${idx + 1} einfügen`}
+                        />
+                      </div>
+                    )}
                   </Fragment>
                 );
               })}
@@ -1502,6 +1679,13 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           <p className="text-xs text-[var(--muted)]">
             <strong className="text-[var(--text-2)]">Drag & Drop:</strong>{" "}
             Sektionen können per Ziehen und Ablegen neu geordnet werden.
+          </p>
+          <p className="text-xs text-[var(--muted)]">
+            <strong className="text-[var(--text-2)]">Visual Canvas:</strong>{" "}
+            Beim Bearbeiten eines{" "}
+            <em>Split Content Cards</em>-Blocks den{" "}
+            <strong>Visual Canvas</strong>-Button aktivieren, um Layout direkt auf der Vorschau zu manipulieren
+            (Spalten tauschen, Breite anpassen, Karten sortieren).
           </p>
           <p className="text-xs text-[var(--muted)]">
             <strong className="text-[var(--text-2)]">Publishing:</strong>{" "}

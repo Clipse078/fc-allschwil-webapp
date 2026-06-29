@@ -1076,6 +1076,23 @@ button {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   SPLIT CONTENT CARDS — responsive column grid
+   Used by SplitContentCardsRenderer. The --scc-cols CSS variable is set
+   via inline style on the grid wrapper and maps _layout.columns to fractional
+   grid widths. On mobile the columns always stack to a single column.
+───────────────────────────────────────────────────────────────────────── */
+.scc-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .scc-grid {
+    grid-template-columns: var(--scc-cols, 1fr 1fr);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    RESPONSIVE
 ───────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
