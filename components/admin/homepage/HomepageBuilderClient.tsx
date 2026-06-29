@@ -19,7 +19,7 @@
  *   ▶ Erweitert    — advanced (placeholder)
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import {
   RefreshCw,
@@ -489,49 +489,30 @@ function InspectorPanel({
   const isInReview = approvalStatus === APPROVAL_STATUS.IN_REVIEW;
 
   // Inspector accordion state
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+  const [baseExpandedSections, setBaseExpandedSections] = useState<Set<string>>(
     new Set(DEFAULT_EXPANDED),
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const prevExpandedRef = useRef<Set<string>>(new Set(DEFAULT_EXPANDED));
 
-  // Reset accordion when section changes
-  const prevSectionId = useRef(section.id);
-  useEffect(() => {
-    if (prevSectionId.current !== section.id) {
-      prevSectionId.current = section.id;
-      setExpandedSections(new Set(DEFAULT_EXPANDED));
-      setSearchQuery("");
-      prevExpandedRef.current = new Set(DEFAULT_EXPANDED);
-    }
-  }, [section.id]);
-
-  // Auto-expand/collapse sections when searching
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const matching = INSPECTOR_SECTIONS.filter((s) =>
-        sectionMatchesQuery(s.id, searchQuery),
-      ).map((s) => s.id);
-      if (matching.length > 0) {
-        setExpandedSections(new Set(matching));
-      }
-    } else {
-      // Restore previous state when search is cleared
-      setExpandedSections(new Set(prevExpandedRef.current));
-    }
-  }, [searchQuery]);
+  // Derive which sections are expanded:
+  // while searching → show only matching sections; when clear → use base state
+  const expandedSections = useMemo(() => {
+    if (!searchQuery.trim()) return baseExpandedSections;
+    const matching = INSPECTOR_SECTIONS.filter((s) =>
+      sectionMatchesQuery(s.id, searchQuery),
+    ).map((s) => s.id);
+    return matching.length > 0 ? new Set(matching) : baseExpandedSections;
+  }, [searchQuery, baseExpandedSections]);
 
   function toggleSection(id: string) {
-    setExpandedSections((prev) => {
+    // Only allow manual toggle when not searching (search controls expansion while active)
+    if (searchQuery.trim()) return;
+    setBaseExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
       } else {
         next.add(id);
-      }
-      // Update prev ref only when NOT searching
-      if (!searchQuery.trim()) {
-        prevExpandedRef.current = new Set(next);
       }
       return next;
     });
@@ -1365,6 +1346,7 @@ export default function HomepageBuilderClient() {
         >
           {selectedSection ? (
             <InspectorPanel
+              key={selectedSection.id}
               section={selectedSection}
               config={editConfig}
               onConfigChange={handleConfigChange}
