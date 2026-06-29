@@ -3,28 +3,39 @@
 /**
  * components/admin/page-builder/PageBuilderClient.tsx
  *
- * Premium Page Builder — CMS V2 Slice 9.
+ * Premium Page Builder — CMS V3 Inspector Panel V2.
  *
  * Features:
  *   - Drag-and-drop reordering (native HTML5 DnD)
  *   - Move Up / Move Down
  *   - Duplicate Block
  *   - Delete Block (with confirmation)
- *   - Collapse / Expand blocks
+ *   - Collapse / Expand block rows
+ *   - Sidebar Inspector Panel (Figma/Framer-style — replaces inline ConfigEditor)
  *   - Inline config editor with autosave (debounced 1.5s)
  *   - Unsaved changes detection (beforeunload warning)
  *   - Responsive preview panel (Desktop / Tablet / Mobile)
- *   - Section-level publish/approval status badges
- *   - Publishing workflow actions (publish, unpublish, schedule, request-review)
- *   - Version history panel
+ *   - Publishing workflow via Inspector Publishing section
+ *   - Version history via Inspector Publishing section
  *   - Visual save indicator (Autosaving… / Gespeichert / Fehler)
+ *
+ * Inspector architecture:
+ *   - Clicking any block row selects it and opens the Inspector in a right sidebar.
+ *   - The Inspector renders sections dynamically from the block's supportsInspector
+ *     capability map (declared in lib/homepage/block-registry.ts).
+ *   - Each section is collapsible; expanded state persists for the session.
+ *   - Inspector search filters sections by title.
+ *   - Layout section reuses LayoutConfigPanel (no duplicate layout logic).
+ *   - Background section isolates background controls via LayoutConfigPanel backgroundOnly.
+ *   - SplitContentCards Content/Style sections delegate to SplitContentCardsInspectorContent.
+ *   - Publishing section exposes workflow actions + revision history.
+ *   - No duplicate state between Inspector and Section List.
  */
 
 import {
   useState,
   useEffect,
   useCallback,
-  useMemo,
   useRef,
   Fragment,
   Suspense,
@@ -47,16 +58,13 @@ import {
   Globe,
   GlobeLock,
   Clock,
-  History,
   Monitor,
   Tablet,
   Smartphone,
-  Send,
-  CheckCircle2,
   AlertCircle,
   Save,
-  LayoutPanelLeft,
   Layers,
+  PanelRight,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -67,40 +75,22 @@ import {
   type BlockDefinition,
 } from "@/lib/homepage/block-registry";
 import { HOMEPAGE_SECTION_TYPE_KEYS } from "@/lib/homepage/section-types";
-import type { ContentRevisionItem } from "@/lib/cms/revision-engine";
 import {
   SECTION_PUBLISH_STATUS,
   SECTION_APPROVAL_STATUS,
 } from "@/lib/cms/section-publishing";
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
-import type { SectionLayout } from "@/lib/cms/layout-types";
-import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
+import InspectorPanel from "@/components/admin/inspector/InspectorPanel";
+import type { InspectorSaveState } from "@/components/admin/inspector/InspectorToolbar";
 
-// Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
-const SplitContentCardsConfigForm = dynamic(
-  () => import("@/components/admin/page-builder/block-forms/SplitContentCardsConfigForm"),
-  { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
-);
-
-// Lazy-load the shared block renderer for live preview
+// Lazy-load block renderer for preview panel
 const SplitContentCardsRenderer = dynamic(
   () => import("@/components/website/blocks/SplitContentCardsRenderer"),
-  { ssr: false, loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" /> },
+  {
+    ssr: false,
+    loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" />,
+  },
 );
-
-// Registry of block types that have a premium property panel
-const PREMIUM_BLOCK_TYPES = new Set(["splitContentCards"]);
-
-/**
- * Renders a visual preview for a known block type.
- * Falls back to JSON config summary for generic blocks.
- */
-function BlockVisualPreview({ type, config }: { type: string; config: Record<string, unknown> }) {
-  if (type === "splitContentCards") {
-    return <SplitContentCardsRenderer config={config} previewMode />;
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -108,8 +98,11 @@ function BlockVisualPreview({ type, config }: { type: string; config: Record<str
 
 const AUTOSAVE_DELAY_MS = 1500;
 
+// Blocks with a live preview renderer
+const RENDERABLE_BLOCK_TYPES = new Set(["splitContentCards"]);
+
 // ---------------------------------------------------------------------------
-// Status badges
+// Helpers: status badges
 // ---------------------------------------------------------------------------
 
 function PublishBadge({ status }: { status: string }) {
@@ -117,16 +110,10 @@ function PublishBadge({ status }: { status: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-        isPublished
-          ? "bg-emerald-50 text-emerald-700"
-          : "bg-amber-50 text-amber-700"
+        isPublished ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
       }`}
     >
-      {isPublished ? (
-        <Globe className="h-3 w-3" />
-      ) : (
-        <GlobeLock className="h-3 w-3" />
-      )}
+      {isPublished ? <Globe className="h-3 w-3" /> : <GlobeLock className="h-3 w-3" />}
       {isPublished ? "Veröffentlicht" : "Entwurf"}
     </span>
   );
@@ -173,12 +160,16 @@ function SectionTypeBadge({ type }: { type: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Autosave indicator
+// Save indicator (toolbar)
 // ---------------------------------------------------------------------------
 
-type SaveState = "idle" | "saving" | "saved" | "error";
-
-function SaveIndicator({ state, lastSaved }: { state: SaveState; lastSaved: Date | null }) {
+function SaveIndicator({
+  state,
+  lastSaved,
+}: {
+  state: InspectorSaveState;
+  lastSaved: Date | null;
+}) {
   if (state === "idle" && !lastSaved) return null;
   return (
     <div className="flex items-center gap-1.5 text-[11px]">
@@ -207,231 +198,20 @@ function SaveIndicator({ state, lastSaved }: { state: SaveState; lastSaved: Date
 }
 
 // ---------------------------------------------------------------------------
-// Config editor
+// Block visual preview (for preview panel)
 // ---------------------------------------------------------------------------
 
-type ConfigEditorProps = {
-  section: PageSectionAdminItem;
-  onSave: (label: string, config: Record<string, unknown>) => Promise<void>;
-  onCancel: () => void;
-  onChanged?: () => void;
-  autoSaveRef?: React.MutableRefObject<(() => void) | null>;
-};
-
-function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: ConfigEditorProps) {
-  const def = getBlockDefinition(section.type);
-  // Exclude _layout from the generic key-value editor — it is handled by LayoutConfigPanel
-  const configKeys = useMemo(
-    () => (def?.configKeys ?? []).filter((k) => k !== "_layout"),
-    [def],
-  );
-  const isPremium = PREMIUM_BLOCK_TYPES.has(section.type);
-  const supportsLayout = def?.supportsLayout ?? false;
-
-  const [label, setLabel] = useState(section.label);
-
-  // Generic block state (string values per configKey, excluding _layout)
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    if (isPremium) return {};
-    const init: Record<string, string> = {};
-    for (const k of configKeys) {
-      const v = section.config[k];
-      init[k] = v !== undefined && v !== null ? String(v) : "";
-    }
-    return init;
-  });
-
-  // Generic block layout state (shared _layout object)
-  const [genericLayout, setGenericLayout] = useState<SectionLayout>(
-    () => (section.config._layout as SectionLayout | undefined) ?? {},
-  );
-
-  // Premium block state (full config object)
-  const [premiumConfig, setPremiumConfig] = useState<Record<string, unknown>>(() =>
-    isPremium ? { ...section.config } : {},
-  );
-
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Live preview toggle for premium blocks
-  const [showLivePreview, setShowLivePreview] = useState(false);
-  // Layout panel visibility for generic blocks
-  const [showLayoutPanel, setShowLayoutPanel] = useState(false);
-
-  const buildConfig = useCallback((): Record<string, unknown> => {
-    if (isPremium) return premiumConfig;
-    const config: Record<string, unknown> = {};
-    for (const k of configKeys) {
-      const raw = values[k];
-      if (raw === "" || raw === undefined) continue;
-      const num = Number(raw);
-      config[k] = !isNaN(num) && raw.trim() !== "" ? num : raw;
-    }
-    if (supportsLayout) {
-      config._layout = genericLayout;
-    }
-    return config;
-  }, [isPremium, premiumConfig, configKeys, values, supportsLayout, genericLayout]);
-
-  async function handleSave() {
-    const trimmed = label.trim();
-    if (!trimmed) { setError("Label darf nicht leer sein."); return; }
-    setSaving(true);
-    setError(null);
-    try {
-      await onSave(trimmed, buildConfig());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
-    } finally {
-      setSaving(false);
-    }
+function BlockVisualPreview({
+  type,
+  config,
+}: {
+  type: string;
+  config: Record<string, unknown>;
+}) {
+  if (type === "splitContentCards") {
+    return <SplitContentCardsRenderer config={config} previewMode />;
   }
-
-  // Expose trigger for autosave
-  useEffect(() => {
-    if (autoSaveRef) {
-      autoSaveRef.current = () => {
-        const trimmed = label.trim();
-        if (trimmed) {
-          void onSave(trimmed, buildConfig()).catch(() => {});
-        }
-      };
-    }
-    return () => {
-      if (autoSaveRef) autoSaveRef.current = null;
-    };
-  }, [label, buildConfig, onSave, autoSaveRef]);
-
-  return (
-    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <div className="space-y-3">
-        <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
-            Label
-          </label>
-          <input
-            className="fca-input w-full"
-            value={label}
-            onChange={(e) => { setLabel(e.target.value); onChanged?.(); }}
-            placeholder="Sektionsbezeichnung"
-          />
-        </div>
-
-        {/* Premium block: dispatch to specialized config form */}
-        {isPremium && section.type === "splitContentCards" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Konfiguration
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowLivePreview((v) => !v)}
-                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition ${
-                  showLivePreview
-                    ? "border-blue-400 bg-blue-50 text-blue-700"
-                    : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                <LayoutPanelLeft className="h-3 w-3" />
-                {showLivePreview ? "Vorschau ausblenden" : "Live-Vorschau"}
-              </button>
-            </div>
-            <SplitContentCardsConfigForm
-              config={premiumConfig}
-              onChange={(updated) => {
-                setPremiumConfig(updated);
-                onChanged?.();
-              }}
-            />
-            {showLivePreview && (
-              <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
-                <p className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Live-Vorschau
-                </p>
-                <div className="overflow-auto">
-                  <Suspense fallback={<div className="h-32 animate-pulse bg-gray-100" />}>
-                    <SplitContentCardsRenderer config={premiumConfig} previewMode />
-                  </Suspense>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Generic block: key-value editor */}
-        {!isPremium && configKeys.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-              Konfiguration
-            </p>
-            {configKeys.map((k) => (
-              <div key={k} className="flex items-center gap-2">
-                <label className="w-36 flex-shrink-0 text-xs text-[var(--text-2)]">{k}</label>
-                <input
-                  className="fca-input flex-1"
-                  value={values[k] ?? ""}
-                  onChange={(e) => { setValues((prev) => ({ ...prev, [k]: e.target.value })); onChanged?.(); }}
-                  placeholder={`${k}…`}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!isPremium && configKeys.length === 0 && (
-          <p className="text-xs text-[var(--muted)] italic">
-            Dieser Blocktyp hat keine konfigurierbaren Felder.
-          </p>
-        )}
-
-        {/* Shared Layout panel — shown for ALL blocks that support layout */}
-        {!isPremium && supportsLayout && (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-            <button
-              type="button"
-              onClick={() => setShowLayoutPanel((v) => !v)}
-              className="flex w-full items-center justify-between px-3 py-2.5 text-left"
-            >
-              <div className="flex items-center gap-2">
-                <Layers className="h-3.5 w-3.5 text-[var(--text-2)]" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Layout
-                </span>
-              </div>
-              <ChevronDown
-                className={`h-3.5 w-3.5 text-[var(--muted)] transition-transform ${showLayoutPanel ? "rotate-180" : ""}`}
-              />
-            </button>
-            {showLayoutPanel && (
-              <div className="border-t border-[var(--border)] p-3">
-                <LayoutConfigPanel
-                  layout={genericLayout}
-                  onChange={(layout) => {
-                    setGenericLayout(layout);
-                    onChanged?.();
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {error && <p className="text-xs text-rose-600">{error}</p>}
-
-        <div className="flex items-center gap-2 pt-1">
-          <button type="button" onClick={handleSave} disabled={saving} className="fca-button-primary py-1.5 text-xs">
-            <Check className="h-3.5 w-3.5" />
-            {saving ? "Speichern…" : "Speichern"}
-          </button>
-          <button type="button" onClick={onCancel} disabled={saving} className="fca-button-secondary py-1.5 text-xs">
-            <X className="h-3.5 w-3.5" />
-            Abbrechen
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -485,10 +265,12 @@ function AddSectionPanel({
 
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <p className="text-sm font-semibold text-[var(--foreground)] mb-3">Neue Sektion hinzufügen</p>
+      <p className="mb-3 text-sm font-semibold text-[var(--foreground)]">
+        Neue Sektion hinzufügen
+      </p>
       <div className="space-y-3">
         <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
             Blocktyp
           </label>
           <select
@@ -506,7 +288,7 @@ function AddSectionPanel({
         </div>
         {def && <p className="text-xs text-[var(--muted)]">{def.description}</p>}
         <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
             Label (optional)
           </label>
           <input
@@ -518,11 +300,21 @@ function AddSectionPanel({
         </div>
         {error && <p className="text-xs text-rose-600">{error}</p>}
         <div className="flex items-center gap-2">
-          <button type="button" onClick={handleCreate} disabled={saving || !selectedType} className="fca-button-primary py-1.5 text-xs">
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={saving || !selectedType}
+            className="fca-button-primary py-1.5 text-xs"
+          >
             <Plus className="h-3.5 w-3.5" />
             {saving ? "Erstelle…" : "Sektion erstellen"}
           </button>
-          <button type="button" onClick={onCancel} disabled={saving} className="fca-button-secondary py-1.5 text-xs">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="fca-button-secondary py-1.5 text-xs"
+          >
             <X className="h-3.5 w-3.5" />
             Abbrechen
           </button>
@@ -589,7 +381,6 @@ function PreviewPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
         <div className="flex items-center gap-3">
           <Eye className="h-4 w-4 text-[var(--text-2)]" />
@@ -599,7 +390,6 @@ function PreviewPanel({
           </div>
         </div>
 
-        {/* Viewport selector */}
         <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
           {(["desktop", "tablet", "mobile"] as ViewportMode[]).map((v) => {
             const vc2 = VIEWPORT_CONFIG[v];
@@ -627,329 +417,75 @@ function PreviewPanel({
         </button>
       </div>
 
-      {/* Preview area */}
       <div className="flex-1 overflow-auto bg-[var(--surface-2)] p-4">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-[var(--muted)]">
-            <RefreshCw className="h-5 w-5 animate-spin mr-2" />
+          <div className="flex h-32 items-center justify-center text-[var(--muted)]">
+            <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
             Lädt Vorschau…
           </div>
         ) : error ? (
-          <div className="flex items-center justify-center h-32 text-rose-600 text-sm">{error}</div>
+          <div className="flex h-32 items-center justify-center text-sm text-rose-600">{error}</div>
         ) : (
-            <div className="mx-auto transition-all duration-300 rounded-lg border border-[var(--border)] bg-white overflow-hidden"
-              style={{ maxWidth: vc.width }}
-            >
-              {sections.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-[var(--muted)]">
-                  <Blocks className="h-8 w-8 mb-2 opacity-40" />
-                  <p className="text-sm">Keine Sektionen vorhanden</p>
-                </div>
-              ) : (
-                <div>
-                  {sections.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`border-b border-[var(--border)] last:border-0 ${
-                        !s.isEnabled || s.publishStatus !== "PUBLISHED" ? "opacity-50" : ""
-                      }`}
-                    >
-                      {/* Section status strip */}
-                      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-2)]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-[var(--foreground)]">{s.label}</span>
-                          <SectionTypeBadge type={s.type} />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <EnabledBadge isEnabled={s.isEnabled} />
-                          <PublishBadge status={s.publishStatus} />
+          <div
+            className="mx-auto overflow-hidden rounded-lg border border-[var(--border)] bg-white transition-all duration-300"
+            style={{ maxWidth: vc.width }}
+          >
+            {sections.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-[var(--muted)]">
+                <Blocks className="mb-2 h-8 w-8 opacity-40" />
+                <p className="text-sm">Keine Sektionen vorhanden</p>
+              </div>
+            ) : (
+              <div>
+                {sections.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`border-b border-[var(--border)] last:border-0 ${
+                      !s.isEnabled || s.publishStatus !== "PUBLISHED" ? "opacity-50" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between bg-[var(--surface-2)] px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-[var(--foreground)]">{s.label}</span>
+                        <SectionTypeBadge type={s.type} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <EnabledBadge isEnabled={s.isEnabled} />
+                        <PublishBadge status={s.publishStatus} />
+                      </div>
+                    </div>
+                    <Suspense fallback={<div className="h-16 animate-pulse bg-gray-50" />}>
+                      <BlockVisualPreview type={s.type} config={s.config} />
+                    </Suspense>
+                    {!RENDERABLE_BLOCK_TYPES.has(s.type) && Object.keys(s.config).length > 0 && (
+                      <div className="px-4 pb-3">
+                        <div className="rounded bg-[var(--surface-2)] px-2 py-1.5">
+                          <p className="font-mono text-[10px] text-[var(--muted)]">
+                            {JSON.stringify(s.config, null, 2).slice(0, 200)}
+                            {JSON.stringify(s.config).length > 200 ? "…" : ""}
+                          </p>
                         </div>
                       </div>
-
-                      {/* Visual block render (if renderer available) */}
-                      <Suspense fallback={<div className="h-16 animate-pulse bg-gray-50" />}>
-                        <BlockVisualPreview type={s.type} config={s.config} />
-                      </Suspense>
-
-                      {/* Fallback: JSON config for non-premium blocks */}
-                      {!PREMIUM_BLOCK_TYPES.has(s.type) && Object.keys(s.config).length > 0 && (
-                        <div className="px-4 pb-3">
-                          <div className="rounded bg-[var(--surface-2)] px-2 py-1.5">
-                            <p className="text-[10px] font-mono text-[var(--muted)]">
-                              {JSON.stringify(s.config, null, 2).slice(0, 200)}
-                              {JSON.stringify(s.config).length > 200 ? "…" : ""}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      {!PREMIUM_BLOCK_TYPES.has(s.type) && s.block && (
-                        <p className="px-4 pb-3 text-[11px] text-[var(--muted)]">{s.block.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    )}
+                    {!RENDERABLE_BLOCK_TYPES.has(s.type) && s.block && (
+                      <p className="px-4 pb-3 text-[11px] text-[var(--muted)]">{s.block.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center gap-3 text-xs text-[var(--muted)]">
+      <div className="flex items-center gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--muted)]">
         <span>{sections.length} Sektion{sections.length !== 1 ? "en" : ""} (inkl. Entwürfe)</span>
         <span>·</span>
-        <span>{sections.filter((s) => s.publishStatus === "PUBLISHED" && s.isEnabled).length} öffentlich sichtbar</span>
+        <span>
+          {sections.filter((s) => s.publishStatus === "PUBLISHED" && s.isEnabled).length} öffentlich
+          sichtbar
+        </span>
       </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Revision history panel
-// ---------------------------------------------------------------------------
-
-function RevisionHistoryPanel({
-  pageId,
-  section,
-  onClose,
-  onRestored,
-}: {
-  pageId: string;
-  section: PageSectionAdminItem;
-  onClose: () => void;
-  onRestored: (section: PageSectionAdminItem) => void;
-}) {
-  const [revisions, setRevisions] = useState<ContentRevisionItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [restoring, setRestoring] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/website-pages/${pageId}/sections/${section.id}/revisions`)
-      .then((r) => r.json())
-      .then((d) => { setRevisions(d.revisions ?? []); setLoading(false); })
-      .catch(() => { setError("Versionen konnten nicht geladen werden."); setLoading(false); });
-  }, [pageId, section.id]);
-
-  async function handleRestore(revId: string, versionNumber: number) {
-    if (!confirm(`Version ${versionNumber} wiederherstellen? Dies erstellt eine neue Version.`)) return;
-    setRestoring(revId);
-    try {
-      const res = await fetch(
-        `/api/website-pages/${pageId}/sections/${section.id}/revisions/${revId}/restore`,
-        { method: "POST" },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Fehler beim Wiederherstellen");
-      onRestored(data.section);
-      onClose();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Fehler");
-    } finally {
-      setRestoring(null);
-    }
-  }
-
-  return (
-    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-[var(--text-2)]" />
-          <p className="text-sm font-semibold">Versionshistorie</p>
-        </div>
-        <button type="button" onClick={onClose} className="text-[var(--muted)] hover:text-[var(--foreground)]">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {loading && (
-        <div className="flex items-center gap-2 py-4 text-sm text-[var(--muted)]">
-          <RefreshCw className="h-4 w-4 animate-spin" /> Lädt…
-        </div>
-      )}
-      {error && <p className="text-xs text-rose-600 py-2">{error}</p>}
-
-      {!loading && !error && revisions.length === 0 && (
-        <p className="text-xs text-[var(--muted)] py-2">Noch keine Versionen vorhanden.</p>
-      )}
-
-      {!loading && revisions.length > 0 && (
-        <div className="space-y-1 max-h-72 overflow-y-auto">
-          {revisions.map((rev) => (
-              <div
-              key={rev.id}
-              className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5 font-medium text-[var(--foreground)]">
-                  <span className="text-[var(--muted)]">v{rev.versionNumber}</span>
-                  {rev.isRestore && (
-                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-                      Wiederherstellung
-                    </span>
-                  )}
-                  {rev.changeNote && (
-                    <span className="truncate">{rev.changeNote}</span>
-                  )}
-                </div>
-                <div className="text-[var(--muted)] mt-0.5">
-                  {rev.createdByUser
-                    ? `${rev.createdByUser.firstName} ${rev.createdByUser.lastName} · `
-                    : ""}
-                  {new Date(rev.createdAt).toLocaleString("de-CH")}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleRestore(rev.id, rev.versionNumber)}
-                disabled={restoring === rev.id}
-                className="shrink-0 rounded border border-[var(--border)] px-2 py-1 text-[11px] font-medium hover:bg-[var(--surface-2)] disabled:opacity-50 transition"
-              >
-                {restoring === rev.id ? "…" : "Wiederherstellen"}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Workflow actions panel
-// ---------------------------------------------------------------------------
-
-function WorkflowPanel({
-  pageId,
-  section,
-  onUpdated,
-  onClose,
-}: {
-  pageId: string;
-  section: PageSectionAdminItem;
-  onUpdated: (section: PageSectionAdminItem) => void;
-  onClose: () => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [scheduledAt, setScheduledAt] = useState("");
-
-  async function doAction(action: string, extra?: Record<string, unknown>) {
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/website-pages/${pageId}/sections/${section.id}/workflow?action=${action}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(extra ?? {}),
-        },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Fehler");
-      onUpdated(data.section);
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  const ps = section.publishStatus;
-  const as = section.approvalStatus;
-  const canPublish = as === SECTION_APPROVAL_STATUS.NOT_REQUIRED || as === SECTION_APPROVAL_STATUS.APPROVED;
-
-  return (
-    <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold">Workflow</p>
-        <button type="button" onClick={onClose} className="text-[var(--muted)] hover:text-[var(--foreground)]">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {ps === SECTION_PUBLISH_STATUS.DRAFT && canPublish && (
-          <button
-            type="button"
-            onClick={() => doAction("publish")}
-            disabled={pending}
-            className="fca-button-primary py-1.5 text-xs"
-          >
-            <Globe className="h-3.5 w-3.5" />
-            Veröffentlichen
-          </button>
-        )}
-        {ps === SECTION_PUBLISH_STATUS.PUBLISHED && (
-          <button
-            type="button"
-            onClick={() => doAction("unpublish")}
-            disabled={pending}
-            className="fca-button-secondary py-1.5 text-xs"
-          >
-            <GlobeLock className="h-3.5 w-3.5" />
-            Zurückziehen
-          </button>
-        )}
-        {as !== SECTION_APPROVAL_STATUS.IN_REVIEW && (
-          <button
-            type="button"
-            onClick={() => doAction("request-review")}
-            disabled={pending}
-            className="fca-button-secondary py-1.5 text-xs"
-          >
-            <Send className="h-3.5 w-3.5" />
-            Zur Überprüfung
-          </button>
-        )}
-        {as === SECTION_APPROVAL_STATUS.IN_REVIEW && (
-          <>
-            <button
-              type="button"
-              onClick={() => doAction("approve")}
-              disabled={pending}
-              className="fca-button-primary py-1.5 text-xs"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Freigeben
-            </button>
-            <button
-              type="button"
-              onClick={() => doAction("reject")}
-              disabled={pending}
-              className="fca-button-secondary py-1.5 text-xs text-rose-600"
-            >
-              <X className="h-3.5 w-3.5" />
-              Ablehnen
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Schedule */}
-      {canPublish && (
-        <div className="mt-3 flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5 text-[var(--muted)] shrink-0" />
-          <input
-            type="datetime-local"
-            className="fca-input flex-1 text-xs"
-            value={scheduledAt}
-            onChange={(e) => setScheduledAt(e.target.value)}
-          />
-          <button
-            type="button"
-            disabled={pending || !scheduledAt}
-            onClick={() => doAction("schedule", { scheduledAt: new Date(scheduledAt).toISOString() })}
-            className="fca-button-secondary py-1.5 text-xs shrink-0"
-          >
-            Planen
-          </button>
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
     </div>
   );
 }
@@ -964,27 +500,49 @@ type PageBuilderClientProps = {
   pageSlug?: string;
 };
 
-export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "" }: PageBuilderClientProps) {
+export default function PageBuilderClient({
+  pageId,
+  pageTitle = "",
+  pageSlug = "",
+}: PageBuilderClientProps) {
   const [sections, setSections] = useState<PageSectionAdminItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
 
+  // Selection (Inspector Panel)
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Inspector shadow state — mirrors the selected section's editable fields
+  const [inspectorConfig, setInspectorConfig] = useState<Record<string, unknown>>({});
+  const [inspectorLabel, setInspectorLabel] = useState<string>("");
+
   // UI state
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [historyId, setHistoryId] = useState<string | null>(null);
-  const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
   // Autosave state
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveState, setSaveState] = useState<InspectorSaveState>("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autosaveFnRef = useRef<(() => void) | null>(null);
+
+  // Keep a ref to current inspector values for autosave closure
+  const inspectorRef = useRef<{
+    id: string | null;
+    label: string;
+    config: Record<string, unknown>;
+  }>({ id: null, label: "", config: {} });
+
+  useEffect(() => {
+    inspectorRef.current = {
+      id: selectedId,
+      label: inspectorLabel,
+      config: inspectorConfig,
+    };
+  }, [selectedId, inspectorLabel, inspectorConfig]);
 
   // Drag-and-drop state
   const [dragSrcId, setDragSrcId] = useState<string | null>(null);
@@ -1021,31 +579,105 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   useEffect(() => { load(); }, [load]);
 
   // ---------------------------------------------------------------------------
+  // Inspector selection
+  // ---------------------------------------------------------------------------
+
+  function selectSection(section: PageSectionAdminItem) {
+    setSelectedId(section.id);
+    setInspectorConfig({ ...section.config });
+    setInspectorLabel(section.label);
+    // Cancel any pending autosave for previous selection
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+  }
+
+  function closeInspector() {
+    setSelectedId(null);
+    setIsDirty(false);
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Autosave trigger
   // ---------------------------------------------------------------------------
 
   const triggerAutosave = useCallback(() => {
     setIsDirty(true);
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(() => {
-      if (autosaveFnRef.current) {
-        setSaveState("saving");
-        Promise.resolve()
-          .then(() => { autosaveFnRef.current?.(); })
-          .then(() => { setSaveState("saved"); setLastSaved(new Date()); setIsDirty(false); })
-          .catch(() => setSaveState("error"));
+    autosaveTimerRef.current = setTimeout(async () => {
+      const { id, label, config } = inspectorRef.current;
+      if (!id || !label.trim()) return;
+      setSaveState("saving");
+      try {
+        const res = await fetch(`/api/website-pages/${pageId}/sections/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: label.trim(), config }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error ?? "Speichern fehlgeschlagen");
+        setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
+        setSaveState("saved");
+        setLastSaved(new Date());
+        setIsDirty(false);
+      } catch {
+        setSaveState("error");
       }
     }, AUTOSAVE_DELAY_MS);
-  }, []);
+  }, [pageId]);
 
   // ---------------------------------------------------------------------------
-  // Actions
+  // Inspector change handlers
+  // ---------------------------------------------------------------------------
+
+  const handleInspectorConfigChange = useCallback(
+    (config: Record<string, unknown>) => {
+      setInspectorConfig(config);
+      triggerAutosave();
+    },
+    [triggerAutosave],
+  );
+
+  const handleInspectorLabelChange = useCallback(
+    (label: string) => {
+      setInspectorLabel(label);
+      triggerAutosave();
+    },
+    [triggerAutosave],
+  );
+
+  const handleWorkflowUpdate = useCallback((updated: PageSectionAdminItem) => {
+    setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    // Also update inspector shadow if this section is selected
+    if (selectedId === updated.id) {
+      setInspectorConfig({ ...updated.config });
+      setInspectorLabel(updated.label);
+    }
+  }, [selectedId]);
+
+  const handleRevisionRestore = useCallback((updated: PageSectionAdminItem) => {
+    setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    if (selectedId === updated.id) {
+      setInspectorConfig({ ...updated.config });
+      setInspectorLabel(updated.label);
+    }
+  }, [selectedId]);
+
+  // ---------------------------------------------------------------------------
+  // Section actions
   // ---------------------------------------------------------------------------
 
   async function handleToggle(id: string) {
     setActionPending(id);
     try {
-      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/toggle`, { method: "PATCH" });
+      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/toggle`, {
+        method: "PATCH",
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data?.error ?? "Fehler"); return; }
       setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
@@ -1074,12 +706,12 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     if (!confirm("Sektion wirklich löschen?")) return;
     setActionPending(id);
     try {
-      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}`, {
+        method: "DELETE",
+      });
       if (res.ok || res.status === 204) {
         setSections((prev) => prev.filter((s) => s.id !== id));
-        if (editingId === id) setEditingId(null);
-        if (historyId === id) setHistoryId(null);
-        if (workflowId === id) setWorkflowId(null);
+        if (selectedId === id) closeInspector();
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data?.error ?? "Löschen fehlgeschlagen");
@@ -1092,7 +724,9 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   async function handleDuplicate(id: string) {
     setActionPending(id);
     try {
-      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/duplicate`, { method: "POST" });
+      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/duplicate`, {
+        method: "POST",
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data?.error ?? "Fehler"); return; }
       setSections((prev) => [...prev, data.section]);
@@ -1101,30 +735,10 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     }
   }
 
-  async function handleSaveConfig(id: string, label: string, config: Record<string, unknown>) {
-    setSaveState("saving");
-    try {
-      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label, config }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Speichern fehlgeschlagen");
-      setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
-      setSaveState("saved");
-      setLastSaved(new Date());
-      setIsDirty(false);
-      if (autosaveTimerRef.current) { clearTimeout(autosaveTimerRef.current); autosaveTimerRef.current = null; }
-    } catch (err) {
-      setSaveState("error");
-      throw err;
-    }
-  }
-
   function handleCreated(section: PageSectionAdminItem) {
     setSections((prev) => [...prev, section]);
     setShowAdd(false);
+    selectSection(section);
   }
 
   function handleToggleCollapse(id: string) {
@@ -1139,9 +753,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   // Drag-and-drop handlers
   // ---------------------------------------------------------------------------
 
-  function handleDragStart(id: string) {
-    setDragSrcId(id);
-  }
+  function handleDragStart(id: string) { setDragSrcId(id); }
 
   function handleDragOver(e: React.DragEvent, id: string) {
     e.preventDefault();
@@ -1155,7 +767,6 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       setDragOverId(null);
       return;
     }
-
     const srcIdx = sections.findIndex((s) => s.id === dragSrcId);
     const tgtIdx = sections.findIndex((s) => s.id === targetId);
     if (srcIdx === -1 || tgtIdx === -1) { setDragSrcId(null); setDragOverId(null); return; }
@@ -1176,18 +787,28 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       const data = await res.json().catch(() => ({}));
       if (res.ok) setSections(data.sections ?? reordered);
     } catch {
-      // Optimistic update already applied; server sync failed silently
+      // Optimistic update already applied
     }
   }
 
-  function handleDragEnd() {
-    setDragSrcId(null);
-    setDragOverId(null);
-  }
+  function handleDragEnd() { setDragSrcId(null); setDragOverId(null); }
+
+  // ---------------------------------------------------------------------------
+  // Derived: selected section (live from sections list, plus shadow values)
+  // ---------------------------------------------------------------------------
+
+  const selectedSection = sections.find((s) => s.id === selectedId);
+
+  // Build inspector section view — merges live section with shadow editable fields
+  const inspectorSection: PageSectionAdminItem | null = selectedSection
+    ? { ...selectedSection, config: inspectorConfig, label: inspectorLabel }
+    : null;
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+
+  const hasInspector = !!inspectorSection;
 
   return (
     <>
@@ -1219,6 +840,12 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             <SaveIndicator state={saveState} lastSaved={lastSaved} />
           </div>
           <div className="flex items-center gap-2">
+            {hasInspector && (
+              <div className="flex items-center gap-1 rounded-md border border-[var(--brand-primary,#f97316)] bg-orange-50 px-2.5 py-1 text-[11px] font-medium text-orange-700">
+                <PanelRight className="h-3 w-3" />
+                Inspector aktiv
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setShowTemplates(true)}
@@ -1226,7 +853,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               title="Seitenvorlage anwenden"
             >
               <Layers className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline ml-1 text-xs">Vorlage</span>
+              <span className="ml-1 hidden text-xs sm:inline">Vorlage</span>
             </button>
             <button
               type="button"
@@ -1235,7 +862,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               title="Vorschau"
             >
               <Eye className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline ml-1 text-xs">Vorschau</span>
+              <span className="ml-1 hidden text-xs sm:inline">Vorschau</span>
             </button>
             <button
               type="button"
@@ -1249,7 +876,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             {!showAdd && (
               <button
                 type="button"
-                onClick={() => { setShowAdd(true); setEditingId(null); }}
+                onClick={() => { setShowAdd(true); closeInspector(); }}
                 className="fca-button-primary"
               >
                 <Plus className="h-4 w-4" />
@@ -1262,7 +889,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
         {/* Unsaved changes warning */}
         {isDirty && saveState !== "saving" && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <Save className="h-3.5 w-3.5 shrink-0" />
+            <Save className="h-3.5 w-3.5 flex-shrink-0" />
             Ungespeicherte Änderungen — wird automatisch gespeichert…
           </div>
         )}
@@ -1283,222 +910,239 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           />
         )}
 
-        {/* Section list */}
-        <SectionCard noPadding>
-          {loading && sections.length === 0 ? (
-            <div className="space-y-2 p-5">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-[var(--surface-2)]" />
-              ))}
-            </div>
-          ) : sections.length === 0 ? (
-            <EmptyState
-              icon={<Blocks className="h-10 w-10" />}
-              heading="Keine Sektionen vorhanden"
-              description="Füge die erste Sektion hinzu, um diese Seite mit Blöcken zu befüllen."
-              action={
-                !showAdd ? (
-                  <button type="button" onClick={() => setShowAdd(true)} className="fca-button-primary">
-                    <Plus className="h-4 w-4" />
-                    Erste Sektion hinzufügen
-                  </button>
-                ) : undefined
-              }
-            />
-          ) : (
-            <div className="divide-y divide-[var(--border)]">
-              {sections.map((section, idx) => {
-                const isCollapsed = collapsedIds.has(section.id);
-                const isDragging = dragSrcId === section.id;
-                const isDragTarget = dragOverId === section.id;
+        {/* Main layout: section list + inspector sidebar */}
+        <div className={`flex gap-4 ${hasInspector ? "items-start" : ""}`}>
+          {/* Section list */}
+          <div className={`min-w-0 flex-1 ${hasInspector ? "max-w-[60%]" : ""}`}>
+            <SectionCard noPadding>
+              {loading && sections.length === 0 ? (
+                <div className="space-y-2 p-5">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-14 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+                  ))}
+                </div>
+              ) : sections.length === 0 ? (
+                <EmptyState
+                  icon={<Blocks className="h-10 w-10" />}
+                  heading="Keine Sektionen vorhanden"
+                  description="Füge die erste Sektion hinzu, um diese Seite mit Blöcken zu befüllen."
+                  action={
+                    !showAdd ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAdd(true)}
+                        className="fca-button-primary"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Erste Sektion hinzufügen
+                      </button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <div className="divide-y divide-[var(--border)]">
+                  {sections.map((section, idx) => {
+                    const isCollapsed = collapsedIds.has(section.id);
+                    const isSelected = selectedId === section.id;
+                    const isDragging = dragSrcId === section.id;
+                    const isDragTarget = dragOverId === section.id;
 
-                return (
-                  <Fragment key={section.id}>
-                    <div
-                      draggable
-                      onDragStart={() => handleDragStart(section.id)}
-                      onDragOver={(e) => handleDragOver(e, section.id)}
-                      onDrop={(e) => handleDrop(e, section.id)}
-                      onDragEnd={handleDragEnd}
-                      className={`px-5 py-4 transition-colors ${
-                        isDragging ? "opacity-40" : ""
-                      } ${isDragTarget && !isDragging ? "bg-blue-50" : ""}`}
-                    >
-                      {/* Row: drag handle + info + actions */}
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        {/* Drag handle + info */}
-                        <div className="min-w-0 flex-1 flex items-start gap-2">
-                          <div className="mt-1 cursor-grab text-[var(--muted)] hover:text-[var(--text-2)] transition shrink-0">
-                            <GripVertical className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-[var(--muted)] w-5 text-right shrink-0">
-                                {idx + 1}.
-                              </span>
-                              <span className="font-medium text-sm text-[var(--foreground)] truncate">
-                                {section.label}
-                              </span>
-                              <EnabledBadge isEnabled={section.isEnabled} />
-                              <PublishBadge status={section.publishStatus} />
-                              <ApprovalBadge status={section.approvalStatus} />
+                    return (
+                      <Fragment key={section.id}>
+                        <div
+                          draggable
+                          onDragStart={() => handleDragStart(section.id)}
+                          onDragOver={(e) => handleDragOver(e, section.id)}
+                          onDrop={(e) => handleDrop(e, section.id)}
+                          onDragEnd={handleDragEnd}
+                          className={`px-4 py-3 transition-colors cursor-pointer ${
+                            isDragging ? "opacity-40" : ""
+                          } ${isDragTarget && !isDragging ? "bg-blue-50" : ""} ${
+                            isSelected
+                              ? "bg-orange-50 ring-1 ring-inset ring-[var(--brand-primary,#f97316)]"
+                              : "hover:bg-[var(--surface-2)]"
+                          }`}
+                          onClick={() => {
+                            if (isSelected) {
+                              closeInspector();
+                            } else {
+                              selectSection(section);
+                            }
+                          }}
+                        >
+                          {/* Row: drag handle + info + actions */}
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            {/* Drag handle + info */}
+                            <div className="flex min-w-0 flex-1 items-start gap-2">
+                              <div
+                                className="mt-1 shrink-0 cursor-grab text-[var(--muted)] transition hover:text-[var(--text-2)]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <GripVertical className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-1 flex flex-wrap items-center gap-2">
+                                  <span className="w-5 shrink-0 text-right text-xs font-medium text-[var(--muted)]">
+                                    {idx + 1}.
+                                  </span>
+                                  <span className="truncate text-sm font-medium text-[var(--foreground)]">
+                                    {section.label}
+                                  </span>
+                                  {isSelected && (
+                                    <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">
+                                      Ausgewählt
+                                    </span>
+                                  )}
+                                  <EnabledBadge isEnabled={section.isEnabled} />
+                                  <PublishBadge status={section.publishStatus} />
+                                  <ApprovalBadge status={section.approvalStatus} />
+                                </div>
+                                <div className="ml-7 flex flex-wrap items-center gap-2">
+                                  <SectionTypeBadge type={section.type} />
+                                  {section.scheduledPublishAt && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted)]">
+                                      <Clock className="h-3 w-3" />
+                                      {new Date(section.scheduledPublishAt).toLocaleString("de-CH")}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="ml-7 flex flex-wrap items-center gap-2">
-                              <SectionTypeBadge type={section.type} />
-                              {section.scheduledPublishAt && (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted)]">
-                                  <Clock className="h-3 w-3" />
-                                  {new Date(section.scheduledPublishAt).toLocaleString("de-CH")}
-                                </span>
-                              )}
+
+                            {/* Actions */}
+                            <div
+                              className="flex shrink-0 items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {/* Collapse row */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleCollapse(section.id)}
+                                className="sce-icon-button"
+                                title={isCollapsed ? "Aufklappen" : "Einklappen"}
+                              >
+                                <ChevronRight
+                                  className={`h-3.5 w-3.5 transition-transform ${
+                                    isCollapsed ? "" : "rotate-90"
+                                  }`}
+                                />
+                              </button>
+                              {/* Inspector toggle */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    closeInspector();
+                                  } else {
+                                    selectSection(section);
+                                  }
+                                }}
+                                className={`sce-icon-button ${isSelected ? "text-orange-600" : ""}`}
+                                title={isSelected ? "Inspector schliessen" : "Inspector öffnen"}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              {/* Move up */}
+                              <button
+                                type="button"
+                                onClick={() => handleMove(section.id, "up")}
+                                disabled={actionPending === section.id || idx === 0}
+                                className="sce-icon-button disabled:opacity-30"
+                                title="Nach oben"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              </button>
+                              {/* Move down */}
+                              <button
+                                type="button"
+                                onClick={() => handleMove(section.id, "down")}
+                                disabled={
+                                  actionPending === section.id || idx === sections.length - 1
+                                }
+                                className="sce-icon-button disabled:opacity-30"
+                                title="Nach unten"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </button>
+                              {/* Toggle enabled */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggle(section.id)}
+                                disabled={actionPending === section.id}
+                                className="sce-icon-button"
+                                title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
+                              >
+                                {section.isEnabled ? (
+                                  <EyeOff className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Eye className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                              {/* Duplicate */}
+                              <button
+                                type="button"
+                                onClick={() => handleDuplicate(section.id)}
+                                disabled={actionPending === section.id}
+                                className="sce-icon-button"
+                                title="Duplizieren"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </button>
+                              {/* Delete */}
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(section.id)}
+                                disabled={actionPending === section.id}
+                                className="sce-icon-button text-rose-500 hover:text-rose-700"
+                                title="Löschen"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          {/* Collapse/expand */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCollapse(section.id)}
-                            className="sce-icon-button"
-                            title={isCollapsed ? "Aufklappen" : "Einklappen"}
-                          >
-                            <ChevronRight
-                              className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
-                            />
-                          </button>
-                          {/* Move up */}
-                          <button
-                            type="button"
-                            onClick={() => handleMove(section.id, "up")}
-                            disabled={actionPending === section.id || idx === 0}
-                            className="sce-icon-button disabled:opacity-30"
-                            title="Nach oben"
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Move down */}
-                          <button
-                            type="button"
-                            onClick={() => handleMove(section.id, "down")}
-                            disabled={actionPending === section.id || idx === sections.length - 1}
-                            className="sce-icon-button disabled:opacity-30"
-                            title="Nach unten"
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Toggle visible */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggle(section.id)}
-                            disabled={actionPending === section.id}
-                            className="sce-icon-button"
-                            title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
-                          >
-                            {section.isEnabled ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                          </button>
-                          {/* Edit config */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setEditingId(editingId === section.id ? null : section.id)
-                            }
-                            className={`sce-icon-button ${editingId === section.id ? "text-blue-600" : ""}`}
-                            title="Konfigurieren"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Duplicate */}
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicate(section.id)}
-                            disabled={actionPending === section.id}
-                            className="sce-icon-button"
-                            title="Duplizieren"
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Workflow */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setWorkflowId(workflowId === section.id ? null : section.id)
-                            }
-                            className={`sce-icon-button ${workflowId === section.id ? "text-emerald-600" : ""}`}
-                            title="Workflow"
-                          >
-                            <Globe className="h-3.5 w-3.5" />
-                          </button>
-                          {/* History */}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setHistoryId(historyId === section.id ? null : section.id)
-                            }
-                            className={`sce-icon-button ${historyId === section.id ? "text-blue-600" : ""}`}
-                            title="Versionshistorie"
-                          >
-                            <History className="h-3.5 w-3.5" />
-                          </button>
-                          {/* Delete */}
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(section.id)}
-                            disabled={actionPending === section.id}
-                            className="sce-icon-button text-rose-500 hover:text-rose-700"
-                            title="Löschen"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {/* Expandable row info (non-inspector) */}
+                          {!isCollapsed && !isSelected && (
+                            <div className="ml-7 mt-2 text-[11px] text-[var(--muted)]">
+                              {getBlockDefinition(section.type)?.description ?? ""}
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              )}
+            </SectionCard>
+          </div>
 
-                      {/* Expandable content */}
-                      {!isCollapsed && (
-                        <>
-                          {editingId === section.id && (
-                            <ConfigEditor
-                              section={section}
-                              onSave={(label, config) => handleSaveConfig(section.id, label, config)}
-                              onCancel={() => setEditingId(null)}
-                              onChanged={triggerAutosave}
-                              autoSaveRef={autosaveFnRef}
-                            />
-                          )}
-                          {workflowId === section.id && (
-                            <WorkflowPanel
-                              pageId={pageId}
-                              section={section}
-                              onUpdated={(updated) =>
-                                setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
-                              }
-                              onClose={() => setWorkflowId(null)}
-                            />
-                          )}
-                          {historyId === section.id && (
-                            <RevisionHistoryPanel
-                              pageId={pageId}
-                              section={section}
-                              onClose={() => setHistoryId(null)}
-                              onRestored={(updated) => {
-                                setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-                                setHistoryId(null);
-                              }}
-                            />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </Fragment>
-                );
-              })}
+          {/* Inspector sidebar */}
+          {hasInspector && inspectorSection && (
+            <div className="w-[40%] min-w-[320px] flex-shrink-0">
+              <div className="sticky top-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden"
+                style={{ maxHeight: "calc(100vh - 8rem)" }}>
+                <InspectorPanel
+                  section={inspectorSection}
+                  pageId={pageId}
+                  onConfigChange={handleInspectorConfigChange}
+                  onLabelChange={handleInspectorLabelChange}
+                  onWorkflowUpdate={handleWorkflowUpdate}
+                  onRevisionRestore={handleRevisionRestore}
+                  saveState={saveState}
+                  lastSaved={lastSaved}
+                  onClose={closeInspector}
+                />
+              </div>
             </div>
           )}
-        </SectionCard>
+        </div>
 
         {/* Info footer */}
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 space-y-1">
+        <div className="space-y-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+          <p className="text-xs text-[var(--muted)]">
+            <strong className="text-[var(--text-2)]">Inspector:</strong>{" "}
+            Klicke auf eine Sektion, um sie im Inspector zu bearbeiten.
+          </p>
           <p className="text-xs text-[var(--muted)]">
             <strong className="text-[var(--text-2)]">Drag & Drop:</strong>{" "}
             Sektionen können per Ziehen und Ablegen neu geordnet werden.
@@ -1506,8 +1150,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           <p className="text-xs text-[var(--muted)]">
             <strong className="text-[var(--text-2)]">Publishing:</strong>{" "}
             Sektionen sind öffentlich sichtbar wenn die übergeordnete Seite{" "}
-            <strong>veröffentlicht</strong> ist, die Sektion{" "}
-            <strong>aktiv</strong> und <strong>veröffentlicht</strong> ist.
+            <strong>veröffentlicht</strong> ist und die Sektion <strong>aktiv</strong> und{" "}
+            <strong>veröffentlicht</strong> ist.
           </p>
         </div>
       </div>

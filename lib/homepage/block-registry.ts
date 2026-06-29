@@ -155,6 +155,31 @@ export type BlockDefinition = {
   supportsLayout: boolean;
 
   /**
+   * Inspector V2 capability model.
+   * Declares which Inspector sections this block supports.
+   * The InspectorPanel renders only the sections listed as true here.
+   * Absent = false (section not shown).
+   */
+  supportsInspector?: {
+    /** Rich content editing: eyebrow, headline, body, cards, images, etc. */
+    content?: boolean;
+    /** Column arrangement, width, spacing, alignment, responsive behaviour. */
+    layout?: boolean;
+    /** Theme, card variants, typography, accent colours. */
+    style?: boolean;
+    /** None / solid / gradient / image background with overlay. */
+    background?: boolean;
+    /** Hover/scroll/entrance animations (placeholder, not yet implemented). */
+    interactions?: boolean;
+    /** Draft / published / scheduled visibility state. */
+    visibility?: boolean;
+    /** Publishing workflow: publish, unpublish, approve, schedule. */
+    publishing?: boolean;
+    /** Anchor ID, developer metadata, analytics attributes. */
+    advanced?: boolean;
+  };
+
+  /**
    * Projects a section's config to the public-safe subset for the public homepage API.
    *
    * All current block types use an identity projection (all config is public-safe).
@@ -200,6 +225,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 0,
     defaultEnabled: true,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: false,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -217,6 +252,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 10,
     defaultEnabled: true,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: false,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -235,6 +280,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 20,
     defaultEnabled: true,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: false,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -252,6 +307,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 30,
     defaultEnabled: true,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: false,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -269,6 +334,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 40,
     defaultEnabled: true,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: false,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -297,6 +372,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 50,
     defaultEnabled: false,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: false,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -315,6 +400,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 60,
     defaultEnabled: false,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: false,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -355,6 +450,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 65,
     defaultEnabled: false,
     supportsLayout: true,
+    supportsInspector: {
+      content: true,
+      layout: true,
+      style: true,
+      background: true,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 
@@ -373,6 +478,16 @@ export const BLOCK_REGISTRY: BlockDefinition[] = [
     defaultSortOrder: 70,
     defaultEnabled: false,
     supportsLayout: false,
+    supportsInspector: {
+      content: false,
+      layout: false,
+      style: false,
+      background: false,
+      interactions: false,
+      visibility: true,
+      publishing: true,
+      advanced: true,
+    },
     projectPublicConfig: (config) => config,
   },
 ];

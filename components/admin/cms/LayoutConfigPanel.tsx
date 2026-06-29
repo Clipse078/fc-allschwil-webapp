@@ -52,6 +52,11 @@ export type LayoutPanelFeatures = {
   vAlign?: boolean;
   /** Show horizontal padding picker. Default: false. */
   paddingX?: boolean;
+  /**
+   * Show background section. Default: true.
+   * Set to false when the inspector renders background in a dedicated section.
+   */
+  background?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -62,6 +67,11 @@ type Props = {
   layout: SectionLayout | undefined;
   onChange: (layout: SectionLayout) => void;
   features?: LayoutPanelFeatures;
+  /**
+   * When true, renders ONLY the background section and hides all layout controls.
+   * Used by the Inspector Panel's dedicated Background section.
+   */
+  backgroundOnly?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -591,7 +601,12 @@ function ResponsiveSection({
 // Main LayoutConfigPanel
 // ---------------------------------------------------------------------------
 
-export default function LayoutConfigPanel({ layout, onChange, features = {} }: Props) {
+export default function LayoutConfigPanel({
+  layout,
+  onChange,
+  features = {},
+  backgroundOnly = false,
+}: Props) {
   const l: SectionLayout = layout ?? {};
 
   function patch(updates: Partial<SectionLayout>) {
@@ -606,6 +621,21 @@ export default function LayoutConfigPanel({ layout, onChange, features = {} }: P
   const columns = l.columns ?? DEFAULT_SECTION_LAYOUT.columns!;
   const background = l.background ?? DEFAULT_SECTION_LAYOUT.background!;
   const responsive: SectionResponsive = l.responsive ?? DEFAULT_SECTION_LAYOUT.responsive ?? {};
+
+  // Background-only mode: render only the background section (for Inspector Panel)
+  if (backgroundOnly) {
+    return (
+      <div className="space-y-5">
+        <BackgroundSection
+          value={background}
+          onChange={(bg) => patch({ background: bg })}
+        />
+      </div>
+    );
+  }
+
+  // Default: whether to show background section (default true)
+  const showBackground = features.background !== false;
 
   return (
     <div className="space-y-5">
@@ -626,10 +656,12 @@ export default function LayoutConfigPanel({ layout, onChange, features = {} }: P
         <ColumnsSection value={columns} onChange={(v) => patch({ columns: v })} />
       )}
 
-      <BackgroundSection
-        value={background}
-        onChange={(bg) => patch({ background: bg })}
-      />
+      {showBackground && (
+        <BackgroundSection
+          value={background}
+          onChange={(bg) => patch({ background: bg })}
+        />
+      )}
 
       {features.responsive && (
         <ResponsiveSection
