@@ -55,18 +55,29 @@ import QuoteConfigForm from "./config-forms/QuoteConfigForm";
 import StatisticsConfigForm from "./config-forms/StatisticsConfigForm";
 import AnnouncementConfigForm from "./config-forms/AnnouncementConfigForm";
 import RichTextConfigForm from "./config-forms/RichTextConfigForm";
+// V4.2 Component Library additions
+import HeroConfigForm from "./config-forms/HeroConfigForm";
+import TimelineConfigForm from "./config-forms/TimelineConfigForm";
+import TeamGridConfigForm from "./config-forms/TeamGridConfigForm";
+import RegistrationCtaConfigForm from "./config-forms/RegistrationCtaConfigForm";
+import FooterBlockConfigForm from "./config-forms/FooterBlockConfigForm";
 
 // ── Type icon map ─────────────────────────────────────────────────────────────
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
-  CTA:            <MousePointerClick className="h-5 w-5" />,
-  SPONSOR_BANNER: <Award className="h-5 w-5" />,
-  CONTACT_CARD:   <ContactRound className="h-5 w-5" />,
-  FAQ:            <CircleHelp className="h-5 w-5" />,
-  QUOTE:          <Quote className="h-5 w-5" />,
-  STATISTICS:     <BarChart3 className="h-5 w-5" />,
-  ANNOUNCEMENT:   <Megaphone className="h-5 w-5" />,
-  RICH_TEXT:      <FileText className="h-5 w-5" />,
+  CTA:              <MousePointerClick className="h-5 w-5" />,
+  SPONSOR_BANNER:   <Award className="h-5 w-5" />,
+  CONTACT_CARD:     <ContactRound className="h-5 w-5" />,
+  FAQ:              <CircleHelp className="h-5 w-5" />,
+  QUOTE:            <Quote className="h-5 w-5" />,
+  STATISTICS:       <BarChart3 className="h-5 w-5" />,
+  ANNOUNCEMENT:     <Megaphone className="h-5 w-5" />,
+  RICH_TEXT:        <FileText className="h-5 w-5" />,
+  HERO:             <FileText className="h-5 w-5" />,
+  TIMELINE:         <FileText className="h-5 w-5" />,
+  TEAM_GRID:        <FileText className="h-5 w-5" />,
+  REGISTRATION_CTA: <MousePointerClick className="h-5 w-5" />,
+  FOOTER_BLOCK:     <FileText className="h-5 w-5" />,
 };
 
 // ── Config form dispatcher ────────────────────────────────────────────────────
@@ -89,6 +100,12 @@ function ConfigForm({
     case "STATISTICS":     return <StatisticsConfigForm config={config} onChange={onChange} />;
     case "ANNOUNCEMENT":   return <AnnouncementConfigForm config={config} onChange={onChange} />;
     case "RICH_TEXT":      return <RichTextConfigForm config={config} onChange={onChange} />;
+    // V4.2 additions
+    case "HERO":             return <HeroConfigForm config={config} onChange={onChange} />;
+    case "TIMELINE":         return <TimelineConfigForm config={config} onChange={onChange} />;
+    case "TEAM_GRID":        return <TeamGridConfigForm config={config} onChange={onChange} />;
+    case "REGISTRATION_CTA": return <RegistrationCtaConfigForm config={config} onChange={onChange} />;
+    case "FOOTER_BLOCK":     return <FooterBlockConfigForm config={config} onChange={onChange} />;
     default: return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
         Kein Formular für Typ «{type}» verfügbar.

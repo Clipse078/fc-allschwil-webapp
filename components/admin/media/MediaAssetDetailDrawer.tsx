@@ -50,6 +50,8 @@ export default function MediaAssetDetailDrawer({
     copyright: "",
     photographer: "",
     folderId: "" as string | null,
+    focusX: 0.5 as number | null,
+    focusY: 0.5 as number | null,
   });
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -59,7 +61,7 @@ export default function MediaAssetDetailDrawer({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [usages, setUsages] = useState<MediaAssetUsageItem[]>([]);
   const [usagesLoading, setUsagesLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"meta" | "usage">("meta");
+  const [activeTab, setActiveTab] = useState<"meta" | "focus" | "usage">("meta");
   const [newTagName, setNewTagName] = useState("");
   const [creatingTag, setCreatingTag] = useState(false);
 
@@ -72,6 +74,8 @@ export default function MediaAssetDetailDrawer({
       copyright: asset.copyright ?? "",
       photographer: asset.photographer ?? "",
       folderId: asset.folderId ?? null,
+      focusX: (asset as Record<string, unknown>).focusX != null ? (asset as Record<string, unknown>).focusX as number : 0.5,
+      focusY: (asset as Record<string, unknown>).focusY != null ? (asset as Record<string, unknown>).focusY as number : 0.5,
     });
     setSelectedTagIds(asset.tags?.map((t) => t.id) ?? []);
     setSaveError(null);
@@ -104,6 +108,8 @@ export default function MediaAssetDetailDrawer({
           photographer: form.photographer || null,
           folderId: form.folderId || null,
           tagIds: selectedTagIds,
+          focusX: form.focusX ?? null,
+          focusY: form.focusY ?? null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -244,7 +250,7 @@ export default function MediaAssetDetailDrawer({
 
       {/* Tabs */}
       <div className="flex border-b border-[var(--border)]">
-        {(["meta", "usage"] as const).map((tab) => (
+        {(["meta", "focus", "usage"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -258,6 +264,10 @@ export default function MediaAssetDetailDrawer({
             {tab === "meta" ? (
               <span className="flex items-center justify-center gap-1">
                 <Info className="h-3 w-3" /> Metadaten
+              </span>
+            ) : tab === "focus" ? (
+              <span className="flex items-center justify-center gap-1">
+                <MapPin className="h-3 w-3" /> Fokus
               </span>
             ) : (
               <span className="flex items-center justify-center gap-1">
@@ -404,6 +414,76 @@ export default function MediaAssetDetailDrawer({
                 "Änderungen speichern"
               )}
             </button>
+          </div>
+        )}
+
+        {activeTab === "focus" && asset?.type === "IMAGE" && (
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-[var(--foreground)] mb-1">Fokuspunkt</p>
+              <p className="text-[11px] text-[var(--muted)] mb-4">
+                Klicken Sie auf das Bild, um den Fokuspunkt zu setzen.
+                Dieser Punkt bleibt beim Zuschneiden immer sichtbar.
+              </p>
+            </div>
+
+            {/* Focus point picker */}
+            {asset.url && (
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div
+                  className="relative overflow-hidden rounded-lg border border-[var(--border)] cursor-crosshair"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) / rect.width;
+                    const y = (e.clientY - rect.top) / rect.height;
+                    setForm((prev) => ({
+                      ...prev,
+                      focusX: Math.round(x * 100) / 100,
+                      focusY: Math.round(y * 100) / 100,
+                    }));
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={asset.url}
+                    alt={form.altText || asset.filename}
+                    className="w-full object-cover"
+                    style={{ maxHeight: 220 }}
+                  />
+                  {/* Focus point indicator */}
+                  {form.focusX != null && form.focusY != null && (
+                    <div
+                      className="absolute h-6 w-6 -translate-x-3 -translate-y-3 pointer-events-none"
+                      style={{
+                        left: `${(form.focusX ?? 0.5) * 100}%`,
+                        top: `${(form.focusY ?? 0.5) * 100}%`,
+                      }}
+                    >
+                      <div className="absolute inset-0 rounded-full border-2 border-white shadow-md bg-[var(--accent)] opacity-80" />
+                      <div className="absolute inset-1.5 rounded-full bg-white" />
+                    </div>
+                  )}
+                </div>
+                <p className="mt-2 text-center text-[10px] text-[var(--muted)]">
+                  Fokuspunkt: {Math.round((form.focusX ?? 0.5) * 100)}% H / {Math.round((form.focusY ?? 0.5) * 100)}% V
+                </p>
+              </div>
+            )}
+
+            {/* Reset */}
+            <div className="flex gap-2">
+              <button type="button"
+                onClick={() => setForm((prev) => ({ ...prev, focusX: 0.5, focusY: 0.5 }))}
+                className="fca-button-secondary text-xs">
+                Fokus zentrieren
+              </button>
+              <button type="button" onClick={handleSave} disabled={saving}
+                className="fca-button-primary text-xs">
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Fokuspunkt speichern
+              </button>
+            </div>
           </div>
         )}
 

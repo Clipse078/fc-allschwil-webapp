@@ -82,6 +82,12 @@ export async function POST(request: NextRequest) {
     sortOrder: body.sortOrder !== undefined ? Number(body.sortOrder) : undefined,
     isVisible: body.isVisible !== undefined ? Boolean(body.isVisible) : true,
     visibilityMode: (body.visibilityMode as string) ?? "ALWAYS",
+    icon: typeof body.icon === "string" ? body.icon || null : null,
+    megaMenu: body.megaMenu !== undefined ? Boolean(body.megaMenu) : false,
+    description: typeof body.description === "string" ? body.description || null : null,
+    badge: typeof body.badge === "string" ? body.badge || null : null,
+    scheduleFrom: typeof body.scheduleFrom === "string" && body.scheduleFrom ? new Date(body.scheduleFrom) : null,
+    scheduleTo: typeof body.scheduleTo === "string" && body.scheduleTo ? new Date(body.scheduleTo) : null,
   };
 
   const result = await createNavItem(tenantId, input);

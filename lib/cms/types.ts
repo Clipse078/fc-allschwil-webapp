@@ -19,6 +19,7 @@ export type CmsFeatureStatus = "available" | "foundation" | "coming_next" | "fut
 
 export type CmsFeatureSection =
   | "content"
+  | "component_library"
   | "publishing"
   | "structure"
   | "governance"

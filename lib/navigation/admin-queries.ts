@@ -43,6 +43,13 @@ export type NavItemAdminRow = {
   sortOrder: number;
   isVisible: boolean;
   visibilityMode: NavVisibilityMode;
+  // V4.2 Navigation Builder fields
+  icon: string | null;
+  megaMenu: boolean;
+  description: string | null;
+  badge: string | null;
+  scheduleFrom: Date | null;
+  scheduleTo: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -68,6 +75,12 @@ const adminSelect = {
   sortOrder: true,
   isVisible: true,
   visibilityMode: true,
+  icon: true,
+  megaMenu: true,
+  description: true,
+  badge: true,
+  scheduleFrom: true,
+  scheduleTo: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -137,6 +150,13 @@ export type CreateNavItemInput = {
   sortOrder?: number;
   isVisible?: boolean;
   visibilityMode?: string;
+  // V4.2
+  icon?: string | null;
+  megaMenu?: boolean;
+  description?: string | null;
+  badge?: string | null;
+  scheduleFrom?: Date | null;
+  scheduleTo?: Date | null;
 };
 
 export type CreateNavItemError =
@@ -240,6 +260,12 @@ export async function createNavItem(
       sortOrder,
       isVisible: input.isVisible ?? true,
       visibilityMode,
+      icon: input.icon ?? null,
+      megaMenu: input.megaMenu ?? false,
+      description: input.description ?? null,
+      badge: input.badge ?? null,
+      scheduleFrom: input.scheduleFrom ?? null,
+      scheduleTo: input.scheduleTo ?? null,
     },
     select: adminSelect,
   });
@@ -261,6 +287,13 @@ export type UpdateNavItemInput = {
   sortOrder?: number;
   isVisible?: boolean;
   visibilityMode?: string;
+  // V4.2
+  icon?: string | null;
+  megaMenu?: boolean;
+  description?: string | null;
+  badge?: string | null;
+  scheduleFrom?: Date | null;
+  scheduleTo?: Date | null;
 };
 
 export type UpdateNavItemError =
@@ -368,6 +401,13 @@ export async function updateNavItem(
       ...(input.isVisible !== undefined ? { isVisible: input.isVisible } : {}),
       ...(input.visibilityMode !== undefined ? { visibilityMode: input.visibilityMode } : {}),
       ...(newParentId !== undefined ? { parentId: newParentId } : {}),
+      // V4.2
+      ...("icon" in input ? { icon: input.icon ?? null } : {}),
+      ...(input.megaMenu !== undefined ? { megaMenu: input.megaMenu } : {}),
+      ...("description" in input ? { description: input.description ?? null } : {}),
+      ...("badge" in input ? { badge: input.badge ?? null } : {}),
+      ...("scheduleFrom" in input ? { scheduleFrom: input.scheduleFrom ?? null } : {}),
+      ...("scheduleTo" in input ? { scheduleTo: input.scheduleTo ?? null } : {}),
     },
     select: adminSelect,
   });

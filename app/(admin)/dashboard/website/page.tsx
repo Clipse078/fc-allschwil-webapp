@@ -57,18 +57,23 @@ export default async function WebsiteCmsOverviewPage() {
     accessibleFeatureKeys.add("scheduled");
     accessibleFeatureKeys.add("review_workflow");
     accessibleFeatureKeys.add("four_eyes");
+    accessibleFeatureKeys.add("preview");
   }
   if (canManageWebsite) {
     accessibleFeatureKeys.add("pages");
     accessibleFeatureKeys.add("homepage_builder");
+    accessibleFeatureKeys.add("page_builder");
     accessibleFeatureKeys.add("navigation");
     accessibleFeatureKeys.add("blocks");
+    accessibleFeatureKeys.add("reusable_components");
     accessibleFeatureKeys.add("redirects");
     accessibleFeatureKeys.add("approval_workflow");
     accessibleFeatureKeys.add("permissions");
     accessibleFeatureKeys.add("website_settings");
     accessibleFeatureKeys.add("seo");
     accessibleFeatureKeys.add("seo_global");
+    accessibleFeatureKeys.add("analytics");
+    accessibleFeatureKeys.add("technical_config");
   }
 
   const hasUrgentItems = stats.publishing.pendingReview > 0;

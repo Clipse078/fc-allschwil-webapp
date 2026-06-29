@@ -17,7 +17,7 @@ import type {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function emptyStatusCounts(): PublishingStatusCounts {
-  return { DRAFT: 0, IN_REVIEW: 0, SCHEDULED: 0, PUBLISHED: 0, ARCHIVED: 0, total: 0 };
+  return { DRAFT: 0, IN_REVIEW: 0, SCHEDULED: 0, PUBLISHED: 0, ARCHIVED: 0, EXPIRED: 0, total: 0 };
 }
 
 function resolveNewsAuthor(
@@ -79,6 +79,7 @@ function mergeCounts(
     SCHEDULED: a.SCHEDULED + b.SCHEDULED,
     PUBLISHED: a.PUBLISHED + b.PUBLISHED,
     ARCHIVED: a.ARCHIVED + b.ARCHIVED,
+    EXPIRED: (a.EXPIRED ?? 0) + (b.EXPIRED ?? 0),
     total: a.total + b.total,
   };
 }
@@ -163,8 +164,14 @@ export async function listPublishableItems(
   const { tenantId, typeFilter, statusFilter, canManageNews, canManagePages, limit, offset } =
     input;
 
-  const statusWhere =
-    statusFilter !== "ALL" ? { status: statusFilter as PublishingStatus } : {};
+  // EXPIRED is a V4.2 UI status not yet in the DB enum; filter it as ARCHIVED
+  const dbStatus =
+    statusFilter === "ALL" ? null
+    : statusFilter === "EXPIRED" ? "ARCHIVED"
+    : statusFilter;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const statusWhere = dbStatus ? { status: dbStatus as any } : {};
 
   // Build individual lists based on access and type filter
   const fetchNews =
@@ -208,6 +215,7 @@ export async function listPublishableItems(
     updatedAt: a.updatedAt.toISOString(),
     publishedAt: a.publishedAt ? a.publishedAt.toISOString() : null,
     scheduledAt: a.scheduledAt ? a.scheduledAt.toISOString() : null,
+    expiresAt: null,
     editHref: `/dashboard/website/news/${a.id}/edit`,
   }));
 
@@ -221,6 +229,7 @@ export async function listPublishableItems(
     updatedAt: p.updatedAt.toISOString(),
     publishedAt: p.publishedAt ? p.publishedAt.toISOString() : null,
     scheduledAt: p.scheduledAt ? p.scheduledAt.toISOString() : null,
+    expiresAt: null,
     editHref: `/dashboard/website/pages/${p.id}/edit`,
   }));
 

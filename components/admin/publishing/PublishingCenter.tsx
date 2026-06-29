@@ -77,6 +77,7 @@ const STATUS_ORDER: PublishingStatus[] = [
   "IN_REVIEW",
   "SCHEDULED",
   "PUBLISHED",
+  "EXPIRED",
   "ARCHIVED",
 ];
 

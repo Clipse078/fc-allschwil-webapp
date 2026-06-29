@@ -2,6 +2,7 @@
  * lib/cms/sections.ts
  *
  * Canonical CMS section and feature definitions for the Website Management hub.
+ * Updated for CMS V4.2 — Website Platform UX Unification.
  *
  * This is the authoritative source of truth for:
  *  - CMS information architecture (sections + features)
@@ -10,7 +11,6 @@
  *  - Permission requirements (informational)
  *
  * Do not duplicate feature descriptions or routes elsewhere.
- * Future roadmap items are explicitly documented here as "coming_next" or "future".
  */
 
 import { CMS_ROUTES } from "./routes";
@@ -26,7 +26,7 @@ export const CMS_SECTIONS: CmsSection[] = [
       {
         key: "news",
         label: "News",
-        description: "Artikel erstellen, bearbeiten und veröffentlichen.",
+        description: "Artikel erstellen, bearbeiten und veröffentlichen. V4.2: Rich Text, Autosave, Inspector, SEO, Revision History.",
         status: "available",
         href: CMS_ROUTES.news,
         requiredPermissions: ["news.manage", "website.manage"],
@@ -41,8 +41,8 @@ export const CMS_SECTIONS: CmsSection[] = [
       },
       {
         key: "media",
-        label: "Mediathek",
-        description: "Bilder und Videos zentral verwalten und in Inhalten verwenden.",
+        label: "Mediathek (DAM)",
+        description: "True DAM: Bilder und Videos zentral verwalten, Fokuspunkt, Alt-Text, Ordner, Tags, Verwendungsnachweis.",
         status: "available",
         href: CMS_ROUTES.media,
         requiredPermissions: ["news.manage", "website.manage"],
@@ -66,6 +66,31 @@ export const CMS_SECTIONS: CmsSection[] = [
     ],
   },
 
+  // ── Component Library ──────────────────────────────────────────────────────
+  {
+    key: "component_library",
+    label: "Komponenten-Bibliothek",
+    description: "Wiederverwendbare Inhaltselemente — einmal erstellen, überall einsetzen.",
+    features: [
+      {
+        key: "reusable_components",
+        label: "Komponenten-Bibliothek",
+        description: "CTA, FAQ, Zitat, Statistik, Ankündigung, Hero, Timeline, Team-Raster, Anmelde-CTA, Footer-Block.",
+        status: "available",
+        href: CMS_ROUTES.components,
+        requiredPermissions: ["website.manage"],
+      },
+      {
+        key: "blocks",
+        label: "Block-Bibliothek",
+        description: "Wiederverwendbare Inhaltsblöcke für den Page Builder definieren und verwalten.",
+        status: "foundation",
+        href: CMS_ROUTES.blocks,
+        requiredPermissions: ["website.manage"],
+      },
+    ],
+  },
+
   // ── Publishing ─────────────────────────────────────────────────────────────
   {
     key: "publishing",
@@ -75,7 +100,7 @@ export const CMS_SECTIONS: CmsSection[] = [
       {
         key: "publishing_queue",
         label: "Publishing-Cockpit",
-        description: "Einheitliche Übersicht über alle Inhalte mit Status-Workflow.",
+        description: "Einheitliche Übersicht über alle Inhalte mit Status-Workflow (inkl. Abgelaufen-Status).",
         status: "available",
         href: CMS_ROUTES.publishing,
         requiredPermissions: ["news.manage", "website.manage"],
@@ -84,7 +109,7 @@ export const CMS_SECTIONS: CmsSection[] = [
         key: "drafts",
         label: "Entwürfe",
         description: "Alle Entwürfe gesammelt anzeigen und weiterbearbeiten.",
-        status: "foundation",
+        status: "available",
         href: CMS_ROUTES.publishing,
         requiredPermissions: ["news.manage", "website.manage"],
       },
@@ -92,7 +117,7 @@ export const CMS_SECTIONS: CmsSection[] = [
         key: "scheduled",
         label: "Geplante Inhalte",
         description: "Termine für automatische Veröffentlichungen planen.",
-        status: "foundation",
+        status: "available",
         href: CMS_ROUTES.publishing,
         requiredPermissions: ["news.manage", "website.manage"],
       },
@@ -114,33 +139,18 @@ export const CMS_SECTIONS: CmsSection[] = [
     features: [
       {
         key: "navigation",
-        label: "Navigation",
-        description: "Menüstruktur und Seitenbaum der Website konfigurieren.",
-        status: "foundation",
-        href: CMS_ROUTES.navigation,
-        requiredPermissions: ["website.manage"],
-      },
-      {
-        key: "blocks",
-        label: "Block-Bibliothek",
-        description: "Wiederverwendbare Inhaltsblöcke definieren und verwalten.",
-        status: "foundation",
-        href: CMS_ROUTES.blocks,
-        requiredPermissions: ["website.manage"],
-      },
-      {
-        key: "reusable_components",
-        label: "Wiederverwendbare Inhalte",
-        description: "CTAs, Zitate, FAQ, Kontaktkarten und weitere Inhalte einmal erstellen — überall verwenden.",
+        label: "Navigation Builder",
+        description: "Visueller Navigation Builder: Drag & Drop, Inspector, Mega-Menü, Zeitplanung, Mobile-Vorschau.",
         status: "available",
-        href: CMS_ROUTES.components,
+        href: CMS_ROUTES.navigation,
         requiredPermissions: ["website.manage"],
       },
       {
         key: "redirects",
         label: "Weiterleitungen",
-        description: "URL-Redirects pflegen und bestehende Verlinkungen absichern.",
-        status: "future",
+        description: "URL-Redirects (301/302) pflegen und bestehende Verlinkungen absichern.",
+        status: "available",
+        href: CMS_ROUTES.settings,
         requiredPermissions: ["website.manage"],
       },
     ],
@@ -164,7 +174,7 @@ export const CMS_SECTIONS: CmsSection[] = [
         key: "review_workflow",
         label: "Redaktioneller Workflow",
         description: "Submit → Review → Approve für News und Seiten.",
-        status: "foundation",
+        status: "available",
         href: CMS_ROUTES.publishing,
         requiredPermissions: ["news.manage", "website.manage"],
       },
@@ -189,12 +199,12 @@ export const CMS_SECTIONS: CmsSection[] = [
   // ── Configuration ──────────────────────────────────────────────────────────
   {
     key: "configuration",
-    label: "Konfiguration",
-    description: "SEO, Metadaten und Website-Einstellungen.",
+    label: "Website-Konfiguration",
+    description: "SEO, Analytics, Social Media, PWA, Cookie-Banner, Favicon und technische Einstellungen.",
     features: [
       {
         key: "website_settings",
-        label: "Website-Einstellungen",
+        label: "Allgemeine Einstellungen",
         description: "Veröffentlichung, Vier-Augen-Prinzip und Basis-Konfiguration.",
         status: "available",
         href: CMS_ROUTES.settings,
@@ -204,15 +214,32 @@ export const CMS_SECTIONS: CmsSection[] = [
         key: "seo",
         label: "SEO-Verwaltung",
         description: "Meta-Titel, Descriptions und strukturierte Daten verwalten.",
-        status: "foundation",
-        href: CMS_ROUTES.pages,
+        status: "available",
+        href: CMS_ROUTES.settings,
         requiredPermissions: ["website.manage"],
       },
       {
         key: "seo_global",
         label: "Globale SEO-Einstellungen",
-        description: "Standardwerte und siteweite SEO-Konfiguration.",
-        status: "coming_next",
+        description: "Siteweite SEO-Konfiguration: Titel-Template, Canonical-URL, OG-Bild, Twitter-Card.",
+        status: "available",
+        href: CMS_ROUTES.settings,
+        requiredPermissions: ["website.manage"],
+      },
+      {
+        key: "analytics",
+        label: "Analytics",
+        description: "Google Analytics 4 und Google Tag Manager einbinden.",
+        status: "available",
+        href: CMS_ROUTES.settings,
+        requiredPermissions: ["website.manage"],
+      },
+      {
+        key: "technical_config",
+        label: "Technische Konfiguration",
+        description: "robots.txt, Sitemap, Favicon, PWA-Manifest, Cookie-Banner.",
+        status: "available",
+        href: CMS_ROUTES.settings,
         requiredPermissions: ["website.manage"],
       },
     ],

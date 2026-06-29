@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     slug: finalSlug,
     title,
     content,
+    contentJson: body.contentJson ?? null,
     excerpt: typeof body.excerpt === "string" ? body.excerpt.trim() || null : null,
     imageUrl: typeof body.imageUrl === "string" ? body.imageUrl.trim() || null : null,
     heroMediaId: typeof body.heroMediaId === "string" ? body.heroMediaId : null,
@@ -104,6 +105,8 @@ export async function POST(request: NextRequest) {
     authorName: typeof body.authorName === "string" ? body.authorName.trim() || null : null,
     authorPersonId: typeof body.authorPersonId === "string" ? body.authorPersonId : null,
     tags: Array.isArray(body.tags) ? (body.tags as string[]) : null,
+    seoTitle: typeof body.seoTitle === "string" ? body.seoTitle.trim() || null : null,
+    seoDescription: typeof body.seoDescription === "string" ? body.seoDescription.trim() || null : null,
   });
 
   return NextResponse.json({ article }, { status: 201 });

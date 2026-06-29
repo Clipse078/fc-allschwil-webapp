@@ -386,6 +386,8 @@ model Tenant {
   contentRevisions       ContentRevision[]
   reusableComponents     ReusableComponent[]
   reusableComponentUsages ReusableComponentUsage[]
+  websiteConfig          WebsiteConfig?
+  websiteRedirects       WebsiteRedirect[]
 
   @@index([status])
   @@index([name])
@@ -1342,6 +1344,10 @@ model MediaAsset {
   archivedAt   DateTime? // Set when status → ARCHIVED; null when active
   storageKey   String?   // Blob storage key for lifecycle management
 
+  // V4.2 — Focus point (relative coordinates 0.0–1.0 from top-left)
+  focusX       Float?    // Horizontal focus (0=left, 1=right). Null = default center.
+  focusY       Float?    // Vertical focus (0=top, 1=bottom). Null = default center.
+
   tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   folder           MediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   newsArticles     NewsArticle[]      @relation("NewsArticleHeroMedia")
@@ -1397,6 +1403,14 @@ model NewsArticle {
   // V2.1 extensions
   authorPersonId String?
   reviewNotes    String?
+
+  // V4.2 — Rich text body (TipTap JSON). Coexists with legacy `content` String.
+  // contentJson supersedes content when non-null; content retained for migration safety.
+  contentJson    Json?
+
+  // V4.2 — SEO overrides per article
+  seoTitle       String?
+  seoDescription String?
 
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -1757,6 +1771,21 @@ model WebsiteNavItem {
   /// Visibility mode. One of: "ALWAYS" | "AUTHENTICATED" | "ANONYMOUS".
   /// Foundation-level: public API currently only filters by isVisible.
   visibilityMode String    @default("ALWAYS")
+
+  // V4.2 — Navigation Builder enhancements
+  /// Optional icon identifier (e.g. Lucide icon name) shown beside label.
+  icon           String?
+  /// Enable mega-menu panel for this top-level item.
+  megaMenu       Boolean   @default(false)
+  /// Short description shown in mega-menu panels.
+  description    String?
+  /// Optional badge label (e.g. "NEU", "BETA").
+  badge          String?
+  /// Scheduling: item is hidden before this datetime.
+  scheduleFrom   DateTime?
+  /// Scheduling: item is hidden after this datetime.
+  scheduleTo     DateTime?
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -2033,4 +2062,85 @@ model ReusableComponentUsage {
   @@index([tenantId])
   @@index([componentId])
   @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteConfig — Tenant-level website configuration (CMS V4.2)
+//
+// One row per tenant (1-to-1 with Tenant). Stores site-wide SEO defaults,
+// social media metadata, analytics IDs, technical settings (robots, sitemap),
+// PWA manifest values, cookie banner content, and favicon URL.
+// ---------------------------------------------------------------------------
+
+model WebsiteConfig {
+  id       String @id @default(cuid())
+  tenantId String @unique
+
+  // ── SEO Defaults ─────────────────────────────────────────────────────────
+  seoSiteTitle          String?
+  seoTitleTemplate      String?
+  seoDefaultDescription String?
+  seoDefaultKeywords    String?
+  seoCanonicalBase      String?
+
+  // ── Open Graph / Social ──────────────────────────────────────────────────
+  ogTitle         String?
+  ogDescription   String?
+  ogImageUrl      String?
+  twitterSite     String?
+  twitterCardType String?
+
+  // ── Analytics ────────────────────────────────────────────────────────────
+  googleAnalyticsId  String?
+  googleTagManagerId String?
+
+  // ── Technical ────────────────────────────────────────────────────────────
+  robotsTxt      String?
+  sitemapEnabled Boolean @default(true)
+  faviconUrl     String?
+
+  // ── PWA ──────────────────────────────────────────────────────────────────
+  pwaEnabled    Boolean @default(false)
+  pwaName       String?
+  pwaShortName  String?
+  pwaThemeColor String?
+  pwaBgColor    String?
+
+  // ── Cookie Banner ────────────────────────────────────────────────────────
+  cookieBannerEnabled  Boolean @default(false)
+  cookieBannerText     String?
+  cookieBannerLinkUrl  String?
+  cookieBannerLinkText String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// WebsiteRedirect — URL redirect rules (CMS V4.2)
+//
+// Manages HTTP redirects (301 permanent / 302 temporary) for renamed pages,
+// external handoffs, and legacy URL preservation.
+// ---------------------------------------------------------------------------
+
+model WebsiteRedirect {
+  id       String @id @default(cuid())
+  tenantId String
+
+  fromPath   String
+  toPath     String
+  statusCode Int     @default(301)
+  isActive   Boolean @default(true)
+  note       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, fromPath])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
 }

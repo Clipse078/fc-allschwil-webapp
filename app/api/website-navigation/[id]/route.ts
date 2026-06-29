@@ -49,6 +49,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if ("isVisible" in body) input.isVisible = Boolean(body.isVisible);
   if ("visibilityMode" in body) input.visibilityMode = body.visibilityMode as string;
   if ("parentId" in body) input.parentId = body.parentId as string | null;
+  // V4.2 fields
+  if ("icon" in body) input.icon = typeof body.icon === "string" ? body.icon || null : null;
+  if ("megaMenu" in body) input.megaMenu = Boolean(body.megaMenu);
+  if ("description" in body) input.description = typeof body.description === "string" ? body.description || null : null;
+  if ("badge" in body) input.badge = typeof body.badge === "string" ? body.badge || null : null;
+  if ("scheduleFrom" in body) input.scheduleFrom = typeof body.scheduleFrom === "string" && body.scheduleFrom ? new Date(body.scheduleFrom as string) : null;
+  if ("scheduleTo" in body) input.scheduleTo = typeof body.scheduleTo === "string" && body.scheduleTo ? new Date(body.scheduleTo as string) : null;
 
   const result = await updateNavItem(tenantId, id, input);
 

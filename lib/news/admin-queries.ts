@@ -74,6 +74,9 @@ export type NewsArticleAdminListItem = {
 
 export type NewsArticleAdminDetail = NewsArticleAdminListItem & {
   content: string;
+  contentJson: unknown | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
   additionalMedia: NewsArticleMediaItem[];
 };
 
@@ -137,6 +140,9 @@ const adminListSelect = {
 const adminDetailSelect = {
   ...adminListSelect,
   content: true,
+  contentJson: true,
+  seoTitle: true,
+  seoDescription: true,
   additionalMedia: {
     select: additionalMediaSelect,
     orderBy: { sortOrder: "asc" as const },
@@ -233,6 +239,7 @@ export type CreateNewsArticleInput = {
   title: string;
   excerpt?: string | null;
   content: string;
+  contentJson?: unknown | null;
   imageUrl?: string | null;
   heroMediaId?: string | null;
   channels?: string[] | null;
@@ -240,6 +247,8 @@ export type CreateNewsArticleInput = {
   authorName?: string | null;
   authorPersonId?: string | null;
   tags?: string[] | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
 };
 
 export async function createNewsArticle(
@@ -252,6 +261,7 @@ export async function createNewsArticle(
     title: input.title,
     excerpt: input.excerpt ?? null,
     content: input.content,
+    contentJson: input.contentJson ?? null,
     imageUrl: input.imageUrl ?? null,
     heroMediaId: input.heroMediaId ?? null,
     channels: input.channels ?? null,
@@ -259,6 +269,8 @@ export async function createNewsArticle(
     authorName: input.authorName ?? null,
     authorPersonId: input.authorPersonId ?? null,
     tags: input.tags ?? null,
+    seoTitle: input.seoTitle ?? null,
+    seoDescription: input.seoDescription ?? null,
     status: "DRAFT",
   };
 
@@ -273,6 +285,7 @@ export type UpdateNewsArticleInput = {
   title?: string;
   excerpt?: string | null;
   content?: string;
+  contentJson?: unknown | null;
   imageUrl?: string | null;
   heroMediaId?: string | null;
   channels?: string[] | null;
@@ -281,6 +294,8 @@ export type UpdateNewsArticleInput = {
   authorPersonId?: string | null;
   tags?: string[] | null;
   reviewNotes?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
 };
 
 export async function updateNewsArticle(
@@ -301,6 +316,7 @@ export async function updateNewsArticle(
   if (input.title !== undefined) data.title = input.title;
   if (input.excerpt !== undefined) data.excerpt = input.excerpt;
   if (input.content !== undefined) data.content = input.content;
+  if (input.contentJson !== undefined) data.contentJson = input.contentJson;
   if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl;
   if (input.heroMediaId !== undefined) {
     data.heroMedia = input.heroMediaId
@@ -317,6 +333,8 @@ export async function updateNewsArticle(
   }
   if (input.tags !== undefined) data.tags = input.tags ?? null;
   if (input.reviewNotes !== undefined) data.reviewNotes = input.reviewNotes;
+  if (input.seoTitle !== undefined) data.seoTitle = input.seoTitle;
+  if (input.seoDescription !== undefined) data.seoDescription = input.seoDescription;
 
   // Auto-transition DRAFT → SCHEDULED when a future scheduledAt is set
   const effectiveScheduledAt =

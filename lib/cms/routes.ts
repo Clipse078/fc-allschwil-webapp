@@ -34,7 +34,7 @@ export const CMS_ROUTES = {
   // ── Structure ──────────────────────────────────────────────────────────────
   navigation: "/dashboard/website/navigation",
 
-  // ── Reusable Components ────────────────────────────────────────────────────
+  // ── Reusable Components (Component Library) ────────────────────────────────
   components: "/dashboard/website/components",
   componentsNew: "/dashboard/website/components/new",
 

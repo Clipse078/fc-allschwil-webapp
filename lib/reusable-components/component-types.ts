@@ -23,14 +23,20 @@
 // ---------------------------------------------------------------------------
 
 export const REUSABLE_COMPONENT_TYPE = {
-  CTA:            "CTA",
-  SPONSOR_BANNER: "SPONSOR_BANNER",
-  CONTACT_CARD:   "CONTACT_CARD",
-  FAQ:            "FAQ",
-  QUOTE:          "QUOTE",
-  STATISTICS:     "STATISTICS",
-  ANNOUNCEMENT:   "ANNOUNCEMENT",
-  RICH_TEXT:      "RICH_TEXT",
+  CTA:              "CTA",
+  SPONSOR_BANNER:   "SPONSOR_BANNER",
+  CONTACT_CARD:     "CONTACT_CARD",
+  FAQ:              "FAQ",
+  QUOTE:            "QUOTE",
+  STATISTICS:       "STATISTICS",
+  ANNOUNCEMENT:     "ANNOUNCEMENT",
+  RICH_TEXT:        "RICH_TEXT",
+  // V4.2 Component Library additions
+  HERO:             "HERO",
+  TIMELINE:         "TIMELINE",
+  TEAM_GRID:        "TEAM_GRID",
+  REGISTRATION_CTA: "REGISTRATION_CTA",
+  FOOTER_BLOCK:     "FOOTER_BLOCK",
 } as const;
 
 export type ReusableComponentType =
@@ -45,7 +51,9 @@ export type ComponentTypeCategory =
   | "content"
   | "social"
   | "data"
-  | "information";
+  | "information"
+  | "layout"
+  | "structure";
 
 export type ComponentTypeEntry = {
   key: ReusableComponentType;
@@ -115,6 +123,42 @@ export const REUSABLE_COMPONENT_TYPES: ComponentTypeEntry[] = [
     description: "Wiederverwendbarer formatierter Text (Datenschutz, Mitgliedschaft, etc.).",
     category: "content",
     icon: "FileText",
+  },
+  // ── V4.2 Component Library additions ──────────────────────────────────────
+  {
+    key: "HERO",
+    label: "Hero-Sektion",
+    description: "Großflächiger Einstiegsbereich mit Bild, Überschrift, Unterzeile und CTA.",
+    category: "layout",
+    icon: "LayoutTemplate",
+  },
+  {
+    key: "TIMELINE",
+    label: "Timeline",
+    description: "Chronologische Darstellung von Ereignissen oder Meilensteinen.",
+    category: "content",
+    icon: "GitBranch",
+  },
+  {
+    key: "TEAM_GRID",
+    label: "Team-Raster",
+    description: "Raster-Ansicht von Teammitgliedern mit Bild, Name, Rolle und Kontakt.",
+    category: "data",
+    icon: "Users",
+  },
+  {
+    key: "REGISTRATION_CTA",
+    label: "Anmelde-CTA",
+    description: "Registrierungsaufforderung mit direktem Link zum Anmeldeformular.",
+    category: "conversion",
+    icon: "UserPlus",
+  },
+  {
+    key: "FOOTER_BLOCK",
+    label: "Footer-Block",
+    description: "Wiederverwendbarer Footer-Bereich mit Links, Text und sozialen Netzwerken.",
+    category: "structure",
+    icon: "PanelBottom",
   },
 ];
 
@@ -199,6 +243,57 @@ export const COMPONENT_DEFAULT_CONFIGS: Record<ReusableComponentType, Record<str
   },
   RICH_TEXT: {
     content: "",
+  },
+  // V4.2 additions
+  HERO: {
+    headline: "",
+    subline: "",
+    imageMediaAssetId: null,
+    imageUrl: "",
+    overlayOpacity: 0.4,
+    ctaPrimaryLabel: "",
+    ctaPrimaryUrl: "",
+    ctaSecondaryLabel: "",
+    ctaSecondaryUrl: "",
+    textAlign: "left",
+    heightPreset: "medium",
+    showScrollIndicator: false,
+  },
+  TIMELINE: {
+    title: "",
+    description: "",
+    items: [],
+    orientation: "vertical",
+    stylePreset: "default",
+  },
+  TEAM_GRID: {
+    title: "",
+    description: "",
+    members: [],
+    columns: 3,
+    showContactInfo: true,
+    showSocialLinks: false,
+  },
+  REGISTRATION_CTA: {
+    headline: "",
+    description: "",
+    registrationType: "",
+    buttonLabel: "Jetzt anmelden",
+    buttonUrl: "",
+    targetAudience: "",
+    deadline: null,
+    spotsLeft: null,
+    backgroundColor: "default",
+  },
+  FOOTER_BLOCK: {
+    title: "",
+    tagline: "",
+    columns: [],
+    showSocialLinks: true,
+    socialLinks: [],
+    showAddress: false,
+    address: "",
+    copyrightText: "",
   },
 };
 

@@ -78,6 +78,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       ? { excerpt: typeof body.excerpt === "string" ? body.excerpt.trim() || null : null }
       : {}),
     ...(typeof body.content === "string" ? { content: body.content } : {}),
+    ...(body.contentJson !== undefined ? { contentJson: body.contentJson ?? null } : {}),
     ...(body.imageUrl !== undefined
       ? { imageUrl: typeof body.imageUrl === "string" ? body.imageUrl.trim() || null : null }
       : {}),
@@ -114,6 +115,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       ? {
           reviewNotes:
             typeof body.reviewNotes === "string" ? body.reviewNotes.trim() || null : null,
+        }
+      : {}),
+    ...(body.seoTitle !== undefined
+      ? { seoTitle: typeof body.seoTitle === "string" ? body.seoTitle.trim() || null : null }
+      : {}),
+    ...(body.seoDescription !== undefined
+      ? {
+          seoDescription:
+            typeof body.seoDescription === "string" ? body.seoDescription.trim() || null : null,
         }
       : {}),
   });
