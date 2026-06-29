@@ -1,14 +1,23 @@
+/**
+ * /dashboard/website/homepage
+ *
+ * Homepage Builder — uses the shared WebsiteBuilderClient (CMS V3).
+ * Identical editing experience to the Page Builder.
+ *
+ * Permission: WEBSITE_MANAGE
+ */
+
 import { LayoutTemplate } from "lucide-react";
 import Link from "next/link";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { CMS_ROUTES } from "@/lib/cms/routes";
-import HomepageSectionList from "@/components/admin/homepage/HomepageSectionList";
 import {
   PageShell,
   PageBreadcrumbs,
   PageHeader,
 } from "@/components/ui/page";
+import HomepageBuilderClient from "@/components/admin/homepage/HomepageBuilderClient";
 
 export default async function HomepageBuilderPage() {
   await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
@@ -32,7 +41,7 @@ export default async function HomepageBuilderPage() {
         />
       </div>
 
-      {/* Architecture note */}
+      {/* Architecture info */}
       <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
         <div className="flex items-start gap-3">
           <div
@@ -43,47 +52,30 @@ export default async function HomepageBuilderPage() {
           </div>
           <div>
             <p className="text-sm font-semibold text-[var(--foreground)]">
-              Homepage Builder Foundation
+              Homepage Builder — CMS V3
             </p>
             <p className="mt-1 text-xs text-[var(--text-2)]">
-              Homepage-Sektionen verwalten: aktivieren/deaktivieren, sortieren,
-              konfigurieren und veröffentlichen. Sektionen erscheinen in der
-              öffentlichen API, sobald sie <strong>aktiviert</strong> und{" "}
-              <strong>veröffentlicht</strong> sind.
+              Sektionen mit dem visuellen Canvas-Editor bearbeiten. Dieselbe
+              Editing-Experience wie der Page Builder: Live-Canvas, Inspektor,
+              Autosave und Workflow.
             </p>
             <p className="mt-2 text-xs text-[var(--muted)]">
               Öffentliche API:{" "}
               <code className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-[11px]">
                 GET /api/public/[tenant]/website/homepage
               </code>
-              {" "}·{" "}
-              Admin-Vorschau:{" "}
-              <code className="rounded bg-[var(--surface-2)] px-1 py-0.5 font-mono text-[11px]">
-                GET /api/homepage-sections/preview
-              </code>
-            </p>
-            <p className="mt-1.5 text-xs text-[var(--muted)]">
-              Deferred:{" "}
-              <span className="text-amber-600">
-                Visueller Editor · Drag-and-Drop · Rich-Config-Editor ·
-                Sponsor-Modell · Vierstufige Freigabe · Zuweisung
-              </span>
             </p>
           </div>
         </div>
       </div>
 
-      {/* Section links */}
       <div className="mb-4 flex flex-wrap gap-2">
-        <Link
-          href={CMS_ROUTES.overview}
-          className="fca-button-secondary text-xs"
-        >
+        <Link href={CMS_ROUTES.overview} className="fca-button-secondary text-xs">
           ← CMS Übersicht
         </Link>
       </div>
 
-      <HomepageSectionList />
+      <HomepageBuilderClient />
     </PageShell>
   );
 }
