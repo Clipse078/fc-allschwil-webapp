@@ -13,10 +13,17 @@
  * The renderer is intentionally self-contained so that the public website can
  * import it directly (or copy it). It must never depend on admin-only modules.
  *
- * Layout (spacing, theme, background, width) is delegated to SectionShell —
- * this renderer focuses exclusively on the two-column content grid:
- *   - Text column (eyebrow, headline, rich text)
- *   - Cards column (stacked content cards)
+ * DESIGN SYSTEM
+ *   All visual styling (typography, cards, shadows, radius) is resolved through
+ *   the Design System via resolveDesignSystem(). No hardcoded Tailwind class
+ *   strings exist for typography sizes, card styles, shadows or radius.
+ *   Layout (spacing, theme, background, width) is delegated to SectionShell.
+ *
+ * CARD ACCENT COLOURS
+ *   Card accent colours (orange / blue / red / neutral) are block-specific
+ *   config values that control the left border colour and tint — they are not
+ *   Design System card style tokens. They coexist with ds.cards.* tokens:
+ *   ds.cards.* controls the card shell; CARD_ACCENT_CLASS controls the tint.
  *
  * Backward compatibility:
  *   When config has no `_layout` key (pre-migration data), SectionShell falls
@@ -36,6 +43,7 @@ import { THEME_TOKENS, resolveLayout } from "@/lib/cms/layout-types";
 import type { RichTextValue } from "@/lib/cms/rich-text";
 import { richTextToHtml, isRichTextValue } from "@/lib/cms/rich-text";
 import SectionShell from "@/components/website/SectionShell";
+import { resolveDesignSystem } from "@/lib/cms/token-resolver";
 
 // ---------------------------------------------------------------------------
 // Backward-compat: resolve layout from _layout OR legacy style + background
@@ -58,10 +66,12 @@ function resolveBlockLayout(cfg: SplitContentCardsSectionConfig): SectionLayout 
 }
 
 // ---------------------------------------------------------------------------
-// Card variant classes
+// Card accent colour classes (block-specific variant, not Design System card style)
+// These control the left-border accent and background tint per card colour value.
+// Design System card shell styles are applied via ds.cards.default.container.
 // ---------------------------------------------------------------------------
 
-const CARD_VARIANT_CLASS: Record<string, { border: string; bg: string; titleColor: string }> = {
+const CARD_ACCENT_CLASS: Record<string, { border: string; bg: string; titleColor: string }> = {
   orange: { border: "border-l-orange-500", bg: "bg-orange-50", titleColor: "text-orange-700" },
   blue: { border: "border-l-blue-600", bg: "bg-blue-50", titleColor: "text-blue-700" },
   red: { border: "border-l-red-600", bg: "bg-red-50", titleColor: "text-red-700" },
@@ -73,20 +83,21 @@ const CARD_VARIANT_CLASS: Record<string, { border: string; bg: string; titleColo
 // ---------------------------------------------------------------------------
 
 function ContentCard({ card, darkMode }: { card: SplitContentCard; darkMode?: boolean }) {
-  const variant = CARD_VARIANT_CLASS[card.variant] ?? CARD_VARIANT_CLASS.neutral;
+  const ds = resolveDesignSystem();
+  const accent = CARD_ACCENT_CLASS[card.variant] ?? CARD_ACCENT_CLASS.neutral;
   return (
     <div
-      className={`rounded-lg border-l-4 p-4 shadow-sm ${variant.border} ${
-        darkMode ? "bg-white/10" : variant.bg
+      className={`${ds.radius.medium} border-l-4 ${ds.shadows.small} p-4 ${accent.border} ${
+        darkMode ? "bg-white/10" : accent.bg
       }`}
     >
       {card.title && (
-        <h4 className={`mb-1 text-sm font-semibold ${darkMode ? "text-white" : variant.titleColor}`}>
+        <h4 className={`mb-1 ${ds.typography.small} font-semibold ${darkMode ? "text-white" : accent.titleColor}`}>
           {card.title}
         </h4>
       )}
       {card.body && (
-        <p className={`text-sm leading-relaxed ${darkMode ? "text-gray-200" : "text-gray-600"}`}>
+        <p className={`${ds.typography.small} ${darkMode ? "text-gray-200" : "text-gray-600"}`}>
           {card.body}
         </p>
       )}
@@ -134,6 +145,7 @@ export default function SplitContentCardsRenderer({
   previewMode = false,
 }: SplitContentCardsRendererProps) {
   const cfg = rawConfig as SplitContentCardsSectionConfig;
+  const ds = resolveDesignSystem();
 
   const blockLayout = resolveBlockLayout(cfg);
   const resolved = resolveLayout(blockLayout);
@@ -147,7 +159,7 @@ export default function SplitContentCardsRenderer({
 
   const cards = cfg.cards ?? [];
 
-  // Text column
+  // Text column — typography resolved from Design System
   const textColumn = (
     <div
       className={`flex flex-col justify-center ${
@@ -163,7 +175,7 @@ export default function SplitContentCardsRenderer({
       )}
       {cfg.headline && (
         <h2
-          className={`mb-4 text-2xl font-bold leading-tight sm:text-3xl ${themeTokens.text}`}
+          className={`mb-4 ${ds.typography.h2} ${themeTokens.text}`}
         >
           {cfg.headline}
         </h2>
@@ -179,18 +191,18 @@ export default function SplitContentCardsRenderer({
         />
       )}
       {!cfg.eyebrow && !cfg.headline && !cfg.bodyRichText && (
-        <div className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-400">
+        <div className={`${ds.radius.medium} border border-dashed border-gray-300 px-4 py-6 text-center ${ds.typography.small} text-gray-400`}>
           Kein Textinhalt konfiguriert
         </div>
       )}
     </div>
   );
 
-  // Cards column
+  // Cards column — spacing resolved from Design System
   const cardsColumn = (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${ds.spacing.s}`}>
       {cards.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-400">
+        <div className={`${ds.radius.medium} border border-dashed border-gray-300 px-4 py-6 text-center ${ds.typography.small} text-gray-400`}>
           Noch keine Karten
         </div>
       ) : (

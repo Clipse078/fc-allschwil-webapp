@@ -48,6 +48,12 @@
  *   SectionShell itself is not aware of legacy fields — it only consumes
  *   SectionLayout. Resolving the fallback is the block renderer's responsibility.
  *
+ * DESIGN SYSTEM
+ *   Width, spacing and padding are resolved from the Design System token maps
+ *   (WIDTH_MAP, SPACING_*_MAP, PADDING_X_MAP in layout-types.ts).
+ *   Renderers should never hardcode max-width, spacing or padding classes —
+ *   those are controlled by the section layout and Design System.
+ *
  * PROPS
  *   layout      — SectionLayout from `config._layout` (use resolveLayout() to
  *                 apply defaults before passing here).
@@ -65,6 +71,7 @@ import {
   SPACING_TOP_MAP,
   SPACING_BOTTOM_MAP,
   WIDTH_MAP,
+  PADDING_X_MAP,
   THEME_TOKENS,
 } from "@/lib/cms/layout-types";
 
@@ -158,10 +165,9 @@ export default function SectionShell({
   const { className: bgClass, style: bgStyle, hasImageOverlay, imageOverlayClass } =
     resolveBackgroundStyle(resolved.background);
 
-  // Determine horizontal padding — use the spacingTop map for the X axis too,
-  // but the dedicated PADDING_X_MAP lives in layout-types. For simplicity we
-  // keep the classic responsive padding inline when not overridden.
-  const paddingXClass = "px-4 sm:px-6 lg:px-8";
+  // Horizontal padding resolved from Design System via PADDING_X_MAP.
+  // Falls back to "md" when paddingX is not set (covered by resolveLayout defaults).
+  const paddingXClass = PADDING_X_MAP[resolved.paddingX];
 
   const sectionClasses = [
     themeTokens.bg,

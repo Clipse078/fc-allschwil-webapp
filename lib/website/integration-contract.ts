@@ -10,6 +10,43 @@
  * Do not duplicate this contract on the website side — import it or copy it verbatim.
  *
  * ─────────────────────────────────────────────────────────────────────────────
+ * DESIGN SYSTEM (CMS V4.1)
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * The Design System is the single source of visual truth for all renderers.
+ * Every renderer resolves its typography, buttons, cards, colours, shadows,
+ * radius and spacing through the Design System — never via hardcoded Tailwind.
+ *
+ * TOKEN RESOLUTION ORDER
+ *   1. Local _layout override (section-level, managed by resolveLayout())
+ *   2. Tenant Design System overrides (future: per-tenant DB customisation)
+ *   3. DEFAULT_DESIGN_SYSTEM baseline (lib/cms/design-system.ts)
+ *   4. Framework fallback (Tailwind utility defaults)
+ *
+ * RENDERER RESPONSIBILITIES
+ *   - Outer shell (width, spacing, background, theme): SectionShell
+ *   - Visual token resolution: resolveDesignSystem()
+ *   - Block content: block-specific renderer (HeroRenderer, etc.)
+ *   Renderers MUST NOT hardcode typography, shadow, radius, card or button styles.
+ *
+ * USAGE
+ *   import { resolveDesignSystem, DEFAULT_DESIGN_SYSTEM } from
+ *     "@/lib/website/integration-contract";
+ *
+ *   const ds = resolveDesignSystem();
+ *   <h2 className={`${ds.typography.h2} ${themeTokens.text}`}>{headline}</h2>
+ *   <a className={`${ds.buttons.primary} ${ds.buttons.rounded}`}>CTA</a>
+ *
+ * REFERENCE RENDERERS
+ *   All renderers live in components/website/blocks/:
+ *   - HeroRenderer.tsx               hero block
+ *   - CallToActionRenderer.tsx        callToAction block
+ *   - SplitContentCardsRenderer.tsx   splitContentCards block
+ *   - NewsTeaserRenderer.tsx          newsTeaser block (data-driven)
+ *   - TeamsTeaserRenderer.tsx         teamsTeaser block (data-driven)
+ *   - SponsorsTeaserRenderer.tsx      sponsorsTeaser block (foundation-ready)
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
  * FLEXIBLE LAYOUT SYSTEM (CMS V2 → V3)
  * ─────────────────────────────────────────────────────────────────────────────
  *
@@ -428,8 +465,53 @@ export {
   THEME_TOKENS,
   SPACING_TOP_MAP,
   SPACING_BOTTOM_MAP,
+  PADDING_X_MAP,
   WIDTH_MAP,
 } from "@/lib/cms/layout-types";
+
+// ---------------------------------------------------------------------------
+// Design System — CMS V4.1 token exports
+// ---------------------------------------------------------------------------
+// The Design System is the single source of visual truth for all renderers.
+// Re-exported for public-website consumption.
+// ---------------------------------------------------------------------------
+
+export type {
+  DesignSystemTokens,
+  TypographyTokens,
+  TypographyTokenKey,
+  ButtonTokens,
+  ButtonVariantKey,
+  ButtonShapeKey,
+  CardTokens,
+  CardStyleKey,
+  ColorTokens,
+  ColorTokenKey,
+  SpacingTokens,
+  SpacingTokenKey,
+  ShadowTokens,
+  ShadowTokenKey,
+  RadiusTokens,
+  RadiusTokenKey,
+  SectionWidthTokens,
+  SectionWidthTokenKey,
+} from "@/lib/cms/design-system";
+
+export type { DesignSystemOverrides } from "@/lib/cms/token-resolver";
+
+export {
+  DEFAULT_DESIGN_SYSTEM,
+  TYPOGRAPHY_TOKENS,
+  BUTTON_TOKENS,
+  CARD_TOKENS,
+  COLOR_TOKENS,
+  SPACING_TOKENS,
+  SHADOW_TOKENS,
+  RADIUS_TOKENS,
+  SECTION_WIDTH_TOKENS,
+} from "@/lib/cms/design-system";
+
+export { resolveDesignSystem } from "@/lib/cms/token-resolver";
 
 // ---------------------------------------------------------------------------
 // CMS section shapes — returned by /homepage and /pages/[slug]/layout
