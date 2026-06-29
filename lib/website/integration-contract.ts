@@ -76,6 +76,7 @@
  * GET /api/public/{tenantSlug}/website/components/{id}
  * GET /api/public/{tenantSlug}/website/media/{id}
  * GET /api/public/{tenantSlug}/website/sponsors
+ * GET /api/public/{tenantSlug}/website/design-system
  *
  * All content endpoints return only published, tenant-safe, non-archived content.
  * Draft and unpublished content never leaks publicly.
@@ -432,6 +433,36 @@ export {
 } from "@/lib/cms/layout-types";
 
 // ---------------------------------------------------------------------------
+// Design System — CMS V4
+// ---------------------------------------------------------------------------
+// Re-exported from lib/website/design-system-types.ts for public-website consumption.
+// Copy these types verbatim into the public website project.
+// ---------------------------------------------------------------------------
+
+export type {
+  TenantDesignSystem,
+  ResolvedDesignSystem,
+  TypographyToken,
+  TypographyScale,
+  ColourTokens,
+  ButtonTokenStyle,
+  ButtonTokens,
+  CardTokenStyle,
+  CardTokens,
+  SpacingScale,
+  ShadowTokens,
+  RadiusTokens,
+  SectionWidthTokens,
+  AnimationTokens,
+  AnimationPreference,
+} from "@/lib/website/design-system-types";
+
+export {
+  DEFAULT_DESIGN_SYSTEM,
+  resolveDesignSystem,
+} from "@/lib/website/design-system-types";
+
+// ---------------------------------------------------------------------------
 // CMS section shapes — returned by /homepage and /pages/[slug]/layout
 // ---------------------------------------------------------------------------
 
@@ -522,4 +553,31 @@ export type WebsitePublicPageMeta = {
 export type WebsitePageLayoutData = {
   page: WebsitePublicPageMeta;
   sections: WebsitePublicSection[];
+};
+
+// ---------------------------------------------------------------------------
+// Design System — CMS V4
+// ---------------------------------------------------------------------------
+
+/**
+ * Response shape for GET /api/public/[tenant]/website/design-system
+ * Access via: envelope.data.designSystem
+ *
+ * Returns the fully-resolved tenant design system tokens. The response is:
+ *   - Always fully populated (DEFAULT_DESIGN_SYSTEM applied for any null fields).
+ *   - Colour tokens primary/secondary are sourced from the existing branding system.
+ *   - Cacheable (s-maxage=120, stale-while-revalidate=600).
+ *   - Safe for public consumption (no admin metadata).
+ *
+ * The public website SHOULD:
+ *   1. Fetch this endpoint once at build time / layout level.
+ *   2. Apply sectionWidths tokens to the SectionShell width container.
+ *   3. Apply typography tokens to global CSS or rendered headings/text.
+ *   4. Apply button/card tokens to the corresponding components.
+ *   5. Pass the resolved design system to SectionShell via the `designSystem` prop.
+ *
+ * See: lib/website/design-system-types.ts for the full ResolvedDesignSystem type.
+ */
+export type WebsiteDesignSystemData = {
+  designSystem: import("@/lib/website/design-system-types").ResolvedDesignSystem;
 };

@@ -193,6 +193,14 @@ export const CMS_SECTIONS: CmsSection[] = [
     description: "SEO, Metadaten und Website-Einstellungen.",
     features: [
       {
+        key: "design_system",
+        label: "Design System Manager",
+        description: "Globale Designsprache für Typography, Farben, Buttons, Cards und mehr — geerbt von allen Templates.",
+        status: "available",
+        href: CMS_ROUTES.designSystem,
+        requiredPermissions: ["website.manage"],
+      },
+      {
         key: "website_settings",
         label: "Website-Einstellungen",
         description: "Veröffentlichung, Vier-Augen-Prinzip und Basis-Konfiguration.",

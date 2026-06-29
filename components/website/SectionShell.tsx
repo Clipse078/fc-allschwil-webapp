@@ -12,11 +12,12 @@
  *     - Background (solid / gradient / DAM image with overlay)
  *     - Theme (bg colour, text colour tokens via THEME_TOKENS)
  *     - Vertical spacing (padding top/bottom from SPACING_TOP/BOTTOM_MAP)
- *     - Container width (max-width from WIDTH_MAP)
+ *     - Container width (max-width from WIDTH_MAP or designSystem.sectionWidths)
  *     - Horizontal padding (responsive px-* utilities)
  *
- *   Block-specific renderers fill the inner content area. They are responsible
- *   only for column/grid/content layout — NOT for spacing, background, or theme.
+ *   When `designSystem` is provided, section width tokens from the Design System
+ *   Manager override the Tailwind max-width classes, allowing tenant-configured
+ *   widths to flow through to the renderer.
  *
  * ONE RENDERING PATH
  *   Used identically for: Homepage, Pages, Admin Preview, Public Website.
@@ -48,6 +49,11 @@
  *   SectionShell itself is not aware of legacy fields — it only consumes
  *   SectionLayout. Resolving the fallback is the block renderer's responsibility.
  *
+ * DESIGN SYSTEM INTEGRATION (CMS V4)
+ *   When `designSystem` is passed, sectionWidths tokens override the default
+ *   Tailwind max-width classes. This allows tenant-configured widths to apply
+ *   globally without requiring individual block updates.
+ *
  * PROPS
  *   layout      — SectionLayout from `config._layout` (use resolveLayout() to
  *                 apply defaults before passing here).
@@ -55,6 +61,7 @@
  *   blockType   — block type key string for the preview label.
  *   children    — inner section content rendered inside the container.
  *   className   — extra className applied to the outer <section>.
+ *   designSystem — optional resolved design system tokens (CMS V4).
  */
 
 import type { ReactNode } from "react";
@@ -67,6 +74,7 @@ import {
   WIDTH_MAP,
   THEME_TOKENS,
 } from "@/lib/cms/layout-types";
+import type { ResolvedDesignSystem } from "@/lib/website/design-system-types";
 
 // ---------------------------------------------------------------------------
 // Background style resolver
@@ -135,6 +143,12 @@ type SectionShellProps = {
   children: ReactNode;
   /** Additional className applied to the outer <section>. */
   className?: string;
+  /**
+   * Optional resolved design system tokens (CMS V4).
+   * When provided, sectionWidths tokens override the Tailwind max-width classes,
+   * allowing tenant-configured widths to apply globally.
+   */
+  designSystem?: ResolvedDesignSystem;
 };
 
 // ---------------------------------------------------------------------------
@@ -147,13 +161,21 @@ export default function SectionShell({
   blockType,
   children,
   className = "",
+  designSystem,
 }: SectionShellProps) {
   const resolved = resolveLayout(layout);
 
   const themeTokens = THEME_TOKENS[resolved.theme];
   const spacingTop = SPACING_TOP_MAP[resolved.spacingTop];
   const spacingBottom = SPACING_BOTTOM_MAP[resolved.spacingBottom];
-  const widthClass = WIDTH_MAP[resolved.width];
+
+  // When design system tokens are available, use the tenant-configured width
+  // value as an inline maxWidth style instead of a Tailwind class.
+  const dsWidth = designSystem?.sectionWidths?.[resolved.width];
+  const widthClass = dsWidth ? "" : WIDTH_MAP[resolved.width];
+  const widthStyle: React.CSSProperties = dsWidth && dsWidth !== "none"
+    ? { maxWidth: dsWidth }
+    : {};
 
   const { className: bgClass, style: bgStyle, hasImageOverlay, imageOverlayClass } =
     resolveBackgroundStyle(resolved.background);
@@ -193,7 +215,10 @@ export default function SectionShell({
       )}
 
       {/* Container */}
-      <div className={`relative mx-auto ${paddingXClass} ${widthClass}`}>
+      <div
+        className={`relative mx-auto ${paddingXClass} ${widthClass}`}
+        style={widthStyle}
+      >
         {children}
       </div>
     </section>

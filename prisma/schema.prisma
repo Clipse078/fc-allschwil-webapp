@@ -365,6 +365,12 @@ model Tenant {
   websiteEnabled   Boolean @default(true)
   approvedDataOnly Boolean @default(false)
 
+  // Design System — CMS V4
+  // Nullable JSON column. Null = use platform defaults from DEFAULT_DESIGN_SYSTEM.
+  // All reads go through resolveDesignSystem() in lib/website/design-system-types.ts.
+  // Non-destructive: existing tenants receive defaults automatically without migration data.
+  websiteDesignSystem Json?
+
   registrations          Registration[]
   users                  User[]
   events                 Event[]
