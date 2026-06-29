@@ -1398,6 +1398,9 @@ model NewsArticle {
   authorPersonId String?
   reviewNotes    String?
 
+  // V4.2 extensions — rich text foundation
+  contentJson    Json?
+
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 

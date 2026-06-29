@@ -39,6 +39,7 @@ const publicArticleDetailSelect = {
   title: true,
   excerpt: true,
   content: true,
+  contentJson: true,
   imageUrl: true,
   publishedAt: true,
   heroMedia: {
@@ -160,6 +161,7 @@ export async function getPublicNewsArticleBySlug(
     title: row.title,
     excerpt: row.excerpt,
     content: row.content,
+    contentJson: row.contentJson ?? null,
     imageUrl: row.imageUrl,
     publishedAt: row.publishedAt!,
     heroMedia: row.heroMedia

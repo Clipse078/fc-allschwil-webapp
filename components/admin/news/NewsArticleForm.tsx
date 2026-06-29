@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -21,6 +22,17 @@ import type {
   ArticleStatus,
   NewsArticleMediaItem,
 } from "@/lib/news/admin-queries";
+import { isRichTextValue, richTextToHtml, type RichTextValue } from "@/lib/cms/rich-text";
+
+const RichTextEditor = dynamic(
+  () => import("@/components/admin/cms/RichTextEditor"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-64 animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface-2)]" />
+    ),
+  },
+);
 
 type HeroMediaValue = {
   id: string;
@@ -64,7 +76,10 @@ export default function NewsArticleForm({
   const [title, setTitle] = useState(article?.title ?? "");
   const [slug, setSlug] = useState(article?.slug ?? "");
   const [excerpt, setExcerpt] = useState(article?.excerpt ?? "");
-  const [content, setContent] = useState(article?.content ?? "");
+  const [content] = useState(article?.content ?? "");
+  const [contentJson, setContentJson] = useState<RichTextValue | null>(
+    isRichTextValue(article?.contentJson) ? (article.contentJson as RichTextValue) : null,
+  );
   const [heroMedia, setHeroMedia] = useState<HeroMediaValue>(
     article?.heroMedia ?? null,
   );
@@ -124,13 +139,19 @@ export default function NewsArticleForm({
 
   function buildPayload() {
     const scheduledAt = scheduledAtInput ? new Date(scheduledAtInput).toISOString() : null;
+
+    // When contentJson is set, derive a backward-compatible HTML string for
+    // consumers that still read the legacy `content` field.
+    // When contentJson is absent, preserve the existing content string unchanged.
+    const resolvedContent = contentJson ? richTextToHtml(contentJson) : content;
+
     return {
       title: title.trim(),
       slug: slug.trim(),
       excerpt: excerpt.trim() || null,
-      content,
+      content: resolvedContent,
+      contentJson: contentJson ?? undefined,
       authorPersonId: authorPerson?.id ?? null,
-      // authorName derived from person or kept empty (person display name takes priority)
       authorName: authorPerson
         ? (authorPerson.displayName || `${authorPerson.firstName} ${authorPerson.lastName}`)
         : null,
@@ -238,21 +259,12 @@ export default function NewsArticleForm({
               />
             </div>
             <div>
-              <label className={labelClass}>Inhalt (Markdown)</label>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Artikelinhalt in Markdown…"
-                rows={18}
-                className="fca-input resize-y font-mono text-xs leading-relaxed"
+              <label className={labelClass}>Inhalt</label>
+              <RichTextEditor
+                value={contentJson}
+                onChange={setContentJson}
+                placeholder="Artikelinhalt eingeben…"
               />
-              <p className="mt-1 text-[10px] text-[var(--muted)]">
-                Markdown wird auf der Website gerendert. Bilder können als{" "}
-                <code className="rounded bg-[var(--surface-2)] px-1 py-0.5">
-                  ![Alt](URL)
-                </code>{" "}
-                eingebettet werden.
-              </p>
             </div>
           </div>
         </div>

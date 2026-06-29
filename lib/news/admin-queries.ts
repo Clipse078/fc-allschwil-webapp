@@ -74,6 +74,8 @@ export type NewsArticleAdminListItem = {
 
 export type NewsArticleAdminDetail = NewsArticleAdminListItem & {
   content: string;
+  /** Structured TipTap/ProseMirror JSON from the shared RichTextEditor. Null for legacy articles. */
+  contentJson: unknown;
   additionalMedia: NewsArticleMediaItem[];
 };
 
@@ -137,6 +139,7 @@ const adminListSelect = {
 const adminDetailSelect = {
   ...adminListSelect,
   content: true,
+  contentJson: true,
   additionalMedia: {
     select: additionalMediaSelect,
     orderBy: { sortOrder: "asc" as const },
@@ -233,6 +236,8 @@ export type CreateNewsArticleInput = {
   title: string;
   excerpt?: string | null;
   content: string;
+  /** Structured TipTap/ProseMirror JSON. When provided, stored alongside content for rich rendering. */
+  contentJson?: unknown;
   imageUrl?: string | null;
   heroMediaId?: string | null;
   channels?: string[] | null;
@@ -252,6 +257,7 @@ export async function createNewsArticle(
     title: input.title,
     excerpt: input.excerpt ?? null,
     content: input.content,
+    contentJson: input.contentJson ?? null,
     imageUrl: input.imageUrl ?? null,
     heroMediaId: input.heroMediaId ?? null,
     channels: input.channels ?? null,
@@ -273,6 +279,8 @@ export type UpdateNewsArticleInput = {
   title?: string;
   excerpt?: string | null;
   content?: string;
+  /** Structured TipTap/ProseMirror JSON. When provided, stored alongside content for rich rendering. */
+  contentJson?: unknown;
   imageUrl?: string | null;
   heroMediaId?: string | null;
   channels?: string[] | null;
@@ -301,6 +309,7 @@ export async function updateNewsArticle(
   if (input.title !== undefined) data.title = input.title;
   if (input.excerpt !== undefined) data.excerpt = input.excerpt;
   if (input.content !== undefined) data.content = input.content;
+  if (input.contentJson !== undefined) data.contentJson = input.contentJson ?? null;
   if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl;
   if (input.heroMediaId !== undefined) {
     data.heroMedia = input.heroMediaId
