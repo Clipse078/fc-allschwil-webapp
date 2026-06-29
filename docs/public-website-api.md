@@ -31,10 +31,11 @@
    - [GET /api/public/[tenant]/website/navigation](#get-apipublictenantwebsitenavigation)
 9. [Endpoints (v1 — header-based tenant, legacy)](#endpoints-v1--header-based-tenant-legacy)
 10. [Type Reference](#type-reference)
-11. [Duplication Audit](#duplication-audit)
-12. [Tenant Isolation Audit](#tenant-isolation-audit)
-13. [Integration Checklist for Website Team](#integration-checklist-for-website-team)
-14. [Recommended Next Slice](#recommended-next-slice)
+11. [Design System — Visual Token Architecture (CMS V4.1)](#design-system--visual-token-architecture-cms-v41)
+12. [Duplication Audit](#duplication-audit)
+13. [Tenant Isolation Audit](#tenant-isolation-audit)
+14. [Integration Checklist for Website Team](#integration-checklist-for-website-team)
+15. [Recommended Next Slice](#recommended-next-slice)
 
 ---
 
@@ -1060,6 +1061,107 @@ When `config._layout` is absent, fall back to those legacy fields. See `resolveB
 - `isEnabled` never exposed (only enabled sections are returned)
 - `block` field contains only public-safe metadata (category, datadriven) — no admin labels, internal status, or admin-only fields
 - Section config is projected through the block registry's public-safe projection before serialisation
+
+---
+
+### Design System — Visual Token Architecture (CMS V4.1)
+
+The Design System is the **single source of visual truth** for all CMS renderers. Every renderer resolves typography, buttons, cards, colours, shadows, radius and spacing through `resolveDesignSystem()` — never via hardcoded Tailwind class strings.
+
+#### Token resolution order
+
+```
+Local _layout override  (section-level — managed by resolveLayout())
+          ↓
+Tenant Design System    (future: per-tenant DB customisation)
+          ↓
+DEFAULT_DESIGN_SYSTEM   (lib/cms/design-system.ts)
+          ↓
+Framework fallback      (Tailwind utility defaults)
+```
+
+#### Token categories
+
+| Category | Token keys | File |
+|----------|-----------|------|
+| Typography | `h1`, `h2`, `h3`, `body`, `small`, `quote` | `lib/cms/design-system.ts` |
+| Buttons | `primary`, `secondary`, `outline`, `ghost`, `rounded`, `square` | `lib/cms/design-system.ts` |
+| Cards | `default`, `soft`, `elevated`, `bordered`, `sponsor`, `highlight` | `lib/cms/design-system.ts` |
+| Colors | `primary`, `secondary`, `accent`, `success`, `warning`, `danger`, `neutral` | `lib/cms/design-system.ts` |
+| Spacing | `xs`, `s`, `m`, `l`, `xl`, `xxl` | `lib/cms/design-system.ts` |
+| Shadows | `none`, `small`, `medium`, `large` | `lib/cms/design-system.ts` |
+| Radius | `small`, `medium`, `large`, `extraLarge` | `lib/cms/design-system.ts` |
+| Section widths | `narrow`, `normal`, `wide`, `full` | `lib/cms/design-system.ts` |
+
+#### Renderer responsibilities
+
+```
+Renderer
+    │
+    ├── SectionShell           outer section shell (width, spacing, background, theme)
+    │
+    └── resolveDesignSystem()  visual token resolution (typography, buttons, cards, ...)
+```
+
+Renderers **must not** hardcode Tailwind classes for typography sizes, card styles, shadows, radius, or button variants. All visual decisions originate from the Design System.
+
+#### Usage in renderers
+
+```typescript
+import { resolveDesignSystem } from "@/lib/cms/token-resolver";
+// or from the integration contract:
+import { resolveDesignSystem } from "@/lib/website/integration-contract";
+
+const ds = resolveDesignSystem();
+
+// Typography
+<h2 className={`${ds.typography.h2} ${themeTokens.text}`}>{headline}</h2>
+<p className={`${ds.typography.body} ${themeTokens.subtext}`}>{body}</p>
+
+// Buttons
+<a href={url} className={`${ds.buttons.primary} ${ds.buttons.rounded}`}>
+  {label}
+</a>
+<a href={url} className={`${ds.buttons.outline} ${ds.buttons.rounded}`}>
+  {secondaryLabel}
+</a>
+
+// Cards
+<div className={ds.cards.default.container}>
+  <h4 className={ds.cards.default.title}>{title}</h4>
+  <p className={ds.cards.default.body}>{body}</p>
+</div>
+
+// Spacing and layout
+<div className={`flex flex-col ${ds.spacing.m}`}>{/* children */}</div>
+
+// Shadows and radius
+<div className={`${ds.radius.large} ${ds.shadows.medium}`}>{/* content */}</div>
+```
+
+#### Reference renderers (CMS V4.1)
+
+All renderers live in `components/website/blocks/` and consume the Design System:
+
+| File | Block | Notes |
+|------|-------|-------|
+| `HeroRenderer.tsx` | `hero` | Full-width banner; typography + button tokens |
+| `CallToActionRenderer.tsx` | `callToAction` | CTA banner; primary + outline button tokens |
+| `SplitContentCardsRenderer.tsx` | `splitContentCards` | Two-column content; h2 + card tokens |
+| `NewsTeaserRenderer.tsx` | `newsTeaser` | Data-driven; card tokens for article cards |
+| `TeamsTeaserRenderer.tsx` | `teamsTeaser` | Data-driven; soft card tokens for team grid |
+| `SponsorsTeaserRenderer.tsx` | `sponsorsTeaser` | Foundation-ready; sponsor card tokens |
+
+#### Backward compatibility
+
+`DEFAULT_DESIGN_SYSTEM` is used when no tenant override exists — all existing websites render identically.
+No visual regressions. No breaking changes to existing `_layout` or `SectionLayout` APIs.
+
+#### No duplication rules
+
+- Typography, spacing, width, colour, button, card, shadow and radius maps exist **once** in `lib/cms/design-system.ts`.
+- The integration contract re-exports everything — the public website imports from one place only.
+- `layout-types.ts` retains ownership of `SectionLayout`, `resolveLayout()`, `THEME_TOKENS` and the layout token maps. These are not duplicated in `design-system.ts`.
 
 ---
 
