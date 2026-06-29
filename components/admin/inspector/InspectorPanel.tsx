@@ -3,32 +3,25 @@
 /**
  * components/admin/inspector/InspectorPanel.tsx
  *
- * CMS V3 Shared Inspector Panel.
+ * CMS V3 Shared Inspector Panel — used by BOTH the Page Builder and the
+ * Homepage Builder. It has no knowledge of which section type it is editing
+ * or which API endpoints to call. All API interactions are lifted into
+ * callback props provided by the parent.
  *
  * Architecture:
- *   - Renders dynamically based on the selected block's `supportsInspector` capabilities.
- *   - Sections: Content, Layout, Style, Background, Interactions, Visibility, Publishing, Advanced.
- *   - Only sections declared as `true` in `supportsInspector` are rendered.
- *   - Each section is collapsible; expanded state persists for the editing session.
+ *   - Renders sections dynamically from the block's supportsInspector capabilities.
+ *   - Sections: Content, Layout, Style, Background, Interactions, Visibility,
+ *     Publishing, Advanced.
+ *   - Only sections declared true in supportsInspector are rendered.
+ *   - Each section is collapsible; expanded state persists for the session.
  *   - Search filters visible sections by title.
+ *   - All workflow and revision API calls are abstracted into callback props.
+ *     The inspector renders buttons only for defined callbacks.
  *
  * Reuse:
- *   - LayoutConfigPanel for Layout + Background (shared; not duplicated).
- *   - SplitContentCardsConfigForm content/columns tabs for splitContentCards Content + Style.
- *   - Generic key-value editor for all other blocks (no premium form).
- *   - WorkflowPanel logic (inlined) for Publishing.
- *   - RevisionHistoryPanel logic (inlined) for Publishing revision info.
- *
- * Props:
- *   section         — the selected page section (label, type, config, publish state, …)
- *   pageId          — for workflow + revision API calls
- *   onConfigChange  — fired on every config mutation (triggers autosave)
- *   onLabelChange   — fired when the section label changes
- *   onWorkflowUpdate— fired when publish/approval state changes
- *   onRevisionRestore — fired when a revision is restored
- *   saveState       — autosave indicator state
- *   lastSaved       — timestamp of last successful save
- *   onClose         — closes the inspector (deselects block)
+ *   - LayoutConfigPanel for Layout + Background (no duplication).
+ *   - SplitContentCardsInspectorContent for splitContentCards Content + Style.
+ *   - Generic key-value editor for all other blocks.
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -40,21 +33,25 @@ import {
   Image as ImageIcon,
   Zap,
   Eye,
-  SendHorizonal,
-  Settings2,
   Globe,
   GlobeLock,
+  Settings2,
   Clock,
   History,
   CheckCircle2,
   RefreshCw,
   X,
+  SendHorizonal,
 } from "lucide-react";
-import type { PageSectionAdminItem } from "@/lib/page-sections/admin-queries";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
 import type { BlockDefinition } from "@/lib/homepage/block-registry";
 import type { SectionLayout } from "@/lib/cms/layout-types";
 import type { ContentRevisionItem } from "@/lib/cms/revision-engine";
+import type {
+  InspectorSectionData,
+  InspectorWorkflowCallbacks,
+  InspectorRevisionCallbacks,
+} from "@/lib/cms/inspector-types";
 import {
   SECTION_PUBLISH_STATUS,
   SECTION_APPROVAL_STATUS,
@@ -70,7 +67,10 @@ import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
 
 // Lazy-load premium block forms to avoid SSR issues with TipTap
 const SplitContentCardsInspectorContent = dynamic(
-  () => import("@/components/admin/page-builder/block-forms/SplitContentCardsInspectorContent"),
+  () =>
+    import(
+      "@/components/admin/page-builder/block-forms/SplitContentCardsInspectorContent"
+    ),
   {
     ssr: false,
     loading: () => (
@@ -153,7 +153,7 @@ const SECTION_DEFS: SectionMeta[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Helper: extract _layout from config
+// Helpers
 // ---------------------------------------------------------------------------
 
 function getLayout(config: Record<string, unknown>): SectionLayout {
@@ -161,14 +161,14 @@ function getLayout(config: Record<string, unknown>): SectionLayout {
 }
 
 // ---------------------------------------------------------------------------
-// Generic content editor (for blocks without a premium form)
+// Generic content editor (blocks without a premium form)
 // ---------------------------------------------------------------------------
 
 function GenericContentEditor({
   section,
   onChange,
 }: {
-  section: PageSectionAdminItem;
+  section: InspectorSectionData;
   onChange: (config: Record<string, unknown>) => void;
 }) {
   const def = getBlockDefinition(section.type);
@@ -223,28 +223,27 @@ function InteractionsPlaceholder() {
         Interaktionen — demnächst verfügbar
       </p>
       <p className="mt-1 text-[11px] text-[var(--muted)]">
-        Hover-Effekte, Eingangsanimationen und Scroll-Animationen werden in einem späteren Slice freigeschaltet.
+        Hover-Effekte, Eingangsanimationen und Scroll-Animationen werden in
+        einem späteren Slice freigeschaltet.
       </p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Visibility section (publish + approval state display)
+// Visibility section
 // ---------------------------------------------------------------------------
 
-function VisibilityContent({ section }: { section: PageSectionAdminItem }) {
+function VisibilityContent({ section }: { section: InspectorSectionData }) {
   const ps = section.publishStatus;
   const as = section.approvalStatus;
 
-  const publishLabel =
-    ps === SECTION_PUBLISH_STATUS.PUBLISHED ? "Veröffentlicht" : "Entwurf";
-  const publishColor =
-    ps === SECTION_PUBLISH_STATUS.PUBLISHED
-      ? "text-emerald-700 bg-emerald-50"
-      : "text-amber-700 bg-amber-50";
-  const PublishIcon =
-    ps === SECTION_PUBLISH_STATUS.PUBLISHED ? Globe : GlobeLock;
+  const isPublished = ps === SECTION_PUBLISH_STATUS.PUBLISHED;
+  const PublishIcon = isPublished ? Globe : GlobeLock;
+  const publishLabel = isPublished ? "Veröffentlicht" : "Entwurf";
+  const publishColor = isPublished
+    ? "text-emerald-700 bg-emerald-50"
+    : "text-amber-700 bg-amber-50";
 
   const approvalLabels: Record<string, string> = {
     NOT_REQUIRED: "Keine Freigabe erforderlich",
@@ -253,7 +252,6 @@ function VisibilityContent({ section }: { section: PageSectionAdminItem }) {
     APPROVED: "Freigegeben",
     CHANGES_REQUESTED: "Änderungen nötig",
   };
-  const approvalLabel = approvalLabels[as] ?? as;
 
   return (
     <div className="space-y-3">
@@ -269,7 +267,7 @@ function VisibilityContent({ section }: { section: PageSectionAdminItem }) {
       {as !== SECTION_APPROVAL_STATUS.NOT_REQUIRED && (
         <InspectorField label="Freigabe-Status">
           <div className="inline-flex items-center rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs text-[var(--text-2)]">
-            {approvalLabel}
+            {approvalLabels[as] ?? as}
           </div>
         </InspectorField>
       )}
@@ -283,42 +281,40 @@ function VisibilityContent({ section }: { section: PageSectionAdminItem }) {
         </InspectorField>
       )}
 
-      {section.isEnabled !== undefined && (
-        <InspectorField label="Sichtbarkeit">
+      <InspectorField label="Sichtbarkeit">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            section.isEnabled
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-[var(--surface-2)] text-[var(--muted)]"
+          }`}
+        >
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-              section.isEnabled
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-[var(--surface-2)] text-[var(--muted)]"
+            className={`h-1.5 w-1.5 rounded-full ${
+              section.isEnabled ? "bg-emerald-500" : "bg-gray-300"
             }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                section.isEnabled ? "bg-emerald-500" : "bg-gray-300"
-              }`}
-            />
-            {section.isEnabled ? "Aktiv" : "Deaktiviert"}
-          </span>
-        </InspectorField>
-      )}
+          />
+          {section.isEnabled ? "Aktiv" : "Deaktiviert"}
+        </span>
+      </InspectorField>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Publishing section (workflow actions + revision history)
+// Publishing section — uses abstract callbacks
 // ---------------------------------------------------------------------------
 
 function PublishingContent({
   section,
-  pageId,
-  onWorkflowUpdate,
-  onRevisionRestore,
+  workflowCallbacks,
+  revisionCallbacks,
+  onSectionUpdate,
 }: {
-  section: PageSectionAdminItem;
-  pageId: string;
-  onWorkflowUpdate: (updated: PageSectionAdminItem) => void;
-  onRevisionRestore: (updated: PageSectionAdminItem) => void;
+  section: InspectorSectionData;
+  workflowCallbacks?: InspectorWorkflowCallbacks;
+  revisionCallbacks?: InspectorRevisionCallbacks;
+  onSectionUpdate: (updated: InspectorSectionData) => void;
 }) {
   const [workflowPending, setWorkflowPending] = useState(false);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
@@ -330,25 +326,37 @@ function PublishingContent({
 
   const ps = section.publishStatus;
   const as = section.approvalStatus;
+  const isPublished = ps === SECTION_PUBLISH_STATUS.PUBLISHED;
   const canPublish =
     as === SECTION_APPROVAL_STATUS.NOT_REQUIRED ||
     as === SECTION_APPROVAL_STATUS.APPROVED;
+  const isInReview = as === SECTION_APPROVAL_STATUS.IN_REVIEW;
 
-  async function doAction(action: string, extra?: Record<string, unknown>) {
+  async function doAction(
+    actionFn: (() => Promise<InspectorSectionData>) | undefined,
+  ) {
+    if (!actionFn) return;
     setWorkflowPending(true);
     setWorkflowError(null);
     try {
-      const res = await fetch(
-        `/api/website-pages/${pageId}/sections/${section.id}/workflow?action=${action}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(extra ?? {}),
-        },
+      const updated = await actionFn();
+      onSectionUpdate(updated);
+    } catch (err) {
+      setWorkflowError(err instanceof Error ? err.message : "Fehler");
+    } finally {
+      setWorkflowPending(false);
+    }
+  }
+
+  async function doSchedule() {
+    if (!workflowCallbacks?.schedule || !scheduledAt) return;
+    setWorkflowPending(true);
+    setWorkflowError(null);
+    try {
+      const updated = await workflowCallbacks.schedule(
+        new Date(scheduledAt).toISOString(),
       );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Fehler");
-      onWorkflowUpdate(data.section);
+      onSectionUpdate(updated);
     } catch (err) {
       setWorkflowError(err instanceof Error ? err.message : "Fehler");
     } finally {
@@ -357,16 +365,12 @@ function PublishingContent({
   }
 
   async function loadRevisions() {
-    if (revisions !== null) return;
+    if (revisions !== null || !revisionCallbacks) return;
     setRevisionsLoading(true);
     setRevisionsError(null);
     try {
-      const res = await fetch(
-        `/api/website-pages/${pageId}/sections/${section.id}/revisions`,
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Fehler");
-      setRevisions(data.revisions ?? []);
+      const list = await revisionCallbacks.loadRevisions();
+      setRevisions(list);
     } catch (err) {
       setRevisionsError(err instanceof Error ? err.message : "Fehler");
     } finally {
@@ -381,15 +385,11 @@ function PublishingContent({
       )
     )
       return;
+    if (!revisionCallbacks) return;
     setRestoring(revId);
     try {
-      const res = await fetch(
-        `/api/website-pages/${pageId}/sections/${section.id}/revisions/${revId}/restore`,
-        { method: "POST" },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? "Fehler");
-      onRevisionRestore(data.section);
+      const updated = await revisionCallbacks.restore(revId);
+      onSectionUpdate(updated);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Fehler");
     } finally {
@@ -397,159 +397,184 @@ function PublishingContent({
     }
   }
 
+  const hasAnyWorkflow =
+    workflowCallbacks?.publish ||
+    workflowCallbacks?.unpublish ||
+    workflowCallbacks?.requestReview ||
+    workflowCallbacks?.approve ||
+    workflowCallbacks?.reject ||
+    workflowCallbacks?.schedule;
+
   return (
     <div className="space-y-4">
       {/* Workflow actions */}
-      <InspectorGroup label="Workflow">
-        <div className="flex flex-wrap gap-2">
-          {ps === SECTION_PUBLISH_STATUS.DRAFT && canPublish && (
-            <button
-              type="button"
-              onClick={() => doAction("publish")}
-              disabled={workflowPending}
-              className="fca-button-primary py-1.5 text-xs"
-            >
-              <Globe className="h-3.5 w-3.5" />
-              Veröffentlichen
-            </button>
-          )}
-          {ps === SECTION_PUBLISH_STATUS.PUBLISHED && (
-            <button
-              type="button"
-              onClick={() => doAction("unpublish")}
-              disabled={workflowPending}
-              className="fca-button-secondary py-1.5 text-xs"
-            >
-              <GlobeLock className="h-3.5 w-3.5" />
-              Zurückziehen
-            </button>
-          )}
-          {as !== SECTION_APPROVAL_STATUS.IN_REVIEW && (
-            <button
-              type="button"
-              onClick={() => doAction("request-review")}
-              disabled={workflowPending}
-              className="fca-button-secondary py-1.5 text-xs"
-            >
-              <SendHorizonal className="h-3.5 w-3.5" />
-              Zur Überprüfung
-            </button>
-          )}
-          {as === SECTION_APPROVAL_STATUS.IN_REVIEW && (
-            <>
+      {hasAnyWorkflow && (
+        <InspectorGroup label="Workflow">
+          <div className="flex flex-wrap gap-2">
+            {!isPublished && canPublish && workflowCallbacks?.publish && (
               <button
                 type="button"
-                onClick={() => doAction("approve")}
+                onClick={() => doAction(workflowCallbacks.publish)}
+                disabled={workflowPending}
+                className="fca-button-primary py-1.5 text-xs"
+              >
+                <Globe className="h-3.5 w-3.5" />
+                Veröffentlichen
+              </button>
+            )}
+            {isPublished && workflowCallbacks?.unpublish && (
+              <button
+                type="button"
+                onClick={() => doAction(workflowCallbacks.unpublish)}
+                disabled={workflowPending}
+                className="fca-button-secondary py-1.5 text-xs"
+              >
+                <GlobeLock className="h-3.5 w-3.5" />
+                Zurückziehen
+              </button>
+            )}
+            {!isInReview && workflowCallbacks?.requestReview && (
+              <button
+                type="button"
+                onClick={() => doAction(workflowCallbacks.requestReview)}
+                disabled={workflowPending}
+                className="fca-button-secondary py-1.5 text-xs"
+              >
+                <SendHorizonal className="h-3.5 w-3.5" />
+                Zur Überprüfung
+              </button>
+            )}
+            {isInReview && workflowCallbacks?.approve && (
+              <button
+                type="button"
+                onClick={() => doAction(() => workflowCallbacks.approve!())}
                 disabled={workflowPending}
                 className="fca-button-primary py-1.5 text-xs"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Freigeben
               </button>
+            )}
+            {isInReview && workflowCallbacks?.reject && (
               <button
                 type="button"
-                onClick={() => doAction("reject")}
+                onClick={() => doAction(() => workflowCallbacks.reject!())}
                 disabled={workflowPending}
                 className="fca-button-secondary py-1.5 text-xs text-rose-600"
               >
                 <X className="h-3.5 w-3.5" />
                 Ablehnen
               </button>
-            </>
-          )}
-        </div>
-
-        {/* Schedule */}
-        {canPublish && (
-          <div className="flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 flex-shrink-0 text-[var(--muted)]" />
-            <input
-              type="datetime-local"
-              className="fca-input flex-1 text-xs"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-            />
-            <button
-              type="button"
-              disabled={workflowPending || !scheduledAt}
-              onClick={() =>
-                doAction("schedule", {
-                  scheduledAt: new Date(scheduledAt).toISOString(),
-                })
-              }
-              className="fca-button-secondary shrink-0 py-1.5 text-xs"
-            >
-              Planen
-            </button>
+            )}
           </div>
-        )}
 
-        {workflowError && (
-          <p className="text-xs text-rose-600">{workflowError}</p>
-        )}
-      </InspectorGroup>
-
-      <InspectorDivider />
-
-      {/* Revision history */}
-      <InspectorGroup label="Versionshistorie">
-        {revisions === null ? (
-          <button
-            type="button"
-            onClick={loadRevisions}
-            disabled={revisionsLoading}
-            className="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)] transition"
-          >
-            {revisionsLoading ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <History className="h-3.5 w-3.5" />
-            )}
-            {revisionsLoading ? "Lädt…" : "Versionen anzeigen"}
-          </button>
-        ) : (
-          <>
-            {revisionsError && (
-              <p className="text-xs text-rose-600">{revisionsError}</p>
-            )}
-            {revisions.length === 0 && (
-              <p className="text-xs italic text-[var(--muted)]">
-                Noch keine Versionen vorhanden.
-              </p>
-            )}
-            <div className="max-h-48 space-y-1 overflow-y-auto">
-              {revisions.map((rev) => (
-                <div
-                  key={rev.id}
-                  className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-2.5 py-2 text-xs"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5 font-medium text-[var(--foreground)]">
-                      <span className="text-[var(--muted)]">v{rev.versionNumber}</span>
-                      {rev.isRestore && (
-                        <span className="rounded bg-blue-50 px-1 py-0.5 text-[10px] text-blue-700">
-                          Restore
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 text-[var(--muted)]">
-                      {new Date(rev.createdAt).toLocaleString("de-CH")}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRestore(rev.id, rev.versionNumber)}
-                    disabled={restoring === rev.id}
-                    className="shrink-0 rounded border border-[var(--border)] px-2 py-0.5 text-[11px] font-medium hover:bg-[var(--surface-2)] disabled:opacity-50 transition"
-                  >
-                    {restoring === rev.id ? "…" : "↩"}
-                  </button>
-                </div>
-              ))}
+          {/* Schedule */}
+          {canPublish && !isPublished && workflowCallbacks?.schedule && (
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 flex-shrink-0 text-[var(--muted)]" />
+              <input
+                type="datetime-local"
+                className="fca-input flex-1 text-xs"
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
+              />
+              <button
+                type="button"
+                disabled={workflowPending || !scheduledAt}
+                onClick={doSchedule}
+                className="fca-button-secondary shrink-0 py-1.5 text-xs"
+              >
+                Planen
+              </button>
             </div>
-          </>
-        )}
-      </InspectorGroup>
+          )}
+
+          {workflowError && (
+            <p className="text-xs text-rose-600">{workflowError}</p>
+          )}
+        </InspectorGroup>
+      )}
+
+      {/* Revision history — only if revisionCallbacks provided */}
+      {revisionCallbacks && (
+        <>
+          {hasAnyWorkflow && <InspectorDivider />}
+          <InspectorGroup label="Versionshistorie">
+            {revisions === null ? (
+              <button
+                type="button"
+                onClick={loadRevisions}
+                disabled={revisionsLoading}
+                className="flex items-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--foreground)]"
+              >
+                {revisionsLoading ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <History className="h-3.5 w-3.5" />
+                )}
+                {revisionsLoading ? "Lädt…" : "Versionen anzeigen"}
+              </button>
+            ) : (
+              <>
+                {revisionsError && (
+                  <p className="text-xs text-rose-600">{revisionsError}</p>
+                )}
+                {revisions.length === 0 && (
+                  <p className="text-xs italic text-[var(--muted)]">
+                    Noch keine Versionen vorhanden.
+                  </p>
+                )}
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {revisions.map((rev) => (
+                    <div
+                      key={rev.id}
+                      className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-2.5 py-2 text-xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 font-medium text-[var(--foreground)]">
+                          <span className="text-[var(--muted)]">
+                            v{rev.versionNumber}
+                          </span>
+                          {rev.isRestore && (
+                            <span className="rounded bg-blue-50 px-1 py-0.5 text-[10px] text-blue-700">
+                              Restore
+                            </span>
+                          )}
+                          {rev.changeNote && (
+                            <span className="truncate">{rev.changeNote}</span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 text-[var(--muted)]">
+                          {rev.createdByUser
+                            ? `${rev.createdByUser.firstName} ${rev.createdByUser.lastName} · `
+                            : ""}
+                          {new Date(rev.createdAt).toLocaleString("de-CH")}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleRestore(rev.id, rev.versionNumber)
+                        }
+                        disabled={restoring === rev.id}
+                        className="shrink-0 rounded border border-[var(--border)] px-2 py-0.5 text-[11px] font-medium transition hover:bg-[var(--surface-2)] disabled:opacity-50"
+                      >
+                        {restoring === rev.id ? "…" : "↩"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </InspectorGroup>
+        </>
+      )}
+
+      {!hasAnyWorkflow && !revisionCallbacks && (
+        <p className="text-xs italic text-[var(--muted)]">
+          Keine Workflow-Aktionen verfügbar.
+        </p>
+      )}
     </div>
   );
 }
@@ -562,7 +587,7 @@ function AdvancedContent({
   section,
   onChange,
 }: {
-  section: PageSectionAdminItem;
+  section: InspectorSectionData;
   onChange: (config: Record<string, unknown>) => void;
 }) {
   const anchorId = (section.config.anchorId as string | undefined) ?? "";
@@ -619,12 +644,27 @@ function AdvancedContent({
 // ---------------------------------------------------------------------------
 
 export type InspectorPanelProps = {
-  section: PageSectionAdminItem;
-  pageId: string;
+  /** The section being inspected (adapated to the generic shape). */
+  section: InspectorSectionData;
+
+  /** Abstract workflow action callbacks — only defined callbacks show buttons. */
+  workflowCallbacks?: InspectorWorkflowCallbacks;
+
+  /** Optional revision history callbacks — absent = no revision UI shown. */
+  revisionCallbacks?: InspectorRevisionCallbacks;
+
+  /** Called whenever config changes (parent handles autosave). */
   onConfigChange: (config: Record<string, unknown>) => void;
+
+  /** Called whenever the section label changes (parent handles autosave). */
   onLabelChange: (label: string) => void;
-  onWorkflowUpdate: (updated: PageSectionAdminItem) => void;
-  onRevisionRestore: (updated: PageSectionAdminItem) => void;
+
+  /**
+   * Called when a workflow action or revision restore resolves.
+   * Parent should update its section list with the returned data.
+   */
+  onSectionUpdate: (updated: InspectorSectionData) => void;
+
   saveState: InspectorSaveState;
   lastSaved: Date | null;
   onClose: () => void;
@@ -632,11 +672,11 @@ export type InspectorPanelProps = {
 
 export default function InspectorPanel({
   section,
-  pageId,
+  workflowCallbacks,
+  revisionCallbacks,
   onConfigChange,
   onLabelChange,
-  onWorkflowUpdate,
-  onRevisionRestore,
+  onSectionUpdate,
   saveState,
   lastSaved,
   onClose,
@@ -656,7 +696,6 @@ export default function InspectorPanel({
   const capabilities: NonNullable<BlockDefinition["supportsInspector"]> =
     def?.supportsInspector ?? {};
 
-  // Determine which sections are visible based on capabilities + search
   const visibleSections = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     return SECTION_DEFS.filter((s) => {
@@ -679,21 +718,10 @@ export default function InspectorPanel({
     [section.config, onConfigChange],
   );
 
-  // Background is split out of Layout for the Background section
-  const handleBackgroundChange = useCallback(
-    (bg: SectionLayout["background"]) => {
-      onConfigChange({
-        ...section.config,
-        _layout: { ...layout, background: bg },
-      });
-    },
-    [section.config, layout, onConfigChange],
-  );
-
   const isPremiumSplitCards = section.type === "splitContentCards";
 
   return (
-    <div className="flex h-full flex-col bg-[var(--surface)] overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--surface)]">
       {/* Toolbar */}
       <InspectorToolbar
         label={section.label}
@@ -705,7 +733,7 @@ export default function InspectorPanel({
 
       {/* Label editor */}
       <div className="border-b border-[var(--border)] px-4 py-3">
-        <label className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)] mb-1">
+        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           Sektionsname
         </label>
         <input
@@ -727,7 +755,7 @@ export default function InspectorPanel({
         {visibleSections.length === 0 && (
           <div className="px-4 py-8 text-center text-xs text-[var(--muted)]">
             {searchQuery
-              ? `Keine Einstellung für "${searchQuery}" gefunden.`
+              ? `Keine Einstellung für „${searchQuery}" gefunden.`
               : "Keine Einstellungen verfügbar."}
           </div>
         )}
@@ -741,7 +769,7 @@ export default function InspectorPanel({
             open={expandedSections[s.key] ?? false}
             onToggle={(open) => toggleSection(s.key, open)}
           >
-            {/* ── Content ───────────────────────────────────────────── */}
+            {/* ── Content ─────────────────────────────────────────────── */}
             {s.key === "content" && (
               <>
                 {isPremiumSplitCards ? (
@@ -758,7 +786,7 @@ export default function InspectorPanel({
               </>
             )}
 
-            {/* ── Layout ────────────────────────────────────────────── */}
+            {/* ── Layout ──────────────────────────────────────────────── */}
             {s.key === "layout" && (
               <LayoutConfigPanel
                 layout={layout}
@@ -768,11 +796,12 @@ export default function InspectorPanel({
                   responsive: true,
                   vAlign: true,
                   paddingX: true,
+                  background: false,
                 }}
               />
             )}
 
-            {/* ── Style ─────────────────────────────────────────────── */}
+            {/* ── Style ───────────────────────────────────────────────── */}
             {s.key === "style" && isPremiumSplitCards && (
               <SplitContentCardsInspectorContent
                 config={section.config}
@@ -781,7 +810,7 @@ export default function InspectorPanel({
               />
             )}
 
-            {/* ── Background ────────────────────────────────────────── */}
+            {/* ── Background ──────────────────────────────────────────── */}
             {s.key === "background" && (
               <LayoutConfigPanel
                 layout={layout}
@@ -791,23 +820,25 @@ export default function InspectorPanel({
               />
             )}
 
-            {/* ── Interactions ──────────────────────────────────────── */}
+            {/* ── Interactions ────────────────────────────────────────── */}
             {s.key === "interactions" && <InteractionsPlaceholder />}
 
-            {/* ── Visibility ────────────────────────────────────────── */}
-            {s.key === "visibility" && <VisibilityContent section={section} />}
+            {/* ── Visibility ──────────────────────────────────────────── */}
+            {s.key === "visibility" && (
+              <VisibilityContent section={section} />
+            )}
 
-            {/* ── Publishing ────────────────────────────────────────── */}
+            {/* ── Publishing ──────────────────────────────────────────── */}
             {s.key === "publishing" && (
               <PublishingContent
                 section={section}
-                pageId={pageId}
-                onWorkflowUpdate={onWorkflowUpdate}
-                onRevisionRestore={onRevisionRestore}
+                workflowCallbacks={workflowCallbacks}
+                revisionCallbacks={revisionCallbacks}
+                onSectionUpdate={onSectionUpdate}
               />
             )}
 
-            {/* ── Advanced ──────────────────────────────────────────── */}
+            {/* ── Advanced ────────────────────────────────────────────── */}
             {s.key === "advanced" && (
               <AdvancedContent section={section} onChange={onConfigChange} />
             )}

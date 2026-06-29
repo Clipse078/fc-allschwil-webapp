@@ -11,25 +11,20 @@
  *   - Duplicate Block
  *   - Delete Block (with confirmation)
  *   - Collapse / Expand block rows
- *   - Sidebar Inspector Panel (Figma/Framer-style — replaces inline ConfigEditor)
- *   - Inline config editor with autosave (debounced 1.5s)
+ *   - Sidebar Inspector Panel (Figma/Framer-style)
+ *   - Autosave (debounced 1.5s)
  *   - Unsaved changes detection (beforeunload warning)
  *   - Responsive preview panel (Desktop / Tablet / Mobile)
- *   - Publishing workflow via Inspector Publishing section
- *   - Version history via Inspector Publishing section
  *   - Visual save indicator (Autosaving… / Gespeichert / Fehler)
  *
  * Inspector architecture:
- *   - Clicking any block row selects it and opens the Inspector in a right sidebar.
- *   - The Inspector renders sections dynamically from the block's supportsInspector
- *     capability map (declared in lib/homepage/block-registry.ts).
- *   - Each section is collapsible; expanded state persists for the session.
- *   - Inspector search filters sections by title.
- *   - Layout section reuses LayoutConfigPanel (no duplicate layout logic).
- *   - Background section isolates background controls via LayoutConfigPanel backgroundOnly.
- *   - SplitContentCards Content/Style sections delegate to SplitContentCardsInspectorContent.
- *   - Publishing section exposes workflow actions + revision history.
- *   - No duplicate state between Inspector and Section List.
+ *   - Clicking any block row selects it and opens the Inspector sidebar.
+ *   - The Inspector renders sections dynamically from the block's
+ *     supportsInspector capability map.
+ *   - Workflow (publish/unpublish/approve/schedule/request-review/reject)
+ *     and revision history are surfaced inside the Inspector's Publishing section.
+ *   - All API calls are lifted into callback bundles; the Inspector has
+ *     no knowledge of which endpoints to call.
  */
 
 import {
@@ -82,13 +77,21 @@ import {
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
 import InspectorPanel from "@/components/admin/inspector/InspectorPanel";
 import type { InspectorSaveState } from "@/components/admin/inspector/InspectorToolbar";
+import type {
+  InspectorSectionData,
+  InspectorWorkflowCallbacks,
+  InspectorRevisionCallbacks,
+} from "@/lib/cms/inspector-types";
+import { adaptToInspectorData } from "@/lib/cms/inspector-types";
+import type { ContentRevisionItem } from "@/lib/cms/revision-engine";
 
-// Lazy-load block renderer for preview panel
 const SplitContentCardsRenderer = dynamic(
   () => import("@/components/website/blocks/SplitContentCardsRenderer"),
   {
     ssr: false,
-    loading: () => <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" />,
+    loading: () => (
+      <div className="h-32 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+    ),
   },
 );
 
@@ -97,12 +100,10 @@ const SplitContentCardsRenderer = dynamic(
 // ---------------------------------------------------------------------------
 
 const AUTOSAVE_DELAY_MS = 1500;
-
-// Blocks with a live preview renderer
 const RENDERABLE_BLOCK_TYPES = new Set(["splitContentCards"]);
 
 // ---------------------------------------------------------------------------
-// Helpers: status badges
+// Status badges
 // ---------------------------------------------------------------------------
 
 function PublishBadge({ status }: { status: string }) {
@@ -121,16 +122,16 @@ function PublishBadge({ status }: { status: string }) {
 
 function ApprovalBadge({ status }: { status: string }) {
   if (status === SECTION_APPROVAL_STATUS.NOT_REQUIRED) return null;
-  const config: Record<string, { label: string; colorClass: string }> = {
+  const cfg: Record<string, { label: string; colorClass: string }> = {
     DRAFT: { label: "Entwurf", colorClass: "bg-gray-100 text-gray-600" },
     IN_REVIEW: { label: "In Überprüfung", colorClass: "bg-blue-50 text-blue-700" },
     APPROVED: { label: "Freigegeben", colorClass: "bg-emerald-50 text-emerald-700" },
     CHANGES_REQUESTED: { label: "Änderungen nötig", colorClass: "bg-rose-50 text-rose-700" },
   };
-  const cfg = config[status] ?? { label: status, colorClass: "bg-gray-100 text-gray-600" };
+  const c = cfg[status] ?? { label: status, colorClass: "bg-gray-100 text-gray-600" };
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cfg.colorClass}`}>
-      {cfg.label}
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${c.colorClass}`}>
+      {c.label}
     </span>
   );
 }
@@ -160,16 +161,10 @@ function SectionTypeBadge({ type }: { type: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Save indicator (toolbar)
+// Save indicator
 // ---------------------------------------------------------------------------
 
-function SaveIndicator({
-  state,
-  lastSaved,
-}: {
-  state: InspectorSaveState;
-  lastSaved: Date | null;
-}) {
+function SaveIndicator({ state, lastSaved }: { state: InspectorSaveState; lastSaved: Date | null }) {
   if (state === "idle" && !lastSaved) return null;
   return (
     <div className="flex items-center gap-1.5 text-[11px]">
@@ -198,16 +193,10 @@ function SaveIndicator({
 }
 
 // ---------------------------------------------------------------------------
-// Block visual preview (for preview panel)
+// Block visual preview
 // ---------------------------------------------------------------------------
 
-function BlockVisualPreview({
-  type,
-  config,
-}: {
-  type: string;
-  config: Record<string, unknown>;
-}) {
+function BlockVisualPreview({ type, config }: { type: string; config: Record<string, unknown> }) {
   if (type === "splitContentCards") {
     return <SplitContentCardsRenderer config={config} previewMode />;
   }
@@ -309,12 +298,7 @@ function AddSectionPanel({
             <Plus className="h-3.5 w-3.5" />
             {saving ? "Erstelle…" : "Sektion erstellen"}
           </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={saving}
-            className="fca-button-secondary py-1.5 text-xs"
-          >
+          <button type="button" onClick={onCancel} disabled={saving} className="fca-button-secondary py-1.5 text-xs">
             <X className="h-3.5 w-3.5" />
             Abbrechen
           </button>
@@ -368,12 +352,8 @@ function PreviewPanel({
     let cancelled = false;
     fetch(`/api/website-pages/${pageId}/preview`)
       .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled) { setSections(d.sections ?? []); setLoading(false); }
-      })
-      .catch(() => {
-        if (!cancelled) { setError("Vorschau konnte nicht geladen werden."); setLoading(false); }
-      });
+      .then((d) => { if (!cancelled) { setSections(d.sections ?? []); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError("Vorschau konnte nicht geladen werden."); setLoading(false); } });
     return () => { cancelled = true; };
   }, [pageId]);
 
@@ -389,7 +369,6 @@ function PreviewPanel({
             <p className="text-[11px] text-[var(--muted)]">/{pageSlug}</p>
           </div>
         </div>
-
         <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
           {(["desktop", "tablet", "mobile"] as ViewportMode[]).map((v) => {
             const vc2 = VIEWPORT_CONFIG[v];
@@ -400,9 +379,7 @@ function PreviewPanel({
                 type="button"
                 onClick={() => setViewport(v)}
                 className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition ${
-                  viewport === v
-                    ? "bg-white text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                  viewport === v ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -411,7 +388,6 @@ function PreviewPanel({
             );
           })}
         </div>
-
         <button type="button" onClick={onClose} className="fca-button-secondary px-2.5">
           <X className="h-4 w-4" />
         </button>
@@ -481,13 +457,74 @@ function PreviewPanel({
       <div className="flex items-center gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--muted)]">
         <span>{sections.length} Sektion{sections.length !== 1 ? "en" : ""} (inkl. Entwürfe)</span>
         <span>·</span>
-        <span>
-          {sections.filter((s) => s.publishStatus === "PUBLISHED" && s.isEnabled).length} öffentlich
-          sichtbar
-        </span>
+        <span>{sections.filter((s) => s.publishStatus === "PUBLISHED" && s.isEnabled).length} öffentlich sichtbar</span>
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Page Builder workflow / revision callback factories
+// ---------------------------------------------------------------------------
+
+function buildWorkflowCallbacks(
+  pageId: string,
+  sectionId: string,
+  onSuccess: (updated: PageSectionAdminItem) => void,
+): InspectorWorkflowCallbacks {
+  async function doAction(
+    action: string,
+    extra?: Record<string, unknown>,
+  ): Promise<InspectorSectionData> {
+    const res = await fetch(
+      `/api/website-pages/${pageId}/sections/${sectionId}/workflow?action=${action}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(extra ?? {}),
+      },
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error ?? "Fehler");
+    onSuccess(data.section);
+    return adaptToInspectorData(data.section as PageSectionAdminItem);
+  }
+
+  return {
+    publish: () => doAction("publish"),
+    unpublish: () => doAction("unpublish"),
+    requestReview: () => doAction("request-review"),
+    approve: () => doAction("approve"),
+    reject: () => doAction("reject"),
+    schedule: (isoDate) => doAction("schedule", { scheduledAt: isoDate }),
+  };
+}
+
+function buildRevisionCallbacks(
+  pageId: string,
+  sectionId: string,
+  onRestored: (updated: PageSectionAdminItem) => void,
+): InspectorRevisionCallbacks {
+  return {
+    loadRevisions: async () => {
+      const res = await fetch(
+        `/api/website-pages/${pageId}/sections/${sectionId}/revisions`,
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Fehler");
+      return (data.revisions ?? []) as ContentRevisionItem[];
+    },
+    restore: async (revId) => {
+      const res = await fetch(
+        `/api/website-pages/${pageId}/sections/${sectionId}/revisions/${revId}/restore`,
+        { method: "POST" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Fehler");
+      onRestored(data.section as PageSectionAdminItem);
+      return adaptToInspectorData(data.section as PageSectionAdminItem);
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +550,7 @@ export default function PageBuilderClient({
   // Selection (Inspector Panel)
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Inspector shadow state — mirrors the selected section's editable fields
+  // Inspector shadow state
   const [inspectorConfig, setInspectorConfig] = useState<Record<string, unknown>>({});
   const [inspectorLabel, setInspectorLabel] = useState<string>("");
 
@@ -529,7 +566,6 @@ export default function PageBuilderClient({
   const [isDirty, setIsDirty] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep a ref to current inspector values for autosave closure
   const inspectorRef = useRef<{
     id: string | null;
     label: string;
@@ -544,11 +580,9 @@ export default function PageBuilderClient({
     };
   }, [selectedId, inspectorLabel, inspectorConfig]);
 
-  // Drag-and-drop state
   const [dragSrcId, setDragSrcId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  // Unsaved changes warning
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (isDirty) {
@@ -586,7 +620,6 @@ export default function PageBuilderClient({
     setSelectedId(section.id);
     setInspectorConfig({ ...section.config });
     setInspectorLabel(section.label);
-    // Cancel any pending autosave for previous selection
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
@@ -603,7 +636,7 @@ export default function PageBuilderClient({
   }
 
   // ---------------------------------------------------------------------------
-  // Autosave trigger
+  // Autosave
   // ---------------------------------------------------------------------------
 
   const triggerAutosave = useCallback(() => {
@@ -651,22 +684,30 @@ export default function PageBuilderClient({
     [triggerAutosave],
   );
 
-  const handleWorkflowUpdate = useCallback((updated: PageSectionAdminItem) => {
-    setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    // Also update inspector shadow if this section is selected
-    if (selectedId === updated.id) {
-      setInspectorConfig({ ...updated.config });
-      setInspectorLabel(updated.label);
-    }
-  }, [selectedId]);
-
-  const handleRevisionRestore = useCallback((updated: PageSectionAdminItem) => {
-    setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    if (selectedId === updated.id) {
-      setInspectorConfig({ ...updated.config });
-      setInspectorLabel(updated.label);
-    }
-  }, [selectedId]);
+  // Called by workflow actions and revision restores
+  const handleSectionUpdate = useCallback(
+    (updated: InspectorSectionData) => {
+      setSections((prev) =>
+        prev.map((s) =>
+          s.id === updated.id
+            ? {
+                ...s,
+                label: updated.label,
+                config: updated.config,
+                publishStatus: updated.publishStatus as PageSectionAdminItem["publishStatus"],
+                approvalStatus: updated.approvalStatus as PageSectionAdminItem["approvalStatus"],
+                scheduledPublishAt: updated.scheduledPublishAt,
+              }
+            : s,
+        ),
+      );
+      if (selectedId === updated.id) {
+        setInspectorConfig({ ...updated.config });
+        setInspectorLabel(updated.label);
+      }
+    },
+    [selectedId],
+  );
 
   // ---------------------------------------------------------------------------
   // Section actions
@@ -675,9 +716,7 @@ export default function PageBuilderClient({
   async function handleToggle(id: string) {
     setActionPending(id);
     try {
-      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/toggle`, {
-        method: "PATCH",
-      });
+      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/toggle`, { method: "PATCH" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data?.error ?? "Fehler"); return; }
       setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
@@ -706,9 +745,7 @@ export default function PageBuilderClient({
     if (!confirm("Sektion wirklich löschen?")) return;
     setActionPending(id);
     try {
-      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}`, { method: "DELETE" });
       if (res.ok || res.status === 204) {
         setSections((prev) => prev.filter((s) => s.id !== id));
         if (selectedId === id) closeInspector();
@@ -724,9 +761,7 @@ export default function PageBuilderClient({
   async function handleDuplicate(id: string) {
     setActionPending(id);
     try {
-      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/duplicate`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/duplicate`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data?.error ?? "Fehler"); return; }
       setSections((prev) => [...prev, data.section]);
@@ -750,34 +785,24 @@ export default function PageBuilderClient({
   }
 
   // ---------------------------------------------------------------------------
-  // Drag-and-drop handlers
+  // DnD
   // ---------------------------------------------------------------------------
 
   function handleDragStart(id: string) { setDragSrcId(id); }
-
-  function handleDragOver(e: React.DragEvent, id: string) {
-    e.preventDefault();
-    setDragOverId(id);
-  }
+  function handleDragOver(e: React.DragEvent, id: string) { e.preventDefault(); setDragOverId(id); }
 
   async function handleDrop(e: React.DragEvent, targetId: string) {
     e.preventDefault();
-    if (!dragSrcId || dragSrcId === targetId) {
-      setDragSrcId(null);
-      setDragOverId(null);
-      return;
-    }
+    if (!dragSrcId || dragSrcId === targetId) { setDragSrcId(null); setDragOverId(null); return; }
     const srcIdx = sections.findIndex((s) => s.id === dragSrcId);
     const tgtIdx = sections.findIndex((s) => s.id === targetId);
     if (srcIdx === -1 || tgtIdx === -1) { setDragSrcId(null); setDragOverId(null); return; }
-
     const reordered = [...sections];
     const [moved] = reordered.splice(srcIdx, 1);
     reordered.splice(tgtIdx, 0, moved);
     setSections(reordered);
     setDragSrcId(null);
     setDragOverId(null);
-
     try {
       const res = await fetch(`/api/website-pages/${pageId}/sections/reorder`, {
         method: "PATCH",
@@ -786,29 +811,38 @@ export default function PageBuilderClient({
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) setSections(data.sections ?? reordered);
-    } catch {
-      // Optimistic update already applied
-    }
+    } catch { /* optimistic update already applied */ }
   }
 
   function handleDragEnd() { setDragSrcId(null); setDragOverId(null); }
 
   // ---------------------------------------------------------------------------
-  // Derived: selected section (live from sections list, plus shadow values)
+  // Derived inspector section
   // ---------------------------------------------------------------------------
 
   const selectedSection = sections.find((s) => s.id === selectedId);
 
-  // Build inspector section view — merges live section with shadow editable fields
-  const inspectorSection: PageSectionAdminItem | null = selectedSection
-    ? { ...selectedSection, config: inspectorConfig, label: inspectorLabel }
+  const inspectorSection: InspectorSectionData | null = selectedSection
+    ? { ...adaptToInspectorData(selectedSection), config: inspectorConfig, label: inspectorLabel }
     : null;
+
+  const workflowCallbacks: InspectorWorkflowCallbacks | undefined = selectedId
+    ? buildWorkflowCallbacks(pageId, selectedId, (updated) =>
+        setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s))),
+      )
+    : undefined;
+
+  const revisionCallbacks: InspectorRevisionCallbacks | undefined = selectedId
+    ? buildRevisionCallbacks(pageId, selectedId, (updated) =>
+        setSections((prev) => prev.map((s) => (s.id === updated.id ? updated : s))),
+      )
+    : undefined;
+
+  const hasInspector = !!inspectorSection;
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
-
-  const hasInspector = !!inspectorSection;
 
   return (
     <>
@@ -820,7 +854,6 @@ export default function PageBuilderClient({
           onClose={() => setShowPreview(false)}
         />
       )}
-
       {showTemplates && (
         <PageTemplatesPicker
           open={showTemplates}
@@ -846,39 +879,19 @@ export default function PageBuilderClient({
                 Inspector aktiv
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => setShowTemplates(true)}
-              className="fca-button-secondary px-2.5"
-              title="Seitenvorlage anwenden"
-            >
+            <button type="button" onClick={() => setShowTemplates(true)} className="fca-button-secondary px-2.5" title="Vorlage">
               <Layers className="h-3.5 w-3.5" />
               <span className="ml-1 hidden text-xs sm:inline">Vorlage</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setShowPreview(true)}
-              className="fca-button-secondary px-2.5"
-              title="Vorschau"
-            >
+            <button type="button" onClick={() => setShowPreview(true)} className="fca-button-secondary px-2.5" title="Vorschau">
               <Eye className="h-3.5 w-3.5" />
               <span className="ml-1 hidden text-xs sm:inline">Vorschau</span>
             </button>
-            <button
-              type="button"
-              onClick={load}
-              disabled={loading}
-              className="fca-button-secondary px-2.5"
-              title="Aktualisieren"
-            >
+            <button type="button" onClick={load} disabled={loading} className="fca-button-secondary px-2.5">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
             {!showAdd && (
-              <button
-                type="button"
-                onClick={() => { setShowAdd(true); closeInspector(); }}
-                className="fca-button-primary"
-              >
+              <button type="button" onClick={() => { setShowAdd(true); closeInspector(); }} className="fca-button-primary">
                 <Plus className="h-4 w-4" />
                 Sektion hinzufügen
               </button>
@@ -886,7 +899,6 @@ export default function PageBuilderClient({
           </div>
         </div>
 
-        {/* Unsaved changes warning */}
         {isDirty && saveState !== "saving" && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <Save className="h-3.5 w-3.5 flex-shrink-0" />
@@ -894,14 +906,12 @@ export default function PageBuilderClient({
           </div>
         )}
 
-        {/* Error banner */}
         {error && (
           <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {error}
           </div>
         )}
 
-        {/* Add section panel */}
         {showAdd && (
           <AddSectionPanel
             pageId={pageId}
@@ -910,7 +920,7 @@ export default function PageBuilderClient({
           />
         )}
 
-        {/* Main layout: section list + inspector sidebar */}
+        {/* Main layout: section list + optional inspector sidebar */}
         <div className={`flex gap-4 ${hasInspector ? "items-start" : ""}`}>
           {/* Section list */}
           <div className={`min-w-0 flex-1 ${hasInspector ? "max-w-[60%]" : ""}`}>
@@ -928,11 +938,7 @@ export default function PageBuilderClient({
                   description="Füge die erste Sektion hinzu, um diese Seite mit Blöcken zu befüllen."
                   action={
                     !showAdd ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowAdd(true)}
-                        className="fca-button-primary"
-                      >
+                      <button type="button" onClick={() => setShowAdd(true)} className="fca-button-primary">
                         <Plus className="h-4 w-4" />
                         Erste Sektion hinzufügen
                       </button>
@@ -955,43 +961,26 @@ export default function PageBuilderClient({
                           onDragOver={(e) => handleDragOver(e, section.id)}
                           onDrop={(e) => handleDrop(e, section.id)}
                           onDragEnd={handleDragEnd}
-                          className={`px-4 py-3 transition-colors cursor-pointer ${
+                          onClick={() => isSelected ? closeInspector() : selectSection(section)}
+                          className={`cursor-pointer px-4 py-3 transition-colors ${
                             isDragging ? "opacity-40" : ""
                           } ${isDragTarget && !isDragging ? "bg-blue-50" : ""} ${
                             isSelected
                               ? "bg-orange-50 ring-1 ring-inset ring-[var(--brand-primary,#f97316)]"
                               : "hover:bg-[var(--surface-2)]"
                           }`}
-                          onClick={() => {
-                            if (isSelected) {
-                              closeInspector();
-                            } else {
-                              selectSection(section);
-                            }
-                          }}
                         >
-                          {/* Row: drag handle + info + actions */}
                           <div className="flex flex-wrap items-start justify-between gap-2">
-                            {/* Drag handle + info */}
                             <div className="flex min-w-0 flex-1 items-start gap-2">
-                              <div
-                                className="mt-1 shrink-0 cursor-grab text-[var(--muted)] transition hover:text-[var(--text-2)]"
-                                onClick={(e) => e.stopPropagation()}
-                              >
+                              <div className="mt-1 shrink-0 cursor-grab text-[var(--muted)] transition hover:text-[var(--text-2)]" onClick={(e) => e.stopPropagation()}>
                                 <GripVertical className="h-4 w-4" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                                  <span className="w-5 shrink-0 text-right text-xs font-medium text-[var(--muted)]">
-                                    {idx + 1}.
-                                  </span>
-                                  <span className="truncate text-sm font-medium text-[var(--foreground)]">
-                                    {section.label}
-                                  </span>
+                                  <span className="w-5 shrink-0 text-right text-xs font-medium text-[var(--muted)]">{idx + 1}.</span>
+                                  <span className="truncate text-sm font-medium text-[var(--foreground)]">{section.label}</span>
                                   {isSelected && (
-                                    <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">
-                                      Ausgewählt
-                                    </span>
+                                    <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">Ausgewählt</span>
                                   )}
                                   <EnabledBadge isEnabled={section.isEnabled} />
                                   <PublishBadge status={section.publishStatus} />
@@ -1009,99 +998,31 @@ export default function PageBuilderClient({
                               </div>
                             </div>
 
-                            {/* Actions */}
-                            <div
-                              className="flex shrink-0 items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {/* Collapse row */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleCollapse(section.id)}
-                                className="sce-icon-button"
-                                title={isCollapsed ? "Aufklappen" : "Einklappen"}
-                              >
-                                <ChevronRight
-                                  className={`h-3.5 w-3.5 transition-transform ${
-                                    isCollapsed ? "" : "rotate-90"
-                                  }`}
-                                />
+                            <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <button type="button" onClick={() => handleToggleCollapse(section.id)} className="sce-icon-button" title={isCollapsed ? "Aufklappen" : "Einklappen"}>
+                                <ChevronRight className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "" : "rotate-90"}`} />
                               </button>
-                              {/* Inspector toggle */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    closeInspector();
-                                  } else {
-                                    selectSection(section);
-                                  }
-                                }}
-                                className={`sce-icon-button ${isSelected ? "text-orange-600" : ""}`}
-                                title={isSelected ? "Inspector schliessen" : "Inspector öffnen"}
-                              >
+                              <button type="button" onClick={() => isSelected ? closeInspector() : selectSection(section)} className={`sce-icon-button ${isSelected ? "text-orange-600" : ""}`} title={isSelected ? "Inspector schliessen" : "Inspector öffnen"}>
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
-                              {/* Move up */}
-                              <button
-                                type="button"
-                                onClick={() => handleMove(section.id, "up")}
-                                disabled={actionPending === section.id || idx === 0}
-                                className="sce-icon-button disabled:opacity-30"
-                                title="Nach oben"
-                              >
+                              <button type="button" onClick={() => handleMove(section.id, "up")} disabled={actionPending === section.id || idx === 0} className="sce-icon-button disabled:opacity-30" title="Nach oben">
                                 <ChevronUp className="h-3.5 w-3.5" />
                               </button>
-                              {/* Move down */}
-                              <button
-                                type="button"
-                                onClick={() => handleMove(section.id, "down")}
-                                disabled={
-                                  actionPending === section.id || idx === sections.length - 1
-                                }
-                                className="sce-icon-button disabled:opacity-30"
-                                title="Nach unten"
-                              >
+                              <button type="button" onClick={() => handleMove(section.id, "down")} disabled={actionPending === section.id || idx === sections.length - 1} className="sce-icon-button disabled:opacity-30" title="Nach unten">
                                 <ChevronDown className="h-3.5 w-3.5" />
                               </button>
-                              {/* Toggle enabled */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggle(section.id)}
-                                disabled={actionPending === section.id}
-                                className="sce-icon-button"
-                                title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
-                              >
-                                {section.isEnabled ? (
-                                  <EyeOff className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Eye className="h-3.5 w-3.5" />
-                                )}
+                              <button type="button" onClick={() => handleToggle(section.id)} disabled={actionPending === section.id} className="sce-icon-button" title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}>
+                                {section.isEnabled ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                               </button>
-                              {/* Duplicate */}
-                              <button
-                                type="button"
-                                onClick={() => handleDuplicate(section.id)}
-                                disabled={actionPending === section.id}
-                                className="sce-icon-button"
-                                title="Duplizieren"
-                              >
+                              <button type="button" onClick={() => handleDuplicate(section.id)} disabled={actionPending === section.id} className="sce-icon-button" title="Duplizieren">
                                 <Copy className="h-3.5 w-3.5" />
                               </button>
-                              {/* Delete */}
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(section.id)}
-                                disabled={actionPending === section.id}
-                                className="sce-icon-button text-rose-500 hover:text-rose-700"
-                                title="Löschen"
-                              >
+                              <button type="button" onClick={() => handleDelete(section.id)} disabled={actionPending === section.id} className="sce-icon-button text-rose-500 hover:text-rose-700" title="Löschen">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           </div>
 
-                          {/* Expandable row info (non-inspector) */}
                           {!isCollapsed && !isSelected && (
                             <div className="ml-7 mt-2 text-[11px] text-[var(--muted)]">
                               {getBlockDefinition(section.type)?.description ?? ""}
@@ -1119,15 +1040,17 @@ export default function PageBuilderClient({
           {/* Inspector sidebar */}
           {hasInspector && inspectorSection && (
             <div className="w-[40%] min-w-[320px] flex-shrink-0">
-              <div className="sticky top-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden"
-                style={{ maxHeight: "calc(100vh - 8rem)" }}>
+              <div
+                className="sticky top-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-sm"
+                style={{ maxHeight: "calc(100vh - 8rem)" }}
+              >
                 <InspectorPanel
                   section={inspectorSection}
-                  pageId={pageId}
+                  workflowCallbacks={workflowCallbacks}
+                  revisionCallbacks={revisionCallbacks}
                   onConfigChange={handleInspectorConfigChange}
                   onLabelChange={handleInspectorLabelChange}
-                  onWorkflowUpdate={handleWorkflowUpdate}
-                  onRevisionRestore={handleRevisionRestore}
+                  onSectionUpdate={handleSectionUpdate}
                   saveState={saveState}
                   lastSaved={lastSaved}
                   onClose={closeInspector}
@@ -1150,8 +1073,8 @@ export default function PageBuilderClient({
           <p className="text-xs text-[var(--muted)]">
             <strong className="text-[var(--text-2)]">Publishing:</strong>{" "}
             Sektionen sind öffentlich sichtbar wenn die übergeordnete Seite{" "}
-            <strong>veröffentlicht</strong> ist und die Sektion <strong>aktiv</strong> und{" "}
-            <strong>veröffentlicht</strong> ist.
+            <strong>veröffentlicht</strong> ist und die Sektion{" "}
+            <strong>aktiv</strong> und <strong>veröffentlicht</strong> ist.
           </p>
         </div>
       </div>
