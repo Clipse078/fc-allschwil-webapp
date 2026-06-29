@@ -57,7 +57,10 @@ import {
   Save,
   LayoutPanelLeft,
   Layers,
+  Undo2,
+  Redo2,
 } from "lucide-react";
+import { useEditorHistory } from "@/lib/cms/use-editor-history";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
 import type { PageSectionAdminItem } from "@/lib/page-sections/admin-queries";
@@ -216,9 +219,29 @@ type ConfigEditorProps = {
   onCancel: () => void;
   onChanged?: () => void;
   autoSaveRef?: React.MutableRefObject<(() => void) | null>;
+  undoRef?: React.MutableRefObject<(() => void) | null>;
+  redoRef?: React.MutableRefObject<(() => void) | null>;
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
 };
 
-function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: ConfigEditorProps) {
+/** Snapshot of all editable state inside ConfigEditor — used for undo/redo. */
+type ConfigSnapshot = {
+  label: string;
+  values: Record<string, string>;
+  premiumConfig: Record<string, unknown>;
+  genericLayout: SectionLayout;
+};
+
+function ConfigEditor({
+  section,
+  onSave,
+  onCancel,
+  onChanged,
+  autoSaveRef,
+  undoRef,
+  redoRef,
+  onHistoryChange,
+}: ConfigEditorProps) {
   const def = getBlockDefinition(section.type);
   // Exclude _layout from the generic key-value editor — it is handled by LayoutConfigPanel
   const configKeys = useMemo(
@@ -228,28 +251,98 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
   const isPremium = PREMIUM_BLOCK_TYPES.has(section.type);
   const supportsLayout = def?.supportsLayout ?? false;
 
-  const [label, setLabel] = useState(section.label);
+  // -------------------------------------------------------------------------
+  // Editor history — all editable state is tracked as a single immutable
+  // snapshot so that undo/redo can restore the full config in one step.
+  // -------------------------------------------------------------------------
 
-  // Generic block state (string values per configKey, excluding _layout)
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    if (isPremium) return {};
-    const init: Record<string, string> = {};
-    for (const k of configKeys) {
-      const v = section.config[k];
-      init[k] = v !== undefined && v !== null ? String(v) : "";
+  const history = useEditorHistory<ConfigSnapshot>(() => ({
+    label: section.label,
+    values: (() => {
+      if (isPremium) return {};
+      const init: Record<string, string> = {};
+      for (const k of configKeys) {
+        const v = section.config[k];
+        init[k] = v !== undefined && v !== null ? String(v) : "";
+      }
+      return init;
+    })(),
+    premiumConfig: isPremium ? { ...section.config } : {},
+    genericLayout: (section.config._layout as SectionLayout | undefined) ?? {},
+  }));
+
+  const { present: snapshot, canUndo, canRedo, push, undo, redo } = history;
+
+  // Destructure for convenience
+  const { label, values, premiumConfig, genericLayout } = snapshot;
+
+  // Notify parent whenever undo/redo availability changes
+  useEffect(() => {
+    onHistoryChange?.(canUndo, canRedo);
+  }, [canUndo, canRedo, onHistoryChange]);
+
+  // Expose undo trigger to parent toolbar / keyboard handler
+  useEffect(() => {
+    if (undoRef) {
+      undoRef.current = canUndo
+        ? () => { undo(); onChanged?.(); }
+        : null;
     }
-    return init;
-  });
+    return () => { if (undoRef) undoRef.current = null; };
+  }, [undoRef, canUndo, undo, onChanged]);
 
-  // Generic block layout state (shared _layout object)
-  const [genericLayout, setGenericLayout] = useState<SectionLayout>(
-    () => (section.config._layout as SectionLayout | undefined) ?? {},
-  );
+  // Expose redo trigger to parent toolbar / keyboard handler
+  useEffect(() => {
+    if (redoRef) {
+      redoRef.current = canRedo
+        ? () => { redo(); onChanged?.(); }
+        : null;
+    }
+    return () => { if (redoRef) redoRef.current = null; };
+  }, [redoRef, canRedo, redo, onChanged]);
 
-  // Premium block state (full config object)
-  const [premiumConfig, setPremiumConfig] = useState<Record<string, unknown>>(() =>
-    isPremium ? { ...section.config } : {},
-  );
+  // -------------------------------------------------------------------------
+  // Change handlers — each mutation pushes a snapshot onto history
+  // -------------------------------------------------------------------------
+
+  function handleLabelChange(v: string) {
+    push({ ...snapshot, label: v });
+    onChanged?.();
+  }
+
+  function handleValuesChange(k: string, v: string) {
+    push({ ...snapshot, values: { ...values, [k]: v } });
+    onChanged?.();
+  }
+
+  function handlePremiumConfigChange(config: Record<string, unknown>) {
+    push({ ...snapshot, premiumConfig: config });
+    onChanged?.();
+  }
+
+  function handleGenericLayoutChange(layout: SectionLayout) {
+    push({ ...snapshot, genericLayout: layout });
+    onChanged?.();
+  }
+
+  // -------------------------------------------------------------------------
+  // Build config from current snapshot
+  // -------------------------------------------------------------------------
+
+  const buildConfig = useCallback((): Record<string, unknown> => {
+    if (isPremium) return snapshot.premiumConfig;
+    const config: Record<string, unknown> = {};
+    for (const k of configKeys) {
+      const raw = snapshot.values[k];
+      if (raw === "" || raw === undefined) continue;
+      const num = Number(raw);
+      config[k] = !isNaN(num) && raw.trim() !== "" ? num : raw;
+    }
+    if (supportsLayout) {
+      config._layout = snapshot.genericLayout;
+    }
+    return config;
+  }, [isPremium, snapshot, configKeys, supportsLayout]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -257,21 +350,6 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
   const [showLivePreview, setShowLivePreview] = useState(false);
   // Layout panel visibility for generic blocks
   const [showLayoutPanel, setShowLayoutPanel] = useState(false);
-
-  const buildConfig = useCallback((): Record<string, unknown> => {
-    if (isPremium) return premiumConfig;
-    const config: Record<string, unknown> = {};
-    for (const k of configKeys) {
-      const raw = values[k];
-      if (raw === "" || raw === undefined) continue;
-      const num = Number(raw);
-      config[k] = !isNaN(num) && raw.trim() !== "" ? num : raw;
-    }
-    if (supportsLayout) {
-      config._layout = genericLayout;
-    }
-    return config;
-  }, [isPremium, premiumConfig, configKeys, values, supportsLayout, genericLayout]);
 
   async function handleSave() {
     const trimmed = label.trim();
@@ -287,7 +365,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
     }
   }
 
-  // Expose trigger for autosave
+  // Expose trigger for autosave — always reads the latest snapshot via buildConfig
   useEffect(() => {
     if (autoSaveRef) {
       autoSaveRef.current = () => {
@@ -312,7 +390,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
           <input
             className="fca-input w-full"
             value={label}
-            onChange={(e) => { setLabel(e.target.value); onChanged?.(); }}
+            onChange={(e) => handleLabelChange(e.target.value)}
             placeholder="Sektionsbezeichnung"
           />
         </div>
@@ -339,10 +417,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
             </div>
             <SplitContentCardsConfigForm
               config={premiumConfig}
-              onChange={(updated) => {
-                setPremiumConfig(updated);
-                onChanged?.();
-              }}
+              onChange={handlePremiumConfigChange}
             />
             {showLivePreview && (
               <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
@@ -371,7 +446,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
                 <input
                   className="fca-input flex-1"
                   value={values[k] ?? ""}
-                  onChange={(e) => { setValues((prev) => ({ ...prev, [k]: e.target.value })); onChanged?.(); }}
+                  onChange={(e) => handleValuesChange(k, e.target.value)}
                   placeholder={`${k}…`}
                 />
               </div>
@@ -407,10 +482,7 @@ function ConfigEditor({ section, onSave, onCancel, onChanged, autoSaveRef }: Con
               <div className="border-t border-[var(--border)] p-3">
                 <LayoutConfigPanel
                   layout={genericLayout}
-                  onChange={(layout) => {
-                    setGenericLayout(layout);
-                    onChanged?.();
-                  }}
+                  onChange={handleGenericLayoutChange}
                 />
               </div>
             )}
@@ -986,6 +1058,56 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveFnRef = useRef<(() => void) | null>(null);
 
+  // -------------------------------------------------------------------------
+  // Editor history — undo/redo session state (not persisted)
+  // -------------------------------------------------------------------------
+
+  // Availability flags — updated by ConfigEditor via onHistoryChange
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Trigger refs — ConfigEditor writes its undo/redo functions here
+  const undoRef = useRef<(() => void) | null>(null);
+  const redoRef = useRef<(() => void) | null>(null);
+
+  // Reset undo/redo availability when the active editor changes
+  useEffect(() => {
+    setCanUndo(false);
+    setCanRedo(false);
+    undoRef.current = null;
+    redoRef.current = null;
+  }, [editingId]);
+
+  // Stable callback passed to ConfigEditor
+  const handleHistoryChange = useCallback((u: boolean, r: boolean) => {
+    setCanUndo(u);
+    setCanRedo(r);
+  }, []);
+
+  // Keyboard shortcuts — Ctrl+Z / Cmd+Z and Ctrl+Shift+Z / Cmd+Shift+Z.
+  // Intentionally skipped when a text input or contentEditable element is
+  // focused so the browser / TipTap can handle native text undo.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isCtrl = e.ctrlKey || e.metaKey;
+      if (!isCtrl) return;
+      if (e.key !== "z" && e.key !== "Z") return;
+
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || el?.isContentEditable) return;
+
+      e.preventDefault();
+      if (e.shiftKey) {
+        redoRef.current?.();
+      } else {
+        undoRef.current?.();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Drag-and-drop state
   const [dragSrcId, setDragSrcId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -1219,6 +1341,28 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             <SaveIndicator state={saveState} lastSaved={lastSaved} />
           </div>
           <div className="flex items-center gap-2">
+            {/* Undo / Redo — only active while a section editor is open */}
+            <button
+              type="button"
+              onClick={() => undoRef.current?.()}
+              disabled={!canUndo}
+              className="fca-button-secondary px-2.5 disabled:opacity-40"
+              title="Rückgängig (Ctrl+Z)"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">Rückgängig</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => redoRef.current?.()}
+              disabled={!canRedo}
+              className="fca-button-secondary px-2.5 disabled:opacity-40"
+              title="Wiederholen (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">Wiederholen</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowTemplates(true)}
@@ -1464,6 +1608,9 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                               onCancel={() => setEditingId(null)}
                               onChanged={triggerAutosave}
                               autoSaveRef={autosaveFnRef}
+                              undoRef={undoRef}
+                              redoRef={redoRef}
+                              onHistoryChange={handleHistoryChange}
                             />
                           )}
                           {workflowId === section.id && (
