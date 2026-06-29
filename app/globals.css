@@ -1091,3 +1091,67 @@ button {
     --sidebar-width: 0px;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CMS V3 INSPECTOR — Accordion animation using CSS grid technique
+   Smooth expand/collapse without JavaScript height measurement.
+───────────────────────────────────────────────────────────────────────── */
+
+/* Accordion grid-row animation container */
+.inspector-accordion-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 180ms ease;
+  overflow: hidden;
+}
+
+.inspector-accordion-body.is-open {
+  grid-template-rows: 1fr;
+}
+
+/* Inner wrapper — overflow:hidden required for the 0fr trick */
+.inspector-accordion-body > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Inspector panel — compact typography for German labels */
+.inspector-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--foreground);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.inspector-section-heading {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Card hover state for inspector list items */
+.inspector-card-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.inspector-card-item:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Selected section highlight in inspector list */
+.inspector-section-selected {
+  border-color: var(--brand-primary, #f97316) !important;
+  background: rgba(249, 115, 22, 0.04) !important;
+}
+

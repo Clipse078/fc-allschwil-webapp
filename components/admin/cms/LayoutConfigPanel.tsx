@@ -54,6 +54,19 @@ export type LayoutPanelFeatures = {
   paddingX?: boolean;
 };
 
+/**
+ * Restrict which groups of controls to show. Useful when embedding
+ * LayoutConfigPanel inside individual Inspector accordion sections.
+ * When omitted, all groups are visible.
+ *
+ * 'size'       → Inhaltsbreite + Abstand oben/unten
+ * 'style'      → Farbschema + Textausrichtung
+ * 'background' → Hintergrundtyp + background sub-controls
+ * 'columns'    → Spalten (requires features.columns)
+ * 'responsive' → Responsiv rules (requires features.responsive)
+ */
+export type LayoutPanelSection = "size" | "style" | "background" | "columns" | "responsive";
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -62,6 +75,8 @@ type Props = {
   layout: SectionLayout | undefined;
   onChange: (layout: SectionLayout) => void;
   features?: LayoutPanelFeatures;
+  /** When provided, only the listed section groups are rendered. */
+  onlySections?: LayoutPanelSection[];
 };
 
 // ---------------------------------------------------------------------------
@@ -591,7 +606,7 @@ function ResponsiveSection({
 // Main LayoutConfigPanel
 // ---------------------------------------------------------------------------
 
-export default function LayoutConfigPanel({ layout, onChange, features = {} }: Props) {
+export default function LayoutConfigPanel({ layout, onChange, features = {}, onlySections }: Props) {
   const l: SectionLayout = layout ?? {};
 
   function patch(updates: Partial<SectionLayout>) {
@@ -607,31 +622,44 @@ export default function LayoutConfigPanel({ layout, onChange, features = {} }: P
   const background = l.background ?? DEFAULT_SECTION_LAYOUT.background!;
   const responsive: SectionResponsive = l.responsive ?? DEFAULT_SECTION_LAYOUT.responsive ?? {};
 
+  const show = (s: LayoutPanelSection) =>
+    !onlySections || onlySections.includes(s);
+
   return (
     <div className="space-y-5">
-      <WidthSection value={width} onChange={(v) => patch({ width: v })} />
+      {show("size") && (
+        <WidthSection value={width} onChange={(v) => patch({ width: v })} />
+      )}
 
-      <SpacingSection
-        spacingTop={spacingTop}
-        spacingBottom={spacingBottom}
-        onTopChange={(v) => patch({ spacingTop: v })}
-        onBottomChange={(v) => patch({ spacingBottom: v })}
-      />
+      {show("size") && (
+        <SpacingSection
+          spacingTop={spacingTop}
+          spacingBottom={spacingBottom}
+          onTopChange={(v) => patch({ spacingTop: v })}
+          onBottomChange={(v) => patch({ spacingBottom: v })}
+        />
+      )}
 
-      <ThemeSection value={theme} onChange={(v) => patch({ theme: v })} />
+      {show("style") && (
+        <ThemeSection value={theme} onChange={(v) => patch({ theme: v })} />
+      )}
 
-      <AlignmentSection value={hAlign} onChange={(v) => patch({ hAlign: v })} />
+      {show("style") && (
+        <AlignmentSection value={hAlign} onChange={(v) => patch({ hAlign: v })} />
+      )}
 
-      {features.columns && (
+      {show("columns") && features.columns && (
         <ColumnsSection value={columns} onChange={(v) => patch({ columns: v })} />
       )}
 
-      <BackgroundSection
-        value={background}
-        onChange={(bg) => patch({ background: bg })}
-      />
+      {show("background") && (
+        <BackgroundSection
+          value={background}
+          onChange={(bg) => patch({ background: bg })}
+        />
+      )}
 
-      {features.responsive && (
+      {show("responsive") && features.responsive && (
         <ResponsiveSection
           value={responsive}
           onChange={(r) => patch({ responsive: r })}
