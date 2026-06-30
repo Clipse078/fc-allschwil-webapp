@@ -6,8 +6,8 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits, getArchivedOrgUnits } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import OrgUnitSearchableList from "@/components/admin/org/OrgUnitSearchableList";
+import { AppPage, AppPageHeader } from "@/components/ui/layout";
 
 // Org Builder Foundation v1: view=archived param switches to the archived units view.
 // Slice 11.2b: tenant resolved from session-carried tenantId.
@@ -29,8 +29,13 @@ export default async function OrgUnitsPage({ searchParams }: PageProps) {
   ]);
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
+    <AppPage>
+      <AppPageHeader
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Organisation" },
+          { label: "Organisationseinheiten" },
+        ]}
         eyebrow="Organisation"
         title="Organisation Builder"
         description="Hierarchische Organisationsstruktur – Grundlage für Sichtbarkeit, Berechtigungen und Kommunikation."
@@ -40,7 +45,7 @@ export default async function OrgUnitsPage({ searchParams }: PageProps) {
               <Plus className="h-4 w-4" />
               Neue Einheit
             </Link>
-          ) : null
+          ) : undefined
         }
       />
 
@@ -55,6 +60,6 @@ export default async function OrgUnitsPage({ searchParams }: PageProps) {
         showArchived={showArchived}
         canManage={canManage}
       />
-    </div>
+    </AppPage>
   );
 }
