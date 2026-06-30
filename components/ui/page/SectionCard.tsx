@@ -63,7 +63,7 @@ export function SectionCard({
         accent && "border-l-2",
         className,
       )}
-      style={accent ? { borderLeftColor: "var(--tenant-primary)" } : undefined}
+      style={accent ? { borderLeftColor: "var(--sce-primary)" } : undefined}
     >
       {hasHeader && (
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">

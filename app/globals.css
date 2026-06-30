@@ -112,6 +112,124 @@
   --tenant-primary:   var(--blue);
   --tenant-secondary: var(--red);
   --tenant-accent:    color-mix(in srgb, var(--tenant-primary) 10%, white);
+
+  /* ── SportClubEvo Design System — Primary Color Namespace ────────────────
+   * These tokens are FIXED to the SCE platform palette and are NOT
+   * overridden by tenant branding. Use --sce-* tokens inside the internal
+   * WebApp shell. Use --tenant-* tokens only for tenant-facing surfaces.
+   * ─────────────────────────────────────────────────────────────────────── */
+  --sce-primary:         var(--blue);
+  --sce-primary-hover:   var(--blue-hover);
+  --sce-primary-light:   var(--blue-light);
+  --sce-secondary:       var(--red);
+  --sce-secondary-hover: var(--red-dark);
+  --sce-secondary-light: var(--red-light);
+  --sce-accent:          color-mix(in srgb, var(--sce-primary) 10%, white);
+
+  /* ── SCE Neutral Aliases ──────────────────────────────────────────────── */
+  --sce-bg:            var(--background);
+  --sce-surface:       var(--surface);
+  --sce-surface-2:     var(--surface-2);
+  --sce-surface-3:     var(--surface-3);
+  --sce-foreground:    var(--foreground);
+  --sce-text-2:        var(--text-2);
+  --sce-muted:         var(--muted);
+  --sce-border:        var(--border);
+  --sce-border-strong: var(--border-strong);
+  --sce-card:          var(--card);
+  --sce-card-hover:    var(--card-hover);
+
+  /* ── SCE Semantic Tokens — Success ───────────────────────────────────── */
+  --sce-success:        #15803d;
+  --sce-success-hover:  #166534;
+  --sce-success-light:  #f0fdf4;
+  --sce-success-border: #bbf7d0;
+
+  /* ── SCE Semantic Tokens — Warning ───────────────────────────────────── */
+  --sce-warning:        #b45309;
+  --sce-warning-hover:  #92400e;
+  --sce-warning-light:  #fffbeb;
+  --sce-warning-border: #fde68a;
+
+  /* ── SCE Semantic Tokens — Danger ────────────────────────────────────── */
+  --sce-danger:         #dc2626;
+  --sce-danger-hover:   #b91c1c;
+  --sce-danger-light:   #fef2f2;
+  --sce-danger-border:  #fecaca;
+
+  /* ── SCE Semantic Tokens — Info ──────────────────────────────────────── */
+  --sce-info:           #2563eb;
+  --sce-info-hover:     #1d4ed8;
+  --sce-info-light:     #eff6ff;
+  --sce-info-border:    #bfdbfe;
+
+  /* ── SCE Typography Tokens ───────────────────────────────────────────── */
+  /* Display XL — Hero headers, landing sections */
+  --sce-fs-display-xl:  clamp(2.5rem, 2rem + 2vw, 3.5rem);
+  --sce-fw-display-xl:  700;
+  --sce-lh-display-xl:  1.05;
+  --sce-ls-display-xl:  -0.025em;
+
+  /* Display — Major section headers */
+  --sce-fs-display:     clamp(2rem, 1.5rem + 1.5vw, 2.75rem);
+  --sce-fw-display:     700;
+  --sce-lh-display:     1.1;
+  --sce-ls-display:     -0.02em;
+
+  /* Page Title — Page-level heading in the app shell */
+  --sce-fs-page-title:  1.25rem;
+  --sce-fw-page-title:  700;
+  --sce-lh-page-title:  1.2;
+  --sce-ls-page-title:  -0.01em;
+
+  /* Section Title — Named sections within a page */
+  --sce-fs-section-title:  1rem;
+  --sce-fw-section-title:  600;
+  --sce-lh-section-title:  1.3;
+  --sce-ls-section-title:  -0.005em;
+
+  /* Card Title — Heading inside a card or panel */
+  --sce-fs-card-title:  0.9375rem;
+  --sce-fw-card-title:  600;
+  --sce-lh-card-title:  1.3;
+
+  /* Subtitle — Supporting label below a title */
+  --sce-fs-subtitle:    0.875rem;
+  --sce-fw-subtitle:    500;
+  --sce-lh-subtitle:    1.4;
+
+  /* Body — Default prose text */
+  --sce-fs-body:        0.875rem;
+  --sce-fw-body:        400;
+  --sce-lh-body:        1.5;
+
+  /* Body Small — Compact body copy */
+  --sce-fs-body-sm:     0.8125rem;
+  --sce-fw-body-sm:     400;
+  --sce-lh-body-sm:     1.5;
+
+  /* Caption — Auxiliary info, timestamps */
+  --sce-fs-caption:     0.75rem;
+  --sce-fw-caption:     400;
+  --sce-lh-caption:     1.4;
+
+  /* Micro — Eyebrows, badges, tiny labels */
+  --sce-fs-micro:       0.6875rem;
+  --sce-fw-micro:       500;
+  --sce-lh-micro:       1.3;
+  --sce-ls-micro:       0.05em;
+
+  /* ── SCE Spacing Aliases ─────────────────────────────────────────────── */
+  --sce-sp-1:  var(--space-1);
+  --sce-sp-2:  var(--space-2);
+  --sce-sp-3:  var(--space-3);
+  --sce-sp-4:  var(--space-4);
+  --sce-sp-5:  var(--space-5);
+  --sce-sp-6:  var(--space-6);
+  --sce-sp-8:  var(--space-8);
+  --sce-sp-10: var(--space-10);
+  --sce-sp-12: var(--space-12);
+  --sce-sp-16: var(--space-16);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -429,21 +547,21 @@ button {
 }
 
 .fca-status-box-success {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #15803d;
+  border-color: var(--sce-success-border);
+  background: var(--sce-success-light);
+  color: var(--sce-success);
 }
 
 .fca-status-box-error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #dc2626;
+  border-color: var(--sce-danger-border);
+  background: var(--sce-danger-light);
+  color: var(--sce-danger);
 }
 
 .fca-status-box-warn {
-  border-color: #fde68a;
-  background: #fffbeb;
-  color: #b45309;
+  border-color: var(--sce-warning-border);
+  background: var(--sce-warning-light);
+  color: var(--sce-warning);
 }
 
 .fca-status-box-muted {
