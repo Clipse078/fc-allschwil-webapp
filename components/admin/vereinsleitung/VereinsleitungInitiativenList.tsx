@@ -97,12 +97,18 @@ export default function VereinsleitungInitiativenList({
   return (
     <div className="space-y-4">
       {initiatives.map((initiative) => (
-        <Link
+        <div
           key={initiative.slug}
-          href={`/vereinsleitung/initiativen/${initiative.slug}`}
-          className="block rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
+          className="relative rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
         >
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          {/* Full-card navigable overlay — covers the card without nesting <a> tags */}
+          <Link
+            href={`/vereinsleitung/initiativen/${initiative.slug}`}
+            className="absolute inset-0 rounded-[26px]"
+            aria-label={initiative.title}
+          />
+
+          <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-[1.05rem] font-semibold text-slate-900">
@@ -138,7 +144,7 @@ export default function VereinsleitungInitiativenList({
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <div className="relative z-10 flex shrink-0 flex-col items-end gap-1.5">
               <div className="flex items-center gap-1.5">
                 <ReviewStageBadge stage={initiative.reviewStage} size="sm" />
                 <VisibilityScopeBadge scope={initiative.visibilityScope} />
@@ -146,7 +152,6 @@ export default function VereinsleitungInitiativenList({
               <div className="flex items-center gap-2">
                 <Link
                   href={`/vereinsleitung/initiativen/${initiative.slug}/edit`}
-                  onClick={(e) => e.stopPropagation()}
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-700"
                 >
                   <Edit className="h-3.5 w-3.5" />
@@ -161,14 +166,14 @@ export default function VereinsleitungInitiativenList({
           </div>
 
           {initiative.progress !== null ? (
-            <div className="mt-4 h-1.5 rounded-full bg-slate-100">
+            <div className="relative mt-4 h-1.5 rounded-full bg-slate-100">
               <div
                 className="h-1.5 rounded-full bg-[#0b4aa2]"
                 style={{ width: `${Math.min(100, initiative.progress)}%` }}
               />
             </div>
           ) : null}
-        </Link>
+        </div>
       ))}
     </div>
   );

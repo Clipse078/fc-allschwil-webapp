@@ -63,8 +63,14 @@ export type NewsArticleAdminListItem = {
   scheduledAt: Date | null;
   authorName: string | null;
   authorPersonId: string | null;
-  channels: unknown;
-  tags: unknown;
+  /**
+   * Sanitised string array (or null). Raw Prisma Json? may return non-plain
+   * objects in certain adapter configurations; coerced here to guarantee
+   * RSC-boundary serializability.
+   */
+  channels: string[] | null;
+  /** Same sanitization contract as channels. */
+  tags: string[] | null;
   heroMediaId: string | null;
   reviewNotes: string | null;
   createdAt: Date;
@@ -85,6 +91,50 @@ export type NewsArticleAdminDetail = NewsArticleAdminListItem & {
   additionalMedia: NewsArticleMediaItem[];
 };
 
+// ── DTO for RSC → Client boundary ────────────────────────────────────────────
+
+/**
+ * Plain-object DTO safe to pass across the React Server Component → Client
+ * Component boundary. Every field is a primitive, plain object, array, or null.
+ *
+ * Dates are serialised to ISO 8601 strings because Next.js RSC converts Date
+ * instances to strings during flight serialization; receiving them as strings
+ * avoids any hydration ambiguity.
+ *
+ * Use toNewsArticleFormDto() to build this from a NewsArticleAdminDetail.
+ */
+export type NewsArticleFormDto = Omit<
+  NewsArticleAdminDetail,
+  "publishedAt" | "scheduledAt" | "createdAt" | "updatedAt"
+> & {
+  publishedAt: string | null;
+  scheduledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * Converts a NewsArticleAdminDetail (raw Prisma result) to a plain-object DTO
+ * safe for RSC → Client Component prop transfer.
+ *
+ * Guarantees:
+ *   - channels / tags: string[] | null (never Prisma.JsonNull or other non-plain)
+ *   - contentJson: RichTextValue | null (already sanitised by sanitizeContentJson)
+ *   - Dates: ISO 8601 strings (null preserved)
+ *   - All other fields: unchanged (already plain)
+ */
+export function toNewsArticleFormDto(article: NewsArticleAdminDetail): NewsArticleFormDto {
+  return {
+    ...article,
+    channels: article.channels,   // already string[] | null after sanitization
+    tags: article.tags,            // already string[] | null after sanitization
+    publishedAt: article.publishedAt?.toISOString() ?? null,
+    scheduledAt: article.scheduledAt?.toISOString() ?? null,
+    createdAt: article.createdAt.toISOString(),
+    updatedAt: article.updatedAt.toISOString(),
+  };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -102,6 +152,38 @@ export type NewsArticleAdminDetail = NewsArticleAdminListItem & {
  */
 function sanitizeContentJson(raw: unknown): RichTextValue | null {
   return isRichTextValue(raw) ? (raw as RichTextValue) : null;
+}
+
+/**
+ * Coerces the raw Prisma Json? field value for string-array columns (channels,
+ * tags) to string[] | null.
+ *
+ * Applies the same RSC-boundary defensive contract as sanitizeContentJson:
+ * any non-array or non-serialisable Prisma representation is converted to null.
+ */
+function sanitizeStringArray(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const result = raw.filter((v): v is string => typeof v === "string");
+  return result.length > 0 ? result : null;
+}
+
+/**
+ * Applies all RSC-boundary sanitizations to a raw Prisma NewsArticle row
+ * that has been selected with adminDetailSelect.
+ *
+ * Centralises the sanitization contract so each query function calls one
+ * helper rather than duplicating field-by-field transformations.
+ */
+function sanitizeDetailRow(
+  row: unknown,
+): NewsArticleAdminDetail {
+  const r = row as Record<string, unknown>;
+  return {
+    ...(row as NewsArticleAdminDetail),
+    channels: sanitizeStringArray(r.channels),
+    tags: sanitizeStringArray(r.tags),
+    contentJson: sanitizeContentJson(r.contentJson),
+  };
 }
 
 // ── Select shapes ─────────────────────────────────────────────────────────────
@@ -197,7 +279,11 @@ export async function listNewsArticlesAdmin(
     select: adminListSelect,
   });
 
-  return rows as unknown as NewsArticleAdminListItem[];
+  return rows.map((row) => ({
+    ...(row as unknown as NewsArticleAdminListItem),
+    channels: sanitizeStringArray((row as Record<string, unknown>).channels),
+    tags: sanitizeStringArray((row as Record<string, unknown>).tags),
+  }));
 }
 
 export async function countNewsArticlesAdmin(
@@ -220,10 +306,7 @@ export async function getNewsArticleAdminById(
     select: adminDetailSelect,
   });
   if (!row) return null;
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 export async function getNewsArticleAdminBySlug(
@@ -235,10 +318,7 @@ export async function getNewsArticleAdminBySlug(
     select: adminDetailSelect,
   });
   if (!row) return null;
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 // ── Slug availability ─────────────────────────────────────────────────────────
@@ -300,10 +380,7 @@ export async function createNewsArticle(
   };
 
   const row = await prisma.newsArticle.create({ data, select: adminDetailSelect });
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 // ── Update ────────────────────────────────────────────────────────────────────
@@ -384,10 +461,7 @@ export async function updateNewsArticle(
     data,
     select: adminDetailSelect,
   });
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 // ── Publish / Unpublish / Archive ─────────────────────────────────────────────
@@ -417,10 +491,7 @@ export async function publishNewsArticle(
     },
     select: adminDetailSelect,
   });
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 export async function unpublishNewsArticle(
@@ -438,10 +509,7 @@ export async function unpublishNewsArticle(
     data: { status: "DRAFT" },
     select: adminDetailSelect,
   });
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 export async function archiveNewsArticle(
@@ -475,10 +543,7 @@ export async function submitNewsArticleForReview(
     data: { status: "IN_REVIEW", reviewNotes: null },
     select: adminDetailSelect,
   });
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 export async function approveNewsArticle(
@@ -504,10 +569,7 @@ export async function approveNewsArticle(
     },
     select: adminDetailSelect,
   });
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 export async function rejectNewsArticle(
@@ -529,10 +591,7 @@ export async function rejectNewsArticle(
     },
     select: adminDetailSelect,
   });
-  return {
-    ...(row as unknown as NewsArticleAdminDetail),
-    contentJson: sanitizeContentJson(row.contentJson),
-  };
+  return sanitizeDetailRow(row);
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────

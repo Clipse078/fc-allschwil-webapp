@@ -18,7 +18,7 @@ import NewsArticleMediaGallery from "@/components/admin/news/NewsArticleMediaGal
 import NewsStatusBadge from "@/components/admin/news/NewsStatusBadge";
 import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
 import type {
-  NewsArticleAdminDetail,
+  NewsArticleFormDto,
   ArticleStatus,
   NewsArticleMediaItem,
 } from "@/lib/news/admin-queries";
@@ -42,8 +42,8 @@ type HeroMediaValue = {
 } | null;
 
 type NewsArticleFormProps = {
-  /** Existing article for edit mode. Undefined = create mode. */
-  article?: NewsArticleAdminDetail;
+  /** Existing article DTO for edit mode. Undefined = create mode. */
+  article?: NewsArticleFormDto;
   /**
    * Whether the tenant requires editorial review before publishing.
    * When true, editors submit for review instead of publishing directly.
@@ -55,9 +55,10 @@ type NewsArticleFormProps = {
 const labelClass =
   "block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] mb-1.5";
 
-function toLocalDatetimeValue(date: Date | null | undefined): string {
+function toLocalDatetimeValue(date: Date | string | null | undefined): string {
   if (!date) return "";
   const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
   // Format as YYYY-MM-DDTHH:MM for <input type="datetime-local">
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
@@ -467,7 +468,7 @@ export default function NewsArticleForm({
                     year: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
-                  }).format(new Date(article.scheduledAt))}
+                  }).format(new Date(article.scheduledAt as string))}
                 </p>
               )}
             </div>

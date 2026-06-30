@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantContextFromSession } from "@/lib/tenants/context";
-import { getNewsArticleAdminById } from "@/lib/news/admin-queries";
+import { getNewsArticleAdminById, toNewsArticleFormDto } from "@/lib/news/admin-queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import NewsArticleForm from "@/components/admin/news/NewsArticleForm";
 
@@ -28,6 +28,8 @@ export default async function NewsArticleEditPage({
   const article = await getNewsArticleAdminById(ctx.id, id);
   if (!article) notFound();
 
+  const articleDto = toNewsArticleFormDto(article);
+
   return (
     <div className="space-y-6">
       <Link
@@ -44,7 +46,7 @@ export default async function NewsArticleEditPage({
         description={`Slug: ${article.slug}`}
       />
 
-      <NewsArticleForm article={article} requiresReview={ctx.approvedDataOnly} />
+      <NewsArticleForm article={articleDto} requiresReview={ctx.approvedDataOnly} />
     </div>
   );
 }
