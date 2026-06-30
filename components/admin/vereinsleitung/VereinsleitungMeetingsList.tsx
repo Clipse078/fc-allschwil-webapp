@@ -1,6 +1,6 @@
 ﻿/**
  * DB-backed meetings list. Data is fetched server-side in meetings/page.tsx
- * and passed as props. When the result set is empty an empty-state is shown.
+ * and passed as props.
  *
  * VISIBILITY NOTE: The meetings array passed here is currently UNFILTERED —
  * every authenticated user sees every meeting. Once VisibilityScope is added
@@ -16,9 +16,10 @@
  */
 
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Edit, Plus, Users } from "lucide-react";
+import { CalendarDays, ChevronRight, Edit, Users } from "lucide-react";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import VisibilityScopeBadge from "@/components/admin/shared/VisibilityScopeBadge";
+import { Badge } from "@/components/ui";
 import type { ReviewWorkflowStage } from "@prisma/client";
 import type { VisibilityScopeValue } from "@/components/admin/shared/VisibilityScopeSelect";
 
@@ -40,6 +41,14 @@ const STATUS_LABELS: Record<MeetingListItemShape["status"], string> = {
   CANCELLED: "Abgesagt",
 };
 
+type StatusVariant = "default" | "success" | "danger";
+
+const STATUS_VARIANTS: Record<MeetingListItemShape["status"], StatusVariant> = {
+  PLANNED: "default",
+  COMPLETED: "success",
+  CANCELLED: "danger",
+};
+
 function formatSwissDate(date: Date) {
   return new Intl.DateTimeFormat("de-CH", {
     day: "2-digit",
@@ -56,67 +65,49 @@ type VereinsleitungMeetingsListProps = {
 export default function VereinsleitungMeetingsList({
   meetings,
 }: VereinsleitungMeetingsListProps) {
-  if (meetings.length === 0) {
-    return (
-      <div className="rounded-[28px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <CalendarDays className="mx-auto mb-4 h-10 w-10 text-slate-300" />
-        <h3 className="text-[1.05rem] font-semibold text-slate-900">
-          Keine zugänglichen Meetings
-        </h3>
-        <p className="mt-2 text-sm text-slate-500">
-          Noch keine Meetings erfasst oder keine für dich sichtbaren Einträge.
-        </p>
-        <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium text-slate-500">
-          <Plus className="h-3.5 w-3.5" />
-          POST /api/meetings
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {meetings.map((meeting) => (
         <div
           key={meeting.slug}
-          className="relative rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
+          className="relative rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
         >
           {/* Transparent overlay link — covers the whole card, sits below interactive children */}
           <Link
             href={`/vereinsleitung/meetings/${meeting.slug}`}
-            className="absolute inset-0 rounded-[26px]"
+            className="absolute inset-0 rounded-xl"
             aria-label={meeting.title}
           />
 
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <h3 className="text-[1.05rem] font-semibold text-slate-900">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">
                 {meeting.title}
               </h3>
 
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-500">
-                <span className="inline-flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-[var(--text-2)]">
+                <span className="inline-flex items-center gap-1.5">
                   <CalendarDays className="h-4 w-4" />
                   {formatSwissDate(meeting.meetingDate)}
                 </span>
 
                 {meeting.attendeeCount ? (
-                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5">
                     <Users className="h-4 w-4" />
                     {meeting.attendeeCount} Teilnehmer
                   </span>
                 ) : null}
 
                 {meeting.location ? (
-                  <span className="text-slate-400">{meeting.location}</span>
+                  <span className="text-[var(--muted)]">{meeting.location}</span>
                 ) : null}
               </div>
             </div>
 
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+              <Badge variant={STATUS_VARIANTS[meeting.status]} size="sm">
                 {STATUS_LABELS[meeting.status]}
-              </span>
+              </Badge>
               <div className="flex items-center gap-1.5">
                 <ReviewStageBadge stage={meeting.reviewStage} size="sm" />
                 <VisibilityScopeBadge scope={meeting.visibilityScope} />
@@ -124,12 +115,12 @@ export default function VereinsleitungMeetingsList({
               <div className="relative z-10 flex items-center gap-2">
                 <Link
                   href={`/vereinsleitung/meetings/${meeting.slug}/edit`}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-700"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--foreground)]"
                 >
                   <Edit className="h-3.5 w-3.5" />
                   Bearbeiten
                 </Link>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--blue)]">
                   Öffnen
                   <ChevronRight className="h-4 w-4" />
                 </span>

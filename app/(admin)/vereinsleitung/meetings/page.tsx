@@ -1,11 +1,12 @@
 ﻿import Link from "next/link";
-import { Plus } from "lucide-react";
+import { CalendarDays, Plus } from "lucide-react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getMeetings } from "@/lib/meetings/queries";
 import { getActorContext } from "@/lib/visibility/get-actor-context";
 import VereinsleitungMeetingsList from "@/components/admin/vereinsleitung/VereinsleitungMeetingsList";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageShell } from "@/components/ui/page";
+import { ListPagePattern } from "@/components/ui/patterns";
 
 export default async function VereinsleitungMeetingsPage() {
   const session = await auth();
@@ -15,22 +16,28 @@ export default async function VereinsleitungMeetingsPage() {
   const meetings = await getMeetings(actor);
 
   return (
-    <div className="space-y-6">
-      <AdminSectionHeader
+    <PageShell fullWidth>
+      <ListPagePattern
         eyebrow="Meetings"
         title="Meetings"
         description="Übersicht aller Sitzungen – absteigend vom neuesten zum ältesten Eintrag."
-        actions={
-          <Link
-            href="/vereinsleitung/meetings/new"
-            className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-          >
+        breadcrumbs={[
+          { label: "Vereinsleitung", href: "/vereinsleitung" },
+          { label: "Meetings" },
+        ]}
+        headerActions={
+          <Link href="/vereinsleitung/meetings/new" className="fca-button-primary">
             <Plus className="h-4 w-4" />
             Neues Meeting
           </Link>
         }
-      />
-      <VereinsleitungMeetingsList meetings={meetings} />
-    </div>
+        isEmpty={meetings.length === 0}
+        emptyIcon={<CalendarDays className="h-10 w-10" />}
+        emptyHeading="Keine zugänglichen Meetings"
+        emptyDescription="Noch keine Meetings erfasst oder keine für dich sichtbaren Einträge."
+      >
+        <VereinsleitungMeetingsList meetings={meetings} />
+      </ListPagePattern>
+    </PageShell>
   );
 }
