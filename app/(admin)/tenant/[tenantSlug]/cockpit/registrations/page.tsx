@@ -6,6 +6,7 @@ import { listRegistrationsForTenant } from "@/lib/registrations/queries";
 import { getCurrentTenantContext } from "@/lib/tenants/context";
 import { requireTenant } from "@/lib/tenants/require-tenant";
 import { prisma } from "@/lib/db/prisma";
+import { PageShell } from "@/components/ui/page";
 
 type Props = {
   params: Promise<{
@@ -45,14 +46,16 @@ export default async function TenantRegistrationsPage({ params }: Props) {
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
 
   return (
-    <RegistrationInbox
-      tenantSlug={tenantSlug}
-      initialRegistrations={registrations}
-      canEdit={canEdit}
-      locale={ctx?.locale ?? undefined}
-      timezone={ctx?.timezone ?? undefined}
-      assignableUsers={assignableUsers}
-      targetGroups={targetGroups}
-    />
+    <PageShell fullWidth>
+      <RegistrationInbox
+        tenantSlug={tenantSlug}
+        initialRegistrations={registrations}
+        canEdit={canEdit}
+        locale={ctx?.locale ?? undefined}
+        timezone={ctx?.timezone ?? undefined}
+        assignableUsers={assignableUsers}
+        targetGroups={targetGroups}
+      />
+    </PageShell>
   );
 }
