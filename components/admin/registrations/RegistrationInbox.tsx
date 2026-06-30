@@ -21,6 +21,8 @@ import RegistrationDetailDrawer, {
   type AssignableUser,
   type TargetGroupOption,
 } from "./RegistrationDetailDrawer";
+import { Card } from "@/components/ui";
+import { EmptyState } from "@/components/ui/page";
 
 // ── Type filter options (icons replace emojis) ────────────────────────────────
 
@@ -146,27 +148,6 @@ function InboxGroup({
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
-function EmptyInbox({ hasQuery }: { hasQuery: boolean }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-2)]">
-        <Search className="h-5 w-5 text-[var(--muted)]" aria-hidden />
-      </div>
-      <div>
-        <p className="text-sm font-semibold text-[var(--foreground)]">
-          {hasQuery ? "Keine Treffer" : "Keine Anmeldungen"}
-        </p>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          {hasQuery
-            ? "Suchbegriff anpassen oder Filter zurücksetzen."
-            : "Noch keine Anmeldungen für diesen Tenant eingegangen."}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 // ── Type filter button ────────────────────────────────────────────────────────
 
@@ -424,9 +405,17 @@ export default function RegistrationInbox({
       )}
 
       {/* ── Inbox list ────────────────────────────────────────────────────── */}
-      <div className="rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)] overflow-hidden">
+      <Card variant="section" noPadding>
         {!hasResults ? (
-          <EmptyInbox hasQuery={hasActiveFilter} />
+          <EmptyState
+            icon={<Search className="h-10 w-10" />}
+            heading={hasActiveFilter ? "Keine Treffer" : "Keine Anmeldungen"}
+            description={
+              hasActiveFilter
+                ? "Suchbegriff anpassen oder Filter zurücksetzen."
+                : "Noch keine Anmeldungen für diesen Tenant eingegangen."
+            }
+          />
         ) : (
           grouped.map((group, idx) => (
             <InboxGroup
@@ -440,7 +429,7 @@ export default function RegistrationInbox({
             />
           ))
         )}
-      </div>
+      </Card>
 
       {/* ── Detail drawer ─────────────────────────────────────────────────── */}
       {selectedRegistration && (

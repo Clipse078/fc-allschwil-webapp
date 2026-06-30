@@ -6,6 +6,7 @@ import { Newspaper, PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide
 import NewsStatusBadge from "@/components/admin/news/NewsStatusBadge";
 import type { ArticleStatus, NewsArticleAdminListItem } from "@/lib/news/admin-queries";
 import { SectionCard, EmptyState } from "@/components/ui/page";
+import { Button } from "@/components/ui";
 
 type FilterStatus = "ALL" | ArticleStatus;
 
@@ -111,15 +112,15 @@ export default function NewsArticleList() {
           ))}
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="icon"
           onClick={load}
           disabled={loading}
-          className="fca-button-secondary px-2.5"
           title="Aktualisieren"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-        </button>
+        </Button>
       </div>
 
       {/* Error banner */}

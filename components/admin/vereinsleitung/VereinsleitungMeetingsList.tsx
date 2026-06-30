@@ -16,9 +16,11 @@
  */
 
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Edit, Plus, Users } from "lucide-react";
+import { CalendarDays, ChevronRight, Edit, Users } from "lucide-react";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import VisibilityScopeBadge from "@/components/admin/shared/VisibilityScopeBadge";
+import { Card, StatusIndicator } from "@/components/ui";
+import { EmptyState } from "@/components/ui/page";
 import type { ReviewWorkflowStage } from "@prisma/client";
 import type { VisibilityScopeValue } from "@/components/admin/shared/VisibilityScopeSelect";
 
@@ -32,6 +34,15 @@ export type MeetingListItemShape = {
   status: "PLANNED" | "COMPLETED" | "CANCELLED";
   reviewStage: ReviewWorkflowStage;
   visibilityScope: VisibilityScopeValue;
+};
+
+const STATUS_INDICATOR_VARIANT: Record<
+  MeetingListItemShape["status"],
+  "info" | "success" | "danger"
+> = {
+  PLANNED: "info",
+  COMPLETED: "success",
+  CANCELLED: "danger",
 };
 
 const STATUS_LABELS: Record<MeetingListItemShape["status"], string> = {
@@ -58,43 +69,37 @@ export default function VereinsleitungMeetingsList({
 }: VereinsleitungMeetingsListProps) {
   if (meetings.length === 0) {
     return (
-      <div className="rounded-[28px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <CalendarDays className="mx-auto mb-4 h-10 w-10 text-slate-300" />
-        <h3 className="text-[1.05rem] font-semibold text-slate-900">
-          Keine zugänglichen Meetings
-        </h3>
-        <p className="mt-2 text-sm text-slate-500">
-          Noch keine Meetings erfasst oder keine für dich sichtbaren Einträge.
-        </p>
-        <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-medium text-slate-500">
-          <Plus className="h-3.5 w-3.5" />
-          POST /api/meetings
-        </p>
-      </div>
+      <EmptyState
+        icon={<CalendarDays className="h-10 w-10" />}
+        heading="Keine zugänglichen Meetings"
+        description="Noch keine Meetings erfasst oder keine für dich sichtbaren Einträge."
+      />
     );
   }
 
   return (
     <div className="space-y-4">
       {meetings.map((meeting) => (
-        <div
+        <Card
           key={meeting.slug}
-          className="relative rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-[1px] hover:shadow-[0_16px_34px_rgba(15,23,42,0.06)]"
+          variant="section"
+          interactive
+          className="relative"
         >
           {/* Transparent overlay link — covers the whole card, sits below interactive children */}
           <Link
             href={`/vereinsleitung/meetings/${meeting.slug}`}
-            className="absolute inset-0 rounded-[26px]"
+            className="absolute inset-0 rounded-xl"
             aria-label={meeting.title}
           />
 
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <h3 className="text-[1.05rem] font-semibold text-slate-900">
+              <h3 className="text-[1.05rem] font-semibold text-[var(--foreground)]">
                 {meeting.title}
               </h3>
 
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-500">
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[var(--text-2)]">
                 <span className="inline-flex items-center gap-2">
                   <CalendarDays className="h-4 w-4" />
                   {formatSwissDate(meeting.meetingDate)}
@@ -108,15 +113,17 @@ export default function VereinsleitungMeetingsList({
                 ) : null}
 
                 {meeting.location ? (
-                  <span className="text-slate-400">{meeting.location}</span>
+                  <span className="text-[var(--muted)]">{meeting.location}</span>
                 ) : null}
               </div>
             </div>
 
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {STATUS_LABELS[meeting.status]}
-              </span>
+              <StatusIndicator
+                variant={STATUS_INDICATOR_VARIANT[meeting.status]}
+                label={STATUS_LABELS[meeting.status]}
+                size="sm"
+              />
               <div className="flex items-center gap-1.5">
                 <ReviewStageBadge stage={meeting.reviewStage} size="sm" />
                 <VisibilityScopeBadge scope={meeting.visibilityScope} />
@@ -124,19 +131,19 @@ export default function VereinsleitungMeetingsList({
               <div className="relative z-10 flex items-center gap-2">
                 <Link
                   href={`/vereinsleitung/meetings/${meeting.slug}/edit`}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-700"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--foreground)]"
                 >
                   <Edit className="h-3.5 w-3.5" />
                   Bearbeiten
                 </Link>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b4aa2]">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--sce-primary)]">
                   Öffnen
                   <ChevronRight className="h-4 w-4" />
                 </span>
               </div>
             </div>
           </div>
-        </div>
+        </Card>
       ))}
     </div>
   );
