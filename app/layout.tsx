@@ -1,17 +1,11 @@
 ﻿import type { Metadata } from "next";
-import { Inter, Barlow_Condensed } from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const barlowCondensed = Barlow_Condensed({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["400", "500", "600", "700"],
+  variable: "--font-geist",
+  weight: "variable",
   display: "swap",
 });
 
@@ -30,7 +24,7 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="de">
-      <body className={`${inter.variable} ${barlowCondensed.variable}`}>
+      <body className={geist.variable}>
         {children}
       </body>
     </html>
