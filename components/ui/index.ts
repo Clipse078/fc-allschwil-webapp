@@ -44,3 +44,7 @@ export type { ToastItem, ToastVariant } from "./Toast";
 
 export { ToastProvider, ToastContext } from "./ToastProvider";
 export type { ToastContextValue } from "./ToastProvider";
+
+// ── Slice 7 ────────────────────────────────────────────────────────────────
+export { ValidationSummary } from "./ValidationSummary";
+export type { ValidationSummaryProps } from "./ValidationSummary";
