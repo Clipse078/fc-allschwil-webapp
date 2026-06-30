@@ -6,6 +6,8 @@ import { Newspaper, PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide
 import NewsStatusBadge from "@/components/admin/news/NewsStatusBadge";
 import type { ArticleStatus, NewsArticleAdminListItem } from "@/lib/news/admin-queries";
 import { SectionCard, EmptyState } from "@/components/ui/page";
+import { Button } from "@/components/ui";
+import { buttonVariants } from "@/components/ui/Button";
 
 type FilterStatus = "ALL" | ArticleStatus;
 
@@ -100,9 +102,9 @@ export default function NewsArticleList() {
               key={f.value}
               type="button"
               onClick={() => setFilter(f.value)}
-              className={`rounded-md px-3 py-1.5 transition ${
+              className={`rounded-md px-3 py-1.5 transition-colors ${
                 filter === f.value
-                  ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)]"
+                  ? "bg-[var(--surface)] shadow-sm text-[var(--foreground)] font-semibold"
                   : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
@@ -111,20 +113,20 @@ export default function NewsArticleList() {
           ))}
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="icon"
           onClick={load}
           disabled={loading}
-          className="fca-button-secondary px-2.5"
           title="Aktualisieren"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-        </button>
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        </Button>
       </div>
 
       {/* Error banner */}
       {error && (
-        <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
+        <div className="border-b border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-5 py-3 text-sm text-[var(--sce-danger)]">
           {error}
         </div>
       )}
@@ -135,7 +137,7 @@ export default function NewsArticleList() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="h-14 animate-pulse rounded-[var(--radius-xl)] bg-[var(--surface-2)]"
+              className="h-14 animate-pulse rounded-lg bg-[var(--surface-2)]"
             />
           ))}
         </div>
@@ -145,7 +147,10 @@ export default function NewsArticleList() {
           heading="Keine Artikel vorhanden"
           description="Erstelle den ersten News-Artikel für deine Website."
           action={
-            <Link href="/dashboard/website/news/new" className="fca-button-primary">
+            <Link
+              href="/dashboard/website/news/new"
+              className={buttonVariants({ variant: "primary" })}
+            >
               <Plus className="h-4 w-4" />
               Ersten Artikel erstellen
             </Link>
@@ -156,19 +161,19 @@ export default function NewsArticleList() {
           <table className="w-full text-sm">
             <thead className="border-b border-[var(--border)] bg-[var(--surface-2)]">
               <tr>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--muted)]">
                   Titel
                 </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--muted)]">
                   Status
                 </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                <th className="hidden px-5 py-3 text-left text-xs font-medium text-[var(--muted)] sm:table-cell">
                   Veröffentlicht
                 </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                <th className="hidden px-5 py-3 text-left text-xs font-medium text-[var(--muted)] md:table-cell">
                   Geändert
                 </th>
-                <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                <th className="px-5 py-3 text-right text-xs font-medium text-[var(--muted)]">
                   Aktionen
                 </th>
               </tr>
@@ -177,33 +182,33 @@ export default function NewsArticleList() {
               {articles.map((article) => (
                 <tr
                   key={article.id}
-                  className="bg-[var(--surface)] transition hover:bg-[var(--surface-2)]"
+                  className="bg-[var(--surface)] transition-colors hover:bg-[var(--surface-2)]"
                 >
-                  <td className="px-4 py-3">
-                    <div>
+                  <td className="px-5 py-3.5">
+                    <div className="min-w-0">
                       <p className="line-clamp-1 font-medium text-[var(--foreground)]">
                         {article.title}
                       </p>
-                      <p className="text-[11px] text-[var(--muted)]">{article.slug}</p>
+                      <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{article.slug}</p>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-3.5">
                     <NewsStatusBadge status={article.status} />
                   </td>
-                  <td className="px-4 py-3 text-[11px] text-[var(--muted)]">
+                  <td className="hidden px-5 py-3.5 text-xs text-[var(--muted)] sm:table-cell">
                     {formatDate(article.publishedAt)}
                   </td>
-                  <td className="px-4 py-3 text-[11px] text-[var(--muted)]">
+                  <td className="hidden px-5 py-3.5 text-xs text-[var(--muted)] md:table-cell">
                     {formatDate(article.updatedAt)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center justify-end gap-1">
                       <Link
                         href={`/dashboard/website/news/${article.id}/edit`}
                         className="sce-icon-button"
                         title="Bearbeiten"
                       >
-                        <PenLine className="h-3.5 w-3.5" />
+                        <PenLine className="h-4 w-4" />
                       </Link>
                       {/* Only show publish toggle for non-review statuses */}
                       {article.status !== "IN_REVIEW" && (
@@ -219,9 +224,9 @@ export default function NewsArticleList() {
                           }
                         >
                           {article.status === "PUBLISHED" ? (
-                            <EyeOff className="h-3.5 w-3.5" />
+                            <EyeOff className="h-4 w-4" />
                           ) : (
-                            <Eye className="h-3.5 w-3.5" />
+                            <Eye className="h-4 w-4" />
                           )}
                         </button>
                       )}
@@ -229,10 +234,10 @@ export default function NewsArticleList() {
                         type="button"
                         onClick={() => handleDelete(article.id)}
                         disabled={actionPending === article.id}
-                        className="sce-icon-button text-rose-500 hover:text-rose-700"
+                        className="sce-icon-button text-[var(--sce-danger)] hover:bg-[var(--sce-danger-light)]"
                         title="Löschen"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -246,7 +251,7 @@ export default function NewsArticleList() {
       {/* Footer count */}
       {!loading && total > 0 && (
         <div className="border-t border-[var(--border)] px-5 py-3">
-          <p className="text-[11px] text-[var(--muted)]">
+          <p className="text-xs text-[var(--muted)]">
             {articles.length} von {total} Artikeln geladen
           </p>
         </div>

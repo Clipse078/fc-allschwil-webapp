@@ -1,26 +1,15 @@
+import { Badge } from "@/components/ui";
 import type { ArticleStatus } from "@/lib/news/admin-queries";
 
-const STATUS_STYLES: Record<ArticleStatus, { label: string; className: string }> = {
-  DRAFT: {
-    label: "Entwurf",
-    className: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]",
-  },
-  IN_REVIEW: {
-    label: "In Prüfung",
-    className: "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  SCHEDULED: {
-    label: "Geplant",
-    className: "bg-amber-50 text-amber-700 border-amber-200",
-  },
-  PUBLISHED: {
-    label: "Veröffentlicht",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  ARCHIVED: {
-    label: "Archiviert",
-    className: "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] opacity-60",
-  },
+const STATUS_CONFIG: Record<
+  ArticleStatus,
+  { label: string; variant: "default" | "info" | "warning" | "success" }
+> = {
+  DRAFT:     { label: "Entwurf",        variant: "default" },
+  IN_REVIEW: { label: "In Prüfung",     variant: "info" },
+  SCHEDULED: { label: "Geplant",        variant: "warning" },
+  PUBLISHED: { label: "Veröffentlicht", variant: "success" },
+  ARCHIVED:  { label: "Archiviert",     variant: "default" },
 };
 
 type NewsStatusBadgeProps = {
@@ -28,12 +17,10 @@ type NewsStatusBadgeProps = {
 };
 
 export default function NewsStatusBadge({ status }: NewsStatusBadgeProps) {
-  const { label, className } = STATUS_STYLES[status] ?? STATUS_STYLES.DRAFT;
+  const { label, variant } = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT;
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${className}`}
-    >
+    <Badge variant={variant} size="sm">
       {label}
-    </span>
+    </Badge>
   );
 }

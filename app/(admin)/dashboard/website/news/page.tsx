@@ -9,6 +9,7 @@ import {
   PageHeader,
   PageActions,
 } from "@/components/ui/page";
+import { buttonVariants } from "@/components/ui/Button";
 
 export default async function NewsAdminPage() {
   await requireAnyPermission([PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE]);
@@ -22,7 +23,7 @@ export default async function NewsAdminPage() {
           { label: "News" },
         ]}
       />
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <PageHeader
           eyebrow="Website"
           title="News"
@@ -30,7 +31,10 @@ export default async function NewsAdminPage() {
           className="mb-0"
         />
         <PageActions>
-          <Link href="/dashboard/website/news/new" className="fca-button-primary">
+          <Link
+            href="/dashboard/website/news/new"
+            className={buttonVariants({ variant: "primary" })}
+          >
             <Plus className="h-4 w-4" />
             Neue News erstellen
           </Link>
