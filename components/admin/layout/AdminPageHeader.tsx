@@ -268,11 +268,19 @@ export default function AdminPageHeader() {
   const pathname = usePathname();
   const headerContent = getHeaderContent(pathname);
 
+  /*
+   * Internal WebApp headers must use the Premium SaaS typography standard.
+   * Do not use tenant branding, football typography, or legacy fca-heading styles here.
+   */
   return (
     <div>
-      <p className="fca-eyebrow">{headerContent.eyebrow}</p>
-      <h1 className="fca-heading mt-2">{headerContent.title}</h1>
-      <p className="mt-3 max-w-2xl text-sm text-[var(--text-2)]">
+      <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
+        {headerContent.eyebrow}
+      </p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">
+        {headerContent.title}
+      </h1>
+      <p className="mt-2 max-w-2xl text-sm text-[var(--text-2)] leading-relaxed">
         {headerContent.description}
       </p>
     </div>

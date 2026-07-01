@@ -11,14 +11,12 @@ export default async function NewUserPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="fca-eyebrow">Benutzerverwaltung</p>
-          <h2
-            className="fca-heading mt-2 flex items-center gap-2"
-          >
-            <UserPlus className="h-6 w-6 text-[var(--blue)]" />
+          <p className="text-xs font-medium tracking-wide text-[var(--muted)]">Benutzerverwaltung</p>
+          <h2 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">
+            <UserPlus className="h-5 w-5 text-[var(--text-2)]" />
             Neuer Benutzer
           </h2>
-          <p className="fca-body-muted mt-3 max-w-2xl">
+          <p className="mt-1.5 max-w-2xl text-sm text-[var(--text-2)] leading-relaxed">
             Lege ein neues Benutzerkonto für die WebApp an. Das temporäre
             Passwort sollte nach dem ersten Login geändert werden.
           </p>

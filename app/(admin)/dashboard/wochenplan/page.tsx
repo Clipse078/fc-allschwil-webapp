@@ -50,11 +50,11 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
     <div className="space-y-6">
       {/* Header + week navigation */}
       <section>
-        <p className="fca-eyebrow">Wochenplan</p>
+        <p className="text-xs font-medium tracking-wide text-[var(--muted)]">Wochenplan</p>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="fca-heading">Feld-/Garderobenplanung</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">Feld-/Garderobenplanung</h1>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--blue)]/30 bg-[var(--blue-light)] px-4 py-1.5 text-sm font-semibold text-[var(--blue)]">
               <CalendarDays className="h-3.5 w-3.5" />
               {weekLabel}

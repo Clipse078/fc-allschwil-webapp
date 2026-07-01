@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 type PageHeaderProps = {
-  /** Short uppercase label above the title (e.g. module name). */
+  /** Short muted label above the title (e.g. module name). */
   eyebrow?: string;
   /** Primary page title — required. */
   title: string;
@@ -19,11 +19,20 @@ type PageHeaderProps = {
 /**
  * PageHeader
  *
- * Prop-driven page heading block. Replaces the path-keyed AdminPageHeader
- * pattern with an explicit, reusable primitive that each page owns directly.
+ * Authoritative internal WebApp page header.
  *
- * Design: eyebrow in tenant accent → bold display-font title → muted description.
- * Tenant-branding-ready: all colours reference CSS custom properties only.
+ * Internal WebApp headers must use the Premium SaaS typography standard.
+ * Do not use tenant branding, football typography, or legacy fca-heading styles here.
+ *
+ * Standard:
+ *   - Font: Geist (system body font, var(--font-body))
+ *   - Title color: neutral foreground (var(--foreground))
+ *   - Title size: text-2xl / text-3xl
+ *   - Title weight: font-semibold
+ *   - Tracking: tracking-tight only
+ *   - No uppercase on main title
+ *   - No blue title color
+ *   - Eyebrow: small, muted, optional — must not visually dominate
  *
  * Usage:
  *   <PageHeader
@@ -40,13 +49,17 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={cn("mb-6 flex flex-col gap-1.5", className)}>
+    <div className={cn("mb-6 flex flex-col gap-1", className)}>
       {eyebrow && (
-        <p className="fca-eyebrow">{eyebrow}</p>
+        <p className="text-xs font-medium tracking-wide text-[var(--muted)]">
+          {eyebrow}
+        </p>
       )}
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <h1 className="fca-heading leading-tight">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">
+          {title}
+        </h1>
         {badge}
       </div>
 
