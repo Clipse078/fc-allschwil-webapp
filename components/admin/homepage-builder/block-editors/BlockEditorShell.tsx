@@ -149,18 +149,18 @@ export function SegmentedControl<T extends string>({
 }
 
 // ---------------------------------------------------------------------------
-// MediaPlaceholder — Slice G preparation
+// MediaPreparedState — for features that are scaffolded but not yet active
 // ---------------------------------------------------------------------------
 
-type MediaPlaceholderType = "image" | "background" | "gradient" | "theme" | "video";
+type MediaPreparedStateType = "image" | "background" | "gradient" | "theme" | "video";
 
-type MediaPlaceholderProps = {
+type MediaPreparedStateProps = {
   label: string;
   hint?: string;
-  type?: MediaPlaceholderType;
+  type?: MediaPreparedStateType;
 };
 
-const MEDIA_ICON_MAP: Record<MediaPlaceholderType, React.ElementType> = {
+const MEDIA_ICON_MAP: Record<MediaPreparedStateType, React.ElementType> = {
   image: ImageIcon,
   background: ImageIcon,
   gradient: Layers,
@@ -168,14 +168,18 @@ const MEDIA_ICON_MAP: Record<MediaPlaceholderType, React.ElementType> = {
   video: Video,
 };
 
-export function MediaPlaceholder({
+/**
+ * MediaPreparedState — renders a "coming soon" placeholder for media features
+ * that are scaffolded in the UI but not yet backed by schema support.
+ */
+export function MediaPreparedState({
   label,
   hint,
   type = "image",
-}: MediaPlaceholderProps) {
+}: MediaPreparedStateProps) {
   const Icon = MEDIA_ICON_MAP[type];
   return (
-    <div className="rounded-lg border-2 border-dashed border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 flex items-center gap-3">
+    <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 flex items-center gap-3">
       <div className="h-7 w-7 rounded-md bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center shrink-0">
         <Icon className="h-3.5 w-3.5 text-[var(--muted)]" />
       </div>
@@ -188,8 +192,14 @@ export function MediaPlaceholder({
         )}
       </div>
       <span className="shrink-0 text-[10px] font-medium text-[var(--muted)] bg-[var(--surface)] border border-[var(--border)] rounded px-1.5 py-0.5 leading-none">
-        Slice G
+        Demnächst
       </span>
     </div>
   );
 }
+
+/**
+ * @deprecated Use MediaPreparedState instead.
+ * Kept for backward compatibility with existing imports.
+ */
+export const MediaPlaceholder = MediaPreparedState;

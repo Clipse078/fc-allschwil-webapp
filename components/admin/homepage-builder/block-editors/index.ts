@@ -13,6 +13,7 @@ export {
   InspectorField,
   SegmentedControl,
   MediaPlaceholder,
+  MediaPreparedState,
 } from "./BlockEditorShell";
 
 // Block editors

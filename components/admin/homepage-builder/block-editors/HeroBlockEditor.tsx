@@ -6,7 +6,11 @@
  * Inspector-based rich editor for the `hero` section type.
  *
  * Supports: headline, subtitle, CTA label + URL, alignment, theme,
- * plus Slice G media placeholders for background / gradient / video.
+ * plus background media (image / gradient) wired to _layout.background.
+ *
+ * Slice G: background image and gradient are now functional via HomepageMediaField
+ * and the existing SharedMediaPicker + _layout.background schema.
+ * Video background is prepared (no schema support yet).
  *
  * Does NOT add new config schema — operates exclusively on the existing
  * HeroSectionConfig + SectionLayout._layout fields.
@@ -14,13 +18,21 @@
 
 import { AlignLeft, AlignCenter, AlignRight, ExternalLink } from "lucide-react";
 import type { HeroSectionConfig } from "@/lib/homepage/section-types";
-import type { SectionLayout, SectionHAlign, SectionTheme } from "@/lib/cms/layout-types";
+import type {
+  SectionLayout,
+  SectionHAlign,
+  SectionTheme,
+  SectionBackground,
+} from "@/lib/cms/layout-types";
+import { GRADIENT_PRESETS } from "@/lib/cms/layout-types";
 import {
   CollapsibleSection,
   InspectorField,
   SegmentedControl,
-  MediaPlaceholder,
+  MediaPreparedState,
 } from "./BlockEditorShell";
+import { HomepageMediaField } from "../media";
+import type { MediaAssetListItem } from "@/lib/media/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,7 +44,7 @@ type Props = {
 };
 
 // ---------------------------------------------------------------------------
-// Alignment options
+// Alignment + theme options
 // ---------------------------------------------------------------------------
 
 const ALIGN_OPTIONS: { value: SectionHAlign; label: string; icon: React.ReactNode }[] = [
@@ -48,6 +60,18 @@ const THEME_OPTIONS: { value: SectionTheme; label: string }[] = [
   { value: "club",  label: "Club"   },
 ];
 
+const BG_TYPE_OPTIONS: { value: "none" | "image" | "gradient"; label: string }[] = [
+  { value: "none",     label: "Kein"    },
+  { value: "image",    label: "Bild"    },
+  { value: "gradient", label: "Verlauf" },
+];
+
+const OVERLAY_OPTIONS: { value: "none" | "light" | "dark"; label: string }[] = [
+  { value: "none",  label: "Kein"   },
+  { value: "light", label: "Hell"   },
+  { value: "dark",  label: "Dunkel" },
+];
+
 // ---------------------------------------------------------------------------
 // HeroBlockEditor
 // ---------------------------------------------------------------------------
@@ -55,6 +79,9 @@ const THEME_OPTIONS: { value: SectionTheme; label: string }[] = [
 export function HeroBlockEditor({ config, onChange }: Props) {
   const hero = config as HeroSectionConfig;
   const layout = (hero._layout ?? {}) as SectionLayout;
+  const background: SectionBackground = layout.background ?? { type: "none" };
+
+  // ── Text/CTA helpers ──────────────────────────────────────────────────────
 
   function set(key: keyof HeroSectionConfig, value: string) {
     const trimmed = value.trim();
@@ -71,8 +98,70 @@ export function HeroBlockEditor({ config, onChange }: Props) {
     onChange({ ...config, _layout: { ...layout, ...patch } });
   }
 
+  function setBackground(bg: SectionBackground) {
+    setLayout({ background: bg });
+  }
+
+  // ── Background type switch ────────────────────────────────────────────────
+
+  function handleBgTypeChange(type: "none" | "image" | "gradient") {
+    switch (type) {
+      case "none":
+        setBackground({ type: "none" });
+        break;
+      case "image":
+        setBackground({
+          type: "image",
+          mediaAssetId:
+            background.type === "image" ? background.mediaAssetId : "",
+          overlay:
+            background.type === "image" ? background.overlay : "dark",
+        });
+        break;
+      case "gradient":
+        setBackground({
+          type: "gradient",
+          gradientPreset:
+            background.type === "gradient"
+              ? background.gradientPreset
+              : "club-warm",
+        });
+        break;
+    }
+  }
+
+  // ── Background image helpers ──────────────────────────────────────────────
+
+  function handleBgImageSelect(asset: MediaAssetListItem) {
+    setBackground({
+      type: "image",
+      mediaAssetId: asset.id,
+      overlay:
+        background.type === "image" ? background.overlay : "dark",
+    });
+  }
+
+  function handleBgImageRemove() {
+    setBackground({ type: "none" });
+  }
+
+  function handleOverlayChange(overlay: "none" | "light" | "dark") {
+    if (background.type === "image") {
+      setBackground({ ...background, overlay });
+    }
+  }
+
+  // ── Derived state ─────────────────────────────────────────────────────────
+
   const hAlign = layout.hAlign ?? "left";
   const theme  = layout.theme  ?? "light";
+  const bgType = background.type === "solid" ? "none" : background.type;
+  const bgImageId =
+    background.type === "image" ? (background.mediaAssetId || null) : null;
+  const bgGradientPreset =
+    background.type === "gradient" ? background.gradientPreset : "club-warm";
+  const bgOverlay =
+    background.type === "image" ? background.overlay : "dark";
 
   return (
     <div>
@@ -160,21 +249,75 @@ export function HeroBlockEditor({ config, onChange }: Props) {
         </InspectorField>
       </CollapsibleSection>
 
-      {/* ── Media (Slice G placeholders) ──────────────────────────── */}
+      {/* ── Media ─────────────────────────────────────────────────── */}
       <CollapsibleSection title="Medien" defaultOpen={false}>
-        <MediaPlaceholder
-          label="Hintergrundbild"
-          hint="Bild aus der Mediathek auswählen"
-          type="background"
-        />
-        <MediaPlaceholder
-          label="Farbverlauf"
-          hint="Gradient-Overlay konfigurieren"
-          type="gradient"
-        />
-        <MediaPlaceholder
+        {/* Background type selector */}
+        <InspectorField label="Hintergrundtyp">
+          <SegmentedControl
+            options={BG_TYPE_OPTIONS}
+            value={bgType}
+            onChange={handleBgTypeChange}
+          />
+        </InspectorField>
+
+        {/* Background image */}
+        {background.type === "image" && (
+          <>
+            <HomepageMediaField
+              assetId={bgImageId}
+              onSelect={handleBgImageSelect}
+              onRemove={handleBgImageRemove}
+              filterType="IMAGE"
+              pickerTitle="Hintergrundbild auswählen"
+              emptyLabel="Kein Hintergrundbild"
+            />
+
+            {/* Overlay picker — only shown when an image is set */}
+            {bgImageId && (
+              <InspectorField label="Overlay">
+                <SegmentedControl
+                  options={OVERLAY_OPTIONS}
+                  value={bgOverlay}
+                  onChange={handleOverlayChange}
+                  compact
+                />
+              </InspectorField>
+            )}
+          </>
+        )}
+
+        {/* Gradient presets */}
+        {background.type === "gradient" && (
+          <InspectorField label="Verlauf-Preset">
+            <div className="space-y-1.5">
+              {GRADIENT_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() =>
+                    setBackground({ type: "gradient", gradientPreset: p.value })
+                  }
+                  className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-xs transition ${
+                    bgGradientPreset === p.value
+                      ? "border-[var(--tenant-primary)] bg-orange-50 font-medium text-orange-700"
+                      : "border-[var(--border)] text-[var(--foreground)] hover:border-[var(--tenant-primary)]"
+                  }`}
+                >
+                  <span
+                    className="h-5 w-5 flex-shrink-0 rounded"
+                    style={{ backgroundImage: p.style }}
+                  />
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </InspectorField>
+        )}
+
+        {/* Video background — no schema support yet */}
+        <MediaPreparedState
           label="Video-Hintergrund"
-          hint="Hintergrundvideo aus der Mediathek"
+          hint="Video-Hintergründe werden in einem späteren Slice unterstützt."
           type="video"
         />
       </CollapsibleSection>
