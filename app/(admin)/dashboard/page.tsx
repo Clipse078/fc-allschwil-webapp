@@ -3,12 +3,9 @@ import {
   CalendarDays,
   CalendarRange,
   CheckSquare,
-  ChevronDown,
   FileText,
   Globe,
-  Inbox,
   LayoutDashboard,
-  Layers,
   Monitor,
   Newspaper,
   Plus,
@@ -18,11 +15,20 @@ import {
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getTenantContextFromSession } from "@/lib/tenants/context";
+import { formatTime } from "@/lib/tenant-runtime/formatters";
 import {
-  formatTime,
-  formatDate,
-} from "@/lib/tenant-runtime/formatters";
-import { KpiCard } from "@/components/admin/dashboard/KpiCard";
+  DashboardHero,
+  DashboardKpiCard,
+  DashboardQuickActions,
+  DashboardActivityFeed,
+  DashboardActivityItem,
+  DashboardSmartNudges,
+  DashboardSection,
+  DashboardGrid,
+  DashboardEmptyState,
+} from "@/components/ui/dashboard";
+import { Button } from "@/components/ui";
+import { cn } from "@/lib/cn";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,6 +56,18 @@ function timeAgo(date: Date): string {
   if (diffH < 24) return `Vor ${diffH} Std.`;
   const diffD = Math.floor(diffH / 24);
   return `Vor ${diffD} Tag${diffD === 1 ? "" : "en"}`;
+}
+
+// ── Season display helper ─────────────────────────────────────────────────────
+
+function getActiveSeasonLabel(seasonStartMonth: number): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+  if (month >= seasonStartMonth) {
+    return `${year}/${String(year + 1).slice(-2)}`;
+  }
+  return `${year - 1}/${String(year).slice(-2)}`;
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -145,73 +163,7 @@ async function getDashboardData(tenantId: string | null) {
   };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-type QuickActionCardProps = {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  iconBg: string;
-  iconColor: string;
-};
-
-function QuickActionCard({ href, icon, title, subtitle, iconBg, iconColor }: QuickActionCardProps) {
-  return (
-    <Link href={href} className="sce-quick-action-card">
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
-        style={{ background: iconBg, color: iconColor }}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-[0.875rem] font-semibold text-[#111827] leading-tight">{title}</p>
-        <p className="mt-0.5 text-[0.75rem] text-[#6B7280]">{subtitle}</p>
-      </div>
-    </Link>
-  );
-}
-
-type ActivityItemProps = {
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
-  title: string;
-  subtitle: string;
-  time: string;
-  tag: string;
-  tagBg: string;
-  tagColor: string;
-};
-
-function ActivityItem({
-  icon, iconBg, iconColor, title, subtitle, time, tag, tagBg, tagColor,
-}: ActivityItemProps) {
-  return (
-    <div className="sce-activity-item">
-      <div
-        className="sce-activity-icon"
-        style={{ background: iconBg, color: iconColor }}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[0.875rem] font-medium text-[#111827]">{title}</p>
-        <p className="mt-0.5 truncate text-[0.75rem] text-[#6B7280]">{subtitle}</p>
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <span className="text-[0.72rem] text-[#9CA3AF]">{time}</span>
-        <span
-          className="sce-tag-pill"
-          style={{ background: tagBg, color: tagColor }}
-        >
-          {tag}
-        </span>
-      </div>
-    </div>
-  );
-}
+// ── Inline sub-components (page-specific) ─────────────────────────────────────
 
 type TaskItemProps = {
   title: string;
@@ -222,15 +174,19 @@ type TaskItemProps = {
 
 function TaskItem({ title, subtitle, dueLabel, urgent = false }: TaskItemProps) {
   return (
-    <div className="sce-task-item">
-      <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#D1D5DB]" />
+    <div className="flex items-start gap-3 border-b border-[var(--border)] py-3 last:border-b-0">
+      <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[var(--border-strong)]" />
       <div className="min-w-0 flex-1">
-        <p className="text-[0.8125rem] font-medium text-[#111827] leading-tight">{title}</p>
-        <p className="mt-0.5 text-[0.72rem] text-[#6B7280] truncate">{subtitle}</p>
+        <p className="text-[0.8125rem] font-medium leading-tight text-[var(--foreground)]">
+          {title}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-[var(--text-2)]">{subtitle}</p>
       </div>
       <span
-        className="shrink-0 text-[0.72rem] font-semibold"
-        style={{ color: urgent ? "#FF6A00" : "#9CA3AF" }}
+        className="shrink-0 text-xs font-semibold"
+        style={{
+          color: urgent ? "var(--sce-warning)" : "var(--muted)",
+        }}
       >
         {dueLabel}
       </span>
@@ -248,16 +204,20 @@ type EventItemProps = {
 
 function EventItem({ day, month, title, location, time }: EventItemProps) {
   return (
-    <div className="sce-event-item">
-      <div className="sce-date-chip">
-        <span className="text-[0.875rem] font-bold leading-none text-[#111827]">{day}</span>
-        <span className="mt-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-[#6B7280]">{month}</span>
+    <div className="flex items-center gap-3 border-b border-[var(--border)] py-3 last:border-b-0">
+      <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)]">
+        <span className="text-sm font-bold leading-none text-[var(--foreground)]">{day}</span>
+        <span className="mt-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">
+          {month}
+        </span>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[0.8125rem] font-semibold text-[#111827] leading-tight">{title}</p>
-        <p className="mt-0.5 truncate text-[0.72rem] text-[#6B7280]">{location}</p>
+        <p className="truncate text-[0.8125rem] font-semibold leading-tight text-[var(--foreground)]">
+          {title}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-[var(--text-2)]">{location}</p>
       </div>
-      <span className="shrink-0 text-[0.75rem] font-medium text-[#6B7280]">{time}</span>
+      <span className="shrink-0 text-xs font-medium text-[var(--text-2)]">{time}</span>
     </div>
   );
 }
@@ -276,73 +236,86 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
 
   const fmtCfg = { locale: ctx?.locale ?? "de-CH", timezone: ctx?.timezone ?? undefined };
 
+  // ── Presentation helpers ──────────────────────────────────────────────────
+
+  const activeSeason = ctx
+    ? getActiveSeasonLabel(ctx.seasonStartMonth)
+    : undefined;
+
+  const todayFormatted = new Intl.DateTimeFormat(fmtCfg.locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+
   // ── Activity feed ────────────────────────────────────────────────────────
 
   type ActivityEntry = {
     key: string;
     icon: React.ReactNode;
-    iconBg: string;
-    iconColor: string;
+    iconAccent: DashboardActivityItem["iconAccent"];
     title: string;
     subtitle: string;
     date: Date;
     tag: string;
-    tagBg: string;
-    tagColor: string;
+    tagVariant: DashboardActivityItem["tagVariant"];
   };
 
-  const activities: ActivityEntry[] = [
+  const rawActivities: ActivityEntry[] = [
     ...dash.recentNews.map((n) => ({
       key: `news-${n.id}`,
       icon: <Newspaper className="h-4 w-4" />,
-      iconBg: "rgba(59,130,246,0.10)",
-      iconColor: "#3B82F6",
+      iconAccent: "info" as const,
       title: n.title,
       subtitle: n.authorName ? `von ${n.authorName}` : "Newsartikel",
       date: n.updatedAt,
       tag: "News",
-      tagBg: "rgba(59,130,246,0.10)",
-      tagColor: "#3B82F6",
+      tagVariant: "info" as const,
     })),
     ...dash.recentRegistrations.map((r) => ({
       key: `reg-${r.id}`,
       icon: <Users className="h-4 w-4" />,
-      iconBg: "rgba(255,106,0,0.10)",
-      iconColor: "#FF6A00",
+      iconAccent: "warning" as const,
       title: `Neue Anmeldung von ${r.firstName} ${r.lastName}`,
       subtitle: r.type === "PROBETRAINING" ? "Probetraining" : "Spieleranmeldung",
       date: r.createdAt,
       tag: "Anmeldung",
-      tagBg: "rgba(255,106,0,0.10)",
-      tagColor: "#FF6A00",
+      tagVariant: "warning" as const,
     })),
     ...dash.recentEvents.map((e) => ({
       key: `event-${e.id}`,
       icon: <CalendarDays className="h-4 w-4" />,
-      iconBg: "rgba(16,185,129,0.10)",
-      iconColor: "#10B981",
+      iconAccent: "success" as const,
       title: `${e.title} wurde aktualisiert`,
       subtitle: e.type === "TRAINING" ? "Training" : e.type === "MATCH" ? "Spiel" : "Event",
       date: e.updatedAt,
       tag: "Planung",
-      tagBg: "rgba(16,185,129,0.10)",
-      tagColor: "#10B981",
+      tagVariant: "success" as const,
     })),
     ...dash.recentMeetings.map((m) => ({
       key: `meeting-${m.id}`,
       icon: <ScrollText className="h-4 w-4" />,
-      iconBg: "rgba(139,92,246,0.10)",
-      iconColor: "#8B5CF6",
+      iconAccent: "primary" as const,
       title: `Meeting "${m.title}" erstellt`,
       subtitle: "Neues Meeting geplant",
       date: m.createdAt,
       tag: "Meeting",
-      tagBg: "rgba(139,92,246,0.10)",
-      tagColor: "#8B5CF6",
+      tagVariant: "primary" as const,
     })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 5);
+
+  const activityItems: DashboardActivityItem[] = rawActivities.map((a) => ({
+    key: a.key,
+    icon: a.icon,
+    iconAccent: a.iconAccent,
+    title: a.title,
+    subtitle: a.subtitle,
+    timestamp: timeAgo(a.date),
+    tag: a.tag,
+    tagVariant: a.tagVariant,
+  }));
 
   // ── Tasks panel ──────────────────────────────────────────────────────────
 
@@ -434,231 +407,202 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
   const greeting = getGreeting(firstName);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
 
-      {/* ── Welcome Row ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[1.625rem] font-bold tracking-tight" style={{ color: "#111827" }}>
-            {greeting}
-          </h1>
-          <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
-            Hier ist, was heute in deinem Verein ansteht.
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-[0.8125rem] font-medium text-[#374151] shadow-sm transition hover:bg-[#F9FAFB]"
-          >
-            <LayoutDashboard className="h-3.5 w-3.5" />
-            Dashboard anpassen
-          </button>
-          <Link
-            href="/dashboard/website/news/new"
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-[0.8125rem] font-semibold text-white shadow-sm transition hover:opacity-90"
-            style={{
-              background: "linear-gradient(135deg, #FF6A00 0%, #FF8533 100%)",
-              boxShadow: "0 2px 8px rgba(255,106,0,0.25)",
-            }}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Schnellaktion
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      </div>
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <DashboardHero
+        greeting={greeting}
+        subtitle="Hier ist, was heute in deinem Verein ansteht."
+        clubName={ctx?.name ?? undefined}
+        activeSeason={activeSeason}
+        date={todayFormatted}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="default"
+              iconLeft={<LayoutDashboard className="h-4 w-4" />}
+            >
+              Dashboard anpassen
+            </Button>
+            <Link
+              href="/dashboard/website/news/new"
+              className={cn(
+                "inline-flex items-center justify-center gap-1.5",
+                "h-9 rounded-lg border border-transparent px-3.5 text-sm font-semibold",
+                "bg-[var(--sce-primary)] text-white",
+                "transition-all duration-[120ms] hover:bg-[var(--sce-primary-hover)]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
+              )}
+            >
+              <Plus className="h-4 w-4" />
+              Schnellaktion
+            </Link>
+          </div>
+        }
+      />
 
-      {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
+      {/* ── KPI Strip ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard
-          label="Offene Anmeldungen"
+        <DashboardKpiCard
+          title="Offene Anmeldungen"
           value={String(dash.openRegistrationCount)}
-          subtext="+3 seit gestern"
-          accent="orange"
+          description="+3 seit gestern"
+          accent="warning"
           icon={<Users className="h-5 w-5" />}
         />
-        <KpiCard
-          label="News in Prüfung"
+        <DashboardKpiCard
+          title="News in Prüfung"
           value={String(dash.newsInReviewCount)}
-          subtext="2 fällig heute"
-          accent="blue"
+          description="2 fällig heute"
+          accent="info"
           icon={<Newspaper className="h-5 w-5" />}
         />
-        <KpiCard
-          label="Veröffentlichungen geplant"
+        <DashboardKpiCard
+          title="Veröffentlichungen geplant"
           value={String(dash.scheduledNewsCount)}
-          subtext="Diese Woche"
-          accent="green"
-          icon={<Layers className="h-5 w-5" />}
+          description="Diese Woche"
+          accent="success"
+          icon={<Monitor className="h-5 w-5" />}
         />
-        <KpiCard
-          label="Events diese Woche"
+        <DashboardKpiCard
+          title="Events diese Woche"
           value={String(dash.weekEventsCount)}
-          subtext={`${dash.todayEventsCount} heute`}
-          accent="purple"
+          description={`${dash.todayEventsCount} heute`}
+          accent="primary"
           icon={<CalendarDays className="h-5 w-5" />}
         />
       </div>
 
-      {/* ── Main content + right sidebar ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_300px]">
-
-        {/* Left: Quick Actions + Activity Feed */}
-        <div className="space-y-6">
-
-          {/* Schnellaktionen */}
-          <div className="sce-section-card-v3">
-            <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Schnellaktionen</h2>
-            </div>
-            <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
-              <QuickActionCard
-                href="/dashboard/website/news/new"
-                icon={<Newspaper className="h-4.5 w-4.5" />}
-                title="Neue News"
-                subtitle="Artikel erstellen"
-                iconBg="rgba(255,106,0,0.10)"
-                iconColor="#FF6A00"
-              />
-              <QuickActionCard
-                href="/dashboard/website/pages/new"
-                icon={<FileText className="h-4.5 w-4.5" />}
-                title="Neue Seite"
-                subtitle="Webseite erstellen"
-                iconBg="rgba(59,130,246,0.10)"
-                iconColor="#3B82F6"
-              />
-              <QuickActionCard
-                href="/dashboard/website/publishing"
-                icon={<Monitor className="h-4.5 w-4.5" />}
-                title="Homepage"
-                subtitle="Vorschau öffnen"
-                iconBg="rgba(16,185,129,0.10)"
-                iconColor="#10B981"
-              />
-              <QuickActionCard
-                href="/dashboard/planner"
-                icon={<CalendarRange className="h-4.5 w-4.5" />}
-                title="Wochenplanung"
-                subtitle="Zur Planung"
-                iconBg="rgba(139,92,246,0.10)"
-                iconColor="#8B5CF6"
-              />
-            </div>
-          </div>
-
-          {/* Aktuelle Aktivitäten */}
-          <div className="sce-section-card-v3">
-            <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Aktuelle Aktivitäten</h2>
-            </div>
-            <div className="sce-section-card-v3-body">
-              {activities.length > 0 ? (
-                activities.map((a) => (
-                  <ActivityItem
-                    key={a.key}
-                    icon={a.icon}
-                    iconBg={a.iconBg}
-                    iconColor={a.iconColor}
-                    title={a.title}
-                    subtitle={a.subtitle}
-                    time={timeAgo(a.date)}
-                    tag={a.tag}
-                    tagBg={a.tagBg}
-                    tagColor={a.tagColor}
+      {/* ── Main content + sidebar ────────────────────────────────────────── */}
+      <DashboardGrid
+        sidebar={
+          <>
+            {/* Meine Aufgaben */}
+            <DashboardSection
+              title="Meine Aufgaben"
+              actions={<CheckSquare className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />}
+              noPadding
+              footer={
+                <Link href="/dashboard/registrations" className="sce-link-primary text-[0.8125rem]">
+                  Alle Aufgaben anzeigen →
+                </Link>
+              }
+            >
+              <div className="px-5 pt-1">
+                {tasks.map((t, i) => (
+                  <TaskItem
+                    key={i}
+                    title={t.title}
+                    subtitle={t.subtitle}
+                    dueLabel={t.dueLabel}
+                    urgent={t.urgent}
                   />
-                ))
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <Globe className="h-7 w-7 text-[#9CA3AF]" />
-                  <p className="text-[0.875rem] text-[#6B7280]">Noch keine Aktivitäten</p>
-                  <p className="text-[0.75rem] text-[#9CA3AF]">Aktivitäten erscheinen hier sobald Inhalte erstellt werden.</p>
-                </div>
-              )}
-            </div>
-            <div className="sce-section-card-v3-footer">
-              <Link
-                href="/dashboard/logs"
-                className="text-[0.8125rem] font-medium transition"
-                style={{ color: "#FF6A00" }}
-              >
-                Alle Aktivitäten anzeigen →
-              </Link>
-            </div>
+                ))}
+              </div>
+            </DashboardSection>
+
+            {/* Nächste Termine */}
+            <DashboardSection
+              title="Nächste Termine"
+              actions={<CalendarDays className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />}
+              noPadding
+              footer={
+                <Link href="/dashboard/events" className="sce-link-primary text-[0.8125rem]">
+                  Alle Termine anzeigen →
+                </Link>
+              }
+            >
+              <div className="px-5 pt-1">
+                {upcomingEntries.length > 0 ? (
+                  upcomingEntries.map((e) => (
+                    <EventItem
+                      key={e.key}
+                      day={e.day}
+                      month={e.month}
+                      title={e.title}
+                      location={e.location}
+                      time={e.time}
+                    />
+                  ))
+                ) : (
+                  <DashboardEmptyState
+                    icon={<CalendarDays className="h-6 w-6" />}
+                    title="Keine bevorstehenden Termine"
+                    className="py-6"
+                  />
+                )}
+              </div>
+            </DashboardSection>
+          </>
+        }
+      >
+        {/* Schnellaktionen */}
+        <DashboardSection title="Schnellaktionen" noPadding>
+          <div className="p-4">
+            <DashboardQuickActions
+              actions={[
+                {
+                  href: "/dashboard/website/news/new",
+                  icon: <Newspaper className="h-4 w-4" />,
+                  title: "Neue News",
+                  subtitle: "Artikel erstellen",
+                  accent: "info",
+                },
+                {
+                  href: "/dashboard/website/pages/new",
+                  icon: <FileText className="h-4 w-4" />,
+                  title: "Neue Seite",
+                  subtitle: "Webseite erstellen",
+                  accent: "primary",
+                },
+                {
+                  href: "/dashboard/website/publishing",
+                  icon: <Monitor className="h-4 w-4" />,
+                  title: "Homepage",
+                  subtitle: "Vorschau öffnen",
+                  accent: "success",
+                },
+                {
+                  href: "/dashboard/planner",
+                  icon: <CalendarRange className="h-4 w-4" />,
+                  title: "Wochenplanung",
+                  subtitle: "Zur Planung",
+                  accent: "warning",
+                },
+              ]}
+            />
           </div>
+        </DashboardSection>
 
-        </div>
-
-        {/* Right sidebar: Tasks + Events */}
-        <div className="space-y-6">
-
-          {/* Meine Aufgaben */}
-          <div className="sce-section-card-v3">
-            <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Meine Aufgaben</h2>
-              <CheckSquare className="h-4 w-4 text-[#9CA3AF]" />
-            </div>
-            <div className="sce-section-card-v3-body">
-              {tasks.map((t, i) => (
-                <TaskItem
-                  key={i}
-                  title={t.title}
-                  subtitle={t.subtitle}
-                  dueLabel={t.dueLabel}
-                  urgent={t.urgent}
+        {/* Aktuelle Aktivitäten */}
+        <DashboardSection
+          title="Aktuelle Aktivitäten"
+          noPadding
+          footer={
+            <Link href="/dashboard/logs" className="sce-link-primary text-[0.8125rem]">
+              Alle Aktivitäten anzeigen →
+            </Link>
+          }
+        >
+          <div className="px-5 pt-1">
+            <DashboardActivityFeed
+              items={activityItems}
+              emptyState={
+                <DashboardEmptyState
+                  icon={<Globe className="h-7 w-7" />}
+                  title="Noch keine Aktivitäten"
+                  description="Aktivitäten erscheinen hier sobald Inhalte erstellt werden."
                 />
-              ))}
-            </div>
-            <div className="sce-section-card-v3-footer">
-              <Link
-                href="/dashboard/registrations"
-                className="text-[0.8125rem] font-medium transition"
-                style={{ color: "#FF6A00" }}
-              >
-                Alle Aufgaben anzeigen →
-              </Link>
-            </div>
+              }
+            />
           </div>
+        </DashboardSection>
+      </DashboardGrid>
 
-          {/* Nächste Termine */}
-          <div className="sce-section-card-v3">
-            <div className="sce-section-card-v3-header">
-              <h2 className="text-[0.875rem] font-semibold text-[#111827]">Nächste Termine</h2>
-              <CalendarDays className="h-4 w-4 text-[#9CA3AF]" />
-            </div>
-            <div className="sce-section-card-v3-body">
-              {upcomingEntries.length > 0 ? (
-                upcomingEntries.map((e) => (
-                  <EventItem
-                    key={e.key}
-                    day={e.day}
-                    month={e.month}
-                    title={e.title}
-                    location={e.location}
-                    time={e.time}
-                  />
-                ))
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <CalendarDays className="h-6 w-6 text-[#9CA3AF]" />
-                  <p className="text-[0.8125rem] text-[#6B7280]">Keine bevorstehenden Termine</p>
-                </div>
-              )}
-            </div>
-            <div className="sce-section-card-v3-footer">
-              <Link
-                href="/dashboard/events"
-                className="text-[0.8125rem] font-medium transition"
-                style={{ color: "#FF6A00" }}
-              >
-                Alle Termine anzeigen →
-              </Link>
-            </div>
-          </div>
+      {/* ── Smart Suggestions Placeholder ────────────────────────────────── */}
+      <DashboardSmartNudges />
 
-        </div>
-      </div>
     </div>
   );
 }
