@@ -13,6 +13,7 @@ import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getRolesWithCountsData, type RoleListItem } from "@/lib/roles/queries";
+import { EmptyState } from "@/components/ui/page";
 
 export default async function RolesPage() {
   await requirePermission(PERMISSIONS.USERS_MANAGE);
@@ -93,19 +94,11 @@ export default async function RolesPage() {
 
         {roles.length === 0 ? (
           <div className="sce-detail-section-body">
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--surface-2)]">
-                <Shield className="h-6 w-6 text-[var(--muted)]" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-[var(--text-2)]">
-                  Keine Rollen vorhanden
-                </p>
-                <p className="mt-1 text-[0.78rem] text-[var(--muted)]">
-                  Rollen werden über das System-Setup konfiguriert.
-                </p>
-              </div>
-            </div>
+            <EmptyState
+              icon={<Shield className="h-10 w-10" />}
+              heading="Keine Rollen vorhanden"
+              description="Rollen werden über das System-Setup konfiguriert und hier angezeigt."
+            />
           </div>
         ) : (
           <>

@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   BadgeIcon,
   BarChart3,
+  BookCheck,
   Briefcase,
   Building2,
   CalendarDays,
@@ -16,16 +17,21 @@ import {
   FileText,
   Flag,
   Globe,
+  Home,
   ImageIcon,
   Inbox,
+  KeyRound,
   Layers,
   LayoutDashboard,
+  LayoutTemplate,
+  Menu,
   Monitor,
   Newspaper,
   Palette,
+  PenLine,
   ScrollText,
   Settings2,
-  Shield,
+  ShieldCheck,
   Target,
   UserCircle2,
   UserRound,
@@ -54,51 +60,57 @@ type AdminSidebarProps = {
 function getNavIcon(label: string) {
   switch (label) {
     // Top-level primary modules
-    case "Dashboard":              return LayoutDashboard;
-    case "Organisation":           return Building2;
-    case "Website":                return Globe;
-    case "Planung":                return CalendarDays;
-    case "Anmeldungen":            return Inbox;
-    case "Meetings":               return ScrollText;
-    case "Initiativen":            return Flag;
-    case "Infoboard":              return Monitor;
-    case "Administration":         return Settings2;
+    case "Dashboard":                   return LayoutDashboard;
+    case "Organisation":                return Building2;
+    case "Website":                     return Globe;
+    case "Planung":                     return CalendarDays;
+    case "Anmeldungen":                 return Inbox;
+    case "Meetings":                    return ScrollText;
+    case "Initiativen":                 return Flag;
+    case "Infoboard":                   return Monitor;
+    case "Administration":              return Settings2;
     // Organisation children
-    case "Organisationseinheiten": return Building2;
-    case "Zielgruppen":            return Target;
-    case "Teams":                  return Users;
-    case "Personen":               return UserCircle2;
+    case "Organisationseinheiten":      return Building2;
+    case "Zielgruppen":                 return Target;
+    case "Teams":                       return Users;
+    case "Personen":                    return UserCircle2;
     // Website children
-    case "News":                   return Newspaper;
-    case "Seiten":                 return FileText;
-    case "Medien":                 return ImageIcon;
-    case "Veröffentlichungen":     return Layers;
-    case "Einstellungen":          return Settings2;
+    case "CMS Übersicht":               return Globe;
+    case "News":                        return Newspaper;
+    case "Seiten":                      return FileText;
+    case "Homepage Builder":            return Home;
+    case "Navigation":                  return Menu;
+    case "Block-Bibliothek":            return LayoutTemplate;
+    case "Medien":                      return ImageIcon;
+    case "Redaktion":                   return PenLine;
+    case "Veröffentlichungen":          return Layers;
+    case "Wiederverwendbare Inhalte":   return BookCheck;
+    case "Einstellungen":               return Settings2;
     // Planung children
-    case "Saisons":                return CalendarRange;
-    case "Saisonplanung":          return ClipboardList;
-    case "Events":                 return CalendarDays;
-    case "Feld & Ressourcen":      return Layers;
+    case "Saisons":                     return CalendarRange;
+    case "Saisonplanung":               return ClipboardList;
+    case "Events":                      return CalendarDays;
+    case "Feld & Ressourcen":           return Layers;
     // Administration children
-    case "Darstellung":            return Palette;
-    case "Anlagen & Ressourcen":   return Building2;
-    case "Benutzer":               return Shield;
-    case "Rollen":                 return Shield;
-    case "Tenants":                return Globe;
+    case "Darstellung":                 return Palette;
+    case "Anlagen & Ressourcen":        return Building2;
+    case "Benutzer":                    return Users;
+    case "Rollen":                      return ShieldCheck;
+    case "Berechtigungen":              return KeyRound;
+    case "Tenants":                     return Globe;
     // Legacy / fallback (keep so any remaining references resolve cleanly)
-    case "Admin":                  return Settings2;
-    case "Vereinsleitung":         return Briefcase;
-    case "KPIs":                   return BarChart3;
-    case "Ziele":                  return Target;
-    case "Vorlagen":               return FileText;
-    case "Saisonplanner":          return ClipboardList;
-    case "Wochenplanner":          return CalendarDays;
-    case "Tagesplanner":           return CalendarDays;
-    case "Spieler":                return UserRound;
-    case "Trainer":                return BadgeIcon;
-    case "Registrierungen":        return Inbox;
-    case "Berechtigungen":         return Shield;
-    default:                       return LayoutDashboard;
+    case "Admin":                       return Settings2;
+    case "Vereinsleitung":              return Briefcase;
+    case "KPIs":                        return BarChart3;
+    case "Ziele":                       return Target;
+    case "Vorlagen":                    return FileText;
+    case "Saisonplanner":               return ClipboardList;
+    case "Wochenplanner":               return CalendarDays;
+    case "Tagesplanner":                return CalendarDays;
+    case "Spieler":                     return UserRound;
+    case "Trainer":                     return BadgeIcon;
+    case "Registrierungen":             return Inbox;
+    default:                            return LayoutDashboard;
   }
 }
 

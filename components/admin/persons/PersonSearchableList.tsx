@@ -6,6 +6,7 @@ import { Search, UserX, ChevronRight } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import PersonRoleBadge from "@/components/admin/shared/PersonRoleBadge";
+import { EmptyState } from "@/components/ui/page";
 
 type PersonItem = {
   id: string;
@@ -28,37 +29,6 @@ function getAssignmentLabel(person: PersonItem) {
   return roles.length > 0 ? roles.join(" / ") : null;
 }
 
-function EmptySearch({ query }: { query: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-        <Search className="h-6 w-6 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-slate-700">Keine Treffer</p>
-        <p className="mt-1 text-sm text-slate-400">
-          Für &ldquo;{query}&rdquo; wurden keine Personen gefunden.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-        <UserX className="h-6 w-6 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-slate-700">Noch keine Personen</p>
-        <p className="mt-1 text-sm text-slate-400">
-          Noch keine Personen erfasst. Über die Schaltfläche oben rechts den ersten Datensatz anlegen.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export default function PersonSearchableList({
   persons,
@@ -139,9 +109,17 @@ export default function PersonSearchableList({
 
       {/* List */}
       {persons.length === 0 ? (
-        <EmptyState />
+        <EmptyState
+          icon={<UserX className="h-10 w-10" />}
+          heading="Noch keine Personen"
+          description="Noch keine Personen erfasst. Über die Schaltfläche oben rechts den ersten Datensatz anlegen."
+        />
       ) : filtered.length === 0 ? (
-        <EmptySearch query={query} />
+        <EmptyState
+          icon={<Search className="h-10 w-10" />}
+          heading="Keine Treffer"
+          description={`Für „${query}" wurden keine Personen gefunden.`}
+        />
       ) : (
         <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
           {filtered.map((person, idx) => {

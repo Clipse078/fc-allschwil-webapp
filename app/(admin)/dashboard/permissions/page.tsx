@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, KeyRound, Shield, Layers } from "lucide-react";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { EmptyState } from "@/components/ui/page";
 import { KpiCard } from "@/components/admin/dashboard/KpiCard";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -178,27 +179,20 @@ export default async function PermissionsPage() {
       {data.moduleGroups.length === 0 ? (
         <div className="sce-detail-section">
           <div className="sce-detail-section-body">
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--surface-2)]">
-                <KeyRound className="h-7 w-7 text-[var(--muted)]" />
-              </div>
-              <div>
-                <p className="text-base font-semibold text-[var(--text-2)]">
-                  Keine Berechtigungen konfiguriert
-                </p>
-                <p className="mt-1.5 max-w-sm text-sm text-[var(--muted)]">
-                  Berechtigungen werden über das Seeding oder die Admin-Konfiguration
-                  erfasst.
-                </p>
-              </div>
-              <Link
-                href="/dashboard/roles"
-                className="mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-semibold text-[var(--blue)] transition-all hover:bg-[var(--blue-light)]"
-              >
-                Rollen anzeigen
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+            <EmptyState
+              icon={<KeyRound className="h-10 w-10" />}
+              heading="Keine Berechtigungen konfiguriert"
+              description="Berechtigungen werden über das Seeding oder die Admin-Konfiguration erfasst."
+              action={
+                <Link
+                  href="/dashboard/roles"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--blue)] transition-all hover:opacity-70"
+                >
+                  Rollen anzeigen
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              }
+            />
           </div>
         </div>
       ) : (
