@@ -201,7 +201,7 @@ export default function AdminSidebar({
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
         {sections.map((section, sectionIdx) => (
-          <div key={section.sectionLabel ?? "__top__"}>
+          <div key={section.sectionLabel ?? `nav-section:${sectionIdx}`}>
             {/* Section divider */}
             {section.sectionLabel && !isCollapsed && (
               <p

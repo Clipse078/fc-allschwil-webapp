@@ -206,8 +206,8 @@ export default function SplitContentCardsRenderer({
           Noch keine Karten
         </div>
       ) : (
-        cards.map((card) => (
-          <ContentCard key={card.id} card={card} darkMode={isDarkMode} />
+        cards.map((card, index) => (
+          <ContentCard key={card.id ?? `card:${index}`} card={card} darkMode={isDarkMode} />
         ))
       )}
     </div>
