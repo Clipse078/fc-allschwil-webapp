@@ -32,6 +32,7 @@ import {
   MediaPreparedState,
 } from "./BlockEditorShell";
 import { HomepageMediaField } from "../media";
+import { ColorPalettePicker } from "./ColorPalettePicker";
 import type { MediaAssetListItem } from "@/lib/media/types";
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,9 @@ import type { MediaAssetListItem } from "@/lib/media/types";
 type Props = {
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
+  /** Called with the asset ID and live URL when a background image is selected.
+   *  Used by the workspace to propagate preview URLs to the canvas renderer. */
+  onMediaPreview?: (assetId: string, url: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -60,10 +64,11 @@ const THEME_OPTIONS: { value: SectionTheme; label: string }[] = [
   { value: "club",  label: "Club"   },
 ];
 
-const BG_TYPE_OPTIONS: { value: "none" | "image" | "gradient"; label: string }[] = [
+const BG_TYPE_OPTIONS: { value: "none" | "image" | "gradient" | "color"; label: string }[] = [
   { value: "none",     label: "Kein"    },
   { value: "image",    label: "Bild"    },
   { value: "gradient", label: "Verlauf" },
+  { value: "color",    label: "Farbe"   },
 ];
 
 const OVERLAY_OPTIONS: { value: "none" | "light" | "dark"; label: string }[] = [
@@ -76,7 +81,7 @@ const OVERLAY_OPTIONS: { value: "none" | "light" | "dark"; label: string }[] = [
 // HeroBlockEditor
 // ---------------------------------------------------------------------------
 
-export function HeroBlockEditor({ config, onChange }: Props) {
+export function HeroBlockEditor({ config, onChange, onMediaPreview }: Props) {
   const hero = config as HeroSectionConfig;
   const layout = (hero._layout ?? {}) as SectionLayout;
   const background: SectionBackground = layout.background ?? { type: "none" };
@@ -104,7 +109,7 @@ export function HeroBlockEditor({ config, onChange }: Props) {
 
   // ── Background type switch ────────────────────────────────────────────────
 
-  function handleBgTypeChange(type: "none" | "image" | "gradient") {
+  function handleBgTypeChange(type: "none" | "image" | "gradient" | "color") {
     switch (type) {
       case "none":
         setBackground({ type: "none" });
@@ -127,6 +132,13 @@ export function HeroBlockEditor({ config, onChange }: Props) {
               : "club-warm",
         });
         break;
+      case "color":
+        setBackground({
+          type: "solid",
+          color:
+            background.type === "solid" ? background.color : "#f97316",
+        });
+        break;
     }
   }
 
@@ -139,6 +151,8 @@ export function HeroBlockEditor({ config, onChange }: Props) {
       overlay:
         background.type === "image" ? background.overlay : "dark",
     });
+    // Notify workspace so the canvas renderer can show a live preview
+    onMediaPreview?.(asset.id, asset.url);
   }
 
   function handleBgImageRemove() {
@@ -155,13 +169,15 @@ export function HeroBlockEditor({ config, onChange }: Props) {
 
   const hAlign = layout.hAlign ?? "left";
   const theme  = layout.theme  ?? "light";
-  const bgType = background.type === "solid" ? "none" : background.type;
+  const bgType = background.type === "solid" ? "color" : background.type;
   const bgImageId =
     background.type === "image" ? (background.mediaAssetId || null) : null;
   const bgGradientPreset =
     background.type === "gradient" ? background.gradientPreset : "club-warm";
   const bgOverlay =
     background.type === "image" ? background.overlay : "dark";
+  const bgSolidColor =
+    background.type === "solid" ? background.color : "#f97316";
 
   return (
     <div>
@@ -311,6 +327,16 @@ export function HeroBlockEditor({ config, onChange }: Props) {
                 </button>
               ))}
             </div>
+          </InspectorField>
+        )}
+
+        {/* Solid color picker */}
+        {background.type === "solid" && (
+          <InspectorField label="Hintergrundfarbe">
+            <ColorPalettePicker
+              value={bgSolidColor}
+              onChange={(color) => setBackground({ type: "solid", color })}
+            />
           </InspectorField>
         )}
 

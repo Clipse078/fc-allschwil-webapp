@@ -30,6 +30,7 @@ import {
   SegmentedControl,
 } from "./BlockEditorShell";
 import { HomepageMediaField } from "../media";
+import { ColorPalettePicker } from "./ColorPalettePicker";
 import type { MediaAssetListItem } from "@/lib/media/types";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +40,8 @@ import type { MediaAssetListItem } from "@/lib/media/types";
 type Props = {
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
+  /** Called with the asset ID and live URL when a background image is selected. */
+  onMediaPreview?: (assetId: string, url: string) => void;
 };
 
 const ALIGN_OPTIONS: { value: SectionHAlign; label: string; icon: React.ReactNode }[] = [
@@ -53,10 +56,11 @@ const THEME_OPTIONS: { value: SectionTheme; label: string }[] = [
   { value: "club",  label: "Club"   },
 ];
 
-const BG_TYPE_OPTIONS: { value: "none" | "image" | "gradient"; label: string }[] = [
+const BG_TYPE_OPTIONS: { value: "none" | "image" | "gradient" | "color"; label: string }[] = [
   { value: "none",     label: "Kein"    },
   { value: "image",    label: "Bild"    },
   { value: "gradient", label: "Verlauf" },
+  { value: "color",    label: "Farbe"   },
 ];
 
 const OVERLAY_OPTIONS: { value: "none" | "light" | "dark"; label: string }[] = [
@@ -69,7 +73,7 @@ const OVERLAY_OPTIONS: { value: "none" | "light" | "dark"; label: string }[] = [
 // CallToActionBlockEditor
 // ---------------------------------------------------------------------------
 
-export function CallToActionBlockEditor({ config, onChange }: Props) {
+export function CallToActionBlockEditor({ config, onChange, onMediaPreview }: Props) {
   const cta = config as CallToActionSectionConfig;
   const layout = (cta._layout ?? {}) as SectionLayout;
   const background: SectionBackground = layout.background ?? { type: "none" };
@@ -97,7 +101,7 @@ export function CallToActionBlockEditor({ config, onChange }: Props) {
 
   // ── Background type switch ────────────────────────────────────────────────
 
-  function handleBgTypeChange(type: "none" | "image" | "gradient") {
+  function handleBgTypeChange(type: "none" | "image" | "gradient" | "color") {
     switch (type) {
       case "none":
         setBackground({ type: "none" });
@@ -120,6 +124,13 @@ export function CallToActionBlockEditor({ config, onChange }: Props) {
               : "club-warm",
         });
         break;
+      case "color":
+        setBackground({
+          type: "solid",
+          color:
+            background.type === "solid" ? background.color : "#f97316",
+        });
+        break;
     }
   }
 
@@ -132,6 +143,7 @@ export function CallToActionBlockEditor({ config, onChange }: Props) {
       overlay:
         background.type === "image" ? background.overlay : "dark",
     });
+    onMediaPreview?.(asset.id, asset.url);
   }
 
   function handleBgImageRemove() {
@@ -150,13 +162,15 @@ export function CallToActionBlockEditor({ config, onChange }: Props) {
   const theme  = (layout.theme  ?? "light")  as SectionTheme;
   const hasPrimary   = Boolean(cta.primaryLabel);
   const hasSecondary = Boolean(cta.secondaryLabel);
-  const bgType = background.type === "solid" ? "none" : background.type;
+  const bgType = background.type === "solid" ? "color" : background.type;
   const bgImageId =
     background.type === "image" ? (background.mediaAssetId || null) : null;
   const bgGradientPreset =
     background.type === "gradient" ? background.gradientPreset : "club-warm";
   const bgOverlay =
     background.type === "image" ? background.overlay : "dark";
+  const bgSolidColor =
+    background.type === "solid" ? background.color : "#f97316";
 
   return (
     <div>
@@ -336,6 +350,16 @@ export function CallToActionBlockEditor({ config, onChange }: Props) {
                 </button>
               ))}
             </div>
+          </InspectorField>
+        )}
+
+        {/* Solid color picker */}
+        {background.type === "solid" && (
+          <InspectorField label="Hintergrundfarbe">
+            <ColorPalettePicker
+              value={bgSolidColor}
+              onChange={(color) => setBackground({ type: "solid", color })}
+            />
           </InspectorField>
         )}
       </CollapsibleSection>

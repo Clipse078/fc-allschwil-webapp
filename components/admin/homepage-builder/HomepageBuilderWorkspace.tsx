@@ -30,6 +30,7 @@ import { HomepageSectionCard } from "./HomepageSectionCard";
 import { HomepageSectionInspector } from "./HomepageSectionInspector";
 import { HomepageCanvas } from "./HomepageCanvas";
 import WebsiteSectionDispatcher from "@/components/website/WebsiteSectionDispatcher";
+import { CanvasPreviewContext } from "./canvas-renderers";
 
 // ---------------------------------------------------------------------------
 // Preview panel types
@@ -337,6 +338,10 @@ export default function HomepageBuilderWorkspace() {
     config: Record<string, unknown>;
   } | null>(null);
 
+  // ── Live image preview URLs (session-local, never persisted) ──────────────
+  // Maps mediaAssetId → ephemeral URL for canvas rendering without a server roundtrip.
+  const [mediaPreviewUrls, setMediaPreviewUrls] = useState<Record<string, string>>({});
+
   // ── Reorder state (Canvas drag & drop) ───────────────────────────────────
   const [reorderPending, setReorderPending] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
@@ -588,6 +593,15 @@ export default function HomepageBuilderWorkspace() {
     setInspectorDraft(null);
   }
 
+  /**
+   * Called by block editors (via inspector) when a background image is selected.
+   * Stores the ephemeral URL so canvas renderers can show a live preview
+   * without waiting for a server round-trip or page reload.
+   */
+  function handleMediaPreview(assetId: string, url: string) {
+    setMediaPreviewUrls((prev) => ({ ...prev, [assetId]: url }));
+  }
+
   // ── Review handlers ───────────────────────────────────────────────────────
 
   async function handleRequestReview(id: string) {
@@ -693,7 +707,11 @@ export default function HomepageBuilderWorkspace() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <>
+    <CanvasPreviewContext.Provider value={{ previewUrls: mediaPreviewUrls }}>
+      {/* Preview overlay */}
+      {showPreview && (
+        <HomepagePreviewPanel onClose={() => setShowPreview(false)} />
+      )}
       {/* Preview overlay */}
       {showPreview && (
         <HomepagePreviewPanel onClose={() => setShowPreview(false)} />
@@ -1002,12 +1020,13 @@ export default function HomepageBuilderWorkspace() {
                   section={selectedSection}
                   onDraftChange={handleInspectorDraftChange}
                   onSaveEdit={handleInspectorSave}
+                  onMediaPreview={handleMediaPreview}
                 />
               </div>
             </div>
           </div>
         )}
       </SectionCard>
-    </>
+    </CanvasPreviewContext.Provider>
   );
 }

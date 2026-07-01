@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/Badge";
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import { HomepageCanvasToolbar } from "./HomepageCanvasToolbar";
 import type { SectionCardCallbacks } from "./HomepageSectionCard";
+import { CanvasSectionRenderer } from "./canvas-renderers";
 
 // ---------------------------------------------------------------------------
 // Block icon map + category colors
@@ -206,7 +207,7 @@ export function HomepageCanvasSection({
       )}
 
       {/* Body */}
-      <div className="flex items-center gap-4 px-4 py-4">
+      <div className="flex items-center gap-4 px-4 py-3">
         {/* Drag handle */}
         <div
           className="shrink-0 opacity-25 group-hover:opacity-60 hover:opacity-80 transition-opacity cursor-grab active:cursor-grabbing"
@@ -299,6 +300,17 @@ export function HomepageCanvasSection({
           )}
         </div>
       </div>
+
+      {/* Real block preview — the canvas rendering surface */}
+      {!isDragging && (
+        <div
+          className={`border-t ${isSelected ? "border-[var(--sce-primary)]/30" : "border-[var(--border)]"}`}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <CanvasSectionRenderer section={section} />
+        </div>
+      )}
 
       {/* Selection indicator bar */}
       {isSelected && !isDragging && (

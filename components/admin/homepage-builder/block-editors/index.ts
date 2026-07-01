@@ -23,6 +23,9 @@ export { SplitContentCardsBlockEditor } from "./SplitContentCardsBlockEditor";
 export { CustomContentBlockEditor } from "./CustomContentBlockEditor";
 export { UnsupportedBlockEditor } from "./UnsupportedBlockEditor";
 
+// Color palette picker (shared between block editors)
+export { ColorPalettePicker } from "./ColorPalettePicker";
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -36,6 +39,9 @@ import { CustomContentBlockEditor } from "./CustomContentBlockEditor";
 export type BlockEditorProps = {
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
+  /** Called with the asset ID and live URL when a background image is selected.
+   *  Enables the canvas renderer to show live image previews without persisting. */
+  onMediaPreview?: (assetId: string, url: string) => void;
 };
 
 /**

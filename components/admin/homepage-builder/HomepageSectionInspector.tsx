@@ -121,6 +121,9 @@ type Props = {
   ) => void;
   /** Called when the user clicks "Speichern". Same signature as card's onSaveEdit. */
   onSaveEdit?: (label: string, config: Record<string, unknown>) => Promise<void>;
+  /** Called when a background image is selected in a block editor, providing
+   *  the asset ID and a live preview URL for canvas rendering. */
+  onMediaPreview?: (assetId: string, url: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -131,6 +134,7 @@ export function HomepageSectionInspector({
   section,
   onDraftChange,
   onSaveEdit,
+  onMediaPreview,
 }: Props) {
   // ── Local draft state ──────────────────────────────────────────────────
   const [draftLabel, setDraftLabel] = useState("");
@@ -356,6 +360,7 @@ export function HomepageSectionInspector({
               <BlockEditor
                 config={draftConfig}
                 onChange={handleConfigChange}
+                onMediaPreview={onMediaPreview}
               />
             </div>
           ) : (
