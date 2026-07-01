@@ -5,7 +5,6 @@ import {
   CheckSquare,
   FileText,
   Globe,
-  LayoutDashboard,
   Monitor,
   Newspaper,
   Plus,
@@ -27,7 +26,6 @@ import {
   DashboardGrid,
   DashboardEmptyState,
 } from "@/components/ui/dashboard";
-import { Button } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -40,9 +38,9 @@ type DashboardPageProps = {
 
 function getGreeting(firstName: string): string {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return `Good morning, ${firstName} 👋`;
-  if (hour >= 12 && hour < 18) return `Good afternoon, ${firstName} 👋`;
-  return `Good evening, ${firstName} 👋`;
+  if (hour >= 5 && hour < 12) return `Guten Morgen, ${firstName}`;
+  if (hour >= 12 && hour < 18) return `Guten Tag, ${firstName}`;
+  return `Guten Abend, ${firstName}`;
 }
 
 // ── Activity helpers ──────────────────────────────────────────────────────────
@@ -344,23 +342,7 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
       urgent: false,
     });
   }
-  // Filler tasks to show at least some items
-  if (tasks.length === 0) {
-    tasks.push(
-      {
-        title: "Homepage überprüfen",
-        subtitle: "Aktuelle Inhalte validieren",
-        dueLabel: "Morgen",
-        urgent: false,
-      },
-      {
-        title: "Saisonplanung aktualisieren",
-        subtitle: "Events für nächste Woche eintragen",
-        dueLabel: "12.06.",
-        urgent: false,
-      },
-    );
-  }
+  const hasTasks = tasks.length > 0;
 
   // ── Upcoming events (merge sport events + meetings) ───────────────────────
 
@@ -418,13 +400,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
         date={todayFormatted}
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="default"
-              iconLeft={<LayoutDashboard className="h-4 w-4" />}
-            >
-              Dashboard anpassen
-            </Button>
             <Link
               href="/dashboard/website/news/new"
               className={cn(
@@ -436,7 +411,20 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
               )}
             >
               <Plus className="h-4 w-4" />
-              Schnellaktion
+              Neue News
+            </Link>
+            <Link
+              href="/dashboard/registrations"
+              className={cn(
+                "inline-flex items-center justify-center gap-1.5",
+                "h-9 rounded-lg border border-[var(--border)] px-3.5 text-sm font-semibold",
+                "bg-[var(--surface)] text-[var(--foreground)]",
+                "transition-all duration-[120ms] hover:bg-[var(--surface-2)]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
+              )}
+            >
+              <Users className="h-4 w-4" />
+              Anmeldungen
             </Link>
           </div>
         }
@@ -447,28 +435,44 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
         <DashboardKpiCard
           title="Offene Anmeldungen"
           value={String(dash.openRegistrationCount)}
-          description="+3 seit gestern"
+          description={
+            dash.openRegistrationCount > 0
+              ? "Warten auf Bestätigung"
+              : "Alles abgearbeitet"
+          }
           accent="warning"
           icon={<Users className="h-5 w-5" />}
         />
         <DashboardKpiCard
           title="News in Prüfung"
           value={String(dash.newsInReviewCount)}
-          description="2 fällig heute"
+          description={
+            dash.newsInReviewCount > 0
+              ? "Warten auf Freigabe"
+              : "Keine offenen Artikel"
+          }
           accent="info"
           icon={<Newspaper className="h-5 w-5" />}
         />
         <DashboardKpiCard
-          title="Veröffentlichungen geplant"
+          title="Geplante Veröffentlichungen"
           value={String(dash.scheduledNewsCount)}
-          description="Diese Woche"
+          description={
+            dash.scheduledNewsCount > 0
+              ? "Stehen zur Veröffentlichung bereit"
+              : "Keine geplanten Artikel"
+          }
           accent="success"
           icon={<Monitor className="h-5 w-5" />}
         />
         <DashboardKpiCard
           title="Events diese Woche"
           value={String(dash.weekEventsCount)}
-          description={`${dash.todayEventsCount} heute`}
+          description={
+            dash.todayEventsCount > 0
+              ? `${dash.todayEventsCount} ${dash.todayEventsCount === 1 ? "Event" : "Events"} heute`
+              : "Keine Events heute"
+          }
           accent="primary"
           icon={<CalendarDays className="h-5 w-5" />}
         />
@@ -484,22 +488,36 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
               actions={<CheckSquare className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />}
               noPadding
               footer={
-                <Link href="/dashboard/registrations" className="sce-link-primary text-[0.8125rem]">
-                  Alle Aufgaben anzeigen →
-                </Link>
+                hasTasks ? (
+                  <Link href="/dashboard/registrations" className="sce-link-primary text-[0.8125rem]">
+                    Alle Aufgaben anzeigen →
+                  </Link>
+                ) : null
               }
             >
-              <div className="px-5 pt-1">
-                {tasks.map((t, i) => (
-                  <TaskItem
-                    key={i}
-                    title={t.title}
-                    subtitle={t.subtitle}
-                    dueLabel={t.dueLabel}
-                    urgent={t.urgent}
-                  />
-                ))}
-              </div>
+              {hasTasks ? (
+                <div className="px-5 pt-1">
+                  {tasks.map((t, i) => (
+                    <TaskItem
+                      key={i}
+                      title={t.title}
+                      subtitle={t.subtitle}
+                      dueLabel={t.dueLabel}
+                      urgent={t.urgent}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="sce-task-empty px-5">
+                  <CheckSquare className="h-8 w-8 text-[var(--sce-success)]" aria-hidden="true" />
+                  <p className="text-sm font-medium text-[var(--foreground)]">
+                    Alles erledigt
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    Keine offenen Aufgaben.
+                  </p>
+                </div>
+              )}
             </DashboardSection>
 
             {/* Nächste Termine */}

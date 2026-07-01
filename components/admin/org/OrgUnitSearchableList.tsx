@@ -12,6 +12,7 @@ import {
   Archive,
 } from "lucide-react";
 import OrgUnitRestoreButton from "@/components/admin/org/OrgUnitRestoreButton";
+import { EmptyState } from "@/components/ui/page";
 
 type OrgUnitItem = {
   id: string;
@@ -95,59 +96,43 @@ function LevelIndent({ level }: { level: number }) {
   );
 }
 
-function EmptySearch({ query }: { query: string }) {
+function OrgEmptySearch({ query, onClear }: { query: string; onClear: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-        <Search className="h-5 w-5 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-[var(--foreground)]">Keine Treffer</p>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Für &ldquo;{query}&rdquo; wurden keine Einheiten gefunden.
-        </p>
-      </div>
-    </div>
+    <EmptyState
+      icon={<Search className="h-10 w-10" />}
+      heading="Keine Treffer"
+      description={`Für „${query}" wurden keine Einheiten gefunden.`}
+      action={
+        <button type="button" onClick={onClear} className="fca-button-secondary">
+          Suche zurücksetzen
+        </button>
+      }
+    />
   );
 }
 
-function EmptyActive() {
+function OrgEmptyActive() {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-        <Building2 className="h-6 w-6 text-slate-400" />
-      </div>
-      <div>
-        <p className="text-base font-semibold text-[var(--foreground)]">
-          Noch keine Organisationseinheiten
-        </p>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Erstelle die erste Einheit, um die Organisationsstruktur aufzubauen.
-        </p>
-      </div>
-      <Link
-        href="/dashboard/org-units/new"
-        className="mt-2 inline-flex items-center gap-2 rounded-[var(--radius-xl)] bg-[var(--blue)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-      >
-        Erste Einheit erstellen
-      </Link>
-    </div>
+    <EmptyState
+      icon={<Building2 className="h-10 w-10" />}
+      heading="Noch keine Organisationseinheiten"
+      description="Baue die Vereinsstruktur auf, indem du Abteilungen, Ressorts und Komitees erstellst."
+      action={
+        <Link href="/dashboard/org-units/new" className="fca-button-primary">
+          Erste Einheit erstellen
+        </Link>
+      }
+    />
   );
 }
 
-function EmptyArchived() {
+function OrgEmptyArchived() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-        <Archive className="h-5 w-5 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-[var(--foreground)]">Keine archivierten Einheiten</p>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Archivierte Einheiten werden hier angezeigt und können wiederhergestellt werden.
-        </p>
-      </div>
-    </div>
+    <EmptyState
+      icon={<Archive className="h-10 w-10" />}
+      heading="Keine archivierten Einheiten"
+      description="Archivierte Einheiten werden hier angezeigt und können jederzeit wiederhergestellt werden."
+    />
   );
 }
 
@@ -304,9 +289,9 @@ export default function OrgUnitSearchableList({
       {/* List — active view */}
       {!showArchived ? (
         displayUnits.length === 0 && query.trim() ? (
-          <EmptySearch query={query} />
+          <OrgEmptySearch query={query} onClear={() => setQuery("")} />
         ) : displayUnits.length === 0 ? (
-          <EmptyActive />
+          <OrgEmptyActive />
         ) : (
           <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
             {displayUnits.map((unit, idx) => {
@@ -385,9 +370,9 @@ export default function OrgUnitSearchableList({
       {/* List — archived view */}
       {showArchived ? (
         displayUnits.length === 0 && query.trim() ? (
-          <EmptySearch query={query} />
+          <OrgEmptySearch query={query} onClear={() => setQuery("")} />
         ) : displayUnits.length === 0 ? (
-          <EmptyArchived />
+          <OrgEmptyArchived />
         ) : (
           <div className="space-y-3">
             {displayUnits.map((unit) => {

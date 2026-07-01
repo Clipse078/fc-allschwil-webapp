@@ -189,18 +189,19 @@ export default function AdminSidebar({
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
         {sections.map((section, sectionIdx) => (
-          <div key={section.sectionLabel ?? "__top__"}>
-            {/* Section divider */}
+          <div key={section.sectionLabel ?? "__top__"} className={cn(sectionIdx > 0 && "mt-1")}>
+            {/* Section label (expanded) */}
             {section.sectionLabel && !isCollapsed && (
-              <p
-                className={cn(
-                  "px-2 pb-1 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]",
-                  sectionIdx > 0 && "mt-4",
+              <>
+                {sectionIdx > 0 && (
+                  <div className="sce-nav-section-divider" />
                 )}
-              >
-                {section.sectionLabel}
-              </p>
+                <p className="px-2 pb-1.5 pt-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                  {section.sectionLabel}
+                </p>
+              </>
             )}
+            {/* Section divider (collapsed) */}
             {section.sectionLabel && isCollapsed && sectionIdx > 0 && (
               <div className="my-2 mx-2 border-t border-[var(--border)]" />
             )}
@@ -224,12 +225,20 @@ export default function AdminSidebar({
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      {!isCollapsed && <span>{item.label}</span>}
+                      {!isCollapsed && <span className="flex-1 truncate">{item.label}</span>}
+                      {/* Active section indicator dot in collapsed mode */}
+                      {isCollapsed && isActive && (
+                        <span
+                          className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full"
+                          style={{ background: "var(--tenant-primary)" }}
+                          aria-hidden="true"
+                        />
+                      )}
                     </Link>
 
                     {/* Children (always expanded when sidebar is open) */}
                     {!isCollapsed && item.children && item.children.length > 0 && (
-                      <ul className="mt-0.5 space-y-0.5">
+                      <ul className="mt-0.5 space-y-0.5 pl-2">
                         {item.children.map((child) => {
                           const ChildIcon = getNavIcon(child.label);
                           const childHref = buildHref(child.href);
@@ -238,10 +247,13 @@ export default function AdminSidebar({
                             <li key={child.key}>
                               <Link
                                 href={childHref}
-                                className={cn("sce-nav-child", isChildActive && "active")}
+                                className={cn(
+                                  "sce-nav-child relative",
+                                  isChildActive && "active",
+                                )}
                               >
                                 <ChildIcon className="h-3.5 w-3.5 shrink-0" />
-                                <span>{child.label}</span>
+                                <span className="flex-1 truncate">{child.label}</span>
                               </Link>
                             </li>
                           );

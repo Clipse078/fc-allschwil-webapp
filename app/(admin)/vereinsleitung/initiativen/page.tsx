@@ -33,8 +33,14 @@ export default async function VereinsleitungInitiativenPage() {
         }
         isEmpty={initiatives.length === 0}
         emptyIcon={<Flag className="h-10 w-10" />}
-        emptyHeading="Keine zugänglichen Initiativen"
-        emptyDescription="Noch keine Initiativen erfasst oder keine für dich sichtbaren Einträge."
+        emptyHeading="Noch keine Initiativen"
+        emptyDescription="Starte die erste Initiative, um Projekte und strategische Vorhaben zentral zu verfolgen."
+        emptyAction={
+          <Link href="/vereinsleitung/initiativen/new" className="fca-button-primary">
+            <Plus className="h-4 w-4" />
+            Erste Initiative anlegen
+          </Link>
+        }
       >
         <VereinsleitungInitiativenList initiatives={initiatives} />
       </ListPagePattern>

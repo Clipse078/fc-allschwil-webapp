@@ -6,6 +6,14 @@ import { Newspaper, PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide
 import NewsStatusBadge from "@/components/admin/news/NewsStatusBadge";
 import type { ArticleStatus, NewsArticleAdminListItem } from "@/lib/news/admin-queries";
 import { SectionCard, EmptyState } from "@/components/ui/page";
+import {
+  DataTable,
+  DataTableHeader,
+  DataTableBody,
+  DataTableRow,
+  DataTableHead,
+  DataTableCell,
+} from "@/components/ui/patterns";
 
 type FilterStatus = "ALL" | ArticleStatus;
 
@@ -152,95 +160,79 @@ export default function NewsArticleList() {
           }
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <tr>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Titel
-                </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Status
-                </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Veröffentlicht
-                </th>
-                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Geändert
-                </th>
-                <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Aktionen
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {articles.map((article) => (
-                <tr
-                  key={article.id}
-                  className="bg-[var(--surface)] transition hover:bg-[var(--surface-2)]"
-                >
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="line-clamp-1 font-medium text-[var(--foreground)]">
-                        {article.title}
-                      </p>
-                      <p className="text-[11px] text-[var(--muted)]">{article.slug}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <NewsStatusBadge status={article.status} />
-                  </td>
-                  <td className="px-4 py-3 text-[11px] text-[var(--muted)]">
-                    {formatDate(article.publishedAt)}
-                  </td>
-                  <td className="px-4 py-3 text-[11px] text-[var(--muted)]">
-                    {formatDate(article.updatedAt)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        href={`/dashboard/website/news/${article.id}/edit`}
-                        className="sce-icon-button"
-                        title="Bearbeiten"
-                      >
-                        <PenLine className="h-3.5 w-3.5" />
-                      </Link>
-                      {/* Only show publish toggle for non-review statuses */}
-                      {article.status !== "IN_REVIEW" && (
-                        <button
-                          type="button"
-                          onClick={() => handlePublish(article.id, article.status)}
-                          disabled={actionPending === article.id}
-                          className="sce-icon-button"
-                          title={
-                            article.status === "PUBLISHED"
-                              ? "Depublizieren"
-                              : "Veröffentlichen"
-                          }
-                        >
-                          {article.status === "PUBLISHED" ? (
-                            <EyeOff className="h-3.5 w-3.5" />
-                          ) : (
-                            <Eye className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      )}
+        <DataTable>
+          <DataTableHeader>
+            <DataTableRow>
+              <DataTableHead>Titel</DataTableHead>
+              <DataTableHead>Status</DataTableHead>
+              <DataTableHead>Veröffentlicht</DataTableHead>
+              <DataTableHead>Geändert</DataTableHead>
+              <DataTableHead align="right">Aktionen</DataTableHead>
+            </DataTableRow>
+          </DataTableHeader>
+          <DataTableBody>
+            {articles.map((article) => (
+              <DataTableRow key={article.id} interactive>
+                <DataTableCell>
+                  <div>
+                    <p className="line-clamp-1 font-medium text-[var(--foreground)]">
+                      {article.title}
+                    </p>
+                    <p className="text-[11px] text-[var(--muted)]">{article.slug}</p>
+                  </div>
+                </DataTableCell>
+                <DataTableCell>
+                  <NewsStatusBadge status={article.status} />
+                </DataTableCell>
+                <DataTableCell muted>
+                  {formatDate(article.publishedAt)}
+                </DataTableCell>
+                <DataTableCell muted>
+                  {formatDate(article.updatedAt)}
+                </DataTableCell>
+                <DataTableCell align="right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Link
+                      href={`/dashboard/website/news/${article.id}/edit`}
+                      className="sce-icon-button"
+                      title="Bearbeiten"
+                    >
+                      <PenLine className="h-3.5 w-3.5" />
+                    </Link>
+                    {article.status !== "IN_REVIEW" && (
                       <button
                         type="button"
-                        onClick={() => handleDelete(article.id)}
+                        onClick={() => handlePublish(article.id, article.status)}
                         disabled={actionPending === article.id}
-                        className="sce-icon-button text-rose-500 hover:text-rose-700"
-                        title="Löschen"
+                        className="sce-icon-button"
+                        title={
+                          article.status === "PUBLISHED"
+                            ? "Depublizieren"
+                            : "Veröffentlichen"
+                        }
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        {article.status === "PUBLISHED" ? (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(article.id)}
+                      disabled={actionPending === article.id}
+                      className="sce-icon-button text-rose-500 hover:text-rose-700"
+                      title="Löschen"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </DataTableCell>
+              </DataTableRow>
+            ))}
+          </DataTableBody>
+        </DataTable>
       )}
 
       {/* Footer count */}

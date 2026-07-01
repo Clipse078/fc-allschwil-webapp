@@ -35,3 +35,12 @@ export type { DashboardPatternProps } from "./DashboardPattern";
 
 export { SettingsPattern } from "./SettingsPattern";
 export type { SettingsPatternProps } from "./SettingsPattern";
+
+export {
+  DataTable,
+  DataTableHeader,
+  DataTableBody,
+  DataTableRow,
+  DataTableHead,
+  DataTableCell,
+} from "./DataTable";

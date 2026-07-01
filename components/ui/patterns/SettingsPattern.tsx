@@ -109,14 +109,20 @@ export function SettingsPattern({
         <PageBreadcrumbs items={breadcrumbs} />
       )}
 
-      <PageHeader
-        eyebrow={eyebrow}
-        title={title}
-        description={description}
-      />
+      {/* Page header — eyebrow + title + description */}
+      <div className="mb-8 border-b border-[var(--border)] pb-6">
+        <PageHeader
+          eyebrow={eyebrow}
+          title={title}
+          description={description}
+          className="mb-0"
+        />
+      </div>
 
-      <div className="flex flex-col">{children}</div>
+      {/* Settings body — divided sections */}
+      <div className="sce-settings-wrapper">{children}</div>
 
+      {/* Sticky action bar */}
       {hasActions && (
         <ActionBar
           sticky={stickyActions}
@@ -128,8 +134,9 @@ export function SettingsPattern({
         </ActionBar>
       )}
 
+      {/* Danger zone */}
       {dangerZone && (
-        <Card variant="warning" title="Gefahrenzone" className="mt-8">
+        <Card variant="warning" title="Gefahrenzone" className="mt-10">
           {dangerZone}
         </Card>
       )}

@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantContextFromSession } from "@/lib/tenants/context";
-import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { PageShell } from "@/components/ui/page";
+import { SettingsPattern } from "@/components/ui/patterns";
 import BrandingSettingsForm from "@/components/admin/branding/BrandingSettingsForm";
 
 // Branding management for the authenticated user's own tenant.
@@ -17,20 +18,26 @@ export default async function BrandingPage() {
   if (!ctx) notFound();
 
   return (
-    <div className="space-y-8">
-      <AdminSectionHeader
-        eyebrow="Admin"
+    <PageShell fullWidth>
+      <SettingsPattern
+        eyebrow="Administration"
         title="Darstellung"
         description="Logo und Vereinsfarben konfigurieren. Änderungen wirken sich sofort auf die Seitenleiste, das Dashboard und alle Branding-Oberflächen aus."
-      />
-      <BrandingSettingsForm
-        tenantName={ctx.name}
-        defaultValues={{
-          logoUrl: ctx.logoUrl,
-          primaryColor: ctx.primaryColor,
-          secondaryColor: ctx.secondaryColor,
-        }}
-      />
-    </div>
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Administration" },
+          { label: "Darstellung" },
+        ]}
+      >
+        <BrandingSettingsForm
+          tenantName={ctx.name}
+          defaultValues={{
+            logoUrl: ctx.logoUrl,
+            primaryColor: ctx.primaryColor,
+            secondaryColor: ctx.secondaryColor,
+          }}
+        />
+      </SettingsPattern>
+    </PageShell>
   );
 }

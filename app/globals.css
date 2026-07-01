@@ -1194,6 +1194,182 @@ button {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   SCE NAVIGATION — POLISH ADDITIONS
+   Tighter section group label spacing, better indentation cues
+───────────────────────────────────────────────────────────────────────── */
+
+.sce-nav-group {
+  margin-bottom: 4px;
+}
+
+.sce-nav-group + .sce-nav-group {
+  padding-top: 4px;
+}
+
+/* Subtle active indicator on child items — left indented bar */
+.sce-nav-child.active::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--tenant-primary);
+  opacity: 0.6;
+}
+
+/* Section label improved contrast when hovered nearby */
+.sce-nav-section-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 6px;
+  opacity: 0.7;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SCE DATA TABLE — Premium table experience
+   Standardised header, row, cell, hover, spacing, status & actions columns
+───────────────────────────────────────────────────────────────────────── */
+
+/* The outer scroll wrapper is handled inline; these styles target the table */
+.sce-data-table {
+  width: 100%;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+
+.sce-data-table thead {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.sce-data-table thead th {
+  padding: 10px 16px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.sce-data-table thead th.right {
+  text-align: right;
+}
+
+.sce-data-table tbody {
+  divide-color: var(--border);
+}
+
+.sce-data-table tbody tr {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  transition: background-color var(--transition-fast);
+}
+
+.sce-data-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.sce-data-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.sce-data-table tbody td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+.sce-data-table tbody td.muted {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sce-data-table tbody td.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Status column — fixed narrow width */
+.sce-data-table-col-status {
+  width: 120px;
+}
+
+.sce-data-table-col-actions {
+  width: 96px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SCE SETTINGS — SettingsPattern visual improvements
+───────────────────────────────────────────────────────────────────────── */
+
+.sce-settings-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sce-settings-section {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sce-settings-section:last-child {
+  border-bottom: none;
+}
+
+/* Settings action bar — sticky bottom bar polish */
+.sce-settings-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 0;
+  background: linear-gradient(to bottom, transparent 0%, var(--background) 30%);
+  margin-top: 8px;
+}
+
+.sce-settings-action-bar.between {
+  justify-content: space-between;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SCE DASHBOARD V2 — Refined dashboard layout
+───────────────────────────────────────────────────────────────────────── */
+
+/* KPI card hover lift */
+.sce-kpi-card-v2 {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  padding: 20px;
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.sce-kpi-card-v2:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+/* Dashboard empty task state */
+.sce-task-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    RESPONSIVE
 ───────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {

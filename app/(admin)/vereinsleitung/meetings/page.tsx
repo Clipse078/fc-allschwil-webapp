@@ -33,8 +33,14 @@ export default async function VereinsleitungMeetingsPage() {
         }
         isEmpty={meetings.length === 0}
         emptyIcon={<CalendarDays className="h-10 w-10" />}
-        emptyHeading="Keine zugänglichen Meetings"
-        emptyDescription="Noch keine Meetings erfasst oder keine für dich sichtbaren Einträge."
+        emptyHeading="Noch keine Meetings"
+        emptyDescription="Plane das erste Meeting, um Sitzungen, Protokolle und Beschlüsse zentral zu erfassen."
+        emptyAction={
+          <Link href="/vereinsleitung/meetings/new" className="fca-button-primary">
+            <Plus className="h-4 w-4" />
+            Erstes Meeting anlegen
+          </Link>
+        }
       >
         <VereinsleitungMeetingsList meetings={meetings} />
       </ListPagePattern>
