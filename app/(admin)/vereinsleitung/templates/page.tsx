@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getCommunicationTemplates } from "@/lib/communication/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { EmptyState } from "@/components/ui/page";
 
 const CATEGORY_LABELS: Record<string, string> = {
   GENERAL: "Allgemein", MATCH_INVITATION: "Spieleinladung", MEETING_FOLLOWUP: "Meeting Nachfass",
@@ -36,8 +37,9 @@ export default async function TemplatesPage({ searchParams }: PageProps) {
         title="Vorlagen"
         description="Deterministische Kommunikationsvorlagen mit Variablen für kontextbewusste Clubkommunikation."
         actions={
-          <Link href="/vereinsleitung/templates/new" className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#08357a]">
-            <Plus className="h-4 w-4" />Neue Vorlage
+          <Link href="/vereinsleitung/templates/new" className="fca-button-primary">
+            <Plus className="h-4 w-4" />
+            Neue Vorlage
           </Link>
         }
       />
@@ -47,14 +49,17 @@ export default async function TemplatesPage({ searchParams }: PageProps) {
       ) : null}
 
       {templates.length === 0 ? (
-        <section className="rounded-[30px] border border-slate-200/80 bg-white p-10 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-          <Sparkles className="mx-auto mb-4 h-10 w-10 text-slate-300" />
-          <h3 className="text-[1.05rem] font-semibold text-slate-900">Noch keine Vorlagen</h3>
-          <p className="mt-2 text-sm text-slate-500">Erstelle die erste kontextbewusste Kommunikationsvorlage.</p>
-          <Link href="/vereinsleitung/templates/new" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#08357a]">
-            <Plus className="h-4 w-4" />Erste Vorlage erstellen
-          </Link>
-        </section>
+        <EmptyState
+          icon={<Sparkles className="h-10 w-10" />}
+          heading="Noch keine Vorlagen"
+          description="Erstelle die erste kontextbewusste Kommunikationsvorlage mit Variablen für deinen Club."
+          action={
+            <Link href="/vereinsleitung/templates/new" className="fca-button-primary">
+              <Plus className="h-4 w-4" />
+              Erste Vorlage erstellen
+            </Link>
+          }
+        />
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {templates.map((t) => (

@@ -7,6 +7,7 @@ import { Calendar, ChevronRight, Mail, Search, UserCheck, UserX } from "lucide-r
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import { formatDateShort } from "@/lib/tenant-runtime/formatters";
+import { EmptyState } from "@/components/ui/page";
 
 type RegistrationsInboxTableProps = {
   tenantSlug: string;
@@ -81,37 +82,6 @@ function RoutingSuggestionBadge({ birthYear }: { birthYear: number | null }) {
   );
 }
 
-function EmptySearch({ query }: { query: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-        <Search className="h-5 w-5 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-[var(--foreground)]">Keine Treffer</p>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Für &ldquo;{query}&rdquo; wurden keine Registrierungen gefunden.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-        <UserX className="h-6 w-6 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-slate-700">Keine Registrierungen</p>
-        <p className="mt-1 text-sm text-slate-400">
-          Noch keine Einträge für diesen Tenant eingegangen.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export default function RegistrationsInboxTable({
   tenantSlug,
@@ -267,9 +237,17 @@ export default function RegistrationsInboxTable({
 
       {/* List */}
       {registrations.length === 0 ? (
-        <EmptyState />
+        <EmptyState
+          icon={<UserX className="h-10 w-10" />}
+          heading="Keine Registrierungen"
+          description="Noch keine Einträge für diesen Tenant eingegangen."
+        />
       ) : filtered.length === 0 ? (
-        <EmptySearch query={query} />
+        <EmptyState
+          icon={<Search className="h-10 w-10" />}
+          heading="Keine Treffer"
+          description={`Für „${query}" wurden keine Registrierungen gefunden.`}
+        />
       ) : (
         <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
           {filtered.map((reg, idx) => {

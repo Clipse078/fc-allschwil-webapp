@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Search, UserX } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
+import { EmptyState } from "@/components/ui/page";
 
 type UserItem = {
   id: string;
@@ -28,38 +29,6 @@ function getRoleBadgeClass(roleName: string): string {
   return "sce-role-badge sce-role-badge-member";
 }
 
-function EmptySearch({ query }: { query: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-        <Search className="h-5 w-5 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-[var(--foreground)]">Keine Treffer</p>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Für &ldquo;{query}&rdquo; wurden keine Benutzer gefunden.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-        <UserX className="h-6 w-6 text-slate-400" />
-      </div>
-      <div>
-        <p className="font-semibold text-slate-700">Noch keine Benutzer</p>
-        <p className="mt-1 text-sm text-slate-400">
-          Noch keine Benutzerkonten erfasst. Über die Schaltfläche oben rechts
-          den ersten anlegen.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export default function UsersSearchableList({
   currentUserId,
@@ -147,9 +116,17 @@ export default function UsersSearchableList({
 
       {/* List */}
       {initialUsers.length === 0 ? (
-        <EmptyState />
+        <EmptyState
+          icon={<UserX className="h-10 w-10" />}
+          heading="Noch keine Benutzer"
+          description="Noch keine Benutzerkonten erfasst. Über die Schaltfläche oben rechts den ersten anlegen."
+        />
       ) : filtered.length === 0 ? (
-        <EmptySearch query={query} />
+        <EmptyState
+          icon={<Search className="h-10 w-10" />}
+          heading="Keine Treffer"
+          description={`Für „${query}" wurden keine Benutzer gefunden.`}
+        />
       ) : (
         <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
           {filtered.map((user, idx) => {

@@ -7,6 +7,7 @@ import { getTargetGroups } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
+import { EmptyState } from "@/components/ui/page";
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Aktiv",
@@ -41,23 +42,17 @@ export default async function TargetGroupsPage() {
 
       {targetGroups.length === 0 ? (
         <div className="sce-detail-section">
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-2)]">
-              <Users className="h-6 w-6 text-[var(--muted)]" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">
-                Noch keine Zielgruppen
-              </p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Zielgruppen definieren Mitgliedergruppen für Sichtbarkeit und Kommunikation.
-              </p>
-            </div>
-            <Link href="/dashboard/target-groups/new" className="fca-button-primary mt-2">
-              <Plus className="h-4 w-4" />
-              Erste Zielgruppe erstellen
-            </Link>
-          </div>
+          <EmptyState
+            icon={<Users className="h-10 w-10" />}
+            heading="Noch keine Zielgruppen"
+            description="Zielgruppen definieren Mitgliedergruppen für Sichtbarkeit, Kommunikation und Workflow-Routing."
+            action={
+              <Link href="/dashboard/target-groups/new" className="fca-button-primary">
+                <Plus className="h-4 w-4" />
+                Erste Zielgruppe erstellen
+              </Link>
+            }
+          />
         </div>
       ) : (
         <div className="sce-detail-section">
