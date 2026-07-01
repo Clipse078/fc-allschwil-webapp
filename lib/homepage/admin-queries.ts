@@ -682,3 +682,42 @@ export async function getReviewerInfo(
   });
   return user ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Bulk reorder
+// ---------------------------------------------------------------------------
+
+/**
+ * Reassigns sortOrder for all homepage sections of a tenant based on the
+ * provided ordered list of IDs. Uses sortOrder = index * 10.
+ *
+ * All IDs must belong to the tenant. Rejects duplicate IDs and mismatched
+ * counts (all-or-nothing semantics).
+ *
+ * Returns the full updated section list, or null if validation fails.
+ */
+export async function reorderHomepageSections(
+  tenantId: string,
+  orderedIds: string[],
+): Promise<HomepageSectionAdminItem[] | null> {
+  const existing = await prisma.homepageSection.findMany({
+    where: { tenantId },
+    select: { id: true },
+  });
+
+  const existingIds = new Set(existing.map((s) => s.id));
+  if (orderedIds.some((id) => !existingIds.has(id))) return null;
+  if (new Set(orderedIds).size !== orderedIds.length) return null;
+  if (orderedIds.length !== existingIds.size) return null;
+
+  await prisma.$transaction(
+    orderedIds.map((id, idx) =>
+      prisma.homepageSection.update({
+        where: { id },
+        data: { sortOrder: idx * 10 },
+      }),
+    ),
+  );
+
+  return listHomepageSections(tenantId);
+}
