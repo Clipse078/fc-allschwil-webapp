@@ -45,6 +45,13 @@
  *   - NewsTeaserRenderer.tsx          newsTeaser block (data-driven)
  *   - TeamsTeaserRenderer.tsx         teamsTeaser block (data-driven)
  *   - SponsorsTeaserRenderer.tsx      sponsorsTeaser block (foundation-ready)
+ *   - EventsTeaserRenderer.tsx        eventsTeaser block (data-driven)
+ *   - WeekplanTeaserRenderer.tsx      weekplanTeaser block (data-driven)
+ *
+ *   SECTION DISPATCHER
+ *   components/website/WebsiteSectionDispatcher.tsx maps every registered block
+ *   type to its renderer. The public website may use this dispatcher directly
+ *   instead of maintaining its own switch/map.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * FLEXIBLE LAYOUT SYSTEM (CMS V2 → V3)
