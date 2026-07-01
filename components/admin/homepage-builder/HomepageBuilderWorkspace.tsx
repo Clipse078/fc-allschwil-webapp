@@ -330,6 +330,10 @@ export default function HomepageBuilderWorkspace() {
   const [showPreview, setShowPreview] = useState(false);
   const [builderMode, setBuilderMode] = useState<BuilderMode>("list");
 
+  // ── Reorder state (Canvas drag & drop) ───────────────────────────────────
+  const [reorderPending, setReorderPending] = useState(false);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+
   // ── Data loading ──────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
@@ -390,6 +394,34 @@ export default function HomepageBuilderWorkspace() {
       setSections(data.sections ?? []);
     } finally {
       setActionPending(null);
+    }
+  }
+
+  async function handleReorder(orderedIds: string[]) {
+    const snapshot = sections;
+    const reordered = orderedIds
+      .map((id) => snapshot.find((s) => s.id === id))
+      .filter((s): s is HomepageSectionAdminItem => s !== undefined);
+
+    setSections(reordered);
+    setReorderPending(true);
+    setReorderError(null);
+
+    try {
+      const res = await fetch("/api/homepage-sections/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSections(snapshot);
+        setReorderError(data?.error ?? "Reihenfolge konnte nicht gespeichert werden.");
+        return;
+      }
+      setSections(data.sections ?? reordered);
+    } finally {
+      setReorderPending(false);
     }
   }
 
@@ -833,6 +865,9 @@ export default function HomepageBuilderWorkspace() {
                     // Switch back to list so the inline edit form is visible
                     setBuilderMode("list");
                   }}
+                  onReorder={handleReorder}
+                  reorderPending={reorderPending}
+                  reorderError={reorderError}
                 />
               ) : (
                 /* List Mode */

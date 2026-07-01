@@ -27,7 +27,7 @@ import { HomepageCanvasToolbar } from "./HomepageCanvasToolbar";
 import type { SectionCardCallbacks } from "./HomepageSectionCard";
 
 // ---------------------------------------------------------------------------
-// Block icon map + category colors (same as card, kept local to avoid coupling)
+// Block icon map + category colors
 // ---------------------------------------------------------------------------
 
 const BLOCK_ICON_MAP: Record<string, React.ElementType> = {
@@ -53,25 +53,6 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 // ---------------------------------------------------------------------------
-// Insertion zone (drag/drop placeholder for Slice E)
-// ---------------------------------------------------------------------------
-
-function InsertionZone() {
-  return (
-    <div
-      className="group/insert flex items-center gap-2 px-2 py-1 opacity-0 hover:opacity-100 transition-opacity duration-150"
-      aria-hidden="true"
-    >
-      <div className="flex-1 h-px border-t border-dashed border-[var(--border)]" />
-      <span className="text-[10px] text-[var(--muted)] px-1.5 py-0.5 rounded border border-dashed border-[var(--border)] bg-[var(--surface-2)] whitespace-nowrap select-none">
-        + Sektion einfügen
-      </span>
-      <div className="flex-1 h-px border-t border-dashed border-[var(--border)]" />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -83,6 +64,12 @@ type Props = {
   isSelected: boolean;
   isPending: boolean;
   isAnyPending: boolean;
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  onFocusPrevious?: () => void;
+  onFocusNext?: () => void;
+  sectionRef?: (el: HTMLDivElement | null) => void;
 } & Pick<
   SectionCardCallbacks,
   | "onSelect"
@@ -106,6 +93,7 @@ export function HomepageCanvasSection({
   isSelected,
   isPending,
   isAnyPending,
+  isDragging = false,
   onSelect,
   onToggle,
   onMoveUp,
@@ -113,6 +101,11 @@ export function HomepageCanvasSection({
   onPublish,
   onUnpublish,
   onStartEdit,
+  onDragStart,
+  onDragEnd,
+  onFocusPrevious,
+  onFocusNext,
+  sectionRef,
 }: Props) {
   const def = getBlockDefinition(section.type);
   const BlockIcon = BLOCK_ICON_MAP[def?.icon ?? "LayoutTemplate"] ?? LayoutTemplate;
@@ -129,162 +122,192 @@ export function HomepageCanvasSection({
     !isPublished && scheduledDate !== null && scheduledDate > new Date();
 
   return (
-    <div className="relative">
-      {/* Insertion zone above (hidden by default, appears on hover) */}
-      <InsertionZone />
-
-      {/* Canvas section tile */}
-      <div
-        role="button"
-        tabIndex={0}
-        aria-pressed={isSelected}
-        onClick={onSelect}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onSelect();
+    <div
+      ref={sectionRef}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      aria-label={`${section.label} — Position ${index + 1}. Strg+Pfeil oben/unten zum Verschieben.`}
+      draggable
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+          return;
+        }
+        // Keyboard reorder: Ctrl/Cmd + Arrow moves section
+        if ((e.ctrlKey || e.metaKey) && e.key === "ArrowUp") {
+          e.preventDefault();
+          if (!isFirst && !isPending && !isAnyPending) {
+            onMoveUp();
           }
-        }}
-        className={[
-          "group relative w-full rounded-xl border bg-[var(--surface)] cursor-pointer",
-          "transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
-          isSelected
-            ? "border-[var(--sce-primary)] shadow-md ring-2 ring-[var(--sce-primary)]/20 ring-offset-1"
-            : "border-[var(--border)] hover:border-[var(--border-strong)] hover:shadow-sm",
-          !section.isEnabled ? "opacity-75" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        {/* Mini toolbar (shown only when selected) */}
-        {isSelected && (
-          <div
-            className="absolute -top-9 left-1/2 -translate-x-1/2 z-10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <HomepageCanvasToolbar
-              section={section}
-              isFirst={isFirst}
-              isLast={isLast}
-              isPending={isPending}
-              isAnyPending={isAnyPending}
-              onStartEdit={onStartEdit}
-              onToggle={onToggle}
-              onMoveUp={onMoveUp}
-              onMoveDown={onMoveDown}
-              onPublish={onPublish}
-              onUnpublish={onUnpublish}
-            />
-          </div>
-        )}
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "ArrowDown") {
+          e.preventDefault();
+          if (!isLast && !isPending && !isAnyPending) {
+            onMoveDown();
+          }
+          return;
+        }
+        // Focus navigation: plain Arrow moves focus between sections
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          onFocusPrevious?.();
+          return;
+        }
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          onFocusNext?.();
+          return;
+        }
+      }}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", section.id);
+        onDragStart?.();
+      }}
+      onDragEnd={onDragEnd}
+      className={[
+        "relative w-full rounded-xl border bg-[var(--surface)]",
+        "transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
+        isDragging
+          ? "opacity-40 scale-[0.98] shadow-lg cursor-grabbing"
+          : "cursor-grab active:cursor-grabbing",
+        isSelected && !isDragging
+          ? "border-[var(--sce-primary)] shadow-md ring-2 ring-[var(--sce-primary)]/20 ring-offset-1"
+          : "border-[var(--border)] hover:border-[var(--border-strong)] hover:shadow-sm",
+        !section.isEnabled ? "opacity-75" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {/* Floating toolbar — shown only when selected and not dragging */}
+      {isSelected && !isDragging && (
+        <div
+          className="absolute -top-9 left-1/2 -translate-x-1/2 z-10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <HomepageCanvasToolbar
+            section={section}
+            isFirst={isFirst}
+            isLast={isLast}
+            isPending={isPending}
+            isAnyPending={isAnyPending}
+            onStartEdit={onStartEdit}
+            onToggle={onToggle}
+            onMoveUp={onMoveUp}
+            onMoveDown={onMoveDown}
+            onPublish={onPublish}
+            onUnpublish={onUnpublish}
+          />
+        </div>
+      )}
 
-        {/* Body */}
-        <div className="flex items-center gap-4 px-4 py-4">
-          {/* Drag handle placeholder */}
-          <div
-            className="shrink-0 cursor-grab opacity-20 group-hover:opacity-50 transition-opacity"
-            title="Drag &amp; Drop folgt in Slice E"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical className="h-5 w-5 text-[var(--muted)]" />
-          </div>
-
-          {/* Sort order pill */}
-          <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-2)] border border-[var(--border)]">
-            <span className="text-[11px] font-semibold text-[var(--text-2)] leading-none">
-              {index + 1}
-            </span>
-          </div>
-
-          {/* Block icon */}
-          <div
-            className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ background: categoryColor.bg, color: categoryColor.text }}
-          >
-            <BlockIcon className="h-5 w-5" />
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-[var(--foreground)] leading-snug truncate">
-              {section.label}
-            </p>
-            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-              {def && (
-                <span className="text-[10px] font-medium uppercase tracking-[0.07em] text-[var(--muted)] bg-[var(--surface-2)] border border-[var(--border)] rounded px-1.5 py-0.5">
-                  {def.category}
-                </span>
-              )}
-              <span className="text-[11px] text-[var(--muted)]">
-                {def?.displayName ?? section.type}
-              </span>
-            </div>
-            {isScheduled && scheduledDate && (
-              <p className="mt-0.5 text-[11px] text-amber-600 font-medium">
-                Geplant: {scheduledDate.toLocaleString("de-CH")}
-              </p>
-            )}
-          </div>
-
-          {/* Status cluster */}
-          <div
-            className="flex flex-wrap items-center justify-end gap-1.5 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {section.isEnabled ? (
-              <StatusIndicator variant="success" label="Aktiv" size="sm" />
-            ) : (
-              <StatusIndicator variant="neutral" label="Aus" size="sm" />
-            )}
-
-            {isPublished ? (
-              <Badge variant="info" size="sm">
-                <Globe className="h-2.5 w-2.5" />
-                Pub
-              </Badge>
-            ) : isScheduled ? (
-              <Badge variant="warning" size="sm">
-                <Clock className="h-2.5 w-2.5" />
-                Geplant
-              </Badge>
-            ) : (
-              <Badge variant="default" size="sm">
-                <GlobeLock className="h-2.5 w-2.5" />
-                Entwurf
-              </Badge>
-            )}
-
-            {approvalStatus !== "NOT_REQUIRED" && (
-              <Badge
-                size="sm"
-                variant={
-                  approvalStatus === "APPROVED"
-                    ? "success"
-                    : approvalStatus === "IN_REVIEW"
-                      ? "info"
-                      : approvalStatus === "CHANGES_REQUESTED"
-                        ? "danger"
-                        : "warning"
-                }
-              >
-                {APPROVAL_STATUS_LABELS[approvalStatus] ?? approvalStatus}
-              </Badge>
-            )}
-          </div>
+      {/* Body */}
+      <div className="flex items-center gap-4 px-4 py-4">
+        {/* Drag handle */}
+        <div
+          className="shrink-0 opacity-25 group-hover:opacity-60 hover:opacity-80 transition-opacity cursor-grab active:cursor-grabbing"
+          onClick={(e) => e.stopPropagation()}
+          aria-hidden="true"
+        >
+          <GripVertical className="h-5 w-5 text-[var(--muted)]" />
         </div>
 
-        {/* Selection indicator bar */}
-        {isSelected && (
-          <div
-            className="absolute inset-y-0 left-0 w-1 rounded-l-xl"
-            style={{ background: "var(--sce-primary)" }}
-            aria-hidden="true"
-          />
-        )}
+        {/* Sort order pill */}
+        <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-2)] border border-[var(--border)]">
+          <span className="text-[11px] font-semibold text-[var(--text-2)] leading-none">
+            {index + 1}
+          </span>
+        </div>
+
+        {/* Block icon */}
+        <div
+          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl"
+          style={{ background: categoryColor.bg, color: categoryColor.text }}
+        >
+          <BlockIcon className="h-5 w-5" />
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--foreground)] leading-snug truncate">
+            {section.label}
+          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            {def && (
+              <span className="text-[10px] font-medium uppercase tracking-[0.07em] text-[var(--muted)] bg-[var(--surface-2)] border border-[var(--border)] rounded px-1.5 py-0.5">
+                {def.category}
+              </span>
+            )}
+            <span className="text-[11px] text-[var(--muted)]">
+              {def?.displayName ?? section.type}
+            </span>
+          </div>
+          {isScheduled && scheduledDate && (
+            <p className="mt-0.5 text-[11px] text-amber-600 font-medium">
+              Geplant: {scheduledDate.toLocaleString("de-CH")}
+            </p>
+          )}
+        </div>
+
+        {/* Status cluster */}
+        <div
+          className="flex flex-wrap items-center justify-end gap-1.5 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {section.isEnabled ? (
+            <StatusIndicator variant="success" label="Aktiv" size="sm" />
+          ) : (
+            <StatusIndicator variant="neutral" label="Aus" size="sm" />
+          )}
+
+          {isPublished ? (
+            <Badge variant="info" size="sm">
+              <Globe className="h-2.5 w-2.5" />
+              Pub
+            </Badge>
+          ) : isScheduled ? (
+            <Badge variant="warning" size="sm">
+              <Clock className="h-2.5 w-2.5" />
+              Geplant
+            </Badge>
+          ) : (
+            <Badge variant="default" size="sm">
+              <GlobeLock className="h-2.5 w-2.5" />
+              Entwurf
+            </Badge>
+          )}
+
+          {approvalStatus !== "NOT_REQUIRED" && (
+            <Badge
+              size="sm"
+              variant={
+                approvalStatus === "APPROVED"
+                  ? "success"
+                  : approvalStatus === "IN_REVIEW"
+                    ? "info"
+                    : approvalStatus === "CHANGES_REQUESTED"
+                      ? "danger"
+                      : "warning"
+              }
+            >
+              {APPROVAL_STATUS_LABELS[approvalStatus] ?? approvalStatus}
+            </Badge>
+          )}
+        </div>
       </div>
 
-      {/* Insertion zone below last item */}
-      {isLast && <InsertionZone />}
+      {/* Selection indicator bar */}
+      {isSelected && !isDragging && (
+        <div
+          className="absolute inset-y-0 left-0 w-1 rounded-l-xl"
+          style={{ background: "var(--sce-primary)" }}
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 }
