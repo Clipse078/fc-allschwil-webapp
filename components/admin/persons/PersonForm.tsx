@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Button, FormSection, ValidationSummary } from "@/components/ui";
+import { FormPagePattern } from "@/components/ui/patterns";
 
 type PersonFormProps = {
   mode: "create" | "edit";
@@ -37,11 +38,6 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const fieldClass =
-    "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30";
-  const labelClass =
-    "block text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1.5";
 
   function validate(): string | null {
     if (!firstName.trim()) return "Vorname ist erforderlich.";
@@ -114,156 +110,177 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
     }
   }
 
+  const pageTitle =
+    mode === "create"
+      ? "Neue Person"
+      : firstName && lastName
+        ? `${firstName} ${lastName} bearbeiten`
+        : "Person bearbeiten";
+
+  const breadcrumbs = [
+    { label: "Dashboard", href: "/dashboard" },
+    { label: "Personen", href: "/dashboard/persons" },
+    { label: pageTitle },
+  ];
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error ? (
-        <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700">
-          {error}
-        </div>
-      ) : null}
-
-      {/* Stammdaten */}
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-5 text-[1.05rem] font-semibold text-slate-900">Stammdaten</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className={labelClass}>Vorname *</label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Vorname"
-              maxLength={100}
-              className={fieldClass}
-              required
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Nachname *</label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Nachname"
-              maxLength={100}
-              className={fieldClass}
-              required
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Anzeigename</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="z.B. Spitzname oder bevorzugter Name"
-              maxLength={150}
-              className={fieldClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Geburtsdatum</label>
-            <input
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
-              className={fieldClass}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Kontakt */}
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-5 text-[1.05rem] font-semibold text-slate-900">Kontakt</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className={labelClass}>E-Mail</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
-              maxLength={200}
-              className={fieldClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Telefon</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+41 79 000 00 00"
-              maxLength={50}
-              className={fieldClass}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Rollen & Status */}
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-5 text-[1.05rem] font-semibold text-slate-900">Rollen & Status</h3>
-        <div className="space-y-3">
-          <Toggle
-            id="isActive"
-            label="Person ist aktiv"
-            checked={isActive}
-            onChange={setIsActive}
-          />
-          <Toggle
-            id="isPlayer"
-            label="Spieler"
-            checked={isPlayer}
-            onChange={setIsPlayer}
-          />
-          <Toggle
-            id="isTrainer"
-            label="Trainer"
-            checked={isTrainer}
-            onChange={setIsTrainer}
-          />
-        </div>
-      </section>
-
-      {/* Notizen */}
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-        <h3 className="mb-5 text-[1.05rem] font-semibold text-slate-900">Notizen</h3>
-        <div>
-          <label className={labelClass}>Interne Notizen</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            placeholder="Optionale interne Notizen…"
-            maxLength={1000}
-            className={`${fieldClass} resize-none`}
-          />
-          <p className="mt-1 text-right text-[11px] text-slate-400">
-            {notes.length}/1000
-          </p>
-        </div>
-      </section>
-
-      <div className="flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+    <form onSubmit={handleSubmit}>
+      <FormPagePattern
+        eyebrow="Personen"
+        title={pageTitle}
+        description={
+          mode === "create"
+            ? "Lege einen neuen Personendatensatz im System an."
+            : "Stammdaten, Kontakt, Rollen und Status dieser Person anpassen."
+        }
+        breadcrumbs={breadcrumbs}
+        validationSummary={
+          error ? <ValidationSummary errors={[error]} /> : undefined
+        }
+        cancelAction={
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => router.back()}
+          >
+            Abbrechen
+          </Button>
+        }
+        primaryAction={
+          <Button type="submit" loading={loading}>
+            {mode === "create" ? "Person erstellen" : "Änderungen speichern"}
+          </Button>
+        }
+      >
+        <FormSection
+          title="Stammdaten"
+          description="Name und optionales Geburtsdatum der Person."
         >
-          Abbrechen
-        </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-full bg-[#0b4aa2] px-6 py-2.5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60 hover:bg-[#08357a]"
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="fca-label block">Vorname *</label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Vorname"
+                maxLength={100}
+                className="fca-input"
+                required
+              />
+            </div>
+            <div>
+              <label className="fca-label block">Nachname *</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Nachname"
+                maxLength={100}
+                className="fca-input"
+                required
+              />
+            </div>
+            <div>
+              <label className="fca-label block">Anzeigename</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="z.B. Spitzname oder bevorzugter Name"
+                maxLength={150}
+                className="fca-input"
+              />
+            </div>
+            <div>
+              <label className="fca-label block">Geburtsdatum</label>
+              <input
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                className="fca-input"
+              />
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Kontakt"
+          description="E-Mail-Adresse und Telefonnummer."
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {mode === "create" ? "Person erstellen" : "Änderungen speichern"}
-        </button>
-      </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="fca-label block">E-Mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                maxLength={200}
+                className="fca-input"
+              />
+            </div>
+            <div>
+              <label className="fca-label block">Telefon</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+41 79 000 00 00"
+                maxLength={50}
+                className="fca-input"
+              />
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Rollen & Status"
+          description="Aktiv-Status und Rollen der Person im Verein."
+        >
+          <div className="space-y-2">
+            <Toggle
+              id="isActive"
+              label="Person ist aktiv"
+              checked={isActive}
+              onChange={setIsActive}
+            />
+            <Toggle
+              id="isPlayer"
+              label="Spieler"
+              checked={isPlayer}
+              onChange={setIsPlayer}
+            />
+            <Toggle
+              id="isTrainer"
+              label="Trainer"
+              checked={isTrainer}
+              onChange={setIsTrainer}
+            />
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Notizen"
+          description="Interne Notizen, die nur für Administratoren sichtbar sind."
+        >
+          <div>
+            <label className="fca-label block">Interne Notizen</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              placeholder="Optionale interne Notizen…"
+              maxLength={1000}
+              className="fca-input resize-none"
+            />
+            <p className="mt-1 text-right text-[11px] text-[var(--muted)]">
+              {notes.length}/1000
+            </p>
+          </div>
+        </FormSection>
+      </FormPagePattern>
     </form>
   );
 }
@@ -282,15 +299,15 @@ function Toggle({
   return (
     <label
       htmlFor={id}
-      className="flex cursor-pointer items-center justify-between rounded-[14px] border border-slate-100 bg-slate-50 px-4 py-3"
+      className="flex cursor-pointer items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
     >
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-[var(--foreground)]">{label}</span>
       <input
         type="checkbox"
         id={id}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 accent-[#0b4aa2]"
+        className="h-4 w-4 rounded border-[var(--border)] accent-[var(--sce-primary)]"
       />
     </label>
   );

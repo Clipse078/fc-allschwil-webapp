@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
+import { Button, FormSection, ValidationSummary } from "@/components/ui";
+import { FormPagePattern } from "@/components/ui/patterns";
 
 const CATEGORY_OPTIONS = [
   { value: "KINDERFUSSBALL", label: "Kinderfussball" },
@@ -81,9 +82,7 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
           throw new Error(data?.error ?? "Saisons konnten nicht geladen werden.");
         }
 
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         const seasons = Array.isArray(data) ? (data as SeasonOption[]) : [];
         setSeasonOptions(seasons);
@@ -95,9 +94,7 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
 
         setSeasonId(preferredSeason?.id ?? "");
       } catch (err) {
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setSeasonOptions([]);
         setSeasonId("");
@@ -105,9 +102,7 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
           err instanceof Error ? err.message : "Ein Fehler ist aufgetreten."
         );
       } finally {
-        if (isMounted) {
-          setSeasonsLoading(false);
-        }
+        if (isMounted) setSeasonsLoading(false);
       }
     }
 
@@ -161,119 +156,161 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
     }
   }
 
+  const errorMessages = [
+    ...(seasonsError ? [seasonsError] : []),
+    ...(error ? [error] : []),
+  ];
+
   return (
-    <AdminSurfaceCard className="p-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <p className="fca-eyebrow">Saison zuerst</p>
-          <p className="text-sm leading-6 text-slate-600">
-            Teams werden saisonspezifisch angelegt. Existiert ein Team bereits im Club,
-            kann derselbe Teamname nur für eine neue zukünftige Saison erneut zugeordnet werden.
-          </p>
-        </div>
-
-        {seasonsError ? (
-          <div className="fca-status-box fca-status-box-error">{seasonsError}</div>
-        ) : null}
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block space-y-2">
-            <span className="fca-label">Saison</span>
-            <select
-              value={seasonId}
-              onChange={(event) => setSeasonId(event.target.value)}
-              className="fca-select"
-              disabled={seasonsLoading || seasonOptions.length === 0}
-              required
-            >
-              <option value="">
-                {seasonsLoading ? "Saisons laden..." : "Bitte wählen"}
-              </option>
-              {seasonOptions.map((season) => (
-                <option key={season.id} value={season.id}>
-                  {season.name}
-                  {season.isActive ? " (aktuell)" : ""}
+    <form onSubmit={handleSubmit}>
+      <FormPagePattern
+        eyebrow="Teams"
+        title="Neues Team"
+        description="Lege ein neues Team an. Wenn eine aktive Saison vorhanden ist, wird automatisch eine Team-Season-Zuordnung erstellt."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Teams", href: "/dashboard/teams" },
+          { label: "Neues Team" },
+        ]}
+        validationSummary={
+          errorMessages.length > 0
+            ? <ValidationSummary errors={errorMessages} />
+            : undefined
+        }
+        cancelAction={
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => router.push("/dashboard/teams")}
+          >
+            Abbrechen
+          </Button>
+        }
+        primaryAction={
+          <Button
+            type="submit"
+            loading={submitting}
+            disabled={submitting || seasonsLoading || !seasonId}
+          >
+            Team erstellen
+          </Button>
+        }
+      >
+        <FormSection
+          title="Saison & Kategorie"
+          description="Teams werden saisonspezifisch angelegt. Existiert ein Team bereits im Club, kann derselbe Teamname nur für eine neue zukünftige Saison erneut zugeordnet werden."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-1.5">
+              <span className="fca-label">Saison *</span>
+              <select
+                value={seasonId}
+                onChange={(event) => setSeasonId(event.target.value)}
+                className="fca-select"
+                disabled={seasonsLoading || seasonOptions.length === 0}
+                required
+              >
+                <option value="">
+                  {seasonsLoading ? "Saisons laden..." : "Bitte wählen"}
                 </option>
-              ))}
-            </select>
-          </label>
+                {seasonOptions.map((season) => (
+                  <option key={season.id} value={season.id}>
+                    {season.name}
+                    {season.isActive ? " (aktuell)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="block space-y-2">
-            <span className="fca-label">Kategorie</span>
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              className="fca-select"
-            >
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="block space-y-1.5">
+              <span className="fca-label">Kategorie</span>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                className="fca-select"
+              >
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </FormSection>
 
-          <label className="block space-y-2">
-            <span className="fca-label">Teamname</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => {
-                setName(event.target.value);
-                if (!slug) {
-                  setSlug(slugify(event.target.value));
-                }
-              }}
-              className="fca-input"
-              required
-            />
-          </label>
+        <FormSection
+          title="Team-Details"
+          description="Name, Slug und Klassifizierung des Teams."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-1.5">
+              <span className="fca-label">Teamname *</span>
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  if (!slug) {
+                    setSlug(slugify(event.target.value));
+                  }
+                }}
+                className="fca-input"
+                required
+              />
+            </label>
 
-          <label className="block space-y-2">
-            <span className="fca-label">Slug</span>
-            <input
-              type="text"
-              value={slug}
-              onChange={(event) => setSlug(slugify(event.target.value))}
-              className="fca-input"
-              required
-            />
-          </label>
+            <label className="block space-y-1.5">
+              <span className="fca-label">Slug *</span>
+              <input
+                type="text"
+                value={slug}
+                onChange={(event) => setSlug(slugify(event.target.value))}
+                className="fca-input font-mono text-xs"
+                required
+              />
+            </label>
 
-          <label className="block space-y-2">
-            <span className="fca-label">Geschlechtergruppe</span>
-            <input
-              type="text"
-              value={genderGroup}
-              onChange={(event) => setGenderGroup(event.target.value)}
-              className="fca-input"
-              placeholder="z. B. Boys, Girls, Mixed"
-            />
-          </label>
+            <label className="block space-y-1.5">
+              <span className="fca-label">Geschlechtergruppe</span>
+              <input
+                type="text"
+                value={genderGroup}
+                onChange={(event) => setGenderGroup(event.target.value)}
+                className="fca-input"
+                placeholder="z. B. Boys, Girls, Mixed"
+              />
+            </label>
 
-          <label className="block space-y-2">
-            <span className="fca-label">Teamstufe</span>
-            <input
-              type="text"
-              value={ageGroup}
-              onChange={(event) => setAgeGroup(event.target.value)}
-              className="fca-input"
-              placeholder="z. B. E, D9, Aktive"
-            />
-          </label>
+            <label className="block space-y-1.5">
+              <span className="fca-label">Teamstufe</span>
+              <input
+                type="text"
+                value={ageGroup}
+                onChange={(event) => setAgeGroup(event.target.value)}
+                className="fca-input"
+                placeholder="z. B. E, D9, Aktive"
+              />
+            </label>
 
-          <label className="block space-y-2 md:max-w-[220px]">
-            <span className="fca-label">Sortierung</span>
-            <input
-              type="number"
-              value={sortOrder}
-              onChange={(event) => setSortOrder(Number(event.target.value))}
-              className="fca-input"
-            />
-          </label>
+            <label className="block space-y-1.5 sm:max-w-[220px]">
+              <span className="fca-label">Sortierung</span>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(Number(event.target.value))}
+                className="fca-input"
+              />
+            </label>
+          </div>
+        </FormSection>
 
-          <label className="block space-y-2 md:col-span-2">
-            <span className="fca-label">Organisationseinheit (optional)</span>
+        <FormSection
+          title="Organisation"
+          description="Optionale Verknüpfung mit einer Organisationseinheit (z. B. Abteilung)."
+        >
+          <label className="block space-y-1.5">
+            <span className="fca-label">Organisationseinheit</span>
             <select
               value={orgUnitId ?? ""}
               onChange={(event) => setOrgUnitId(event.target.value || null)}
@@ -287,30 +324,8 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
               ))}
             </select>
           </label>
-        </div>
-
-        {error ? (
-          <div className="fca-status-box fca-status-box-error">{error}</div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={submitting || seasonsLoading || !seasonId}
-            className="fca-button-primary"
-          >
-            {submitting ? "Speichern..." : "Team erstellen"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard/teams")}
-            className="fca-button-secondary"
-          >
-            Abbrechen
-          </button>
-        </div>
-      </form>
-    </AdminSurfaceCard>
+        </FormSection>
+      </FormPagePattern>
+    </form>
   );
 }
