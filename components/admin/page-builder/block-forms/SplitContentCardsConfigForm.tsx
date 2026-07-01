@@ -458,7 +458,7 @@ function ContentTab({
         <div className="space-y-2">
           {cards.map((card, idx) => (
             <CardEditorItem
-              key={card.id}
+              key={card.id ?? `card:${idx}`}
               card={card}
               index={idx}
               onChange={(updated) => updateCard(idx, updated)}
@@ -512,7 +512,7 @@ function ContentTab({
         <div className="space-y-2">
           {images.map((img, idx) => (
             <ImageEditorItem
-              key={idx}
+              key={`${img.mediaAssetId}:${idx}`}
               image={img}
               index={idx}
               onChange={(updated) => updateImage(idx, updated)}
