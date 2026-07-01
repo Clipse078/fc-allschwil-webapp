@@ -86,9 +86,14 @@ export function HomepageCanvas({
   reorderPending,
   reorderError,
 }: Props) {
-  // ── DnD state ─────────────────────────────────────────────────────────────
+  // ── DnD state (refs for synchronous access + state for rendering) ─────────
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  // Refs always hold the latest value — prevents stale-closure bugs in
+  // drag event handlers that fire before React can flush state updates.
+  const draggedIdRef = useRef<string | null>(null);
+  const dropIndexRef = useRef<number | null>(null);
 
   // ── Aria live announcement ─────────────────────────────────────────────────
   const [announcement, setAnnouncement] = useState("");
@@ -96,45 +101,69 @@ export function HomepageCanvas({
   // ── Refs for keyboard focus management ────────────────────────────────────
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // ── DnD handlers ──────────────────────────────────────────────────────────
+  // ── DnD helpers ───────────────────────────────────────────────────────────
 
-  const handleDragStart = useCallback((id: string) => {
+  const updateDraggedId = useCallback((id: string | null) => {
+    draggedIdRef.current = id;
     setDraggedId(id);
-    setDropIndex(null);
   }, []);
+
+  const updateDropIndex = useCallback((idx: number | null) => {
+    dropIndexRef.current = idx;
+    setDropIndex(idx);
+  }, []);
+
+  const handleDragStart = useCallback(
+    (id: string) => {
+      updateDraggedId(id);
+      updateDropIndex(null);
+    },
+    [updateDraggedId, updateDropIndex],
+  );
 
   const handleDragEnd = useCallback(() => {
-    setDraggedId(null);
-    setDropIndex(null);
-  }, []);
+    updateDraggedId(null);
+    updateDropIndex(null);
+  }, [updateDraggedId, updateDropIndex]);
 
   const handleSectionDragOver = useCallback(
     (e: React.DragEvent<HTMLDivElement>, idx: number, sectionId: string) => {
       e.preventDefault();
-      if (draggedId === null || draggedId === sectionId) return;
+      e.dataTransfer.dropEffect = "move";
+      // Use ref (synchronous) — state may lag behind on the first dragover
+      // event that fires before React flushes the dragstart state update.
+      if (draggedIdRef.current === null || draggedIdRef.current === sectionId) {
+        return;
+      }
       const rect = e.currentTarget.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      setDropIndex(e.clientY < midY ? idx : idx + 1);
+      updateDropIndex(e.clientY < midY ? idx : idx + 1);
     },
-    [draggedId],
+    [updateDropIndex],
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      if (draggedId === null || dropIndex === null) {
+      // Read from ref for latest values (avoids stale-closure issues).
+      const currentDraggedId =
+        draggedIdRef.current ?? e.dataTransfer.getData("text/plain") ?? null;
+      const currentDropIndex = dropIndexRef.current;
+
+      if (!currentDraggedId || currentDropIndex === null) {
         handleDragEnd();
         return;
       }
 
-      const draggedIdx = sections.findIndex((s) => s.id === draggedId);
+      const draggedIdx = sections.findIndex((s) => s.id === currentDraggedId);
       if (draggedIdx < 0) {
         handleDragEnd();
         return;
       }
 
-      const rest = sections.filter((s) => s.id !== draggedId);
-      let insertIdx = dropIndex > draggedIdx ? dropIndex - 1 : dropIndex;
+      const rest = sections.filter((s) => s.id !== currentDraggedId);
+      let insertIdx =
+        currentDropIndex > draggedIdx ? currentDropIndex - 1 : currentDropIndex;
       insertIdx = Math.max(0, Math.min(rest.length, insertIdx));
 
       const newSections = [
@@ -159,7 +188,7 @@ export function HomepageCanvas({
         });
       }
     },
-    [draggedId, dropIndex, sections, handleDragEnd, onReorder],
+    [sections, handleDragEnd, onReorder],
   );
 
   // ── Keyboard focus helpers ─────────────────────────────────────────────────
@@ -168,14 +197,14 @@ export function HomepageCanvas({
     itemRefs.current[idx]?.focus();
   }, []);
 
-  // ── Derived drag state ─────────────────────────────────────────────────────
+  // ── Derived values for rendering ──────────────────────────────────────────
 
   const draggedIdx =
     draggedId !== null ? sections.findIndex((s) => s.id === draggedId) : -1;
 
   function isActiveDropLine(lineIdx: number): boolean {
     if (draggedId === null || dropIndex === null || dropIndex !== lineIdx) return false;
-    // Suppress indicator at current position (no-op drop)
+    // Suppress indicator at the no-op positions (would leave section in same place)
     if (draggedIdx >= 0 && (lineIdx === draggedIdx || lineIdx === draggedIdx + 1)) {
       return false;
     }
