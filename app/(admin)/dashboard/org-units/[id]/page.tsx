@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Clock,
   GitBranch,
-  Hash,
   Layers,
   Pencil,
   Shield,
@@ -22,6 +21,12 @@ import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipMan
 import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
 import OrgUnitArchiveButton from "@/components/admin/org/OrgUnitArchiveButton";
 import OrgUnitRestoreButton from "@/components/admin/org/OrgUnitRestoreButton";
+import { PageShell, SectionCard } from "@/components/ui/page";
+import { DetailPagePattern } from "@/components/ui/patterns";
+import { Badge, Card } from "@/components/ui";
+import { PropertyGrid } from "@/components/ui/PropertyGrid";
+import { MetadataCard } from "@/components/ui/MetadataCard";
+import { TimelinePlaceholder } from "@/components/ui/TimelinePlaceholder";
 
 // Slice 11.2b: tenant resolved from session-carried tenantId.
 // Slice 11.5: sibling sort controls and parent breadcrumb added.
@@ -130,7 +135,6 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
 
   const typeLabel = TYPE_LABELS[unit.type] ?? unit.type;
   const statusLabel = STATUS_LABELS[unit.status] ?? unit.status;
-  const initials = getInitials(unit.name);
   const memberCount = unit.memberships.length;
   const childCount = unit.children.length;
   // Write access requires ORG_MANAGE — membership-based access is read-only.
@@ -138,427 +142,158 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   const canArchive = canManage && unit.status !== "ARCHIVED" && childCount === 0;
   const canRestore = canManage && unit.status === "ARCHIVED";
 
+  // Build breadcrumb items from ancestors
+  const breadcrumbs = [
+    { label: "Organisationseinheiten", href: "/dashboard/org-units" },
+    ...ancestors.map((a) => ({ label: a.name, href: `/dashboard/org-units/${a.id}` })),
+    { label: unit.name },
+  ];
+
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString("de-CH", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
   return (
-    <div className="space-y-6">
-      {/* Ancestor breadcrumb */}
-      {ancestors.length > 0 ? (
-        <nav className="flex flex-wrap items-center gap-1 text-sm text-[var(--muted)]">
-          <Link href="/dashboard/org-units" className="hover:text-[var(--blue)]">
-            Organisationseinheiten
-          </Link>
-          {ancestors.map((ancestor) => (
-            <span key={ancestor.id} className="flex items-center gap-1">
-              <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+    <PageShell fullWidth>
+      <DetailPagePattern
+        eyebrow="Organisationseinheiten"
+        title={unit.name}
+        headerBadge={
+          <Badge
+            variant={
+              unit.status === "ACTIVE"
+                ? "success"
+                : unit.status === "ARCHIVED"
+                ? "danger"
+                : "default"
+            }
+          >
+            {statusLabel}
+          </Badge>
+        }
+        breadcrumbs={breadcrumbs}
+        headerActions={
+          <div className="flex items-center gap-2">
+            {canManage ? (
               <Link
-                href={`/dashboard/org-units/${ancestor.id}`}
-                className="hover:text-[var(--blue)]"
+                href={`/dashboard/org-units/${unit.id}/edit`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
               >
-                {ancestor.name}
+                <Pencil className="h-3.5 w-3.5" />
+                Bearbeiten
               </Link>
-            </span>
-          ))}
-          <span className="flex items-center gap-1">
-            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
-            <span className="font-medium text-[var(--foreground)]">{unit.name}</span>
-          </span>
-        </nav>
-      ) : null}
-
-      {/* Hero */}
-      <div className="sce-entity-hero">
-        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-5">
-            {/* Avatar */}
-            <div className="sce-avatar-xl">
-              {initials}
-            </div>
-
-            {/* Identity */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
-                {typeLabel}
-              </p>
-              <h1
-                className="mt-1 text-2xl font-bold text-white"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {unit.name}
-              </h1>
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                {/* Status */}
-                <span
-                  className={`inline-flex h-5 items-center rounded-full border px-2.5 text-[0.65rem] font-semibold ${
-                    unit.status === "ACTIVE"
-                      ? "border-emerald-300/60 bg-emerald-500/20 text-emerald-200"
-                      : "border-white/20 bg-white/10 text-white/60"
-                  }`}
-                >
-                  {statusLabel}
-                </span>
-                {/* Key */}
-                <code className="rounded border border-white/20 bg-white/10 px-2 py-0.5 text-[0.72rem] font-mono text-white/80">
-                  {unit.key}
-                </code>
-                {/* Level */}
-                <span className="inline-flex items-center gap-1 text-xs text-white/60">
-                  <Layers className="h-3 w-3" />
-                  Ebene {unit.level}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/dashboard/org-units/${unit.id}/edit`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/25"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Bearbeiten
-            </Link>
+            ) : null}
             <Link
               href="/dashboard/org-units"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-transparent px-3.5 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Zurück
             </Link>
           </div>
-        </div>
-
-        {/* Quick stats */}
-        <div className="relative z-10 mt-6 flex flex-wrap gap-6 border-t border-white/15 pt-4">
-          <div className="flex items-center gap-2 text-sm text-white/80">
-            <Users className="h-4 w-4 text-white/60" />
-            <span className="font-semibold text-white">{memberCount}</span>
-            <span>Mitglied{memberCount !== 1 ? "er" : ""}</span>
-          </div>
-          {childCount > 0 ? (
-            <div className="flex items-center gap-2 text-sm text-white/80">
-              <GitBranch className="h-4 w-4 text-white/60" />
-              <span className="font-semibold text-white">{childCount}</span>
-              <span>Untereinheit{childCount !== 1 ? "en" : ""}</span>
+        }
+        summary={
+          <Card variant="section" noPadding>
+            <div className="px-5 py-4">
+              <PropertyGrid
+                items={[
+                  { label: "Typ", value: typeLabel },
+                  {
+                    label: "Key",
+                    value: (
+                      <code className="font-mono text-[0.8rem]">{unit.key}</code>
+                    ),
+                  },
+                  {
+                    label: "Ebene",
+                    value: (
+                      <span className="flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5" />
+                        {unit.level}
+                      </span>
+                    ),
+                  },
+                  {
+                    label: "Übergeordnete Einheit",
+                    value: unit.parent?.name,
+                    href: unit.parent
+                      ? `/dashboard/org-units/${unit.parent.id}`
+                      : undefined,
+                    icon: <Building2 className="h-3.5 w-3.5" />,
+                    emptyText: "Haupteinheit",
+                  },
+                  {
+                    label: "Mitglieder",
+                    value: `${memberCount}`,
+                    icon: <Users className="h-3.5 w-3.5" />,
+                  },
+                  {
+                    label: "Untereinheiten",
+                    value: childCount > 0 ? `${childCount}` : null,
+                    icon: <GitBranch className="h-3.5 w-3.5" />,
+                    emptyText: "Keine",
+                  },
+                ]}
+                columns={3}
+              />
             </div>
-          ) : null}
-          {unit.parent ? (
-            <div className="flex items-center gap-2 text-sm text-white/80">
-              <Building2 className="h-4 w-4 text-white/60" />
-              <span>unter</span>
-              <span className="font-semibold text-white">
-                {unit.parent.name}
-              </span>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Tab navigation — Phase B */}
-      <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
-        <span className="flex items-center gap-1.5 rounded-lg bg-[var(--surface-2)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]">
-          <Users className="h-4 w-4" />
-          Aktive Mitglieder
-        </span>
-        <Link
-          href={`/dashboard/org-units/${unit.id}/history`}
-          className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:text-[var(--foreground)]"
-        >
-          <Clock className="h-4 w-4" />
-          Verlauf
-        </Link>
-      </div>
-
-      {/* Content grid */}
-      <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
-        {/* Main column */}
-        <div className="space-y-5">
-          {/* Untereinheiten */}
-          {unit.children.length > 0 ? (
-            <div className="sce-detail-section">
-              <div className="sce-detail-section-header">
-                <div className="flex items-center gap-2">
-                  <GitBranch className="h-4 w-4 text-[var(--muted)]" />
-                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                    Untereinheiten
-                  </p>
-                  <span className="sce-count-badge">{unit.children.length}</span>
-                </div>
-              </div>
-              <div className="divide-y divide-[var(--border)]">
-                {unit.children.map((child) => {
-                  const childTypeLabel = TYPE_LABELS[child.type] ?? child.type;
-                  const childBg =
-                    CHILD_TYPE_COLORS[child.type] ?? CHILD_TYPE_COLORS.CUSTOM;
-
-                  return (
-                    <Link
-                      key={child.id}
-                      href={`/dashboard/org-units/${child.id}`}
-                      className={`group flex items-center gap-4 px-5 py-3.5 transition hover:bg-[var(--surface-2)]`}
-                    >
-                      <div
-                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${childBg}`}
-                      >
-                        <Building2 className="h-4 w-4 text-[var(--text-2)]" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-[var(--foreground)]">
-                          {child.name}
-                        </p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {childTypeLabel}
-                          {" · "}
-                          <code className="font-mono">{child.key}</code>
-                        </p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--blue)]" />
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Teams linked via Team.orgUnitId (Slice 11.3) */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-[var(--muted)]" />
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Teams
-                </p>
-                {unit.teams.length > 0 ? (
-                  <span className="sce-count-badge">{unit.teams.length}</span>
-                ) : null}
-              </div>
-            </div>
-            {unit.teams.length > 0 ? (
-              <div className="divide-y divide-[var(--border)]">
-                {unit.teams.map((team) => {
-                  const activeSeason = team.teamSeasons[0] ?? null;
-                  return (
-                    <Link
-                      key={team.id}
-                      href={`/dashboard/teams/${team.id}`}
-                      className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-[var(--surface-2)]"
-                    >
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50">
-                        <Shield className="h-4 w-4 text-emerald-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-[var(--foreground)]">
-                          {activeSeason?.displayName ?? team.name}
-                        </p>
-                        {activeSeason ? (
-                          <p className="text-xs text-[var(--muted)]">
-                            {activeSeason.season.name}
-                          </p>
-                        ) : null}
-                      </div>
-                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--blue)]" />
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="sce-detail-section-body">
-                <p className="text-sm text-[var(--muted)]">
-                  No teams linked to this organisation unit yet.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Sibling reorder (Slice 11.5) */}
-          {siblings.length > 1 ? (
-            <div className="sce-detail-section">
-              <div className="sce-detail-section-header">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-[var(--muted)]" />
-                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                    Reihenfolge
-                  </p>
-                </div>
-              </div>
-              <div className="sce-detail-section-body">
-                <p className="mb-3 text-sm text-[var(--muted)]">
-                  Position dieser Einheit unter den Geschwistern.
-                </p>
-                <OrgUnitSortControls
-                  orgUnitId={unit.id}
-                  position={siblingPosition >= 0 ? siblingPosition : 0}
-                  total={siblings.length}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {/* Membership management (Slice 11.4: role picker; Phase A: season/notes) */}
-          <OrgMembershipManagementCard
-            orgUnitId={unit.id}
-            initialMemberships={unit.memberships}
-            roles={roles}
-            seasons={seasons}
-          />
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-5">
-          {/* Details */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                Details
-              </p>
-            </div>
-            <div className="sce-detail-section-body space-y-4">
-              <div className="sce-data-field">
-                <span className="sce-data-label">Typ</span>
-                <span className="sce-data-value">{typeLabel}</span>
-              </div>
-              <div className="sce-data-field">
-                <span className="sce-data-label">Key</span>
-                <code className="sce-data-value font-mono text-[0.8rem]">
-                  {unit.key}
-                </code>
-              </div>
-              <div className="sce-data-field">
-                <span className="sce-data-label">Ebene</span>
-                <span className="sce-data-value flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-[var(--muted)]" />
-                  {unit.level}
-                </span>
-              </div>
-              {unit.parent ? (
-                <div className="sce-data-field">
-                  <span className="sce-data-label">Übergeordnete Einheit</span>
-                  <Link
-                    href={`/dashboard/org-units/${unit.parent.id}`}
-                    className="sce-data-value flex items-center gap-1.5 text-[var(--blue)] hover:underline"
-                  >
-                    <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
-                    {unit.parent.name}
-                  </Link>
-                </div>
-              ) : (
-                <div className="sce-data-field">
-                  <span className="sce-data-label">Übergeordnete Einheit</span>
-                  <span className="sce-data-value-empty">Keine (Haupteinheit)</span>
-                </div>
-              )}
-              <div className="sce-data-field">
-                <span className="sce-data-label">Status</span>
-                <span className="sce-data-value">{statusLabel}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          {unit.description ? (
-            <div className="sce-detail-section">
-              <div className="sce-detail-section-header">
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Beschreibung
-                </p>
-              </div>
-              <div className="sce-detail-section-body">
+          </Card>
+        }
+        sidebar={
+          <>
+            {/* Description */}
+            {unit.description ? (
+              <SectionCard title="Beschreibung">
                 <p className="text-sm leading-relaxed text-[var(--text-2)]">
                   {unit.description}
                 </p>
-              </div>
-            </div>
-          ) : null}
+              </SectionCard>
+            ) : null}
 
-          {/* Key info card */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <div className="flex items-center gap-2">
-                <Hash className="h-4 w-4 text-[var(--muted)]" />
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Systeminfo
-                </p>
-              </div>
-            </div>
-            <div className="sce-detail-section-body space-y-4">
-              <div className="sce-data-field">
-                <span className="sce-data-label">Erstellt</span>
-                <span className="sce-data-value">
-                  {unit.createdAt.toLocaleDateString("de-CH", {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-              <div className="sce-data-field">
-                <span className="sce-data-label">Zuletzt geändert</span>
-                <span className="sce-data-value">
-                  {unit.updatedAt.toLocaleDateString("de-CH", {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-              {unit.archivedAt ? (
-                <div className="sce-data-field">
-                  <span className="sce-data-label">Archiviert</span>
-                  <span className="sce-data-value">
-                    {unit.archivedAt.toLocaleDateString("de-CH", {
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </span>
+            {/* System metadata */}
+            <MetadataCard
+              fields={[
+                { label: "Erstellt", value: formatDate(unit.createdAt) },
+                { label: "Zuletzt geändert", value: formatDate(unit.updatedAt) },
+                ...(unit.archivedAt
+                  ? [{ label: "Archiviert", value: formatDate(unit.archivedAt) }]
+                  : []),
+              ]}
+            />
+
+            {/* Danger zone — archive action */}
+            {canArchive ? (
+              <Card variant="warning">
+                <div className="px-5 py-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--sce-warning)]">
+                    Gefahrenzone
+                  </p>
+                  <OrgUnitArchiveButton
+                    orgUnitId={unit.id}
+                    orgUnitName={unit.name}
+                  />
                 </div>
-              ) : null}
-            </div>
-          </div>
+              </Card>
+            ) : null}
 
-          {/* Danger zone — archive action (ORG_MANAGE + leaf unit + not already archived) */}
-          {canArchive ? (
-            <div className="sce-detail-section border-rose-100">
-              <div className="sce-detail-section-header">
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-rose-400">
-                  Gefahrenzone
-                </p>
+            {/* Info: non-leaf units cannot be archived */}
+            {canManage && unit.status !== "ARCHIVED" && childCount > 0 ? (
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
+                Diese Einheit hat {childCount} untergeordnete
+                {childCount === 1 ? " Einheit" : " Einheiten"}. Archiviere
+                zuerst alle untergeordneten Einheiten.
               </div>
-              <div className="sce-detail-section-body">
-                <OrgUnitArchiveButton
-                  orgUnitId={unit.id}
-                  orgUnitName={unit.name}
-                />
-              </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {/* Info: non-leaf units cannot be archived */}
-          {canManage && unit.status !== "ARCHIVED" && childCount > 0 ? (
-            <div className="rounded-[var(--radius-xl)] border border-amber-100 bg-amber-50 px-4 py-3 text-[12px] text-amber-700">
-              Diese Einheit hat {childCount} untergeordnete{childCount === 1 ? " Einheit" : " Einheiten"}. Archiviere zuerst alle untergeordneten Einheiten.
-            </div>
-          ) : null}
-
-          {/* Restore zone — shown for archived units */}
-          {canRestore ? (
-            <div className="sce-detail-section border-emerald-100">
-              <div className="sce-detail-section-header">
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-emerald-600">
-                  Wiederherstellung
-                </p>
-              </div>
-              <div className="sce-detail-section-body space-y-3">
+            {/* Restore zone */}
+            {canRestore ? (
+              <SectionCard title="Wiederherstellung">
                 {unit.archivedAt ? (
-                  <p className="text-[12px] text-[var(--muted)]">
-                    Archiviert am{" "}
-                    {unit.archivedAt.toLocaleDateString("de-CH", {
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    })}
+                  <p className="mb-3 text-[12px] text-[var(--muted)]">
+                    Archiviert am {formatDate(unit.archivedAt)}
                   </p>
                 ) : null}
                 <OrgUnitRestoreButton
@@ -566,11 +301,145 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
                   orgUnitName={unit.name}
                   redirectToList={false}
                 />
-              </div>
-            </div>
-          ) : null}
+              </SectionCard>
+            ) : null}
+
+            <TimelinePlaceholder />
+          </>
+        }
+      >
+        {/* Tab navigation */}
+        <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
+          <span className="flex items-center gap-1.5 rounded-lg bg-[var(--surface-2)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]">
+            <Users className="h-4 w-4" />
+            Aktive Mitglieder
+          </span>
+          <Link
+            href={`/dashboard/org-units/${unit.id}/history`}
+            className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:text-[var(--foreground)]"
+          >
+            <Clock className="h-4 w-4" />
+            Verlauf
+          </Link>
         </div>
-      </div>
-    </div>
+
+        {/* Untereinheiten */}
+        {unit.children.length > 0 ? (
+          <SectionCard
+            title="Untereinheiten"
+            noPadding
+            headerActions={
+              <Badge variant="default" size="sm">
+                {unit.children.length}
+              </Badge>
+            }
+          >
+            <div className="divide-y divide-[var(--border)]">
+              {unit.children.map((child) => {
+                const childTypeLabel = TYPE_LABELS[child.type] ?? child.type;
+                const childBg =
+                  CHILD_TYPE_COLORS[child.type] ?? CHILD_TYPE_COLORS.CUSTOM;
+
+                return (
+                  <Link
+                    key={child.id}
+                    href={`/dashboard/org-units/${child.id}`}
+                    className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-[var(--surface-2)]"
+                  >
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${childBg}`}
+                    >
+                      <Building2 className="h-4 w-4 text-[var(--text-2)]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--foreground)]">
+                        {child.name}
+                      </p>
+                      <p className="text-xs text-[var(--muted)]">
+                        {childTypeLabel}
+                        {" · "}
+                        <code className="font-mono">{child.key}</code>
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--sce-primary)]" />
+                  </Link>
+                );
+              })}
+            </div>
+          </SectionCard>
+        ) : null}
+
+        {/* Teams */}
+        <SectionCard
+          title="Teams"
+          noPadding
+          headerActions={
+            unit.teams.length > 0 ? (
+              <Badge variant="default" size="sm">
+                {unit.teams.length}
+              </Badge>
+            ) : undefined
+          }
+        >
+          {unit.teams.length > 0 ? (
+            <div className="divide-y divide-[var(--border)]">
+              {unit.teams.map((team) => {
+                const activeSeason = team.teamSeasons[0] ?? null;
+                return (
+                  <Link
+                    key={team.id}
+                    href={`/dashboard/teams/${team.id}`}
+                    className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-[var(--surface-2)]"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50">
+                      <Shield className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--foreground)]">
+                        {activeSeason?.displayName ?? team.name}
+                      </p>
+                      {activeSeason ? (
+                        <p className="text-xs text-[var(--muted)]">
+                          {activeSeason.season.name}
+                        </p>
+                      ) : null}
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--sce-primary)]" />
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="px-5 py-4">
+              <p className="text-sm text-[var(--muted)]">
+                Keine Teams mit dieser Organisationseinheit verknüpft.
+              </p>
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Sibling reorder */}
+        {siblings.length > 1 ? (
+          <SectionCard title="Reihenfolge">
+            <p className="mb-3 text-sm text-[var(--muted)]">
+              Position dieser Einheit unter den Geschwistern.
+            </p>
+            <OrgUnitSortControls
+              orgUnitId={unit.id}
+              position={siblingPosition >= 0 ? siblingPosition : 0}
+              total={siblings.length}
+            />
+          </SectionCard>
+        ) : null}
+
+        {/* Membership management */}
+        <OrgMembershipManagementCard
+          orgUnitId={unit.id}
+          initialMemberships={unit.memberships}
+          roles={roles}
+          seasons={seasons}
+        />
+      </DetailPagePattern>
+    </PageShell>
   );
 }
