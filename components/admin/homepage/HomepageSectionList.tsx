@@ -36,6 +36,12 @@ import {
 import { getHomepageSectionType } from "@/lib/homepage/section-types";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
 import { CMS_ROUTES } from "@/lib/cms/routes";
+import {
+  WebsitePreviewShell,
+  type WebsitePreviewSection,
+  type PreviewMode,
+  type PreviewDevice,
+} from "@/components/admin/website-preview";
 
 const SplitContentCardsConfigForm = dynamic(
   () => import("@/components/admin/page-builder/block-forms/SplitContentCardsConfigForm"),
@@ -620,6 +626,11 @@ export default function HomepageSectionList() {
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [bootstrapping, setBootstrapping] = useState(false);
 
+  // ── Preview state ────────────────────────────────────────────────────────
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("draft");
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
+
   // ── Inline edit state ───────────────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -928,8 +939,30 @@ export default function HomepageSectionList() {
     (s) => s.isEnabled && s.publishStatus === "PUBLISHED",
   ).length;
 
+  const previewSections: WebsitePreviewSection[] = sections.map((s) => ({
+    id: s.id,
+    type: s.type,
+    label: s.label,
+    isDraft: s.publishStatus !== "PUBLISHED",
+    isEnabled: s.isEnabled,
+    config: s.config as Record<string, unknown>,
+  }));
+
   return (
     <>
+      {/* Website Preview Shell */}
+      {showPreview && (
+        <WebsitePreviewShell
+          title="Homepage"
+          sections={previewSections}
+          mode={previewMode}
+          device={previewDevice}
+          onModeChange={setPreviewMode}
+          onDeviceChange={setPreviewDevice}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+
       {/* Approval review modal (CMS V2 Slice 6) */}
       {reviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -1072,15 +1105,27 @@ export default function HomepageSectionList() {
                 : `${sections.length} Sektion${sections.length !== 1 ? "en" : ""} konfiguriert`}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={load}
-            disabled={loading || isAnyActionPending}
-            className="fca-button-secondary px-2.5"
-            title="Aktualisieren"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              disabled={loading || sections.length === 0}
+              className="fca-button-secondary px-2.5"
+              title="Homepage-Vorschau"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">Vorschau</span>
+            </button>
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading || isAnyActionPending}
+              className="fca-button-secondary px-2.5"
+              title="Aktualisieren"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         {/* Governance info banner */}

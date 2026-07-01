@@ -48,9 +48,6 @@ import {
   GlobeLock,
   Clock,
   History,
-  Monitor,
-  Tablet,
-  Smartphone,
   Send,
   CheckCircle2,
   AlertCircle,
@@ -73,6 +70,12 @@ import {
   SECTION_APPROVAL_STATUS,
 } from "@/lib/cms/section-publishing";
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
+import {
+  WebsitePreviewShell,
+  type WebsitePreviewSection,
+  type PreviewMode,
+  type PreviewDevice,
+} from "@/components/admin/website-preview";
 import type { SectionLayout } from "@/lib/cms/layout-types";
 import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
 
@@ -90,17 +93,6 @@ const SplitContentCardsRenderer = dynamic(
 
 // Registry of block types that have a premium property panel
 const PREMIUM_BLOCK_TYPES = new Set(["splitContentCards"]);
-
-/**
- * Renders a visual preview for a known block type.
- * Falls back to JSON config summary for generic blocks.
- */
-function BlockVisualPreview({ type, config }: { type: string; config: Record<string, unknown> }) {
-  if (type === "splitContentCards") {
-    return <SplitContentCardsRenderer config={config} previewMode />;
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -533,30 +525,19 @@ function AddSectionPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Preview panel
+// Page builder preview container
 // ---------------------------------------------------------------------------
 
-type ViewportMode = "desktop" | "tablet" | "mobile";
-
-const VIEWPORT_CONFIG: Record<ViewportMode, { label: string; icon: React.ElementType; width: string }> = {
-  desktop: { label: "Desktop", icon: Monitor, width: "100%" },
-  tablet: { label: "Tablet", icon: Tablet, width: "768px" },
-  mobile: { label: "Mobile", icon: Smartphone, width: "375px" },
-};
-
-type PreviewSection = {
+type PagePreviewRawSection = {
   id: string;
   type: string;
   label: string;
-  sortOrder: number;
   isEnabled: boolean;
   publishStatus: string;
-  approvalStatus: string;
   config: Record<string, unknown>;
-  block: { displayName: string; description: string; category: string } | null;
 };
 
-function PreviewPanel({
+function PageBuilderPreviewContainer({
   pageId,
   pageTitle,
   pageSlug,
@@ -567,9 +548,10 @@ function PreviewPanel({
   pageSlug: string;
   onClose: () => void;
 }) {
-  const [viewport, setViewport] = useState<ViewportMode>("desktop");
+  const [mode, setMode] = useState<PreviewMode>("draft");
+  const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [loading, setLoading] = useState(true);
-  const [sections, setSections] = useState<PreviewSection[]>([]);
+  const [sections, setSections] = useState<WebsitePreviewSection[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -577,129 +559,45 @@ function PreviewPanel({
     fetch(`/api/website-pages/${pageId}/preview`)
       .then((r) => r.json())
       .then((d) => {
-        if (!cancelled) { setSections(d.sections ?? []); setLoading(false); }
+        if (!cancelled) {
+          const raw: PagePreviewRawSection[] = d.sections ?? [];
+          setSections(
+            raw.map((s) => ({
+              id: s.id,
+              type: s.type,
+              label: s.label,
+              isDraft: s.publishStatus !== "PUBLISHED",
+              isEnabled: s.isEnabled,
+              config: s.config,
+            })),
+          );
+          setLoading(false);
+        }
       })
       .catch(() => {
-        if (!cancelled) { setError("Vorschau konnte nicht geladen werden."); setLoading(false); }
+        if (!cancelled) {
+          setError("Vorschau konnte nicht geladen werden.");
+          setLoading(false);
+        }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [pageId]);
 
-  const vc = VIEWPORT_CONFIG[viewport];
-
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Eye className="h-4 w-4 text-[var(--text-2)]" />
-          <div>
-            <p className="text-sm font-semibold">{pageTitle}</p>
-            <p className="text-[11px] text-[var(--muted)]">/{pageSlug}</p>
-          </div>
-        </div>
-
-        {/* Viewport selector */}
-        <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
-          {(["desktop", "tablet", "mobile"] as ViewportMode[]).map((v) => {
-            const vc2 = VIEWPORT_CONFIG[v];
-            const Icon = vc2.icon;
-            return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setViewport(v)}
-                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition ${
-                  viewport === v
-                    ? "bg-white text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{vc2.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <button type="button" onClick={onClose} className="fca-button-secondary px-2.5">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Preview area */}
-      <div className="flex-1 overflow-auto bg-[var(--surface-2)] p-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-32 text-[var(--muted)]">
-            <RefreshCw className="h-5 w-5 animate-spin mr-2" />
-            Lädt Vorschau…
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-32 text-rose-600 text-sm">{error}</div>
-        ) : (
-            <div className="mx-auto transition-all duration-300 rounded-lg border border-[var(--border)] bg-white overflow-hidden"
-              style={{ maxWidth: vc.width }}
-            >
-              {sections.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-[var(--muted)]">
-                  <Blocks className="h-8 w-8 mb-2 opacity-40" />
-                  <p className="text-sm">Keine Sektionen vorhanden</p>
-                </div>
-              ) : (
-                <div>
-                  {sections.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`border-b border-[var(--border)] last:border-0 ${
-                        !s.isEnabled || s.publishStatus !== "PUBLISHED" ? "opacity-50" : ""
-                      }`}
-                    >
-                      {/* Section status strip */}
-                      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-2)]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-[var(--foreground)]">{s.label}</span>
-                          <SectionTypeBadge type={s.type} />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <EnabledBadge isEnabled={s.isEnabled} />
-                          <PublishBadge status={s.publishStatus} />
-                        </div>
-                      </div>
-
-                      {/* Visual block render (if renderer available) */}
-                      <Suspense fallback={<div className="h-16 animate-pulse bg-gray-50" />}>
-                        <BlockVisualPreview type={s.type} config={s.config} />
-                      </Suspense>
-
-                      {/* Fallback: JSON config for non-premium blocks */}
-                      {!PREMIUM_BLOCK_TYPES.has(s.type) && Object.keys(s.config).length > 0 && (
-                        <div className="px-4 pb-3">
-                          <div className="rounded bg-[var(--surface-2)] px-2 py-1.5">
-                            <p className="text-[10px] font-mono text-[var(--muted)]">
-                              {JSON.stringify(s.config, null, 2).slice(0, 200)}
-                              {JSON.stringify(s.config).length > 200 ? "…" : ""}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      {!PREMIUM_BLOCK_TYPES.has(s.type) && s.block && (
-                        <p className="px-4 pb-3 text-[11px] text-[var(--muted)]">{s.block.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center gap-3 text-xs text-[var(--muted)]">
-        <span>{sections.length} Sektion{sections.length !== 1 ? "en" : ""} (inkl. Entwürfe)</span>
-        <span>·</span>
-        <span>{sections.filter((s) => s.publishStatus === "PUBLISHED" && s.isEnabled).length} öffentlich sichtbar</span>
-      </div>
-    </div>
+    <WebsitePreviewShell
+      title={pageTitle || "Seite"}
+      subtitle={pageSlug ? `/${pageSlug}` : undefined}
+      sections={sections}
+      mode={mode}
+      device={device}
+      onModeChange={setMode}
+      onDeviceChange={setDevice}
+      onClose={onClose}
+      loading={loading}
+      error={error}
+    />
   );
 }
 
@@ -1192,7 +1090,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   return (
     <>
       {showPreview && (
-        <PreviewPanel
+        <PageBuilderPreviewContainer
           pageId={pageId}
           pageTitle={pageTitle}
           pageSlug={pageSlug}
