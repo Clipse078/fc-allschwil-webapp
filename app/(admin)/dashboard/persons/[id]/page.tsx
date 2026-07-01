@@ -1,11 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Mail, Phone, Pencil, Calendar, FileText, Shield, UserCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  FileText,
+  Mail,
+  Pencil,
+  Phone,
+  Shield,
+  UserCheck,
+} from "lucide-react";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getPersonById } from "@/lib/people/queries";
-import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import PersonRoleBadge from "@/components/admin/shared/PersonRoleBadge";
+import { PageShell, SectionCard } from "@/components/ui/page";
+import { DetailPagePattern } from "@/components/ui/patterns";
+import { Badge, StatusIndicator } from "@/components/ui";
+import { PropertyGrid } from "@/components/ui/PropertyGrid";
+import { MetadataCard } from "@/components/ui/MetadataCard";
+import { TimelinePlaceholder } from "@/components/ui/TimelinePlaceholder";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -21,30 +35,6 @@ function getInitials(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
-function DataField({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string | null | undefined;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="sce-data-field">
-      <span className="sce-data-label">{label}</span>
-      {value ? (
-        <span className="sce-data-value flex items-center gap-2">
-          {icon ? <span className="text-[var(--muted)]">{icon}</span> : null}
-          {value}
-        </span>
-      ) : (
-        <span className="sce-data-value-empty">—</span>
-      )}
-    </div>
-  );
-}
-
 export default async function PersonDetailPage({ params }: PageProps) {
   await requirePermission(PERMISSIONS.PEOPLE_VIEW);
 
@@ -58,206 +48,197 @@ export default async function PersonDetailPage({ params }: PageProps) {
   const hasRoles = person.isPlayer || person.isTrainer;
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <div className="sce-entity-hero">
-        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-5">
-            {/* Avatar */}
-            <div className="sce-avatar-xl">
-              {initials}
-            </div>
-
-            {/* Identity */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
-                Personenprofil
-              </p>
-              <h1 className="mt-1 text-2xl font-bold text-white" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.01em" }}>
-                {fullName}
-              </h1>
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <AdminStatusPill
-                  label={person.isActive ? "Aktiv" : "Inaktiv"}
-                  tone={person.isActive ? "success" : "muted"}
-                />
-                {hasRoles ? (
-                  <PersonRoleBadge
-                    isPlayer={person.isPlayer}
-                    isTrainer={person.isTrainer}
-                  />
-                ) : (
-                  <span className="sce-role-badge sce-role-badge-member">
-                    Mitglied
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-wrap items-center gap-2">
+    <PageShell fullWidth>
+      <DetailPagePattern
+        eyebrow="Personen"
+        title={fullName}
+        headerBadge={
+          <Badge variant={person.isActive ? "success" : "default"}>
+            {person.isActive ? "Aktiv" : "Inaktiv"}
+          </Badge>
+        }
+        breadcrumbs={[
+          { label: "Personen", href: "/dashboard/persons" },
+          { label: fullName },
+        ]}
+        headerActions={
+          <div className="flex items-center gap-2">
             <Link
               href={`/dashboard/persons/${person.id}/edit`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/25"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
             >
               <Pencil className="h-3.5 w-3.5" />
               Bearbeiten
             </Link>
             <Link
               href="/dashboard/persons"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-transparent px-3.5 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Zurück
             </Link>
           </div>
-        </div>
-      </div>
-
-      {/* Content grid */}
-      <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
-        {/* Main column */}
-        <div className="space-y-5">
-          {/* Stammdaten */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                Stammdaten
-              </p>
+        }
+        summary={
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 shadow-sm">
+            {/* Initials avatar */}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--sce-primary-light)] text-sm font-bold text-[var(--sce-primary)]">
+              {initials}
             </div>
-            <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
-              <DataField label="Vorname" value={person.firstName} />
-              <DataField label="Nachname" value={person.lastName} />
-              {person.displayName ? (
-                <DataField label="Anzeigename" value={person.displayName} />
-              ) : null}
-              <DataField
-                label="Geburtsdatum"
-                value={person.dateOfBirth ? formatDate(person.dateOfBirth) : null}
-                icon={<Calendar className="h-3.5 w-3.5" />}
+            <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--text-2)]">
+              <StatusIndicator
+                variant={person.isActive ? "success" : "neutral"}
+                label={person.isActive ? "Aktiv" : "Inaktiv"}
               />
-            </div>
-          </div>
-
-          {/* Notizen */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                Notizen
-              </p>
-              <FileText className="h-4 w-4 text-[var(--muted)]" />
-            </div>
-            <div className="sce-detail-section-body">
-              {person.notes ? (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-2)]">
-                  {person.notes}
-                </p>
-              ) : (
-                <p className="text-sm italic text-[var(--muted)]">
-                  Keine Notizen hinterlegt.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-5">
-          {/* Kontakt */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                Kontakt
-              </p>
-            </div>
-            <div className="sce-detail-section-body space-y-4">
-              {person.email ? (
-                <div className="sce-data-field">
-                  <span className="sce-data-label">E-Mail</span>
-                  <a
-                    href={`mailto:${person.email}`}
-                    className="sce-data-value flex items-center gap-2 text-[var(--blue)] hover:underline"
-                  >
-                    <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-                    {person.email}
-                  </a>
-                </div>
-              ) : (
-                <DataField label="E-Mail" value={null} />
-              )}
-              {person.phone ? (
-                <div className="sce-data-field">
-                  <span className="sce-data-label">Telefon</span>
-                  <a
-                    href={`tel:${person.phone}`}
-                    className="sce-data-value flex items-center gap-2 text-[var(--blue)] hover:underline"
-                  >
-                    <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-                    {person.phone}
-                  </a>
-                </div>
-              ) : (
-                <DataField label="Telefon" value={null} />
-              )}
-            </div>
-          </div>
-
-          {/* Rollen & Status */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                Rollen & Status
-              </p>
-            </div>
-            <div className="sce-detail-section-body space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <AdminStatusPill
-                  label={person.isActive ? "Aktiv" : "Inaktiv"}
-                  tone={person.isActive ? "success" : "muted"}
+              {hasRoles ? (
+                <PersonRoleBadge
+                  isPlayer={person.isPlayer}
+                  isTrainer={person.isTrainer}
                 />
+              ) : (
+                <Badge variant="default" size="sm">
+                  Mitglied
+                </Badge>
+              )}
+            </div>
+            {person.email ? (
+              <a
+                href={`mailto:${person.email}`}
+                className="ml-auto hidden items-center gap-1.5 text-sm text-[var(--sce-primary)] hover:underline sm:flex"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {person.email}
+              </a>
+            ) : null}
+          </div>
+        }
+        sidebar={
+          <>
+            {/* Contact */}
+            <SectionCard title="Kontakt">
+              <div className="space-y-3">
+                {person.email ? (
+                  <div>
+                    <p className="text-xs font-medium text-[var(--muted)]">
+                      E-Mail
+                    </p>
+                    <a
+                      href={`mailto:${person.email}`}
+                      className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-[var(--sce-primary)] hover:underline"
+                    >
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      {person.email}
+                    </a>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xs font-medium text-[var(--muted)]">
+                      E-Mail
+                    </p>
+                    <p className="mt-0.5 text-sm text-[var(--muted)]">—</p>
+                  </div>
+                )}
+                {person.phone ? (
+                  <div>
+                    <p className="text-xs font-medium text-[var(--muted)]">
+                      Telefon
+                    </p>
+                    <a
+                      href={`tel:${person.phone}`}
+                      className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-[var(--sce-primary)] hover:underline"
+                    >
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      {person.phone}
+                    </a>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xs font-medium text-[var(--muted)]">
+                      Telefon
+                    </p>
+                    <p className="mt-0.5 text-sm text-[var(--muted)]">—</p>
+                  </div>
+                )}
               </div>
+            </SectionCard>
 
-              <div className="space-y-2 pt-1">
-                <RoleIndicator
+            {/* Roles */}
+            <SectionCard title="Rollen & Status">
+              <div className="space-y-2">
+                <RoleRow
                   label="Spieler"
                   active={person.isPlayer}
-                  icon={<Shield className="h-4 w-4" />}
+                  icon={<Shield className="h-3.5 w-3.5" />}
                 />
-                <RoleIndicator
+                <RoleRow
                   label="Trainer"
                   active={person.isTrainer}
-                  icon={<UserCheck className="h-4 w-4" />}
+                  icon={<UserCheck className="h-3.5 w-3.5" />}
                 />
               </div>
-            </div>
-          </div>
+            </SectionCard>
 
-          {/* Metadaten */}
-          <div className="sce-detail-section">
-            <div className="sce-detail-section-header">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                Systemdaten
-              </p>
-            </div>
-            <div className="sce-detail-section-body space-y-3">
-              <DataField
-                label="Erstellt"
-                value={formatDate(person.createdAt)}
-              />
-              <DataField
-                label="Zuletzt geändert"
-                value={formatDate(person.updatedAt)}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            {/* System metadata */}
+            <MetadataCard
+              fields={[
+                { label: "Erstellt", value: formatDate(person.createdAt) },
+                {
+                  label: "Zuletzt geändert",
+                  value: formatDate(person.updatedAt),
+                },
+              ]}
+            />
+
+            <TimelinePlaceholder />
+          </>
+        }
+      >
+        {/* Stammdaten */}
+        <SectionCard title="Stammdaten">
+          <PropertyGrid
+            items={[
+              { label: "Vorname", value: person.firstName },
+              { label: "Nachname", value: person.lastName },
+              person.displayName
+                ? { label: "Anzeigename", value: person.displayName }
+                : { label: "Anzeigename", value: null },
+              {
+                label: "Geburtsdatum",
+                value: person.dateOfBirth ? formatDate(person.dateOfBirth) : null,
+                icon: <Calendar className="h-3.5 w-3.5" />,
+                emptyText: "Nicht erfasst",
+              },
+            ]}
+            columns={2}
+          />
+        </SectionCard>
+
+        {/* Notes */}
+        <SectionCard
+          title="Notizen"
+          headerActions={
+            <FileText
+              className="h-4 w-4 text-[var(--muted)]"
+              aria-hidden="true"
+            />
+          }
+        >
+          {person.notes ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-2)]">
+              {person.notes}
+            </p>
+          ) : (
+            <p className="text-sm italic text-[var(--muted)]">
+              Keine Notizen hinterlegt.
+            </p>
+          )}
+        </SectionCard>
+      </DetailPagePattern>
+    </PageShell>
   );
 }
 
-function RoleIndicator({
+function RoleRow({
   label,
   active,
   icon,
@@ -268,19 +249,17 @@ function RoleIndicator({
 }) {
   return (
     <div
-      className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+      className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium transition ${
         active
-          ? "border-[var(--blue)] bg-[var(--blue-light)] text-[var(--blue)]"
+          ? "border-[var(--sce-primary-light)] bg-[var(--sce-primary-light)] text-[var(--sce-primary)]"
           : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)]"
       }`}
     >
       {icon}
       <span className="flex-1">{label}</span>
-      <span
-        className={`text-xs font-semibold ${active ? "text-[var(--blue)]" : "text-[var(--muted)]"}`}
-      >
+      <Badge variant={active ? "primary" : "default"} size="sm">
         {active ? "Ja" : "Nein"}
-      </span>
+      </Badge>
     </div>
   );
 }
