@@ -24,10 +24,11 @@ import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
 import { CMS_ROUTES } from "@/lib/cms/routes";
-import { HomepageBuilderToolbar } from "./HomepageBuilderToolbar";
+import { HomepageBuilderToolbar, type BuilderMode } from "./HomepageBuilderToolbar";
 import { HomepageBuilderEmptyState } from "./HomepageBuilderEmptyState";
 import { HomepageSectionCard } from "./HomepageSectionCard";
 import { HomepageSectionInspector } from "./HomepageSectionInspector";
+import { HomepageCanvas } from "./HomepageCanvas";
 import WebsiteSectionDispatcher from "@/components/website/WebsiteSectionDispatcher";
 
 // ---------------------------------------------------------------------------
@@ -327,6 +328,7 @@ export default function HomepageBuilderWorkspace() {
   // ── Canvas / inspector state ──────────────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [builderMode, setBuilderMode] = useState<BuilderMode>("list");
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -583,6 +585,16 @@ export default function HomepageBuilderWorkspace() {
     }
   }
 
+  // ── Builder mode change ───────────────────────────────────────────────────
+
+  function handleBuilderModeChange(mode: BuilderMode) {
+    if (mode === "canvas") {
+      // Clear the inline edit form when entering canvas — editing stays in list
+      setEditingId(null);
+    }
+    setBuilderMode(mode);
+  }
+
   // ── Derived values ────────────────────────────────────────────────────────
 
   const isAnyActionPending = actionPending !== null || bootstrapping;
@@ -742,6 +754,8 @@ export default function HomepageBuilderWorkspace() {
           publishedCount={publishedCount}
           loading={loading}
           disabled={isAnyActionPending}
+          builderMode={builderMode}
+          onBuilderModeChange={handleBuilderModeChange}
           onRefresh={load}
           onPreview={() => setShowPreview(true)}
         />
@@ -794,73 +808,102 @@ export default function HomepageBuilderWorkspace() {
         ) : (
           /* Two-column workspace */
           <div className="flex flex-col lg:flex-row lg:divide-x lg:divide-[var(--border)]">
-            {/* ── Block list ── */}
-            <div className="flex-1 min-w-0 p-5">
-              <div className="space-y-3">
-                {sections.map((section, idx) => {
-                  const isFirst = idx === 0;
-                  const isLast = idx === sections.length - 1;
-                  const isSelected = selectedId === section.id;
-                  const isEditing = editingId === section.id;
-                  const isPending =
-                    actionPending === section.id ||
-                    actionPending === `${section.id}-up` ||
-                    actionPending === `${section.id}-down` ||
-                    actionPending === `${section.id}-publish` ||
-                    actionPending === `${section.id}-unpublish` ||
-                    actionPending === `${section.id}-request-review`;
+            {/* ── Left panel: List or Canvas ── */}
+            <div className="flex-1 min-w-0">
+              {builderMode === "canvas" ? (
+                /* Canvas Mode */
+                <HomepageCanvas
+                  sections={sections}
+                  selectedId={selectedId}
+                  actionPending={actionPending}
+                  isAnyPending={isAnyActionPending}
+                  onBootstrap={handleBootstrap}
+                  bootstrapping={bootstrapping}
+                  onSelectSection={(id) =>
+                    setSelectedId((prev) => (prev === id ? null : id))
+                  }
+                  onToggle={(id) => handleToggle(id)}
+                  onMoveUp={(id) => handleMove(id, "up")}
+                  onMoveDown={(id) => handleMove(id, "down")}
+                  onPublish={(id) => handlePublish(id)}
+                  onUnpublish={(id) => handleUnpublish(id)}
+                  onStartEdit={(id) => {
+                    setEditingId(id);
+                    setSelectedId(id);
+                    // Switch back to list so the inline edit form is visible
+                    setBuilderMode("list");
+                  }}
+                />
+              ) : (
+                /* List Mode */
+                <div className="p-5">
+                  <div className="space-y-3">
+                    {sections.map((section, idx) => {
+                      const isFirst = idx === 0;
+                      const isLast = idx === sections.length - 1;
+                      const isSelected = selectedId === section.id;
+                      const isEditing = editingId === section.id;
+                      const isPending =
+                        actionPending === section.id ||
+                        actionPending === `${section.id}-up` ||
+                        actionPending === `${section.id}-down` ||
+                        actionPending === `${section.id}-publish` ||
+                        actionPending === `${section.id}-unpublish` ||
+                        actionPending === `${section.id}-request-review`;
 
-                  return (
-                    <HomepageSectionCard
-                      key={section.id}
-                      section={section}
-                      isFirst={isFirst}
-                      isLast={isLast}
-                      isSelected={isSelected}
-                      isEditing={isEditing}
-                      isPending={isPending}
-                      isAnyPending={isAnyActionPending}
-                      onSelect={() =>
-                        setSelectedId((prev) =>
-                          prev === section.id ? null : section.id,
-                        )
-                      }
-                      onToggle={() => handleToggle(section.id)}
-                      onMoveUp={() => handleMove(section.id, "up")}
-                      onMoveDown={() => handleMove(section.id, "down")}
-                      onPublish={() => handlePublish(section.id)}
-                      onUnpublish={() => handleUnpublish(section.id)}
-                      onStartSchedule={() => handleStartSchedule(section.id)}
-                      onStartEdit={() => {
-                        setEditingId(section.id);
-                        setSelectedId(section.id);
-                      }}
-                      onCancelEdit={() => setEditingId(null)}
-                      onSaveEdit={(label, config) =>
-                        handleSaveEdit(section.id, label, config)
-                      }
-                      onRequestReview={() => handleRequestReview(section.id)}
-                      onOpenApprove={() =>
-                        handleOpenReviewModal(section.id, section.label, "approve")
-                      }
-                      onOpenReject={() =>
-                        handleOpenReviewModal(section.id, section.label, "reject")
-                      }
-                    />
-                  );
-                })}
-              </div>
+                      return (
+                        <HomepageSectionCard
+                          key={section.id}
+                          section={section}
+                          isFirst={isFirst}
+                          isLast={isLast}
+                          isSelected={isSelected}
+                          isEditing={isEditing}
+                          isPending={isPending}
+                          isAnyPending={isAnyActionPending}
+                          onSelect={() =>
+                            setSelectedId((prev) =>
+                              prev === section.id ? null : section.id,
+                            )
+                          }
+                          onToggle={() => handleToggle(section.id)}
+                          onMoveUp={() => handleMove(section.id, "up")}
+                          onMoveDown={() => handleMove(section.id, "down")}
+                          onPublish={() => handlePublish(section.id)}
+                          onUnpublish={() => handleUnpublish(section.id)}
+                          onStartSchedule={() => handleStartSchedule(section.id)}
+                          onStartEdit={() => {
+                            setEditingId(section.id);
+                            setSelectedId(section.id);
+                          }}
+                          onCancelEdit={() => setEditingId(null)}
+                          onSaveEdit={(label, config) =>
+                            handleSaveEdit(section.id, label, config)
+                          }
+                          onRequestReview={() => handleRequestReview(section.id)}
+                          onOpenApprove={() =>
+                            handleOpenReviewModal(section.id, section.label, "approve")
+                          }
+                          onOpenReject={() =>
+                            handleOpenReviewModal(section.id, section.label, "reject")
+                          }
+                        />
+                      );
+                    })}
+                  </div>
 
-              {/* Footer count */}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] text-[var(--muted)]">
-                  {publishedCount} von {sections.length} Sektionen aktiv &amp;
-                  veröffentlicht · sichtbar in der öffentlichen Homepage-API
-                </p>
-              </div>
+                  {/* Footer count */}
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] text-[var(--muted)]">
+                      {publishedCount} von {sections.length} Sektionen aktiv &amp;
+                      veröffentlicht · sichtbar in der öffentlichen Homepage-API
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* ── Inspector panel ── */}
+            {/* ── Inspector panel (shared between modes) ── */}
             <div className="w-full lg:w-80 xl:w-96 shrink-0 border-t border-[var(--border)] lg:border-t-0">
               <div className="sticky top-0 max-h-screen overflow-y-auto">
                 <div className="border-b border-[var(--border)] px-4 py-3 bg-[var(--surface-2)]">
