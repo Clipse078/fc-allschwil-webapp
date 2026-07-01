@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -330,6 +330,13 @@ export default function HomepageBuilderWorkspace() {
   const [showPreview, setShowPreview] = useState(false);
   const [builderMode, setBuilderMode] = useState<BuilderMode>("list");
 
+  // ── Inspector draft state (live preview without persisting) ──────────────
+  const [inspectorDraft, setInspectorDraft] = useState<{
+    id: string;
+    label: string;
+    config: Record<string, unknown>;
+  } | null>(null);
+
   // ── Reorder state (Canvas drag & drop) ───────────────────────────────────
   const [reorderPending, setReorderPending] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
@@ -552,6 +559,35 @@ export default function HomepageBuilderWorkspace() {
     setEditingId(null);
   }
 
+  // ── Inspector draft handlers (live preview) ───────────────────────────────
+
+  /**
+   * Called by the Inspector on every keystroke.
+   * Updates the local draft so the Canvas tiles immediately reflect the new label.
+   * Does NOT persist anything to the server.
+   */
+  function handleInspectorDraftChange(
+    id: string,
+    label: string,
+    config: Record<string, unknown>,
+  ) {
+    setInspectorDraft({ id, label, config });
+  }
+
+  /**
+   * Called by the Inspector when the user clicks "Speichern".
+   * Delegates to the existing handleSaveEdit which calls the API.
+   */
+  async function handleInspectorSave(
+    label: string,
+    config: Record<string, unknown>,
+  ): Promise<void> {
+    if (!selectedId) return;
+    await handleSaveEdit(selectedId, label, config);
+    // Clear the draft — sections array is now refreshed from API response
+    setInspectorDraft(null);
+  }
+
   // ── Review handlers ───────────────────────────────────────────────────────
 
   async function handleRequestReview(id: string) {
@@ -636,6 +672,23 @@ export default function HomepageBuilderWorkspace() {
 
   const selectedSection =
     sections.find((s) => s.id === selectedId) ?? null;
+
+  /**
+   * Merge the inspector draft into the sections array for Canvas live preview.
+   * Canvas tiles reflect the draft label immediately without a server round-trip.
+   */
+  const sectionsForCanvas = useMemo(() => {
+    if (!inspectorDraft) return sections;
+    return sections.map((s) =>
+      s.id === inspectorDraft.id
+        ? {
+            ...s,
+            label: inspectorDraft.label,
+            config: inspectorDraft.config as HomepageSectionAdminItem["config"],
+          }
+        : s,
+    );
+  }, [sections, inspectorDraft]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -845,7 +898,7 @@ export default function HomepageBuilderWorkspace() {
               {builderMode === "canvas" ? (
                 /* Canvas Mode */
                 <HomepageCanvas
-                  sections={sections}
+                  sections={sectionsForCanvas}
                   selectedId={selectedId}
                   actionPending={actionPending}
                   isAnyPending={isAnyActionPending}
@@ -860,10 +913,9 @@ export default function HomepageBuilderWorkspace() {
                   onPublish={(id) => handlePublish(id)}
                   onUnpublish={(id) => handleUnpublish(id)}
                   onStartEdit={(id) => {
-                    setEditingId(id);
+                    // In Canvas mode, select the section so the Inspector
+                    // becomes the editing surface (no mode switch needed).
                     setSelectedId(id);
-                    // Switch back to list so the inline edit form is visible
-                    setBuilderMode("list");
                   }}
                   onReorder={handleReorder}
                   reorderPending={reorderPending}
@@ -946,7 +998,11 @@ export default function HomepageBuilderWorkspace() {
                     Sektion Inspector
                   </p>
                 </div>
-                <HomepageSectionInspector section={selectedSection} />
+                <HomepageSectionInspector
+                  section={selectedSection}
+                  onDraftChange={handleInspectorDraftChange}
+                  onSaveEdit={handleInspectorSave}
+                />
               </div>
             </div>
           </div>
