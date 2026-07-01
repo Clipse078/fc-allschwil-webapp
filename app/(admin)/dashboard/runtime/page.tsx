@@ -14,8 +14,8 @@ export default async function DashboardRuntimePage() {
   return (
     <div className="space-y-6">
       <section className="rounded-[32px] border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur-xl lg:p-7">
-        <p className="fca-eyebrow">Deployment Diagnostics</p>
-        <h2 className="mt-2 font-[var(--font-display)] text-[2rem] font-bold uppercase tracking-[-0.04em] text-[#0b4aa2] lg:text-[2.35rem]">
+        <p className="text-xs font-medium tracking-wide text-[var(--muted)]">Deployment Diagnostics</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">
           Runtime & Deployment
         </h2>
       </section>
