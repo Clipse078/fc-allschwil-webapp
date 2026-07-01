@@ -42,16 +42,20 @@ export function PageHeader({
   return (
     <div className={cn("mb-6 flex flex-col gap-1.5", className)}>
       {eyebrow && (
-        <p className="fca-eyebrow">{eyebrow}</p>
+        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
+          {eyebrow}
+        </p>
       )}
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <h1 className="fca-heading leading-tight">{title}</h1>
+        <h1 className="text-[1.375rem] font-semibold leading-tight tracking-tight text-[var(--foreground)]">
+          {title}
+        </h1>
         {badge}
       </div>
 
       {description && (
-        <p className="mt-1 max-w-2xl text-sm text-[var(--text-2)] leading-relaxed">
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[var(--text-2)]">
           {description}
         </p>
       )}

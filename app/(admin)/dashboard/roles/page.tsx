@@ -13,6 +13,7 @@ import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getRolesWithCountsData, type RoleListItem } from "@/lib/roles/queries";
+import { buttonVariants } from "@/components/ui";
 
 export default async function RolesPage() {
   await requirePermission(PERMISSIONS.USERS_MANAGE);
@@ -31,7 +32,7 @@ export default async function RolesPage() {
         actions={
           <Link
             href="/dashboard/permissions"
-            className="fca-button-secondary flex items-center gap-2"
+            className={buttonVariants({ variant: "secondary" })}
           >
             <KeyRound className="h-4 w-4" />
             Berechtigungen

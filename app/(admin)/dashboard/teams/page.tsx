@@ -8,6 +8,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons, getTeamsListData } from "@/lib/teams/queries";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
+import { buttonVariants } from "@/components/ui";
 
 const CATEGORY_DISPLAY: Record<string, { label: string; accentClass: string; dotClass: string }> = {
   KINDERFUSSBALL: {
@@ -97,7 +98,7 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
           { label: "Teams" },
         ]}
         headerActions={
-          <Link href="/dashboard/teams/new" className="fca-button-primary">
+          <Link href="/dashboard/teams/new" className={buttonVariants({ variant: "primary" })}>
             <Plus className="h-4 w-4" />
             Neues Team
           </Link>
@@ -129,7 +130,7 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
             : "Noch keine Teams im System erfasst."
         }
         emptyAction={
-          <Link href="/dashboard/teams/new" className="fca-button-primary">
+          <Link href="/dashboard/teams/new" className={buttonVariants({ variant: "primary" })}>
             Erstes Team anlegen
           </Link>
         }

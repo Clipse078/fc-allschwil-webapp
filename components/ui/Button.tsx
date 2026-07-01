@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-const buttonVariants = cva(
+export const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-1.5",
     "whitespace-nowrap font-semibold",

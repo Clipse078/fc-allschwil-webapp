@@ -9,6 +9,7 @@ import {
   PageBreadcrumbs,
   PageHeader,
 } from "@/components/ui/page";
+import { buttonVariants } from "@/components/ui";
 
 export default async function HomepageBuilderPage() {
   await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
@@ -75,9 +76,9 @@ export default async function HomepageBuilderPage() {
 
       {/* Section links */}
       <div className="mb-4 flex flex-wrap gap-2">
-        <Link
+          <Link
           href={CMS_ROUTES.overview}
-          className="fca-button-secondary text-xs"
+          className={buttonVariants({ variant: "secondary", size: "sm" })}
         >
           ← CMS Übersicht
         </Link>

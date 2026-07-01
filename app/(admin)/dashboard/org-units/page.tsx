@@ -8,6 +8,7 @@ import { getOrgUnits, getArchivedOrgUnits } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import OrgUnitSearchableList from "@/components/admin/org/OrgUnitSearchableList";
 import { ListPagePattern } from "@/components/ui/patterns";
+import { buttonVariants } from "@/components/ui";
 
 // Org Builder Foundation v1: view=archived param switches to the archived units view.
 // Slice 11.2b: tenant resolved from session-carried tenantId.
@@ -35,7 +36,7 @@ export default async function OrgUnitsPage({ searchParams }: PageProps) {
       description="Hierarchische Organisationsstruktur – Grundlage für Sichtbarkeit, Berechtigungen und Kommunikation."
       headerActions={
         canManage ? (
-          <Link href="/dashboard/org-units/new" className="fca-button-primary">
+          <Link href="/dashboard/org-units/new" className={buttonVariants({ variant: "primary" })}>
             <Plus className="h-4 w-4" />
             Neue Einheit
           </Link>

@@ -7,6 +7,7 @@ import { getActorContext } from "@/lib/visibility/get-actor-context";
 import VereinsleitungMeetingsList from "@/components/admin/vereinsleitung/VereinsleitungMeetingsList";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
+import { buttonVariants } from "@/components/ui";
 
 export default async function VereinsleitungMeetingsPage() {
   const session = await auth();
@@ -26,7 +27,7 @@ export default async function VereinsleitungMeetingsPage() {
           { label: "Meetings" },
         ]}
         headerActions={
-          <Link href="/vereinsleitung/meetings/new" className="fca-button-primary">
+          <Link href="/vereinsleitung/meetings/new" className={buttonVariants({ variant: "primary" })}>
             <Plus className="h-4 w-4" />
             Neues Meeting
           </Link>

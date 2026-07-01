@@ -5,6 +5,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import NewsArticleList from "@/components/admin/news/NewsArticleList";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
+import { buttonVariants } from "@/components/ui";
 
 export default async function NewsAdminPage() {
   await requireAnyPermission([PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE]);
@@ -21,7 +22,7 @@ export default async function NewsAdminPage() {
           { label: "News" },
         ]}
         headerActions={
-          <Link href="/dashboard/website/news/new" className="fca-button-primary">
+          <Link href="/dashboard/website/news/new" className={buttonVariants({ variant: "primary" })}>
             <Plus className="h-4 w-4" />
             Neue News erstellen
           </Link>

@@ -9,6 +9,7 @@ import {
   PageHeader,
   PageActions,
 } from "@/components/ui/page";
+import { buttonVariants } from "@/components/ui";
 
 export default async function WebsitePagesAdminPage() {
   await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
@@ -30,7 +31,7 @@ export default async function WebsitePagesAdminPage() {
           className="mb-0"
         />
         <PageActions>
-          <Link href="/dashboard/website/pages/new" className="fca-button-primary">
+          <Link href="/dashboard/website/pages/new" className={buttonVariants({ variant: "primary" })}>
             <Plus className="h-4 w-4" />
             Neue Seite
           </Link>

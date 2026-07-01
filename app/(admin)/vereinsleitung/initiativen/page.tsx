@@ -7,6 +7,7 @@ import { getActorContext } from "@/lib/visibility/get-actor-context";
 import VereinsleitungInitiativenList from "@/components/admin/vereinsleitung/VereinsleitungInitiativenList";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
+import { buttonVariants } from "@/components/ui";
 
 export default async function VereinsleitungInitiativenPage() {
   const session = await auth();
@@ -26,7 +27,7 @@ export default async function VereinsleitungInitiativenPage() {
           { label: "Initiativen" },
         ]}
         headerActions={
-          <Link href="/vereinsleitung/initiativen/new" className="fca-button-primary">
+          <Link href="/vereinsleitung/initiativen/new" className={buttonVariants({ variant: "primary" })}>
             <Plus className="h-4 w-4" />
             Neue Initiative
           </Link>

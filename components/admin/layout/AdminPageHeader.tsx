@@ -270,9 +270,13 @@ export default function AdminPageHeader() {
 
   return (
     <div>
-      <p className="fca-eyebrow">{headerContent.eyebrow}</p>
-      <h1 className="fca-heading mt-2">{headerContent.title}</h1>
-      <p className="mt-3 max-w-2xl text-sm text-[var(--text-2)]">
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
+        {headerContent.eyebrow}
+      </p>
+      <h1 className="mt-1 text-[1.375rem] font-semibold tracking-tight text-[var(--foreground)]">
+        {headerContent.title}
+      </h1>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-2)]">
         {headerContent.description}
       </p>
     </div>

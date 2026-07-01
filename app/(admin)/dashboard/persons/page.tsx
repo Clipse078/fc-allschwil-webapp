@@ -6,6 +6,7 @@ import { getPersons } from "@/lib/people/queries";
 import PersonSearchableList from "@/components/admin/persons/PersonSearchableList";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
+import { buttonVariants } from "@/components/ui";
 
 export default async function PersonsPage() {
   await requirePermission(PERMISSIONS.PEOPLE_VIEW);
@@ -23,7 +24,7 @@ export default async function PersonsPage() {
           { label: "Personen" },
         ]}
         headerActions={
-          <Link href="/dashboard/persons/new" className="fca-button-primary">
+          <Link href="/dashboard/persons/new" className={buttonVariants({ variant: "primary" })}>
             <UserPlus className="h-4 w-4" />
             Neue Person
           </Link>
