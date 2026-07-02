@@ -36,18 +36,27 @@ import {
   BarChart3,
   Megaphone,
   FileText,
-  Plus,
   ChevronDown,
   RefreshCw,
+  LayoutTemplate,
+  Newspaper,
+  Calendar,
+  Users,
+  CalendarDays,
+  LayoutPanelLeft,
+  Blocks,
+  Library,
 } from "lucide-react";
 import type { ReusableComponentAdminItem } from "@/lib/reusable-components/types";
 import {
   REUSABLE_COMPONENT_TYPES,
-  COMPONENT_TYPE_LABELS,
+  BLOCK_SECTION_TYPE_LABELS,
+  getTypeLabel,
 } from "@/lib/reusable-components/component-types";
 import { SECTION_PUBLISH_STATUS } from "@/lib/cms/section-publishing";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
+  // Inline component types
   CTA:            <MousePointerClick className="h-4 w-4" />,
   SPONSOR_BANNER: <Award className="h-4 w-4" />,
   CONTACT_CARD:   <ContactRound className="h-4 w-4" />,
@@ -56,6 +65,16 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   STATISTICS:     <BarChart3 className="h-4 w-4" />,
   ANNOUNCEMENT:   <Megaphone className="h-4 w-4" />,
   RICH_TEXT:      <FileText className="h-4 w-4" />,
+  // Block section types (saved from Homepage / Page Builder)
+  hero:                   <LayoutTemplate className="h-4 w-4" />,
+  newsTeaser:             <Newspaper className="h-4 w-4" />,
+  eventsTeaser:           <Calendar className="h-4 w-4" />,
+  teamsTeaser:            <Users className="h-4 w-4" />,
+  weekplanTeaser:         <CalendarDays className="h-4 w-4" />,
+  callToAction:           <MousePointerClick className="h-4 w-4" />,
+  sponsorsTeaser:         <Award className="h-4 w-4" />,
+  splitContentCards:      <LayoutPanelLeft className="h-4 w-4" />,
+  customContentPlaceholder: <Blocks className="h-4 w-4" />,
 };
 
 type SharedComponentPickerProps = {
@@ -64,6 +83,8 @@ type SharedComponentPickerProps = {
   onSelect: (component: ReusableComponentAdminItem) => void;
   filterType?: string;
   title?: string;
+  /** Label for the confirm button. Default: "Auswählen" */
+  insertLabel?: string;
   /** When true, only shows published components. Default: false (show all) */
   publishedOnly?: boolean;
 };
@@ -73,7 +94,8 @@ export default function SharedComponentPicker({
   onClose,
   onSelect,
   filterType,
-  title = "Komponente auswählen",
+  title = "Wiederverwendbaren Inhalt auswählen",
+  insertLabel = "Als Kopie einfügen",
   publishedOnly = false,
 }: SharedComponentPickerProps) {
   const [components, setComponents] = useState<ReusableComponentAdminItem[]>([]);
@@ -181,9 +203,16 @@ export default function SharedComponentPicker({
                 className="appearance-none rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-3 pr-7 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--tenant-primary)]"
               >
                 <option value="">Alle Typen</option>
-                {REUSABLE_COMPONENT_TYPES.map((t) => (
-                  <option key={t.key} value={t.key}>{t.label}</option>
-                ))}
+                <optgroup label="Komponenten">
+                  {REUSABLE_COMPONENT_TYPES.map((t) => (
+                    <option key={t.key} value={t.key}>{t.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Sektion-Vorlagen">
+                  {Object.entries(BLOCK_SECTION_TYPE_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </optgroup>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--muted)]" />
             </div>
@@ -203,13 +232,13 @@ export default function SharedComponentPicker({
               <FileText className="h-8 w-8 text-[var(--muted)]" />
               <p className="text-sm text-[var(--muted)]">Keine Komponenten gefunden.</p>
               <a
-                href="/dashboard/website/components/new"
+                href="/dashboard/website/components"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-[var(--tenant-primary)] hover:underline"
               >
-                <Plus className="h-3 w-3" />
-                Neue Komponente erstellen
+                <Library className="h-3 w-3" />
+                Zur Bibliothek
               </a>
             </div>
           ) : (
@@ -257,7 +286,7 @@ export default function SharedComponentPicker({
                       <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--muted)]">
                         <span className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px]">
                           {TYPE_ICONS[c.type]}
-                          {COMPONENT_TYPE_LABELS[c.type] ?? c.type}
+                          {getTypeLabel(c.type)}
                         </span>
                         <span>/{c.slug}</span>
                       </div>
@@ -285,13 +314,13 @@ export default function SharedComponentPicker({
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3">
           <a
-            href="/dashboard/website/components/new"
+            href="/dashboard/website/components"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-[var(--tenant-primary)] hover:underline"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Neue Komponente erstellen
+            <Library className="h-3.5 w-3.5" />
+            Bibliothek verwalten
           </a>
 
           <div className="flex items-center gap-2">
@@ -307,7 +336,7 @@ export default function SharedComponentPicker({
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
               style={{ background: "var(--tenant-primary)" }}
             >
-              Auswählen
+              {insertLabel}
             </button>
           </div>
         </div>

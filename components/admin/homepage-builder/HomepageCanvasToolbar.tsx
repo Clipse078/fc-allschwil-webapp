@@ -10,6 +10,7 @@ import {
   GlobeLock,
   Copy,
   Trash2,
+  Bookmark,
 } from "lucide-react";
 import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
 import {
@@ -34,6 +35,8 @@ type Props = {
   onDuplicate?: () => void;
   /** Delete the section (caller handles confirmation). */
   onDelete?: () => void;
+  /** Save this section's config as a reusable library item. */
+  onSaveAsReusable?: () => void;
 };
 
 export function HomepageCanvasToolbar({
@@ -50,6 +53,7 @@ export function HomepageCanvasToolbar({
   onUnpublish,
   onDuplicate,
   onDelete,
+  onSaveAsReusable,
 }: Props) {
   const isBusy = isPending || isAnyPending;
   const approvalStatus = section.approvalStatus as ApprovalStatus;
@@ -184,9 +188,29 @@ export function HomepageCanvasToolbar({
         </>
       )}
 
-      {onDelete && (
+      {onSaveAsReusable && (
         <>
           {!onDuplicate && (
+            <span className="h-4 w-px bg-[var(--border)] mx-0.5" aria-hidden="true" />
+          )}
+
+          {/* Save as reusable */}
+          <button
+            type="button"
+            onClick={onSaveAsReusable}
+            disabled={isBusy}
+            className="sce-icon-button text-[var(--muted)] hover:text-[var(--tenant-primary)] hover:bg-[var(--surface-2)]"
+            title="Als wiederverwendbaren Block speichern"
+            aria-label="Als wiederverwendbaren Block speichern"
+          >
+            <Bookmark className="h-3.5 w-3.5" />
+          </button>
+        </>
+      )}
+
+      {onDelete && (
+        <>
+          {(!onDuplicate && !onSaveAsReusable) && (
             <span className="h-4 w-px bg-[var(--border)] mx-0.5" aria-hidden="true" />
           )}
 

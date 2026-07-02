@@ -13,7 +13,7 @@ import {
   listReusableComponents,
   createReusableComponent,
 } from "@/lib/reusable-components/queries";
-import { REUSABLE_COMPONENT_TYPE } from "@/lib/reusable-components/component-types";
+import { REUSABLE_COMPONENT_TYPE, BLOCK_SECTION_TYPE_LABELS } from "@/lib/reusable-components/component-types";
 
 // ── GET /api/reusable-components ─────────────────────────────────────────────
 
@@ -80,7 +80,9 @@ export async function POST(request: NextRequest) {
       ? (body.config as Record<string, unknown>)
       : undefined;
 
-  if (!type || !Object.values(REUSABLE_COMPONENT_TYPE).includes(type as never)) {
+  const isKnownComponentType = Object.values(REUSABLE_COMPONENT_TYPE).includes(type as never);
+  const isKnownSectionType = Object.prototype.hasOwnProperty.call(BLOCK_SECTION_TYPE_LABELS, type);
+  if (!type || (!isKnownComponentType && !isKnownSectionType)) {
     return NextResponse.json(
       { error: `Unbekannter Komponenten-Typ: ${type}` },
       { status: 400 },

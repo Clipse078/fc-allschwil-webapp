@@ -40,11 +40,19 @@ import {
   CheckCircle2,
   Clock,
   Pencil,
+  LayoutTemplate,
+  Newspaper,
+  Calendar,
+  Users,
+  CalendarDays,
+  LayoutPanelLeft,
+  Blocks,
 } from "lucide-react";
 import type { ReusableComponentAdminItem } from "@/lib/reusable-components/types";
 import {
   REUSABLE_COMPONENT_TYPES,
-  COMPONENT_TYPE_LABELS,
+  BLOCK_SECTION_TYPE_LABELS,
+  getTypeLabel,
 } from "@/lib/reusable-components/component-types";
 import { SECTION_PUBLISH_STATUS, SECTION_APPROVAL_STATUS_LABELS } from "@/lib/cms/section-publishing";
 import { CMS_ROUTES } from "@/lib/cms/routes";
@@ -52,6 +60,7 @@ import { CMS_ROUTES } from "@/lib/cms/routes";
 // ── Icon map ─────────────────────────────────────────────────────────────────
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
+  // Inline component types
   CTA:            <MousePointerClick className="h-4 w-4" />,
   SPONSOR_BANNER: <Award className="h-4 w-4" />,
   CONTACT_CARD:   <ContactRound className="h-4 w-4" />,
@@ -60,6 +69,16 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   STATISTICS:     <BarChart3 className="h-4 w-4" />,
   ANNOUNCEMENT:   <Megaphone className="h-4 w-4" />,
   RICH_TEXT:      <FileText className="h-4 w-4" />,
+  // Block section types (saved from Homepage / Page Builder)
+  hero:                   <LayoutTemplate className="h-4 w-4" />,
+  newsTeaser:             <Newspaper className="h-4 w-4" />,
+  eventsTeaser:           <Calendar className="h-4 w-4" />,
+  teamsTeaser:            <Users className="h-4 w-4" />,
+  weekplanTeaser:         <CalendarDays className="h-4 w-4" />,
+  callToAction:           <MousePointerClick className="h-4 w-4" />,
+  sponsorsTeaser:         <Award className="h-4 w-4" />,
+  splitContentCards:      <LayoutPanelLeft className="h-4 w-4" />,
+  customContentPlaceholder: <Blocks className="h-4 w-4" />,
 };
 
 // ── Status badge ─────────────────────────────────────────────────────────────
@@ -242,9 +261,16 @@ export default function ReusableComponentsLibrary() {
               className="appearance-none rounded-lg border border-[var(--border)] bg-[var(--surface)] py-2 pl-3 pr-8 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--tenant-primary)]"
             >
               <option value="">Alle Typen</option>
-              {REUSABLE_COMPONENT_TYPES.map((t) => (
-                <option key={t.key} value={t.key}>{t.label}</option>
-              ))}
+              <optgroup label="Komponenten">
+                {REUSABLE_COMPONENT_TYPES.map((t) => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Sektion-Vorlagen">
+                {Object.entries(BLOCK_SECTION_TYPE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </optgroup>
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--muted)]" />
           </div>
@@ -361,8 +387,8 @@ export default function ReusableComponentsLibrary() {
                   {/* Type */}
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs font-medium text-[var(--foreground)]">
-                      <span className="text-[var(--tenant-primary)]">{TYPE_ICONS[c.type]}</span>
-                      {COMPONENT_TYPE_LABELS[c.type] ?? c.type}
+                      <span className="text-[var(--tenant-primary)]">{TYPE_ICONS[c.type] ?? <FileText className="h-4 w-4" />}</span>
+                      {getTypeLabel(c.type)}
                     </span>
                   </td>
 
@@ -481,7 +507,7 @@ export default function ReusableComponentsLibrary() {
                 </span>
                 <div>
                   <p className="font-semibold text-[var(--foreground)]">{previewComponent.title}</p>
-                  <p className="text-xs text-[var(--muted)]">{COMPONENT_TYPE_LABELS[previewComponent.type] ?? previewComponent.type} · /{previewComponent.slug}</p>
+                  <p className="text-xs text-[var(--muted)]">{getTypeLabel(previewComponent.type)} · /{previewComponent.slug}</p>
                 </div>
               </div>
               <button onClick={() => setPreviewComponent(null)} className="rounded-lg p-1 text-[var(--muted)] hover:text-[var(--foreground)]">

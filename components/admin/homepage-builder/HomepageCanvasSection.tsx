@@ -110,6 +110,7 @@ type Props = {
   onDeselect?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  onSaveAsReusable?: () => void;
 } & Pick<
   SectionCardCallbacks,
   | "onSelect"
@@ -149,6 +150,7 @@ export function HomepageCanvasSection({
   onDeselect,
   onDuplicate,
   onDelete,
+  onSaveAsReusable,
 }: Props) {
   const def = getBlockDefinition(section.type);
   const BlockIcon = BLOCK_ICON_MAP[def?.icon ?? "LayoutTemplate"] ?? LayoutTemplate;
@@ -247,6 +249,7 @@ export function HomepageCanvasSection({
             onUnpublish={onUnpublish}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
+            onSaveAsReusable={onSaveAsReusable}
           />
         </div>
       )}

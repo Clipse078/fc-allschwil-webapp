@@ -72,6 +72,8 @@ import {
   Layers,
   List,
   LayoutGrid,
+  Library,
+  Bookmark,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
@@ -93,6 +95,9 @@ import type { SectionLayout } from "@/lib/cms/layout-types";
 import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
 import { HomepageSectionInspector } from "@/components/admin/homepage-builder/HomepageSectionInspector";
 import { PageBuilderCanvas } from "@/components/admin/page-builder/PageBuilderCanvas";
+import { SaveAsReusableDialog } from "@/components/admin/homepage-builder/SaveAsReusableDialog";
+import SharedComponentPicker from "@/components/admin/reusable-components/SharedComponentPicker";
+import type { ReusableComponentAdminItem } from "@/lib/reusable-components/types";
 
 // Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
 const SplitContentCardsConfigForm = dynamic(
@@ -1088,6 +1093,14 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [reorderPending, setReorderPending] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
 
+  // ── Block Library state ────────────────────────────────────────────────────
+  const [saveAsReusableFor, setSaveAsReusableFor] = useState<{
+    type: string;
+    label: string;
+    config: Record<string, unknown>;
+  } | null>(null);
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+
   // ── Unsaved changes warning ────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -1252,6 +1265,41 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  }
+
+  // ── Block Library actions ──────────────────────────────────────────────────
+
+  function handleOpenSaveAsReusable(sectionId: string) {
+    const base = sections.find((s) => s.id === sectionId);
+    if (!base) return;
+    const draft = inspectorDraft?.id === sectionId ? inspectorDraft : null;
+    setSaveAsReusableFor({
+      type: base.type,
+      label: draft?.label ?? base.label,
+      config: (draft?.config ?? base.config) as Record<string, unknown>,
+    });
+  }
+
+  async function handleInsertFromLibrary(component: ReusableComponentAdminItem) {
+    try {
+      const res = await fetch(`/api/website-pages/${pageId}/sections`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: component.type,
+          label: component.title,
+          config: component.config,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Fehler beim Einfügen des Blocks.");
+        return;
+      }
+      setSections((prev) => [...prev, data.section]);
+    } catch {
+      alert("Fehler beim Einfügen des Blocks.");
+    }
   }
 
   // ── Canvas actions (Slice I) ───────────────────────────────────────────────
@@ -1458,6 +1506,27 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
         />
       )}
 
+      {/* Save-as-reusable dialog */}
+      {saveAsReusableFor && (
+        <SaveAsReusableDialog
+          open
+          sectionType={saveAsReusableFor.type}
+          sectionLabel={saveAsReusableFor.label}
+          sectionConfig={saveAsReusableFor.config}
+          onClose={() => setSaveAsReusableFor(null)}
+          onSaved={() => setSaveAsReusableFor(null)}
+        />
+      )}
+
+      {/* Insert-from-library picker */}
+      <SharedComponentPicker
+        open={showLibraryPicker}
+        onClose={() => setShowLibraryPicker(false)}
+        onSelect={handleInsertFromLibrary}
+        title="Aus Bibliothek einfügen"
+        insertLabel="Als Kopie einfügen"
+      />
+
       <div className="space-y-4">
         {/* ── Toolbar ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1495,6 +1564,16 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               ))}
             </div>
 
+            <button
+              type="button"
+              onClick={() => setShowLibraryPicker(true)}
+              className="fca-button-secondary px-2.5"
+              title="Block aus Bibliothek einfügen"
+              aria-label="Block aus Bibliothek einfügen"
+            >
+              <Library className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline ml-1 text-xs">Bibliothek</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowTemplates(true)}
@@ -1633,6 +1712,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                   onReorder={handleCanvasReorder}
                   onDuplicate={handleDuplicate}
                   onDelete={handleDeleteRequest}
+                  onSaveAsReusable={handleOpenSaveAsReusable}
                   reorderPending={reorderPending}
                   reorderError={reorderError}
                 />
@@ -1654,6 +1734,9 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                     }
                     onDraftChange={handleInspectorDraftChange}
                     onSaveEdit={handleInspectorSave}
+                    onSaveAsReusable={
+                      selectedId ? () => handleOpenSaveAsReusable(selectedId) : undefined
+                    }
                   />
                 </div>
               </div>
@@ -1799,6 +1882,16 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             aria-pressed={workflowId === section.id}
                           >
                             <Globe className="h-3.5 w-3.5" />
+                          </button>
+                          {/* Save as reusable */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSaveAsReusable(section.id)}
+                            className="sce-icon-button text-[var(--muted)] hover:text-[var(--tenant-primary)]"
+                            title="Als wiederverwendbaren Block speichern"
+                            aria-label="Als wiederverwendbaren Block speichern"
+                          >
+                            <Bookmark className="h-3.5 w-3.5" />
                           </button>
                           {/* History */}
                           <button

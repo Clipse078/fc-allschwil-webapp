@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, ClipboardCheck, Eye, List, LayoutGrid } from "lucide-react";
+import { RefreshCw, ClipboardCheck, Eye, List, LayoutGrid, Library } from "lucide-react";
 import Link from "next/link";
 import { CMS_ROUTES } from "@/lib/cms/routes";
 
@@ -15,6 +15,7 @@ type Props = {
   onBuilderModeChange: (mode: BuilderMode) => void;
   onRefresh: () => void;
   onPreview: () => void;
+  onOpenLibrary?: () => void;
 };
 
 const MODE_CONFIG: { mode: BuilderMode; label: string; icon: React.ElementType; title: string }[] = [
@@ -31,6 +32,7 @@ export function HomepageBuilderToolbar({
   onBuilderModeChange,
   onRefresh,
   onPreview,
+  onOpenLibrary,
 }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
@@ -84,6 +86,20 @@ export function HomepageBuilderToolbar({
             </button>
           ))}
         </div>
+
+        {/* Insert from library */}
+        {onOpenLibrary && (
+          <button
+            type="button"
+            onClick={onOpenLibrary}
+            disabled={disabled}
+            className="fca-button-secondary px-2.5"
+            title="Block aus Bibliothek einfügen"
+          >
+            <Library className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline ml-1 text-xs">Bibliothek</span>
+          </button>
+        )}
 
         {/* Review queue */}
         <Link
