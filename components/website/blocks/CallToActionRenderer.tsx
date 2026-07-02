@@ -21,12 +21,15 @@
  * Props:
  *   config      — CallToActionSectionConfig (the DB JSON column, parsed)
  *   previewMode — when true adds an admin border/label overlay (via SectionShell)
+ *   onFieldChange — Admin canvas only. When provided, text fields become
+ *                   inline-editable. Never set by the public website.
  */
 
 import type { CallToActionSectionConfig } from "@/lib/homepage/section-types";
 import { THEME_TOKENS, resolveLayout } from "@/lib/cms/layout-types";
 import SectionShell from "@/components/website/SectionShell";
 import { resolveDesignSystem } from "@/lib/cms/token-resolver";
+import { CanvasInlineTextField } from "@/components/admin/homepage-builder/CanvasInlineTextField";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -37,6 +40,13 @@ type CallToActionRendererProps = {
   previewMode?: boolean;
   /** Resolved background image URL for canvas preview (admin only). */
   backgroundImageUrl?: string;
+  /**
+   * Admin canvas only. When provided, title/body/button labels become
+   * inline-editable text fields. The public website never passes this prop.
+   */
+  onFieldChange?: (field: string, value: string) => void;
+  /** Admin canvas only: overrides the CSS background-position for focal-point preview. */
+  backgroundPositionOverride?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -47,6 +57,8 @@ export default function CallToActionRenderer({
   config: rawConfig,
   previewMode = false,
   backgroundImageUrl,
+  onFieldChange,
+  backgroundPositionOverride,
 }: CallToActionRendererProps) {
   const cfg = rawConfig as CallToActionSectionConfig;
   const ds = resolveDesignSystem();
@@ -63,6 +75,7 @@ export default function CallToActionRenderer({
         : "items-start text-left";
 
   const hasContent = cfg.title || cfg.body || cfg.primaryLabel || cfg.secondaryLabel;
+  const isInlineEdit = !!onFieldChange;
 
   return (
     <SectionShell
@@ -70,58 +83,101 @@ export default function CallToActionRenderer({
       previewMode={previewMode}
       blockType="callToAction"
       backgroundImageUrl={backgroundImageUrl}
+      backgroundPositionOverride={backgroundPositionOverride}
     >
-      {!hasContent && previewMode ? (
+      {!hasContent && previewMode && !isInlineEdit ? (
         <div className={`${ds.radius.medium} border border-dashed border-gray-300 px-6 py-12 text-center ${ds.typography.small} text-gray-400`}>
           Call-to-Action — Titel, Text und Buttons konfigurieren
         </div>
       ) : (
         <div className={`flex flex-col ${alignClass} ${ds.spacing.m}`}>
           {/* Headline */}
-          {cfg.title && (
-            <h2 className={`${ds.typography.h2} ${themeTokens.text}`}>
-              {cfg.title}
-            </h2>
+          {isInlineEdit ? (
+            <CanvasInlineTextField
+              value={(cfg.title as string) ?? ""}
+              onChange={(v) => onFieldChange("title", v)}
+              className={`${ds.typography.h2} ${themeTokens.text}`}
+              placeholder="CTA-Titel eingeben…"
+            />
+          ) : (
+            cfg.title && (
+              <h2 className={`${ds.typography.h2} ${themeTokens.text}`}>
+                {cfg.title}
+              </h2>
+            )
           )}
 
           {/* Body text */}
-          {cfg.body && (
-            <p className={`${ds.typography.body} ${themeTokens.subtext} max-w-2xl`}>
-              {cfg.body}
-            </p>
+          {isInlineEdit ? (
+            <CanvasInlineTextField
+              value={(cfg.body as string) ?? ""}
+              onChange={(v) => onFieldChange("body", v)}
+              className={`${ds.typography.body} ${themeTokens.subtext} max-w-2xl`}
+              placeholder="Beschreibungstext eingeben…"
+              multiline
+            />
+          ) : (
+            cfg.body && (
+              <p className={`${ds.typography.body} ${themeTokens.subtext} max-w-2xl`}>
+                {cfg.body}
+              </p>
+            )
           )}
 
           {/* Button group */}
-          {(cfg.primaryLabel || cfg.secondaryLabel) && (
-            <div className={`flex flex-wrap gap-3 ${hAlign === "center" ? "justify-center" : ""}`}>
-              {cfg.primaryLabel && cfg.primaryUrl && (
-                <a
-                  href={cfg.primaryUrl}
-                  className={`${ds.buttons.primary} ${ds.buttons.rounded}`}
-                >
-                  {cfg.primaryLabel}
-                </a>
-              )}
-              {cfg.primaryLabel && !cfg.primaryUrl && (
-                <span className={`${ds.buttons.primary} ${ds.buttons.rounded} opacity-50 cursor-not-allowed`}>
-                  {cfg.primaryLabel}
-                </span>
-              )}
-              {cfg.secondaryLabel && cfg.secondaryUrl && (
-                <a
-                  href={cfg.secondaryUrl}
-                  className={`${ds.buttons.outline} ${ds.buttons.rounded}`}
-                >
-                  {cfg.secondaryLabel}
-                </a>
-              )}
-              {cfg.secondaryLabel && !cfg.secondaryUrl && (
-                <span className={`${ds.buttons.outline} ${ds.buttons.rounded} opacity-50 cursor-not-allowed`}>
-                  {cfg.secondaryLabel}
-                </span>
-              )}
-            </div>
-          )}
+          <div className={`flex flex-wrap gap-3 ${hAlign === "center" ? "justify-center" : ""}`}>
+            {/* Primary button */}
+            {isInlineEdit ? (
+              <CanvasInlineTextField
+                value={(cfg.primaryLabel as string) ?? ""}
+                onChange={(v) => onFieldChange("primaryLabel", v)}
+                className={`${ds.buttons.primary} ${ds.buttons.rounded} w-auto`}
+                placeholder="Primär-Button…"
+              />
+            ) : (
+              <>
+                {cfg.primaryLabel && cfg.primaryUrl && (
+                  <a
+                    href={cfg.primaryUrl}
+                    className={`${ds.buttons.primary} ${ds.buttons.rounded}`}
+                  >
+                    {cfg.primaryLabel}
+                  </a>
+                )}
+                {cfg.primaryLabel && !cfg.primaryUrl && (
+                  <span className={`${ds.buttons.primary} ${ds.buttons.rounded} opacity-50 cursor-not-allowed`}>
+                    {cfg.primaryLabel}
+                  </span>
+                )}
+              </>
+            )}
+
+            {/* Secondary button */}
+            {isInlineEdit ? (
+              <CanvasInlineTextField
+                value={(cfg.secondaryLabel as string) ?? ""}
+                onChange={(v) => onFieldChange("secondaryLabel", v)}
+                className={`${ds.buttons.outline} ${ds.buttons.rounded} w-auto`}
+                placeholder="Sekundär-Button…"
+              />
+            ) : (
+              <>
+                {cfg.secondaryLabel && cfg.secondaryUrl && (
+                  <a
+                    href={cfg.secondaryUrl}
+                    className={`${ds.buttons.outline} ${ds.buttons.rounded}`}
+                  >
+                    {cfg.secondaryLabel}
+                  </a>
+                )}
+                {cfg.secondaryLabel && !cfg.secondaryUrl && (
+                  <span className={`${ds.buttons.outline} ${ds.buttons.rounded} opacity-50 cursor-not-allowed`}>
+                    {cfg.secondaryLabel}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </SectionShell>

@@ -88,6 +88,7 @@ import type { ResolvedDesignSystem } from "@/lib/website/design-system-types";
 function resolveBackgroundStyle(
   bg: SectionBackground,
   backgroundImageUrl?: string,
+  backgroundPositionOverride?: string,
 ): {
   className: string;
   style: React.CSSProperties;
@@ -120,7 +121,7 @@ function resolveBackgroundStyle(
     };
   }
 
-  if (bg.type === "image") {
+    if (bg.type === "image") {
     // Overlay class logic is unchanged from the original — only backgroundImageUrl
     // support has been added. The overlayOpacity path intentionally preserves the
     // original behaviour (empty overlayClass when opacity is set) so that existing
@@ -136,11 +137,15 @@ function resolveBackgroundStyle(
     // When a resolved image URL is provided (admin canvas preview only), apply it
     // as backgroundImage. Public callers never pass backgroundImageUrl so bgStyle
     // is {} for them — identical to the original code.
+    //
+    // backgroundPositionOverride is also admin-only (focal-point drag, Slice K).
+    // It only takes effect when backgroundImageUrl is also provided, so public
+    // website rendering is unaffected.
     const imageStyle: React.CSSProperties = backgroundImageUrl
       ? {
           backgroundImage: `url(${backgroundImageUrl})`,
           backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundPosition: backgroundPositionOverride ?? "center",
         }
       : {};
 
@@ -186,6 +191,13 @@ type SectionShellProps = {
    * Public website renderers do not pass this prop and are unaffected.
    */
   backgroundImageUrl?: string;
+  /**
+   * Admin canvas only. Overrides the CSS background-position value for
+   * focal-point drag preview (Slice K). Only takes effect when
+   * backgroundImageUrl is also provided. Public website callers never set
+   * this prop. See FocalPointControl.tsx for persistence gap notes.
+   */
+  backgroundPositionOverride?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -200,6 +212,7 @@ export default function SectionShell({
   className = "",
   designSystem,
   backgroundImageUrl,
+  backgroundPositionOverride,
 }: SectionShellProps) {
   const resolved = resolveLayout(layout);
 
@@ -216,7 +229,7 @@ export default function SectionShell({
     : {};
 
   const { className: bgClass, style: bgStyle, hasImageOverlay, imageOverlayClass, imageOverlayStyle } =
-    resolveBackgroundStyle(resolved.background, backgroundImageUrl);
+    resolveBackgroundStyle(resolved.background, backgroundImageUrl, backgroundPositionOverride);
 
   // Horizontal padding resolved from Design System via PADDING_X_MAP.
   // Falls back to "md" when paddingX is not set (covered by resolveLayout defaults).

@@ -128,6 +128,12 @@ function RichTextDisplay({
 }
 
 // ---------------------------------------------------------------------------
+// Inline edit import (admin canvas only)
+// ---------------------------------------------------------------------------
+
+import { CanvasInlineTextField } from "@/components/admin/homepage-builder/CanvasInlineTextField";
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
@@ -136,6 +142,14 @@ type SplitContentCardsRendererProps = {
   previewMode?: boolean;
   /** Resolved background image URL for canvas preview (admin only). */
   backgroundImageUrl?: string;
+  /**
+   * Admin canvas only. When provided, section headline becomes inline-editable.
+   * Card-level inline editing is not supported in Slice K (see report gap 12).
+   * The public website never passes this prop.
+   */
+  onFieldChange?: (field: string, value: string) => void;
+  /** Admin canvas only: overrides CSS background-position for focal-point preview. */
+  backgroundPositionOverride?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -146,6 +160,8 @@ export default function SplitContentCardsRenderer({
   config: rawConfig,
   previewMode = false,
   backgroundImageUrl,
+  onFieldChange,
+  backgroundPositionOverride,
 }: SplitContentCardsRendererProps) {
   const cfg = rawConfig as SplitContentCardsSectionConfig;
   const ds = resolveDesignSystem();
@@ -162,6 +178,8 @@ export default function SplitContentCardsRenderer({
 
   const cards = cfg.cards ?? [];
 
+  const isInlineEdit = !!onFieldChange;
+
   // Text column — typography resolved from Design System
   const textColumn = (
     <div
@@ -176,12 +194,21 @@ export default function SplitContentCardsRenderer({
           {cfg.eyebrow}
         </p>
       )}
-      {cfg.headline && (
-        <h2
+      {isInlineEdit ? (
+        <CanvasInlineTextField
+          value={(cfg.headline as string) ?? ""}
+          onChange={(v) => onFieldChange("headline", v)}
           className={`mb-4 ${ds.typography.h2} ${themeTokens.text}`}
-        >
-          {cfg.headline}
-        </h2>
+          placeholder="Überschrift eingeben…"
+        />
+      ) : (
+        cfg.headline && (
+          <h2
+            className={`mb-4 ${ds.typography.h2} ${themeTokens.text}`}
+          >
+            {cfg.headline}
+          </h2>
+        )
       )}
       {isRichTextValue(cfg.bodyRichText) && (
         <RichTextDisplay
@@ -193,7 +220,7 @@ export default function SplitContentCardsRenderer({
           }
         />
       )}
-      {!cfg.eyebrow && !cfg.headline && !cfg.bodyRichText && (
+      {!cfg.eyebrow && !cfg.headline && !cfg.bodyRichText && !isInlineEdit && (
         <div className={`${ds.radius.medium} border border-dashed border-gray-300 px-4 py-6 text-center ${ds.typography.small} text-gray-400`}>
           Kein Textinhalt konfiguriert
         </div>
@@ -228,6 +255,7 @@ export default function SplitContentCardsRenderer({
       previewMode={previewMode}
       blockType="splitContentCards"
       backgroundImageUrl={backgroundImageUrl}
+      backgroundPositionOverride={backgroundPositionOverride}
     >
       <div className={stackClass}>
         {isCardsLeft ? (

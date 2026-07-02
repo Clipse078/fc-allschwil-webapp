@@ -111,6 +111,13 @@ type Props = {
   onDuplicate?: () => void;
   onDelete?: () => void;
   onSaveAsReusable?: () => void;
+  /**
+   * Admin canvas inline editing (Slice K).
+   * When provided and the section is selected, pointer-events-none is removed
+   * from the block preview wrapper and text fields become inline editable.
+   * Called on every change; the parent merges into inspectorDraft.
+   */
+  onInlineFieldChange?: (field: string, value: string) => void;
 } & Pick<
   SectionCardCallbacks,
   | "onSelect"
@@ -151,6 +158,7 @@ export function HomepageCanvasSection({
   onDuplicate,
   onDelete,
   onSaveAsReusable,
+  onInlineFieldChange,
 }: Props) {
   const def = getBlockDefinition(section.type);
   const BlockIcon = BLOCK_ICON_MAP[def?.icon ?? "LayoutTemplate"] ?? LayoutTemplate;
@@ -359,21 +367,24 @@ export function HomepageCanvasSection({
           Renders the actual block using the shared website renderer in
           previewMode. pointer-events-none prevents accidental link navigation
           and keeps click-to-select working on the outer wrapper.
+          When inline editing is active (section selected + onInlineFieldChange
+          provided), pointer-events-none is removed so text fields are interactive.
           Opacity reflects the section's enabled/disabled state.
           ─────────────────────────────────────────────────────────────────── */}
       <div
         className={[
-          "pointer-events-none select-none",
+          isSelected && onInlineFieldChange ? "" : "pointer-events-none select-none",
           !section.isEnabled ? "opacity-50" : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        aria-hidden="true"
+        aria-hidden={!(isSelected && onInlineFieldChange)}
       >
         <Suspense fallback={<RendererSkeleton />}>
           <CanvasBlockPreview
             type={section.type}
             config={section.config as Record<string, unknown>}
+            onFieldChange={isSelected && onInlineFieldChange ? onInlineFieldChange : undefined}
           />
         </Suspense>
       </div>

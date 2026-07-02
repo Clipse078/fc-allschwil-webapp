@@ -28,13 +28,30 @@
  *   HomepageMediaField (which does the same resolution for the inspector
  *   thumbnail). Public renderers are unaffected — they do not receive this prop.
  *
+ * INLINE EDITING (Slice K)
+ *   When `onFieldChange` is provided (admin canvas only), text fields inside
+ *   the rendered block become inline editable. The pointer-events-none wrapper
+ *   in HomepageCanvasSection must be removed by the parent to allow interaction.
+ *   Supported fields per block type:
+ *     hero:              title, subtitle, ctaLabel
+ *     callToAction:      title, body, primaryLabel, secondaryLabel
+ *     splitContentCards: headline
+ *
+ * BACKGROUND FOCAL POINT (Slice K — preview-only)
+ *   Local `backgroundPosition` state is managed here. When the section has a
+ *   background image and `onFieldChange` is active, `FocalPointControl` overlays
+ *   the rendered block. Dragging repositions the image in the canvas preview.
+ *   PERSISTENCE GAP: the focal point is NOT saved to the database (no schema
+ *   field exists). It resets on page reload. See FocalPointControl.tsx.
+ *
  * INTERACTIVITY
  *   The preview wrapper uses pointer-events-none so clicks on links/buttons
  *   inside the rendered block are intercepted by the canvas section's onClick
  *   handler (section selection) rather than triggering navigation.
+ *   When `onFieldChange` is provided, the parent must remove pointer-events-none.
  */
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 import {
   Database,
@@ -47,6 +64,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
+import { FocalPointControl } from "./FocalPointControl";
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded renderers (same pattern as PageBuilderClient / HomepagePreviewPanel)
@@ -211,15 +229,53 @@ function useBackgroundImageUrl(config: Record<string, unknown>): string | null {
 type CanvasBlockPreviewProps = {
   type: string;
   config: Record<string, unknown>;
+  /**
+   * Admin canvas only. When provided, supported text fields become
+   * inline-editable. The parent (HomepageCanvasSection) must remove
+   * pointer-events-none from the wrapper when this is set.
+   */
+  onFieldChange?: (field: string, value: string) => void;
 };
 
 // ---------------------------------------------------------------------------
 // CanvasBlockPreview
 // ---------------------------------------------------------------------------
 
-export function CanvasBlockPreview({ type, config }: CanvasBlockPreviewProps) {
+export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockPreviewProps) {
   const backgroundImageUrl = useBackgroundImageUrl(config) ?? undefined;
   const def = getBlockDefinition(type);
+
+  // ── Focal-point local state (preview-only, not persisted) ──────────────
+  // Tracks the position keyed by the current mediaAssetId so it auto-resets
+  // when the background image changes — no effect needed.
+  const [focalPoint, setFocalPoint] = useState<{
+    assetId: string | null;
+    pos: string;
+  }>({ assetId: null, pos: "50% 50%" });
+
+  const layout = config._layout as Record<string, unknown> | undefined;
+  const background = layout?.background as Record<string, unknown> | undefined;
+  const mediaAssetId =
+    background?.type === "image" && typeof background.mediaAssetId === "string"
+      ? background.mediaAssetId
+      : null;
+
+  // Derive effective background position: reset to center when assetId changes
+  const backgroundPosition =
+    focalPoint.assetId === mediaAssetId ? focalPoint.pos : "50% 50%";
+
+  function handleFocalPositionChange(pos: string) {
+    setFocalPoint({ assetId: mediaAssetId, pos });
+  }
+
+  function handleFocalReset() {
+    setFocalPoint({ assetId: mediaAssetId, pos: "50% 50%" });
+  }
+
+  // Only show focal point control when inline editing is active AND there's a bg image
+  const showFocalPoint = !!onFieldChange && !!backgroundImageUrl;
+
+  // ── Placeholder blocks (no inline editing) ────────────────────────────
 
   // Data-driven blocks — show informational placeholder instead of trying to
   // render live data that is not available in the admin canvas context.
@@ -232,41 +288,72 @@ export function CanvasBlockPreview({ type, config }: CanvasBlockPreviewProps) {
     return <ComingSoonPlaceholder type={type} />;
   }
 
-  switch (type) {
-    case "hero":
-      return (
-        <Suspense fallback={<RendererSkeleton />}>
-          <HeroRenderer
-            config={config}
-            previewMode
-            backgroundImageUrl={backgroundImageUrl}
-          />
-        </Suspense>
-      );
+  // ── Rendered blocks ────────────────────────────────────────────────────
 
-    case "callToAction":
-      return (
-        <Suspense fallback={<RendererSkeleton />}>
-          <CallToActionRenderer
-            config={config}
-            previewMode
-            backgroundImageUrl={backgroundImageUrl}
-          />
-        </Suspense>
-      );
+  const rendererNode = (() => {
+    switch (type) {
+      case "hero":
+        return (
+          <Suspense fallback={<RendererSkeleton />}>
+            <HeroRenderer
+              config={config}
+              previewMode
+              backgroundImageUrl={backgroundImageUrl}
+              onFieldChange={onFieldChange}
+              backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+            />
+          </Suspense>
+        );
 
-    case "splitContentCards":
-      return (
-        <Suspense fallback={<RendererSkeleton />}>
-          <SplitContentCardsRenderer
-            config={config}
-            previewMode
-            backgroundImageUrl={backgroundImageUrl}
-          />
-        </Suspense>
-      );
+      case "callToAction":
+        return (
+          <Suspense fallback={<RendererSkeleton />}>
+            <CallToActionRenderer
+              config={config}
+              previewMode
+              backgroundImageUrl={backgroundImageUrl}
+              onFieldChange={onFieldChange}
+              backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+            />
+          </Suspense>
+        );
 
-    default:
-      return <UnknownBlockPlaceholder type={type} />;
+      case "splitContentCards":
+        return (
+          <Suspense fallback={<RendererSkeleton />}>
+            <SplitContentCardsRenderer
+              config={config}
+              previewMode
+              backgroundImageUrl={backgroundImageUrl}
+              onFieldChange={onFieldChange}
+              backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+            />
+          </Suspense>
+        );
+
+      default:
+        return <UnknownBlockPlaceholder type={type} />;
+    }
+  })();
+
+  // When inline editing is not active, return the renderer directly.
+  // The parent wrapper (HomepageCanvasSection) handles pointer-events-none.
+  if (!onFieldChange) {
+    return rendererNode;
   }
+
+  // When inline editing is active, wrap in a relative container so we can
+  // overlay FocalPointControl on top of the background image.
+  return (
+    <div className="relative">
+      {rendererNode}
+      {showFocalPoint && (
+        <FocalPointControl
+          position={backgroundPosition}
+          onPositionChange={handleFocalPositionChange}
+          onReset={handleFocalReset}
+        />
+      )}
+    </div>
+  );
 }
