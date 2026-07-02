@@ -35,6 +35,8 @@ import { resolveDesignSystem } from "@/lib/cms/token-resolver";
 type CallToActionRendererProps = {
   config: Record<string, unknown>;
   previewMode?: boolean;
+  /** Resolved background image URL for canvas preview (admin only). */
+  backgroundImageUrl?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -44,6 +46,7 @@ type CallToActionRendererProps = {
 export default function CallToActionRenderer({
   config: rawConfig,
   previewMode = false,
+  backgroundImageUrl,
 }: CallToActionRendererProps) {
   const cfg = rawConfig as CallToActionSectionConfig;
   const ds = resolveDesignSystem();
@@ -66,6 +69,7 @@ export default function CallToActionRenderer({
       layout={cfg._layout}
       previewMode={previewMode}
       blockType="callToAction"
+      backgroundImageUrl={backgroundImageUrl}
     >
       {!hasContent && previewMode ? (
         <div className={`${ds.radius.medium} border border-dashed border-gray-300 px-6 py-12 text-center ${ds.typography.small} text-gray-400`}>

@@ -134,6 +134,8 @@ function RichTextDisplay({
 type SplitContentCardsRendererProps = {
   config: Record<string, unknown>;
   previewMode?: boolean;
+  /** Resolved background image URL for canvas preview (admin only). */
+  backgroundImageUrl?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -143,6 +145,7 @@ type SplitContentCardsRendererProps = {
 export default function SplitContentCardsRenderer({
   config: rawConfig,
   previewMode = false,
+  backgroundImageUrl,
 }: SplitContentCardsRendererProps) {
   const cfg = rawConfig as SplitContentCardsSectionConfig;
   const ds = resolveDesignSystem();
@@ -224,6 +227,7 @@ export default function SplitContentCardsRenderer({
       layout={blockLayout}
       previewMode={previewMode}
       blockType="splitContentCards"
+      backgroundImageUrl={backgroundImageUrl}
     >
       <div className={stackClass}>
         {isCardsLeft ? (

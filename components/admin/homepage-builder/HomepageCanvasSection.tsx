@@ -1,5 +1,35 @@
 "use client";
 
+/**
+ * components/admin/homepage-builder/HomepageCanvasSection.tsx
+ *
+ * Visual canvas section card — shared by Homepage Builder and Website Page Builder
+ * (PageBuilderCanvas adapts PageSectionAdminItem → HomepageSectionAdminItem and
+ * delegates here via HomepageCanvas).
+ *
+ * VISUAL PARITY (Slice I.1)
+ *   The canvas section now renders the actual block content using the shared
+ *   website renderers (HeroRenderer, CallToActionRenderer,
+ *   SplitContentCardsRenderer) via CanvasBlockPreview. Data-driven blocks show
+ *   an informational placeholder. This makes editing feel like Webflow/Builder.io
+ *   while preserving all admin chrome.
+ *
+ * STRUCTURE
+ *   ┌─ Admin chrome strip ──────────────────────────────────────────────────┐
+ *   │  [Drag] [#] [Icon] [Label · Category]          [Status badges]        │
+ *   └───────────────────────────────────────────────────────────────────────┘
+ *   ┌─ Visual block preview (pointer-events-none) ──────────────────────────┐
+ *   │  Actual block rendered in previewMode                                  │
+ *   └───────────────────────────────────────────────────────────────────────┘
+ *   ┌─ Quick-action strip (hover / focus-within) ───────────────────────────┐
+ *   │  Toggle · ↑ · ↓ · Duplicate · Delete                                  │
+ *   └───────────────────────────────────────────────────────────────────────┘
+ *
+ * The floating toolbar appears above the card when the section is selected.
+ * The selection ring and left-bar indicator remain unchanged from before.
+ */
+
+import { Suspense } from "react";
 import {
   GripVertical,
   LayoutTemplate,
@@ -30,6 +60,7 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import { HomepageCanvasToolbar } from "./HomepageCanvasToolbar";
+import { CanvasBlockPreview } from "./CanvasBlockPreview";
 import type { SectionCardCallbacks } from "./HomepageSectionCard";
 
 // ---------------------------------------------------------------------------
@@ -76,11 +107,8 @@ type Props = {
   onFocusPrevious?: () => void;
   onFocusNext?: () => void;
   sectionRef?: (el: HTMLDivElement | null) => void;
-  /** Deselect this section (Escape key). */
   onDeselect?: () => void;
-  /** Duplicate this section. */
   onDuplicate?: () => void;
-  /** Delete this section (caller handles confirmation). */
   onDelete?: () => void;
 } & Pick<
   SectionCardCallbacks,
@@ -153,28 +181,21 @@ export function HomepageCanvasSection({
           onSelect();
           return;
         }
-        // Escape → deselect if selected
         if (e.key === "Escape" && isSelected) {
           e.preventDefault();
           onDeselect?.();
           return;
         }
-        // Keyboard reorder: Ctrl/Cmd + Arrow moves section
         if ((e.ctrlKey || e.metaKey) && e.key === "ArrowUp") {
           e.preventDefault();
-          if (!isFirst && !isPending && !isAnyPending) {
-            onMoveUp();
-          }
+          if (!isFirst && !isPending && !isAnyPending) onMoveUp();
           return;
         }
         if ((e.ctrlKey || e.metaKey) && e.key === "ArrowDown") {
           e.preventDefault();
-          if (!isLast && !isPending && !isAnyPending) {
-            onMoveDown();
-          }
+          if (!isLast && !isPending && !isAnyPending) onMoveDown();
           return;
         }
-        // Focus navigation: plain Arrow moves focus between sections
         if (e.key === "ArrowUp") {
           e.preventDefault();
           onFocusPrevious?.();
@@ -193,13 +214,11 @@ export function HomepageCanvasSection({
       }}
       onDragEnd={onDragEnd}
       className={[
-        // Base — `group` enables child hover/focus-within reveal
-        "group relative w-full rounded-xl border bg-[var(--surface)]",
-        // Smooth transitions for color, shadow, transform (150 ms)
+        "group relative w-full rounded-xl border bg-[var(--surface)] overflow-hidden",
         "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
         isDragging
           ? "opacity-40 scale-[0.98] shadow-lg cursor-grabbing"
-          : "cursor-grab active:cursor-grabbing",
+          : "cursor-pointer active:cursor-grabbing",
         isSelected && !isDragging
           ? "border-[var(--sce-primary)] shadow-md ring-2 ring-[var(--sce-primary)]/20 ring-offset-1"
           : "border-[var(--border)] hover:border-[var(--border-strong)] hover:shadow-sm",
@@ -211,7 +230,7 @@ export function HomepageCanvasSection({
       {/* Floating toolbar — shown only when selected and not dragging */}
       {isSelected && !isDragging && (
         <div
-          className="absolute -top-9 left-1/2 -translate-x-1/2 z-10"
+          className="absolute -top-9 left-1/2 -translate-x-1/2 z-20"
           onClick={(e) => e.stopPropagation()}
         >
           <HomepageCanvasToolbar
@@ -232,49 +251,55 @@ export function HomepageCanvasSection({
         </div>
       )}
 
-      {/* Main body row */}
-      <div className="flex items-center gap-4 px-4 py-4">
+      {/* ── Admin chrome strip ──────────────────────────────────────────────
+          Compact header row with drag handle, sort order, block identity,
+          and publish/approval status. Always visible above the visual preview.
+          ─────────────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-3 py-2.5 border-b border-[var(--border)] bg-[var(--surface)] z-10 relative">
         {/* Drag handle */}
         <div
-          className="shrink-0 opacity-25 group-hover:opacity-60 hover:opacity-80 transition-opacity cursor-grab active:cursor-grabbing"
+          className="shrink-0 opacity-30 group-hover:opacity-60 transition-opacity cursor-grab active:cursor-grabbing"
           onClick={(e) => e.stopPropagation()}
           aria-hidden="true"
         >
-          <GripVertical className="h-5 w-5 text-[var(--muted)]" />
+          <GripVertical className="h-4 w-4 text-[var(--muted)]" />
         </div>
 
         {/* Sort order pill */}
-        <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-2)] border border-[var(--border)]">
-          <span className="text-[11px] font-semibold text-[var(--text-2)] leading-none">
+        <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--surface-2)] border border-[var(--border)]">
+          <span className="text-[10px] font-semibold text-[var(--text-2)] leading-none">
             {index + 1}
           </span>
         </div>
 
         {/* Block icon */}
         <div
-          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-200"
+          className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200"
           style={{ background: categoryColor.bg, color: categoryColor.text }}
         >
-          <BlockIcon className="h-5 w-5" />
+          <BlockIcon className="h-4 w-4" />
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[var(--foreground)] leading-snug truncate">
+          <p className="text-xs font-semibold text-[var(--foreground)] leading-snug truncate">
             {section.label}
           </p>
-          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {def && (
-              <span className="text-[10px] font-medium uppercase tracking-[0.07em] text-[var(--muted)] bg-[var(--surface-2)] border border-[var(--border)] rounded px-1.5 py-0.5">
+              <span className="text-[9px] font-medium uppercase tracking-[0.07em] text-[var(--muted)]">
                 {def.category}
               </span>
             )}
-            <span className="text-[11px] text-[var(--muted)]">
+            {def && (
+              <span className="text-[9px] text-[var(--muted)]">·</span>
+            )}
+            <span className="text-[9px] text-[var(--muted)] truncate">
               {def?.displayName ?? section.type}
             </span>
           </div>
           {isScheduled && scheduledDate && (
-            <p className="mt-0.5 text-[11px] text-amber-600 font-medium">
+            <p className="text-[9px] text-amber-600 font-medium">
               Geplant: {scheduledDate.toLocaleString("de-CH")}
             </p>
           )}
@@ -282,7 +307,7 @@ export function HomepageCanvasSection({
 
         {/* Status cluster */}
         <div
-          className="flex flex-wrap items-center justify-end gap-1.5 shrink-0"
+          className="flex flex-wrap items-center justify-end gap-1 shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
           {section.isEnabled ? (
@@ -327,16 +352,36 @@ export function HomepageCanvasSection({
         </div>
       </div>
 
-      {/* ── Inline quick-action strip ────────────────────────────────────────
-          Revealed on hover or keyboard focus-within. Always present in the DOM
-          (fixed height) so focus traversal works naturally. Buttons are
-          pointer-events-none / opacity-0 when the card is idle so they don't
-          interfere with drag or normal browsing.
+      {/* ── Visual block preview ────────────────────────────────────────────
+          Renders the actual block using the shared website renderer in
+          previewMode. pointer-events-none prevents accidental link navigation
+          and keeps click-to-select working on the outer wrapper.
+          Opacity reflects the section's enabled/disabled state.
           ─────────────────────────────────────────────────────────────────── */}
       <div
         className={[
-          "flex items-center gap-1 px-4 pb-2 border-t",
-          // Show on hover or focus-within; always shown when selected
+          "pointer-events-none select-none",
+          !section.isEnabled ? "opacity-50" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-hidden="true"
+      >
+        <Suspense fallback={<RendererSkeleton />}>
+          <CanvasBlockPreview
+            type={section.type}
+            config={section.config as Record<string, unknown>}
+          />
+        </Suspense>
+      </div>
+
+      {/* ── Inline quick-action strip ────────────────────────────────────────
+          Revealed on hover or keyboard focus-within. Hidden when selected
+          (floating toolbar takes over). Fixed height so DOM order is stable.
+          ─────────────────────────────────────────────────────────────────── */}
+      <div
+        className={[
+          "flex items-center gap-1 px-3 pb-2 pt-1.5 border-t",
           "transition-all duration-150",
           isSelected
             ? "opacity-0 pointer-events-none border-transparent"
@@ -430,6 +475,23 @@ export function HomepageCanvasSection({
           aria-hidden="true"
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton for lazy-loaded renderers
+// ---------------------------------------------------------------------------
+
+function RendererSkeleton() {
+  return (
+    <div className="w-full animate-pulse bg-[var(--surface-2)] py-8 px-6">
+      <div className="mx-auto max-w-xl space-y-3">
+        <div className="h-6 w-2/3 rounded bg-[var(--border)]" />
+        <div className="h-3.5 w-full rounded bg-[var(--border)]" />
+        <div className="h-3.5 w-4/5 rounded bg-[var(--border)]" />
+        <div className="mt-3 h-8 w-24 rounded-lg bg-[var(--border)]" />
+      </div>
     </div>
   );
 }

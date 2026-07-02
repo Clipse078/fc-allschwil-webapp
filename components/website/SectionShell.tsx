@@ -85,14 +85,18 @@ import type { ResolvedDesignSystem } from "@/lib/website/design-system-types";
 // Background style resolver
 // ---------------------------------------------------------------------------
 
-function resolveBackgroundStyle(bg: SectionBackground): {
+function resolveBackgroundStyle(
+  bg: SectionBackground,
+  backgroundImageUrl?: string,
+): {
   className: string;
   style: React.CSSProperties;
   hasImageOverlay: boolean;
   imageOverlayClass: string;
+  imageOverlayStyle: React.CSSProperties;
 } {
   if (!bg || bg.type === "none") {
-    return { className: "", style: {}, hasImageOverlay: false, imageOverlayClass: "" };
+    return { className: "", style: {}, hasImageOverlay: false, imageOverlayClass: "", imageOverlayStyle: {} };
   }
 
   if (bg.type === "solid") {
@@ -101,6 +105,7 @@ function resolveBackgroundStyle(bg: SectionBackground): {
       style: { backgroundColor: bg.color ?? "#f3f4f6" },
       hasImageOverlay: false,
       imageOverlayClass: "",
+      imageOverlayStyle: {},
     };
   }
 
@@ -111,26 +116,47 @@ function resolveBackgroundStyle(bg: SectionBackground): {
       style: { backgroundImage: preset?.style ?? "" },
       hasImageOverlay: false,
       imageOverlayClass: "",
+      imageOverlayStyle: {},
     };
   }
 
   if (bg.type === "image") {
     const opacity = bg.overlayOpacity;
     let overlayClass = "";
+    let overlayStyle: React.CSSProperties = {};
     if (bg.overlay === "dark") {
-      overlayClass = opacity !== undefined ? "" : "bg-black/50";
+      if (opacity !== undefined) {
+        overlayStyle = { backgroundColor: "#000", opacity: opacity / 100 };
+      } else {
+        overlayClass = "bg-black/50";
+      }
     } else if (bg.overlay === "light") {
-      overlayClass = opacity !== undefined ? "" : "bg-white/40";
+      if (opacity !== undefined) {
+        overlayStyle = { backgroundColor: "#fff", opacity: opacity / 100 };
+      } else {
+        overlayClass = "bg-white/40";
+      }
     }
+
+    // When a resolved image URL is provided (canvas preview), apply it as backgroundImage.
+    const imageStyle: React.CSSProperties = backgroundImageUrl
+      ? {
+          backgroundImage: `url(${backgroundImageUrl})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+      : {};
+
     return {
       className: "relative",
-      style: {},
+      style: imageStyle,
       hasImageOverlay: true,
       imageOverlayClass: overlayClass,
+      imageOverlayStyle: overlayStyle,
     };
   }
 
-  return { className: "", style: {}, hasImageOverlay: false, imageOverlayClass: "" };
+  return { className: "", style: {}, hasImageOverlay: false, imageOverlayClass: "", imageOverlayStyle: {} };
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +180,15 @@ type SectionShellProps = {
    * allowing tenant-configured widths to apply globally.
    */
   designSystem?: ResolvedDesignSystem;
+  /**
+   * Optional resolved background image URL (admin canvas preview only).
+   * When provided with a `_layout.background.type === "image"` config, renders
+   * the image as a CSS backgroundImage. Callers (e.g. CanvasBlockPreview) fetch
+   * the URL from `/api/media/[id]` and pass it here so the canvas preview shows
+   * the actual background image without modifying the stored config.
+   * Public website renderers do not pass this prop and are unaffected.
+   */
+  backgroundImageUrl?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -167,6 +202,7 @@ export default function SectionShell({
   children,
   className = "",
   designSystem,
+  backgroundImageUrl,
 }: SectionShellProps) {
   const resolved = resolveLayout(layout);
 
@@ -182,8 +218,8 @@ export default function SectionShell({
     ? { maxWidth: dsWidth }
     : {};
 
-  const { className: bgClass, style: bgStyle, hasImageOverlay, imageOverlayClass } =
-    resolveBackgroundStyle(resolved.background);
+  const { className: bgClass, style: bgStyle, hasImageOverlay, imageOverlayClass, imageOverlayStyle } =
+    resolveBackgroundStyle(resolved.background, backgroundImageUrl);
 
   // Horizontal padding resolved from Design System via PADDING_X_MAP.
   // Falls back to "md" when paddingX is not set (covered by resolveLayout defaults).
@@ -203,10 +239,11 @@ export default function SectionShell({
 
   return (
     <section className={sectionClasses} style={bgStyle}>
-      {/* Background image overlay */}
-      {hasImageOverlay && resolved.background.type === "image" && resolved.background.mediaAssetId && (
+      {/* Background image overlay — rendered when bg type is "image" */}
+      {hasImageOverlay && resolved.background.type === "image" && (
         <div
           className={`absolute inset-0 ${imageOverlayClass}`}
+          style={imageOverlayStyle}
           aria-hidden="true"
         />
       )}
