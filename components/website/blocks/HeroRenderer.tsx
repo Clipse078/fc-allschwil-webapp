@@ -34,6 +34,8 @@ import { resolveDesignSystem } from "@/lib/cms/token-resolver";
 type HeroRendererProps = {
   config: Record<string, unknown>;
   previewMode?: boolean;
+  /** Resolved background image URL for canvas preview (admin only). */
+  backgroundImageUrl?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -43,6 +45,7 @@ type HeroRendererProps = {
 export default function HeroRenderer({
   config: rawConfig,
   previewMode = false,
+  backgroundImageUrl,
 }: HeroRendererProps) {
   const cfg = rawConfig as HeroSectionConfig;
   const ds = resolveDesignSystem();
@@ -63,6 +66,7 @@ export default function HeroRenderer({
       layout={cfg._layout}
       previewMode={previewMode}
       blockType="hero"
+      backgroundImageUrl={backgroundImageUrl}
     >
       <div className={`flex flex-col ${alignClass} ${ds.spacing.m}`}>
         {/* Headline */}
