@@ -3,21 +3,34 @@
 /**
  * components/admin/page-builder/PageBuilderClient.tsx
  *
- * Premium Page Builder — CMS V2 Slice 9.
+ * Premium Page Builder — CMS V2 Slice 9 + Slice I (Page Builder Parity).
  *
- * Features:
+ * Slice 9 features (existing):
  *   - Drag-and-drop reordering (native HTML5 DnD)
  *   - Move Up / Move Down
  *   - Duplicate Block
  *   - Delete Block (with confirmation)
  *   - Collapse / Expand blocks
- *   - Inline config editor with autosave (debounced 1.5s)
+ *   - Inline config editor with autosave (debounced 1.5s) — LIST MODE only
  *   - Unsaved changes detection (beforeunload warning)
- *   - Responsive preview panel (Desktop / Tablet / Mobile)
  *   - Section-level publish/approval status badges
  *   - Publishing workflow actions (publish, unpublish, schedule, request-review)
  *   - Version history panel
  *   - Visual save indicator (Autosaving… / Gespeichert / Fehler)
+ *
+ * Slice I additions (canvas parity):
+ *   - List / Canvas mode toggle
+ *   - Canvas: drag-and-drop reorder with insertion lines (via PageBuilderCanvas)
+ *   - Canvas: Desktop / Tablet / Mobile viewport toggle
+ *   - Canvas: floating toolbar per section (edit, visibility, move, publish, duplicate, delete)
+ *   - Canvas: inline quick-action strip on hover
+ *   - Inspector panel (right panel, canvas mode): rich block editors via HomepageSectionInspector
+ *   - Local draft rendering: inspector changes reflected on canvas tiles before save
+ *   - Keyboard accessibility: Arrow navigation, Ctrl+Arrow reorder, Escape deselect
+ *   - Aria live region for canvas announcements
+ *   - Structured loading skeleton
+ *   - Explicit save via inspector (no autosave in canvas mode)
+ *   - Responsive preview panel: Desktop / Tablet / Mobile (existing)
  */
 
 import {
@@ -57,10 +70,13 @@ import {
   Save,
   LayoutPanelLeft,
   Layers,
+  List,
+  LayoutGrid,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SectionCard, EmptyState } from "@/components/ui/page";
 import type { PageSectionAdminItem } from "@/lib/page-sections/admin-queries";
+import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
 import {
   BLOCK_REGISTRY,
   getBlockDefinition,
@@ -75,6 +91,8 @@ import {
 import PageTemplatesPicker from "@/components/admin/page-builder/PageTemplatesPicker";
 import type { SectionLayout } from "@/lib/cms/layout-types";
 import LayoutConfigPanel from "@/components/admin/cms/LayoutConfigPanel";
+import { HomepageSectionInspector } from "@/components/admin/homepage-builder/HomepageSectionInspector";
+import { PageBuilderCanvas } from "@/components/admin/page-builder/PageBuilderCanvas";
 
 // Lazy-load premium block forms (client-only, avoid SSR issues with TipTap)
 const SplitContentCardsConfigForm = dynamic(
@@ -101,6 +119,39 @@ function BlockVisualPreview({ type, config }: { type: string; config: Record<str
   }
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Type adapter — Slice I
+// ---------------------------------------------------------------------------
+
+/**
+ * Structural cast to bridge PageSectionAdminItem → HomepageSectionAdminItem.
+ *
+ * Safe because:
+ *   - PageSectionAdminItem is a strict superset of HomepageSectionAdminItem
+ *   - ApprovalStatus === SectionApprovalStatus (same string literals)
+ *   - config is Record<string,unknown> at runtime in both types
+ *   - Extra page fields (pageId, publishUntil) are not accessed by inspector/canvas
+ */
+function adaptSectionForCanvas(s: PageSectionAdminItem): HomepageSectionAdminItem {
+  return s as unknown as HomepageSectionAdminItem;
+}
+
+// ---------------------------------------------------------------------------
+// Builder mode — Slice I
+// ---------------------------------------------------------------------------
+
+type BuilderMode = "list" | "canvas";
+
+const BUILDER_MODE_CONFIG: {
+  mode: BuilderMode;
+  label: string;
+  icon: React.ElementType;
+  title: string;
+}[] = [
+  { mode: "list", label: "Liste", icon: List, title: "Listen-Modus" },
+  { mode: "canvas", label: "Canvas", icon: LayoutGrid, title: "Canvas-Modus" },
+];
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -207,7 +258,7 @@ function SaveIndicator({ state, lastSaved }: { state: SaveState; lastSaved: Date
 }
 
 // ---------------------------------------------------------------------------
-// Config editor
+// Config editor (list mode inline editing with autosave)
 // ---------------------------------------------------------------------------
 
 type ConfigEditorProps = {
@@ -600,7 +651,11 @@ function PreviewPanel({
         </div>
 
         {/* Viewport selector */}
-        <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5">
+        <div
+          className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5"
+          role="group"
+          aria-label="Vorschaubreite"
+        >
           {(["desktop", "tablet", "mobile"] as ViewportMode[]).map((v) => {
             const vc2 = VIEWPORT_CONFIG[v];
             const Icon = vc2.icon;
@@ -609,7 +664,9 @@ function PreviewPanel({
                 key={v}
                 type="button"
                 onClick={() => setViewport(v)}
-                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition ${
+                aria-label={`${vc2.label}-Breite`}
+                aria-pressed={viewport === v}
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] ${
                   viewport === v
                     ? "bg-white text-[var(--foreground)] shadow-sm"
                     : "text-[var(--muted)] hover:text-[var(--foreground)]"
@@ -622,7 +679,12 @@ function PreviewPanel({
           })}
         </div>
 
-        <button type="button" onClick={onClose} className="fca-button-secondary px-2.5">
+        <button
+          type="button"
+          onClick={onClose}
+          className="fca-button-secondary px-2.5"
+          aria-label="Vorschau schließen"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -757,7 +819,12 @@ function RevisionHistoryPanel({
           <History className="h-4 w-4 text-[var(--text-2)]" />
           <p className="text-sm font-semibold">Versionshistorie</p>
         </div>
-        <button type="button" onClick={onClose} className="text-[var(--muted)] hover:text-[var(--foreground)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[var(--muted)] hover:text-[var(--foreground)]"
+          aria-label="Versionshistorie schließen"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -865,7 +932,12 @@ function WorkflowPanel({
     <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold">Workflow</p>
-        <button type="button" onClick={onClose} className="text-[var(--muted)] hover:text-[var(--foreground)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[var(--muted)] hover:text-[var(--foreground)]"
+          aria-label="Workflow schließen"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -965,12 +1037,13 @@ type PageBuilderClientProps = {
 };
 
 export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "" }: PageBuilderClientProps) {
+  // ── Core data state ────────────────────────────────────────────────────────
   const [sections, setSections] = useState<PageSectionAdminItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
 
-  // UI state
+  // ── List mode UI state ─────────────────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [historyId, setHistoryId] = useState<string | null>(null);
@@ -979,18 +1052,43 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
-  // Autosave state
+  // ── Autosave state (list mode only) ────────────────────────────────────────
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveFnRef = useRef<(() => void) | null>(null);
 
-  // Drag-and-drop state
+  // ── List mode drag-and-drop state ─────────────────────────────────────────
   const [dragSrcId, setDragSrcId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  // Unsaved changes warning
+  // ── Canvas / inspector state (Slice I) ────────────────────────────────────
+  const [builderMode, setBuilderMode] = useState<BuilderMode>("list");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  /**
+   * Local draft state for canvas inspector — live preview without persisting.
+   *
+   * UNDO/REDO READINESS (future Slice):
+   * This is the single mutation choke-point for inspector draft changes.
+   * To add undo/redo later:
+   *   1. Create a useDraftHistory hook wrapping useState with a snapshots stack.
+   *   2. Replace setInspectorDraft below with pushDraftSnapshot(...).
+   *   3. Add Ctrl+Z / Ctrl+Y handlers in this component to pop the stack.
+   * No other components need to change — draft mutations are centralised here.
+   */
+  const [inspectorDraft, setInspectorDraft] = useState<{
+    id: string;
+    label: string;
+    config: Record<string, unknown>;
+  } | null>(null);
+
+  // ── Canvas reorder state (Slice I) ────────────────────────────────────────
+  const [reorderPending, setReorderPending] = useState(false);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+
+  // ── Unsaved changes warning ────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (isDirty) {
@@ -1002,6 +1100,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
+
+  // ── Data loading ───────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1020,9 +1120,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
 
   useEffect(() => { load(); }, [load]);
 
-  // ---------------------------------------------------------------------------
-  // Autosave trigger
-  // ---------------------------------------------------------------------------
+  // ── Autosave trigger (list mode only) ─────────────────────────────────────
 
   const triggerAutosave = useCallback(() => {
     setIsDirty(true);
@@ -1038,9 +1136,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     }, AUTOSAVE_DELAY_MS);
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // Actions
-  // ---------------------------------------------------------------------------
+  // ── Section actions ────────────────────────────────────────────────────────
 
   async function handleToggle(id: string) {
     setActionPending(id);
@@ -1070,8 +1166,24 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Sektion wirklich löschen?")) return;
+  /**
+   * Separating request (with rich confirmation) from execution
+   * allows canvas mode to call the same flow.
+   *
+   * UNDO/REDO NOTE: To add undo support for delete, snapshot `sections`
+   * before calling handleDeleteExecute and push to a history stack.
+   */
+  function handleDeleteRequest(id: string) {
+    const section = sections.find((s) => s.id === id);
+    if (!section) return;
+    const confirmed = confirm(
+      `Sektion „${section.label}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`,
+    );
+    if (!confirmed) return;
+    void handleDeleteExecute(id);
+  }
+
+  async function handleDeleteExecute(id: string) {
     setActionPending(id);
     try {
       const res = await fetch(`/api/website-pages/${pageId}/sections/${id}`, { method: "DELETE" });
@@ -1080,6 +1192,11 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
         if (editingId === id) setEditingId(null);
         if (historyId === id) setHistoryId(null);
         if (workflowId === id) setWorkflowId(null);
+        // Canvas-mode cleanup
+        if (selectedId === id) {
+          setSelectedId(null);
+          setInspectorDraft(null);
+        }
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data?.error ?? "Löschen fehlgeschlagen");
@@ -1090,6 +1207,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   }
 
   async function handleDuplicate(id: string) {
+    // UNDO/REDO NOTE: To add undo support for duplicate, snapshot `sections`
+    // before calling setSections and push to a history stack.
     setActionPending(id);
     try {
       const res = await fetch(`/api/website-pages/${pageId}/sections/${id}/duplicate`, { method: "POST" });
@@ -1135,9 +1254,117 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Drag-and-drop handlers
-  // ---------------------------------------------------------------------------
+  // ── Canvas actions (Slice I) ───────────────────────────────────────────────
+
+  /**
+   * Canvas drag-and-drop reorder — optimistic update with rollback on error.
+   *
+   * UNDO/REDO NOTE: To add undo for reorder, snapshot `sections` before
+   * the optimistic setSections call and push it to a history stack.
+   */
+  async function handleCanvasReorder(orderedIds: string[]) {
+    const snapshot = sections;
+    const reordered = orderedIds
+      .map((id) => snapshot.find((s) => s.id === id))
+      .filter((s): s is PageSectionAdminItem => s !== undefined);
+
+    setSections(reordered);
+    setReorderPending(true);
+    setReorderError(null);
+
+    try {
+      const res = await fetch(`/api/website-pages/${pageId}/sections/reorder`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSections(snapshot);
+        setReorderError(data?.error ?? "Reihenfolge konnte nicht gespeichert werden.");
+        return;
+      }
+      setSections(data.sections ?? reordered);
+    } finally {
+      setReorderPending(false);
+    }
+  }
+
+  async function handlePublishSection(id: string) {
+    setActionPending(`${id}-publish`);
+    try {
+      const res = await fetch(
+        `/api/website-pages/${pageId}/sections/${id}/workflow?action=publish`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data?.error ?? "Fehler beim Veröffentlichen"); return; }
+      setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  async function handleUnpublishSection(id: string) {
+    setActionPending(`${id}-unpublish`);
+    try {
+      const res = await fetch(
+        `/api/website-pages/${pageId}/sections/${id}/workflow?action=unpublish`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data?.error ?? "Fehler beim Zurückziehen"); return; }
+      setSections((prev) => prev.map((s) => (s.id === id ? data.section : s)));
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  /**
+   * Central draft mutation handler — all live inspector changes flow here.
+   *
+   * Updates inspectorDraft so canvas tiles reflect the new label/config
+   * immediately, without a server round-trip.
+   *
+   * UNDO/REDO READINESS: To add undo for inspector edits, replace
+   * setInspectorDraft with pushDraftSnapshot and add key handlers here.
+   */
+  function handleInspectorDraftChange(
+    id: string,
+    label: string,
+    config: Record<string, unknown>,
+  ) {
+    // UNDO SNAPSHOT POINT
+    setInspectorDraft({ id, label, config });
+  }
+
+  /**
+   * Called when the inspector "Speichern" button is clicked.
+   * Delegates to the existing save endpoint. Clears draft on success.
+   * No autosave — explicit save only (canvas mode).
+   */
+  async function handleInspectorSave(
+    label: string,
+    config: Record<string, unknown>,
+  ): Promise<void> {
+    if (!selectedId) return;
+    await handleSaveConfig(selectedId, label, config);
+    // Clear draft — sections array is now updated from API response
+    setInspectorDraft(null);
+  }
+
+  function handleBuilderModeChange(mode: BuilderMode) {
+    if (mode === "canvas") {
+      setEditingId(null); // Close inline editor when entering canvas
+    } else {
+      // Leaving canvas: clear selection and draft
+      setSelectedId(null);
+      setInspectorDraft(null);
+    }
+    setBuilderMode(mode);
+  }
+
+  // ── List mode drag-and-drop handlers ─────────────────────────────────────
 
   function handleDragStart(id: string) {
     setDragSrcId(id);
@@ -1185,9 +1412,31 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
     setDragOverId(null);
   }
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  // ── Derived values ─────────────────────────────────────────────────────────
+
+  const isAnyActionPending = actionPending !== null;
+
+  /**
+   * Canvas live preview: merge inspector draft into the sections array.
+   * Canvas tiles reflect the draft label/config without a server round-trip.
+   * Does NOT persist anything.
+   */
+  const sectionsForCanvas = useMemo(() => {
+    if (!inspectorDraft) return sections;
+    return sections.map((s) =>
+      s.id === inspectorDraft.id
+        ? { ...s, label: inspectorDraft.label, config: inspectorDraft.config }
+        : s,
+    );
+  }, [sections, inspectorDraft]);
+
+  /**
+   * Selected section resolved from the canvas-aware sections array.
+   * Uses sectionsForCanvas so the inspector also reflects draft changes.
+   */
+  const selectedSection = sectionsForCanvas.find((s) => s.id === selectedId) ?? null;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -1210,20 +1459,48 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
       )}
 
       <div className="space-y-4">
-        {/* Toolbar */}
+        {/* ── Toolbar ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <p className="text-sm text-[var(--muted)]">
               {loading ? "Lädt…" : `${sections.length} Sektion${sections.length !== 1 ? "en" : ""}`}
             </p>
-            <SaveIndicator state={saveState} lastSaved={lastSaved} />
+            {builderMode === "list" && (
+              <SaveIndicator state={saveState} lastSaved={lastSaved} />
+            )}
           </div>
           <div className="flex items-center gap-2">
+            {/* List / Canvas mode toggle */}
+            <div
+              className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5"
+              role="group"
+              aria-label="Ansichtsmodus"
+            >
+              {BUILDER_MODE_CONFIG.map(({ mode, label, icon: Icon, title }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleBuilderModeChange(mode)}
+                  title={title}
+                  aria-pressed={builderMode === mode}
+                  className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] ${
+                    builderMode === mode
+                      ? "bg-white text-[var(--foreground)] shadow-sm font-medium"
+                      : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+
             <button
               type="button"
               onClick={() => setShowTemplates(true)}
               className="fca-button-secondary px-2.5"
               title="Seitenvorlage anwenden"
+              aria-label="Seitenvorlage anwenden"
             >
               <Layers className="h-3.5 w-3.5" />
               <span className="hidden sm:inline ml-1 text-xs">Vorlage</span>
@@ -1233,6 +1510,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               onClick={() => setShowPreview(true)}
               className="fca-button-secondary px-2.5"
               title="Vorschau"
+              aria-label="Seite in Vorschau öffnen"
             >
               <Eye className="h-3.5 w-3.5" />
               <span className="hidden sm:inline ml-1 text-xs">Vorschau</span>
@@ -1243,10 +1521,11 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
               disabled={loading}
               className="fca-button-secondary px-2.5"
               title="Aktualisieren"
+              aria-label="Sektionen aktualisieren"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
-            {!showAdd && (
+            {!showAdd && builderMode === "list" && (
               <button
                 type="button"
                 onClick={() => { setShowAdd(true); setEditingId(null); }}
@@ -1256,11 +1535,21 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                 Sektion hinzufügen
               </button>
             )}
+            {builderMode === "canvas" && !showAdd && (
+              <button
+                type="button"
+                onClick={() => setShowAdd(true)}
+                className="fca-button-primary"
+              >
+                <Plus className="h-4 w-4" />
+                Sektion hinzufügen
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Unsaved changes warning */}
-        {isDirty && saveState !== "saving" && (
+        {/* Unsaved changes warning (list mode autosave) */}
+        {builderMode === "list" && isDirty && saveState !== "saving" && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <Save className="h-3.5 w-3.5 shrink-0" />
             Ungespeicherte Änderungen — wird automatisch gespeichert…
@@ -1283,12 +1572,28 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
           />
         )}
 
-        {/* Section list */}
+        {/* ── Main builder area ── */}
         <SectionCard noPadding>
           {loading && sections.length === 0 ? (
+            /* Structured loading skeleton */
             <div className="space-y-2 p-5">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-[var(--surface-2)]" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 animate-pulse"
+                >
+                  <div className="h-5 w-5 shrink-0 rounded bg-[var(--border)]" />
+                  <div className="h-7 w-7 shrink-0 rounded-full bg-[var(--border)]" />
+                  <div className="h-10 w-10 shrink-0 rounded-xl bg-[var(--border)]" />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="h-4 w-40 rounded bg-[var(--border)]" />
+                    <div className="h-3 w-24 rounded bg-[var(--border)]" />
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <div className="h-5 w-12 rounded-full bg-[var(--border)]" />
+                    <div className="h-5 w-16 rounded-full bg-[var(--border)]" />
+                  </div>
+                </div>
               ))}
             </div>
           ) : sections.length === 0 ? (
@@ -1305,7 +1610,56 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                 ) : undefined
               }
             />
+          ) : builderMode === "canvas" ? (
+            /* ── Canvas mode: two-column layout (canvas + inspector) ── */
+            <div className="flex flex-col lg:flex-row lg:divide-x lg:divide-[var(--border)]">
+              {/* Left: canvas */}
+              <div className="flex-1 min-w-0">
+                <PageBuilderCanvas
+                  sections={sectionsForCanvas}
+                  selectedId={selectedId}
+                  actionPending={actionPending}
+                  isAnyPending={isAnyActionPending}
+                  onSelectSection={(id) =>
+                    setSelectedId((prev) => (prev === id ? null : id))
+                  }
+                  onDeselectSection={() => setSelectedId(null)}
+                  onToggle={handleToggle}
+                  onMoveUp={(id) => handleMove(id, "up")}
+                  onMoveDown={(id) => handleMove(id, "down")}
+                  onPublish={handlePublishSection}
+                  onUnpublish={handleUnpublishSection}
+                  onStartEdit={(id) => setSelectedId(id)}
+                  onReorder={handleCanvasReorder}
+                  onDuplicate={handleDuplicate}
+                  onDelete={handleDeleteRequest}
+                  reorderPending={reorderPending}
+                  reorderError={reorderError}
+                />
+              </div>
+
+              {/* Right: inspector panel */}
+              <div className="w-full lg:w-80 xl:w-96 shrink-0 border-t border-[var(--border)] lg:border-t-0">
+                <div className="sticky top-0 max-h-screen overflow-y-auto">
+                  <div className="border-b border-[var(--border)] px-4 py-3 bg-[var(--surface-2)]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                      Sektion Inspector
+                    </p>
+                  </div>
+                  <HomepageSectionInspector
+                    section={
+                      selectedSection
+                        ? adaptSectionForCanvas(selectedSection)
+                        : null
+                    }
+                    onDraftChange={handleInspectorDraftChange}
+                    onSaveEdit={handleInspectorSave}
+                  />
+                </div>
+              </div>
+            </div>
           ) : (
+            /* ── List mode: existing inline editing ── */
             <div className="divide-y divide-[var(--border)]">
               {sections.map((section, idx) => {
                 const isCollapsed = collapsedIds.has(section.id);
@@ -1328,7 +1682,10 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         {/* Drag handle + info */}
                         <div className="min-w-0 flex-1 flex items-start gap-2">
-                          <div className="mt-1 cursor-grab text-[var(--muted)] hover:text-[var(--text-2)] transition shrink-0">
+                          <div
+                            className="mt-1 cursor-grab text-[var(--muted)] hover:text-[var(--text-2)] transition shrink-0"
+                            aria-hidden="true"
+                          >
                             <GripVertical className="h-4 w-4" />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -1363,6 +1720,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             onClick={() => handleToggleCollapse(section.id)}
                             className="sce-icon-button"
                             title={isCollapsed ? "Aufklappen" : "Einklappen"}
+                            aria-label={isCollapsed ? "Sektion aufklappen" : "Sektion einklappen"}
+                            aria-expanded={!isCollapsed}
                           >
                             <ChevronRight
                               className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
@@ -1375,6 +1734,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             disabled={actionPending === section.id || idx === 0}
                             className="sce-icon-button disabled:opacity-30"
                             title="Nach oben"
+                            aria-label="Sektion nach oben verschieben"
+                            aria-disabled={idx === 0}
                           >
                             <ChevronUp className="h-3.5 w-3.5" />
                           </button>
@@ -1385,6 +1746,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             disabled={actionPending === section.id || idx === sections.length - 1}
                             className="sce-icon-button disabled:opacity-30"
                             title="Nach unten"
+                            aria-label="Sektion nach unten verschieben"
+                            aria-disabled={idx === sections.length - 1}
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
                           </button>
@@ -1395,6 +1758,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             disabled={actionPending === section.id}
                             className="sce-icon-button"
                             title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
+                            aria-label={section.isEnabled ? "Sektion deaktivieren" : "Sektion aktivieren"}
+                            aria-pressed={section.isEnabled}
                           >
                             {section.isEnabled ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                           </button>
@@ -1406,6 +1771,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             }
                             className={`sce-icon-button ${editingId === section.id ? "text-blue-600" : ""}`}
                             title="Konfigurieren"
+                            aria-label="Sektion konfigurieren"
+                            aria-pressed={editingId === section.id}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -1416,6 +1783,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             disabled={actionPending === section.id}
                             className="sce-icon-button"
                             title="Duplizieren"
+                            aria-label="Sektion duplizieren"
                           >
                             <Copy className="h-3.5 w-3.5" />
                           </button>
@@ -1427,6 +1795,8 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             }
                             className={`sce-icon-button ${workflowId === section.id ? "text-emerald-600" : ""}`}
                             title="Workflow"
+                            aria-label="Workflow-Aktionen"
+                            aria-pressed={workflowId === section.id}
                           >
                             <Globe className="h-3.5 w-3.5" />
                           </button>
@@ -1438,16 +1808,19 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                             }
                             className={`sce-icon-button ${historyId === section.id ? "text-blue-600" : ""}`}
                             title="Versionshistorie"
+                            aria-label="Versionshistorie öffnen"
+                            aria-pressed={historyId === section.id}
                           >
                             <History className="h-3.5 w-3.5" />
                           </button>
                           {/* Delete */}
                           <button
                             type="button"
-                            onClick={() => handleDelete(section.id)}
+                            onClick={() => handleDeleteRequest(section.id)}
                             disabled={actionPending === section.id}
                             className="sce-icon-button text-rose-500 hover:text-rose-700"
                             title="Löschen"
+                            aria-label="Sektion löschen"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -1500,8 +1873,10 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
         {/* Info footer */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 space-y-1">
           <p className="text-xs text-[var(--muted)]">
-            <strong className="text-[var(--text-2)]">Drag & Drop:</strong>{" "}
-            Sektionen können per Ziehen und Ablegen neu geordnet werden.
+            <strong className="text-[var(--text-2)]">Drag &amp; Drop:</strong>{" "}
+            {builderMode === "canvas"
+              ? "Sektionen können im Canvas per Ziehen und Ablegen neu geordnet werden."
+              : "Sektionen können per Ziehen und Ablegen neu geordnet werden."}
           </p>
           <p className="text-xs text-[var(--muted)]">
             <strong className="text-[var(--text-2)]">Publishing:</strong>{" "}
@@ -1509,6 +1884,12 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
             <strong>veröffentlicht</strong> ist, die Sektion{" "}
             <strong>aktiv</strong> und <strong>veröffentlicht</strong> ist.
           </p>
+          {builderMode === "canvas" && (
+            <p className="text-xs text-[var(--muted)]">
+              <strong className="text-[var(--text-2)]">Canvas:</strong>{" "}
+              Sektion im Canvas auswählen, um sie im Inspector rechts zu bearbeiten. Speichern ist manuell.
+            </p>
+          )}
         </div>
       </div>
     </>
