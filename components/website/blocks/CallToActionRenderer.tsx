@@ -47,6 +47,8 @@ type CallToActionRendererProps = {
   onFieldChange?: (field: string, value: string) => void;
   /** Admin canvas only: overrides the CSS background-position for focal-point preview. */
   backgroundPositionOverride?: string;
+  /** Admin canvas only: overrides the CSS background-size for zoom slider preview. */
+  backgroundSizeOverride?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -59,6 +61,7 @@ export default function CallToActionRenderer({
   backgroundImageUrl,
   onFieldChange,
   backgroundPositionOverride,
+  backgroundSizeOverride,
 }: CallToActionRendererProps) {
   const cfg = rawConfig as CallToActionSectionConfig;
   const ds = resolveDesignSystem();
@@ -84,6 +87,7 @@ export default function CallToActionRenderer({
       blockType="callToAction"
       backgroundImageUrl={backgroundImageUrl}
       backgroundPositionOverride={backgroundPositionOverride}
+      backgroundSizeOverride={backgroundSizeOverride}
     >
       {!hasContent && previewMode && !isInlineEdit ? (
         <div className={`${ds.radius.medium} border border-dashed border-gray-300 px-6 py-12 text-center ${ds.typography.small} text-gray-400`}>

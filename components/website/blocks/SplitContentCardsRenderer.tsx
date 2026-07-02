@@ -150,6 +150,8 @@ type SplitContentCardsRendererProps = {
   onFieldChange?: (field: string, value: string) => void;
   /** Admin canvas only: overrides CSS background-position for focal-point preview. */
   backgroundPositionOverride?: string;
+  /** Admin canvas only: overrides the CSS background-size for zoom slider preview. */
+  backgroundSizeOverride?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -162,6 +164,7 @@ export default function SplitContentCardsRenderer({
   backgroundImageUrl,
   onFieldChange,
   backgroundPositionOverride,
+  backgroundSizeOverride,
 }: SplitContentCardsRendererProps) {
   const cfg = rawConfig as SplitContentCardsSectionConfig;
   const ds = resolveDesignSystem();
@@ -256,6 +259,7 @@ export default function SplitContentCardsRenderer({
       blockType="splitContentCards"
       backgroundImageUrl={backgroundImageUrl}
       backgroundPositionOverride={backgroundPositionOverride}
+      backgroundSizeOverride={backgroundSizeOverride}
     >
       <div className={stackClass}>
         {isCardsLeft ? (

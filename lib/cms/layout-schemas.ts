@@ -61,6 +61,11 @@ export const sectionBackgroundSchema = z
           y: z.number().min(0).max(100),
         })
         .optional(),
+      /**
+       * Zoom level set by zoom slider in FocalPointControl (Slice K.1). 100–200.
+       * 100 = cover (default). Values above 100 scale the image proportionally.
+       */
+      zoom: z.number().min(100).max(200).optional(),
     }),
   ])
   .optional();

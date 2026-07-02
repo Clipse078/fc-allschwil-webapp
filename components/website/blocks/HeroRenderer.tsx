@@ -52,6 +52,8 @@ type HeroRendererProps = {
   onFieldChange?: (field: string, value: string) => void;
   /** Admin canvas only: overrides the CSS background-position for focal-point preview. */
   backgroundPositionOverride?: string;
+  /** Admin canvas only: overrides the CSS background-size for zoom slider preview. */
+  backgroundSizeOverride?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -64,6 +66,7 @@ export default function HeroRenderer({
   backgroundImageUrl,
   onFieldChange,
   backgroundPositionOverride,
+  backgroundSizeOverride,
 }: HeroRendererProps) {
   const cfg = rawConfig as HeroSectionConfig;
   const ds = resolveDesignSystem();
@@ -88,6 +91,7 @@ export default function HeroRenderer({
       blockType="hero"
       backgroundImageUrl={backgroundImageUrl}
       backgroundPositionOverride={backgroundPositionOverride}
+      backgroundSizeOverride={backgroundSizeOverride}
     >
       <div className={`flex flex-col ${alignClass} ${ds.spacing.m}`}>
         {/* Headline */}

@@ -89,6 +89,7 @@ function resolveBackgroundStyle(
   bg: SectionBackground,
   backgroundImageUrl?: string,
   backgroundPositionOverride?: string,
+  backgroundSizeOverride?: string,
 ): {
   className: string;
   style: React.CSSProperties;
@@ -151,10 +152,17 @@ function resolveBackgroundStyle(
         ? `${bg.position.x}% ${bg.position.y}%`
         : null;
 
+    // Zoom: live override first (slider drag), then stored config value, then cover.
+    // Values 100–200 stored as integers; 100 maps to "cover" for exact cover behaviour.
+    const storedZoom = bg.type === "image" && bg.zoom != null && bg.zoom !== 100
+      ? `${bg.zoom}%`
+      : undefined;
+    const backgroundSize = backgroundSizeOverride ?? storedZoom ?? "cover";
+
     const imageStyle: React.CSSProperties = backgroundImageUrl
       ? {
           backgroundImage: `url(${backgroundImageUrl})`,
-          backgroundSize: "cover",
+          backgroundSize,
           backgroundPosition:
             backgroundPositionOverride ?? storedPosition ?? "center",
         }
@@ -206,9 +214,17 @@ type SectionShellProps = {
    * Admin canvas only. Overrides the CSS background-position value for
    * focal-point drag preview (Slice K). Only takes effect when
    * backgroundImageUrl is also provided. Public website callers never set
-   * this prop. See FocalPointControl.tsx for persistence gap notes.
+   * this prop.
    */
   backgroundPositionOverride?: string;
+  /**
+   * Admin canvas only. Overrides the CSS background-size value for
+   * zoom slider live preview (Slice K.1). Only takes effect when
+   * backgroundImageUrl is also provided. Public website callers never set
+   * this prop.
+   * Format: "cover" | "150%" (percentage of container width).
+   */
+  backgroundSizeOverride?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -224,6 +240,7 @@ export default function SectionShell({
   designSystem,
   backgroundImageUrl,
   backgroundPositionOverride,
+  backgroundSizeOverride,
 }: SectionShellProps) {
   const resolved = resolveLayout(layout);
 
@@ -240,7 +257,7 @@ export default function SectionShell({
     : {};
 
   const { className: bgClass, style: bgStyle, hasImageOverlay, imageOverlayClass, imageOverlayStyle } =
-    resolveBackgroundStyle(resolved.background, backgroundImageUrl, backgroundPositionOverride);
+    resolveBackgroundStyle(resolved.background, backgroundImageUrl, backgroundPositionOverride, backgroundSizeOverride);
 
   // Horizontal padding resolved from Design System via PADDING_X_MAP.
   // Falls back to "md" when paddingX is not set (covered by resolveLayout defaults).

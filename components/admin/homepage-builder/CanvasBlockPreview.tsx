@@ -47,6 +47,21 @@
  *       which merges into inspectorDraft → persisted on next Save
  *     - On reload: SectionShell reads background.position from stored config
  *
+ * BACKGROUND ZOOM (Slice K.1)
+ *   Zoom is stored in `config._layout.background.zoom: number` (100–200).
+ *   Flow mirrors the focal point pattern:
+ *     - On mount: read stored zoom from config (lazy useState initializer)
+ *     - On slider change: update local state (backgroundSizeOverride for live preview)
+ *     - On slider release / reset: commit via onFieldChange("_layout", ...)
+ *     - On reload: SectionShell reads background.zoom from stored config
+ *   Reset clears both position and zoom from background (defaults: center + cover).
+ *
+ * MOBILE READINESS (Slice K.1)
+ *   Architecture is prepared for future breakpoint-specific positioning:
+ *     background.responsive.{desktop,tablet,mobile}.{position,zoom}
+ *   For now, a single position and zoom applies across all breakpoints.
+ *   The local state objects use `assetId` keying; future could add `breakpoint`.
+ *
  * INTERACTIVITY
  *   The preview wrapper uses pointer-events-none so clicks on links/buttons
  *   inside the rendered block are intercepted by the canvas section's onClick
@@ -198,7 +213,6 @@ function useBackgroundImageUrl(config: Record<string, unknown>): string | null {
 
   useEffect(() => {
     if (!mediaAssetId) return;
-    // Already resolved for this asset — skip fetch
     if (resolved?.assetId === mediaAssetId) return;
 
     const controller = new AbortController();
@@ -220,7 +234,6 @@ function useBackgroundImageUrl(config: Record<string, unknown>): string | null {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaAssetId]);
 
-  // Return the URL only when it belongs to the current assetId
   if (!mediaAssetId || resolved?.assetId !== mediaAssetId) return null;
   return resolved.url;
 }
@@ -242,6 +255,19 @@ function readStoredFocalPoint(config: Record<string, unknown>): string | null {
     return `${Math.round(pos.x)}% ${Math.round(pos.y)}%`;
   }
   return null;
+}
+
+/**
+ * Read stored zoom from config._layout.background.zoom.
+ * Returns 100–200, default 100.
+ */
+function readStoredZoom(config: Record<string, unknown>): number {
+  const layout = config._layout as Record<string, unknown> | undefined;
+  const bg = layout?.background as Record<string, unknown> | undefined;
+  if (bg?.type !== "image" || bg.zoom == null) return 100;
+  const z = bg.zoom;
+  if (typeof z === "number" && z >= 100 && z <= 200) return Math.round(z);
+  return 100;
 }
 
 // ---------------------------------------------------------------------------
@@ -287,15 +313,26 @@ export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockP
     pos: string;
   }>(() => {
     const stored = readStoredFocalPoint(config);
-    return {
-      assetId: mediaAssetId,
-      pos: stored ?? "50% 50%",
-    };
+    return { assetId: mediaAssetId, pos: stored ?? "50% 50%" };
   });
 
   // Derive effective background position: reset to center when assetId changes
   const backgroundPosition =
     focalPoint.assetId === mediaAssetId ? focalPoint.pos : "50% 50%";
+
+  // ── Zoom local state ───────────────────────────────────────────────────
+  // Keyed by mediaAssetId: when the image changes, zoom resets to 100 (cover).
+  // Future: could also be keyed by breakpoint for responsive positioning.
+  const [zoomState, setZoomState] = useState<{
+    assetId: string | null;
+    value: number;
+  }>(() => ({ assetId: mediaAssetId, value: readStoredZoom(config) }));
+
+  const activeZoom = zoomState.assetId === mediaAssetId ? zoomState.value : 100;
+
+  // CSS background-size override for live slider preview
+  const backgroundSizeOverride =
+    activeZoom === 100 ? "cover" : `${activeZoom}%`;
 
   // Only show focal point control when inline editing is active AND there's a bg image
   const showFocalPoint = !!onFieldChange && !!backgroundImageUrl;
@@ -303,13 +340,10 @@ export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockP
   // ── Focal-point handlers ───────────────────────────────────────────────
 
   function handleFocalPositionChange(pos: string) {
-    // Live drag: update local state only (backgroundPositionOverride provides preview)
     setFocalPoint({ assetId: mediaAssetId, pos });
   }
 
   function handleFocalPositionCommit(pos: string) {
-    // Drag end / keyboard nudge: persist position into _layout config via existing
-    // onFieldChange path so it's saved on next inspector "Speichern".
     if (!onFieldChange || !mediaAssetId) return;
     const parts = pos.split(" ");
     const x = Math.round(parseFloat(parts[0] ?? "50"));
@@ -322,17 +356,46 @@ export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockP
     });
   }
 
-  function handleFocalReset() {
-    setFocalPoint({ assetId: mediaAssetId, pos: "50% 50%" });
-    // Commit reset: remove position from background (SectionShell defaults to center)
+  // ── Zoom handlers ──────────────────────────────────────────────────────
+
+  function handleZoomChange(z: number) {
+    setZoomState({ assetId: mediaAssetId, value: z });
+  }
+
+  function handleZoomCommit(z: number) {
     if (!onFieldChange || !mediaAssetId) return;
     const currentLayout = (layout ?? {}) as Record<string, unknown>;
     const currentBackground = (background ?? {}) as Record<string, unknown>;
+    // Store 100 as absence (default) to keep config clean; >100 stored explicitly
+    if (z === 100) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { zoom: _removed, ...backgroundWithoutZoom } = currentBackground;
+      onFieldChange("_layout", {
+        ...currentLayout,
+        background: backgroundWithoutZoom,
+      });
+    } else {
+      onFieldChange("_layout", {
+        ...currentLayout,
+        background: { ...currentBackground, zoom: z },
+      });
+    }
+  }
+
+  // ── Reset handler (position → center, zoom → 100) ──────────────────────
+
+  function handleFocalReset() {
+    setFocalPoint({ assetId: mediaAssetId, pos: "50% 50%" });
+    setZoomState({ assetId: mediaAssetId, value: 100 });
+    if (!onFieldChange || !mediaAssetId) return;
+    const currentLayout = (layout ?? {}) as Record<string, unknown>;
+    const currentBackground = (background ?? {}) as Record<string, unknown>;
+    // Remove both position and zoom — SectionShell defaults: center + cover
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { position: _removed, ...backgroundWithoutPosition } = currentBackground;
+    const { position: _p, zoom: _z, ...backgroundDefaults } = currentBackground;
     onFieldChange("_layout", {
       ...currentLayout,
-      background: backgroundWithoutPosition,
+      background: backgroundDefaults,
     });
   }
 
@@ -366,6 +429,7 @@ export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockP
               backgroundImageUrl={backgroundImageUrl}
               onFieldChange={rendererFieldChange}
               backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+              backgroundSizeOverride={showFocalPoint ? backgroundSizeOverride : undefined}
             />
           </Suspense>
         );
@@ -379,6 +443,7 @@ export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockP
               backgroundImageUrl={backgroundImageUrl}
               onFieldChange={rendererFieldChange}
               backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+              backgroundSizeOverride={showFocalPoint ? backgroundSizeOverride : undefined}
             />
           </Suspense>
         );
@@ -392,6 +457,7 @@ export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockP
               backgroundImageUrl={backgroundImageUrl}
               onFieldChange={rendererFieldChange}
               backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+              backgroundSizeOverride={showFocalPoint ? backgroundSizeOverride : undefined}
             />
           </Suspense>
         );
@@ -415,8 +481,11 @@ export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockP
       {showFocalPoint && (
         <FocalPointControl
           position={backgroundPosition}
+          zoom={activeZoom}
           onPositionChange={handleFocalPositionChange}
           onPositionCommit={handleFocalPositionCommit}
+          onZoomChange={handleZoomChange}
+          onZoomCommit={handleZoomCommit}
           onReset={handleFocalReset}
         />
       )}

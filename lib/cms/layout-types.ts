@@ -114,6 +114,16 @@ export type SectionBackground =
        * Safe for public rendering: absent = "center" (unchanged from pre-K behaviour).
        */
       position?: { x: number; y: number };
+      /**
+       * Background image zoom level (100–200, default 100 = cover).
+       * Stored in config JSON; used by SectionShell as CSS background-size.
+       * Set by the zoom slider in FocalPointControl (Slice K.1).
+       * 100 → backgroundSize "cover". >100 → `${zoom}%` width-relative scale.
+       *
+       * Future: responsive.desktop/tablet/mobile each get their own zoom.
+       * For now a single value applies across all breakpoints.
+       */
+      zoom?: number;
     };
 
 // ---------------------------------------------------------------------------
