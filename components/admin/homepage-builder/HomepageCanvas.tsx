@@ -86,7 +86,13 @@ type Props = {
    * When provided, text fields in selected sections become inline-editable.
    * Called with (sectionId, field, value) on every change.
    */
-  onInlineFieldChange?: (sectionId: string, field: string, value: string) => void;
+  /**
+   * Admin canvas inline editing (Slice K).
+   * When provided, text fields in selected sections become inline-editable.
+   * Called with (sectionId, field, value) on every change.
+   * Accepts unknown values because focal-point commits pass the full _layout object.
+   */
+  onInlineFieldChange?: (sectionId: string, field: string, value: unknown) => void;
 };
 
 // ---------------------------------------------------------------------------

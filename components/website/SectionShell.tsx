@@ -141,11 +141,22 @@ function resolveBackgroundStyle(
     // backgroundPositionOverride is also admin-only (focal-point drag, Slice K).
     // It only takes effect when backgroundImageUrl is also provided, so public
     // website rendering is unaffected.
+    //
+    // Priority for background-position:
+    //   1. Live drag override (backgroundPositionOverride) — in-progress drag
+    //   2. Stored position from config (bg.position) — persisted focal point
+    //   3. Default "center"
+    const storedPosition =
+      bg.position != null
+        ? `${bg.position.x}% ${bg.position.y}%`
+        : null;
+
     const imageStyle: React.CSSProperties = backgroundImageUrl
       ? {
           backgroundImage: `url(${backgroundImageUrl})`,
           backgroundSize: "cover",
-          backgroundPosition: backgroundPositionOverride ?? "center",
+          backgroundPosition:
+            backgroundPositionOverride ?? storedPosition ?? "center",
         }
       : {};
 

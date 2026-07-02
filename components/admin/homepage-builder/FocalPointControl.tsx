@@ -57,6 +57,8 @@ function formatPosition(x: number, y: number): string {
 type FocalPointControlProps = {
   position: string; // CSS background-position, e.g. "50% 50%"
   onPositionChange: (pos: string) => void;
+  /** Called on pointer-up and on reset — use to persist the final position. */
+  onPositionCommit: (pos: string) => void;
   onReset: () => void;
 };
 
@@ -67,6 +69,7 @@ type FocalPointControlProps = {
 export function FocalPointControl({
   position,
   onPositionChange,
+  onPositionCommit,
   onReset,
 }: FocalPointControlProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -107,8 +110,11 @@ export function FocalPointControl({
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!draggingRef.current) return;
     draggingRef.current = false;
     (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+    // Commit the final position so the parent can persist it to config
+    onPositionCommit(position);
   }
 
   // ── Keyboard fallback ──────────────────────────────────────────────────
@@ -121,7 +127,10 @@ export function FocalPointControl({
     else if (e.key === "ArrowUp") { e.preventDefault(); y = clamp(y - step, 0, 100); }
     else if (e.key === "ArrowDown") { e.preventDefault(); y = clamp(y + step, 0, 100); }
     else return;
-    onPositionChange(formatPosition(x, y));
+    const newPos = formatPosition(x, y);
+    onPositionChange(newPos);
+    // Commit immediately on keyboard so each nudge is persisted
+    onPositionCommit(newPos);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -164,7 +173,7 @@ export function FocalPointControl({
       <button
         type="button"
         data-focal-reset
-        onClick={(e) => { e.stopPropagation(); onReset(); }}
+        onClick={(e) => { e.stopPropagation(); onReset(); onPositionCommit("50% 50%"); }}
         onPointerDown={(e) => e.stopPropagation()}
         className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/50 px-2 py-1 text-[11px] text-white hover:bg-black/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
         title="Bildposition zurücksetzen (Mitte)"

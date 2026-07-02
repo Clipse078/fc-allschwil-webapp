@@ -1393,7 +1393,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   function handleInlineFieldChange(
     sectionId: string,
     field: string,
-    value: string,
+    value: unknown,
   ) {
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;

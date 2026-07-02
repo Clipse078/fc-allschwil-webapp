@@ -64,7 +64,7 @@ export type PageBuilderCanvasProps = {
   reorderPending?: boolean;
   reorderError?: string | null;
   /** Admin canvas inline editing (Slice K). See HomepageCanvas for details. */
-  onInlineFieldChange?: (sectionId: string, field: string, value: string) => void;
+  onInlineFieldChange?: (sectionId: string, field: string, value: unknown) => void;
 };
 
 // ---------------------------------------------------------------------------

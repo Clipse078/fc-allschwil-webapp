@@ -621,7 +621,7 @@ export default function HomepageBuilderWorkspace() {
   function handleInlineFieldChange(
     sectionId: string,
     field: string,
-    value: string,
+    value: unknown,
   ) {
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;

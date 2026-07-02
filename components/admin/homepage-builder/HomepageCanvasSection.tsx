@@ -116,8 +116,9 @@ type Props = {
    * When provided and the section is selected, pointer-events-none is removed
    * from the block preview wrapper and text fields become inline editable.
    * Called on every change; the parent merges into inspectorDraft.
+   * Accepts unknown values because focal-point commits pass the full _layout object.
    */
-  onInlineFieldChange?: (field: string, value: string) => void;
+  onInlineFieldChange?: (field: string, value: unknown) => void;
 } & Pick<
   SectionCardCallbacks,
   | "onSelect"
