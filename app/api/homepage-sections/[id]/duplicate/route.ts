@@ -4,8 +4,8 @@
  * Creates a copy of a homepage section within the same tenant.
  *
  * The duplicate is created as a DRAFT with isEnabled=false and
- * a label of "{original} (Kopie)", placed immediately after the original
- * in sort order.
+ * a label of "{original} (Kopie)", appended at the end of the canvas
+ * (sortOrder = MAX(existing) + 10). The admin can drag it to any position.
  *
  * Returns: { section, sections } — the new section and the full updated list.
  *
