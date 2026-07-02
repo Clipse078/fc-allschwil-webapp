@@ -107,6 +107,13 @@ export type SectionBackground =
       overlay: "none" | "light" | "dark";
       /** Overlay opacity 0–100. Default: 50 for dark, 40 for light. */
       overlayOpacity?: number;
+      /**
+       * Background image focal point (0–100 for each axis).
+       * Stored in config JSON; used by SectionShell as CSS background-position.
+       * Set by FocalPointControl in the admin canvas (Slice K).
+       * Safe for public rendering: absent = "center" (unchanged from pre-K behaviour).
+       */
+      position?: { x: number; y: number };
     };
 
 // ---------------------------------------------------------------------------

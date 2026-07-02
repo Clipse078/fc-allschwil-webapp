@@ -28,10 +28,30 @@
  *   HomepageMediaField (which does the same resolution for the inspector
  *   thumbnail). Public renderers are unaffected — they do not receive this prop.
  *
+ * INLINE EDITING (Slice K)
+ *   When `onFieldChange` is provided (admin canvas only), text fields inside
+ *   the rendered block become inline editable. The pointer-events-none wrapper
+ *   in HomepageCanvasSection must be removed by the parent to allow interaction.
+ *   Supported fields per block type:
+ *     hero:              title, subtitle, ctaLabel
+ *     callToAction:      title, body, primaryLabel, secondaryLabel
+ *     splitContentCards: headline
+ *
+ * BACKGROUND FOCAL POINT (Slice K)
+ *   Focal point is stored in `config._layout.background.position: { x, y }`
+ *   (added to SectionBackground type + sectionBackgroundSchema in Slice K).
+ *   Flow:
+ *     - On mount: read stored position from config (lazy useState initializer)
+ *     - On drag: update local state only (backgroundPositionOverride for live preview)
+ *     - On drag end / keyboard / reset: commit via onFieldChange("_layout", ...)
+ *       which merges into inspectorDraft → persisted on next Save
+ *     - On reload: SectionShell reads background.position from stored config
+ *
  * INTERACTIVITY
  *   The preview wrapper uses pointer-events-none so clicks on links/buttons
  *   inside the rendered block are intercepted by the canvas section's onClick
  *   handler (section selection) rather than triggering navigation.
+ *   When `onFieldChange` is provided, the parent must remove pointer-events-none.
  */
 
 import { useState, useEffect, Suspense } from "react";
@@ -47,6 +67,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
+import { FocalPointControl } from "./FocalPointControl";
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded renderers (same pattern as PageBuilderClient / HomepagePreviewPanel)
@@ -205,68 +226,200 @@ function useBackgroundImageUrl(config: Record<string, unknown>): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Focal-point helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Read stored focal point from config._layout.background.position.
+ * Returns a CSS background-position string, or null if not set.
+ */
+function readStoredFocalPoint(config: Record<string, unknown>): string | null {
+  const layout = config._layout as Record<string, unknown> | undefined;
+  const bg = layout?.background as Record<string, unknown> | undefined;
+  if (bg?.type !== "image" || bg.position == null) return null;
+  const pos = bg.position as { x?: unknown; y?: unknown };
+  if (typeof pos.x === "number" && typeof pos.y === "number") {
+    return `${Math.round(pos.x)}% ${Math.round(pos.y)}%`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 type CanvasBlockPreviewProps = {
   type: string;
   config: Record<string, unknown>;
+  /**
+   * Admin canvas only. When provided, supported text fields become
+   * inline-editable and the background focal-point control is shown.
+   * The parent (HomepageCanvasSection) must remove pointer-events-none
+   * from the wrapper when this is set.
+   *
+   * Accepts `unknown` values because focal-point commits pass the full
+   * `_layout` object (not just a string).
+   */
+  onFieldChange?: (field: string, value: unknown) => void;
 };
 
 // ---------------------------------------------------------------------------
 // CanvasBlockPreview
 // ---------------------------------------------------------------------------
 
-export function CanvasBlockPreview({ type, config }: CanvasBlockPreviewProps) {
+export function CanvasBlockPreview({ type, config, onFieldChange }: CanvasBlockPreviewProps) {
   const backgroundImageUrl = useBackgroundImageUrl(config) ?? undefined;
   const def = getBlockDefinition(type);
 
-  // Data-driven blocks — show informational placeholder instead of trying to
-  // render live data that is not available in the admin canvas context.
+  // ── Extract background metadata ────────────────────────────────────────
+  const layout = config._layout as Record<string, unknown> | undefined;
+  const background = layout?.background as Record<string, unknown> | undefined;
+  const mediaAssetId =
+    background?.type === "image" && typeof background.mediaAssetId === "string"
+      ? background.mediaAssetId
+      : null;
+
+  // ── Focal-point local state ────────────────────────────────────────────
+  // Initialised from stored config so a saved position is visible immediately.
+  // Keyed by mediaAssetId: when the image changes, falls back to "50% 50%".
+  const [focalPoint, setFocalPoint] = useState<{
+    assetId: string | null;
+    pos: string;
+  }>(() => {
+    const stored = readStoredFocalPoint(config);
+    return {
+      assetId: mediaAssetId,
+      pos: stored ?? "50% 50%",
+    };
+  });
+
+  // Derive effective background position: reset to center when assetId changes
+  const backgroundPosition =
+    focalPoint.assetId === mediaAssetId ? focalPoint.pos : "50% 50%";
+
+  // Only show focal point control when inline editing is active AND there's a bg image
+  const showFocalPoint = !!onFieldChange && !!backgroundImageUrl;
+
+  // ── Focal-point handlers ───────────────────────────────────────────────
+
+  function handleFocalPositionChange(pos: string) {
+    // Live drag: update local state only (backgroundPositionOverride provides preview)
+    setFocalPoint({ assetId: mediaAssetId, pos });
+  }
+
+  function handleFocalPositionCommit(pos: string) {
+    // Drag end / keyboard nudge: persist position into _layout config via existing
+    // onFieldChange path so it's saved on next inspector "Speichern".
+    if (!onFieldChange || !mediaAssetId) return;
+    const parts = pos.split(" ");
+    const x = Math.round(parseFloat(parts[0] ?? "50"));
+    const y = Math.round(parseFloat(parts[1] ?? "50"));
+    const currentLayout = (layout ?? {}) as Record<string, unknown>;
+    const currentBackground = (background ?? {}) as Record<string, unknown>;
+    onFieldChange("_layout", {
+      ...currentLayout,
+      background: { ...currentBackground, position: { x, y } },
+    });
+  }
+
+  function handleFocalReset() {
+    setFocalPoint({ assetId: mediaAssetId, pos: "50% 50%" });
+    // Commit reset: remove position from background (SectionShell defaults to center)
+    if (!onFieldChange || !mediaAssetId) return;
+    const currentLayout = (layout ?? {}) as Record<string, unknown>;
+    const currentBackground = (background ?? {}) as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { position: _removed, ...backgroundWithoutPosition } = currentBackground;
+    onFieldChange("_layout", {
+      ...currentLayout,
+      background: backgroundWithoutPosition,
+    });
+  }
+
+  // ── Placeholder blocks (no inline editing) ────────────────────────────
+
   if (def?.datadriven) {
     return <DataDrivenPlaceholder type={type} />;
   }
 
-  // Coming-next blocks
   if (def?.status === "coming-next") {
     return <ComingSoonPlaceholder type={type} />;
   }
 
-  switch (type) {
-    case "hero":
-      return (
-        <Suspense fallback={<RendererSkeleton />}>
-          <HeroRenderer
-            config={config}
-            previewMode
-            backgroundImageUrl={backgroundImageUrl}
-          />
-        </Suspense>
-      );
+  // ── Rendered blocks ────────────────────────────────────────────────────
 
-    case "callToAction":
-      return (
-        <Suspense fallback={<RendererSkeleton />}>
-          <CallToActionRenderer
-            config={config}
-            previewMode
-            backgroundImageUrl={backgroundImageUrl}
-          />
-        </Suspense>
-      );
+  // Cast onFieldChange to the renderer's narrower (string value) type. This is
+  // safe because renderers only ever call onFieldChange with string values for
+  // text fields. The _layout object commits are handled here in CanvasBlockPreview.
+  const rendererFieldChange = onFieldChange as
+    | ((field: string, value: string) => void)
+    | undefined;
 
-    case "splitContentCards":
-      return (
-        <Suspense fallback={<RendererSkeleton />}>
-          <SplitContentCardsRenderer
-            config={config}
-            previewMode
-            backgroundImageUrl={backgroundImageUrl}
-          />
-        </Suspense>
-      );
+  const rendererNode = (() => {
+    switch (type) {
+      case "hero":
+        return (
+          <Suspense fallback={<RendererSkeleton />}>
+            <HeroRenderer
+              config={config}
+              previewMode
+              backgroundImageUrl={backgroundImageUrl}
+              onFieldChange={rendererFieldChange}
+              backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+            />
+          </Suspense>
+        );
 
-    default:
-      return <UnknownBlockPlaceholder type={type} />;
+      case "callToAction":
+        return (
+          <Suspense fallback={<RendererSkeleton />}>
+            <CallToActionRenderer
+              config={config}
+              previewMode
+              backgroundImageUrl={backgroundImageUrl}
+              onFieldChange={rendererFieldChange}
+              backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+            />
+          </Suspense>
+        );
+
+      case "splitContentCards":
+        return (
+          <Suspense fallback={<RendererSkeleton />}>
+            <SplitContentCardsRenderer
+              config={config}
+              previewMode
+              backgroundImageUrl={backgroundImageUrl}
+              onFieldChange={rendererFieldChange}
+              backgroundPositionOverride={showFocalPoint ? backgroundPosition : undefined}
+            />
+          </Suspense>
+        );
+
+      default:
+        return <UnknownBlockPlaceholder type={type} />;
+    }
+  })();
+
+  // When inline editing is not active, return the renderer directly.
+  // The parent wrapper (HomepageCanvasSection) handles pointer-events-none.
+  if (!onFieldChange) {
+    return rendererNode;
   }
+
+  // When inline editing is active, wrap in a relative container so we can
+  // overlay FocalPointControl on top of the background image.
+  return (
+    <div className="relative">
+      {rendererNode}
+      {showFocalPoint && (
+        <FocalPointControl
+          position={backgroundPosition}
+          onPositionChange={handleFocalPositionChange}
+          onPositionCommit={handleFocalPositionCommit}
+          onReset={handleFocalReset}
+        />
+      )}
+    </div>
+  );
 }

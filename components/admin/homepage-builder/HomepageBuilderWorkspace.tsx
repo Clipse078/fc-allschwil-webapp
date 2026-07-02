@@ -607,6 +607,37 @@ export default function HomepageBuilderWorkspace() {
   }
 
   /**
+   * Inline canvas text edit handler (Slice K).
+   * Called by HomepageCanvas → HomepageCanvasSection → CanvasBlockPreview
+   * → renderer when the user edits text directly in the canvas.
+   *
+   * Merges the changed field into the current inspectorDraft config
+   * (or the persisted section config if no draft exists yet) and updates
+   * inspectorDraft. This keeps:
+   *   1. The canvas live preview in sync (via sectionsForCanvas)
+   *   2. The inspector form in sync (via externalDraftConfig prop)
+   *   3. The save path correct (inspector saves the merged draft)
+   */
+  function handleInlineFieldChange(
+    sectionId: string,
+    field: string,
+    value: unknown,
+  ) {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const currentConfig =
+      inspectorDraft?.id === sectionId
+        ? inspectorDraft.config
+        : (section.config as Record<string, unknown>);
+    const currentLabel =
+      inspectorDraft?.id === sectionId ? inspectorDraft.label : section.label;
+    handleInspectorDraftChange(sectionId, currentLabel, {
+      ...currentConfig,
+      [field]: value,
+    });
+  }
+
+  /**
    * Called by the Inspector when the user clicks "Speichern".
    * Delegates to the existing handleSaveEdit which calls the API.
    */
@@ -1087,6 +1118,7 @@ export default function HomepageBuilderWorkspace() {
                   onSaveAsReusable={handleOpenSaveAsReusable}
                   reorderPending={reorderPending}
                   reorderError={reorderError}
+                  onInlineFieldChange={handleInlineFieldChange}
                 />
               ) : (
                 /* List Mode */
@@ -1171,6 +1203,9 @@ export default function HomepageBuilderWorkspace() {
                   onSaveEdit={handleInspectorSave}
                   onSaveAsReusable={
                     selectedId ? () => handleOpenSaveAsReusable(selectedId) : undefined
+                  }
+                  externalDraftConfig={
+                    inspectorDraft?.id === selectedId ? inspectorDraft.config : null
                   }
                 />
               </div>

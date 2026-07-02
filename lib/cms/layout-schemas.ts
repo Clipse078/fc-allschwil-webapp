@@ -54,6 +54,13 @@ export const sectionBackgroundSchema = z
       mediaAssetId: z.string().max(200),
       overlay: z.enum(["none", "light", "dark"]),
       overlayOpacity: z.number().int().min(0).max(100).optional(),
+      /** Focal point set by FocalPointControl (Slice K). 0–100 per axis. */
+      position: z
+        .object({
+          x: z.number().min(0).max(100),
+          y: z.number().min(0).max(100),
+        })
+        .optional(),
     }),
   ])
   .optional();

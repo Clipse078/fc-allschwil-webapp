@@ -1387,6 +1387,29 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
   }
 
   /**
+   * Inline canvas text edit handler (Slice K).
+   * Mirrors the same logic as HomepageBuilderWorkspace.handleInlineFieldChange.
+   */
+  function handleInlineFieldChange(
+    sectionId: string,
+    field: string,
+    value: unknown,
+  ) {
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const currentConfig =
+      inspectorDraft?.id === sectionId
+        ? inspectorDraft.config
+        : (section.config as Record<string, unknown>);
+    const currentLabel =
+      inspectorDraft?.id === sectionId ? inspectorDraft.label : section.label;
+    handleInspectorDraftChange(sectionId, currentLabel, {
+      ...currentConfig,
+      [field]: value,
+    });
+  }
+
+  /**
    * Called when the inspector "Speichern" button is clicked.
    * Delegates to the existing save endpoint. Clears draft on success.
    * No autosave — explicit save only (canvas mode).
@@ -1715,6 +1738,7 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                   onSaveAsReusable={handleOpenSaveAsReusable}
                   reorderPending={reorderPending}
                   reorderError={reorderError}
+                  onInlineFieldChange={handleInlineFieldChange}
                 />
               </div>
 
@@ -1736,6 +1760,9 @@ export default function PageBuilderClient({ pageId, pageTitle = "", pageSlug = "
                     onSaveEdit={handleInspectorSave}
                     onSaveAsReusable={
                       selectedId ? () => handleOpenSaveAsReusable(selectedId) : undefined
+                    }
+                    externalDraftConfig={
+                      inspectorDraft?.id === selectedId ? inspectorDraft.config : null
                     }
                   />
                 </div>

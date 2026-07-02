@@ -124,6 +124,14 @@ type Props = {
   onSaveEdit?: (label: string, config: Record<string, unknown>) => Promise<void>;
   /** Save this section's current draft config as a reusable library item. */
   onSaveAsReusable?: () => void;
+  /**
+   * Canvas inline-edit sync (Slice K).
+   * When provided, the inspector's draftConfig is updated to match this value.
+   * Used to reflect inline text edits made in the canvas back to the inspector
+   * form fields without losing inspector-local state.
+   * The value should be `inspectorDraft.config` when it belongs to this section.
+   */
+  externalDraftConfig?: Record<string, unknown> | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -135,6 +143,7 @@ export function HomepageSectionInspector({
   onDraftChange,
   onSaveEdit,
   onSaveAsReusable,
+  externalDraftConfig,
 }: Props) {
   // ── Local draft state ──────────────────────────────────────────────────
   const [draftLabel, setDraftLabel] = useState("");
@@ -165,6 +174,15 @@ export function HomepageSectionInspector({
     setSaveError(null);
     setSavedOk(false);
   }, [sectionId, sectionUpdatedAt]);
+
+  // Sync inline canvas edits back to the inspector (Slice K).
+  // When the canvas updates a field via inline editing, externalDraftConfig
+  // changes and this effect applies the new config to the inspector's draft
+  // so the form fields stay in sync.
+  useEffect(() => {
+    if (!externalDraftConfig) return;
+    setDraftConfig(externalDraftConfig);
+  }, [externalDraftConfig]);
 
   // ── Empty state ────────────────────────────────────────────────────────
 

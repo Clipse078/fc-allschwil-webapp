@@ -81,6 +81,18 @@ type Props = {
   onSaveAsReusable?: (id: string) => void;
   reorderPending?: boolean;
   reorderError?: string | null;
+  /**
+   * Admin canvas inline editing (Slice K).
+   * When provided, text fields in selected sections become inline-editable.
+   * Called with (sectionId, field, value) on every change.
+   */
+  /**
+   * Admin canvas inline editing (Slice K).
+   * When provided, text fields in selected sections become inline-editable.
+   * Called with (sectionId, field, value) on every change.
+   * Accepts unknown values because focal-point commits pass the full _layout object.
+   */
+  onInlineFieldChange?: (sectionId: string, field: string, value: unknown) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -108,6 +120,7 @@ export function HomepageCanvas({
   onSaveAsReusable,
   reorderPending,
   reorderError,
+  onInlineFieldChange,
 }: Props) {
   // ── Viewport toggle (local UI state — does not affect saved config) ────────
   const [canvasViewport, setCanvasViewport] = useState<CanvasViewport>("desktop");
@@ -368,6 +381,11 @@ export function HomepageCanvas({
                   sectionRef={(el) => {
                     itemRefs.current[idx] = el;
                   }}
+                  onInlineFieldChange={
+                    onInlineFieldChange
+                      ? (field, value) => onInlineFieldChange(section.id, field, value)
+                      : undefined
+                  }
                 />
 
                 {/* Insertion line after each section */}

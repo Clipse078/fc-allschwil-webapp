@@ -63,6 +63,8 @@ export type PageBuilderCanvasProps = {
   onSaveAsReusable?: (id: string) => void;
   reorderPending?: boolean;
   reorderError?: string | null;
+  /** Admin canvas inline editing (Slice K). See HomepageCanvas for details. */
+  onInlineFieldChange?: (sectionId: string, field: string, value: unknown) => void;
 };
 
 // ---------------------------------------------------------------------------
