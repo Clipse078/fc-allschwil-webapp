@@ -41,5 +41,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  return NextResponse.json(result, { status: 201 });
+  return NextResponse.json(
+    { ...result, meta: { total: result.sections.length } },
+    { status: 201 },
+  );
 }

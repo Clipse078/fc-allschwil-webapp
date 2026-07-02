@@ -1,15 +1,20 @@
 /**
  * DELETE /api/homepage-sections/[id]
  *
- * Permanently deletes a homepage section.
+ * Permanently deletes a homepage section (hard delete).
  *
  * Safety: section ownership is verified in the query layer (tenant-scoped).
- * Published sections can be deleted — the caller (UI) should confirm first.
+ * Published sections can be deleted — the UI requires confirmation before
+ * calling this endpoint.
  *
- * Returns: { sections: HomepageSectionAdminItem[] } — full updated list.
+ * Audit trail: written to AuditLog (best-effort, never throws).
+ * Matches the same audit pattern as requestReview, approve, and reject.
+ *
+ * Returns: { sections, meta: { total } } — full updated list + count.
  *
  * Permission: WEBSITE_MANAGE
  * Isolation:  tenantId from session — never from request body.
+ *             actorUserId from session — used for audit trail only.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -30,9 +35,14 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }
 
+  const actorUserId = access.session.user?.id;
+  if (!actorUserId) {
+    return NextResponse.json({ error: "Benutzer-ID fehlt in der Sitzung." }, { status: 401 });
+  }
+
   const { id } = await params;
 
-  const sections = await deleteHomepageSection(tenantId, id);
+  const sections = await deleteHomepageSection(tenantId, id, actorUserId);
   if (sections === null) {
     return NextResponse.json(
       { error: "Sektion nicht gefunden oder kein Zugriff." },
@@ -40,5 +50,5 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  return NextResponse.json({ sections });
+  return NextResponse.json({ sections, meta: { total: sections.length } });
 }
