@@ -684,6 +684,114 @@ export async function getReviewerInfo(
 }
 
 // ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+/**
+ * Permanently deletes a homepage section (hard delete).
+ *
+ * Safety: only deletes sections belonging to the tenant.
+ * After deletion the remaining sections are NOT automatically renumbered —
+ * sortOrder gaps are tolerated by the ordering query (ORDER BY sortOrder ASC).
+ *
+ * Audit trail: written to AuditLog (best-effort, never throws). Matches the
+ * same audit pattern used by requestReview, approve, and reject.
+ *
+ * Returns the full updated section list, or null if the section was not found.
+ */
+export async function deleteHomepageSection(
+  tenantId: string,
+  id: string,
+  actorUserId: string,
+): Promise<HomepageSectionAdminItem[] | null> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true, label: true, type: true },
+  });
+  if (!existing) return null;
+
+  await prisma.homepageSection.delete({ where: { id } });
+
+  void logAction({
+    actorUserId,
+    moduleKey: "homepage",
+    entityType: "HomepageSection",
+    entityId: id,
+    action: "DELETE",
+    beforeJson: { label: existing.label, type: existing.type },
+    afterJson: null,
+    metadataJson: { tenantId },
+  });
+
+  return listHomepageSections(tenantId);
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates a copy of a homepage section for the same tenant.
+ *
+ * The duplicate is created as:
+ *   - label: original label + " (Kopie)"
+ *   - sortOrder: MAX(existing sortOrders for tenant) + 10, collision-free
+ *     and consistent with reorderHomepageSections' stride of 10.
+ *   - isEnabled: false  (safe default — admin must consciously enable)
+ *   - publishStatus: DRAFT
+ *   - approvalStatus: DRAFT
+ *   - all other workflow fields reset to initial values (all timestamps null)
+ *
+ * sortOrder strategy matches the page-builder duplicate pattern: always appends
+ * to the end of the sort space rather than inserting mid-list, avoiding any
+ * risk of collisions with existing sortOrder values.
+ *
+ * Returns the new section and the full updated section list,
+ * or null if the source section was not found.
+ */
+export async function duplicateHomepageSection(
+  tenantId: string,
+  id: string,
+): Promise<{ section: HomepageSectionAdminItem; sections: HomepageSectionAdminItem[] } | null> {
+  const source = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: {
+      type: true,
+      label: true,
+      config: true,
+    },
+  });
+  if (!source) return null;
+
+  // Derive a collision-free sortOrder by taking the current maximum and
+  // adding 10 (the same stride used by reorderHomepageSections). This means
+  // the duplicate always lands at the end of the canvas, which is intentional:
+  // the admin can then drag it into the desired position.
+  const maxResult = await prisma.homepageSection.aggregate({
+    where: { tenantId },
+    _max: { sortOrder: true },
+  });
+  const newSortOrder = (maxResult._max.sortOrder ?? 0) + 10;
+
+  const newSection = await prisma.homepageSection.create({
+    data: {
+      tenantId,
+      type: source.type,
+      label: `${source.label} (Kopie)`,
+      sortOrder: newSortOrder,
+      isEnabled: false,
+      config: source.config as Prisma.InputJsonValue,
+      publishStatus: PUBLISH_STATUS.DRAFT,
+      approvalStatus: APPROVAL_STATUS.DRAFT,
+    },
+    select: adminSelect,
+  });
+
+  const sections = await listHomepageSections(tenantId);
+  return { section: newSection as HomepageSectionAdminItem, sections };
+}
+
+// ---------------------------------------------------------------------------
 // Bulk reorder
 // ---------------------------------------------------------------------------
 
