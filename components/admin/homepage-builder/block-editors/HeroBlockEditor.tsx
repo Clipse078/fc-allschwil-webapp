@@ -84,10 +84,11 @@ export function HeroBlockEditor({ config, onChange }: Props) {
   // ── Text/CTA helpers ──────────────────────────────────────────────────────
 
   function set(key: keyof HeroSectionConfig, value: string) {
-    const trimmed = value.trim();
+    // Store the raw value to preserve spaces while typing.
+    // Only delete the field when the value is entirely whitespace (empty intent).
     const next = { ...config };
-    if (trimmed) {
-      next[key] = trimmed;
+    if (value.trim()) {
+      next[key] = value;
     } else {
       delete next[key];
     }
