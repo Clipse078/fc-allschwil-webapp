@@ -14,6 +14,11 @@
  * selection. The persisted value is `assetId` only — callers write that to
  * their config key; the preview snapshot is ephemeral and session-local.
  *
+ * Slice H.5: On mount (or when assetId changes), if no local snapshot exists,
+ * the component fetches GET /api/media/[id] to resolve the preview URL so
+ * background images show correctly after a page reload. If the fetch fails,
+ * the existing graceful placeholder is kept.
+ *
  * Public API:
  *   assetId    — the currently persisted DAM asset ID (or null)
  *   onSelect   — called with the full MediaAssetListItem on selection
@@ -22,14 +27,14 @@
  *   pickerTitle — optional dialog title override
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Image as ImageIcon,
   Film,
   RotateCcw,
   X,
-  Library,
-  Info,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import SharedMediaPicker from "@/components/admin/media/SharedMediaPicker";
 import type { MediaAssetListItem } from "@/lib/media/types";
@@ -100,22 +105,78 @@ export function HomepageMediaField({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [snapshot, setSnapshot] = useState<AssetSnapshot | null>(null);
 
+  // Slice H.5 — Resolve assetId → preview URL after page reload.
+  // When assetId is set but we have no local snapshot (or the snapshot
+  // belongs to a different asset), fetch the media record from the API.
+  // This keeps the inspector's thumbnail in sync after a full page reload.
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+
+  useEffect(() => {
+    if (!assetId) {
+      setPreviewError(false);
+      return;
+    }
+    // Already have the right snapshot from this session
+    if (snapshot !== null && snapshot.id === assetId) return;
+
+    let cancelled = false;
+    setLoadingPreview(true);
+    setPreviewError(false);
+
+    fetch(`/api/media/${assetId}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("not_found");
+        return r.json();
+      })
+      .then((data: { asset?: MediaAssetListItem }) => {
+        if (cancelled) return;
+        const a = data?.asset;
+        if (a) {
+          setSnapshot({
+            id: a.id,
+            url: a.url,
+            filename: a.filename,
+            mimeType: a.mimeType,
+            width: a.width ?? null,
+            height: a.height ?? null,
+            type: a.type,
+          });
+        } else {
+          setPreviewError(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPreview(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId]);
+
   function handleSelect(asset: MediaAssetListItem) {
     setSnapshot({
       id: asset.id,
       url: asset.url,
       filename: asset.filename,
       mimeType: asset.mimeType,
-      width: asset.width,
-      height: asset.height,
+      width: asset.width ?? null,
+      height: asset.height ?? null,
       type: asset.type,
     });
+    setPreviewError(false);
     onSelect(asset);
     setPickerOpen(false);
   }
 
   function handleRemove() {
     setSnapshot(null);
+    setPreviewError(false);
     onRemove();
   }
 
@@ -154,6 +215,20 @@ export function HomepageMediaField({
           title={pickerTitle}
         />
       </>
+    );
+  }
+
+  // ── Loading preview (fetching asset URL after reload) ──────────────────────
+  if (loadingPreview) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center shrink-0">
+            <Loader2 className="h-3.5 w-3.5 text-[var(--tenant-primary)] animate-spin" />
+          </div>
+          <p className="text-xs text-[var(--muted)]">Vorschau wird geladen…</p>
+        </div>
+      </div>
     );
   }
 
@@ -227,27 +302,35 @@ export function HomepageMediaField({
     );
   }
 
-  // ── Asset ID set but no local preview (e.g., after page reload) ────────────
+  // ── Asset ID set but preview could not be resolved ─────────────────────────
+  // This covers both: resolution failed, and initial render before fetch
+  // completes. Shows a graceful admin-only placeholder.
   return (
     <>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center shrink-0">
-            <Library className="h-3.5 w-3.5 text-[var(--tenant-primary)]" />
+          <div
+            className={`h-8 w-8 rounded-lg border flex items-center justify-center shrink-0 ${
+              previewError
+                ? "bg-amber-50 border-amber-200"
+                : "bg-[var(--surface-2)] border-[var(--border)]"
+            }`}
+          >
+            {previewError ? (
+              <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+            ) : (
+              <ImageIcon className="h-3.5 w-3.5 text-[var(--tenant-primary)]" />
+            )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className="text-xs font-medium text-[var(--foreground)]">
-                Asset gesetzt
-              </p>
-              <Info
-                className="h-3 w-3 text-[var(--muted)] shrink-0"
-                aria-label="Vorschau nicht geladen – Seite neu laden für Vorschau"
-              />
-            </div>
-            <p className="mt-0.5 truncate font-mono text-[10px] text-[var(--muted)]">
-              {assetId}
+            <p className="text-xs font-medium text-[var(--foreground)]">
+              {previewError ? "Vorschau nicht verfügbar" : "Bild gesetzt"}
             </p>
+            {previewError && (
+              <p className="mt-0.5 text-[10px] text-amber-600">
+                Asset-Vorschau konnte nicht geladen werden
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button

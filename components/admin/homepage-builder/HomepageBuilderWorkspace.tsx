@@ -341,6 +341,7 @@ export default function HomepageBuilderWorkspace() {
   const [reorderPending, setReorderPending] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
 
+
   // ── Data loading ──────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
@@ -405,6 +406,8 @@ export default function HomepageBuilderWorkspace() {
   }
 
   async function handleReorder(orderedIds: string[]) {
+    // UNDO SNAPSHOT POINT — to add undo/redo for reorder, push `sections`
+    // to a history stack here before optimistic update, then restore on undo.
     const snapshot = sections;
     const reordered = orderedIds
       .map((id) => snapshot.find((s) => s.id === id))
@@ -562,15 +565,29 @@ export default function HomepageBuilderWorkspace() {
   // ── Inspector draft handlers (live preview) ───────────────────────────────
 
   /**
-   * Called by the Inspector on every keystroke.
-   * Updates the local draft so the Canvas tiles immediately reflect the new label.
+   * Central draft mutation handler — all live config/label changes flow here.
+   *
+   * Called by the Inspector on every keystroke. Updates `inspectorDraft` so
+   * the Canvas tiles reflect the new label immediately without a server round-trip.
    * Does NOT persist anything to the server.
+   *
+   * UNDO/REDO READINESS (Slice H.5):
+   * This is the single choke-point for draft mutations. To add a full undo
+   * history later:
+   *   1. Create a `useDraftHistory` hook that wraps useState with a snapshots
+   *      stack (push on each call, pop on undo).
+   *   2. Replace `setInspectorDraft` below with `pushDraftSnapshot(...)`.
+   *   3. Add Ctrl+Z / Ctrl+Y key handlers in HomepageBuilderWorkspace to call
+   *      popDraftSnapshot() and set the restored draft.
+   * No other components need to change — draft mutations are intentionally
+   * centralised here.
    */
   function handleInspectorDraftChange(
     id: string,
     label: string,
     config: Record<string, unknown>,
   ) {
+    // UNDO SNAPSHOT POINT — see comment above
     setInspectorDraft({ id, label, config });
   }
 
@@ -586,6 +603,64 @@ export default function HomepageBuilderWorkspace() {
     await handleSaveEdit(selectedId, label, config);
     // Clear the draft — sections array is now refreshed from API response
     setInspectorDraft(null);
+  }
+
+  // ── Duplicate handler ─────────────────────────────────────────────────────
+  // HISTORY NOTE: This is a draft-mutating action. To add undo/redo support
+  // later, take a snapshot of `sections` before calling setSections here,
+  // push it to a history stack, and call setSections(snapshot) on undo.
+
+  async function handleDuplicate(id: string) {
+    setActionPending(`${id}-duplicate`);
+    try {
+      const res = await fetch(`/api/homepage-sections/${id}/duplicate`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Fehler beim Duplizieren");
+        return;
+      }
+      setSections(data.sections ?? sections);
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  // ── Delete handler ────────────────────────────────────────────────────────
+  // HISTORY NOTE: This is a destructive draft-mutating action. To add undo/redo
+  // support later, take a snapshot of `sections` before deletion and push it
+  // to a history stack so the delete can be undone.
+
+  function handleDeleteRequest(id: string) {
+    const section = sections.find((s) => s.id === id);
+    if (!section) return;
+    // Use existing browser confirm pattern (matches handleBootstrap pattern)
+    const confirmed = confirm(
+      `Sektion „${section.label}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`,
+    );
+    if (!confirmed) return;
+    void handleDeleteConfirmed(id);
+  }
+
+  async function handleDeleteConfirmed(id: string) {
+    setActionPending(`${id}-delete`);
+    try {
+      const res = await fetch(`/api/homepage-sections/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Fehler beim Löschen");
+        return;
+      }
+      // Deselect if the deleted section was selected
+      if (selectedId === id) setSelectedId(null);
+      setInspectorDraft((d) => (d?.id === id ? null : d));
+      setSections(data.sections ?? []);
+    } finally {
+      setActionPending(null);
+    }
   }
 
   // ── Review handlers ───────────────────────────────────────────────────────
@@ -879,10 +954,23 @@ export default function HomepageBuilderWorkspace() {
         {loading && sections.length === 0 ? (
           <div className="space-y-2 p-5">
             {Array.from({ length: 5 }).map((_, i) => (
+              /* Structured skeleton that mirrors the section card layout */
               <div
                 key={i}
-                className="h-20 animate-pulse rounded-xl bg-[var(--surface-2)]"
-              />
+                className="flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4 animate-pulse"
+              >
+                <div className="h-5 w-5 shrink-0 rounded bg-[var(--border)]" />
+                <div className="h-7 w-7 shrink-0 rounded-full bg-[var(--border)]" />
+                <div className="h-10 w-10 shrink-0 rounded-xl bg-[var(--border)]" />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="h-4 w-40 rounded bg-[var(--border)]" />
+                  <div className="h-3 w-24 rounded bg-[var(--border)]" />
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <div className="h-5 w-12 rounded-full bg-[var(--border)]" />
+                  <div className="h-5 w-12 rounded-full bg-[var(--border)]" />
+                </div>
+              </div>
             ))}
           </div>
         ) : sections.length === 0 ? (
@@ -907,6 +995,7 @@ export default function HomepageBuilderWorkspace() {
                   onSelectSection={(id) =>
                     setSelectedId((prev) => (prev === id ? null : id))
                   }
+                  onDeselectSection={() => setSelectedId(null)}
                   onToggle={(id) => handleToggle(id)}
                   onMoveUp={(id) => handleMove(id, "up")}
                   onMoveDown={(id) => handleMove(id, "down")}
@@ -918,6 +1007,8 @@ export default function HomepageBuilderWorkspace() {
                     setSelectedId(id);
                   }}
                   onReorder={handleReorder}
+                  onDuplicate={handleDuplicate}
+                  onDelete={handleDeleteRequest}
                   reorderPending={reorderPending}
                   reorderError={reorderError}
                 />

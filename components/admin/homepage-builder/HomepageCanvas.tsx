@@ -1,10 +1,25 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Loader2, CheckCircle2, Monitor, Tablet, Smartphone } from "lucide-react";
 import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
 import { HomepageCanvasSection } from "./HomepageCanvasSection";
 import { HomepageCanvasEmptyState } from "./HomepageCanvasEmptyState";
+
+// ---------------------------------------------------------------------------
+// Viewport toggle
+// ---------------------------------------------------------------------------
+
+type CanvasViewport = "desktop" | "tablet" | "mobile";
+
+const VIEWPORT_CONFIG: Record<
+  CanvasViewport,
+  { label: string; icon: React.ElementType; maxWidth: string | null; ariaLabel: string }
+> = {
+  desktop: { label: "Desktop", icon: Monitor,    maxWidth: null,    ariaLabel: "Desktop-Breite" },
+  tablet:  { label: "Tablet",  icon: Tablet,     maxWidth: "768px", ariaLabel: "Tablet-Breite (768 px)" },
+  mobile:  { label: "Mobile",  icon: Smartphone, maxWidth: "375px", ariaLabel: "Mobil-Breite (375 px)" },
+};
 
 // ---------------------------------------------------------------------------
 // Insertion line — rendered between sections during drag
@@ -53,6 +68,7 @@ type Props = {
   onBootstrap?: () => void;
   bootstrapping?: boolean;
   onSelectSection: (id: string) => void;
+  onDeselectSection: () => void;
   onToggle: (id: string) => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
@@ -60,6 +76,8 @@ type Props = {
   onUnpublish: (id: string) => void;
   onStartEdit: (id: string) => void;
   onReorder: (orderedIds: string[]) => Promise<void>;
+  onDuplicate: (id: string) => void;
+  onDelete: (id: string) => void;
   reorderPending?: boolean;
   reorderError?: string | null;
 };
@@ -76,6 +94,7 @@ export function HomepageCanvas({
   onBootstrap,
   bootstrapping,
   onSelectSection,
+  onDeselectSection,
   onToggle,
   onMoveUp,
   onMoveDown,
@@ -83,9 +102,14 @@ export function HomepageCanvas({
   onUnpublish,
   onStartEdit,
   onReorder,
+  onDuplicate,
+  onDelete,
   reorderPending,
   reorderError,
 }: Props) {
+  // ── Viewport toggle (local UI state — does not affect saved config) ────────
+  const [canvasViewport, setCanvasViewport] = useState<CanvasViewport>("desktop");
+
   // ── DnD state (refs for synchronous access + state for rendering) ─────────
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -211,6 +235,8 @@ export function HomepageCanvas({
     return true;
   }
 
+  const vc = VIEWPORT_CONFIG[canvasViewport];
+
   // ── Empty state ────────────────────────────────────────────────────────────
 
   if (sections.length === 0) {
@@ -231,69 +257,122 @@ export function HomepageCanvas({
         {announcement}
       </div>
 
-      {/* Section list */}
+      {/* ── Viewport toggle bar ─────────────────────────────────────────────
+          Admin-only canvas width preview. Does not affect saved config or
+          the public website. State is local to this canvas session.
+          ─────────────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 px-5 pt-3 pb-1 border-b border-[var(--border)]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+          Ansicht
+        </p>
+        <div
+          className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-0.5"
+          role="group"
+          aria-label="Canvas-Vorschaubreite"
+        >
+          {(["desktop", "tablet", "mobile"] as CanvasViewport[]).map((v) => {
+            const cfg = VIEWPORT_CONFIG[v];
+            const Icon = cfg.icon;
+            const isActive = canvasViewport === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setCanvasViewport(v)}
+                title={cfg.ariaLabel}
+                aria-label={cfg.ariaLabel}
+                aria-pressed={isActive}
+                className={`flex items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] ${
+                  isActive
+                    ? "bg-white text-[var(--foreground)] shadow-sm font-medium"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                <Icon className="h-3 w-3" />
+                <span className="hidden sm:inline">{cfg.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Viewport wrapper ────────────────────────────────────────────────
+          max-width transitions as viewport changes. Sections remain fully
+          selectable, draggable, and editable in all viewport modes.
+          ─────────────────────────────────────────────────────────────────── */}
       <div
-        className="px-5 pt-4 pb-2"
-        role="list"
-        aria-label="Homepage-Sektionen (Canvas)"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
+        className="mx-auto w-full transition-all duration-300"
+        style={vc.maxWidth ? { maxWidth: vc.maxWidth } : undefined}
       >
-        {/* Insertion line before first section */}
-        <InsertionLine isActive={isActiveDropLine(0)} />
+        {/* Section list */}
+        <div
+          className="px-5 pt-4 pb-2"
+          role="list"
+          aria-label="Homepage-Sektionen (Canvas)"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+        >
+          {/* Insertion line before first section */}
+          <InsertionLine isActive={isActiveDropLine(0)} />
 
-        {sections.map((section, idx) => {
-          const isFirst = idx === 0;
-          const isLast = idx === sections.length - 1;
-          const isSelected = selectedId === section.id;
-          const isDragging = draggedId === section.id;
-          const isPending =
-            actionPending === section.id ||
-            actionPending === `${section.id}-up` ||
-            actionPending === `${section.id}-down` ||
-            actionPending === `${section.id}-publish` ||
-            actionPending === `${section.id}-unpublish` ||
-            actionPending === `${section.id}-request-review`;
+          {sections.map((section, idx) => {
+            const isFirst = idx === 0;
+            const isLast = idx === sections.length - 1;
+            const isSelected = selectedId === section.id;
+            const isDragging = draggedId === section.id;
+            const isPending =
+              actionPending === section.id ||
+              actionPending === `${section.id}-up` ||
+              actionPending === `${section.id}-down` ||
+              actionPending === `${section.id}-publish` ||
+              actionPending === `${section.id}-unpublish` ||
+              actionPending === `${section.id}-request-review` ||
+              actionPending === `${section.id}-duplicate` ||
+              actionPending === `${section.id}-delete`;
 
-          return (
-            <div
-              key={section.id}
-              role="listitem"
-              onDragOver={(e) => handleSectionDragOver(e, idx, section.id)}
-              onDrop={handleDrop}
-            >
-              <HomepageCanvasSection
-                section={section}
-                index={idx}
-                isFirst={isFirst}
-                isLast={isLast}
-                isSelected={isSelected}
-                isPending={isPending}
-                isAnyPending={isAnyPending}
-                isDragging={isDragging}
-                onSelect={() => onSelectSection(section.id)}
-                onToggle={() => onToggle(section.id)}
-                onMoveUp={() => onMoveUp(section.id)}
-                onMoveDown={() => onMoveDown(section.id)}
-                onPublish={() => onPublish(section.id)}
-                onUnpublish={() => onUnpublish(section.id)}
-                onStartEdit={() => onStartEdit(section.id)}
-                onDragStart={() => handleDragStart(section.id)}
-                onDragEnd={handleDragEnd}
-                onFocusPrevious={idx > 0 ? () => focusSectionAt(idx - 1) : undefined}
-                onFocusNext={
-                  idx < sections.length - 1 ? () => focusSectionAt(idx + 1) : undefined
-                }
-                sectionRef={(el) => {
-                  itemRefs.current[idx] = el;
-                }}
-              />
+            return (
+              <div
+                key={section.id}
+                role="listitem"
+                onDragOver={(e) => handleSectionDragOver(e, idx, section.id)}
+                onDrop={handleDrop}
+              >
+                <HomepageCanvasSection
+                  section={section}
+                  index={idx}
+                  isFirst={isFirst}
+                  isLast={isLast}
+                  isSelected={isSelected}
+                  isPending={isPending}
+                  isAnyPending={isAnyPending}
+                  isDragging={isDragging}
+                  onSelect={() => onSelectSection(section.id)}
+                  onDeselect={onDeselectSection}
+                  onToggle={() => onToggle(section.id)}
+                  onMoveUp={() => onMoveUp(section.id)}
+                  onMoveDown={() => onMoveDown(section.id)}
+                  onPublish={() => onPublish(section.id)}
+                  onUnpublish={() => onUnpublish(section.id)}
+                  onStartEdit={() => onStartEdit(section.id)}
+                  onDuplicate={() => onDuplicate(section.id)}
+                  onDelete={() => onDelete(section.id)}
+                  onDragStart={() => handleDragStart(section.id)}
+                  onDragEnd={handleDragEnd}
+                  onFocusPrevious={idx > 0 ? () => focusSectionAt(idx - 1) : undefined}
+                  onFocusNext={
+                    idx < sections.length - 1 ? () => focusSectionAt(idx + 1) : undefined
+                  }
+                  sectionRef={(el) => {
+                    itemRefs.current[idx] = el;
+                  }}
+                />
 
-              {/* Insertion line after each section */}
-              <InsertionLine isActive={isActiveDropLine(idx + 1)} />
-            </div>
-          );
-        })}
+                {/* Insertion line after each section */}
+                <InsertionLine isActive={isActiveDropLine(idx + 1)} />
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Status footer */}

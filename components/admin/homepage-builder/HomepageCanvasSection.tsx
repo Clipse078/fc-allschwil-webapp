@@ -14,6 +14,12 @@ import {
   Globe,
   GlobeLock,
   Clock,
+  Eye,
+  EyeOff,
+  ChevronUp,
+  ChevronDown,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
@@ -70,6 +76,12 @@ type Props = {
   onFocusPrevious?: () => void;
   onFocusNext?: () => void;
   sectionRef?: (el: HTMLDivElement | null) => void;
+  /** Deselect this section (Escape key). */
+  onDeselect?: () => void;
+  /** Duplicate this section. */
+  onDuplicate?: () => void;
+  /** Delete this section (caller handles confirmation). */
+  onDelete?: () => void;
 } & Pick<
   SectionCardCallbacks,
   | "onSelect"
@@ -106,6 +118,9 @@ export function HomepageCanvasSection({
   onFocusPrevious,
   onFocusNext,
   sectionRef,
+  onDeselect,
+  onDuplicate,
+  onDelete,
 }: Props) {
   const def = getBlockDefinition(section.type);
   const BlockIcon = BLOCK_ICON_MAP[def?.icon ?? "LayoutTemplate"] ?? LayoutTemplate;
@@ -121,19 +136,27 @@ export function HomepageCanvasSection({
   const isScheduled =
     !isPublished && scheduledDate !== null && scheduledDate > new Date();
 
+  const isBusy = isPending || isAnyPending;
+
   return (
     <div
       ref={sectionRef}
       role="button"
       tabIndex={0}
       aria-pressed={isSelected}
-      aria-label={`${section.label} — Position ${index + 1}. Strg+Pfeil oben/unten zum Verschieben.`}
+      aria-label={`${section.label} — Position ${index + 1}. Enter zum Auswählen, Strg+Pfeil zum Verschieben.`}
       draggable
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect();
+          return;
+        }
+        // Escape → deselect if selected
+        if (e.key === "Escape" && isSelected) {
+          e.preventDefault();
+          onDeselect?.();
           return;
         }
         // Keyboard reorder: Ctrl/Cmd + Arrow moves section
@@ -170,8 +193,10 @@ export function HomepageCanvasSection({
       }}
       onDragEnd={onDragEnd}
       className={[
-        "relative w-full rounded-xl border bg-[var(--surface)]",
-        "transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
+        // Base — `group` enables child hover/focus-within reveal
+        "group relative w-full rounded-xl border bg-[var(--surface)]",
+        // Smooth transitions for color, shadow, transform (150 ms)
+        "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
         isDragging
           ? "opacity-40 scale-[0.98] shadow-lg cursor-grabbing"
           : "cursor-grab active:cursor-grabbing",
@@ -201,11 +226,13 @@ export function HomepageCanvasSection({
             onMoveDown={onMoveDown}
             onPublish={onPublish}
             onUnpublish={onUnpublish}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
           />
         </div>
       )}
 
-      {/* Body */}
+      {/* Main body row */}
       <div className="flex items-center gap-4 px-4 py-4">
         {/* Drag handle */}
         <div
@@ -225,7 +252,7 @@ export function HomepageCanvasSection({
 
         {/* Block icon */}
         <div
-          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl"
+          className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-200"
           style={{ background: categoryColor.bg, color: categoryColor.text }}
         >
           <BlockIcon className="h-5 w-5" />
@@ -300,10 +327,105 @@ export function HomepageCanvasSection({
         </div>
       </div>
 
+      {/* ── Inline quick-action strip ────────────────────────────────────────
+          Revealed on hover or keyboard focus-within. Always present in the DOM
+          (fixed height) so focus traversal works naturally. Buttons are
+          pointer-events-none / opacity-0 when the card is idle so they don't
+          interfere with drag or normal browsing.
+          ─────────────────────────────────────────────────────────────────── */}
+      <div
+        className={[
+          "flex items-center gap-1 px-4 pb-2 border-t",
+          // Show on hover or focus-within; always shown when selected
+          "transition-all duration-150",
+          isSelected
+            ? "opacity-0 pointer-events-none border-transparent"
+            : "opacity-0 pointer-events-none border-transparent group-hover:opacity-100 group-hover:pointer-events-auto group-hover:border-[var(--border)]/60 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:border-[var(--border)]/60",
+        ].join(" ")}
+        onClick={(e) => e.stopPropagation()}
+        aria-hidden={isSelected}
+      >
+        {/* Toggle visibility */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          disabled={isBusy}
+          className={`sce-icon-button text-xs transition-colors ${
+            section.isEnabled
+              ? "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+              : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+          }`}
+          title={section.isEnabled ? "Deaktivieren" : "Aktivieren"}
+          aria-label={section.isEnabled ? "Sektion deaktivieren" : "Sektion aktivieren"}
+        >
+          {section.isEnabled ? (
+            <Eye className="h-3.5 w-3.5" />
+          ) : (
+            <EyeOff className="h-3.5 w-3.5" />
+          )}
+        </button>
+
+        {/* Move up */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+          disabled={isFirst || isBusy}
+          className="sce-icon-button text-[var(--text-2)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Nach oben verschieben"
+          aria-label="Sektion nach oben verschieben"
+          aria-disabled={isFirst || isBusy}
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+        </button>
+
+        {/* Move down */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+          disabled={isLast || isBusy}
+          className="sce-icon-button text-[var(--text-2)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Nach unten verschieben"
+          aria-label="Sektion nach unten verschieben"
+          aria-disabled={isLast || isBusy}
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+
+        <span className="flex-1" />
+
+        {/* Duplicate */}
+        {onDuplicate && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+            disabled={isBusy}
+            className="sce-icon-button text-[var(--text-2)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+            title="Sektion duplizieren"
+            aria-label="Sektion duplizieren"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {/* Delete */}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            disabled={isBusy}
+            className="sce-icon-button text-[var(--muted)] hover:text-rose-600 hover:bg-rose-50"
+            title="Sektion löschen"
+            aria-label="Sektion löschen"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Selection indicator bar */}
       {isSelected && !isDragging && (
         <div
-          className="absolute inset-y-0 left-0 w-1 rounded-l-xl"
+          className="absolute inset-y-0 left-0 w-1 rounded-l-xl transition-opacity duration-200"
           style={{ background: "var(--sce-primary)" }}
           aria-hidden="true"
         />

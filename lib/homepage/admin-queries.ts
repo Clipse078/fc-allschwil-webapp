@@ -684,6 +684,85 @@ export async function getReviewerInfo(
 }
 
 // ---------------------------------------------------------------------------
+// Delete
+// ---------------------------------------------------------------------------
+
+/**
+ * Permanently deletes a homepage section (hard delete).
+ *
+ * Safety: only deletes sections belonging to the tenant.
+ * After deletion the remaining sections are NOT automatically renumbered —
+ * sortOrder gaps are tolerated by the ordering query (ORDER BY sortOrder ASC).
+ *
+ * Returns the full updated section list, or null if the section was not found.
+ */
+export async function deleteHomepageSection(
+  tenantId: string,
+  id: string,
+): Promise<HomepageSectionAdminItem[] | null> {
+  const existing = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  await prisma.homepageSection.delete({ where: { id } });
+
+  return listHomepageSections(tenantId);
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates a copy of a homepage section for the same tenant.
+ *
+ * The duplicate is created as:
+ *   - label: original label + " (Kopie)"
+ *   - sortOrder: placed immediately after the original (original.sortOrder + 1)
+ *   - isEnabled: false  (safe default — admin must consciously enable)
+ *   - publishStatus: DRAFT
+ *   - approvalStatus: DRAFT
+ *   - all other workflow fields reset to initial values
+ *
+ * Returns the new section and the full updated section list,
+ * or null if the source section was not found.
+ */
+export async function duplicateHomepageSection(
+  tenantId: string,
+  id: string,
+): Promise<{ section: HomepageSectionAdminItem; sections: HomepageSectionAdminItem[] } | null> {
+  const source = await prisma.homepageSection.findFirst({
+    where: { id, tenantId },
+    select: {
+      type: true,
+      label: true,
+      sortOrder: true,
+      config: true,
+    },
+  });
+  if (!source) return null;
+
+  const newSection = await prisma.homepageSection.create({
+    data: {
+      tenantId,
+      type: source.type,
+      label: `${source.label} (Kopie)`,
+      sortOrder: source.sortOrder + 1,
+      isEnabled: false,
+      config: source.config as Prisma.InputJsonValue,
+      publishStatus: PUBLISH_STATUS.DRAFT,
+      approvalStatus: APPROVAL_STATUS.DRAFT,
+    },
+    select: adminSelect,
+  });
+
+  const sections = await listHomepageSections(tenantId);
+  return { section: newSection as HomepageSectionAdminItem, sections };
+}
+
+// ---------------------------------------------------------------------------
 // Bulk reorder
 // ---------------------------------------------------------------------------
 
