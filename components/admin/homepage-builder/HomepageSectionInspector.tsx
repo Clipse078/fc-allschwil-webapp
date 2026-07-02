@@ -39,6 +39,7 @@ import {
   Check,
   AlertCircle,
   Save,
+  Bookmark,
 } from "lucide-react";
 import type { HomepageSectionAdminItem } from "@/lib/homepage/admin-queries";
 import { getBlockDefinition } from "@/lib/homepage/block-registry";
@@ -121,6 +122,8 @@ type Props = {
   ) => void;
   /** Called when the user clicks "Speichern". Same signature as card's onSaveEdit. */
   onSaveEdit?: (label: string, config: Record<string, unknown>) => Promise<void>;
+  /** Save this section's current draft config as a reusable library item. */
+  onSaveAsReusable?: () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -131,6 +134,7 @@ export function HomepageSectionInspector({
   section,
   onDraftChange,
   onSaveEdit,
+  onSaveAsReusable,
 }: Props) {
   // ── Local draft state ──────────────────────────────────────────────────
   const [draftLabel, setDraftLabel] = useState("");
@@ -410,46 +414,60 @@ export function HomepageSectionInspector({
         </CollapsibleSection>
 
         {/* Actions */}
-        {onSaveEdit && (
-          <div className="px-4 py-4 border-b border-[var(--border)]">
-            {saveError && (
-              <div className="mb-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+        {(onSaveEdit || onSaveAsReusable) && (
+          <div className="px-4 py-4 border-b border-[var(--border)] space-y-2">
+            {onSaveEdit && saveError && (
+              <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {saveError}
               </div>
             )}
 
-            <div className="flex items-center gap-2">
+            {onSaveEdit && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving || !isDirty}
+                  className="fca-button-primary text-xs flex-1"
+                >
+                  {saving ? (
+                    <>
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                      Wird gespeichert…
+                    </>
+                  ) : savedOk ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 shrink-0" />
+                      Gespeichert
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5 shrink-0" />
+                      Speichern
+                    </>
+                  )}
+                </button>
+
+                {isDirty && !saving && !savedOk && (
+                  <span className="text-[11px] text-amber-600 font-medium shrink-0">
+                    Nicht gespeichert
+                  </span>
+                )}
+              </div>
+            )}
+
+            {onSaveAsReusable && (
               <button
                 type="button"
-                onClick={handleSave}
-                disabled={saving || !isDirty}
-                className="fca-button-primary text-xs flex-1"
+                onClick={onSaveAsReusable}
+                className="fca-button-secondary text-xs w-full"
+                title="Aktuelle Konfiguration als Vorlage in der Bibliothek speichern"
               >
-                {saving ? (
-                  <>
-                    <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
-                    Wird gespeichert…
-                  </>
-                ) : savedOk ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 shrink-0" />
-                    Gespeichert
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-3.5 w-3.5 shrink-0" />
-                    Speichern
-                  </>
-                )}
+                <Bookmark className="h-3.5 w-3.5 shrink-0" />
+                Als wiederverwendbaren Block speichern
               </button>
-
-              {isDirty && !saving && !savedOk && (
-                <span className="text-[11px] text-amber-600 font-medium shrink-0">
-                  Nicht gespeichert
-                </span>
-              )}
-            </div>
+            )}
           </div>
         )}
       </div>

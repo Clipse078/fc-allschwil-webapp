@@ -131,6 +131,49 @@ export const COMPONENT_TYPE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 // ---------------------------------------------------------------------------
+// Block section type labels
+// ---------------------------------------------------------------------------
+// These mirror the block registry display names — kept here so both the
+// SharedComponentPicker and ReusableComponentsLibrary can import a single
+// shared label map without pulling in the full block registry (which imports
+// server-side code in some code paths).
+
+/** Display labels for block-registry section types saved as reusable items. */
+export const BLOCK_SECTION_TYPE_LABELS: Record<string, string> = {
+  hero:                   "Hero-Sektion",
+  newsTeaser:             "News-Teaser",
+  eventsTeaser:           "Events-Teaser",
+  teamsTeaser:            "Teams-Teaser",
+  weekplanTeaser:         "Wochenplan-Teaser",
+  callToAction:           "Call-to-Action-Sektion",
+  sponsorsTeaser:         "Sponsoren-Teaser",
+  splitContentCards:      "Inhaltskarten",
+  customContentPlaceholder: "Benutzerdefinierter Inhalt",
+};
+
+/**
+ * Returns the human-readable label for any reusable component type,
+ * covering both inline component types (CTA, FAQ, …) and block-registry
+ * section types (hero, callToAction, …).
+ */
+export function getTypeLabel(type: string): string {
+  return COMPONENT_TYPE_LABELS[type] ?? BLOCK_SECTION_TYPE_LABELS[type] ?? type;
+}
+
+/** Lucide icon names for block section types (mirrors block-registry icon field). */
+export const BLOCK_SECTION_TYPE_ICONS: Record<string, string> = {
+  hero:                   "LayoutTemplate",
+  newsTeaser:             "Newspaper",
+  eventsTeaser:           "Calendar",
+  teamsTeaser:            "Users",
+  weekplanTeaser:         "CalendarDays",
+  callToAction:           "MousePointerClick",
+  sponsorsTeaser:         "Award",
+  splitContentCards:      "LayoutPanelLeft",
+  customContentPlaceholder: "Blocks",
+};
+
+// ---------------------------------------------------------------------------
 // Default configs per type
 // ---------------------------------------------------------------------------
 

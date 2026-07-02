@@ -29,7 +29,10 @@ import { HomepageBuilderEmptyState } from "./HomepageBuilderEmptyState";
 import { HomepageSectionCard } from "./HomepageSectionCard";
 import { HomepageSectionInspector } from "./HomepageSectionInspector";
 import { HomepageCanvas } from "./HomepageCanvas";
+import { SaveAsReusableDialog } from "./SaveAsReusableDialog";
+import SharedComponentPicker from "@/components/admin/reusable-components/SharedComponentPicker";
 import WebsiteSectionDispatcher from "@/components/website/WebsiteSectionDispatcher";
+import type { ReusableComponentAdminItem } from "@/lib/reusable-components/types";
 
 // ---------------------------------------------------------------------------
 // Preview panel types
@@ -340,6 +343,18 @@ export default function HomepageBuilderWorkspace() {
   // ── Reorder state (Canvas drag & drop) ───────────────────────────────────
   const [reorderPending, setReorderPending] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
+
+  // ── Block Library state ───────────────────────────────────────────────────
+  /** Section whose config is being saved to the reusable library. */
+  const [saveAsReusableFor, setSaveAsReusableFor] = useState<{
+    type: string;
+    label: string;
+    config: Record<string, unknown>;
+  } | null>(null);
+  /** Whether the "insert from library" picker is open. */
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  /** Whether we're currently inserting a library item. */
+  const [insertingFromLibrary, setInsertingFromLibrary] = useState(false);
 
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -663,6 +678,44 @@ export default function HomepageBuilderWorkspace() {
     }
   }
 
+  // ── Block Library handlers ────────────────────────────────────────────────
+
+  function handleOpenSaveAsReusable(sectionId: string) {
+    // Prefer the inspector draft if this section is currently being edited
+    const base = sections.find((s) => s.id === sectionId);
+    if (!base) return;
+    const draft = inspectorDraft?.id === sectionId ? inspectorDraft : null;
+    setSaveAsReusableFor({
+      type: base.type,
+      label: draft?.label ?? base.label,
+      config: (draft?.config ?? base.config) as Record<string, unknown>,
+    });
+  }
+
+  async function handleInsertFromLibrary(component: ReusableComponentAdminItem) {
+    setInsertingFromLibrary(true);
+    try {
+      const res = await fetch("/api/homepage-sections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: component.type,
+          label: component.title,
+          config: component.config,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error ?? "Fehler beim Einfügen des Blocks.");
+        return;
+      }
+      // Reload so new section appears in the list with correct sortOrder
+      await load();
+    } finally {
+      setInsertingFromLibrary(false);
+    }
+  }
+
   // ── Review handlers ───────────────────────────────────────────────────────
 
   async function handleRequestReview(id: string) {
@@ -769,6 +822,27 @@ export default function HomepageBuilderWorkspace() {
 
   return (
     <>
+      {/* Save-as-reusable dialog */}
+      {saveAsReusableFor && (
+        <SaveAsReusableDialog
+          open
+          sectionType={saveAsReusableFor.type}
+          sectionLabel={saveAsReusableFor.label}
+          sectionConfig={saveAsReusableFor.config}
+          onClose={() => setSaveAsReusableFor(null)}
+          onSaved={() => setSaveAsReusableFor(null)}
+        />
+      )}
+
+      {/* Insert-from-library picker */}
+      <SharedComponentPicker
+        open={showLibraryPicker}
+        onClose={() => setShowLibraryPicker(false)}
+        onSelect={handleInsertFromLibrary}
+        title="Aus Bibliothek einfügen"
+        insertLabel="Als Kopie einfügen"
+      />
+
       {/* Preview overlay */}
       {showPreview && (
         <HomepagePreviewPanel onClose={() => setShowPreview(false)} />
@@ -913,11 +987,12 @@ export default function HomepageBuilderWorkspace() {
           sectionCount={sections.length}
           publishedCount={publishedCount}
           loading={loading}
-          disabled={isAnyActionPending}
+          disabled={isAnyActionPending || insertingFromLibrary}
           builderMode={builderMode}
           onBuilderModeChange={handleBuilderModeChange}
           onRefresh={load}
           onPreview={() => setShowPreview(true)}
+          onOpenLibrary={() => setShowLibraryPicker(true)}
         />
 
         {/* Governance info banner */}
@@ -1009,6 +1084,7 @@ export default function HomepageBuilderWorkspace() {
                   onReorder={handleReorder}
                   onDuplicate={handleDuplicate}
                   onDelete={handleDeleteRequest}
+                  onSaveAsReusable={handleOpenSaveAsReusable}
                   reorderPending={reorderPending}
                   reorderError={reorderError}
                 />
@@ -1093,6 +1169,9 @@ export default function HomepageBuilderWorkspace() {
                   section={selectedSection}
                   onDraftChange={handleInspectorDraftChange}
                   onSaveEdit={handleInspectorSave}
+                  onSaveAsReusable={
+                    selectedId ? () => handleOpenSaveAsReusable(selectedId) : undefined
+                  }
                 />
               </div>
             </div>

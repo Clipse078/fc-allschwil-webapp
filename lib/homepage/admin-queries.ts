@@ -170,6 +170,59 @@ export async function bootstrapDefaultSections(
 }
 
 // ---------------------------------------------------------------------------
+// Create single section (insert from reusable library)
+// ---------------------------------------------------------------------------
+
+type CreateHomepageSectionInput = {
+  type: string;
+  label: string;
+  config: Record<string, unknown>;
+  actorUserId?: string | null;
+};
+
+/**
+ * Creates a single new homepage section for a tenant.
+ * Used when inserting a reusable block as a local copy.
+ * New sections start as DRAFT (publish) and NOT_REQUIRED (approval) — matching
+ * the existing duplicate-section semantics.
+ */
+export async function createHomepageSection(
+  tenantId: string,
+  input: CreateHomepageSectionInput,
+): Promise<HomepageSectionAdminItem> {
+  const maxOrder = await prisma.homepageSection.aggregate({
+    where: { tenantId },
+    _max: { sortOrder: true },
+  });
+  const nextOrder = (maxOrder._max.sortOrder ?? -1) + 1;
+
+  const section = await prisma.homepageSection.create({
+    data: {
+      tenantId,
+      type: input.type,
+      label: input.label,
+      sortOrder: nextOrder,
+      isEnabled: false,
+      config: input.config as Prisma.InputJsonValue,
+      publishStatus: PUBLISH_STATUS.DRAFT,
+      approvalStatus: APPROVAL_STATUS.NOT_REQUIRED,
+    },
+    select: adminSelect,
+  });
+
+  void logAction({
+    actorUserId: input.actorUserId ?? null,
+    moduleKey: "website",
+    entityType: "HomepageSection",
+    entityId: section.id,
+    action: "CREATE_FROM_LIBRARY",
+    metadataJson: { type: input.type, label: input.label },
+  });
+
+  return section as HomepageSectionAdminItem;
+}
+
+// ---------------------------------------------------------------------------
 // Toggle enabled/disabled
 // ---------------------------------------------------------------------------
 

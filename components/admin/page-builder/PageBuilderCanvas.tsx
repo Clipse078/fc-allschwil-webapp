@@ -60,6 +60,7 @@ export type PageBuilderCanvasProps = {
   onDuplicate: (id: string) => void;
   /** Caller must confirm before calling — canvas delegates confirmation. */
   onDelete: (id: string) => void;
+  onSaveAsReusable?: (id: string) => void;
   reorderPending?: boolean;
   reorderError?: string | null;
 };

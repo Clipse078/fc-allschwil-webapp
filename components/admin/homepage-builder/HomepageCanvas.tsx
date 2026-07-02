@@ -78,6 +78,7 @@ type Props = {
   onReorder: (orderedIds: string[]) => Promise<void>;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
+  onSaveAsReusable?: (id: string) => void;
   reorderPending?: boolean;
   reorderError?: string | null;
 };
@@ -104,6 +105,7 @@ export function HomepageCanvas({
   onReorder,
   onDuplicate,
   onDelete,
+  onSaveAsReusable,
   reorderPending,
   reorderError,
 }: Props) {
@@ -356,6 +358,7 @@ export function HomepageCanvas({
                   onStartEdit={() => onStartEdit(section.id)}
                   onDuplicate={() => onDuplicate(section.id)}
                   onDelete={() => onDelete(section.id)}
+                  onSaveAsReusable={onSaveAsReusable ? () => onSaveAsReusable(section.id) : undefined}
                   onDragStart={() => handleDragStart(section.id)}
                   onDragEnd={handleDragEnd}
                   onFocusPrevious={idx > 0 ? () => focusSectionAt(idx - 1) : undefined}
