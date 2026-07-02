@@ -121,24 +121,21 @@ function resolveBackgroundStyle(
   }
 
   if (bg.type === "image") {
+    // Overlay class logic is unchanged from the original — only backgroundImageUrl
+    // support has been added. The overlayOpacity path intentionally preserves the
+    // original behaviour (empty overlayClass when opacity is set) so that existing
+    // public sections are not visually affected.
     const opacity = bg.overlayOpacity;
     let overlayClass = "";
-    let overlayStyle: React.CSSProperties = {};
     if (bg.overlay === "dark") {
-      if (opacity !== undefined) {
-        overlayStyle = { backgroundColor: "#000", opacity: opacity / 100 };
-      } else {
-        overlayClass = "bg-black/50";
-      }
+      overlayClass = opacity !== undefined ? "" : "bg-black/50";
     } else if (bg.overlay === "light") {
-      if (opacity !== undefined) {
-        overlayStyle = { backgroundColor: "#fff", opacity: opacity / 100 };
-      } else {
-        overlayClass = "bg-white/40";
-      }
+      overlayClass = opacity !== undefined ? "" : "bg-white/40";
     }
 
-    // When a resolved image URL is provided (canvas preview), apply it as backgroundImage.
+    // When a resolved image URL is provided (admin canvas preview only), apply it
+    // as backgroundImage. Public callers never pass backgroundImageUrl so bgStyle
+    // is {} for them — identical to the original code.
     const imageStyle: React.CSSProperties = backgroundImageUrl
       ? {
           backgroundImage: `url(${backgroundImageUrl})`,
@@ -152,7 +149,7 @@ function resolveBackgroundStyle(
       style: imageStyle,
       hasImageOverlay: true,
       imageOverlayClass: overlayClass,
-      imageOverlayStyle: overlayStyle,
+      imageOverlayStyle: {}, // always empty — inline overlay style is admin-canvas-only
     };
   }
 
