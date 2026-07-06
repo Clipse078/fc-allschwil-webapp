@@ -35,7 +35,17 @@ export async function GET(request: NextRequest) {
     const limit = parseLimit(searchParams.get("limit"));
     const weekId = searchParams.get("weekId");
 
+    const tenant = await getDefaultTenant();
+
+    if (!tenant) {
+      return NextResponse.json(
+        { error: "Tenant not found." },
+        { status: 404 },
+      );
+    }
+
     const days = await getGroupedWochenplan({
+      tenantId: tenant.id,
       seasonKey,
       teamSlug,
       dateFrom,
@@ -54,18 +64,15 @@ export async function GET(request: NextRequest) {
     } | null = null;
 
     if (weekId) {
-      const tenant = await getDefaultTenant();
-      if (tenant) {
-        const pub = await getWochenplanPublication(tenant.id, weekId);
-        if (pub && pub.isPublished) {
-          publication = {
-            weekId: pub.weekId,
-            variantLabel: pub.variantLabel,
-            variantBadge: formatWochenplanVariantBadge(pub.weekId, pub.variantLabel),
-            isPublished: pub.isPublished,
-            publishedAt: pub.publishedAt,
-          };
-        }
+      const pub = await getWochenplanPublication(tenant.id, weekId);
+      if (pub && pub.isPublished) {
+        publication = {
+          weekId: pub.weekId,
+          variantLabel: pub.variantLabel,
+          variantBadge: formatWochenplanVariantBadge(pub.weekId, pub.variantLabel),
+          isPublished: pub.isPublished,
+          publishedAt: pub.publishedAt,
+        };
       }
     }
 
