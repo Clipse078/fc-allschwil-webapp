@@ -6,6 +6,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import {
+  assertEventBelongsToTenant,
+  assertTeamBelongsToTenant,
+} from "@/lib/weekly-plan/tenant-validation";
 
 function toBool(value: FormDataEntryValue | null) {
   return value === "on" || value === "true" || value === "1";
@@ -68,9 +72,13 @@ async function requirePlannerManagePermission() {
   return session;
 }
 
+// Season has no tenantId field — it is a global/shared entity.
+// Season validation is limited to existence and key match.
+// Team ownership is enforced via assertTeamBelongsToTenant.
 async function validatePlannerForm(
   formData: FormData,
   mode: "create" | "update",
+  tenantId: string,
 ) {
   const seasonId = toNullableString(formData.get("seasonId"));
   const seasonKey = toNullableString(formData.get("seasonKey"));
@@ -107,6 +115,7 @@ async function validatePlannerForm(
     );
   }
 
+  // Season has no tenantId; validate existence and submitted key match only.
   const season = await prisma.season.findUnique({
     where: { id: seasonId },
     select: { id: true, key: true },
@@ -116,14 +125,11 @@ async function validatePlannerForm(
     redirect(buildPlannerRedirect({ seasonKey, status: `${prefix}-invalid-season` }));
   }
 
-  const team = teamId
-    ? await prisma.team.findUnique({
-        where: { id: teamId },
-        select: { id: true },
-      })
-    : null;
-
-  if (teamId && !team) {
+  // Team must belong to the actor tenant.
+  let team: { id: string } | null = null;
+  try {
+    team = await assertTeamBelongsToTenant(teamId, tenantId);
+  } catch {
     redirect(buildPlannerRedirect({ seasonKey, status: `${prefix}-invalid-team` }));
   }
 
@@ -164,8 +170,13 @@ function revalidatePlannerPaths() {
 
 export async function createPlannerEntryAction(formData: FormData) {
   const session = await requirePlannerManagePermission();
-  const tenantId = session?.user?.tenantId ?? null;
-  const data = await validatePlannerForm(formData, "create");
+  const actorTenantId = session?.user?.tenantId;
+
+  if (!actorTenantId) {
+    redirect(buildPlannerRedirect({ status: "create-tenant-required" }));
+  }
+
+  const data = await validatePlannerForm(formData, "create", actorTenantId);
 
   await prisma.event.create({
     data: {
@@ -192,7 +203,7 @@ export async function createPlannerEntryAction(formData: FormData) {
       pitchCode: data.pitchCode,
       homeDressingRoomCode: data.homeDressingRoomCode,
       awayDressingRoomCode: data.awayDressingRoomCode,
-      tenantId,
+      tenantId: actorTenantId,
     },
   });
 
@@ -204,7 +215,12 @@ export async function createPlannerEntryAction(formData: FormData) {
 }
 
 export async function updatePlannerEntryAction(formData: FormData) {
-  await requirePlannerManagePermission();
+  const session = await requirePlannerManagePermission();
+  const actorTenantId = session?.user?.tenantId;
+
+  if (!actorTenantId) {
+    redirect(buildPlannerRedirect({ status: "update-tenant-required" }));
+  }
 
   const eventId = toNullableString(formData.get("eventId"));
   const seasonKey = toNullableString(formData.get("seasonKey"));
@@ -213,19 +229,19 @@ export async function updatePlannerEntryAction(formData: FormData) {
     redirect(buildPlannerRedirect({ seasonKey, status: "update-invalid-event" }));
   }
 
-  const existingEvent = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { id: true },
-  });
-
-  if (!existingEvent) {
+  try {
+    await assertEventBelongsToTenant(eventId, actorTenantId);
+  } catch {
     redirect(buildPlannerRedirect({ seasonKey, status: "update-invalid-event" }));
   }
 
-  const data = await validatePlannerForm(formData, "update");
+  const data = await validatePlannerForm(formData, "update", actorTenantId);
 
-  await prisma.event.update({
-    where: { id: eventId },
+  const result = await prisma.event.updateMany({
+    where: {
+      id: eventId,
+      tenantId: actorTenantId,
+    },
     data: {
       seasonId: data.season.id,
       teamId: data.teamId,
@@ -252,6 +268,10 @@ export async function updatePlannerEntryAction(formData: FormData) {
     },
   });
 
+  if (result.count === 0) {
+    redirect(buildPlannerRedirect({ seasonKey: data.seasonKey, status: "update-invalid-event" }));
+  }
+
   revalidatePlannerPaths();
 
   redirect(
@@ -260,7 +280,12 @@ export async function updatePlannerEntryAction(formData: FormData) {
 }
 
 export async function deletePlannerEntryAction(formData: FormData) {
-  await requirePlannerManagePermission();
+  const session = await requirePlannerManagePermission();
+  const actorTenantId = session?.user?.tenantId;
+
+  if (!actorTenantId) {
+    redirect(buildPlannerRedirect({ status: "delete-tenant-required" }));
+  }
 
   const eventId = toNullableString(formData.get("eventId"));
   const seasonKey = toNullableString(formData.get("seasonKey"));
@@ -269,18 +294,22 @@ export async function deletePlannerEntryAction(formData: FormData) {
     redirect(buildPlannerRedirect({ seasonKey, status: "delete-invalid-event" }));
   }
 
-  const existingEvent = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { id: true },
-  });
-
-  if (!existingEvent) {
+  try {
+    await assertEventBelongsToTenant(eventId, actorTenantId);
+  } catch {
     redirect(buildPlannerRedirect({ seasonKey, status: "delete-invalid-event" }));
   }
 
-  await prisma.event.delete({
-    where: { id: eventId },
+  const result = await prisma.event.deleteMany({
+    where: {
+      id: eventId,
+      tenantId: actorTenantId,
+    },
   });
+
+  if (result.count === 0) {
+    redirect(buildPlannerRedirect({ seasonKey, status: "delete-invalid-event" }));
+  }
 
   revalidatePlannerPaths();
 
