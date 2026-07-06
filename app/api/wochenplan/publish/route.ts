@@ -23,7 +23,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { upsertWochenplanPublication } from "@/lib/wochenplan/publication-queries";
+import { upsertWeeklyPlanPublicationState } from "@/lib/weekly-plan/publication-state";
 
 export async function POST(req: NextRequest) {
   const access = await requireApiAnyPermission([
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         ? variantLabel.trim()
         : "Standard-Wochenplan";
 
-    publication = await upsertWochenplanPublication({
+    publication = await upsertWeeklyPlanPublicationState({
       tenantId: actorTenantId,
       weekId: weekId.trim(),
       variantLabel: label,
