@@ -13,6 +13,7 @@ import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permi
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { FCA_PITCH_ALLOCATIONS } from "@/lib/facilities/pitches";
 import { FCA_DRESSING_ROOMS } from "@/lib/facilities/dressing-rooms";
+import { assertEventBelongsToTenant } from "@/lib/weekly-plan/tenant-validation";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
@@ -35,6 +36,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
   const actorTenantId = access.session?.user?.tenantId ?? null;
 
+  // Reject actors without tenant context before any DB query or update.
+  if (!actorTenantId) {
+    return NextResponse.json({ error: "Tenant context is required." }, { status: 403 });
+  }
+
   const { eventId } = await params;
   const body = await req.json().catch(() => ({}));
 
@@ -47,19 +53,20 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const awayResult = validateNullableCode(body.awayDressingRoomCode, VALID_ROOM_CODES, "awayDressingRoomCode");
   if (!awayResult.ok) return NextResponse.json({ error: awayResult.error }, { status: 400 });
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { id: true, tenantId: true },
-  });
-  if (!event) return NextResponse.json({ error: "Event nicht gefunden." }, { status: 404 });
-
-  // Tenant isolation: if the event has a tenantId, it must match the actor's tenant.
-  if (event.tenantId && actorTenantId && event.tenantId !== actorTenantId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Verify event ownership before any write. All failure modes (not found,
+  // tenantless event, event belonging to another tenant) return the same
+  // safe response to avoid leaking cross-tenant existence information.
+  try {
+    await assertEventBelongsToTenant(eventId, actorTenantId);
+  } catch {
+    return NextResponse.json({ error: "Event nicht gefunden." }, { status: 404 });
   }
 
-  const updated = await prisma.event.update({
-    where: { id: eventId },
+  // Defence-in-depth: the write itself also constrains by tenantId so that
+  // a concurrent tenant reassignment cannot slip through between validation
+  // and the update.
+  const updatedEvents = await prisma.event.updateManyAndReturn({
+    where: { id: eventId, tenantId: actorTenantId },
     data: {
       pitchCode: pitchResult.value,
       homeDressingRoomCode: homeResult.value,
@@ -73,5 +80,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     },
   });
 
-  return NextResponse.json({ event: updated });
+  if (updatedEvents.length === 0) {
+    return NextResponse.json({ error: "Event nicht gefunden." }, { status: 404 });
+  }
+
+  return NextResponse.json({ event: updatedEvents[0] });
 }
