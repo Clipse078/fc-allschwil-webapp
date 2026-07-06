@@ -202,14 +202,14 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
   }
 
   if (input.dateFrom || input.dateTo) {
-    const startAt: Record<string, string> = {};
+    const startAt: Record<string, Date> = {};
 
     if (input.dateFrom) {
-      startAt.gte = input.dateFrom;
+      startAt.gte = new Date(`${input.dateFrom}T00:00:00.000Z`);
     }
 
     if (input.dateTo) {
-      startAt.lte = input.dateTo;
+      startAt.lte = new Date(`${input.dateTo}T23:59:59.999Z`);
     }
 
     where.startAt = startAt;
