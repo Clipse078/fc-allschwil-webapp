@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGroupedWochenplan } from "@/lib/events/public-event-feed";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { resolveTenantFromRequest, assertWebsiteEnabled } from "@/lib/website/response-helpers";
 import {
   getWochenplanPublication,
   formatWochenplanVariantBadge,
 } from "@/lib/wochenplan/publication-queries";
 
-// TODO(tenant-isolation/website): resolve tenant from request context (host/subdomain/path)
-// for multi-tenant deployments. Currently defaults to fc-allschwil for the
-// single-tenant kiosk/website setup.
 
 function parseLimit(value: string | null) {
   if (!value) {
@@ -35,7 +32,7 @@ export async function GET(request: NextRequest) {
     const limit = parseLimit(searchParams.get("limit"));
     const weekId = searchParams.get("weekId");
 
-    const tenant = await getDefaultTenant();
+    const tenant = await resolveTenantFromRequest(request);
 
     if (!tenant) {
       return NextResponse.json(
@@ -43,6 +40,9 @@ export async function GET(request: NextRequest) {
         { status: 404 },
       );
     }
+
+    const guard = assertWebsiteEnabled(tenant);
+    if (guard) return guard;
 
     const days = await getGroupedWochenplan({
       tenantId: tenant.id,
@@ -54,7 +54,6 @@ export async function GET(request: NextRequest) {
     });
 
     // Resolve active variant publication for the requested week.
-    // TODO(tenant-isolation/website): replace with resolveTenantFromRequest(request).
     let publication: {
       weekId: string;
       variantLabel: string;
