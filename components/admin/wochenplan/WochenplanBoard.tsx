@@ -309,8 +309,8 @@ function buildDemoEvents(): WochenplanBoardEvent[] {
       slotKey: "20:15-21:45",
       pitchRowKey: "KUNSTRASEN_3",
       fieldLabel: "A",
-      homeLabel: "E. Vögt",
-      coachLabel: "E. Vögt",
+      homeLabel: "E. VÃ¶gt",
+      coachLabel: "E. VÃ¶gt",
       categoryKey: "FRAUEN",
       allocation: {
         pitchCode: "KUNSTRASEN_3_A",
@@ -806,7 +806,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
         activeVariantLabel={publishedVariant}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
           {DAYS.map((day) => (
             <WochenplanDayGrid

@@ -48,28 +48,28 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         month: "2-digit",
       }),
     )
-    .join(" â€“ ");
+    .join(" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ ");
 
   return (
     <div className="space-y-6">
       {/* Header + week navigation */}
-      <section>
-        <p className="text-xs font-medium tracking-wide text-[var(--muted)]">Wochenplan</p>
+      <section className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Planung</p>
 
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">Wochenplan</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--blue)]/30 bg-[var(--blue-light)] px-4 py-1.5 text-sm font-semibold text-[var(--blue)]">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Wochenplan</h1>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--blue)]/20 bg-[var(--blue-light)] px-3 py-1 text-xs font-semibold text-[var(--blue)]">
               <CalendarDays className="h-3.5 w-3.5" />
               {weekLabel}
             </span>
-            <span className="hidden text-[0.78rem] text-[var(--muted)] sm:block">
+            <span className="text-sm text-slate-500">
               {dateRange}
             </span>
           </div>
 
           {/* Week navigation */}
-          <div className="flex items-center gap-2">
+          <nav className="flex flex-wrap items-center gap-2" aria-label="Wochen Navigation">
             <Link
               href={`/dashboard/wochenplan?week=${previousWeekId}`}
               className="fca-button-secondary flex items-center gap-1"
@@ -88,12 +88,12 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
             <Link
               href={`/dashboard/wochenplan?week=${nextWeekId}`}
               className="fca-button-secondary flex items-center gap-1"
-              title="NÃ¤chste Woche"
+              title="NÃƒÆ’Ã‚Â¤chste Woche"
             >
-              NÃ¤chste
+              NÃƒÆ’Ã‚Â¤chste
               <ChevronRight className="h-4 w-4" />
             </Link>
-          </div>
+          </nav>
         </div>
       </section>
 
@@ -106,7 +106,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
               {boardData.unplaced.length} Event{boardData.unplaced.length !== 1 ? "s" : ""} kann nicht auf dem Grid platziert werden
             </p>
             <p className="mt-0.5 text-[0.75rem] text-amber-700">
-              Wochenend-Events oder ungewÃ¶hnliche Zeiten werden hier nicht angezeigt â€”{" "}
+              Wochenend-Events oder ungewÃƒÆ’Ã‚Â¶hnliche Zeiten werden hier nicht angezeigt ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â{" "}
               sie erscheinen aber in der Saisonplaner-Ansicht.
             </p>
             <ul className="mt-1 flex flex-wrap gap-2">

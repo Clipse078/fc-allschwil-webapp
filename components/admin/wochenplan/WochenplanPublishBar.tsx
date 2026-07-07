@@ -8,7 +8,7 @@ import {
   formatWochenplanVariantBadge,
 } from "@/lib/wochenplan/format-variant-badge";
 
-// ── Variant options ───────────────────────────────────────────────────────────
+// â”€â”€ Variant options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const WEEKPLAN_VARIANT_OPTIONS = [
   { value: "Standard-Wochenplan", label: "Standard-Wochenplan" },
@@ -19,7 +19,7 @@ export const WEEKPLAN_VARIANT_OPTIONS = [
 
 export type WochenplanVariantOption = (typeof WEEKPLAN_VARIANT_OPTIONS)[number]["value"];
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Props â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type WochenplanPublishBarProps = {
   hasUnsavedChanges: boolean;
@@ -30,7 +30,7 @@ type WochenplanPublishBarProps = {
   activeVariantLabel?: string | null;
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function WochenplanPublishBar({
   hasUnsavedChanges,
@@ -72,20 +72,20 @@ export default function WochenplanPublishBar({
         : null;
 
   return (
-    <AdminSurfaceCard className="p-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <AdminSurfaceCard className="border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <p className="fca-eyebrow">Publikation</p>
-          <h3 className="fca-subheading mt-2">Wochenplan publizieren</h3>
+          
           {weekId ? (
-            <p className="mt-1 text-[0.75rem] text-[var(--muted)]">
-              Woche {weekId} — Entwurf pruefen und ausgewaehlte Variante bewusst publizieren.
+            <p className="mt-1 text-[0.75rem] text-slate-500">
+              Woche {weekId} â€” Variante pruefen und bewusst publizieren.
             </p>
           ) : null}
 
           {/* Active variant badge */}
           {activeVariantBadge ? (
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <div className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.7rem] font-semibold text-emerald-700">
               <CheckCircle2 className="h-3 w-3" />
               {activeVariantBadge}
             </div>
@@ -94,7 +94,7 @@ export default function WochenplanPublishBar({
 
         <div className="flex flex-col gap-3 sm:items-end">
           {/* Pitch allocation auto-save notice */}
-          <p className="text-[0.75rem] text-[var(--muted)]">
+          <p className="hidden text-[0.75rem] text-slate-500">
             Platz- und Garderobenzuteilungen werden automatisch gespeichert. Die Publikation bleibt ein bewusster Schritt.
           </p>
 
@@ -112,7 +112,7 @@ export default function WochenplanPublishBar({
                     {opt.label}
                   </option>
                 ))}
-                <option value="__custom__">Benutzerdefiniert…</option>
+                <option value="__custom__">Benutzerdefiniertâ€¦</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             </div>
@@ -122,7 +122,7 @@ export default function WochenplanPublishBar({
                 autoFocus
                 value={customLabel}
                 onChange={(e) => setCustomLabel(e.target.value)}
-                placeholder="Variante eingeben…"
+                placeholder="Variante eingebenâ€¦"
                 className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--blue)]/20"
               />
             ) : null}
@@ -139,7 +139,7 @@ export default function WochenplanPublishBar({
               title={
                 hasUnsavedChanges
                   ? `Wochenplan publizieren als: ${effectiveLabel}`
-                  : "Noch keine neuen Änderungen auf dem Grid"
+                  : "Noch keine neuen Ã„nderungen auf dem Grid"
               }
             >
               {isSaving ? (
@@ -147,14 +147,14 @@ export default function WochenplanPublishBar({
               ) : (
                 <CheckCircle2 className="h-3.5 w-3.5" />
               )}
-              {isSaving ? "Publiziert…" : "Wochenplan publizieren"}
+              {isSaving ? "Publiziertâ€¦" : "Publizieren"}
             </button>
           </div>
 
           {/* Preview of the variant badge that will be displayed publicly */}
           {!isSaving && hasUnsavedChanges && weekNumber !== null ? (
             <p className="text-[0.7rem] text-slate-400">
-              Öffentlich: &ldquo;KW {weekNumber} | {effectiveLabel} aktiv&rdquo;
+              Ã–ffentlich: &ldquo;KW {weekNumber} | {effectiveLabel} aktiv&rdquo;
             </p>
           ) : null}
         </div>
