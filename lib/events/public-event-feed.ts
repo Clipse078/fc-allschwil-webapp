@@ -16,7 +16,7 @@ export type GetPublicEventsInput = {
    * New website endpoints MUST always supply this. Legacy routes may omit it
    * for backward compatibility (single-tenant fallback path).
    */
-  tenantId?: string | null;
+  tenantId: string;
   seasonKey?: string | null;
   teamSlug?: string | null;
   dateFrom?: string | null;
@@ -185,9 +185,7 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
     },
   };
 
-  if (input.tenantId) {
-    where.tenantId = input.tenantId;
-  }
+  where.tenantId = input.tenantId;
 
   if (input.seasonKey) {
     where.season = {

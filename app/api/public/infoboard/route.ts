@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getInfoboardFeed } from "@/lib/events/public-event-feed";
-import { getDefaultTenant } from "@/lib/tenants/queries";
+import { resolveTenantFromRequest } from "@/lib/website/response-helpers";
 
 // TODO(tenant-isolation): Public InfoBoard feed is currently not tenant-scoped.
 //
@@ -45,8 +45,14 @@ export async function GET(request: NextRequest) {
     const limit = parseLimit(searchParams.get("limit"));
 
     // Resolve the default tenant so facility/resource labels use tenant-configured names.
-    // TODO(tenant-isolation/website): replace with resolveTenantFromRequest(request).
-    const tenant = await getDefaultTenant();
+    const tenant = await resolveTenantFromRequest(request);
+
+    if (!tenant) {
+      return NextResponse.json(
+        { error: "Tenant not found." },
+        { status: 404 },
+      );
+    }
 
     const events = await getInfoboardFeed({
       seasonKey,
@@ -54,7 +60,7 @@ export async function GET(request: NextRequest) {
       dateFrom,
       dateTo,
       limit,
-      tenantId: tenant?.id ?? null,
+      tenantId: tenant.id,
     });
 
     return NextResponse.json({

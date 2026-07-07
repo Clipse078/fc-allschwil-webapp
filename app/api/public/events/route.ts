@@ -3,10 +3,8 @@ import {
   getPublicEvents,
   type PublicEventSurface,
 } from "@/lib/events/public-event-feed";
+import { resolveTenantFromRequest } from "@/lib/website/response-helpers";
 
-// TODO(tenant-isolation): Public events feed is currently not tenant-scoped.
-// See app/api/public/infoboard/route.ts for the full tracking note.
-// When multi-tenant public websites go live, add tenant resolution here too.
 
 const ALLOWED_SURFACES: PublicEventSurface[] = [
   "all",
@@ -54,8 +52,18 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get("dateTo");
     const limit = parseLimit(searchParams.get("limit"));
 
+    const tenant = await resolveTenantFromRequest(request);
+
+    if (!tenant) {
+      return NextResponse.json(
+        { error: "Tenant not found." },
+        { status: 404 },
+      );
+    }
+
     const rawEvents = await getPublicEvents({
       surface,
+      tenantId: tenant.id,
       seasonKey,
       teamSlug,
       dateFrom,
