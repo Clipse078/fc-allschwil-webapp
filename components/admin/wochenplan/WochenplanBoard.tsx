@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import WochenplanConflictPanel from "@/components/admin/wochenplan/WochenplanConflictPanel";
@@ -592,7 +592,7 @@ function buildSnapshot(events: WochenplanBoardEvent[]) {
 }
 
 type WochenplanBoardProps = {
-  /** Real events loaded from the database. Falls back to demo data when absent. */
+  /** Real events loaded from the database. Empty weeks stay empty. */
   initialEvents?: WochenplanBoardEvent[];
   /** ISO week identifier (e.g. "2026-W23") used for publish API call. */
   weekId?: string;
@@ -612,7 +612,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
   const [publishedVariant, setPublishedVariant] = useState<string | null>(activeVariantLabel ?? null);
   const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
-  const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
+  const seedEvents = initialEvents ?? [];
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(seedEvents);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
@@ -627,7 +627,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initialSnapshot = useMemo(() => buildSnapshot(seedEvents), []);
+  const initialSnapshot = useMemo(() => buildSnapshot(seedEvents), [seedEvents]);
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
 
@@ -787,6 +787,16 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {saveError}
         </div>
+      ) : null}
+      {events.length === 0 ? (
+        <section className="rounded-[2rem] border border-dashed border-slate-200 bg-white px-8 py-12 text-center shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Entwurf</p>
+          <h2 className="mt-3 text-xl font-semibold text-slate-950">Diese Woche ist noch leer.</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+            Es werden keine Demo-Daten mehr angezeigt. Sobald Trainings, Spiele oder Anfragen fuer diese Woche vorhanden sind,
+            erscheinen sie hier als Grundlage fuer die Premium Minimal Wochenplanung.
+          </p>
+        </section>
       ) : null}
       <WochenplanPublishBar
         hasUnsavedChanges={hasUnsavedChanges}

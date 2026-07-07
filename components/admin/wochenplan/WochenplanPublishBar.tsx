@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { CheckCircle2, Loader2, ChevronDown } from "lucide-react";
@@ -75,11 +75,11 @@ export default function WochenplanPublishBar({
     <AdminSurfaceCard className="p-5">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
-          <p className="fca-eyebrow">Publish Status</p>
+          <p className="fca-eyebrow">Publikation</p>
           <h3 className="fca-subheading mt-2">Wochenplan publizieren</h3>
           {weekId ? (
             <p className="mt-1 text-[0.75rem] text-[var(--muted)]">
-              Woche {weekId} — Alle platzierten Events auf Wochenplan setzen.
+              Woche {weekId} — Entwurf pruefen und ausgewaehlte Variante bewusst publizieren.
             </p>
           ) : null}
 
@@ -95,7 +95,7 @@ export default function WochenplanPublishBar({
         <div className="flex flex-col gap-3 sm:items-end">
           {/* Pitch allocation auto-save notice */}
           <p className="text-[0.75rem] text-[var(--muted)]">
-            Platz- und Garderoben-Zuteilung wird automatisch gespeichert.
+            Platz- und Garderobenzuteilungen werden automatisch gespeichert. Die Publikation bleibt ein bewusster Schritt.
           </p>
 
           {/* Variant selector */}

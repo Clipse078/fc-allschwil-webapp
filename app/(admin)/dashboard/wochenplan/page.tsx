@@ -48,7 +48,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         month: "2-digit",
       }),
     )
-    .join(" – ");
+    .join(" â€“ ");
 
   return (
     <div className="space-y-6">
@@ -58,7 +58,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
 
         <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">Feld-/Garderobenplanung</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)] leading-tight">Wochenplan</h1>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--blue)]/30 bg-[var(--blue-light)] px-4 py-1.5 text-sm font-semibold text-[var(--blue)]">
               <CalendarDays className="h-3.5 w-3.5" />
               {weekLabel}
@@ -88,9 +88,9 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
             <Link
               href={`/dashboard/wochenplan?week=${nextWeekId}`}
               className="fca-button-secondary flex items-center gap-1"
-              title="Nächste Woche"
+              title="NÃ¤chste Woche"
             >
-              Nächste
+              NÃ¤chste
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
@@ -106,7 +106,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
               {boardData.unplaced.length} Event{boardData.unplaced.length !== 1 ? "s" : ""} kann nicht auf dem Grid platziert werden
             </p>
             <p className="mt-0.5 text-[0.75rem] text-amber-700">
-              Wochenend-Events oder ungewöhnliche Zeiten werden hier nicht angezeigt —{" "}
+              Wochenend-Events oder ungewÃ¶hnliche Zeiten werden hier nicht angezeigt â€”{" "}
               sie erscheinen aber in der Saisonplaner-Ansicht.
             </p>
             <ul className="mt-1 flex flex-wrap gap-2">
