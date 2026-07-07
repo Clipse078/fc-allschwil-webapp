@@ -6,9 +6,9 @@
  * Loads Event rows for a given ISO week and maps them into
  * WochenplanBoardEvent objects that the board component can render.
  *
- * Events that fall outside Mon–Fri or outside the four standard
- * time slots (15:45–17:15, 17:15–18:45, 18:45–20:15, 20:15–21:45)
- * are returned in the `unplaced` list — the board does not display
+ * Events that fall outside Monâ€“Fri or outside the four standard
+ * time slots (15:45â€“17:15, 17:15â€“18:45, 18:45â€“20:15, 20:15â€“21:45)
+ * are returned in the `unplaced` list â€” the board does not display
  * them but the page can show them as a sidebar.
  */
 import { prisma } from "@/lib/db/prisma";
@@ -20,7 +20,7 @@ import type {
   WochenplanBoardCategoryKey,
 } from "@/lib/wochenplan/types";
 
-// ── Slot snap ────────────────────────────────────────────────────────────────
+// â”€â”€ Slot snap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SLOT_BOUNDARIES: { slot: WochenplanBoardSlotKey; startMin: number; endMin: number }[] = [
   { slot: "15:45-17:15", startMin: 15 * 60 + 45, endMin: 17 * 60 + 15 },
@@ -43,7 +43,7 @@ function snapToSlot(date: Date): WochenplanBoardSlotKey | null {
   return null;
 }
 
-// ── Day key ──────────────────────────────────────────────────────────────────
+// â”€â”€ Day key â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ISO_WEEKDAY_TO_DAY: Record<number, WochenplanBoardDayKey> = {
   1: "MONDAY",
@@ -58,7 +58,7 @@ function toDayKey(date: Date): WochenplanBoardDayKey | null {
   return ISO_WEEKDAY_TO_DAY[isoWeekday] ?? null;
 }
 
-// ── Pitch code → board fields ─────────────────────────────────────────────────
+// â”€â”€ Pitch code â†’ board fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type PitchBoardFields = {
   pitchRowKey: WochenplanBoardPitchRowKey;
@@ -79,7 +79,7 @@ function parsePitchCode(code: string | null | undefined): PitchBoardFields | nul
   return null;
 }
 
-// ── Category mapping ──────────────────────────────────────────────────────────
+// â”€â”€ Category mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function toCategoryKey(teamCategory: string | null | undefined): WochenplanBoardCategoryKey {
   if (!teamCategory) return "JUNIOREN";
@@ -92,7 +92,7 @@ function toCategoryKey(teamCategory: string | null | undefined): WochenplanBoard
   return "JUNIOREN";
 }
 
-// ── Prisma select ─────────────────────────────────────────────────────────────
+// â”€â”€ Prisma select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const BOARD_EVENT_SELECT = {
   id: true,
@@ -142,7 +142,7 @@ type BoardEventRow = {
   team: { id: string; name: string; category: string } | null;
 };
 
-// ── Public types ──────────────────────────────────────────────────────────────
+// â”€â”€ Public types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type WochenplanBoardData = {
   placed: WochenplanBoardEvent[];
@@ -170,7 +170,7 @@ export type WochenplanAllocationRow = {
   wochenplanVisible: boolean;
 };
 
-// ── Main query ────────────────────────────────────────────────────────────────
+// â”€â”€ Main query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Loads all Events in the given ISO week, maps them to board placements.
@@ -181,13 +181,13 @@ export async function getWochenplanBoardData(
   weekStart: Date,
   weekEnd: Date,
   weekId: string,
-  tenantId?: string | null,
+  tenantId: string,
 ): Promise<WochenplanBoardData> {
   const events = await prisma.event.findMany({
     where: {
       startAt: { gte: weekStart, lte: weekEnd },
       status: { in: ["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED"] },
-      ...(tenantId ? { tenantId } : {}),
+      tenantId,
     },
     orderBy: [{ startAt: "asc" }],
     select: BOARD_EVENT_SELECT,
@@ -268,13 +268,13 @@ export async function getWochenplanBoardData(
 export async function getWochenplanWeekEventIds(
   weekStart: Date,
   weekEnd: Date,
-  tenantId?: string | null,
+  tenantId: string,
 ): Promise<string[]> {
   const events = await prisma.event.findMany({
     where: {
       startAt: { gte: weekStart, lte: weekEnd },
       status: { in: ["SCHEDULED", "LIVE", "POSTPONED"] },
-      ...(tenantId ? { tenantId } : {}),
+      tenantId,
     },
     select: { id: true },
   });

@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, CalendarDays, AlertCircle } from "lucide-react";
 import WochenplanBoard from "@/components/admin/wochenplan/WochenplanBoard";
 import { requirePermission } from "@/lib/permissions/require-permission";
@@ -15,7 +15,11 @@ type PageProps = {
 
 export default async function WochenplanPage({ searchParams }: PageProps) {
   const session = await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
-  const tenantId = session?.user?.tenantId ?? null;
+  const tenantId = session.user?.tenantId;
+
+  if (!tenantId) {
+    throw new Error("Tenant context is required for Wochenplan access.");
+  }
 
   const { week } = await searchParams;
   const { weekId, start, end, previousWeekId, nextWeekId } = getWeekWindow(week);
@@ -23,7 +27,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
   // Load real events + active publication in parallel (scoped to actor's tenant)
   const [boardData, publication] = await Promise.all([
     getWochenplanBoardData(start, end, weekId, tenantId),
-    tenantId ? getWochenplanPublication(tenantId, weekId) : Promise.resolve(null),
+    getWochenplanPublication(tenantId, weekId),
   ]);
 
   // Resolve pitch row labels via the canonical facility/resource display helper.

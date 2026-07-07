@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   CalendarDays,
   MonitorSmartphone,
@@ -12,6 +12,7 @@ import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelect
 import { getDayPlannerData } from "@/lib/planner/queries";
 
 type DayPlannerPageProps = {
+  tenantId: string;
   seasonKey?: string;
   day?: string;
 };
@@ -54,10 +55,12 @@ function buildEditHref(eventId: string, seasonKey: string, type: string) {
 }
 
 export default async function DayPlannerPage({
+  tenantId,
   seasonKey,
   day,
 }: DayPlannerPageProps) {
   const data = await getDayPlannerData({
+    tenantId,
     selectedSeasonKey: seasonKey,
     day,
   });

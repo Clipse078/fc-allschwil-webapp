@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   CalendarDays,
   Globe,
@@ -13,6 +13,7 @@ import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelect
 import { getWeekPlannerData } from "@/lib/planner/queries";
 
 type WeekPlannerPageProps = {
+  tenantId: string;
   seasonKey?: string;
   week?: string;
 };
@@ -52,10 +53,12 @@ function buildEditHref(eventId: string, seasonKey: string, type: string) {
 }
 
 export default async function WeekPlannerPage({
+  tenantId,
   seasonKey,
   week,
 }: WeekPlannerPageProps) {
   const data = await getWeekPlannerData({
+    tenantId,
     selectedSeasonKey: seasonKey,
     weekId: week,
   });

@@ -1,6 +1,8 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import PlannerEntryCreateForm from "@/components/admin/planner/PlannerEntryCreateForm";
 import { getPlannerEditFormData } from "@/lib/planner/queries";
+import { requirePermission } from "@/lib/permissions/require-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 type PlannerEditPageProps = {
   params: Promise<{
@@ -17,9 +19,16 @@ export default async function PlannerEditPage({
   searchParams,
 }: PlannerEditPageProps) {
   const { eventId } = await params;
+  const session = await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
+  const tenantId = session.user?.tenantId;
+
+  if (!tenantId) {
+    throw new Error("Tenant context is required for planner access.");
+  }
+
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
-  const data = await getPlannerEditFormData(eventId, {
+  const data = await getPlannerEditFormData(tenantId, eventId, {
     selectedType: resolvedSearchParams?.type ?? null,
   });
 

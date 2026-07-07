@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
   CalendarDays,
   ClipboardList,
@@ -59,6 +59,7 @@ const MODULE_META = [
 ] as const;
 
 type SeasonPlannerPageProps = {
+  tenantId: string;
   seasonKey?: string;
   status?: string;
 };
@@ -148,10 +149,11 @@ function getFeedback(status?: string) {
 }
 
 export default async function SeasonPlannerPage({
+  tenantId,
   seasonKey,
   status,
 }: SeasonPlannerPageProps) {
-  const data = await getSeasonPlannerData(seasonKey);
+  const data = await getSeasonPlannerData(tenantId, seasonKey);
   const selectedSeasonKey = data.selectedSeason?.key ?? "";
   const feedback = getFeedback(status);
 
