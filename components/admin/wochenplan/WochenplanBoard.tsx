@@ -310,8 +310,8 @@ function buildDemoEvents(): WochenplanBoardEvent[] {
       slotKey: "20:15-21:45",
       pitchRowKey: "KUNSTRASEN_3",
       fieldLabel: "A",
-      homeLabel: "E. VÃƒÆ’Ã‚Â¶gt",
-      coachLabel: "E. VÃƒÆ’Ã‚Â¶gt",
+      homeLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
+      coachLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
       categoryKey: "FRAUEN",
       allocation: {
         pitchCode: "KUNSTRASEN_3_A",
@@ -642,6 +642,9 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pitchCode,
+          startAt: event.startAt,
+          endAt: event.endAt,
+          location: event.location,
           homeDressingRoomCode: event.allocation.homeDressingRoomCode,
           awayDressingRoomCode: event.allocation.awayDressingRoomCode,
         }),
@@ -760,8 +763,8 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
           pitchRowKey: nextPitchRowKey,
           slotKey: nextSlotKey,
           fieldLabel: nextFieldLabel,
-          startAt: createIsoDateTime(nextDayKey, nextSlotKey, false),
-          endAt: createIsoDateTime(nextDayKey, nextSlotKey, true),
+          startAt: createIsoDateTime(nextDayKey, nextSlotKey, false, weekStart),
+          endAt: createIsoDateTime(nextDayKey, nextSlotKey, true, weekStart),
           location: resolvedLocation,
         };
       });

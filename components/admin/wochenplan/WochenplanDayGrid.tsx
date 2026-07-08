@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -29,6 +30,11 @@ type WochenplanDayGridProps = {
   onDragEnd: () => void;
   draggingEventId: string | null;
 };
+
+type DropTarget = {
+  pitchRowKey: WochenplanBoardPitchRowKey;
+  slotKey: WochenplanBoardSlotKey;
+} | null;
 
 function hasRoomConflictForEvent(
   event: WochenplanBoardEvent,
@@ -110,6 +116,7 @@ export default function WochenplanDayGrid({
   onDragEnd,
   draggingEventId,
 }: WochenplanDayGridProps) {
+  const [dropTarget, setDropTarget] = useState<DropTarget>(null);
   const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
 
   return (
@@ -158,29 +165,87 @@ export default function WochenplanDayGrid({
               const roomConflictCountInCell = getCellRoomConflictCount(cellEvents, dayEvents);
               const hasCellConflict = hasCellPitchIssue || roomConflictCountInCell > 0;
 
+              const isDropTarget =
+                dropTarget?.pitchRowKey === pitchRow.key &&
+                dropTarget.slotKey === slot;
+
               return (
                 <div
                   key={pitchRow.key + "-" + slot}
-                  onDragOver={(dragEvent) => dragEvent.preventDefault()}
-                  onDrop={() => {
+                  onDragEnter={(dragEvent) => {
+                    dragEvent.preventDefault();
+
                     if (!draggingEventId) {
+                      return;
+                    }
+
+                    setDropTarget({
+                      pitchRowKey: pitchRow.key,
+                      slotKey: slot,
+                    });
+                  }}
+                  onDragOver={(dragEvent) => {
+                    dragEvent.preventDefault();
+                    dragEvent.dataTransfer.dropEffect = "move";
+                  }}
+                  onDragLeave={(dragEvent) => {
+                    if (dragEvent.currentTarget.contains(dragEvent.relatedTarget as Node | null)) {
+                      return;
+                    }
+
+                    setDropTarget(null);
+                  }}
+                  onDrop={(dragEvent) => {
+                    dragEvent.preventDefault();
+
+                    if (!draggingEventId) {
+                      return;
+                    }
+
+                    const draggedEvent = events.find(
+                      (event) => event.id === draggingEventId,
+                    );
+
+                    setDropTarget(null);
+
+                    if (
+                      draggedEvent &&
+                      draggedEvent.boardDayKey === dayKey &&
+                      draggedEvent.pitchRowKey === pitchRow.key &&
+                      draggedEvent.slotKey === slot
+                    ) {
                       return;
                     }
 
                     onDropEvent(draggingEventId, dayKey, pitchRow.key, slot);
                   }}
-                  className="min-h-[110px] border-r border-t border-slate-200 bg-white p-2 last:border-r-0"
+                  className={[
+                    "min-h-[110px] border-r border-t border-slate-200 p-2 transition-colors last:border-r-0",
+                    isDropTarget
+                      ? "bg-sky-50"
+                      : "bg-white",
+                  ].join(" ")}
                 >
                   <div
                     className={[
                       "relative h-full overflow-hidden rounded-2xl border border-dashed p-1.5 transition",
-                      hasCellConflict
-                        ? "border-red-200 bg-red-50/20"
-                        : "border-slate-200 bg-slate-50/50",
+                      isDropTarget
+                        ? "border-sky-400 bg-sky-50 ring-2 ring-sky-300/40"
+                        : hasCellConflict
+                          ? "border-red-200 bg-red-50/20"
+                          : "border-slate-200 bg-slate-50/50",
                     ].join(" ")}
                   >
                     {hasCellConflict ? (
                       <div className="absolute right-2 top-2 z-10 h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]" />
+                    ) : null}
+
+                    {isDropTarget ? (
+                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                        <span className="rounded-full border border-sky-200 bg-white/95 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-sky-700 shadow-sm">
+                          Hier platzieren
+                        </span>
+                      </div>
                     ) : null}
 
                     <div className="grid gap-2">
@@ -193,7 +258,10 @@ export default function WochenplanDayGrid({
                           isSelected={selectedEventId === event.id}
                           onSelect={onSelectEvent}
                           onDragStart={onDragStart}
-                          onDragEnd={onDragEnd}
+                          onDragEnd={() => {
+                            setDropTarget(null);
+                            onDragEnd();
+                          }}
                         />
                       ))}
                     </div>
