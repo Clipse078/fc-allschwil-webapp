@@ -59,7 +59,7 @@ function toOptionalNullableString(value: unknown, field: string): { ok: true; va
 function validateNullableCode(value: unknown, valid: Set<string>, field: string): { ok: true; value: string | null } | { ok: false; error: string } {
   if (value === null || value === undefined) return { ok: true, value: null };
   if (typeof value !== "string") return { ok: false, error: `${field} muss ein String oder null sein.` };
-  if (!valid.has(value)) return { ok: false, error: `UngÃ¼ltiger ${field}: ${value}` };
+  if (!valid.has(value)) return { ok: false, error: `Ungültiger ${field}: ${value}` };
   return { ok: true, value };
 }
 

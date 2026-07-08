@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import AdminFloatingFeedback from "@/components/admin/shared/AdminFloatingFeedback";
 import WochenplanConflictPanel from "@/components/admin/wochenplan/WochenplanConflictPanel";
 import WochenplanContextPanel from "@/components/admin/wochenplan/WochenplanContextPanel";
 import WochenplanDayGrid from "@/components/admin/wochenplan/WochenplanDayGrid";
@@ -310,8 +311,8 @@ function buildDemoEvents(): WochenplanBoardEvent[] {
       slotKey: "20:15-21:45",
       pitchRowKey: "KUNSTRASEN_3",
       fieldLabel: "A",
-      homeLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
-      coachLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
+      homeLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
+      coachLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
       categoryKey: "FRAUEN",
       allocation: {
         pitchCode: "KUNSTRASEN_3_A",
@@ -619,6 +620,8 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingMutationCount, setPendingMutationCount] = useState(0);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [dayPlannerState, setDayPlannerState] = useState<{
     dayKey: WochenplanBoardDayKey | null;
@@ -636,24 +639,57 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   /** Persist allocation for a single event immediately. */
   async function persistAllocation(event: WochenplanBoardEvent) {
     const pitchCode = toPitchCode(event);
-    try {
-      await fetch(`/api/wochenplan/${event.id}/allocation`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pitchCode,
-          startAt: event.startAt,
-          endAt: event.endAt,
-          location: event.location,
-          homeDressingRoomCode: event.allocation.homeDressingRoomCode,
-          awayDressingRoomCode: event.allocation.awayDressingRoomCode,
-        }),
-      });
-    } catch {
-      // Silent: allocation is still shown in UI; next explicit save will retry.
+
+    const response = await fetch(`/api/wochenplan/${event.id}/allocation`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pitchCode,
+        startAt: event.startAt,
+        endAt: event.endAt,
+        location: event.location,
+        homeDressingRoomCode: event.allocation.homeDressingRoomCode,
+        awayDressingRoomCode: event.allocation.awayDressingRoomCode,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error ?? "Ãƒâ€žnderung konnte nicht gespeichert werden.");
     }
   }
 
+  async function persistEventMutation(
+    previousEvent: WochenplanBoardEvent,
+    updatedEvent: WochenplanBoardEvent,
+  ) {
+    setPendingMutationCount((count) => count + 1);
+    setSaveSuccess(null);
+    setSaveError(null);
+
+    try {
+      await persistAllocation(updatedEvent);
+      setSaveSuccess("Änderung gespeichert.");
+
+      window.setTimeout(() => {
+        setSaveSuccess(null);
+      }, 2000);
+    } catch (error) {
+      setEvents((current) =>
+        current.map((event) =>
+          event.id === previousEvent.id ? previousEvent : event,
+        ),
+      );
+
+      setSaveError(
+        error instanceof Error
+          ? `${error.message} Die Ãƒâ€žnderung wurde zurÃƒÂ¼ckgesetzt.`
+          : "Ãƒâ€žnderung konnte nicht gespeichert werden. Die Ãƒâ€žnderung wurde zurÃƒÂ¼ckgesetzt.",
+      );
+    } finally {
+      setPendingMutationCount((count) => Math.max(0, count - 1));
+    }
+  }
   /** Publish all board events: set wochenplanVisible = true. */
   async function publishWeek(variantLabel: string) {
     if (isSaving) return;
@@ -768,9 +804,13 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
           location: resolvedLocation,
         };
       });
-      // Persist the updated event's allocation immediately.
-      const updated = next.find((e) => e.id === eventId);
-      if (updated) void persistAllocation(updated);
+      const previous = current.find((event) => event.id === eventId);
+      const updated = next.find((event) => event.id === eventId);
+
+      if (previous && updated) {
+        void persistEventMutation(previous, updated);
+      }
+
       return next;
     });
   }
@@ -791,30 +831,40 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
             }
           : event,
       );
-      // Persist room change immediately.
-      const updated = next.find((e) => e.id === eventId);
-      if (updated) void persistAllocation(updated);
+      const previous = current.find((event) => event.id === eventId);
+      const updated = next.find((event) => event.id === eventId);
+
+      if (previous && updated) {
+        void persistEventMutation(previous, updated);
+      }
+
       return next;
     });
   }
 
   return (
     <div className="space-y-6">
-      {saveError ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {saveError}
-        </div>
-      ) : null}
-      {events.length === 0 ? (
-        <section className="rounded-[2rem] border border-dashed border-slate-200 bg-white px-8 py-12 text-center shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Entwurf</p>
-          <h2 className="mt-3 text-xl font-semibold text-slate-950">Diese Woche ist noch leer.</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-            Es werden keine Demo-Daten mehr angezeigt. Sobald Trainings, Spiele oder Anfragen fuer diese Woche vorhanden sind,
-            erscheinen sie hier als Grundlage fuer die Premium Minimal Wochenplanung.
-          </p>
-        </section>
-      ) : null}
+      <AdminFloatingFeedback
+        message={
+          saveError ??
+          saveSuccess ??
+          (pendingMutationCount > 0 ? "Änderung wird gespeichert…" : null)
+        }
+        tone={
+          saveError
+            ? "error"
+            : saveSuccess
+              ? "success"
+              : "loading"
+        }
+        onDismiss={
+          saveError
+            ? () => setSaveError(null)
+            : saveSuccess
+              ? () => setSaveSuccess(null)
+              : undefined
+        }
+      />
       <WochenplanPublishBar
         hasUnsavedChanges={hasUnsavedChanges}
         isSaving={isSaving}
