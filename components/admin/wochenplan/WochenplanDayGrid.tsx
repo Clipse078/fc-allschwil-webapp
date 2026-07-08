@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type {
   WochenplanBoardDayKey,
@@ -23,7 +23,8 @@ type WochenplanDayGridProps = {
     nextPitchRowKey: WochenplanBoardPitchRowKey,
     nextSlotKey: WochenplanBoardSlotKey,
   ) => void;
-  onOpenRooms: (eventId: string) => void;
+  selectedEventId: string | null;
+  onSelectEvent: (eventId: string) => void;
   onDragStart: (eventId: string) => void;
   onDragEnd: () => void;
   draggingEventId: string | null;
@@ -103,7 +104,8 @@ export default function WochenplanDayGrid({
   roomConflictCount,
   onOpenDayPlanner,
   onDropEvent,
-  onOpenRooms,
+  selectedEventId,
+  onSelectEvent,
   onDragStart,
   onDragEnd,
   draggingEventId,
@@ -188,7 +190,8 @@ export default function WochenplanDayGrid({
                           event={event}
                           hasPitchConflict={hasPitchConflictForEvent(event, cellEvents)}
                           hasRoomConflict={hasRoomConflictForEvent(event, dayEvents)}
-                          onOpenRooms={onOpenRooms}
+                          isSelected={selectedEventId === event.id}
+                          onSelect={onSelectEvent}
                           onDragStart={onDragStart}
                           onDragEnd={onDragEnd}
                         />

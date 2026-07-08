@@ -16,20 +16,35 @@ type WochenplanRoomDrawerProps = {
 function RoomBadge({
   roomCode,
   occupied,
+  selected,
+  onSelect,
 }: {
   roomCode: string;
   occupied: boolean;
+  selected: boolean;
+  onSelect: (roomCode: string) => void;
 }) {
   return (
-    <div
-      className={
+    <button
+      type="button"
+      disabled={occupied}
+      onClick={() => onSelect(roomCode)}
+      className={[
+        "rounded-xl border px-3 py-2 text-left text-sm font-semibold transition",
+        selected
+          ? "border-sky-300 bg-sky-50 text-sky-800 ring-2 ring-sky-300/60"
+          : occupied
+            ? "cursor-not-allowed border-red-200 bg-red-50 text-red-700 opacity-70"
+            : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100",
+      ].join(" ")}
+      title={
         occupied
-          ? "rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
-          : "rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"
+          ? `${roomCode} ist belegt`
+          : `${roomCode} als Heim / Team Garderobe wählen`
       }
     >
-      {roomCode} {occupied ? "belegt" : "frei"}
-    </div>
+      {roomCode} {selected ? "ausgewählt" : occupied ? "belegt" : "frei"}
+    </button>
   );
 }
 
@@ -43,6 +58,9 @@ export default function WochenplanRoomDrawer({
   if (!event) {
     return null;
   }
+
+  const selectedHomeRoom = event.allocation.homeDressingRoomCode;
+  const selectedAwayRoom = event.allocation.awayDressingRoomCode;
 
   return (
     <div className="fixed inset-y-0 right-0 z-40 w-full max-w-[420px] border-l border-slate-200 bg-white/95 p-4 backdrop-blur-xl">
@@ -69,7 +87,7 @@ export default function WochenplanRoomDrawer({
           <label className="block space-y-2">
             <span className="fca-label">Heim / Team Garderobe</span>
             <select
-              value={event.allocation.homeDressingRoomCode ?? ""}
+              value={selectedHomeRoom ?? ""}
               onChange={(e) => onChangeHomeRoom(e.target.value || null)}
               className="fca-select"
             >
@@ -85,7 +103,7 @@ export default function WochenplanRoomDrawer({
           <label className="block space-y-2">
             <span className="fca-label">Gäste Garderobe</span>
             <select
-              value={event.allocation.awayDressingRoomCode ?? ""}
+              value={selectedAwayRoom ?? ""}
               onChange={(e) => onChangeAwayRoom(e.target.value || null)}
               className="fca-select"
             >
@@ -104,12 +122,18 @@ export default function WochenplanRoomDrawer({
             Verfügbarkeit in diesem Slot
           </p>
 
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            Freie Garderobe anklicken, um sie direkt als Heim / Team Garderobe zu übernehmen.
+          </p>
+
           <div className="mt-3 grid grid-cols-2 gap-3">
             {FCA_DRESSING_ROOMS.map((room) => (
               <RoomBadge
                 key={room.code}
                 roomCode={room.code}
                 occupied={occupiedRooms.includes(room.code)}
+                selected={selectedHomeRoom === room.code || selectedAwayRoom === room.code}
+                onSelect={onChangeHomeRoom}
               />
             ))}
           </div>

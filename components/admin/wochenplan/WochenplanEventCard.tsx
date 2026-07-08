@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   AlertTriangle,
@@ -13,7 +13,8 @@ type WochenplanEventCardProps = {
   event: WochenplanBoardEvent;
   hasPitchConflict?: boolean;
   hasRoomConflict?: boolean;
-  onOpenRooms: (eventId: string) => void;
+  isSelected?: boolean;
+  onSelect: (eventId: string) => void;
   onDragStart: (eventId: string) => void;
   onDragEnd: () => void;
 };
@@ -54,7 +55,8 @@ export default function WochenplanEventCard({
   event,
   hasPitchConflict = false,
   hasRoomConflict = false,
-  onOpenRooms,
+  isSelected = false,
+  onSelect,
   onDragStart,
   onDragEnd,
 }: WochenplanEventCardProps) {
@@ -67,15 +69,18 @@ export default function WochenplanEventCard({
       draggable
       onDragStart={() => onDragStart(event.id)}
       onDragEnd={onDragEnd}
-      onClick={() => onOpenRooms(event.id)}
+      onClick={() => onSelect(event.id)}
       className={[
         "group relative block w-full max-w-full overflow-hidden rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:shadow-md",
         categoryClasses,
         hasConflict
           ? "ring-2 ring-red-300/60 shadow-[0_10px_24px_rgba(239,68,68,0.10)]"
           : "",
+        isSelected
+          ? "ring-2 ring-sky-400 shadow-[0_14px_30px_rgba(14,165,233,0.16)]"
+          : "",
       ].join(" ")}
-      title="Karte ziehen oder klicken für Garderoben"
+      title="Karte ziehen oder klicken für Details"
     >
       {hasConflict ? (
         <div className="absolute right-2 top-2 flex items-center gap-1">

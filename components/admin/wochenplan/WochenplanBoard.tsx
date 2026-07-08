@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import WochenplanConflictPanel from "@/components/admin/wochenplan/WochenplanConflictPanel";
+import WochenplanContextPanel from "@/components/admin/wochenplan/WochenplanContextPanel";
 import WochenplanDayGrid from "@/components/admin/wochenplan/WochenplanDayGrid";
 import WochenplanLegend from "@/components/admin/wochenplan/WochenplanLegend";
 import WochenplanPublishBar from "@/components/admin/wochenplan/WochenplanPublishBar";
@@ -309,8 +310,8 @@ function buildDemoEvents(): WochenplanBoardEvent[] {
       slotKey: "20:15-21:45",
       pitchRowKey: "KUNSTRASEN_3",
       fieldLabel: "A",
-      homeLabel: "E. VÃƒÂ¶gt",
-      coachLabel: "E. VÃƒÂ¶gt",
+      homeLabel: "E. VÃƒÆ’Ã‚Â¶gt",
+      coachLabel: "E. VÃƒÆ’Ã‚Â¶gt",
       categoryKey: "FRAUEN",
       allocation: {
         pitchCode: "KUNSTRASEN_3_A",
@@ -615,6 +616,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   const seedEvents = initialEvents ?? [];
   const [events, setEvents] = useState<WochenplanBoardEvent[]>(seedEvents);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [roomDrawerEventId, setRoomDrawerEventId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -686,6 +688,18 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   const roomConflicts = useMemo(() => {
     return getRoomConflictPairs(events);
   }, [events]);
+
+  const selectedEvent = useMemo(() => {
+    return events.find((event) => event.id === selectedEventId) ?? null;
+  }, [events, selectedEventId]);
+
+  const selectedPitchLabel = useMemo(() => {
+    if (!selectedEvent) {
+      return null;
+    }
+
+    return PITCH_ROWS.find((row) => row.key === selectedEvent.pitchRowKey)?.label ?? null;
+  }, [PITCH_ROWS, selectedEvent]);
 
   const roomDrawerEvent = useMemo(() => {
     return events.find((event) => event.id === roomDrawerEventId) ?? null;
@@ -826,7 +840,8 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
               }
               onOpenDayPlanner={openDayPlanner}
               onDropEvent={handleDropEvent}
-              onOpenRooms={setRoomDrawerEventId}
+              selectedEventId={selectedEventId}
+              onSelectEvent={setSelectedEventId}
               onDragStart={setDraggingEventId}
               onDragEnd={() => setDraggingEventId(null)}
               draggingEventId={draggingEventId}
@@ -836,7 +851,13 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
           <WochenplanLegend />
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 xl:sticky xl:top-4 xl:self-start">
+          <WochenplanContextPanel
+            event={selectedEvent}
+            pitchLabel={selectedPitchLabel}
+            onClose={() => setSelectedEventId(null)}
+            onOpenRooms={setRoomDrawerEventId}
+          />
           <WochenplanConflictPanel conflicts={conflicts} />
         </div>
       </div>
