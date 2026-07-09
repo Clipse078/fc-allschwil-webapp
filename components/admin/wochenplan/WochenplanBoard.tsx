@@ -311,8 +311,8 @@ function buildDemoEvents(): WochenplanBoardEvent[] {
       slotKey: "20:15-21:45",
       pitchRowKey: "KUNSTRASEN_3",
       fieldLabel: "A",
-      homeLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
-      coachLabel: "E. VÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶gt",
+      homeLabel: "E. V\u00f6gt",
+      coachLabel: "E. V\u00f6gt",
       categoryKey: "FRAUEN",
       allocation: {
         pitchCode: "KUNSTRASEN_3_A",
@@ -655,7 +655,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data?.error ?? "Ãƒâ€žnderung konnte nicht gespeichert werden.");
+      throw new Error(data?.error ?? "\u00c4nderung konnte nicht gespeichert werden.");
     }
   }
 
@@ -683,8 +683,8 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
 
       setSaveError(
         error instanceof Error
-          ? `${error.message} Die Ãƒâ€žnderung wurde zurÃƒÂ¼ckgesetzt.`
-          : "Ãƒâ€žnderung konnte nicht gespeichert werden. Die Ãƒâ€žnderung wurde zurÃƒÂ¼ckgesetzt.",
+          ? `${error.message} Die \u00c4nderung wurde zur\u00fcckgesetzt.`
+          : "\u00c4nderung konnte nicht gespeichert werden. Die \u00c4nderung wurde zur\u00fcckgesetzt.",
       );
     } finally {
       setPendingMutationCount((count) => Math.max(0, count - 1));

@@ -48,7 +48,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         month: "2-digit",
       }),
     )
-    .join(" ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ ");
+    .join(" \u2013 ");
 
   return (
     <div className="space-y-6">
@@ -88,10 +88,8 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
             <Link
               href={`/dashboard/wochenplan?week=${nextWeekId}`}
               className="fca-button-secondary flex items-center gap-1"
-              title="NÃƒÆ’Ã‚Â¤chste Woche"
-            >
-              NÃƒÆ’Ã‚Â¤chste
-              <ChevronRight className="h-4 w-4" />
+              title="Nächste Woche"
+            >Nächste<ChevronRight className="h-4 w-4" />
             </Link>
           </nav>
         </div>
@@ -106,7 +104,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
               {boardData.unplaced.length} Event{boardData.unplaced.length !== 1 ? "s" : ""} kann nicht auf dem Grid platziert werden
             </p>
             <p className="mt-0.5 text-[0.75rem] text-amber-700">
-              Wochenend-Events oder ungewÃƒÆ’Ã‚Â¶hnliche Zeiten werden hier nicht angezeigt ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â{" "}
+              Wochenend-Events oder ungew\u00f6hnliche Zeiten werden hier nicht angezeigt \u2013 {" "}
               sie erscheinen aber in der Saisonplaner-Ansicht.
             </p>
             <ul className="mt-1 flex flex-wrap gap-2">
