@@ -18,14 +18,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { FCA_PITCH_ALLOCATIONS } from "@/lib/facilities/pitches";
-import { FCA_DRESSING_ROOMS } from "@/lib/facilities/dressing-rooms";
 import { assertEventBelongsToTenant } from "@/lib/weekly-plan/tenant-validation";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
-
-const VALID_PITCH_CODES = new Set(FCA_PITCH_ALLOCATIONS.map((p) => p.code));
-const VALID_ROOM_CODES = new Set(FCA_DRESSING_ROOMS.map((r) => r.code));
 
 function toOptionalDate(value: unknown, field: string): { ok: true; value?: Date } | { ok: false; error: string } {
   if (value === undefined) return { ok: true };
@@ -79,6 +74,33 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
   const { eventId } = await params;
   const body = await req.json().catch(() => ({}));
+
+  const activeResources = await prisma.facilityResource.findMany({
+    where: {
+      tenantId: actorTenantId,
+      status: "ACTIVE",
+      facility: {
+        tenantId: actorTenantId,
+        status: "ACTIVE",
+      },
+    },
+    select: {
+      code: true,
+      type: true,
+    },
+  });
+
+  const VALID_PITCH_CODES = new Set(
+    activeResources
+      .filter((resource) => resource.type === "FULL_PITCH" || resource.type === "HALF_PITCH")
+      .map((resource) => resource.code),
+  );
+
+  const VALID_ROOM_CODES = new Set(
+    activeResources
+      .filter((resource) => resource.type === "DRESSING_ROOM")
+      .map((resource) => resource.code),
+  );
 
   const pitchResult = validateNullableCode(body.pitchCode, VALID_PITCH_CODES, "pitchCode");
   if (!pitchResult.ok) return NextResponse.json({ error: pitchResult.error }, { status: 400 });
