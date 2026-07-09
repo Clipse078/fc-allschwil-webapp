@@ -208,6 +208,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.SEASONS_VIEW, PERMISSIONS.SEASONS_MANAGE],
           },
           {
+            key: "wochenplan",
+            label: "Wochenplan",
+            href: "/dashboard/wochenplan",
+            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
+          },
+          {
             key: "saisonplanung",
             label: "Saisonplanung",
             href: "/dashboard/planner",
@@ -218,12 +224,6 @@ export const NAV_SECTIONS: NavSection[] = [
             label: "Events",
             href: "/dashboard/events",
             permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
-          },
-          {
-            key: "feldressourcen",
-            label: "Feld & Ressourcen",
-            href: "/dashboard/wochenplan",
-            permissionKeys: [PERMISSIONS.WOCHENPLAN_MANAGE],
           },
         ],
       },
