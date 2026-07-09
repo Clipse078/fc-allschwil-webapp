@@ -378,6 +378,7 @@ model Tenant {
   facilities             Facility[]
   facilityResources      FacilityResource[]
   wochenplanPublications WochenplanPublication[]
+  planningTimeSlots      PlanningTimeSlot[]
   newsArticles           NewsArticle[]
   mediaAssets            MediaAsset[]
   mediaFolders           MediaFolder[]
@@ -1309,6 +1310,26 @@ model WochenplanPublication {
   @@unique([tenantId, weekId])
   @@index([tenantId, weekId])
   @@index([tenantId, isPublished])
+}
+model PlanningTimeSlot {
+  id          String   @id @default(cuid())
+  tenantId    String
+  key         String
+  label       String
+  startHour   Int
+  startMinute Int
+  endHour     Int
+  endMinute   Int
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId, isActive])
+  @@index([tenantId, sortOrder])
 }
 
 // ---------------------------------------------------------------------------
