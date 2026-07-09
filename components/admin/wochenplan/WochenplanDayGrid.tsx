@@ -120,14 +120,14 @@ export default function WochenplanDayGrid({
   const dayEvents = events.filter((event) => event.boardDayKey === dayKey);
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-4 bg-[#0f1b3d] px-5 py-4 text-white">
         <p className="text-sm font-semibold">{dayLabel}</p>
 
         <button
           type="button"
           onClick={() => onOpenDayPlanner(dayKey, dayLabel)}
-          className="inline-flex items-center gap-3 rounded-2xl border border-sky-300 bg-sky-500/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500/30"
+          className="inline-flex items-center gap-2.5 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
         >
           <span>Garderobe Tagesplaner</span>
           <WochenplanRoomConflictBadge count={roomConflictCount} />
@@ -220,20 +220,20 @@ export default function WochenplanDayGrid({
                     onDropEvent(draggingEventId, dayKey, pitchRow.key, slot);
                   }}
                   className={[
-                    "min-h-[110px] border-r border-t border-slate-200 p-2 transition-colors last:border-r-0",
+                    "min-h-[118px] border-r border-t border-slate-200 p-2 transition-colors duration-150 last:border-r-0",
                     isDropTarget
-                      ? "bg-sky-50"
+                      ? "bg-sky-50/80"
                       : "bg-white",
                   ].join(" ")}
                 >
                   <div
                     className={[
-                      "relative h-full overflow-hidden rounded-2xl border border-dashed p-1.5 transition",
+                      "relative h-full min-h-[100px] overflow-hidden rounded-xl border border-dashed p-1.5 transition-all duration-150",
                       isDropTarget
-                        ? "border-sky-400 bg-sky-50 ring-2 ring-sky-300/40"
+                        ? "border-sky-400 bg-sky-50 ring-2 ring-sky-300/30"
                         : hasCellConflict
                           ? "border-red-200 bg-red-50/20"
-                          : "border-slate-200 bg-slate-50/50",
+                          : "border-slate-200/80 bg-slate-50/35 hover:bg-slate-50/60",
                     ].join(" ")}
                   >
                     {hasCellConflict ? (
@@ -248,7 +248,7 @@ export default function WochenplanDayGrid({
                       </div>
                     ) : null}
 
-                    <div className="grid gap-2">
+                    <div className="grid gap-1.5">
                       {cellEvents.map((event) => (
                         <WochenplanEventCard
                           key={event.id}

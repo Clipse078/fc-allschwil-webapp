@@ -71,13 +71,13 @@ export default function WochenplanEventCard({
       onDragEnd={onDragEnd}
       onClick={() => onSelect(event.id)}
       className={[
-        "group relative block w-full max-w-full overflow-hidden rounded-2xl border p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:shadow-md",
+        "group relative block w-full max-w-full cursor-grab overflow-hidden rounded-xl border p-3 text-left shadow-sm transition-all duration-150 hover:-translate-y-[1px] hover:shadow-md active:cursor-grabbing",
         categoryClasses,
         hasConflict
-          ? "ring-2 ring-red-300/60 shadow-[0_10px_24px_rgba(239,68,68,0.10)]"
+          ? "ring-1 ring-red-300 shadow-[0_8px_20px_rgba(239,68,68,0.08)]"
           : "",
         isSelected
-          ? "ring-2 ring-sky-400 shadow-[0_14px_30px_rgba(14,165,233,0.16)]"
+          ? "ring-2 ring-sky-500 ring-offset-1 shadow-[0_10px_24px_rgba(14,165,233,0.14)]"
           : "",
       ].join(" ")}
       title="Karte ziehen oder klicken für Details"
@@ -102,19 +102,19 @@ export default function WochenplanEventCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className={"h-2.5 w-2.5 shrink-0 rounded-full " + getTypeDotClass(event.eventType)} />
-            <p className="truncate text-xs font-bold">{event.title}</p>
+            <p className="truncate text-[0.78rem] font-bold leading-5">{event.title}</p>
           </div>
         </div>
 
-        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 opacity-50 transition group-hover:opacity-100" />
+        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-current opacity-30 transition group-hover:opacity-70" />
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium opacity-80">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold opacity-80">
         <span className="shrink-0">{event.slotKey}</span>
         {event.fieldLabel ? <span className="truncate">• Feld {event.fieldLabel}</span> : null}
       </div>
 
-      <div className="mt-3 space-y-1.5 text-[11px] opacity-85">
+      <div className="mt-2.5 space-y-1 text-[11px] leading-4 opacity-80">
         <div className="flex min-w-0 items-center gap-1.5">
           <MapPinned className="h-3 w-3 shrink-0" />
           <span className="truncate">
