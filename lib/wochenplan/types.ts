@@ -1,3 +1,4 @@
+import type { WochenplanBoardSlotKey } from "@/lib/wochenplan/time-slots";
 export type WochenplanEventAllocation = {
   pitchCode: string | null;
   homeDressingRoomCode: string | null;
@@ -62,11 +63,7 @@ export type WochenplanBoardPitchRowKey =
   | "KUNSTRASEN_2"
   | "KUNSTRASEN_3";
 
-export type WochenplanBoardSlotKey =
-  | "15:45-17:15"
-  | "17:15-18:45"
-  | "18:45-20:15"
-  | "20:15-21:45";
+export type { WochenplanBoardSlotKey } from "@/lib/wochenplan/time-slots";
 
 export type WochenplanBoardCategoryKey =
   | "KINDERFUSSBALL"

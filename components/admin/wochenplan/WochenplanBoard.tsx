@@ -13,6 +13,7 @@ import WochenplanRoomDayPlannerDialog, {
 import WochenplanRoomDrawer from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 import { getWochenplanConflicts } from "@/lib/wochenplan/conflict-engine";
 import { parseIsoWeekId } from "@/lib/planner/date-utils";
+import { getWochenplanTimeSlot, getWochenplanTimeSlotKeys } from "@/lib/wochenplan/time-slots";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -27,12 +28,7 @@ const DEFAULT_PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; label: string
   { key: "KUNSTRASEN_3", label: "KR 3" },
 ];
 
-const TIME_SLOTS: WochenplanBoardSlotKey[] = [
-  "15:45-17:15",
-  "17:15-18:45",
-  "18:45-20:15",
-  "20:15-21:45",
-];
+const TIME_SLOTS: WochenplanBoardSlotKey[] = getWochenplanTimeSlotKeys();
 
 const DAYS: Array<{ key: WochenplanBoardDayKey; label: string }> = [
   { key: "MONDAY", label: "Montag" },
@@ -43,19 +39,14 @@ const DAYS: Array<{ key: WochenplanBoardDayKey; label: string }> = [
 ];
 
 function getSlotStartHour(slotKey: WochenplanBoardSlotKey) {
-  if (slotKey === "15:45-17:15") {
-    return { hour: 15, minute: 45, endHour: 17, endMinute: 15 };
-  }
+  const slot = getWochenplanTimeSlot(slotKey);
 
-  if (slotKey === "17:15-18:45") {
-    return { hour: 17, minute: 15, endHour: 18, endMinute: 45 };
-  }
-
-  if (slotKey === "18:45-20:15") {
-    return { hour: 18, minute: 45, endHour: 20, endMinute: 15 };
-  }
-
-  return { hour: 20, minute: 15, endHour: 21, endMinute: 45 };
+  return {
+    hour: slot.startHour,
+    minute: slot.startMinute,
+    endHour: slot.endHour,
+    endMinute: slot.endMinute,
+  };
 }
 
 function getBoardDate(dayKey: WochenplanBoardDayKey, weekStart: Date | null): string {
@@ -327,7 +318,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
 
     try {
       await persistAllocation(updatedEvent);
-      setSaveSuccess("Ã„nderung gespeichert.");
+      setSaveSuccess("Ãƒâ€žnderung gespeichert.");
 
       window.setTimeout(() => {
         setSaveSuccess(null);
@@ -506,7 +497,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
         message={
           saveError ??
           saveSuccess ??
-          (pendingMutationCount > 0 ? "Ã„nderung wird gespeichertâ€¦" : null)
+          (pendingMutationCount > 0 ? "Ãƒâ€žnderung wird gespeichertÃ¢â‚¬Â¦" : null)
         }
         tone={
           saveError
