@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
@@ -307,6 +307,15 @@ export async function POST(request: NextRequest) {
     }
 
     const session = access.session;
+    const actorTenantId = session?.user?.tenantId;
+
+    if (!actorTenantId) {
+      return NextResponse.json(
+        { error: "Kein Mandant in der Sitzung." },
+        { status: 401 },
+      );
+    }
+
     const actorUserId =
       session?.user?.effectiveUserId ??
       session?.user?.id ??
@@ -371,6 +380,7 @@ export async function POST(request: NextRequest) {
 
         const createdEvent = await tx.event.create({
           data: {
+            tenantId: actorTenantId,
             seasonId,
             teamId,
             type: type as AllowedEventType,
@@ -535,7 +545,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-
-
-
