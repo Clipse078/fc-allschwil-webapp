@@ -10,26 +10,20 @@
  *   - No token persistence in database or browser storage.
  *   - Retry only on safe transient failures; never retry 401/403.
  *
- * TOKEN CONTRACT BOUNDARY:
- *   The function `executeTokenRequest()` is the single boundary where the
- *   official SFV API authentication contract must be implemented. It is
- *   currently a placeholder that throws `SfvContractUnresolvedError`.
- *
- *   Before connecting this adapter to the live SFV endpoint:
- *     1. Obtain the official SFV ClubCorner API authentication documentation.
- *     2. Confirm the exact HTTP method, Content-Type, request field names,
- *        response token field, and expiry semantics.
- *     3. Replace the placeholder body of `executeTokenRequest()` with the
- *        documented implementation.
- *     4. Update the tests in __tests__/client.test.ts to cover the actual contract.
- *
- *   Do NOT guess field names, do NOT probe the live endpoint with speculative
- *   payloads, and do NOT infer field names from environment variable names.
+ * AUTHENTICATION CONTRACT (SFV ClubCorner API — confirmed from Swagger):
+ *   POST /api/token
+ *   Content-Type: application/json
+ *   Body: { "applicationKey": "<key>", "applicationPass": "<pass>" }
+ *   Success: HTTP 200, Content-Type: text/plain, body is the raw session-token string
+ *   Failure: HTTP 401 (authentication failure), HTTP 500 (server error)
+ *   Token validity: 30 minutes initial; extended on each valid authenticated request.
+ *   No expiry timestamp is returned in the response.
  */
 
 import { getSfvConfig, type SfvConfig } from "./config";
 import {
-  SfvContractUnresolvedError,
+  SfvError,
+  SfvAuthError,
   SfvNetworkError,
   toSafePublicError,
   isRetryableSfvError,
@@ -40,13 +34,18 @@ import {
 
 /**
  * Parsed token held in memory. Never persisted to database or browser storage.
- * The `expiresAt` field is null when the upstream contract does not document
- * a reliable expiry — in that case the token is never considered expired and
- * will only be refreshed after a 401 response.
+ *
+ * `expiresAt` reflects the LOCAL CACHE POLICY only — the SFV API does not
+ * return an expiry timestamp. This field must NOT be surfaced in API responses
+ * as if it were an SFV-supplied expiry.
  */
 type CachedToken = {
   token: string;
-  expiresAt: Date | null;
+  /**
+   * Local cache expiry. Set to LOCAL_TOKEN_CACHE_MAX_AGE_MS from acquisition
+   * time. This is a local policy — not derived from or implied by the SFV API.
+   */
+  expiresAt: Date;
 };
 
 let cachedToken: CachedToken | null = null;
@@ -57,15 +56,19 @@ let cachedToken: CachedToken | null = null;
  */
 let inflight: Promise<CachedToken> | null = null;
 
-/** Seconds before expiry to proactively refresh the token. */
+/**
+ * Local maximum token cache age in milliseconds.
+ * Conservative — shorter than the documented 30-minute initial SFV token validity.
+ * This is a LOCAL CACHE POLICY. The SFV API does not return an expiry timestamp.
+ * Actual server-side validity is 30 minutes; extended on each valid API request.
+ */
+const LOCAL_TOKEN_CACHE_MAX_AGE_MS = 20 * 60 * 1000; // 20 minutes
+
+/** Seconds before local cache expiry to proactively refresh the token. */
 const EXPIRY_BUFFER_SECONDS = 60;
 
-/**
- * Request timeout in milliseconds.
- * Used in the reference skeleton in executeTokenRequest().
- * Activate when implementing the token request contract.
- */
-// const REQUEST_TIMEOUT_MS = 10_000;
+/** Request timeout in milliseconds. */
+const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Maximum retry attempts for transient failures (not authentication failures). */
 const MAX_RETRIES = 2;
@@ -73,138 +76,83 @@ const MAX_RETRIES = 2;
 /** Base delay in milliseconds for retry backoff. */
 const RETRY_BASE_DELAY_MS = 500;
 
-// ── Token contract boundary ───────────────────────────────────────────────────
+// ── Token request ─────────────────────────────────────────────────────────────
 
 /**
- * Represents the raw response parsed from the SFV token endpoint.
+ * Executes the authenticated token request to the SFV ClubCorner API.
  *
- * IMPORTANT: The actual field names are placeholders pending official
- * SFV API documentation. Do not assume these match the real response shape.
- * Update this type when the documentation is available.
+ * Contract (confirmed from official SFV Swagger documentation):
+ *   - Method: POST
+ *   - Content-Type: application/json
+ *   - Body fields: applicationKey, applicationPass (exact names per Swagger)
+ *   - Success: HTTP 200, text/plain body containing the raw session token
+ *   - HTTP 401: authentication failure
+ *   - HTTP 500: server error
+ *
+ * Security invariants:
+ *   - Never logs the request body or credential values.
+ *   - Never includes Authorization header values in thrown errors.
+ *   - Applies REQUEST_TIMEOUT_MS; AbortError maps to SFV_TIMEOUT.
  */
-type RawTokenResponse = {
-  /** The bearer token. Field name TBD from official documentation. */
-  access_token?: string;
-  /** Expiry in seconds. Field name TBD from official documentation. May not exist. */
-  expires_in?: number;
-  /** Token type hint. Field name TBD from official documentation. May not exist. */
-  token_type?: string;
-};
+async function executeTokenRequest(config: SfvConfig): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-/**
- * CONTRACT BOUNDARY — executeTokenRequest()
- *
- * This function contains the actual HTTP call to the SFV token endpoint.
- * It is currently a stub that throws `SfvContractUnresolvedError`.
- *
- * Implementation checklist (complete when official documentation is available):
- *   [ ] Confirm: HTTP method (likely POST)
- *   [ ] Confirm: Content-Type (e.g. application/x-www-form-urlencoded or application/json)
- *   [ ] Confirm: request field name for the application key
- *   [ ] Confirm: request field name for the application password
- *   [ ] Confirm: whether grant_type or another field is required
- *   [ ] Confirm: whether credentials go in the body or in an Authorization header
- *   [ ] Confirm: response token field name
- *   [ ] Confirm: response expiry field name and semantics (seconds? epoch? absent?)
- *   [ ] Update `RawTokenResponse` type to match the actual response shape
- *   [ ] Update `parseTokenResponse()` to read the correct field names
- *   [ ] Update tests in __tests__/client.test.ts
- *
- * The function must:
- *   - Apply REQUEST_TIMEOUT_MS
- *   - Never log the Authorization header
- *   - Never log request body contents
- *   - Return a RawTokenResponse on success
- *   - Throw a typed SfvError on failure
- */
-async function executeTokenRequest(config: SfvConfig): Promise<RawTokenResponse> {
-  // ── CONTRACT BOUNDARY ────────────────────────────────────────────────────────
-  //
-  // Replace this stub with the real token request once official SFV API
-  // documentation has been obtained and reviewed.
-  //
-  // STUB: deliberately throws so that tests and callers surface the unresolved
-  // boundary clearly instead of failing with a cryptic network error.
+  try {
+    const response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        applicationKey: config.applicationKey,
+        applicationPass: config.applicationPass,
+      }),
+      signal: controller.signal,
+    });
 
-  void config; // suppress unused parameter warning in stub
-  throw new SfvContractUnresolvedError();
+    if (response.status === 401) {
+      throw new SfvAuthError("SFV_UNAUTHORIZED", "SFV token request rejected: 401 Unauthorized.");
+    }
+    if (response.status === 403) {
+      throw new SfvAuthError("SFV_FORBIDDEN", "SFV token request rejected: 403 Forbidden.");
+    }
+    if (response.status === 429) {
+      throw new SfvNetworkError(
+        "SFV_RATE_LIMITED",
+        "SFV token endpoint returned 429 Too Many Requests.",
+      );
+    }
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV token endpoint returned HTTP ${response.status}.`,
+      );
+    }
 
-  // ── REFERENCE SKELETON (do not enable — complete from official docs) ─────────
-  // Import additions needed: SfvAuthError, REQUEST_TIMEOUT_MS (uncomment above)
-  //
-  // const controller = new AbortController();
-  // const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  //
-  // try {
-  //   const body = new URLSearchParams();
-  //   // TODO: set body fields from official documentation
-  //   // body.set("FIELD_NAME_FROM_DOCS", config.applicationKey);
-  //   // body.set("FIELD_NAME_FROM_DOCS", config.applicationPass);
-  //
-  //   const response = await fetch(config.tokenUrl, {
-  //     method: "POST",
-  //     headers: {
-  //       // TODO: confirm Content-Type from official documentation
-  //       "Content-Type": "application/x-www-form-urlencoded",
-  //     },
-  //     body: body.toString(),
-  //     signal: controller.signal,
-  //   });
-  //
-  //   if (response.status === 401) {
-  //     throw new SfvAuthError("SFV_UNAUTHORIZED", "SFV token request rejected: 401 Unauthorized.");
-  //   }
-  //   if (response.status === 403) {
-  //     throw new SfvAuthError("SFV_FORBIDDEN", "SFV token request rejected: 403 Forbidden.");
-  //   }
-  //   if (response.status === 429) {
-  //     throw new SfvNetworkError("SFV_RATE_LIMITED", "SFV token endpoint returned 429 Too Many Requests.");
-  //   }
-  //   if (!response.ok) {
-  //     throw new SfvNetworkError("SFV_UNAVAILABLE", `SFV token endpoint returned HTTP ${response.status}.`);
-  //   }
-  //
-  //   const raw: unknown = await response.json().catch(() => null);
-  //   return raw as RawTokenResponse;
-  // } catch (error) {
-  //   if (error instanceof SfvError) throw error;
-  //   if (error instanceof Error && error.name === "AbortError") {
-  //     throw new SfvNetworkError("SFV_TIMEOUT", "SFV token request timed out.");
-  //   }
-  //   throw new SfvNetworkError("SFV_UNAVAILABLE", "SFV token request failed: network error.");
-  // } finally {
-  //   clearTimeout(timeoutId);
-  // }
-}
+    const rawText = await response.text();
+    const trimmed = rawText.trim();
 
-/**
- * Parses the raw token response into a CachedToken.
- *
- * IMPORTANT: The field names below (access_token, expires_in) are placeholders.
- * Update them to match the actual SFV API response once the contract is confirmed.
- */
-function parseTokenResponse(raw: RawTokenResponse): CachedToken {
-  // TODO: update field names from official documentation
-  const token = raw?.access_token;
+    if (!trimmed) {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV token response did not contain a valid token.",
+      );
+    }
 
-  if (!token || typeof token !== "string" || token.trim() === "") {
-    throw new SfvNetworkError(
-      "SFV_INVALID_RESPONSE",
-      "SFV token response did not contain a valid token.",
-    );
+    return trimmed;
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", "SFV token request timed out.");
+    }
+    throw new SfvNetworkError("SFV_UNAVAILABLE", "SFV token request failed: network error.");
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  let expiresAt: Date | null = null;
-
-  if (typeof raw.expires_in === "number" && raw.expires_in > 0) {
-    expiresAt = new Date(Date.now() + raw.expires_in * 1000);
-  }
-
-  return { token: token.trim(), expiresAt };
 }
 
 function isTokenExpired(cached: CachedToken): boolean {
-  if (!cached.expiresAt) return false;
   const bufferMs = EXPIRY_BUFFER_SECONDS * 1000;
   return cached.expiresAt.getTime() - bufferMs <= Date.now();
 }
@@ -220,8 +168,11 @@ async function acquireTokenWithRetry(config: SfvConfig): Promise<CachedToken> {
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const raw = await executeTokenRequest(config);
-      return parseTokenResponse(raw);
+      const token = await executeTokenRequest(config);
+      return {
+        token,
+        expiresAt: new Date(Date.now() + LOCAL_TOKEN_CACHE_MAX_AGE_MS),
+      };
     } catch (error) {
       lastError = error;
 
@@ -245,9 +196,9 @@ async function acquireTokenWithRetry(config: SfvConfig): Promise<CachedToken> {
 /**
  * Acquires a valid SFV access token.
  *
- * Uses in-memory caching: the token is reused until it is within
- * EXPIRY_BUFFER_SECONDS of expiry. Concurrent callers await the same
- * inflight request to prevent parallel token fetches.
+ * Uses in-memory caching governed by LOCAL_TOKEN_CACHE_MAX_AGE_MS (20 minutes).
+ * This is a local policy: the SFV API does not return an expiry timestamp.
+ * Concurrent callers await the same inflight request to prevent parallel fetches.
  *
  * Throws a typed SfvError on failure. Never returns the token to the browser.
  * Callers must use the token server-side only.
@@ -288,10 +239,11 @@ export function evictCachedToken(): void {
 }
 
 /**
- * Returns the expiry timestamp of the cached token, or null if none is cached
- * or if the upstream contract does not provide an expiry.
+ * Returns the local-policy expiry of the cached token, or null if none is cached.
  *
- * Safe to include in API responses — contains no credential material.
+ * IMPORTANT: This reflects a LOCAL CACHE POLICY, not an SFV-provided expiry.
+ * Do not surface this value in API responses as if it were an SFV-supplied timestamp.
+ * Safe to use for internal cache management decisions only.
  */
 export function getCachedTokenExpiresAt(): Date | null {
   return cachedToken?.expiresAt ?? null;
@@ -308,12 +260,16 @@ export function hasCachedToken(): boolean {
 /**
  * Tests the SFV connection by acquiring a token.
  * Returns a sanitized result object suitable for the API response.
+ *
+ * tokenExpiresAt is always null: the SFV API does not return an expiry timestamp,
+ * and the local cache deadline must not be presented as an SFV-supplied value.
+ *
  * Never includes the token, application key, password, or Authorization header.
  */
 export async function testSfvConnection(): Promise<{
   connected: boolean;
   tokenValid: boolean;
-  tokenExpiresAt: string | null;
+  tokenExpiresAt: null;
   testedAt: string;
   error: { code: string; message: string } | null;
 }> {
@@ -322,12 +278,12 @@ export async function testSfvConnection(): Promise<{
   evictCachedToken();
 
   try {
-    const cached = await acquireToken();
+    await acquireToken();
 
     return {
       connected: true,
       tokenValid: true,
-      tokenExpiresAt: cached.expiresAt ? cached.expiresAt.toISOString() : null,
+      tokenExpiresAt: null,
       testedAt,
       error: null,
     };

@@ -175,12 +175,22 @@ describe("POST /api/admin/integrations/sfv/test", () => {
     expect(body.testedAt).toBeDefined();
   });
 
+  it("tokenExpiresAt is null in successful response (SFV API returns no expiry timestamp)", async () => {
+    mockRequireApiPermission.mockResolvedValue(AUTHENTICATED_ADMIN);
+
+    const response = await POST();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.tokenExpiresAt).toBeNull();
+  });
+
   it("response does not contain application key, password, or token", async () => {
     mockRequireApiPermission.mockResolvedValue(AUTHENTICATED_ADMIN);
     mockTestSfvConnection.mockResolvedValue({
       connected: true,
       tokenValid: true,
-      tokenExpiresAt: "2026-07-10T20:00:00.000Z",
+      tokenExpiresAt: null,
       testedAt: new Date().toISOString(),
       error: null,
     });
@@ -202,16 +212,17 @@ describe("POST /api/admin/integrations/sfv/test", () => {
       tokenValid: false,
       tokenExpiresAt: null,
       testedAt: new Date().toISOString(),
-      error: { code: "CONTRACT_UNRESOLVED", message: "Contract not implemented." },
+      error: { code: "SFV_UNAUTHORIZED", message: "SFV token request rejected: 401 Unauthorized." },
     });
 
     const response = await POST();
     const body = await response.json();
     const json = JSON.stringify(body);
 
-    expect(json).not.toContain("application_key");
-    expect(json).not.toContain("application_pass");
-    expect(json).not.toContain("access_token");
+    expect(json).not.toContain("applicationKey");
+    expect(json).not.toContain("applicationPass");
+    expect(json).not.toContain("test-application-key");
+    expect(json).not.toContain("test-application-pass");
   });
 
   // ── Failed connection test ──────────────────────────────────────────────────
@@ -223,7 +234,7 @@ describe("POST /api/admin/integrations/sfv/test", () => {
       tokenValid: false,
       tokenExpiresAt: null,
       testedAt: new Date().toISOString(),
-      error: { code: "CONTRACT_UNRESOLVED", message: "Contract not implemented." },
+      error: { code: "SFV_UNAUTHORIZED", message: "SFV token request rejected: 401 Unauthorized." },
     });
 
     const response = await POST();
@@ -232,7 +243,7 @@ describe("POST /api/admin/integrations/sfv/test", () => {
     const body = await response.json();
     expect(body.connected).toBe(false);
     expect(body.error).toBeDefined();
-    expect(body.error.code).toBe("CONTRACT_UNRESOLVED");
+    expect(body.error.code).toBe("SFV_UNAUTHORIZED");
   });
 
   // ── No database write ───────────────────────────────────────────────────────

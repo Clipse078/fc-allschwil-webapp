@@ -1,7 +1,7 @@
 # SFV / ClubCorner Integration — Slice 1: Authentication
 
 > **Document type:** Integration specification and runbook  
-> **Status:** Slice 1 complete — token contract pending  
+> **Status:** Slice 1 complete — token contract implemented from Swagger
 > **Last updated:** 2026-07-10  
 > **Maintained by:** SportClubEvo engineering team
 
@@ -30,7 +30,7 @@ SFV_CLUB_ID=
 
 | Variable              | Description                                              | Format          |
 |-----------------------|----------------------------------------------------------|-----------------|
-| `SFV_TOKEN_URL`       | HTTPS endpoint for obtaining a bearer token from SFV    | Full HTTPS URL  |
+| `SFV_TOKEN_URL`       | HTTPS endpoint for obtaining a session token from SFV   | Full HTTPS URL  |
 | `SFV_APPLICATION_KEY` | Application key / client identifier assigned by SFV     | String          |
 | `SFV_APPLICATION_PASS`| Application password / client secret assigned by SFV    | String          |
 | `SFV_CLUB_ID`         | Numeric club identifier assigned by SFV                 | 1–10 digit int  |
@@ -77,7 +77,7 @@ The page displays:
 - SFV environment (always: production)
 - Club ID configured (boolean)
 - Token valid (boolean)
-- Token expiry if documented by the SFV API
+- `tokenExpiresAt: null` — the SFV API does not return an expiry timestamp
 - Tested-at timestamp
 - Sanitized error code and message if the test fails
 
@@ -89,6 +89,87 @@ curl -X POST http://localhost:3000/api/admin/integrations/sfv/test \
   -H "Content-Type: application/json" \
   -b "next-auth.session-token=<your-local-session-token>"
 ```
+
+---
+
+## SFV Authentication Contract
+
+Documented source: SFV ClubCorner API Swagger/OpenAPI specification.
+
+### Token endpoint
+
+```
+POST /api/token
+```
+
+### Request
+
+```
+Content-Type: application/json
+```
+
+Body (exact field names per Swagger):
+
+```json
+{
+  "applicationKey": "<SFV_APPLICATION_KEY>",
+  "applicationPass": "<SFV_APPLICATION_PASS>"
+}
+```
+
+### Successful response
+
+```
+HTTP 200
+Content-Type: text/plain
+Body: <raw session-token string>
+```
+
+The body is an opaque plain-text string. No JSON parsing is performed.
+Surrounding transport whitespace is trimmed; an empty body is rejected.
+
+### Error responses
+
+| HTTP Status | Meaning                    | Local error code    |
+|-------------|----------------------------|---------------------|
+| 401         | Authentication failure     | `SFV_UNAUTHORIZED`  |
+| 403         | Forbidden                  | `SFV_FORBIDDEN`     |
+| 429         | Too many requests          | `SFV_RATE_LIMITED`  |
+| 500         | Unexpected server error    | `SFV_UNAVAILABLE`   |
+| Timeout     | Request exceeded 10 000 ms | `SFV_TIMEOUT`       |
+
+### Token validity
+
+Per Swagger documentation:
+- Initial validity: **30 minutes**
+- Validity is **extended on each valid authenticated API request**
+
+No expiry timestamp is returned in the token response.
+
+### Token handling invariants
+
+- The token is never decoded or assumed to be JWT.
+- The token is never persisted to the database or browser storage.
+- The token is never returned to the browser.
+- The token is never logged.
+- No `Authorization` header value is included in error messages.
+- Credentials (`applicationKey`, `applicationPass`) are never logged.
+
+---
+
+## Local Token Cache Policy
+
+The client maintains an **in-process token cache** governed by a local policy:
+
+| Parameter                      | Value        | Notes                                      |
+|--------------------------------|--------------|--------------------------------------------|
+| `LOCAL_TOKEN_CACHE_MAX_AGE_MS` | 20 minutes   | Conservative; shorter than 30-min validity |
+| Expiry buffer                  | 60 seconds   | Proactive refresh window                   |
+| Persistence                    | None         | Module-level memory only                   |
+
+**Important:** The local cache deadline is a **local policy only**. It is NOT
+derived from or implied by any field in the SFV API response (no expiry is
+returned). The `tokenExpiresAt` field in API responses is always `null`.
 
 ---
 
@@ -107,6 +188,7 @@ The SFV client module (`lib/integrations/sfv/client.ts`) enforces the following:
 | Transient retry is bounded                 | MAX_RETRIES = 2, exponential backoff                   |
 | Request timeout enforced                   | REQUEST_TIMEOUT_MS = 10 000 ms                         |
 | Concurrent deduplication                   | Single inflight promise shared across callers          |
+| No fabricated expiry in API response       | `tokenExpiresAt` is always null                        |
 
 ---
 
@@ -120,35 +202,11 @@ Admin UI (SfvConnectionPanel)
        └─ testSfvConnection()
             └─ acquireToken()
                  ├─ getSfvConfig()             ← reads validated env vars
-                 └─ executeTokenRequest()      ← [TOKEN CONTRACT BOUNDARY]
-                      └─ (stub — see below)
+                 └─ executeTokenRequest()      ← POST /api/token (JSON body)
+                      ├─ applicationKey
+                      ├─ applicationPass
+                      └─ HTTP 200 → text/plain token
 ```
-
-### Token Contract Boundary
-
-The function `executeTokenRequest()` in `lib/integrations/sfv/client.ts` is
-the single point where the actual HTTP call to the SFV token endpoint is made.
-
-**This function is currently a stub** that throws `SfvContractUnresolvedError`.
-The stub is intentional: it surfaces the missing contract clearly rather than
-silently failing or making speculative requests.
-
-**Before connecting to the live SFV endpoint:**
-
-1. Obtain the official SFV ClubCorner API authentication documentation from SFV.
-2. Confirm all of the following from the documentation:
-   - HTTP method (expected: POST)
-   - Content-Type of the request
-   - Field name(s) for the application key in the request body or header
-   - Field name(s) for the application password in the request body or header
-   - Whether Basic Auth, form body, or JSON body is used
-   - Response field name for the access token
-   - Response field name for token expiry (if documented)
-   - Expiry semantics (seconds, epoch timestamp, or absent)
-3. Implement `executeTokenRequest()` from the confirmed documentation.
-4. Update `parseTokenResponse()` to read the confirmed field names.
-5. Update `RawTokenResponse` type to match the actual response shape.
-6. Update the tests in `lib/integrations/sfv/__tests__/client.test.ts`.
 
 ---
 
@@ -167,29 +225,25 @@ silently failing or making speculative requests.
 
 ## Known Limitations
 
-1. **Token contract unresolved.** The actual HTTP request to the SFV token endpoint
-   requires the official SFV API documentation before implementation. The
-   `executeTokenRequest()` function is a clearly-marked stub.
+1. **Token cache is per-process.** In a multi-instance deployment (e.g. Vercel
+   serverless), each instance maintains its own token cache. This may result in
+   slightly more token requests than in a single-instance deployment. This is safe
+   per the SFV API rate-limit semantics (to be confirmed in Slice 2).
 
 2. **No test credential mechanism.** The repository has no pre-configured mechanism
    for authenticated browser test credentials. Manual UI testing requires a user
    account with `tenants.manage` permission and SFV credentials in `.env.local`.
 
-3. **Token cache is per-process.** In a multi-instance deployment (e.g. Vercel
-   serverless), each instance maintains its own token cache. This may result in
-   slightly more token requests than in a single-instance deployment. This is safe
-   per the SFV API rate-limit semantics (to be confirmed in Slice 2).
+3. **Slice 1 connection test only.** The connection test acquires a token but does
+   not exercise authenticated business-data endpoints. Token validity beyond initial
+   acquisition will be exercised in Slice 2.
 
 ---
 
 ## Next Planned Slice — Slice 2
 
-Slice 2 will complete the SFV authentication by:
+Slice 2 will extend the SFV integration by:
 
-1. Implementing `executeTokenRequest()` from the confirmed official SFV API contract.
-2. Adding integration tests against a mocked SFV token endpoint with realistic responses.
-3. Validating the connection test against the live SFV API in a safe local environment.
-4. Establishing the foundation for the first SFV data fetch (fixture list).
-
-Slice 2 requires the SFV authentication documentation to be obtained and reviewed
-before any implementation begins.
+1. Exercising the first authenticated business-data request (fixture list).
+2. Verifying that token validity extends on each valid API request (per documented behavior).
+3. Establishing the foundation for SFV data import.
