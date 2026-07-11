@@ -240,6 +240,41 @@ Admin UI (SfvConnectionPanel)
 
 ---
 
+## Cloudflare WAF Requirement (discovered in live integration test — 2026-07-11)
+
+The SFV ClubCorner staging API (`stg-club-api-services.football.ch`) is fronted
+by Cloudflare. Requests **without a `User-Agent` header** are rejected at the CDN
+layer before reaching the origin server:
+
+```
+HTTP 403
+Body: error code: 1010
+```
+
+Cloudflare error code 1010 means the request was blocked by Cloudflare's bot/IP
+access-control rules. Adding a descriptive `User-Agent` header allows requests to
+pass the Cloudflare layer and reach the SFV API.
+
+The `executeTokenRequest` function in `client.ts` now sends:
+
+```
+User-Agent: fc-allschwil-webapp/0.1 (SFV-Integration)
+```
+
+**Live integration test results (2026-07-11, staging environment):**
+
+| Attempt | User-Agent | HTTP Status | Result |
+|---------|-----------|-------------|--------|
+| 1       | None      | 403         | Cloudflare block (`error code: 1010`) |
+| 2       | Present   | 401         | SFV API credential rejection (`Unauthorized`) |
+
+The HTTP 401 on attempt 2 means the request successfully passed Cloudflare and
+reached the SFV API origin. The credential rejection (`SFV_UNAUTHORIZED`) indicates
+either invalid credentials for the staging environment or credentials pending
+activation by SFV. This is a configuration/provisioning issue, not a code issue.
+
+---
+
 ## Next Planned Slice — Slice 2
 
 Slice 2 will extend the SFV integration by:

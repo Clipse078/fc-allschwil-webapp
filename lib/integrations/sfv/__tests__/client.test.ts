@@ -107,6 +107,19 @@ describe("token request HTTP contract", () => {
     expect(headers["Content-Type"]).toBe("application/json");
   });
 
+  it("sends a non-empty User-Agent header (required to pass Cloudflare WAF on football.ch)", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockTextResponse(SYNTHETIC_TOKEN),
+    );
+
+    await acquireToken();
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers["User-Agent"]).toBeTruthy();
+    expect(headers["User-Agent"].length).toBeGreaterThan(0);
+  });
+
   it("request body contains applicationKey field (exact Swagger field name)", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       mockTextResponse(SYNTHETIC_TOKEN),

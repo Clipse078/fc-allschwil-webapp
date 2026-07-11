@@ -70,6 +70,16 @@ const EXPIRY_BUFFER_SECONDS = 60;
 /** Request timeout in milliseconds. */
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * User-Agent sent with every SFV API request.
+ *
+ * The SFV ClubCorner API is fronted by Cloudflare. Requests without a
+ * User-Agent header are blocked at the CDN layer with HTTP 403 (Cloudflare
+ * error code 1010 — bot/IP access denied) before reaching the origin server.
+ * A recognisable User-Agent is required for requests to reach the SFV API.
+ */
+const SFV_USER_AGENT = "fc-allschwil-webapp/0.1 (SFV-Integration)";
+
 /** Maximum retry attempts for transient failures (not authentication failures). */
 const MAX_RETRIES = 2;
 
@@ -103,6 +113,7 @@ async function executeTokenRequest(config: SfvConfig): Promise<string> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "User-Agent": SFV_USER_AGENT,
       },
       body: JSON.stringify({
         applicationKey: config.applicationKey,
