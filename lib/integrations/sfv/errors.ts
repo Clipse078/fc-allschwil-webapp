@@ -19,6 +19,7 @@ export type SfvErrorCode =
   | "CONFIGURATION_INVALID"
   | "SFV_UNAUTHORIZED"
   | "SFV_FORBIDDEN"
+  | "SFV_NOT_FOUND"
   | "SFV_RATE_LIMITED"
   | "SFV_TIMEOUT"
   | "SFV_UNAVAILABLE"
@@ -34,6 +35,7 @@ export const SFV_ERROR_HTTP_STATUS: Record<SfvErrorCode, number> = {
   CONFIGURATION_INVALID: 503,
   SFV_UNAUTHORIZED: 502,
   SFV_FORBIDDEN: 502,
+  SFV_NOT_FOUND: 404,
   SFV_RATE_LIMITED: 503,
   SFV_TIMEOUT: 504,
   SFV_UNAVAILABLE: 503,
@@ -81,7 +83,11 @@ export class SfvNetworkError extends SfvError {
   constructor(
     code: Extract<
       SfvErrorCode,
-      "SFV_TIMEOUT" | "SFV_UNAVAILABLE" | "SFV_RATE_LIMITED" | "SFV_INVALID_RESPONSE"
+      | "SFV_TIMEOUT"
+      | "SFV_UNAVAILABLE"
+      | "SFV_NOT_FOUND"
+      | "SFV_RATE_LIMITED"
+      | "SFV_INVALID_RESPONSE"
     >,
     message: string,
   ) {

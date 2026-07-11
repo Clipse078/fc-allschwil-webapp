@@ -70,6 +70,19 @@ const EXPIRY_BUFFER_SECONDS = 60;
 /** Request timeout in milliseconds. */
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * User-Agent sent with every SFV API request.
+ *
+ * The SFV ClubCorner API is fronted by Cloudflare. Requests without a
+ * User-Agent header are blocked at the CDN layer with HTTP 403 (Cloudflare
+ * error code 1010 — bot/IP access denied) before reaching the origin server.
+ * A recognisable User-Agent is required for requests to reach the SFV API.
+ *
+ * Confirmed by live test (2026-07-11): without this header the production
+ * Cloudflare layer returns 403 before the request reaches the SFV origin.
+ */
+const SFV_USER_AGENT = "fc-allschwil-webapp/0.1 (SFV-Integration)";
+
 /** Maximum retry attempts for transient failures (not authentication failures). */
 const MAX_RETRIES = 2;
 
@@ -103,6 +116,7 @@ async function executeTokenRequest(config: SfvConfig): Promise<string> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "User-Agent": SFV_USER_AGENT,
       },
       body: JSON.stringify({
         applicationKey: config.applicationKey,
@@ -256,6 +270,184 @@ export function getCachedTokenExpiresAt(): Date | null {
 export function hasCachedToken(): boolean {
   return cachedToken !== null && !isTokenExpired(cachedToken);
 }
+
+// ── Business data types (Slice 2) ─────────────────────────────────────────────
+
+/**
+ * Represents a single player record returned by GET /api/club/{clubId}/players.
+ *
+ * All nullable fields may be absent from the upstream response; the contract
+ * is defined by the official SFV Club API Interface OpenAPI v26.6.15.2 spec.
+ * Personal data (email1, email2, tel1, tel2, birthDate) is handled server-side
+ * only and must never be forwarded to the browser.
+ */
+export type ClubPlayer = {
+  personId: number;
+  playerId: number;
+  /** 1 = male, 2 = female (SFV Gender enum). */
+  gender: 1 | 2;
+  name: string | null;
+  secondName: string | null;
+  firstname: string | null;
+  /** ISO 8601 date-time string, or null. Personal data — server-side only. */
+  birthDate: string | null;
+  /** Personal data — server-side only. */
+  email1: string | null;
+  /** Personal data — server-side only. */
+  email2: string | null;
+  /** Personal data — server-side only. */
+  tel1: string | null;
+  /** Personal data — server-side only. */
+  tel2: string | null;
+  clubOwnerId: number | null;
+  clubOwnerName: string | null;
+  clubOwnerNumber: number | null;
+  qualificationType: number;
+  qualificationTypeText: string | null;
+  licenceType: number;
+  licenceTypeText: string | null;
+  playerState: number | null;
+  playerStateText: string | null;
+  /** ISO 8601 date-time string. */
+  dateOfEntry: string;
+};
+
+// ── Club players request (Slice 2) ────────────────────────────────────────────
+
+/**
+ * Executes a read-only GET /api/club/{clubId}/players request.
+ *
+ * Contract (confirmed from SFV Club API Interface OpenAPI v26.6.15.2):
+ *   Method:  GET
+ *   Path:    /api/club/{clubId}/players
+ *   Header:  X-User-Token — raw opaque session token (no "Bearer" prefix)
+ *   Header:  User-Agent   — SFV_USER_AGENT (required by Cloudflare WAF)
+ *   Header:  Accept       — application/json
+ *   200: application/json — ClubPlayer[]
+ *   401: SFV_UNAUTHORIZED (token invalid; cached token is evicted)
+ *   403: SFV_FORBIDDEN
+ *   404: SFV_NOT_FOUND
+ *   429: SFV_RATE_LIMITED
+ *   5xx: SFV_UNAVAILABLE
+ *
+ * Security invariants:
+ *   - Token is never included in thrown errors or logs.
+ *   - clubId is validated as non-empty numeric before the request is sent.
+ *   - No data is persisted.
+ */
+async function executeClubPlayersRequest(
+  config: SfvConfig,
+  token: string,
+): Promise<ClubPlayer[]> {
+  const baseUrl = new URL(config.tokenUrl).origin;
+  const url = `${baseUrl}/api/club/${encodeURIComponent(config.clubId)}/players`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-User-Token": token,
+        "User-Agent": SFV_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 401) {
+      evictCachedToken();
+      throw new SfvAuthError(
+        "SFV_UNAUTHORIZED",
+        "SFV club players request rejected: 401 Unauthorized.",
+      );
+    }
+    if (response.status === 403) {
+      throw new SfvAuthError(
+        "SFV_FORBIDDEN",
+        "SFV club players request rejected: 403 Forbidden.",
+      );
+    }
+    if (response.status === 404) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        "SFV club players: club not found (404).",
+      );
+    }
+    if (response.status === 429) {
+      throw new SfvNetworkError(
+        "SFV_RATE_LIMITED",
+        "SFV club players endpoint returned 429 Too Many Requests.",
+      );
+    }
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV club players endpoint returned HTTP ${response.status}.`,
+      );
+    }
+
+    const rawText = await response.text();
+    if (!rawText.trim()) {
+      return [];
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV club players response is not valid JSON.",
+      );
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV club players response expected an array.",
+      );
+    }
+
+    return parsed as ClubPlayer[];
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", "SFV club players request timed out.");
+    }
+    throw new SfvNetworkError(
+      "SFV_UNAVAILABLE",
+      "SFV club players request failed: network error.",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetches the list of registered players for the configured club.
+ *
+ * Endpoint: GET /api/club/{clubId}/players
+ * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
+ *
+ * Uses the in-memory token cache from acquireToken(). On 401, the cache is
+ * evicted automatically so the next call will re-authenticate.
+ *
+ * Returns an empty array when the upstream body is empty (204-equivalent).
+ * Never persists data to the database.
+ *
+ * PERSONAL DATA WARNING: the returned ClubPlayer objects contain personal
+ * fields (email1, email2, tel1, tel2, birthDate). Callers must handle these
+ * server-side only and must not forward them to the browser.
+ */
+export async function fetchClubPlayers(): Promise<ClubPlayer[]> {
+  const config = getSfvConfig();
+  const cached = await acquireToken();
+  return executeClubPlayersRequest(config, cached.token);
+}
+
+// ── SFV connection test (Slice 1) ─────────────────────────────────────────────
 
 /**
  * Tests the SFV connection by acquiring a token.
