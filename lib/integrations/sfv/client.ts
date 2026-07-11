@@ -447,6 +447,143 @@ export async function fetchClubPlayers(): Promise<ClubPlayer[]> {
   return executeClubPlayersRequest(config, cached.token);
 }
 
+// ── Club identifier resolution (Slice 2b) ────────────────────────────────────
+
+/**
+ * Conservative response container for GET /api/common/ids.
+ *
+ * OpenAPI v26.6.15.2 declares the 200 response body as schema `type: string`.
+ * The endpoint summary states "return json with all relevant ids."
+ * No named properties or sub-schema are defined in the specification.
+ *
+ * Both fields are returned so callers can inspect without this layer
+ * assuming a concrete shape:
+ *   raw    — verbatim response text body, exactly as received.
+ *   parsed — result of JSON.parse(raw), or undefined if not parseable.
+ */
+export type ClubIdsResponse = {
+  /** Verbatim text body received from GET /api/common/ids. */
+  raw: string;
+  /**
+   * Result of JSON.parse(raw). Undefined if the body is not valid JSON.
+   * The documented schema is type: string; the actual object shape is
+   * conservatively left as unknown for caller inspection.
+   */
+  parsed: unknown;
+};
+
+/**
+ * Executes a read-only GET /api/common/ids request.
+ *
+ * Contract (SFV Club API Interface OpenAPI v26.6.15.2):
+ *   Method:  GET
+ *   Path:    /api/common/ids
+ *   Query:   ClubId={clubId} (integer, required — exact casing per spec)
+ *   Header:  X-User-Token — raw opaque session token (no "Bearer" prefix)
+ *   Header:  User-Agent   — SFV_USER_AGENT (required by Cloudflare WAF)
+ *   Header:  Accept       — application/json
+ *   200: body declared as type: string; summary implies JSON — both raw and
+ *        parsed values are returned for caller inspection.
+ *   204: no content found → returns null.
+ *   401: session token cannot be validated → SFV_UNAUTHORIZED + evict cache.
+ *   404: resource not found → SFV_NOT_FOUND.
+ *   5xx and undocumented errors → SFV_UNAVAILABLE.
+ *
+ * Security invariants:
+ *   - Token is never included in thrown errors or logs.
+ *   - No data is persisted.
+ */
+async function executeClubIdsRequest(
+  config: SfvConfig,
+  token: string,
+): Promise<ClubIdsResponse | null> {
+  const baseUrl = new URL(config.tokenUrl).origin;
+  const url = `${baseUrl}/api/common/ids?ClubId=${encodeURIComponent(config.clubId)}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-User-Token": token,
+        "User-Agent": SFV_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    if (response.status === 401) {
+      evictCachedToken();
+      throw new SfvAuthError(
+        "SFV_UNAUTHORIZED",
+        "SFV common/ids request rejected: 401 Unauthorized.",
+      );
+    }
+
+    if (response.status === 404) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        "SFV common/ids: resource not found (404).",
+      );
+    }
+
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV common/ids endpoint returned HTTP ${response.status}.`,
+      );
+    }
+
+    const raw = await response.text();
+
+    let parsed: unknown = undefined;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // Body is not JSON-parseable; raw is preserved as-is per conservative contract.
+    }
+
+    return { raw, parsed };
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", "SFV common/ids request timed out.");
+    }
+    throw new SfvNetworkError(
+      "SFV_UNAVAILABLE",
+      "SFV common/ids request failed: network error.",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Resolves identifier mappings for the configured club from GET /api/common/ids.
+ *
+ * Endpoint: GET /api/common/ids?ClubId={SFV_CLUB_ID}
+ * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
+ *
+ * The 200 response schema is declared as type: string. The endpoint summary
+ * says "return json with all relevant ids." Because no named properties are
+ * defined in the schema, both the raw body and a best-effort parsed value are
+ * returned for caller inspection without this layer guessing the shape.
+ *
+ * Returns null on 204 (no content found).
+ * Never persists data. No database reads or writes.
+ */
+export async function resolveClubIds(): Promise<ClubIdsResponse | null> {
+  const config = getSfvConfig();
+  const cached = await acquireToken();
+  return executeClubIdsRequest(config, cached.token);
+}
+
 // ── SFV connection test (Slice 1) ─────────────────────────────────────────────
 
 /**
