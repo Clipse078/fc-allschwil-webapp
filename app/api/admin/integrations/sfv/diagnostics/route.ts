@@ -3,33 +3,33 @@
  *
  * Authenticated admin-only SFV diagnostics endpoint.
  *
- * Runs the stateless, read-only SFV admin diagnostics pipeline and returns the
- * typed result as JSON. Delegates entirely to runSfvAdminDiagnostics — no raw
- * SFV client calls, no database access, no cache, no mutations.
+ * Tenant-safe contract:
+ *   - clubId is resolved exclusively from tenant configuration — never from the request body.
+ *   - tenantId is resolved exclusively from the authenticated session — never from the request.
+ *   - seasonId defaults to config.defaultSeasonId; an explicit positive-integer override may
+ *     be supplied in the request body as { "seasonId": <positive integer> }.
+ *   - Any request body containing "clubId" is rejected with 400.
  *
  * Authorization: requires TENANTS_MANAGE permission.
- * Tenant isolation: session-carried tenantId via the existing requireApiPermission
- * mechanism. ClubId and seasonId are accepted from the request body.
- *
- * Tenant-safety note (future work — Slice: Tenant-Scoped SFV Configuration):
- *   clubId and seasonId are currently accepted from the request body because no
- *   tenant-scoped SFV configuration layer exists yet. A future configuration slice
- *   should validate that the requesting tenant is authorized for the given clubId
- *   before allowing the call. Until that layer exists, only administrators with
- *   TENANTS_MANAGE permission may reach this route. Arbitrary clubId access is
- *   not production-safe across tenants without that additional authorization.
+ * Tenant isolation: tenantId always comes from the authenticated session.
  *
  * HTTP status mapping:
- *   healthy   → 200
- *   degraded  → 200
- *   unhealthy → 503 if any issue is retryable; 502 otherwise
+ *   200  — healthy or degraded
+ *   400  — validation failure (clubId in body, invalid seasonId, malformed JSON)
+ *   401  — unauthenticated
+ *   403  — unauthorized or missing tenant context in session
+ *   404  — no SFV configuration found for this tenant
+ *   409  — SFV integration is disabled for this tenant
+ *   500  — unexpected internal error (no internal details exposed)
+ *   502  — unhealthy, no retryable issues
+ *   503  — unhealthy, at least one retryable issue
  *
  * Response shape:
  *   { diagnostics: SfvAdminDiagnostics }
  *
  * Safety guarantees:
+ *   - No Prisma imports. No repository imports. Service layer only.
  *   - No base64, credentials, tokens, raw SFV response bodies, or stack traces.
- *   - Input validated before runSfvAdminDiagnostics is called.
  *   - Unexpected programmer errors return a generic 500 without internal details.
  */
 
@@ -41,6 +41,11 @@ import {
   type SfvAdminDiagnostics,
   type SfvDiagnosticIssue,
 } from "@/lib/integrations/sfv/admin-diagnostics-service";
+import { requireEnabledSfvConfigForTenant } from "@/lib/integrations/sfv/tenant-config-service";
+import {
+  SfvTenantConfigNotFoundError,
+  SfvTenantConfigDisabledError,
+} from "@/lib/integrations/sfv/tenant-config-types";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +54,8 @@ export const dynamic = "force-dynamic";
  *
  * Retryable conditions (e.g. SFV_TIMEOUT, SFV_UNAVAILABLE, SFV_RATE_LIMITED)
  * indicate a transient upstream failure that may resolve on retry.
- * Non-retryable conditions (e.g. SFV_AUTH_FAILURE, SFV_SERVER_FAILURE,
- * SFV_NETWORK_FAILURE with non-retryable codes) indicate a persistent upstream
- * or configuration problem that will not resolve without intervention.
+ * Non-retryable conditions (e.g. SFV_AUTH_FAILURE, SFV_SERVER_FAILURE) indicate
+ * a persistent problem that will not resolve without intervention.
  */
 function unhealthyHttpStatus(issues: readonly SfvDiagnosticIssue[]): 502 | 503 {
   return issues.some((issue) => issue.retryable === true) ? 503 : 502;
@@ -65,51 +69,110 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  // ── 2. Parse request body ──────────────────────────────────────────────────
-  const body = await request.json().catch(() => null);
+  // ── 2. Resolve tenantId from session — never from request ─────────────────
+  const tenantId = access.session.user.tenantId;
 
-  if (body === null || body === undefined) {
-    return NextResponse.json({ error: "Request body required" }, { status: 400 });
-  }
-
-  if (typeof body !== "object" || Array.isArray(body)) {
+  if (!tenantId) {
     return NextResponse.json(
-      { error: "Request body must be a JSON object" },
-      { status: 400 },
+      { error: "Tenant context missing from session" },
+      { status: 403 },
     );
   }
 
-  // ── 3. Validate clubId ────────────────────────────────────────────────────
-  const raw = body as Record<string, unknown>;
+  // ── 3. Parse request body — optional; clubId is forbidden ─────────────────
+  //
+  // An absent or empty body is valid. The only accepted field is seasonId,
+  // which overrides the tenant-configured default season when supplied.
+  // clubId MUST NOT appear in the body — it is sourced from tenant configuration.
+  let seasonOverride: number | undefined;
 
-  if (!("clubId" in raw)) {
-    return NextResponse.json({ error: "clubId is required" }, { status: 400 });
+  const rawText = await request.text().catch(() => "");
+  const trimmed = rawText.trim();
+
+  if (trimmed.length > 0) {
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return NextResponse.json(
+        { error: "Request body must be valid JSON" },
+        { status: 400 },
+      );
+    }
+
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return NextResponse.json(
+        { error: "Request body must be a JSON object" },
+        { status: 400 },
+      );
+    }
+
+    const raw = parsed as Record<string, unknown>;
+
+    // clubId MUST NOT be supplied — it is resolved from tenant configuration
+    if ("clubId" in raw) {
+      return NextResponse.json(
+        {
+          error:
+            "clubId must not be supplied in the request body. " +
+            "It is resolved from the tenant SFV configuration.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // seasonId is optional — when present it must be a valid positive integer
+    if ("seasonId" in raw) {
+      const { seasonId } = raw;
+
+      if (
+        typeof seasonId !== "number" ||
+        !Number.isInteger(seasonId) ||
+        seasonId <= 0
+      ) {
+        return NextResponse.json(
+          { error: "seasonId must be a positive integer" },
+          { status: 400 },
+        );
+      }
+
+      seasonOverride = seasonId;
+    }
   }
 
-  const { clubId } = raw;
+  // ── 4. Resolve tenant SFV configuration — tenantId from session only ──────
+  let config;
 
-  if (typeof clubId !== "number" || !Number.isInteger(clubId) || clubId <= 0) {
-    return NextResponse.json(
-      { error: "clubId must be a positive integer" },
-      { status: 400 },
+  try {
+    config = await requireEnabledSfvConfigForTenant(tenantId);
+  } catch (e) {
+    if (e instanceof SfvTenantConfigNotFoundError) {
+      return NextResponse.json(
+        { error: "No SFV configuration found for this tenant" },
+        { status: 404 },
+      );
+    }
+
+    if (e instanceof SfvTenantConfigDisabledError) {
+      return NextResponse.json(
+        { error: "SFV integration is disabled for this tenant" },
+        { status: 409 },
+      );
+    }
+
+    console.error(
+      "[sfv/diagnostics] Unexpected error from requireEnabledSfvConfigForTenant:",
+      e,
     );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
-  // ── 4. Validate seasonId ──────────────────────────────────────────────────
-  if (!("seasonId" in raw)) {
-    return NextResponse.json({ error: "seasonId is required" }, { status: 400 });
-  }
+  // ── 5. Resolve clubId and seasonId — exclusively from configuration ────────
+  const clubId = config.clubId;
+  const seasonId = seasonOverride ?? config.defaultSeasonId;
 
-  const { seasonId } = raw;
-
-  if (typeof seasonId !== "number" || !Number.isInteger(seasonId) || seasonId <= 0) {
-    return NextResponse.json(
-      { error: "seasonId must be a positive integer" },
-      { status: 400 },
-    );
-  }
-
-  // ── 5. Run diagnostics ────────────────────────────────────────────────────
+  // ── 6. Run diagnostics ────────────────────────────────────────────────────
   let diagnostics: SfvAdminDiagnostics;
 
   try {
@@ -119,7 +182,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 
-  // ── 6. Map health to HTTP status and return ───────────────────────────────
+  // ── 7. Map health to HTTP status and return ───────────────────────────────
   const status =
     diagnostics.health === "unhealthy" ? unhealthyHttpStatus(diagnostics.issues) : 200;
 
