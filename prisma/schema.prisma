@@ -393,6 +393,10 @@ model Tenant {
   reusableComponents     ReusableComponent[]
   reusableComponentUsages ReusableComponentUsage[]
 
+  // SFV Integration — Slice: Tenant-Scoped SFV Configuration
+  // One config per tenant (@@unique on tenantId). Null when not configured.
+  sfvConfig TenantSfvConfig?
+
   @@index([status])
   @@index([name])
 }
@@ -2042,4 +2046,59 @@ model ReusableComponentUsage {
   @@index([tenantId])
   @@index([componentId])
   @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// TenantSfvConfig — Tenant-scoped SFV / ClubCorner integration configuration
+//
+// Slice: Tenant-Scoped SFV Integration Configuration
+//
+// One record per tenant (@@unique on tenantId). The Tenant.sfvConfig relation
+// is nullable — tenants without SFV integration have no row here.
+//
+// Design invariants:
+//   - Exactly one config per tenant (1:1 via @unique).
+//   - clubId: positive integer SFV club identifier (e.g. 483 for FC Allschwil).
+//   - defaultSeasonId: positive integer SFV season identifier used when no
+//     explicit seasonId is provided by the caller (e.g. 2027 for 2026/2027).
+//   - organisationId: optional SFV organisation identifier. Null when not
+//     assigned by SFV or not required by the integration.
+//   - enabled: when false the integration is administratively disabled and
+//     must be treated as "not configured" by all consumers.
+//   - createdAt / updatedAt: standard lifecycle timestamps.
+//
+// Security invariant:
+//   Future services resolve clubId from this config (via tenantId from session)
+//   instead of accepting caller-supplied clubId values. Tenant A cannot access
+//   Tenant B configuration because all lookups go through tenantId.
+//
+// NOT included (explicit exclusions):
+//   - cached SFV data
+//   - sync state or run history
+//   - player or match data
+//   - picture or media blobs
+//   - diagnostics snapshots
+//   - season-level metadata
+// ---------------------------------------------------------------------------
+
+model TenantSfvConfig {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  /// Positive integer SFV club identifier (e.g. 483 for FC Allschwil).
+  /// Must be a numeric identifier as returned by the SFV API.
+  clubId          Int
+  /// Positive integer SFV season identifier used as the default when no
+  /// explicit seasonId is provided (e.g. 2027 for the 2026/2027 season).
+  defaultSeasonId Int
+  /// Optional SFV organisation identifier. Null when not assigned or not required.
+  organisationId  Int?
+  /// When false, the SFV integration is administratively disabled.
+  /// Consumers must treat disabled configs as "not configured".
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([enabled])
 }
