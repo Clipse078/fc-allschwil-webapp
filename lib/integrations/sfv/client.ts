@@ -762,6 +762,219 @@ export async function fetchTeamList(params: TeamListParams): Promise<TeamDetail[
   return executeTeamListRequest(config, cached.token, params);
 }
 
+// ── Club schedule types and client (Slice 3b) ─────────────────────────────────
+
+/**
+ * Represents a single schedule entry returned by GET /api/club/schedule.
+ *
+ * All fields match the OpenAPI v26.6.15.2 Schedule schema exactly.
+ * Field name `isUnkownPlayground` preserves the upstream spelling (typo in spec).
+ * additionalProperties: false — no extra fields are expected.
+ */
+export type ClubScheduleEntry = {
+  matchId: number;
+  matchNumber: number;
+  matchDate: string;
+  groupId: number | null;
+  cupId: number | null;
+  groupName: string | null;
+  roundNbr: number;
+  playgroundId: number;
+  stadiumPlaygroundName: string | null;
+  /** Upstream spelling: "isUnkownPlayground" (single 'n') — preserved as-is. */
+  isUnkownPlayground: boolean;
+  leagueId: number;
+  leagueNumber: number;
+  leagueName: string | null;
+  divisionId: number;
+  divisionName: string | null;
+  organisationId: number;
+  organisationName: string | null;
+  matchType: number;
+  matchTypeName: string | null;
+  matchState: number;
+  matchStateName: string | null;
+  playDay: number;
+  playDayName: string | null;
+  seasonId: number;
+  seasonName: string | null;
+  scoreTeamA: number;
+  scoreTeamB: number;
+  teamAId: number;
+  teamNameA: string | null;
+  teamBId: number;
+  teamNameB: string | null;
+};
+
+/**
+ * Parameters for GET /api/club/schedule (OpenAPI v26.6.15.2).
+ *
+ * SeasonId and ClubId are required. All other parameters are optional query
+ * filters. Parameter names preserve exact OpenAPI casing.
+ */
+export type ClubScheduleParams = {
+  SeasonId: number;
+  ClubId: number;
+  OrganisationId?: number;
+  TeamId?: number;
+  LeagueId?: number;
+  CupId?: number;
+  DivisionId?: number;
+  GroupId?: number;
+  RoundNbr?: number;
+  MatchType?: number;
+  Language?: number;
+  /** ISO 8601 date-time string. */
+  DateFrom?: string;
+  /** ISO 8601 date-time string. */
+  DateUntil?: string;
+};
+
+/**
+ * Executes a read-only GET /api/club/schedule request.
+ *
+ * Contract (SFV Club API Interface OpenAPI v26.6.15.2):
+ *   Tag:     ClubSchedule
+ *   Method:  GET
+ *   Path:    /api/club/schedule
+ *   Query:   SeasonId (int32, required), ClubId (int32, required), optional filters
+ *   Header:  X-User-Token — raw opaque session token (no "Bearer" prefix)
+ *   Header:  User-Agent   — SFV_USER_AGENT (required by Cloudflare WAF)
+ *   Header:  Accept       — application/json
+ *   200: application/json — Schedule[] (mapped to ClubScheduleEntry[])
+ *   401: session token cannot be validated → SFV_UNAUTHORIZED + evict cache
+ *   404: resource not found → SFV_NOT_FOUND
+ *   406: resource not available → SFV_NOT_FOUND
+ *   500: unexpected server error → SFV_UNAVAILABLE
+ *
+ * Security invariants:
+ *   - Token is never included in thrown errors or logs.
+ *   - No data is persisted.
+ */
+async function executeClubScheduleRequest(
+  config: SfvConfig,
+  token: string,
+  params: ClubScheduleParams,
+): Promise<ClubScheduleEntry[]> {
+  const baseUrl = new URL(config.tokenUrl).origin;
+  const qs = new URLSearchParams();
+  qs.set("SeasonId", String(params.SeasonId));
+  qs.set("ClubId", String(params.ClubId));
+  if (params.OrganisationId !== undefined) qs.set("OrganisationId", String(params.OrganisationId));
+  if (params.TeamId !== undefined) qs.set("TeamId", String(params.TeamId));
+  if (params.LeagueId !== undefined) qs.set("LeagueId", String(params.LeagueId));
+  if (params.CupId !== undefined) qs.set("CupId", String(params.CupId));
+  if (params.DivisionId !== undefined) qs.set("DivisionId", String(params.DivisionId));
+  if (params.GroupId !== undefined) qs.set("GroupId", String(params.GroupId));
+  if (params.RoundNbr !== undefined) qs.set("RoundNbr", String(params.RoundNbr));
+  if (params.MatchType !== undefined) qs.set("MatchType", String(params.MatchType));
+  if (params.Language !== undefined) qs.set("Language", String(params.Language));
+  if (params.DateFrom !== undefined) qs.set("DateFrom", params.DateFrom);
+  if (params.DateUntil !== undefined) qs.set("DateUntil", params.DateUntil);
+
+  const url = `${baseUrl}/api/club/schedule?${qs.toString()}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-User-Token": token,
+        "User-Agent": SFV_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 401) {
+      evictCachedToken();
+      throw new SfvAuthError(
+        "SFV_UNAUTHORIZED",
+        "SFV club schedule request rejected: 401 Unauthorized.",
+      );
+    }
+
+    if (response.status === 404) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        "SFV club schedule: resource not found (404).",
+      );
+    }
+
+    if (response.status === 406) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        "SFV club schedule: resource not currently available (406).",
+      );
+    }
+
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV club schedule endpoint returned HTTP ${response.status}.`,
+      );
+    }
+
+    const rawText = await response.text();
+    if (!rawText.trim()) {
+      return [];
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV club schedule response is not valid JSON.",
+      );
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV club schedule response expected an array.",
+      );
+    }
+
+    return parsed as ClubScheduleEntry[];
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", "SFV club schedule request timed out.");
+    }
+    throw new SfvNetworkError(
+      "SFV_UNAVAILABLE",
+      "SFV club schedule request failed: network error.",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetches the schedule of matches for a given club and season.
+ *
+ * Endpoint: GET /api/club/schedule
+ * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
+ *
+ * Uses the in-memory token cache from acquireToken(). On 401, the cache is
+ * evicted automatically so the next call will re-authenticate.
+ *
+ * Returns an empty array on empty response body.
+ * Never persists data to the database.
+ *
+ * Schedule entries contain teamAId and teamBId which identify both the club's
+ * own teams and opponent teams. These IDs can be used with GET /api/team/picture.
+ */
+export async function fetchClubSchedule(params: ClubScheduleParams): Promise<ClubScheduleEntry[]> {
+  const config = getSfvConfig();
+  const cached = await acquireToken();
+  return executeClubScheduleRequest(config, cached.token, params);
+}
+
 // ── SFV connection test (Slice 1) ─────────────────────────────────────────────
 
 /**
