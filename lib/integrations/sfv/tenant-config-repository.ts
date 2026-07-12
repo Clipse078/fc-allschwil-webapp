@@ -3,23 +3,23 @@
  *
  * Prisma-backed repository for TenantSfvConfig.
  *
- * Provides read access to the tenant-scoped SFV integration configuration.
- * All lookups are keyed on tenantId — never on caller-supplied clubId values.
+ * Provides read and write access to the tenant-scoped SFV integration
+ * configuration. All lookups and mutations are keyed on tenantId — never on
+ * caller-supplied clubId values.
  *
  * Architecture invariants:
- *   - Read-only in this slice: no create/update/delete operations yet.
  *   - Failures from Prisma are not swallowed — callers handle DB errors.
  *   - Returns null when no row exists (not an error; tenant may be unconfigured).
  *   - The select projection is explicit: no internal Prisma fields leak out.
  *
  * Security invariant:
- *   All queries are scoped to a single tenantId. Tenant A cannot retrieve
- *   Tenant B's configuration because tenantId is always taken from a trusted
- *   session context, never from caller-provided input.
+ *   All queries are scoped to a single tenantId. Tenant A cannot retrieve or
+ *   modify Tenant B's configuration because tenantId is always taken from a
+ *   trusted session context, never from caller-provided input.
  */
 
 import { prisma } from "@/lib/db/prisma";
-import type { TenantSfvConfig } from "./tenant-config-types";
+import type { TenantSfvConfig, TenantSfvConfigInput } from "./tenant-config-types";
 
 const sfvConfigSelect = {
   id: true,
@@ -61,6 +61,35 @@ export async function getEnabledSfvConfigByTenantId(
 ): Promise<TenantSfvConfig | null> {
   return prisma.tenantSfvConfig.findFirst({
     where: { tenantId, enabled: true },
+    select: sfvConfigSelect,
+  });
+}
+
+/**
+ * Creates or updates the SFV configuration for the given tenant.
+ *
+ * Uses Prisma upsert keyed on the unique tenantId constraint.
+ * Creates a new row when none exists; overwrites all mutable fields when one
+ * does. The tenantId is always provided by the caller — never derived from
+ * the input payload.
+ *
+ * Returns the persisted config after the upsert.
+ */
+export async function upsertSfvConfigByTenantId(
+  tenantId: string,
+  input: TenantSfvConfigInput,
+): Promise<TenantSfvConfig> {
+  const fields = {
+    clubId: input.clubId,
+    defaultSeasonId: input.defaultSeasonId,
+    organisationId: input.organisationId ?? null,
+    enabled: input.enabled,
+  };
+
+  return prisma.tenantSfvConfig.upsert({
+    where: { tenantId },
+    create: { tenantId, ...fields },
+    update: fields,
     select: sfvConfigSelect,
   });
 }

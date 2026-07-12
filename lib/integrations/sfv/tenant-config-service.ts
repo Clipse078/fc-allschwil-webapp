@@ -34,12 +34,15 @@
 import {
   findSfvConfigByTenantId,
   getEnabledSfvConfigByTenantId,
+  upsertSfvConfigByTenantId,
 } from "./tenant-config-repository";
 import {
   type TenantSfvConfig,
+  type TenantSfvConfigInput,
   SfvTenantConfigNotFoundError,
   SfvTenantConfigDisabledError,
 } from "./tenant-config-types";
+import { validateTenantSfvConfigInput } from "./tenant-config-validation";
 
 // ── Public service functions ───────────────────────────────────────────────────
 
@@ -128,4 +131,24 @@ export async function resolveSfvDefaultSeasonId(tenantId: string): Promise<numbe
 export async function isSfvEnabledForTenant(tenantId: string): Promise<boolean> {
   const config = await getEnabledSfvConfigByTenantId(tenantId);
   return config !== null;
+}
+
+/**
+ * Creates or updates the SFV configuration for the given tenant.
+ *
+ * Validates the input before persisting. Throws SfvTenantConfigValidationError
+ * when any field fails validation — callers should surface this as a 400.
+ *
+ * tenantId MUST come from a trusted session context, never from caller-supplied
+ * request body. The service enforces this by accepting tenantId as a separate
+ * argument, not as part of input.
+ *
+ * @throws {SfvTenantConfigValidationError} — when any input field is invalid
+ */
+export async function upsertSfvConfigForTenant(
+  tenantId: string,
+  input: TenantSfvConfigInput,
+): Promise<TenantSfvConfig> {
+  validateTenantSfvConfigInput(input);
+  return upsertSfvConfigByTenantId(tenantId, input);
 }
