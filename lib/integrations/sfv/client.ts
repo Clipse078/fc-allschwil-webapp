@@ -584,6 +584,184 @@ export async function resolveClubIds(): Promise<ClubIdsResponse | null> {
   return executeClubIdsRequest(config, cached.token);
 }
 
+// ── Team list types and client (Slice 3a) ─────────────────────────────────────
+
+/**
+ * Represents a single team returned by GET /api/team/list.
+ *
+ * All fields match the OpenAPI v26.6.15.2 TeamDetail schema exactly.
+ * additionalProperties: false — no extra fields are expected.
+ */
+export type TeamDetail = {
+  isHomeTeam: boolean;
+  teamId: number;
+  teamName: string | null;
+  teamFullname: string | null;
+  clubNumber: number;
+  clubName: string | null;
+  teamLeagueId: number;
+  teamLeagueName: string | null;
+  teamDivisionName: string | null;
+  teamOrganisationId: number;
+  isTeamActive: boolean;
+};
+
+/**
+ * Parameters for GET /api/team/list (OpenAPI v26.6.15.2).
+ *
+ * SeasonId and ClubId are required. All other parameters are optional query
+ * filters. Parameter names preserve exact OpenAPI casing.
+ */
+export type TeamListParams = {
+  SeasonId: number;
+  ClubId: number;
+  OrganisationId?: number;
+  TeamId?: number;
+  LeagueId?: number;
+  CupId?: number;
+  DivisionId?: number;
+  GroupId?: number;
+  RoundNbr?: number;
+  MatchType?: number;
+  Language?: number;
+  /** ISO 8601 date-time string. */
+  DateFrom?: string;
+  /** ISO 8601 date-time string. */
+  DateUntil?: string;
+};
+
+/**
+ * Executes a read-only GET /api/team/list request.
+ *
+ * Contract (SFV Club API Interface OpenAPI v26.6.15.2):
+ *   Method:  GET
+ *   Path:    /api/team/list
+ *   Query:   SeasonId (int32, required), ClubId (int32, required), optional filters
+ *   Header:  X-User-Token — raw opaque session token (no "Bearer" prefix)
+ *   Header:  User-Agent   — SFV_USER_AGENT (required by Cloudflare WAF)
+ *   Header:  Accept       — application/json
+ *   200: application/json — TeamDetail[]
+ *   204: no content found → returns []
+ *   401: session token cannot be validated → SFV_UNAUTHORIZED + evict cache
+ *   404: resource not found → SFV_NOT_FOUND
+ *   500: unexpected server error → SFV_UNAVAILABLE
+ *
+ * Security invariants:
+ *   - Token is never included in thrown errors or logs.
+ *   - No data is persisted.
+ */
+async function executeTeamListRequest(
+  config: SfvConfig,
+  token: string,
+  params: TeamListParams,
+): Promise<TeamDetail[]> {
+  const baseUrl = new URL(config.tokenUrl).origin;
+  const qs = new URLSearchParams();
+  qs.set("SeasonId", String(params.SeasonId));
+  qs.set("ClubId", String(params.ClubId));
+  if (params.OrganisationId !== undefined) qs.set("OrganisationId", String(params.OrganisationId));
+  if (params.TeamId !== undefined) qs.set("TeamId", String(params.TeamId));
+  if (params.LeagueId !== undefined) qs.set("LeagueId", String(params.LeagueId));
+  if (params.CupId !== undefined) qs.set("CupId", String(params.CupId));
+  if (params.DivisionId !== undefined) qs.set("DivisionId", String(params.DivisionId));
+  if (params.GroupId !== undefined) qs.set("GroupId", String(params.GroupId));
+  if (params.RoundNbr !== undefined) qs.set("RoundNbr", String(params.RoundNbr));
+  if (params.MatchType !== undefined) qs.set("MatchType", String(params.MatchType));
+  if (params.Language !== undefined) qs.set("Language", String(params.Language));
+  if (params.DateFrom !== undefined) qs.set("DateFrom", params.DateFrom);
+  if (params.DateUntil !== undefined) qs.set("DateUntil", params.DateUntil);
+
+  const url = `${baseUrl}/api/team/list?${qs.toString()}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-User-Token": token,
+        "User-Agent": SFV_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 204) {
+      return [];
+    }
+
+    if (response.status === 401) {
+      evictCachedToken();
+      throw new SfvAuthError(
+        "SFV_UNAUTHORIZED",
+        "SFV team list request rejected: 401 Unauthorized.",
+      );
+    }
+
+    if (response.status === 404) {
+      throw new SfvNetworkError("SFV_NOT_FOUND", "SFV team list: resource not found (404).");
+    }
+
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV team list endpoint returned HTTP ${response.status}.`,
+      );
+    }
+
+    const rawText = await response.text();
+    if (!rawText.trim()) {
+      return [];
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV team list response is not valid JSON.",
+      );
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV team list response expected an array.",
+      );
+    }
+
+    return parsed as TeamDetail[];
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", "SFV team list request timed out.");
+    }
+    throw new SfvNetworkError("SFV_UNAVAILABLE", "SFV team list request failed: network error.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetches the list of teams for a given club and season.
+ *
+ * Endpoint: GET /api/team/list
+ * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
+ *
+ * Uses the in-memory token cache from acquireToken(). On 401, the cache is
+ * evicted automatically so the next call will re-authenticate.
+ *
+ * Returns an empty array on 204 (no content found) or empty response body.
+ * Never persists data to the database.
+ */
+export async function fetchTeamList(params: TeamListParams): Promise<TeamDetail[]> {
+  const config = getSfvConfig();
+  const cached = await acquireToken();
+  return executeTeamListRequest(config, cached.token, params);
+}
+
 // ── SFV connection test (Slice 1) ─────────────────────────────────────────────
 
 /**
