@@ -318,6 +318,30 @@ enum WorkflowDomain {
   TARGETS
 }
 
+// ── SFV Synchronization Enums ─────────────────────────────────────────────────
+
+enum SfvSyncStatus {
+  RUNNING
+  COMPLETED
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+enum SfvSyncType {
+  FULL
+  TEAMS_ONLY
+  MATCHES_ONLY
+  RANKINGS_ONLY
+  PICTURES_ONLY
+}
+
+enum SfvSyncEntityType {
+  TEAM
+  MATCH
+  RANKING
+  PICTURE
+}
+
 enum WorkflowAction {
   CREATE
   UPDATE
@@ -396,6 +420,16 @@ model Tenant {
   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
   sfvConfig TenantSfvConfig?
+
+  // SFV Sync Architecture — Slice: SFV Database Synchronization Design
+  // Cached SFV data persisted per-tenant from the SFV API.
+  // All six relations cascade on tenant deletion.
+  sfvCachedTeams    SfvCachedTeam[]
+  sfvCachedMatches  SfvCachedMatch[]
+  sfvCachedRankings SfvCachedRanking[]
+  sfvCachedPictures SfvCachedTeamPicture[]
+  sfvSyncRuns       SfvSyncRun[]
+  sfvSyncErrors     SfvSyncError[]
 
   @@index([status])
   @@index([name])
@@ -2101,4 +2135,440 @@ model TenantSfvConfig {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([enabled])
+}
+
+// ---------------------------------------------------------------------------
+// SFV Database Synchronization Design — Architecture Slice
+//
+// These six models establish the complete persistence architecture for
+// synchronized SFV data. They are designed to support:
+//
+//   • Multi-tenant isolation    — every row is scoped to a single tenantId
+//   • Idempotent upserts        — unique constraints define the upsert key
+//   • Soft deletes              — isDeleted + deletedAt; no hard DELETEs
+//   • Auditability              — syncVersion, lastSyncedAt, SfvSyncRun/Error
+//   • Future synchronization    — syncVersion / lastSyncedAt / sourceUpdatedAt
+//   • Efficient querying        — covering indexes on (tenantId, sfvSeasonId, …)
+//
+// Source mappings (SFV API → persisted model):
+//   GET /api/team/list              → SfvCachedTeam
+//   GET /api/club/schedule          → SfvCachedMatch
+//   GET /api/club/ranking           → SfvCachedRanking
+//   GET /api/team/picture/{teamId}  → SfvCachedTeamPicture
+//   (run metadata)                  → SfvSyncRun
+//   (per-entity errors)             → SfvSyncError
+//
+// NOT included in this slice:
+//   — synchronization implementation
+//   — scheduler, cron, queue
+//   — HTTP routes
+//   — admin UI for sync management
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// SfvCachedTeam — Persisted team records from GET /api/team/list
+//
+// Source: TeamDetail (SFV Club API Interface OpenAPI v26.6.15.2)
+//
+// A team entry is season-specific: the same physical team (same sfvTeamId)
+// may be in a different league or division each season.
+// Upsert key: (tenantId, sfvTeamId, sfvSeasonId) — one row per team per season.
+//
+// Soft-delete strategy:
+//   When a team disappears from a subsequent sync response for the same season,
+//   the sync engine sets isDeleted = true and deletedAt = now(). The row is
+//   never hard-deleted — it remains for audit and historical queries.
+//
+// syncVersion:
+//   Monotonically incremented by the sync engine on each upsert. Enables
+//   idempotency checks: if the incoming data has already been persisted at the
+//   same version, the row is skipped. Initial value is 1.
+//
+// sourceUpdatedAt:
+//   The SFV API does not return an updatedAt timestamp for team records.
+//   This field is null for teams. Reserved for future SFV API improvements.
+// ---------------------------------------------------------------------------
+
+model SfvCachedTeam {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  /// SFV teamId from GET /api/team/list → TeamDetail.teamId
+  sfvTeamId          Int
+  /// SFV seasonId from the fetch parameters (SeasonId query param)
+  sfvSeasonId        Int
+  isHomeTeam         Boolean
+  teamName           String?
+  teamFullname       String?
+  clubNumber         Int
+  clubName           String?
+  teamLeagueId       Int
+  teamLeagueName     String?
+  teamDivisionName   String?
+  teamOrganisationId Int
+  isTeamActive       Boolean
+  /// true when the team was present in a previous sync but absent in the latest.
+  /// Set by the sync engine; never set by consumers.
+  isDeleted          Boolean   @default(false)
+  deletedAt          DateTime?
+  /// Wall-clock timestamp of the last successful sync that touched this row.
+  lastSyncedAt       DateTime
+  /// Monotonically increasing sync counter. Enables idempotency and conflict detection.
+  syncVersion        Int       @default(1)
+  /// Reserved: SFV API does not provide a source-side updatedAt for teams. Always null.
+  sourceUpdatedAt    DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Upsert key: one row per team per season per tenant.
+  @@unique([tenantId, sfvTeamId, sfvSeasonId])
+  @@index([tenantId])
+  @@index([tenantId, sfvSeasonId])
+  @@index([tenantId, sfvSeasonId, isDeleted])
+  @@index([tenantId, isTeamActive])
+  @@index([tenantId, lastSyncedAt])
+}
+
+// ---------------------------------------------------------------------------
+// SfvCachedMatch — Persisted match records from GET /api/club/schedule
+//
+// Source: ClubScheduleEntry (SFV Club API Interface OpenAPI v26.6.15.2)
+//
+// SFV matchIds are globally unique within SFV (not scoped by season or club).
+// Upsert key: (tenantId, sfvMatchId) — one row per match per tenant.
+//
+// Note on upstream typo:
+//   The SFV API field "isUnkownPlayground" (single 'n') is normalised to
+//   isUnknownPlayground (standard spelling) in this model. The raw API spelling
+//   is documented in client.ts → ClubScheduleEntry.isUnkownPlayground.
+//
+// Soft-delete strategy:
+//   Matches that disappear from a subsequent same-season sync are soft-deleted.
+//   Score updates are handled as upserts (match state can change: e.g. 0–0 live
+//   to 2–1 final). syncVersion tracks which run last touched the row.
+//
+// sourceUpdatedAt:
+//   SFV does not return a match-level updatedAt timestamp. Always null.
+// ---------------------------------------------------------------------------
+
+model SfvCachedMatch {
+  id                     String    @id @default(cuid())
+  tenantId               String
+  /// SFV matchId from ClubScheduleEntry.matchId. Globally unique in SFV.
+  sfvMatchId             Int
+  /// SFV seasonId from ClubScheduleEntry.seasonId
+  sfvSeasonId            Int
+  matchNumber            Int
+  /// ISO 8601 match date/time as returned by the SFV API.
+  matchDate              DateTime
+  groupId                Int?
+  cupId                  Int?
+  groupName              String?
+  roundNbr               Int
+  playgroundId           Int
+  stadiumPlaygroundName  String?
+  /// Normalised spelling of the SFV upstream field "isUnkownPlayground".
+  isUnknownPlayground    Boolean
+  leagueId               Int
+  leagueNumber           Int
+  leagueName             String?
+  divisionId             Int
+  divisionName           String?
+  organisationId         Int
+  organisationName       String?
+  matchType              Int
+  matchTypeName          String?
+  matchState             Int
+  matchStateName         String?
+  playDay                Int
+  playDayName            String?
+  seasonName             String?
+  scoreTeamA             Int
+  scoreTeamB             Int
+  teamAId                Int
+  teamNameA              String?
+  teamBId                Int
+  teamNameB              String?
+  isDeleted              Boolean   @default(false)
+  deletedAt              DateTime?
+  lastSyncedAt           DateTime
+  syncVersion            Int       @default(1)
+  /// Reserved: SFV API does not provide match-level updatedAt. Always null.
+  sourceUpdatedAt        DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Upsert key: one row per match per tenant (matchId is globally unique in SFV).
+  @@unique([tenantId, sfvMatchId])
+  @@index([tenantId])
+  @@index([tenantId, sfvSeasonId])
+  @@index([tenantId, sfvSeasonId, isDeleted])
+  @@index([tenantId, matchDate])
+  @@index([tenantId, sfvSeasonId, matchDate])
+  @@index([tenantId, matchState])
+  @@index([tenantId, lastSyncedAt])
+}
+
+// ---------------------------------------------------------------------------
+// SfvCachedRanking — Persisted ranking entries from GET /api/club/ranking
+//
+// Source: ClubRankingEntry (SFV Club API Interface OpenAPI v26.6.15.2)
+//
+// A ranking entry represents one team's standing within a specific league
+// group for a given season. The composite key is:
+//   (tenantId, sfvSeasonId, sfvTeamId, sfvGroupId)
+//
+// Rationale: A team appears exactly once per group per season in the ranking
+// table. The groupId is the lowest-level subdivision (below division and
+// league), making it the discriminating component for ties at higher levels.
+//
+// Soft-delete strategy:
+//   Ranking entries for a season can be recomputed throughout the season
+//   (positions change after each match day). On each sync, rows are upserted
+//   with current values. Rows absent from a new full-season sync are
+//   soft-deleted (isDeleted = true) to preserve the last known ranking.
+//
+// sourceUpdatedAt:
+//   SFV does not return a per-entry updatedAt timestamp. Always null.
+// ---------------------------------------------------------------------------
+
+model SfvCachedRanking {
+  id              String    @id @default(cuid())
+  tenantId        String
+  /// SFV seasonId from the fetch parameters (SeasonId query param)
+  sfvSeasonId     Int
+  /// SFV teamId from ClubRankingEntry.teamId
+  sfvTeamId       Int
+  /// SFV leagueId from ClubRankingEntry.leagueId
+  sfvLeagueId     Int
+  /// SFV divisionId from ClubRankingEntry.divisionId
+  sfvDivisionId   Int
+  /// SFV groupId from ClubRankingEntry.groupId
+  sfvGroupId      Int
+  leagueNumber    Int
+  leagueName      String?
+  divisionName    String?
+  groupName       String?
+  teamName        String?
+  clubNumber      Int
+  position        Int
+  matches         Int
+  wins            Int
+  draws           Int
+  losses          Int
+  penaltyPoints   Int
+  goalsFor        Int
+  goalsAgainst    Int
+  points          Int
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  lastSyncedAt    DateTime
+  syncVersion     Int       @default(1)
+  /// Reserved: SFV API does not provide ranking-level updatedAt. Always null.
+  sourceUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Upsert key: one ranking row per team per group per season per tenant.
+  @@unique([tenantId, sfvSeasonId, sfvTeamId, sfvGroupId])
+  @@index([tenantId])
+  @@index([tenantId, sfvSeasonId])
+  @@index([tenantId, sfvSeasonId, isDeleted])
+  @@index([tenantId, sfvSeasonId, sfvLeagueId])
+  @@index([tenantId, sfvSeasonId, position])
+  @@index([tenantId, lastSyncedAt])
+}
+
+// ---------------------------------------------------------------------------
+// SfvCachedTeamPicture — Persisted team pictures from GET /api/team/picture/{teamId}
+//
+// Source: TeamPictureResponse (SFV Club API Interface OpenAPI v26.6.15.2)
+//
+// Team pictures are NOT season-specific: a teamId alone uniquely identifies
+// a picture in SFV. The same team picture persists across seasons.
+// Upsert key: (tenantId, sfvTeamId) — one row per team per tenant.
+//
+// Storage note:
+//   base64Data holds the raw base64 string exactly as returned by the SFV API.
+//   This is stored as TEXT. Consumer code decodes it to an image buffer when
+//   serving the picture (e.g. to serve as a GIF response).
+//   Base64 content must never be logged or surfaced in error messages.
+//
+// Soft-delete strategy:
+//   When a subsequent sync returns 204 (no picture) or 404 (team not found)
+//   for a teamId that previously had a picture, the sync engine sets
+//   isDeleted = true. The base64Data is preserved for historical auditing.
+//
+// sourceUpdatedAt:
+//   Maps to the Last-Modified HTTP header from the SFV API response, when
+//   present. Production observations show this is usually null. Stored when
+//   available to enable future conditional-GET optimisation.
+// ---------------------------------------------------------------------------
+
+model SfvCachedTeamPicture {
+  id              String    @id @default(cuid())
+  tenantId        String
+  /// SFV teamId — matches TeamDetail.teamId, ClubScheduleEntry.teamAId/teamBId,
+  /// ClubRankingEntry.teamId. Not season-specific.
+  sfvTeamId       Int
+  /// Raw base64 string from the SFV API JSON-quoted response body.
+  /// Decodes to a GIF (production observation). Never log this value.
+  base64Data      String    @db.Text
+  /// Content-Type header from the SFV API response (always "application/json" for this endpoint).
+  contentType     String
+  /// Content-Length parsed as integer, or null when not returned.
+  contentLength   Int?
+  /// ETag header from the SFV API response, or null when not returned.
+  etag            String?
+  /// Last-Modified header from the SFV API response, or null when not returned.
+  lastModified    String?
+  /// Cache-Control header from the SFV API response, or null when not returned.
+  cacheControl    String?
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  lastSyncedAt    DateTime
+  syncVersion     Int       @default(1)
+  /// Last-Modified parsed as DateTime, or null if the header was absent or unparseable.
+  sourceUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Upsert key: one picture per team per tenant (pictures are not season-specific).
+  @@unique([tenantId, sfvTeamId])
+  @@index([tenantId])
+  @@index([tenantId, isDeleted])
+  @@index([tenantId, lastSyncedAt])
+}
+
+// ---------------------------------------------------------------------------
+// SfvSyncRun — Audit record for a single synchronization run
+//
+// Append-only. One row is created at the start of each sync run (status=RUNNING)
+// and updated when the run completes or fails.
+//
+// Counters (teamsCreated, matchesUpdated, etc.) are written by the sync engine
+// as it processes each entity type. They reflect the final delta for the run.
+//
+// triggeredBy:
+//   Free-form string identifying what initiated the run.
+//   Convention: "system:cron", "manual:<userId>", "api:<requestId>".
+//   Not enforced at DB level; the sync engine sets this.
+//
+// Design invariant:
+//   SfvSyncRun rows are never deleted (hard or soft). They form a permanent
+//   audit trail. Retention policy is an application-layer concern.
+// ---------------------------------------------------------------------------
+
+model SfvSyncRun {
+  id                String         @id @default(cuid())
+  tenantId          String
+  /// The SFV season this run targeted (matches sfvSeasonId in cached entity tables).
+  sfvSeasonId       Int
+  syncType          SfvSyncType
+  status            SfvSyncStatus  @default(RUNNING)
+  /// Free-form initiator string. Convention: "system:cron", "manual:<userId>".
+  triggeredBy       String?
+  startedAt         DateTime       @default(now())
+  completedAt       DateTime?
+  /// Duration in milliseconds from startedAt to completedAt. Null while running.
+  durationMs        Int?
+  /// Counts of entities processed (read from SFV API) during the run.
+  teamsProcessed    Int            @default(0)
+  matchesProcessed  Int            @default(0)
+  rankingsProcessed Int            @default(0)
+  picturesProcessed Int            @default(0)
+  /// Counts of new rows created during the run (INSERT path of upsert).
+  teamsCreated      Int            @default(0)
+  matchesCreated    Int            @default(0)
+  rankingsCreated   Int            @default(0)
+  picturesCreated   Int            @default(0)
+  /// Counts of existing rows updated during the run (UPDATE path of upsert).
+  teamsUpdated      Int            @default(0)
+  matchesUpdated    Int            @default(0)
+  rankingsUpdated   Int            @default(0)
+  picturesUpdated   Int            @default(0)
+  /// Counts of rows soft-deleted during the run (absent from current SFV response).
+  teamsDeleted      Int            @default(0)
+  matchesDeleted    Int            @default(0)
+  rankingsDeleted   Int            @default(0)
+  picturesDeleted   Int            @default(0)
+  /// Total errors encountered during the run (mirrors SfvSyncError rows for this run).
+  errorCount        Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  errors SfvSyncError[]
+
+  @@index([tenantId])
+  @@index([tenantId, sfvSeasonId])
+  @@index([tenantId, status])
+  @@index([tenantId, startedAt])
+  @@index([tenantId, sfvSeasonId, startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// SfvSyncError — Per-entity error record within a synchronization run
+//
+// One row per entity that raised an error during a sync run.
+// Append-only within a run. Never updated once written.
+//
+// resolvedAt:
+//   Set by an operator or a retry mechanism once the error has been
+//   acknowledged or automatically resolved. Null until then.
+//
+// retryCount:
+//   Incremented by the sync engine on each retry attempt for this entity.
+//   Capped at a strategy-defined maximum (defined in the sync engine — not here).
+//
+// stackTrace:
+//   Server-side only. Never exposed in API responses, logs, or UI.
+//   Stored for internal post-mortem analysis.
+//
+// Design invariant:
+//   SfvSyncError rows are never hard-deleted. Retention is an application-layer
+//   concern. The syncRunId FK cascades on SfvSyncRun deletion (which never
+//   happens — see SfvSyncRun invariant above), so the cascade is defensive only.
+// ---------------------------------------------------------------------------
+
+model SfvSyncError {
+  id               String            @id @default(cuid())
+  tenantId         String
+  /// FK to the SfvSyncRun that produced this error.
+  syncRunId        String
+  entityType       SfvSyncEntityType
+  /// Human-readable external identifier for the failing entity.
+  /// Convention: "teamId:<n>", "matchId:<n>", "rankingKey:<tenantId>:<seasonId>:<teamId>:<groupId>".
+  entityExternalId String?
+  /// Named phase within the sync pipeline where the error occurred.
+  /// Convention: "fetch", "parse", "upsert", "soft-delete", "picture-download".
+  phase            String
+  /// Structured error code. Matches SfvErrorCode for SFV API errors,
+  /// or a DB/internal code (e.g. "DB_CONSTRAINT", "UNKNOWN") for others.
+  errorCode        String
+  errorMessage     String
+  /// Full server-side stack trace. Never expose in API responses.
+  stackTrace       String?           @db.Text
+  retryCount       Int               @default(0)
+  /// Null until the error is acknowledged or resolved by an operator or retry logic.
+  resolvedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  tenant  Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  syncRun SfvSyncRun @relation(fields: [syncRunId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([syncRunId])
+  @@index([tenantId, entityType])
+  @@index([tenantId, errorCode])
+  @@index([resolvedAt])
+  @@index([tenantId, createdAt])
 }
