@@ -1165,6 +1165,222 @@ export async function fetchClubRanking(params: ClubRankingParams): Promise<ClubR
   return executeClubRankingRequest(config, cached.token, params);
 }
 
+// ── Team picture types and client (Slice 3d) ─────────────────────────────────
+
+/**
+ * Represents the response from GET /api/team/picture/{teamId}.
+ *
+ * CONTRACT (SFV Club API Interface OpenAPI v26.6.15.2 + production observation):
+ *   - 200 body is a JSON-quoted base64 string (application/json; charset=utf-8).
+ *   - The spec describes the content as "binary data encoded in base64."
+ *   - Production response content-type is application/json, not image/*.
+ *   - No cache headers (cache-control, etag, last-modified) are returned.
+ *   - No content-length header is returned.
+ *   - The endpoint is not season-specific: teamId alone is sufficient.
+ *   - Own teams and opponent teams behave identically.
+ *
+ * Fields:
+ *   base64       — raw base64 string exactly as returned by the SFV API.
+ *                  Decodes to a GIF (and possibly other image formats).
+ *   contentType  — Content-Type header value from the upstream response.
+ *   contentLength — Content-Length header as integer, or null if absent.
+ *   etag          — ETag header, or null if absent.
+ *   lastModified  — Last-Modified header, or null if absent.
+ *   cacheControl  — Cache-Control header, or null if absent.
+ */
+export type TeamPictureResponse = {
+  /** Base64-encoded image data, exactly as returned by the SFV API. */
+  base64: string;
+  /** Content-Type header from the upstream response (always application/json for this endpoint). */
+  contentType: string;
+  /** Content-Length header parsed as integer, or null if not present. */
+  contentLength: number | null;
+  /** ETag header, or null if not present. */
+  etag: string | null;
+  /** Last-Modified header, or null if not present. */
+  lastModified: string | null;
+  /** Cache-Control header, or null if not present. */
+  cacheControl: string | null;
+};
+
+/**
+ * Executes a read-only GET /api/team/picture/{teamId} request.
+ *
+ * CONTRACT (SFV Club API Interface OpenAPI v26.6.15.2):
+ *   Tag:     Team
+ *   Method:  GET
+ *   Path:    /api/team/picture/{teamId}
+ *   Path param: teamId (int32, required) — percent-encoded
+ *   Header:  X-User-Token — raw opaque session token (no "Bearer" prefix)
+ *   Header:  User-Agent   — SFV_USER_AGENT (required by Cloudflare WAF)
+ *   Header:  Accept       — application/json
+ *   200: application/json — JSON-quoted base64 string ("binary data encoded in base64")
+ *   204: no content found → returns null
+ *   401: session token cannot be validated → SFV_UNAUTHORIZED + cache eviction
+ *   404: resource not found → SFV_NOT_FOUND
+ *   500: unexpected server error → SFV_UNAVAILABLE
+ *
+ * PRODUCTION OBSERVATIONS (2026-07-12):
+ *   - Response body is a JSON string value (double-quoted), not raw base64 text.
+ *   - Content-Type is application/json; charset=utf-8 (not image/*).
+ *   - Base64 decodes to GIF format (observed for all tested FC Allschwil teams
+ *     and all tested opponent teams).
+ *   - No cache-control, etag, last-modified, or content-length headers present.
+ *   - teamId alone is sufficient; no ClubId, SeasonId, or OrganisationId required.
+ *   - Own teams and opponent teams (schedule/ranking) behave identically.
+ *   - Inactive/synthetic team IDs return HTTP 404 with application/problem+json body.
+ *
+ * Security invariants:
+ *   - Token is never included in thrown errors or logs.
+ *   - teamId is validated as non-negative integer before the request is sent.
+ *   - No data is persisted.
+ *   - Base64 content is never logged.
+ */
+async function executeTeamPictureRequest(
+  config: SfvConfig,
+  token: string,
+  teamId: number,
+): Promise<TeamPictureResponse | null> {
+  const baseUrl = new URL(config.tokenUrl).origin;
+  const url = `${baseUrl}/api/team/picture/${encodeURIComponent(String(teamId))}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-User-Token": token,
+        "User-Agent": SFV_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    const contentType = response.headers.get("content-type") ?? "";
+    const contentLengthRaw = response.headers.get("content-length");
+    const contentLength =
+      contentLengthRaw !== null ? parseInt(contentLengthRaw, 10) || null : null;
+    const etag = response.headers.get("etag");
+    const lastModified = response.headers.get("last-modified");
+    const cacheControl = response.headers.get("cache-control");
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    if (response.status === 401) {
+      evictCachedToken();
+      throw new SfvAuthError(
+        "SFV_UNAUTHORIZED",
+        "SFV team picture request rejected: 401 Unauthorized.",
+      );
+    }
+
+    if (response.status === 404) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        `SFV team picture: team not found (404) for teamId=${teamId}.`,
+      );
+    }
+
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV team picture endpoint returned HTTP ${response.status}.`,
+      );
+    }
+
+    const rawText = await response.text();
+
+    if (!rawText.trim()) {
+      return null;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV team picture response is not valid JSON.",
+      );
+    }
+
+    if (typeof parsed !== "string") {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV team picture response expected a JSON string (base64).",
+      );
+    }
+
+    if (parsed.trim() === "") {
+      return null;
+    }
+
+    return {
+      base64: parsed,
+      contentType,
+      contentLength,
+      etag,
+      lastModified,
+      cacheControl,
+    };
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", "SFV team picture request timed out.");
+    }
+    throw new SfvNetworkError(
+      "SFV_UNAVAILABLE",
+      "SFV team picture request failed: network error.",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetches the team picture (club logo) for a given team ID.
+ *
+ * Endpoint: GET /api/team/picture/{teamId}
+ * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
+ *
+ * Returns a TeamPictureResponse on success (HTTP 200).
+ * Returns null when the upstream returns 204 (no content) or an empty body.
+ * Throws SfvNetworkError with SFV_NOT_FOUND when the team has no image (404).
+ *
+ * Authentication: uses X-User-Token from acquireToken(). On 401, the cached
+ * token is evicted and the request is retried once with a freshly acquired token
+ * (one controlled retry — no retry loop). If the retry also returns 401, throws
+ * SFV_UNAUTHORIZED.
+ *
+ * teamId alone is sufficient. ClubId, SeasonId, and OrganisationId are not
+ * required. Own teams and opponent teams behave identically.
+ *
+ * Security invariants:
+ *   - Token is never included in errors or logs.
+ *   - No image data is persisted.
+ *   - No database access.
+ */
+export async function fetchTeamPicture(teamId: number): Promise<TeamPictureResponse | null> {
+  const config = getSfvConfig();
+  const cached = await acquireToken();
+
+  try {
+    return await executeTeamPictureRequest(config, cached.token, teamId);
+  } catch (error) {
+    if (error instanceof SfvAuthError && error.code === "SFV_UNAUTHORIZED") {
+      // One controlled retry after 401: evict cache and re-acquire.
+      // executeTeamPictureRequest already called evictCachedToken() before throwing.
+      const fresh = await acquireToken();
+      return executeTeamPictureRequest(config, fresh.token, teamId);
+    }
+    throw error;
+  }
+}
+
 // ── SFV connection test (Slice 1) ─────────────────────────────────────────────
 
 /**
