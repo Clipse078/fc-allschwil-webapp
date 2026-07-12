@@ -975,6 +975,196 @@ export async function fetchClubSchedule(params: ClubScheduleParams): Promise<Clu
   return executeClubScheduleRequest(config, cached.token, params);
 }
 
+// ── Club ranking types and client (Slice 3c) ──────────────────────────────────
+
+/**
+ * Represents a single ranking entry returned by GET /api/club/ranking.
+ *
+ * All fields match the OpenAPI v26.6.15.2 Ranking schema exactly.
+ * additionalProperties: false — no extra fields are expected.
+ */
+export type ClubRankingEntry = {
+  leagueId: number;
+  leagueNumber: number;
+  leagueName: string | null;
+  divisionId: number;
+  divisionName: string | null;
+  groupId: number;
+  groupName: string | null;
+  teamName: string | null;
+  clubNumber: number;
+  position: number;
+  matches: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  penaltyPoints: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  points: number;
+  teamId: number;
+};
+
+/**
+ * Parameters for GET /api/club/ranking (OpenAPI v26.6.15.2).
+ *
+ * SeasonId and ClubId are required. All other parameters are optional query
+ * filters. Parameter names preserve exact OpenAPI casing, including GroupeId
+ * (with trailing 'e' — upstream spelling).
+ */
+export type ClubRankingParams = {
+  SeasonId: number;
+  ClubId: number;
+  OrganisationId?: number;
+  TeamId?: number;
+  LeagueId?: number;
+  Language?: number;
+  DivisionId?: number;
+  /** Upstream spelling: "GroupeId" (with 'e') — preserved exactly as in OpenAPI spec. */
+  GroupeId?: number;
+  MatchType?: number;
+};
+
+/**
+ * Executes a read-only GET /api/club/ranking request.
+ *
+ * Contract (SFV Club API Interface OpenAPI v26.6.15.2):
+ *   Tag:     ClubSchedule
+ *   Method:  GET
+ *   Path:    /api/club/ranking
+ *   Query:   SeasonId (int32, required), ClubId (int32, required), optional filters
+ *   Header:  X-User-Token — raw opaque session token (no "Bearer" prefix)
+ *   Header:  User-Agent   — SFV_USER_AGENT (required by Cloudflare WAF)
+ *   Header:  Accept       — application/json
+ *   200: application/json — Ranking[] (mapped to ClubRankingEntry[])
+ *   401: session token cannot be validated → SFV_UNAUTHORIZED + evict cache
+ *   404: resource not found → SFV_NOT_FOUND
+ *   406: resource not available → SFV_NOT_FOUND
+ *   500: unexpected server error → SFV_UNAVAILABLE
+ *
+ * Security invariants:
+ *   - Token is never included in thrown errors or logs.
+ *   - No data is persisted.
+ */
+async function executeClubRankingRequest(
+  config: SfvConfig,
+  token: string,
+  params: ClubRankingParams,
+): Promise<ClubRankingEntry[]> {
+  const baseUrl = new URL(config.tokenUrl).origin;
+  const qs = new URLSearchParams();
+  qs.set("SeasonId", String(params.SeasonId));
+  qs.set("ClubId", String(params.ClubId));
+  if (params.OrganisationId !== undefined) qs.set("OrganisationId", String(params.OrganisationId));
+  if (params.TeamId !== undefined) qs.set("TeamId", String(params.TeamId));
+  if (params.LeagueId !== undefined) qs.set("LeagueId", String(params.LeagueId));
+  if (params.Language !== undefined) qs.set("Language", String(params.Language));
+  if (params.DivisionId !== undefined) qs.set("DivisionId", String(params.DivisionId));
+  if (params.GroupeId !== undefined) qs.set("GroupeId", String(params.GroupeId));
+  if (params.MatchType !== undefined) qs.set("MatchType", String(params.MatchType));
+
+  const url = `${baseUrl}/api/club/ranking?${qs.toString()}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-User-Token": token,
+        "User-Agent": SFV_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 401) {
+      evictCachedToken();
+      throw new SfvAuthError(
+        "SFV_UNAUTHORIZED",
+        "SFV club ranking request rejected: 401 Unauthorized.",
+      );
+    }
+
+    if (response.status === 404) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        "SFV club ranking: resource not found (404).",
+      );
+    }
+
+    if (response.status === 406) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        "SFV club ranking: resource not currently available (406).",
+      );
+    }
+
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV club ranking endpoint returned HTTP ${response.status}.`,
+      );
+    }
+
+    const rawText = await response.text();
+    if (!rawText.trim()) {
+      return [];
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV club ranking response is not valid JSON.",
+      );
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        "SFV club ranking response expected an array.",
+      );
+    }
+
+    return parsed as ClubRankingEntry[];
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", "SFV club ranking request timed out.");
+    }
+    throw new SfvNetworkError(
+      "SFV_UNAVAILABLE",
+      "SFV club ranking request failed: network error.",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetches the ranking table for a given club and season.
+ *
+ * Endpoint: GET /api/club/ranking
+ * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
+ *
+ * Uses the in-memory token cache from acquireToken(). On 401, the cache is
+ * evicted automatically so the next call will re-authenticate.
+ *
+ * Returns an empty array on empty response body.
+ * Never persists data to the database.
+ *
+ * Ranking entries contain teamId which can be used with GET /api/team/picture.
+ */
+export async function fetchClubRanking(params: ClubRankingParams): Promise<ClubRankingEntry[]> {
+  const config = getSfvConfig();
+  const cached = await acquireToken();
+  return executeClubRankingRequest(config, cached.token, params);
+}
+
 // ── SFV connection test (Slice 1) ─────────────────────────────────────────────
 
 /**
