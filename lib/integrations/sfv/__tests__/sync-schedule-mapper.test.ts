@@ -1,0 +1,327 @@
+/**
+ * lib/integrations/sfv/__tests__/sync-schedule-mapper.test.ts
+ *
+ * Unit tests for the schedule mapper pure functions.
+ * No mocks needed — all functions are pure and deterministic.
+ */
+
+import { describe, it, expect } from "vitest";
+import {
+  mapMatchStateToEventStatus,
+  buildResultLabel,
+  buildMappingFields,
+  detectChanges,
+  isLocalTeamId,
+  resolveOpponentName,
+} from "../sync/schedule-mapper";
+import type { ClubScheduleEntry } from "../client";
+
+// ── Fixtures ───────────────────────────────────────────────────────────────────
+
+function makeEntry(overrides: Partial<ClubScheduleEntry> = {}): ClubScheduleEntry {
+  return {
+    matchId: 99001,
+    matchNumber: 1,
+    matchDate: "2026-09-13T15:00:00",
+    groupId: null,
+    cupId: null,
+    groupName: null,
+    roundNbr: 3,
+    playgroundId: 1001,
+    stadiumPlaygroundName: "Testzentrum",
+    isUnkownPlayground: false,
+    leagueId: 17131,
+    leagueNumber: 1,
+    leagueName: "4. Liga",
+    divisionId: 999,
+    divisionName: "Gruppe 1",
+    organisationId: 8,
+    organisationName: "Testverband",
+    matchType: 1,
+    matchTypeName: "Meisterschaft",
+    matchState: 0,
+    matchStateName: "angesetzt",
+    playDay: 3,
+    playDayName: "3. Spieltag",
+    seasonId: 2027,
+    seasonName: "2026/2027",
+    scoreTeamA: 0,
+    scoreTeamB: 0,
+    teamAId: 31927,
+    teamNameA: "FC Local A",
+    teamBId: 44001,
+    teamNameB: "FC Opponent B",
+    ...overrides,
+  };
+}
+
+function makeContext() {
+  return {
+    tenantId: "tenant-test",
+    clubId: 483,
+    seasonId: 2027,
+    organisationId: null,
+    dateFrom: "2026-06-13",
+    dateTo: "2026-10-11",
+    syncedAt: new Date("2026-07-13T10:00:00.000Z"),
+  };
+}
+
+// ── mapMatchStateToEventStatus ────────────────────────────────────────────────
+
+describe("mapMatchStateToEventStatus", () => {
+  it("maps 'gespielt' to COMPLETED", () => {
+    expect(mapMatchStateToEventStatus(1, "gespielt")).toBe("COMPLETED");
+  });
+
+  it("maps 'joué' to COMPLETED", () => {
+    expect(mapMatchStateToEventStatus(1, "joué")).toBe("COMPLETED");
+  });
+
+  it("maps 'annulliert' to CANCELLED", () => {
+    expect(mapMatchStateToEventStatus(3, "annulliert")).toBe("CANCELLED");
+  });
+
+  it("maps 'annulé' to CANCELLED", () => {
+    expect(mapMatchStateToEventStatus(3, "annulé")).toBe("CANCELLED");
+  });
+
+  it("maps 'verschoben' to POSTPONED", () => {
+    expect(mapMatchStateToEventStatus(2, "verschoben")).toBe("POSTPONED");
+  });
+
+  it("maps 'reporté' to POSTPONED", () => {
+    expect(mapMatchStateToEventStatus(2, "reporté")).toBe("POSTPONED");
+  });
+
+  it("maps 'läuft' to LIVE", () => {
+    expect(mapMatchStateToEventStatus(4, "läuft")).toBe("LIVE");
+  });
+
+  it("maps unknown state to SCHEDULED (safe default)", () => {
+    expect(mapMatchStateToEventStatus(9999, "unbekannt")).toBe("SCHEDULED");
+  });
+
+  it("maps null matchStateName to SCHEDULED (safe default)", () => {
+    expect(mapMatchStateToEventStatus(0, null)).toBe("SCHEDULED");
+  });
+
+  it("maps null matchState with null name to SCHEDULED", () => {
+    expect(mapMatchStateToEventStatus(null, null)).toBe("SCHEDULED");
+  });
+
+  it("is case-insensitive — 'Gespielt' maps to COMPLETED", () => {
+    expect(mapMatchStateToEventStatus(1, "Gespielt")).toBe("COMPLETED");
+  });
+});
+
+// ── buildResultLabel ──────────────────────────────────────────────────────────
+
+describe("buildResultLabel", () => {
+  it("returns 'X:Y' string for COMPLETED match", () => {
+    expect(buildResultLabel(2, 1, "COMPLETED")).toBe("2:1");
+  });
+
+  it("returns null for SCHEDULED match (no score yet)", () => {
+    expect(buildResultLabel(0, 0, "SCHEDULED")).toBeNull();
+  });
+
+  it("returns null for POSTPONED match", () => {
+    expect(buildResultLabel(0, 0, "POSTPONED")).toBeNull();
+  });
+
+  it("returns null for CANCELLED match", () => {
+    expect(buildResultLabel(0, 0, "CANCELLED")).toBeNull();
+  });
+
+  it("returns 'X:Y' for LIVE match", () => {
+    expect(buildResultLabel(1, 0, "LIVE")).toBe("1:0");
+  });
+
+  it("returns null when scores are null", () => {
+    expect(buildResultLabel(null, null, "COMPLETED")).toBeNull();
+  });
+
+  it("returns null when one score is null", () => {
+    expect(buildResultLabel(2, null, "COMPLETED")).toBeNull();
+  });
+
+  it("returns '0:0' for COMPLETED match with 0:0 score", () => {
+    expect(buildResultLabel(0, 0, "COMPLETED")).toBe("0:0");
+  });
+});
+
+// ── buildMappingFields ────────────────────────────────────────────────────────
+
+describe("buildMappingFields", () => {
+  it("sets provider to 'SFV'", () => {
+    const fields = buildMappingFields(makeEntry(), makeContext(), null, null);
+    expect(fields.provider).toBe("SFV");
+  });
+
+  it("sets externalMatchId from entry.matchId", () => {
+    const fields = buildMappingFields(makeEntry({ matchId: 99001 }), makeContext(), null, null);
+    expect(fields.externalMatchId).toBe(99001);
+  });
+
+  it("matchNumber is stored but separate from externalMatchId", () => {
+    const fields = buildMappingFields(makeEntry({ matchId: 99001, matchNumber: 5 }), makeContext(), null, null);
+    expect(fields.externalMatchId).toBe(99001);
+    expect(fields.matchNumber).toBe(5);
+    // matchNumber != externalMatchId
+    expect(fields.matchNumber).not.toBe(fields.externalMatchId);
+  });
+
+  it("sets homeTeamId and awayTeamId from resolved local teams", () => {
+    const fields = buildMappingFields(makeEntry(), makeContext(), "local-team-1", "local-team-2");
+    expect(fields.homeTeamId).toBe("local-team-1");
+    expect(fields.awayTeamId).toBe("local-team-2");
+  });
+
+  it("homeTeamId is null when home team is external", () => {
+    const fields = buildMappingFields(makeEntry(), makeContext(), null, null);
+    expect(fields.homeTeamId).toBeNull();
+  });
+
+  it("scoreHome corresponds to teamA (home) score", () => {
+    const fields = buildMappingFields(makeEntry({ scoreTeamA: 3, scoreTeamB: 1 }), makeContext(), null, null);
+    expect(fields.scoreHome).toBe(3);
+    expect(fields.scoreAway).toBe(1);
+  });
+});
+
+// ── detectChanges ─────────────────────────────────────────────────────────────
+
+describe("detectChanges", () => {
+  function makeExistingMapping(overrides = {}) {
+    return {
+      providerMatchState: 0,
+      providerMatchStateName: "angesetzt",
+      scoreHome: 0,
+      scoreAway: 0,
+      providerLeagueId: 17131,
+      providerLeagueName: "4. Liga",
+      providerDivisionId: 999,
+      providerDivisionName: "Gruppe 1",
+      providerRoundNbr: 3,
+      providerVenueName: "Testzentrum",
+      providerHomeTeamName: "FC Local A",
+      providerAwayTeamName: "FC Opponent B",
+      homeTeamId: "team-1" as string | null,
+      awayTeamId: null as string | null,
+      ...overrides,
+    };
+  }
+
+  function makeExistingEvent(overrides = {}) {
+    return {
+      startAt: new Date("2026-09-13T15:00:00.000Z"),
+      status: "SCHEDULED",
+      ...overrides,
+    };
+  }
+
+  it("returns hasAnyChange=false when nothing changed", () => {
+    const mapping = makeExistingMapping();
+    const event = makeExistingEvent();
+    const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+    );
+    expect(result.hasAnyChange).toBe(false);
+    expect(result.scoreChanged).toBe(false);
+    expect(result.kickoffChanged).toBe(false);
+    expect(result.statusChanged).toBe(false);
+  });
+
+  it("detects score change", () => {
+    const mapping = makeExistingMapping({ scoreHome: 0, scoreAway: 0 });
+    const event = makeExistingEvent();
+    const incoming = buildMappingFields(
+      makeEntry({ scoreTeamA: 2, scoreTeamB: 1 }),
+      makeContext(),
+      "team-1",
+      null,
+    );
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+    );
+    expect(result.scoreChanged).toBe(true);
+    expect(result.hasAnyChange).toBe(true);
+  });
+
+  it("detects kickoff change", () => {
+    const mapping = makeExistingMapping();
+    const event = makeExistingEvent({ startAt: new Date("2026-09-13T15:00:00.000Z") });
+    const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-20T18:00:00.000Z"), // changed kickoff
+      "SCHEDULED",
+    );
+    expect(result.kickoffChanged).toBe(true);
+    expect(result.hasAnyChange).toBe(true);
+  });
+
+  it("detects status change", () => {
+    const mapping = makeExistingMapping();
+    const event = makeExistingEvent({ status: "SCHEDULED" });
+    const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "COMPLETED", // changed status
+    );
+    expect(result.statusChanged).toBe(true);
+    expect(result.hasAnyChange).toBe(true);
+  });
+});
+
+// ── isLocalTeamId ─────────────────────────────────────────────────────────────
+
+describe("isLocalTeamId", () => {
+  it("returns true when teamId is in the local set", () => {
+    const localIds = new Set([31927, 31928]);
+    expect(isLocalTeamId(31927, localIds)).toBe(true);
+  });
+
+  it("returns false when teamId is not in the local set", () => {
+    const localIds = new Set([31927]);
+    expect(isLocalTeamId(44001, localIds)).toBe(false);
+  });
+
+  it("returns false for empty set", () => {
+    expect(isLocalTeamId(31927, new Set())).toBe(false);
+  });
+});
+
+// ── resolveOpponentName ───────────────────────────────────────────────────────
+
+describe("resolveOpponentName", () => {
+  it("returns teamNameB when our team is home", () => {
+    const entry = makeEntry({ teamNameA: "FC Us", teamNameB: "FC Them" });
+    expect(resolveOpponentName(entry, true)).toBe("FC Them");
+  });
+
+  it("returns teamNameA when our team is away", () => {
+    const entry = makeEntry({ teamNameA: "FC Them", teamNameB: "FC Us" });
+    expect(resolveOpponentName(entry, false)).toBe("FC Them");
+  });
+
+  it("returns null when opponent name is null", () => {
+    const entry = makeEntry({ teamNameB: null });
+    expect(resolveOpponentName(entry, true)).toBeNull();
+  });
+});
