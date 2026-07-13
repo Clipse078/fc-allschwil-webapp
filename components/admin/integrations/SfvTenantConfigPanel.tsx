@@ -11,16 +11,19 @@
  *   - Show connection status (Configured / Not Configured) from loaded config.
  *   - Run diagnostics via POST /api/admin/integrations/sfv/diagnostics and
  *     render the full SfvAdminDiagnostics response.
+ *   - Run team synchronization via POST /api/admin/integrations/sfv/teams/sync
+ *     and render the typed SfvTeamSyncResult summary.
  *
  * Data flow:
  *   - initialConfig from server (SSR) populates the form on first render.
  *   - Save → POST → reload config into form state.
  *   - Run Diagnostics → POST → display diagnostics result inline.
+ *   - Teams synchronisieren → POST → display sync result inline.
  *
  * Security:
  *   - No Prisma. No repository layer. API only.
  *   - tenantId is resolved server-side; never submitted in the request body.
- *   - No credentials, tokens, or stack traces are rendered.
+ *   - No credentials, tokens, raw provider payloads, or stack traces are rendered.
  */
 
 import { useState, useCallback } from "react";
@@ -30,6 +33,7 @@ import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import { useToast } from "@/hooks/use-toast";
 import type { TenantSfvConfig } from "@/lib/integrations/sfv/tenant-config-types";
 import type { SfvAdminDiagnostics, SfvDiagnosticIssue } from "@/lib/integrations/sfv/admin-diagnostics-service";
+import type { SfvTeamSyncResult } from "@/lib/integrations/sfv/sync/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +50,12 @@ type DiagnosticsState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; data: SfvAdminDiagnostics }
+  | { status: "error"; message: string };
+
+type TeamSyncState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: SfvTeamSyncResult }
   | { status: "error"; message: string };
 
 type SfvTenantConfigPanelProps = {
@@ -199,6 +209,74 @@ function DiagnosticsResult({ data }: { data: SfvAdminDiagnostics }) {
   );
 }
 
+// ── Sub-component: Team Sync Result ──────────────────────────────────────────
+
+function TeamSyncResult({ data }: { data: SfvTeamSyncResult }) {
+  const hasErrors = data.errors.length > 0;
+
+  const rows: { label: string; value: number | string }[] = [
+    { label: "Abgerufen", value: data.fetched },
+    { label: "Neu erstellt", value: data.created },
+    { label: "Aktualisiert", value: data.updated },
+    { label: "Unverändert", value: data.unchanged },
+    { label: "Inaktiv markiert", value: data.markedInactive },
+    { label: "Fehler", value: data.failed },
+    { label: "Dauer", value: `${data.durationMs} ms` },
+  ];
+
+  return (
+    <div className="space-y-4" data-testid="team-sync-result">
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusIndicator
+          variant={hasErrors ? (data.created + data.updated + data.unchanged > 0 ? "warning" : "danger") : "success"}
+          label={hasErrors ? "Abgeschlossen (mit Fehlern)" : "Erfolgreich abgeschlossen"}
+          data-testid="team-sync-status"
+        />
+        <span className="text-xs text-[var(--muted)]">
+          Saison {data.seasonId} · Club {data.clubId}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        {rows.map(({ label, value }) => (
+          <div
+            key={label}
+            className="flex justify-between gap-2 border-b border-[var(--border)] py-1.5"
+          >
+            <span className="text-[var(--text-2)]">{label}</span>
+            <span className="font-semibold text-[var(--foreground)]">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {hasErrors && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Fehlerdetails ({data.errors.length})
+          </p>
+          <ul className="space-y-1.5" data-testid="team-sync-errors">
+            {data.errors.map((err, idx) => (
+              <li
+                key={`${err.code}-${idx}`}
+                className="flex items-start gap-2 rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-3 py-2"
+              >
+                <StatusIndicator variant="danger" size="sm" className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">
+                    {err.code}
+                    {err.externalTeamId !== undefined ? ` · Team ${err.externalTeamId}` : ""}
+                  </p>
+                  <p className="mt-0.5 text-sm text-[var(--foreground)]">{err.message}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigPanelProps) {
@@ -209,6 +287,7 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsState>({ status: "idle" });
+  const [teamSync, setTeamSync] = useState<TeamSyncState>({ status: "idle" });
 
   // ── Field change handlers ──────────────────────────────────────────────────
 
@@ -297,6 +376,52 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
       setDiagnostics({ status: "success", data: data.diagnostics });
     } catch {
       setDiagnostics({ status: "error", message: "Netzwerkfehler. Bitte Seite neu laden." });
+    }
+  }, []);
+
+  // ── Team synchronization ──────────────────────────────────────────────────
+
+  const handleTeamSync = useCallback(async () => {
+    setTeamSync({ status: "loading" });
+    try {
+      const res = await fetch("/api/admin/integrations/sfv/teams/sync", {
+        method: "POST",
+      });
+
+      const data = await res.json().catch(() => ({})) as {
+        result?: SfvTeamSyncResult;
+        error?: string;
+      };
+
+      if (res.status === 404) {
+        setTeamSync({
+          status: "error",
+          message: "Keine SFV-Konfiguration gefunden. Bitte zuerst speichern.",
+        });
+        return;
+      }
+      if (res.status === 409) {
+        setTeamSync({
+          status: "error",
+          message: "SFV-Integration ist deaktiviert.",
+        });
+        return;
+      }
+
+      if (!res.ok || !data.result) {
+        setTeamSync({
+          status: "error",
+          message: data.error ?? "Unbekannter Fehler bei der Synchronisierung.",
+        });
+        return;
+      }
+
+      setTeamSync({ status: "success", data: data.result });
+    } catch {
+      setTeamSync({
+        status: "error",
+        message: "Netzwerkfehler. Bitte Seite neu laden.",
+      });
     }
   }, []);
 
@@ -475,6 +600,54 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
             </div>
           </dl>
         )}
+      </SectionCard>
+
+      {/* ── Teams synchronisieren ─────────────────────────────────────────── */}
+      <SectionCard
+        title="Teams synchronisieren"
+        description="SFV-Teams für die konfigurierte Saison importieren und aktualisieren. Club-ID und Saison werden aus der gespeicherten Konfiguration gelesen."
+      >
+        <div className="space-y-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleTeamSync}
+            loading={teamSync.status === "loading"}
+            disabled={teamSync.status === "loading" || !isConfigured}
+            data-testid="btn-team-sync"
+          >
+            {teamSync.status === "loading"
+              ? "Synchronisierung läuft…"
+              : "Teams synchronisieren"}
+          </Button>
+
+          {!isConfigured && teamSync.status === "idle" && (
+            <p className="text-xs text-[var(--muted)]">
+              Konfigurieren und aktivieren Sie die Integration, um die Teams zu synchronisieren.
+            </p>
+          )}
+
+          {teamSync.status === "loading" && (
+            <p className="text-sm text-[var(--text-2)]" data-testid="team-sync-loading">
+              Teams werden synchronisiert — dies kann einige Sekunden dauern…
+            </p>
+          )}
+
+          {teamSync.status === "error" && (
+            <div
+              className="rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-4 py-3"
+              data-testid="team-sync-error"
+            >
+              <p className="text-sm font-medium text-[var(--sce-danger)]">
+                {teamSync.message}
+              </p>
+            </div>
+          )}
+
+          {teamSync.status === "success" && (
+            <TeamSyncResult data={teamSync.data} />
+          )}
+        </div>
       </SectionCard>
 
       {/* ── Diagnostics ───────────────────────────────────────────────────── */}

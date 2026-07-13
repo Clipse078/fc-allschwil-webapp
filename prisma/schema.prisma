@@ -395,7 +395,8 @@ model Tenant {
 
   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
-  sfvConfig TenantSfvConfig?
+  sfvConfig            TenantSfvConfig?
+  teamExternalMappings TeamExternalMapping[]
 
   @@index([status])
   @@index([name])
@@ -642,15 +643,68 @@ model Team {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  teamSeasons     TeamSeason[]
-  events          Event[]
-  eventImportRuns EventImportRun[]
-  orgUnit         OrgUnit?     @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  teamSeasons          TeamSeason[]
+  events               Event[]
+  eventImportRuns      EventImportRun[]
+  orgUnit              OrgUnit?               @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  externalMappings     TeamExternalMapping[]
 
   @@index([category, sortOrder])
   @@index([isActive])
   @@index([orgUnitId])
   @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// TeamExternalMapping — external-provider identity for a Team.
+//
+// Holds the mapping between a canonical SportClubEvo Team and a record in an
+// external provider (e.g. SFV / ClubCorner). One mapping row per provider +
+// external team + season + tenant combination.
+//
+// Team remains the canonical entity owned by Organisation Builder.
+// SFV is an external provider. This model links the two without coupling Team
+// to any provider-specific column.
+//
+// Future providers (e.g. Fussball.ch, licencing systems) add their own rows
+// without schema changes to Team.
+// ---------------------------------------------------------------------------
+
+model TeamExternalMapping {
+  id                   String   @id @default(cuid())
+  /// Owning tenant. Scopes all lookups and mutations to a single tenant.
+  tenantId             String
+  /// The canonical Team this mapping belongs to.
+  teamId               String
+  /// External provider identifier, e.g. "SFV".
+  provider             String
+  /// Provider-assigned team identifier (e.g. SFV teamId integer).
+  externalTeamId       Int
+  /// Provider-assigned season identifier used at time of sync (e.g. SFV seasonId integer).
+  externalSeasonId     Int
+  /// Provider-reported team name at time of last sync.
+  providerTeamName     String?
+  /// Provider-reported league identifier at time of last sync.
+  providerLeagueId     Int?
+  /// Provider-reported league name at time of last sync.
+  providerLeagueName   String?
+  /// Provider-reported organisation identifier at time of last sync.
+  providerOrganisationId Int?
+  /// Whether the provider reports this team as active.
+  providerIsActive     Boolean  @default(true)
+  /// Timestamp of the last successful sync that touched this mapping.
+  lastSyncedAt         DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Prevents duplicate mappings for the same external team/season/provider/tenant.
+  @@unique([tenantId, provider, externalTeamId, externalSeasonId])
+  @@index([tenantId, provider])
+  @@index([teamId])
+  @@index([providerIsActive])
 }
 
 model TeamSeason {
