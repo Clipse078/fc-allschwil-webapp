@@ -34,6 +34,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { TenantSfvConfig } from "@/lib/integrations/sfv/tenant-config-types";
 import type { SfvAdminDiagnostics, SfvDiagnosticIssue } from "@/lib/integrations/sfv/admin-diagnostics-service";
 import type { SfvTeamSyncResult } from "@/lib/integrations/sfv/sync/types";
+import type { SfvScheduleSyncResult } from "@/lib/integrations/sfv/sync/schedule-types";
+import type { SfvDetailSyncResult } from "@/lib/integrations/sfv/sync/detail-types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,18 @@ type TeamSyncState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; data: SfvTeamSyncResult }
+  | { status: "error"; message: string };
+
+type ScheduleSyncState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: SfvScheduleSyncResult }
+  | { status: "error"; message: string };
+
+type DetailSyncState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: SfvDetailSyncResult }
   | { status: "error"; message: string };
 
 type SfvTenantConfigPanelProps = {
@@ -277,6 +291,172 @@ function TeamSyncResult({ data }: { data: SfvTeamSyncResult }) {
   );
 }
 
+// ── Sub-component: Schedule Sync Result ──────────────────────────────────────
+
+function ScheduleSyncResult({ data }: { data: SfvScheduleSyncResult }) {
+  const hasErrors = data.errors.length > 0;
+  const hasUnresolvedLocalTeams = data.unresolvedLocalTeamRefs > 0;
+
+  // Status: danger if fatal errors with no data; warning if unresolved local teams
+  // or errors alongside data; success only when clean run
+  const statusVariant: "success" | "warning" | "danger" =
+    hasErrors && data.created + data.updated + data.unchanged === 0
+      ? "danger"
+      : hasErrors || hasUnresolvedLocalTeams
+        ? "warning"
+        : "success";
+  const statusLabel =
+    statusVariant === "danger"
+      ? "Fehlgeschlagen"
+      : statusVariant === "warning"
+        ? "Abgeschlossen (mit Hinweisen)"
+        : "Erfolgreich abgeschlossen";
+
+  const rows: { label: string; value: number | string }[] = [
+    { label: "Zeitraum", value: `${data.dateFrom} – ${data.dateTo}` },
+    { label: "Abgerufen", value: data.fetched },
+    { label: "Neu erstellt", value: data.created },
+    { label: "Aktualisiert", value: data.updated },
+    { label: "Unverändert", value: data.unchanged },
+    { label: "Fehler", value: data.failed },
+    { label: "Ergebnisänderungen", value: data.scoresUpdated },
+    { label: "Verschobene Anspielzeiten", value: data.kickoffChanges },
+    { label: "Nicht zugeordnete lokale Teams", value: data.unresolvedLocalTeamRefs },
+    { label: "Externe Gegner", value: data.externalOpponents },
+    { label: "Dauer", value: `${data.durationMs} ms` },
+  ];
+
+  return (
+    <div className="space-y-4" data-testid="schedule-sync-result">
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusIndicator
+          variant={statusVariant}
+          label={statusLabel}
+          data-testid="schedule-sync-status"
+        />
+        {hasUnresolvedLocalTeams && !hasErrors && (
+          <span className="text-xs text-[var(--muted)]">
+            Teams-Synchronisierung noch nicht ausgeführt
+          </span>
+        )}
+        <span className="text-xs text-[var(--muted)]">
+          Saison {data.seasonId} · Club {data.clubId}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        {rows.map(({ label, value }) => (
+          <div
+            key={label}
+            className="flex justify-between gap-2 border-b border-[var(--border)] py-1.5"
+          >
+            <span className="text-[var(--text-2)]">{label}</span>
+            <span className="font-semibold text-[var(--foreground)]">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {hasErrors && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Fehlerdetails ({data.errors.length})
+          </p>
+          <ul className="space-y-1.5" data-testid="schedule-sync-errors">
+            {data.errors.map((err, idx) => (
+              <li
+                key={`${err.code}-${idx}`}
+                className="flex items-start gap-2 rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-3 py-2"
+              >
+                <StatusIndicator variant="danger" size="sm" className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">
+                    {err.code}
+                  </p>
+                  <p className="mt-0.5 text-sm text-[var(--foreground)]">{err.message}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-component: Detail Sync Result ────────────────────────────────────────
+
+function DetailSyncResult({ data }: { data: SfvDetailSyncResult }) {
+  const hasErrors = data.errors.length > 0;
+  const statusVariant: "success" | "warning" | "danger" =
+    hasErrors && data.updated + data.unchanged === 0
+      ? "danger"
+      : hasErrors
+        ? "warning"
+        : "success";
+  const statusLabel =
+    statusVariant === "danger"
+      ? "Fehlgeschlagen"
+      : statusVariant === "warning"
+        ? "Abgeschlossen (mit Hinweisen)"
+        : "Erfolgreich abgeschlossen";
+
+  const rows: { label: string; value: number | string }[] = [
+    { label: "Verarbeitet", value: data.processed },
+    { label: "Aktualisiert", value: data.updated },
+    { label: "Unverändert", value: data.unchanged },
+    { label: "Fehler", value: data.failed },
+    { label: "Dauer", value: `${data.durationMs} ms` },
+  ];
+
+  return (
+    <div className="space-y-4" data-testid="detail-sync-result">
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusIndicator
+          variant={statusVariant}
+          label={statusLabel}
+          data-testid="detail-sync-status"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        {rows.map(({ label, value }) => (
+          <div
+            key={label}
+            className="flex justify-between gap-2 border-b border-[var(--border)] py-1.5"
+          >
+            <span className="text-[var(--text-2)]">{label}</span>
+            <span className="font-semibold text-[var(--foreground)]">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {hasErrors && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Fehlerdetails ({data.errors.length})
+          </p>
+          <ul className="space-y-1.5" data-testid="detail-sync-errors">
+            {data.errors.map((err, idx) => (
+              <li
+                key={`${err.code}-${idx}`}
+                className="flex items-start gap-2 rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-3 py-2"
+              >
+                <StatusIndicator variant="danger" size="sm" className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">
+                    {err.code}
+                  </p>
+                  <p className="mt-0.5 text-sm text-[var(--foreground)]">{err.message}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigPanelProps) {
@@ -288,6 +468,8 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
   const [saving, setSaving] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsState>({ status: "idle" });
   const [teamSync, setTeamSync] = useState<TeamSyncState>({ status: "idle" });
+  const [scheduleSync, setScheduleSync] = useState<ScheduleSyncState>({ status: "idle" });
+  const [detailSync, setDetailSync] = useState<DetailSyncState>({ status: "idle" });
 
   // ── Field change handlers ──────────────────────────────────────────────────
 
@@ -419,6 +601,98 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
       setTeamSync({ status: "success", data: data.result });
     } catch {
       setTeamSync({
+        status: "error",
+        message: "Netzwerkfehler. Bitte Seite neu laden.",
+      });
+    }
+  }, []);
+
+  // ── Schedule synchronization ─────────────────────────────────────────────
+
+  const handleScheduleSync = useCallback(async () => {
+    setScheduleSync({ status: "loading" });
+    try {
+      const res = await fetch("/api/admin/integrations/sfv/schedule/sync", {
+        method: "POST",
+      });
+
+      const data = await res.json().catch(() => ({})) as {
+        result?: SfvScheduleSyncResult;
+        error?: string;
+      };
+
+      if (res.status === 404) {
+        setScheduleSync({
+          status: "error",
+          message: "Keine SFV-Konfiguration gefunden. Bitte zuerst speichern.",
+        });
+        return;
+      }
+      if (res.status === 409) {
+        setScheduleSync({
+          status: "error",
+          message: "SFV-Integration ist deaktiviert.",
+        });
+        return;
+      }
+
+      if (!res.ok || !data.result) {
+        setScheduleSync({
+          status: "error",
+          message: data.error ?? "Unbekannter Fehler bei der Synchronisierung.",
+        });
+        return;
+      }
+
+      setScheduleSync({ status: "success", data: data.result });
+    } catch {
+      setScheduleSync({
+        status: "error",
+        message: "Netzwerkfehler. Bitte Seite neu laden.",
+      });
+    }
+  }, []);
+
+  // ── Match-detail synchronization ─────────────────────────────────────────
+
+  const handleDetailSync = useCallback(async () => {
+    setDetailSync({ status: "loading" });
+    try {
+      const res = await fetch("/api/admin/integrations/sfv/detail/sync", {
+        method: "POST",
+      });
+
+      const data = await res.json().catch(() => ({})) as {
+        result?: SfvDetailSyncResult;
+        error?: string;
+      };
+
+      if (res.status === 404) {
+        setDetailSync({
+          status: "error",
+          message: "Keine SFV-Konfiguration gefunden. Bitte zuerst speichern.",
+        });
+        return;
+      }
+      if (res.status === 409) {
+        setDetailSync({
+          status: "error",
+          message: "SFV-Integration ist deaktiviert.",
+        });
+        return;
+      }
+
+      if (!res.ok || !data.result) {
+        setDetailSync({
+          status: "error",
+          message: data.error ?? "Unbekannter Fehler bei der Matchdetail-Synchronisierung.",
+        });
+        return;
+      }
+
+      setDetailSync({ status: "success", data: data.result });
+    } catch {
+      setDetailSync({
         status: "error",
         message: "Netzwerkfehler. Bitte Seite neu laden.",
       });
@@ -600,6 +874,102 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
             </div>
           </dl>
         )}
+      </SectionCard>
+
+      {/* ── Spielplan synchronisieren ─────────────────────────────────────── */}
+      <SectionCard
+        title="Spielplan synchronisieren"
+        description="SFV-Spielplan (Spiele und Resultate) für das konfigurierte Zeitfenster synchronisieren. Standard: 30 Tage Vergangenheit bis 90 Tage Zukunft."
+      >
+        <div className="space-y-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleScheduleSync}
+            loading={scheduleSync.status === "loading"}
+            disabled={scheduleSync.status === "loading" || !isConfigured}
+            data-testid="btn-schedule-sync"
+          >
+            {scheduleSync.status === "loading"
+              ? "Synchronisierung läuft…"
+              : "Spielplan synchronisieren"}
+          </Button>
+
+          {!isConfigured && scheduleSync.status === "idle" && (
+            <p className="text-xs text-[var(--muted)]">
+              Konfigurieren und aktivieren Sie die Integration, um den Spielplan zu synchronisieren.
+            </p>
+          )}
+
+          {scheduleSync.status === "loading" && (
+            <p className="text-sm text-[var(--text-2)]" data-testid="schedule-sync-loading">
+              Spielplan wird synchronisiert — dies kann einige Sekunden dauern…
+            </p>
+          )}
+
+          {scheduleSync.status === "error" && (
+            <div
+              className="rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-4 py-3"
+              data-testid="schedule-sync-error"
+            >
+              <p className="text-sm font-medium text-[var(--sce-danger)]">
+                {scheduleSync.message}
+              </p>
+            </div>
+          )}
+
+          {scheduleSync.status === "success" && (
+            <ScheduleSyncResult data={scheduleSync.data} />
+          )}
+        </div>
+      </SectionCard>
+
+      {/* ── Matchdetails synchronisieren ──────────────────────────────────── */}
+      <SectionCard
+        title="Matchdetails synchronisieren"
+        description="Erweiterte Matchdetails (Halbzeitstand, korrigierte Anspielzeit, bestätigte Spielstätte) von SFV abrufen. Wird nur auf bestehende Spiele aus dem Spielplan angewendet — es werden keine neuen Spiele erstellt. Club-verwaltete Felder (Titel, Bemerkungen, Treffpunkt, Platz, Garderobe) bleiben unverändert."
+      >
+        <div className="space-y-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleDetailSync}
+            loading={detailSync.status === "loading"}
+            disabled={detailSync.status === "loading" || !isConfigured}
+            data-testid="btn-detail-sync"
+          >
+            {detailSync.status === "loading"
+              ? "Synchronisierung läuft…"
+              : "Matchdetails synchronisieren"}
+          </Button>
+
+          {!isConfigured && detailSync.status === "idle" && (
+            <p className="text-xs text-[var(--muted)]">
+              Konfigurieren und aktivieren Sie die Integration, um Matchdetails zu synchronisieren.
+            </p>
+          )}
+
+          {detailSync.status === "loading" && (
+            <p className="text-sm text-[var(--text-2)]" data-testid="detail-sync-loading">
+              Matchdetails werden synchronisiert — dies kann einige Sekunden dauern…
+            </p>
+          )}
+
+          {detailSync.status === "error" && (
+            <div
+              className="rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-4 py-3"
+              data-testid="detail-sync-error"
+            >
+              <p className="text-sm font-medium text-[var(--sce-danger)]">
+                {detailSync.message}
+              </p>
+            </div>
+          )}
+
+          {detailSync.status === "success" && (
+            <DetailSyncResult data={detailSync.data} />
+          )}
+        </div>
       </SectionCard>
 
       {/* ── Teams synchronisieren ─────────────────────────────────────────── */}

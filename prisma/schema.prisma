@@ -271,6 +271,7 @@ enum EventSource {
   MANUAL
   CSV_EXCEL_IMPORT
   MUNICIPALITY_API
+  SFV
 }
 
 enum EventStatus {
@@ -395,8 +396,9 @@ model Tenant {
 
   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
-  sfvConfig            TenantSfvConfig?
-  teamExternalMappings TeamExternalMapping[]
+  sfvConfig              TenantSfvConfig?
+  teamExternalMappings   TeamExternalMapping[]
+  matchExternalMappings  MatchExternalMapping[]
 
   @@index([status])
   @@index([name])
@@ -643,11 +645,13 @@ model Team {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  teamSeasons          TeamSeason[]
-  events               Event[]
-  eventImportRuns      EventImportRun[]
-  orgUnit              OrgUnit?               @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  externalMappings     TeamExternalMapping[]
+  teamSeasons             TeamSeason[]
+  events                  Event[]
+  eventImportRuns         EventImportRun[]
+  orgUnit                 OrgUnit?               @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  externalMappings        TeamExternalMapping[]
+  homeMatchMappings       MatchExternalMapping[] @relation("MatchHomeTeam")
+  awayMatchMappings       MatchExternalMapping[] @relation("MatchAwayTeam")
 
   @@index([category, sortOrder])
   @@index([isActive])
@@ -811,12 +815,16 @@ model Event {
   importBatchKey   String?
   lastSyncedAt     DateTime?
 
-  opponentName     String?
-  organizerName    String?
-  competitionLabel String?
-  homeAway         String?
-  resultLabel      String?
-  meetingTime      DateTime?
+  opponentName              String?
+  organizerName             String?
+  competitionLabel          String?
+  homeAway                  String?
+  resultLabel               String?
+  /// Live or half-time intermediate score label (e.g. "1:0 (HZ)").
+  /// Set and updated exclusively by match-detail synchronization (Slice 3C).
+  /// Null until a detail sync has been run and an intermediate result is available.
+  intermediateResultLabel   String?
+  meetingTime               DateTime?
 
   websiteVisible       Boolean @default(true)
   infoboardVisible     Boolean @default(false)
@@ -840,8 +848,9 @@ model Event {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  team   Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  season               Season                @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team                 Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  matchExternalMapping MatchExternalMapping?
 
   @@index([seasonId, type])
   @@index([teamId, type])
@@ -2134,6 +2143,108 @@ model ReusableComponentUsage {
 //   - diagnostics snapshots
 //   - season-level metadata
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// MatchExternalMapping — external-provider identity for a match/fixture.
+//
+// Holds the mapping between a canonical SportClubEvo Event (type=MATCH) and
+// a match record in an external provider (e.g. SFV / ClubCorner). One row
+// per provider + externalMatchId + tenant combination.
+//
+// SFV matchId is the canonical external identifier (externalMatchId). It is
+// the only programmatic integration key. matchNumber is display-only.
+//
+// Field ownership:
+//   - SFV-owned (updated every sync): everything in this model.
+//   - Locally managed (on Event, never overwritten by sync):
+//       pitchCode, homeDressingRoomCode, awayDressingRoomCode, remarks,
+//       websiteVisible, infoboardVisible, wochenplanVisible, reviewStage,
+//       sortOrder, description, internal assignment fields.
+//
+// Opponent strategy:
+//   - homeTeamId / awayTeamId: nullable FKs to canonical Team records.
+//     Set when the team is a tenant-owned Team resolved via TeamExternalMapping.
+//     Null when the team is an external opponent not in the canonical Team table.
+//   - Provider team names (providerHomeTeamName / providerAwayTeamName) are
+//     always stored for display fallback.
+//   - External opponents are NEVER created as tenant-owned Teams during match sync.
+//
+// The unique constraint prevents duplicate SFV match mappings per tenant.
+// ---------------------------------------------------------------------------
+
+model MatchExternalMapping {
+  id                     String    @id @default(cuid())
+  /// Owning tenant. Scopes all lookups and mutations to a single tenant.
+  tenantId               String
+  /// The canonical Event (type=MATCH) this mapping belongs to.
+  eventId                String    @unique
+  /// External provider identifier, e.g. "SFV".
+  provider               String
+  /// SFV matchId — the canonical external identity. Never use matchNumber for identity.
+  externalMatchId        Int
+  /// SFV seasonId at time of sync.
+  externalSeasonId       Int
+  /// Display-only SFV match number. Never used as identity or integration key.
+  matchNumber            Int?
+  /// SFV teamId for the home team (teamAId in ClubScheduleEntry).
+  providerHomeTeamId     Int
+  /// SFV teamId for the away team (teamBId in ClubScheduleEntry).
+  providerAwayTeamId     Int
+  /// Provider home team display name for fallback rendering.
+  providerHomeTeamName   String?
+  /// Provider away team display name for fallback rendering.
+  providerAwayTeamName   String?
+  /// Canonical local Team for home side. Null when external opponent.
+  homeTeamId             String?
+  /// Canonical local Team for away side. Null when external opponent.
+  awayTeamId             String?
+  /// Raw SFV matchState integer, preserved exactly as received. Never interpreted.
+  providerMatchState     Int?
+  /// Human-readable match state name from provider, for admin reference.
+  providerMatchStateName String?
+  /// Home team score (teamA score in SFV terms). Null when not yet played.
+  scoreHome              Int?
+  /// Away team score (teamB score in SFV terms). Null when not yet played.
+  scoreAway              Int?
+  /// Provider league identifier.
+  providerLeagueId       Int?
+  /// Provider league name.
+  providerLeagueName     String?
+  /// Provider division identifier.
+  providerDivisionId     Int?
+  /// Provider division name.
+  providerDivisionName   String?
+  /// Provider round number.
+  providerRoundNbr       Int?
+  /// Provider organisation identifier.
+  providerOrganisationId Int?
+  /// Provider playground/venue identifier.
+  providerPlaygroundId   Int?
+  /// Provider venue/playground name for display.
+  providerVenueName      String?
+  /// Provider season name.
+  providerSeasonName     String?
+  /// Timestamp of the last successful sync that touched this mapping.
+  lastSyncedAt           DateTime
+  /// Timestamp of the last successful match-detail sync for this mapping.
+  /// Null until the first match-detail synchronization run has been executed.
+  detailSyncedAt         DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  homeTeam Team?  @relation("MatchHomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  awayTeam Team?  @relation("MatchAwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  /// Prevents duplicate SFV match mappings within the same tenant.
+  @@unique([tenantId, provider, externalMatchId])
+  @@index([tenantId, provider])
+  @@index([tenantId, provider, externalSeasonId])
+  @@index([eventId])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+}
 
 model TenantSfvConfig {
   id              String   @id @default(cuid())

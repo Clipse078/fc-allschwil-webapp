@@ -1381,6 +1381,164 @@ export async function fetchTeamPicture(teamId: number): Promise<TeamPictureRespo
   }
 }
 
+// ── Match detail types and client (Slice 3C) ──────────────────────────────────
+
+/**
+ * Represents the detail payload returned by GET /api/match/{matchId}.
+ *
+ * The endpoint provides richer match-day information than the schedule list,
+ * including live intermediate scores, precise kickoff adjustments, and
+ * confirmed venue data. All fields match the SFV ClubCorner OpenAPI v26.6.15.2
+ * Match schema.
+ *
+ * Field notes:
+ *   - intermediateScoreHome / intermediateScoreAway: live half-time or
+ *     intermediate score. Null when not in a live/half-time state.
+ *   - matchDate: ISO 8601 datetime string (same format as ClubScheduleEntry).
+ *   - playgroundName: confirmed venue name for match day (may differ from
+ *     the schedule list when changed close to match day).
+ *   - leagueName / divisionName: same as in schedule — included here for
+ *     completeness in the detail payload.
+ */
+export type MatchDetail = {
+  matchId: number;
+  matchDate: string;
+  matchState: number;
+  matchStateName: string | null;
+  scoreTeamA: number;
+  scoreTeamB: number;
+  intermediateScoreHome: number | null;
+  intermediateScoreAway: number | null;
+  playgroundId: number | null;
+  playgroundName: string | null;
+  leagueId: number | null;
+  leagueName: string | null;
+  divisionId: number | null;
+  divisionName: string | null;
+  seasonId: number;
+  teamAId: number;
+  teamBId: number;
+};
+
+/**
+ * Executes a read-only GET /api/match/{matchId} request.
+ *
+ * Contract (SFV Club API Interface OpenAPI v26.6.15.2):
+ *   Tag:     Match
+ *   Method:  GET
+ *   Path:    /api/match/{matchId}
+ *   Header:  X-User-Token — raw opaque session token (no "Bearer" prefix)
+ *   Header:  User-Agent   — SFV_USER_AGENT (required by Cloudflare WAF)
+ *   Header:  Accept       — application/json
+ *   200: application/json — MatchDetail
+ *   401: session token cannot be validated → SFV_UNAUTHORIZED + evict cache
+ *   404: match not found → SFV_NOT_FOUND
+ *   500: unexpected server error → SFV_UNAVAILABLE
+ *
+ * Security invariants:
+ *   - Token is never included in thrown errors or logs.
+ *   - No data is persisted.
+ */
+async function executeMatchDetailRequest(
+  config: SfvConfig,
+  token: string,
+  matchId: number,
+): Promise<MatchDetail> {
+  const baseUrl = new URL(config.tokenUrl).origin;
+  const url = `${baseUrl}/api/match/${encodeURIComponent(String(matchId))}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-User-Token": token,
+        "User-Agent": SFV_USER_AGENT,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 401) {
+      evictCachedToken();
+      throw new SfvAuthError(
+        "SFV_UNAUTHORIZED",
+        `SFV match detail request rejected: 401 Unauthorized.`,
+      );
+    }
+
+    if (response.status === 404) {
+      throw new SfvNetworkError(
+        "SFV_NOT_FOUND",
+        `SFV match detail: match not found (404) for matchId ${matchId}.`,
+      );
+    }
+
+    if (!response.ok) {
+      throw new SfvNetworkError(
+        "SFV_UNAVAILABLE",
+        `SFV match detail endpoint returned HTTP ${response.status}.`,
+      );
+    }
+
+    const rawText = await response.text();
+    if (!rawText.trim()) {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        `SFV match detail response was empty for matchId ${matchId}.`,
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new SfvNetworkError(
+        "SFV_INVALID_RESPONSE",
+        `SFV match detail response is not valid JSON for matchId ${matchId}.`,
+      );
+    }
+
+    return parsed as MatchDetail;
+  } catch (error) {
+    if (error instanceof SfvError) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SfvNetworkError("SFV_TIMEOUT", `SFV match detail request timed out (matchId ${matchId}).`);
+    }
+    throw new SfvNetworkError(
+      "SFV_UNAVAILABLE",
+      `SFV match detail request failed: network error (matchId ${matchId}).`,
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetches detailed match information for a single match by its SFV matchId.
+ *
+ * Endpoint: GET /api/match/{matchId}
+ * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
+ *
+ * Provides richer match-day data than the schedule list, including live
+ * intermediate scores and confirmed venue details.
+ *
+ * Uses the in-memory token cache from acquireToken(). On 401, the cache is
+ * evicted automatically so the next call will re-authenticate.
+ *
+ * Never persists data to the database.
+ * Never returns the token in any form.
+ *
+ * @throws SfvNetworkError (SFV_NOT_FOUND) when the matchId is not known to SFV.
+ */
+export async function fetchMatchDetail(matchId: number): Promise<MatchDetail> {
+  const config = getSfvConfig();
+  const cached = await acquireToken();
+  return executeMatchDetailRequest(config, cached.token, matchId);
+}
+
 // ── SFV connection test (Slice 1) ─────────────────────────────────────────────
 
 /**
