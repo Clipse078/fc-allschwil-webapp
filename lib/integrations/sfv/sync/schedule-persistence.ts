@@ -34,8 +34,12 @@ import {
   detectChanges,
   mapMatchStateToEventStatus,
   buildResultLabel,
-  resolveOpponentName,
-  isLocalTeamId,
+  classifyParticipant,
+  resolvedTeamId,
+  isUnresolvedLocal,
+  isExternalOpponent,
+  resolveEventTeamId,
+  resolveOpponentNameFromClassification,
 } from "./schedule-mapper";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -76,6 +80,7 @@ export type ExistingMatchMappingRow = {
   event: {
     startAt: Date;
     status: string;
+    teamId: string | null;
   };
 };
 
@@ -114,7 +119,7 @@ export async function loadExistingMatchMappings(
       homeTeamId: true,
       awayTeamId: true,
       event: {
-        select: { startAt: true, status: true },
+        select: { startAt: true, status: true, teamId: true },
       },
     },
   });
@@ -274,9 +279,11 @@ export async function createMatchWithMapping(
 /**
  * Updates an existing Event and MatchExternalMapping with the latest provider data.
  *
- * Only SFV-owned fields are updated on Event:
+ * SFV-owned Event fields updated on every changed sync:
  *   - startAt (kickoff — may change after rescheduling)
  *   - status (derived from matchState)
+ *   - teamId (canonical local Team — may newly resolve after team sync is run)
+ *   - homeAway (H/A derived from team classification)
  *   - opponentName (display name may change)
  *   - competitionLabel (league name may change)
  *   - location (venue may change)
@@ -299,6 +306,8 @@ export async function updateMatchRecord(
   opponentName: string | null,
   homeTeamId: string | null,
   awayTeamId: string | null,
+  localTeamId: string | null,
+  isHome: boolean,
 ): Promise<SchedulePersistenceOutcome & { status: "updated" | "failed" }> {
   const mappingFields = buildMappingFields(entry, context, homeTeamId, awayTeamId);
   const kickoff = new Date(entry.matchDate);
@@ -306,6 +315,7 @@ export async function updateMatchRecord(
   const resultLabel = buildResultLabel(entry.scoreTeamA, entry.scoreTeamB, status);
   const competition = entry.leagueName ?? entry.divisionName ?? null;
   const venue = entry.stadiumPlaygroundName ?? null;
+  const homeAway = isHome ? "H" : "A";
 
   try {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -315,6 +325,8 @@ export async function updateMatchRecord(
         data: {
           startAt: kickoff,
           status,
+          teamId: localTeamId, // may newly resolve after team sync is run
+          homeAway,
           opponentName,
           competitionLabel: competition,
           location: venue,
@@ -350,15 +362,30 @@ export async function updateMatchRecord(
 // ── High-level per-record processing ──────────────────────────────────────────
 
 /**
+ * Participant counts for a single schedule entry.
+ *
+ * unresolvedLocalTeamRefs: count of club-owned participants with no canonical mapping.
+ * externalOpponents: count of external (non-club) participant appearances.
+ */
+export type ParticipantCounts = {
+  unresolvedLocalTeamRefs: number;
+  externalOpponents: number;
+};
+
+/**
  * Processes a single ClubScheduleEntry: creates or updates as needed.
  *
  * Steps:
- *   1. Resolve local team IDs (home/away) from TeamExternalMapping.
- *   2. Determine which team is "ours" (the local club's team).
- *   3. If no mapping → create Event + MatchExternalMapping.
- *   4. If mapping exists → detect changes and update if needed.
+ *   1. Classify each team participant using club ownership (from team list) and
+ *      canonical mapping (from TeamExternalMapping).
+ *   2. If no existing mapping → create Event + MatchExternalMapping.
+ *   3. If mapping exists → detect changes and update if needed.
  *
- * Returns a typed outcome for result accumulation in the main sync loop.
+ * clubOwnedSfvTeamIds must be built from GET /api/team/list at sync time.
+ * When empty (fallback), all unknown participants are treated as unknown.
+ *
+ * Returns a typed outcome for result accumulation in the main sync loop,
+ * plus participant classification counts.
  */
 export async function processScheduleEntry(
   entry: ClubScheduleEntry,
@@ -366,27 +393,42 @@ export async function processScheduleEntry(
   seasonId: string | null,
   existingMappings: Map<number, ExistingMatchMappingRow>,
   teamMappings: Map<number, string>,
-): Promise<{ outcome: SchedulePersistenceOutcome; wasUnresolved: boolean }> {
-  // Resolve local team IDs from the provider team IDs
-  const homeTeamId = teamMappings.get(entry.teamAId) ?? null;
-  const awayTeamId = teamMappings.get(entry.teamBId) ?? null;
+  clubOwnedSfvTeamIds: ReadonlySet<number>,
+): Promise<{ outcome: SchedulePersistenceOutcome; participantCounts: ParticipantCounts }> {
+  // Classify both participants using confirmed club ownership + TeamExternalMapping
+  const homeClassification = classifyParticipant(
+    entry.teamAId,
+    clubOwnedSfvTeamIds,
+    teamMappings,
+  );
+  const awayClassification = classifyParticipant(
+    entry.teamBId,
+    clubOwnedSfvTeamIds,
+    teamMappings,
+  );
 
-  // Determine our local team and opponent
-  const localSfvTeamIds = new Set(teamMappings.keys());
-  const ourTeamIsHome = isLocalTeamId(entry.teamAId, localSfvTeamIds);
-  const ourTeamIsAway = isLocalTeamId(entry.teamBId, localSfvTeamIds);
+  // Count participant classification outcomes
+  let unresolvedLocalTeamRefs = 0;
+  let externalOpponents = 0;
+  for (const c of [homeClassification, awayClassification]) {
+    if (isUnresolvedLocal(c)) unresolvedLocalTeamRefs++;
+    else if (isExternalOpponent(c)) externalOpponents++;
+  }
 
-  const wasUnresolved = !ourTeamIsHome && !ourTeamIsAway;
+  const participantCounts: ParticipantCounts = { unresolvedLocalTeamRefs, externalOpponents };
 
-  // Our local team FK: prefer the home side if both happen to be local
-  const localTeamId = ourTeamIsHome
-    ? (homeTeamId ?? null)
-    : ourTeamIsAway
-      ? (awayTeamId ?? null)
-      : null;
-
-  const isHome = ourTeamIsHome;
-  const opponentName = resolveOpponentName(entry, isHome);
+  // Resolve canonical IDs and event fields from classifications
+  const homeTeamId = resolvedTeamId(homeClassification);
+  const awayTeamId = resolvedTeamId(awayClassification);
+  const localTeamId = resolveEventTeamId(homeClassification, awayClassification);
+  const isHome =
+    homeClassification.kind === "resolved" ||
+    homeClassification.kind === "unresolved_local";
+  const opponentName = resolveOpponentNameFromClassification(
+    entry,
+    homeClassification,
+    awayClassification,
+  );
 
   const existing = existingMappings.get(entry.matchId);
 
@@ -401,7 +443,7 @@ export async function processScheduleEntry(
       homeTeamId,
       awayTeamId,
     );
-    return { outcome, wasUnresolved };
+    return { outcome, participantCounts };
   }
 
   // Detect what changed
@@ -415,10 +457,11 @@ export async function processScheduleEntry(
     incomingMapping,
     incomingKickoff,
     incomingStatus,
+    localTeamId,
   );
 
   if (!changes.hasAnyChange) {
-    return { outcome: { status: "unchanged" }, wasUnresolved };
+    return { outcome: { status: "unchanged" }, participantCounts };
   }
 
   const rawOutcome = await updateMatchRecord(
@@ -429,10 +472,12 @@ export async function processScheduleEntry(
     opponentName,
     homeTeamId,
     awayTeamId,
+    localTeamId,
+    isHome,
   );
 
   if (rawOutcome.status === "failed") {
-    return { outcome: rawOutcome, wasUnresolved };
+    return { outcome: rawOutcome, participantCounts };
   }
 
   return {
@@ -442,6 +487,6 @@ export async function processScheduleEntry(
       kickoffChanged: changes.kickoffChanged,
       statusChanged: changes.statusChanged,
     },
-    wasUnresolved,
+    participantCounts,
   };
 }

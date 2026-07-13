@@ -46,7 +46,7 @@
  */
 
 import { requireEnabledSfvConfigForTenant } from "../tenant-config-service";
-import { fetchClubSchedule } from "../client";
+import { fetchClubSchedule, fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
 import type { SfvScheduleSyncContext, SfvScheduleSyncResult } from "./schedule-types";
 import type { SyncErrorEntry } from "./types";
@@ -121,7 +121,8 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
         scoresUpdated: 0,
         kickoffChanges: 0,
         statusChanges: 0,
-        unresolvedTeams: 0,
+        unresolvedLocalTeamRefs: 0,
+        externalOpponents: 0,
         errors: [{ code: "INVALID_DATE_WINDOW", message: windowError }],
       },
     );
@@ -169,7 +170,8 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
       scoresUpdated: 0,
       kickoffChanges: 0,
       statusChanges: 0,
-      unresolvedTeams: 0,
+      unresolvedLocalTeamRefs: 0,
+      externalOpponents: 0,
       errors: [
         {
           code: safe.code,
@@ -187,6 +189,34 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     resolveActiveSeason(tenantId),
   ]);
 
+  // ── Fetch club-owned team IDs for participant classification ─────────────
+  //
+  // GET /api/team/list returns all teams belonging to the configured club.
+  // Their teamId values are in the same identity domain as the schedule's
+  // teamAId / teamBId. This allows classifying participants as "club-owned"
+  // or "external opponent" without relying on TeamExternalMapping being
+  // pre-populated — enabling correct metrics even before Slice 3A team sync.
+  //
+  // On failure: fall back to the TeamExternalMapping key set as a proxy.
+  // This preserves backward compatibility but prevents accurate classification
+  // of unresolved vs external when the team list is unavailable.
+
+  let clubOwnedSfvTeamIds: ReadonlySet<number>;
+  try {
+    const clubTeamList = await fetchTeamList({
+      SeasonId: context.seasonId,
+      ClubId: context.clubId,
+      ...(context.organisationId !== null
+        ? { OrganisationId: context.organisationId }
+        : {}),
+    });
+    clubOwnedSfvTeamIds = new Set(clubTeamList.map((t) => t.teamId));
+  } catch {
+    // Team list fetch failed — fall back to TeamExternalMapping keys.
+    // Metrics may be less precise in this fallback path.
+    clubOwnedSfvTeamIds = new Set(teamMappings.keys());
+  }
+
   // ── Process each schedule entry ──────────────────────────────────────────
 
   let created = 0;
@@ -196,20 +226,24 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
   let scoresUpdated = 0;
   let kickoffChanges = 0;
   let statusChanges = 0;
-  let unresolvedTeams = 0;
+  let unresolvedLocalTeamRefs = 0;
+  let externalOpponents = 0;
   const errors: SyncErrorEntry[] = [];
 
   for (const entry of providerEntries) {
-    const { outcome, wasUnresolved } = await processScheduleEntry(
+    const { outcome, participantCounts } = await processScheduleEntry(
       entry,
       context,
       seasonId,
       existingMappings,
       teamMappings,
+      clubOwnedSfvTeamIds,
     );
 
-    if (wasUnresolved) {
-      unresolvedTeams++;
+    unresolvedLocalTeamRefs += participantCounts.unresolvedLocalTeamRefs;
+    externalOpponents += participantCounts.externalOpponents;
+
+    if (participantCounts.unresolvedLocalTeamRefs > 0) {
       logUnresolvedTeam(tenantId, entry.matchId, entry.teamAId, entry.teamBId);
     }
 
@@ -251,7 +285,8 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     scoresUpdated,
     kickoffChanges,
     statusChanges,
-    unresolvedTeams,
+    unresolvedLocalTeamRefs,
+    externalOpponents,
     errors,
   });
 
@@ -272,7 +307,8 @@ type CountFields = Pick<
   | "scoresUpdated"
   | "kickoffChanges"
   | "statusChanges"
-  | "unresolvedTeams"
+  | "unresolvedLocalTeamRefs"
+  | "externalOpponents"
   | "errors"
 >;
 

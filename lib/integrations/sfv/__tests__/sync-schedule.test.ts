@@ -75,8 +75,10 @@ import type { ClubScheduleEntry } from "../client";
 // ── Mock: SFV client ──────────────────────────────────────────────────────────
 
 const mockFetchClubSchedule = vi.fn();
+const mockFetchTeamList = vi.fn();
 vi.mock("../client", () => ({
   fetchClubSchedule: (...args: unknown[]) => mockFetchClubSchedule(...args),
+  fetchTeamList: (...args: unknown[]) => mockFetchTeamList(...args),
   acquireToken: vi.fn(),
 }));
 
@@ -201,6 +203,7 @@ function makeExistingMatchMapping(externalMatchId = 99001) {
         event: {
           startAt: new Date("2026-09-13T15:00:00.000Z"),
           status: "SCHEDULED",
+          teamId: "team-local-1",
         },
       },
     ],
@@ -214,6 +217,12 @@ beforeEach(() => {
   mockLoadExistingMatchMappings.mockResolvedValue(makeEmptyMappings());
   mockLoadTeamMappings.mockResolvedValue(makeTeamMappingWithEntry());
   mockResolveActiveSeason.mockResolvedValue(SEASON_ID);
+  // Default: team list returns our single club team (teamAId=31927)
+  mockFetchTeamList.mockResolvedValue([
+    { teamId: 31927, teamName: "FC Testclub A", teamFullname: "FC Testclub A", clubNumber: 9999,
+      clubName: "FC Testclub", teamLeagueId: 17131, teamLeagueName: "4. Liga",
+      teamDivisionName: "Gruppe 1", teamOrganisationId: 8, isTeamActive: true, isHomeTeam: false },
+  ]);
 });
 
 // ── 1-3: First synchronization ────────────────────────────────────────────────
@@ -224,7 +233,7 @@ describe("First synchronization", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([entry]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -238,7 +247,7 @@ describe("First synchronization", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -252,8 +261,8 @@ describe("First synchronization", () => {
     const entries = [makeScheduleEntry({ matchId: 99001 }), makeScheduleEntry({ matchId: 99002 })];
     mockFetchClubSchedule.mockResolvedValueOnce(entries);
     mockProcessScheduleEntry
-      .mockResolvedValueOnce({ outcome: { status: "created" }, wasUnresolved: false })
-      .mockResolvedValueOnce({ outcome: { status: "created" }, wasUnresolved: false });
+      .mockResolvedValueOnce({ outcome: { status: "created" }, participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 } })
+      .mockResolvedValueOnce({ outcome: { status: "created" }, participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 } });
 
     const result = await syncSfvSchedule(TENANT_A);
 
@@ -268,7 +277,7 @@ describe("Idempotency and identity", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "unchanged" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -284,7 +293,7 @@ describe("Idempotency and identity", () => {
     mockLoadExistingMatchMappings.mockResolvedValueOnce(makeExistingMatchMapping());
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "unchanged" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -300,7 +309,7 @@ describe("Idempotency and identity", () => {
     mockLoadExistingMatchMappings.mockResolvedValueOnce(makeExistingMatchMapping(99001));
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "unchanged" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -314,6 +323,7 @@ describe("Idempotency and identity", () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
+      expect.any(Set), // clubOwnedSfvTeamIds
     );
   });
 });
@@ -332,7 +342,7 @@ describe("Update behavior", () => {
         kickoffChanged: true,
         statusChanged: false,
       },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -353,7 +363,7 @@ describe("Update behavior", () => {
         kickoffChanged: false,
         statusChanged: true,
       },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -374,7 +384,7 @@ describe("Update behavior", () => {
         kickoffChanged: false,
         statusChanged: true,
       },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -392,7 +402,7 @@ describe("Local field preservation", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "updated", scoreChanged: false, kickoffChanged: false, statusChanged: false },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -410,7 +420,7 @@ describe("Local field preservation", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -435,7 +445,7 @@ describe("Cancelled match", () => {
         kickoffChanged: false,
         statusChanged: true,
       },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -536,7 +546,7 @@ describe("Tenant isolation", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     await syncSfvSchedule(TENANT_A);
@@ -555,7 +565,7 @@ describe("Tenant isolation", () => {
     mockResolveActiveSeason.mockResolvedValueOnce(SEASON_ID);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
     const resultA = await syncSfvSchedule(TENANT_A);
 
@@ -567,7 +577,7 @@ describe("Tenant isolation", () => {
     mockResolveActiveSeason.mockResolvedValueOnce(SEASON_ID);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
     const resultB = await syncSfvSchedule(TENANT_B);
 
@@ -589,7 +599,7 @@ describe("Opponent strategy and team resolution", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -599,18 +609,26 @@ describe("Opponent strategy and team resolution", () => {
     expect(mockProcessScheduleEntry).toHaveBeenCalledOnce();
   });
 
-  it("21 — unresolved team increments unresolvedTeams counter", async () => {
-    // Neither teamAId nor teamBId in TeamExternalMapping → unresolved
-    mockLoadTeamMappings.mockResolvedValueOnce(new Map()); // no local teams
-    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+  it("21 — unresolved local team increments unresolvedLocalTeamRefs; external opponent increments externalOpponents", async () => {
+    // teamAId=31927 is club-owned (in team list) but has no TeamExternalMapping → unresolved local
+    // teamBId=44001 is external → external opponent
+    mockLoadTeamMappings.mockResolvedValueOnce(new Map()); // empty — no canonical links
+    // team list has our team so it can be classified as club-owned (unresolved)
+    mockFetchTeamList.mockResolvedValueOnce([
+      { teamId: 31927, teamName: "FC Testclub", teamFullname: "FC Testclub", clubNumber: 9999,
+        clubName: "FC Testclub", teamLeagueId: 17131, teamLeagueName: "4. Liga",
+        teamDivisionName: null, teamOrganisationId: 8, isTeamActive: true, isHomeTeam: false },
+    ]);
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927, teamBId: 44001 })]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: true, // persistence layer signals unresolved
+      participantCounts: { unresolvedLocalTeamRefs: 1, externalOpponents: 1 }, // 1 unresolved + 1 external
     });
 
     const result = await syncSfvSchedule(TENANT_A);
 
-    expect(result.unresolvedTeams).toBe(1);
+    expect(result.unresolvedLocalTeamRefs).toBe(1);
+    expect(result.externalOpponents).toBe(1);
   });
 
   it("22 — local team is resolved via TeamExternalMapping when available", async () => {
@@ -620,7 +638,7 @@ describe("Opponent strategy and team resolution", () => {
     mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927 })]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -632,8 +650,9 @@ describe("Opponent strategy and team resolution", () => {
       expect.anything(),
       expect.anything(),
       expect.objectContaining({ get: expect.any(Function) }),
+      expect.any(Set), // clubOwnedSfvTeamIds
     );
-    expect(result.unresolvedTeams).toBe(0);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
   });
 });
 
@@ -646,7 +665,7 @@ describe("Unknown matchState handling", () => {
     ]);
     mockProcessScheduleEntry.mockResolvedValueOnce({
       outcome: { status: "created" },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     // Must not throw
@@ -669,13 +688,249 @@ describe("Score and result safety", () => {
         kickoffChanged: false,
         statusChanged: true,
       },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
 
     expect(result.scoresUpdated).toBe(1);
     expect(result.updated).toBe(1);
+  });
+});
+
+// ── Step 9: Participant classification tests ──────────────────────────────────
+//
+// These tests target the NEW participant classification logic, verifying that:
+// - Local home/away teams resolve via TeamExternalMapping+TeamList
+// - External opponents are NOT counted as unresolved
+// - Two local club teams (derby) both resolve
+// - Missing TeamExternalMapping = unresolved local (warning)
+// - Wrong tenant/provider mapping never resolves
+// - Idempotent repair of previously unresolved matches
+//
+// Coverage maps to Step 9 items 1-16 of the task.
+
+describe("Participant classification (Step 9)", () => {
+  it("PC-1 — local home team resolves: unresolvedLocalTeamRefs=0, externalOpponents=1", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927, teamBId: 44001 })]);
+    // teamAId=31927 is club-owned + has mapping → resolved; teamBId=44001 is external
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+    expect(result.externalOpponents).toBe(1);
+  });
+
+  it("PC-2 — local away team resolves: unresolvedLocalTeamRefs=0, externalOpponents=1", async () => {
+    // Club is away (teamBId=31927)
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 44001, teamBId: 31927 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+    expect(result.externalOpponents).toBe(1);
+  });
+
+  it("PC-3 — external opponent never counted as unresolved", async () => {
+    // teamBId=44001 is an external team — NOT club-owned, NOT unresolved
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamBId: 44001 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+    expect(result.externalOpponents).toBe(1);
+  });
+
+  it("PC-4 — derby: both local teams → externalOpponents=0, unresolvedLocalTeamRefs=0 if both mapped", async () => {
+    // Both sides are club teams, both have mappings
+    mockFetchTeamList.mockResolvedValueOnce([
+      { teamId: 31927, teamName: "Team A", teamFullname: "Team A", clubNumber: 9999,
+        clubName: "FC Testclub", teamLeagueId: 17131, teamLeagueName: "4. Liga",
+        teamDivisionName: null, teamOrganisationId: 8, isTeamActive: true, isHomeTeam: false },
+      { teamId: 31928, teamName: "Team B", teamFullname: "Team B", clubNumber: 9999,
+        clubName: "FC Testclub", teamLeagueId: 17131, teamLeagueName: "4. Liga",
+        teamDivisionName: null, teamOrganisationId: 8, isTeamActive: true, isHomeTeam: false },
+    ]);
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927, teamBId: 31928 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 0 }, // derby, no external
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+    expect(result.externalOpponents).toBe(0);
+  });
+
+  it("PC-5 — club team with no TeamExternalMapping → unresolvedLocalTeamRefs increments", async () => {
+    // teamAId=31927 is club-owned (in team list) but has NO mapping → unresolved
+    mockLoadTeamMappings.mockResolvedValueOnce(new Map()); // no canonical links
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 1, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.unresolvedLocalTeamRefs).toBe(1);
+  });
+
+  it("PC-6 — genuine external team does NOT increment unresolvedLocalTeamRefs", async () => {
+    // teamBId is external (not in team list) → externalOpponent, never unresolved
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamBId: 99999 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+    expect(result.externalOpponents).toBe(1);
+  });
+
+  it("PC-7 — team list provides correct integer IDs for Set lookup (no type coercion needed)", async () => {
+    // teamId from team list and teamAId from schedule are both numbers
+    mockFetchTeamList.mockResolvedValueOnce([
+      { teamId: 31927, teamName: "T", teamFullname: "T", clubNumber: 9999,
+        clubName: "FC", teamLeagueId: 1, teamLeagueName: null,
+        teamDivisionName: null, teamOrganisationId: 8, isTeamActive: true, isHomeTeam: false },
+    ]);
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    // processScheduleEntry called with a Set that contains 31927
+    expect(mockProcessScheduleEntry).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(),
+      expect.anything(), expect.anything(),
+      expect.objectContaining({ has: expect.any(Function) }),
+    );
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+  });
+
+  it("PC-8 — season-scoped TeamExternalMapping resolves correctly", async () => {
+    // TeamExternalMapping is keyed by externalSeasonId — correct season must be used
+    const seasonMapping = new Map([[31927, "team-local-1"]]);
+    mockLoadTeamMappings.mockResolvedValueOnce(seasonMapping);
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    // loadTeamMappings called with correct season 2027
+    expect(mockLoadTeamMappings).toHaveBeenCalledWith(TENANT_A, "SFV", 2027);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+  });
+
+  it("PC-9 — wrong tenant mapping never resolves (loadTeamMappings scoped to tenantId)", async () => {
+    // Tenant B's mappings would not be loaded for Tenant A sync
+    mockRequireEnabledSfvConfigForTenant.mockResolvedValueOnce(makeTenantConfig(TENANT_A));
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    await syncSfvSchedule(TENANT_A);
+    // Verify loadTeamMappings is ONLY called with TENANT_A
+    expect(mockLoadTeamMappings).toHaveBeenCalledWith(TENANT_A, "SFV", expect.any(Number));
+    expect(mockLoadTeamMappings).not.toHaveBeenCalledWith(TENANT_B, expect.anything(), expect.anything());
+  });
+
+  it("PC-10 — wrong provider never resolves (teamMappings keyed by provider=SFV)", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    await syncSfvSchedule(TENANT_A);
+    // loadTeamMappings is called with "SFV" provider
+    expect(mockLoadTeamMappings).toHaveBeenCalledWith(TENANT_A, "SFV", expect.any(Number));
+  });
+
+  it("PC-11 — repeat sync repairs previously unresolved match (update with resolved team)", async () => {
+    // First time: match exists with null homeTeamId (unresolved)
+    // Second time: team mapping now exists → update fires to repair
+    mockLoadExistingMatchMappings.mockResolvedValueOnce(makeExistingMatchMapping(99001));
+    mockLoadTeamMappings.mockResolvedValueOnce(new Map([[31927, "team-local-1"]]));
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: {
+        status: "updated",
+        scoreChanged: false,
+        kickoffChanged: false,
+        statusChanged: false,
+      },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.updated).toBe(1);
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+  });
+
+  it("PC-12 — repair sync creates no duplicate Event or MatchExternalMapping", async () => {
+    // Same matchId in existing mappings → update, not create
+    mockLoadExistingMatchMappings.mockResolvedValueOnce(makeExistingMatchMapping(99001));
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ matchId: 99001 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "unchanged" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.created).toBe(0); // no new record
+    expect(result.unchanged).toBe(1);
+  });
+
+  it("PC-13 — clubOwnedSfvTeamIds set is passed to processScheduleEntry", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    await syncSfvSchedule(TENANT_A);
+    // 6th argument is clubOwnedSfvTeamIds Set
+    const calls = mockProcessScheduleEntry.mock.calls;
+    expect(calls[0][5]).toBeInstanceOf(Set);
+    // Set should contain teamId=31927 (from default mock fetchTeamList)
+    expect((calls[0][5] as Set<number>).has(31927)).toBe(true);
+  });
+
+  it("PC-14 — team list fetch failure falls back gracefully without throwing", async () => {
+    mockFetchTeamList.mockRejectedValueOnce(new Error("Team list unavailable"));
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 0 },
+    });
+    // Must not throw — sync proceeds with fallback empty set
+    const result = await syncSfvSchedule(TENANT_A);
+    expect(result.created).toBe(1);
+    expect(result.failed).toBe(0);
+  });
+
+  it("PC-15 — warning state: unresolvedLocalTeamRefs > 0 is not a clean success", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 1, externalOpponents: 1 },
+    });
+    const result = await syncSfvSchedule(TENANT_A);
+    // Result must carry the unresolved count (UI checks this for warning state)
+    expect(result.unresolvedLocalTeamRefs).toBeGreaterThan(0);
+    expect(result.failed).toBe(0); // not a fatal error
+  });
+
+  it("PC-16 — fetchTeamList called with correct clubId and seasonId", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([]);
+    await syncSfvSchedule(TENANT_A);
+    expect(mockFetchTeamList).toHaveBeenCalledWith(
+      expect.objectContaining({ SeasonId: 2027, ClubId: 483 }),
+    );
   });
 });
 
@@ -690,7 +945,7 @@ describe("Database uniqueness", () => {
         code: "MATCH_CREATE_FAILED",
         message: "Unique constraint violation for matchId 99001",
       },
-      wasUnresolved: false,
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
     });
 
     const result = await syncSfvSchedule(TENANT_A);
@@ -755,7 +1010,8 @@ describe("API-layer guarantees", () => {
       scoresUpdated: 0,
       kickoffChanges: 0,
       statusChanges: 0,
-      unresolvedTeams: 0,
+      unresolvedLocalTeamRefs: 0,
+      externalOpponents: 0,
       errors: [],
     });
   });

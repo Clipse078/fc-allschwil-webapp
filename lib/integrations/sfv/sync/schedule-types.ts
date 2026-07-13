@@ -69,11 +69,25 @@ export type SfvScheduleSyncResult = {
    */
   statusChanges: number;
   /**
-   * Number of schedule entries where neither home nor away team could be
-   * resolved to a local TeamExternalMapping. The match is still created but
-   * the Event.teamId will be null.
+   * Number of individual team references where the team belongs to the
+   * configured club (confirmed via the club team list) but could not be
+   * linked to a canonical TeamExternalMapping record.
+   *
+   * A non-zero value indicates that Slice 3A team sync has not been run
+   * yet, or that a club team is missing from the TeamExternalMapping table.
+   * This is a warning condition: matches are still created/updated, but
+   * Event.teamId or MatchExternalMapping.homeTeamId/awayTeamId will be null
+   * for the affected participants.
+   *
+   * External opponents never contribute to this count.
    */
-  unresolvedTeams: number;
+  unresolvedLocalTeamRefs: number;
+  /**
+   * Number of individual external opponent team appearances across all
+   * processed matches. External opponents are expected and not an error.
+   * This is purely informational.
+   */
+  externalOpponents: number;
   /** Sanitized per-match error entries. Empty when failed === 0. */
   errors: SyncErrorEntry[];
 };

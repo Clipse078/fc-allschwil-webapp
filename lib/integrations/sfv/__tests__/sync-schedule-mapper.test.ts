@@ -11,6 +11,12 @@ import {
   buildResultLabel,
   buildMappingFields,
   detectChanges,
+  classifyParticipant,
+  resolvedTeamId,
+  isUnresolvedLocal,
+  isExternalOpponent,
+  resolveEventTeamId,
+  resolveOpponentNameFromClassification,
   isLocalTeamId,
   resolveOpponentName,
 } from "../sync/schedule-mapper";
@@ -213,17 +219,18 @@ describe("detectChanges", () => {
     };
   }
 
-  function makeExistingEvent(overrides = {}) {
+  function makeExistingEvent(overrides: Partial<{ startAt: Date; status: string; teamId: string | null }> = {}) {
     return {
       startAt: new Date("2026-09-13T15:00:00.000Z"),
       status: "SCHEDULED",
+      teamId: null as string | null,
       ...overrides,
     };
   }
 
   it("returns hasAnyChange=false when nothing changed", () => {
     const mapping = makeExistingMapping();
-    const event = makeExistingEvent();
+    const event = makeExistingEvent({ teamId: "team-1" });
     const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
     const result = detectChanges(
       mapping,
@@ -231,6 +238,7 @@ describe("detectChanges", () => {
       incoming,
       new Date("2026-09-13T15:00:00.000Z"),
       "SCHEDULED",
+      "team-1", // same localTeamId
     );
     expect(result.hasAnyChange).toBe(false);
     expect(result.scoreChanged).toBe(false);
@@ -240,7 +248,7 @@ describe("detectChanges", () => {
 
   it("detects score change", () => {
     const mapping = makeExistingMapping({ scoreHome: 0, scoreAway: 0 });
-    const event = makeExistingEvent();
+    const event = makeExistingEvent({ teamId: "team-1" });
     const incoming = buildMappingFields(
       makeEntry({ scoreTeamA: 2, scoreTeamB: 1 }),
       makeContext(),
@@ -253,6 +261,7 @@ describe("detectChanges", () => {
       incoming,
       new Date("2026-09-13T15:00:00.000Z"),
       "SCHEDULED",
+      "team-1",
     );
     expect(result.scoreChanged).toBe(true);
     expect(result.hasAnyChange).toBe(true);
@@ -260,7 +269,7 @@ describe("detectChanges", () => {
 
   it("detects kickoff change", () => {
     const mapping = makeExistingMapping();
-    const event = makeExistingEvent({ startAt: new Date("2026-09-13T15:00:00.000Z") });
+    const event = makeExistingEvent({ startAt: new Date("2026-09-13T15:00:00.000Z"), teamId: "team-1" });
     const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
     const result = detectChanges(
       mapping,
@@ -268,6 +277,7 @@ describe("detectChanges", () => {
       incoming,
       new Date("2026-09-20T18:00:00.000Z"), // changed kickoff
       "SCHEDULED",
+      "team-1",
     );
     expect(result.kickoffChanged).toBe(true);
     expect(result.hasAnyChange).toBe(true);
@@ -275,7 +285,7 @@ describe("detectChanges", () => {
 
   it("detects status change", () => {
     const mapping = makeExistingMapping();
-    const event = makeExistingEvent({ status: "SCHEDULED" });
+    const event = makeExistingEvent({ status: "SCHEDULED", teamId: "team-1" });
     const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
     const result = detectChanges(
       mapping,
@@ -283,13 +293,134 @@ describe("detectChanges", () => {
       incoming,
       new Date("2026-09-13T15:00:00.000Z"),
       "COMPLETED", // changed status
+      "team-1",
     );
     expect(result.statusChanged).toBe(true);
     expect(result.hasAnyChange).toBe(true);
   });
+
+  it("detects teamId improvement (null → resolved) as a change", () => {
+    // Before team sync: teamId was null; after team sync: can now be resolved
+    const mapping = makeExistingMapping();
+    const event = makeExistingEvent({ teamId: null }); // was null
+    const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1", // now resolved
+    );
+    expect(result.hasAnyChange).toBe(true); // must fire update to repair teamId
+  });
 });
 
-// ── isLocalTeamId ─────────────────────────────────────────────────────────────
+// ── classifyParticipant ───────────────────────────────────────────────────────
+
+describe("classifyParticipant", () => {
+  const ownedIds = new Set([31927, 31928]);
+  const teamMappings = new Map([[31927, "canonical-team-1"]]);
+
+  it("resolved: club-owned team with mapping", () => {
+    const result = classifyParticipant(31927, ownedIds, teamMappings);
+    expect(result.kind).toBe("resolved");
+    expect(resolvedTeamId(result)).toBe("canonical-team-1");
+  });
+
+  it("unresolved_local: club-owned team with no mapping", () => {
+    const result = classifyParticipant(31928, ownedIds, teamMappings); // 31928 not in mappings
+    expect(result.kind).toBe("unresolved_local");
+    expect(isUnresolvedLocal(result)).toBe(true);
+    expect(isExternalOpponent(result)).toBe(false);
+  });
+
+  it("external_opponent: team not in clubOwnedIds", () => {
+    const result = classifyParticipant(44001, ownedIds, teamMappings);
+    expect(result.kind).toBe("external_opponent");
+    expect(isExternalOpponent(result)).toBe(true);
+    expect(isUnresolvedLocal(result)).toBe(false);
+  });
+
+  it("unknown: empty clubOwnedIds, team not in mappings", () => {
+    const result = classifyParticipant(31927, new Set(), new Map());
+    expect(result.kind).toBe("unknown");
+  });
+
+  it("resolved via fallback: empty clubOwnedIds but team in mappings", () => {
+    const result = classifyParticipant(31927, new Set(), new Map([[31927, "canonical-1"]]));
+    expect(result.kind).toBe("resolved");
+  });
+});
+
+// ── resolveEventTeamId ────────────────────────────────────────────────────────
+
+describe("resolveEventTeamId", () => {
+  it("returns home canonical ID when home is resolved", () => {
+    const home = { kind: "resolved" as const, canonicalTeamId: "home-1" };
+    const away = { kind: "external_opponent" as const };
+    expect(resolveEventTeamId(home, away)).toBe("home-1");
+  });
+
+  it("returns away canonical ID when home is external", () => {
+    const home = { kind: "external_opponent" as const };
+    const away = { kind: "resolved" as const, canonicalTeamId: "away-1" };
+    expect(resolveEventTeamId(home, away)).toBe("away-1");
+  });
+
+  it("returns null when both are unresolved/external", () => {
+    const home = { kind: "unresolved_local" as const };
+    const away = { kind: "external_opponent" as const };
+    expect(resolveEventTeamId(home, away)).toBeNull();
+  });
+
+  it("returns home canonical ID for derby (both resolved)", () => {
+    const home = { kind: "resolved" as const, canonicalTeamId: "home-1" };
+    const away = { kind: "resolved" as const, canonicalTeamId: "away-1" };
+    expect(resolveEventTeamId(home, away)).toBe("home-1");
+  });
+});
+
+// ── resolveOpponentNameFromClassification ─────────────────────────────────────
+
+describe("resolveOpponentNameFromClassification", () => {
+  it("returns away name when club is home (resolved)", () => {
+    const entry = makeEntry({ teamNameA: "FC Us", teamNameB: "FC Them" });
+    const home = { kind: "resolved" as const, canonicalTeamId: "us" };
+    const away = { kind: "external_opponent" as const };
+    expect(resolveOpponentNameFromClassification(entry, home, away)).toBe("FC Them");
+  });
+
+  it("returns home name when club is away (resolved)", () => {
+    const entry = makeEntry({ teamNameA: "FC Them", teamNameB: "FC Us" });
+    const home = { kind: "external_opponent" as const };
+    const away = { kind: "resolved" as const, canonicalTeamId: "us" };
+    expect(resolveOpponentNameFromClassification(entry, home, away)).toBe("FC Them");
+  });
+
+  it("returns null for derby (both club teams)", () => {
+    const entry = makeEntry({ teamNameA: "FC A", teamNameB: "FC B" });
+    const home = { kind: "resolved" as const, canonicalTeamId: "team-a" };
+    const away = { kind: "resolved" as const, canonicalTeamId: "team-b" };
+    expect(resolveOpponentNameFromClassification(entry, home, away)).toBeNull();
+  });
+
+  it("returns null when both external (unexpected)", () => {
+    const entry = makeEntry({ teamNameA: "FC X", teamNameB: "FC Y" });
+    const home = { kind: "external_opponent" as const };
+    const away = { kind: "external_opponent" as const };
+    expect(resolveOpponentNameFromClassification(entry, home, away)).toBeNull();
+  });
+
+  it("returns away name when home is unresolved_local (still our team)", () => {
+    const entry = makeEntry({ teamNameA: "FC Us (unlinked)", teamNameB: "FC Them" });
+    const home = { kind: "unresolved_local" as const };
+    const away = { kind: "external_opponent" as const };
+    expect(resolveOpponentNameFromClassification(entry, home, away)).toBe("FC Them");
+  });
+});
+
+// ── isLocalTeamId (legacy) ────────────────────────────────────────────────────
 
 describe("isLocalTeamId", () => {
   it("returns true when teamId is in the local set", () => {
@@ -307,7 +438,7 @@ describe("isLocalTeamId", () => {
   });
 });
 
-// ── resolveOpponentName ───────────────────────────────────────────────────────
+// ── resolveOpponentName (legacy) ─────────────────────────────────────────────
 
 describe("resolveOpponentName", () => {
   it("returns teamNameB when our team is home", () => {

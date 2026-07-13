@@ -62,7 +62,8 @@ export function logScheduleSyncCompleted(result: SfvScheduleSyncResult): void {
     scoresUpdated: result.scoresUpdated,
     kickoffChanges: result.kickoffChanges,
     statusChanges: result.statusChanges,
-    unresolvedTeams: result.unresolvedTeams,
+    unresolvedLocalTeamRefs: result.unresolvedLocalTeamRefs,
+    externalOpponents: result.externalOpponents,
     durationMs: result.durationMs,
   });
 }

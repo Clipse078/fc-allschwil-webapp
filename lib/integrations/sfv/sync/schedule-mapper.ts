@@ -279,6 +279,7 @@ type ExistingMappingSnapshot = {
 type ExistingEventSnapshot = {
   startAt: Date;
   status: string;
+  teamId: string | null;
 };
 
 /**
@@ -293,6 +294,7 @@ export function detectChanges(
   incomingMapping: ReturnType<typeof buildMappingFields>,
   incomingKickoff: Date,
   incomingStatus: "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED" | "POSTPONED",
+  incomingLocalTeamId: string | null,
 ): {
   hasAnyChange: boolean;
   scoreChanged: boolean;
@@ -307,6 +309,10 @@ export function detectChanges(
     existingEvent.startAt.getTime() !== incomingKickoff.getTime();
 
   const statusChanged = existingEvent.status !== incomingStatus;
+
+  // Team resolution improvement: fire an update if the canonical teamId
+  // was previously null and can now be resolved (after team sync is run).
+  const teamIdChanged = existingEvent.teamId !== incomingLocalTeamId;
 
   const otherMappingChanged =
     existingMapping.providerMatchState !== incomingMapping.providerMatchState ||
@@ -323,7 +329,7 @@ export function detectChanges(
     existingMapping.awayTeamId !== incomingMapping.awayTeamId;
 
   const hasAnyChange =
-    scoreChanged || kickoffChanged || statusChanged || otherMappingChanged;
+    scoreChanged || kickoffChanged || statusChanged || teamIdChanged || otherMappingChanged;
 
   return { hasAnyChange, scoreChanged, kickoffChanged, statusChanged };
 }
@@ -331,8 +337,160 @@ export function detectChanges(
 // ── Team resolution helpers ───────────────────────────────────────────────────
 
 /**
- * Given an SFV teamId, determines whether it belongs to the local tenant by
- * checking against a pre-loaded set of known local SFV team IDs.
+ * Given an SFV teamId, determines whether it belongs to the configured club
+ * by checking against a pre-loaded set of confirmed club-owned SFV team IDs.
+ *
+ * clubOwnedSfvTeamIds is built from GET /api/team/list at sync time.
+ * Never uses team name, fuzzy matching, or slug matching.
+ */
+export function isClubOwnedTeam(
+  sfvTeamId: number,
+  clubOwnedSfvTeamIds: ReadonlySet<number>,
+): boolean {
+  return clubOwnedSfvTeamIds.has(sfvTeamId);
+}
+
+/**
+ * Participant classification for a single SFV team reference in a schedule entry.
+ *
+ * Possible outcomes:
+ *   "resolved"           — club-owned team AND has a canonical TeamExternalMapping
+ *   "unresolved_local"   — club-owned team but NO TeamExternalMapping row
+ *   "external_opponent"  — team does not belong to the configured club (normal)
+ *   "unknown"            — cannot determine ownership (e.g. club team list unavailable)
+ */
+export type ParticipantClassification =
+  | { kind: "resolved"; canonicalTeamId: string }
+  | { kind: "unresolved_local" }
+  | { kind: "external_opponent" }
+  | { kind: "unknown" };
+
+/**
+ * Classifies a single SFV team identifier as belonging to the club or external.
+ *
+ * Resolution chain (deterministic, evidence-based):
+ *   1. If sfvTeamId ∈ clubOwnedSfvTeamIds AND in teamMappings → "resolved"
+ *   2. If sfvTeamId ∈ clubOwnedSfvTeamIds but NOT in teamMappings → "unresolved_local"
+ *   3. If sfvTeamId ∉ clubOwnedSfvTeamIds → "external_opponent"
+ *   4. If clubOwnedSfvTeamIds is empty (team list unavailable) → "unknown"
+ *
+ * External opponents are never an error. Only unresolved_local triggers a warning.
+ */
+export function classifyParticipant(
+  sfvTeamId: number,
+  clubOwnedSfvTeamIds: ReadonlySet<number>,
+  teamMappings: ReadonlyMap<number, string>,
+): ParticipantClassification {
+  if (clubOwnedSfvTeamIds.size === 0) {
+    // Team list was unavailable — cannot determine ownership
+    const canonicalId = teamMappings.get(sfvTeamId);
+    if (canonicalId !== undefined) return { kind: "resolved", canonicalTeamId: canonicalId };
+    return { kind: "unknown" };
+  }
+
+  const isOwned = clubOwnedSfvTeamIds.has(sfvTeamId);
+
+  if (!isOwned) {
+    return { kind: "external_opponent" };
+  }
+
+  const canonicalId = teamMappings.get(sfvTeamId);
+  if (canonicalId !== undefined) {
+    return { kind: "resolved", canonicalTeamId: canonicalId };
+  }
+
+  return { kind: "unresolved_local" };
+}
+
+/**
+ * Returns the canonical teamId if the participant is resolved, otherwise null.
+ */
+export function resolvedTeamId(c: ParticipantClassification): string | null {
+  return c.kind === "resolved" ? c.canonicalTeamId : null;
+}
+
+/**
+ * Returns true when the participant is unresolved (club team with missing mapping).
+ * External opponents and resolved teams are not unresolved.
+ */
+export function isUnresolvedLocal(c: ParticipantClassification): boolean {
+  return c.kind === "unresolved_local";
+}
+
+/**
+ * Returns true when the participant is an external opponent (not an error).
+ */
+export function isExternalOpponent(c: ParticipantClassification): boolean {
+  return c.kind === "external_opponent";
+}
+
+/**
+ * Given the home and away participant classifications, returns the canonical
+ * local Team ID to set on Event.teamId.
+ *
+ * Convention: prefer home if both are club teams (derby).
+ * For a normal match, one side is a club team and the other external.
+ */
+export function resolveEventTeamId(
+  homeClassification: ParticipantClassification,
+  awayClassification: ParticipantClassification,
+): string | null {
+  if (homeClassification.kind === "resolved") return homeClassification.canonicalTeamId;
+  if (awayClassification.kind === "resolved") return awayClassification.canonicalTeamId;
+  return null;
+}
+
+/**
+ * Returns true when at least one side of the match is a club-owned team
+ * (resolved or unresolved_local). Used to determine isHome for Event.homeAway.
+ */
+export function ourTeamIsHome(
+  homeClassification: ParticipantClassification,
+): boolean {
+  return (
+    homeClassification.kind === "resolved" ||
+    homeClassification.kind === "unresolved_local" ||
+    homeClassification.kind === "unknown"
+  );
+}
+
+/**
+ * Resolves the opponent display name for Event.opponentName.
+ *
+ * For a normal match (one club team, one opponent):
+ *   - If club is home (teamA) → opponent is teamB (away)
+ *   - If club is away (teamB) → opponent is teamA (home)
+ *
+ * For a derby (both are club teams): no single "opponent" → returns null.
+ * For an external-vs-external (unexpected): returns null.
+ */
+export function resolveOpponentNameFromClassification(
+  entry: ClubScheduleEntry,
+  homeClassification: ParticipantClassification,
+  awayClassification: ParticipantClassification,
+): string | null {
+  const homeIsClub = homeClassification.kind !== "external_opponent";
+  const awayIsClub = awayClassification.kind !== "external_opponent";
+
+  if (homeIsClub && awayIsClub) {
+    // Derby: no single opponent
+    return null;
+  }
+  if (homeIsClub) {
+    // Club is home → opponent is away (teamB)
+    return entry.teamNameB ?? null;
+  }
+  if (awayIsClub) {
+    // Club is away → opponent is home (teamA)
+    return entry.teamNameA ?? null;
+  }
+  // Both external (unexpected for a club schedule)
+  return null;
+}
+
+/**
+ * @deprecated Use classifyParticipant instead.
+ * Kept for backward compatibility with existing code referencing isLocalTeamId.
  */
 export function isLocalTeamId(
   sfvTeamId: number,
@@ -343,9 +501,7 @@ export function isLocalTeamId(
 
 /**
  * Resolves opponent name from the provider entry.
- *
- * Given which SFV teamId belongs to the local club (our team), returns the
- * display name of the opposing team (the one that is NOT our team).
+ * @deprecated Use resolveOpponentNameFromClassification instead.
  */
 export function resolveOpponentName(
   entry: ClubScheduleEntry,

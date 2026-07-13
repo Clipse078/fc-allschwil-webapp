@@ -288,6 +288,22 @@ function TeamSyncResult({ data }: { data: SfvTeamSyncResult }) {
 
 function ScheduleSyncResult({ data }: { data: SfvScheduleSyncResult }) {
   const hasErrors = data.errors.length > 0;
+  const hasUnresolvedLocalTeams = data.unresolvedLocalTeamRefs > 0;
+
+  // Status: danger if fatal errors with no data; warning if unresolved local teams
+  // or errors alongside data; success only when clean run
+  const statusVariant: "success" | "warning" | "danger" =
+    hasErrors && data.created + data.updated + data.unchanged === 0
+      ? "danger"
+      : hasErrors || hasUnresolvedLocalTeams
+        ? "warning"
+        : "success";
+  const statusLabel =
+    statusVariant === "danger"
+      ? "Fehlgeschlagen"
+      : statusVariant === "warning"
+        ? "Abgeschlossen (mit Hinweisen)"
+        : "Erfolgreich abgeschlossen";
 
   const rows: { label: string; value: number | string }[] = [
     { label: "Zeitraum", value: `${data.dateFrom} – ${data.dateTo}` },
@@ -298,7 +314,8 @@ function ScheduleSyncResult({ data }: { data: SfvScheduleSyncResult }) {
     { label: "Fehler", value: data.failed },
     { label: "Ergebnisänderungen", value: data.scoresUpdated },
     { label: "Verschobene Anspielzeiten", value: data.kickoffChanges },
-    { label: "Nicht zugeordnete Teams", value: data.unresolvedTeams },
+    { label: "Nicht zugeordnete lokale Teams", value: data.unresolvedLocalTeamRefs },
+    { label: "Externe Gegner", value: data.externalOpponents },
     { label: "Dauer", value: `${data.durationMs} ms` },
   ];
 
@@ -306,16 +323,15 @@ function ScheduleSyncResult({ data }: { data: SfvScheduleSyncResult }) {
     <div className="space-y-4" data-testid="schedule-sync-result">
       <div className="flex flex-wrap items-center gap-3">
         <StatusIndicator
-          variant={
-            hasErrors
-              ? data.created + data.updated + data.unchanged > 0
-                ? "warning"
-                : "danger"
-              : "success"
-          }
-          label={hasErrors ? "Abgeschlossen (mit Fehlern)" : "Erfolgreich abgeschlossen"}
+          variant={statusVariant}
+          label={statusLabel}
           data-testid="schedule-sync-status"
         />
+        {hasUnresolvedLocalTeams && !hasErrors && (
+          <span className="text-xs text-[var(--muted)]">
+            Teams-Synchronisierung noch nicht ausgeführt
+          </span>
+        )}
         <span className="text-xs text-[var(--muted)]">
           Saison {data.seasonId} · Club {data.clubId}
         </span>
