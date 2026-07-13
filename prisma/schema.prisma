@@ -815,12 +815,16 @@ model Event {
   importBatchKey   String?
   lastSyncedAt     DateTime?
 
-  opponentName     String?
-  organizerName    String?
-  competitionLabel String?
-  homeAway         String?
-  resultLabel      String?
-  meetingTime      DateTime?
+  opponentName              String?
+  organizerName             String?
+  competitionLabel          String?
+  homeAway                  String?
+  resultLabel               String?
+  /// Live or half-time intermediate score label (e.g. "1:0 (HZ)").
+  /// Set and updated exclusively by match-detail synchronization (Slice 3C).
+  /// Null until a detail sync has been run and an intermediate result is available.
+  intermediateResultLabel   String?
+  meetingTime               DateTime?
 
   websiteVisible       Boolean @default(true)
   infoboardVisible     Boolean @default(false)
@@ -2222,6 +2226,9 @@ model MatchExternalMapping {
   providerSeasonName     String?
   /// Timestamp of the last successful sync that touched this mapping.
   lastSyncedAt           DateTime
+  /// Timestamp of the last successful match-detail sync for this mapping.
+  /// Null until the first match-detail synchronization run has been executed.
+  detailSyncedAt         DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
