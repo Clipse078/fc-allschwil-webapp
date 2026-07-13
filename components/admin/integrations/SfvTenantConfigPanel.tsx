@@ -146,7 +146,7 @@ function DiagnosticsResult({ data }: { data: SfvAdminDiagnostics }) {
       </div>
 
       {/* Counts grid */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         {[
           { label: "Eigene Teams", value: counts.ownTeams },
           { label: "Spielplan-Einträge", value: counts.scheduleRows },
@@ -313,8 +313,8 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
     "block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)] mb-1.5";
 
   return (
-    <div className="space-y-6">
-      {/* ── Configuration form ─────────────────────────────────────────────── */}
+    <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      {/* ── Left column: Configuration form ──────────────────────────────── */}
       <SectionCard
         title="Konfiguration"
         description="SFV-Verbindungsparameter für diesen Mandanten konfigurieren."
@@ -440,86 +440,89 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
         </form>
       </SectionCard>
 
-      {/* ── Connection status ──────────────────────────────────────────────── */}
-      <SectionCard title="Verbindungsstatus">
-        <div className="flex items-center gap-3" data-testid="connection-status">
-          {isConfigured ? (
-            <StatusIndicator variant="success" label="Konfiguriert" data-testid="status-configured" />
-          ) : config !== null && !config.enabled ? (
-            <StatusIndicator variant="warning" label="Deaktiviert" data-testid="status-disabled" />
-          ) : (
-            <StatusIndicator variant="neutral" label="Nicht konfiguriert" data-testid="status-not-configured" />
-          )}
-        </div>
-        {config && (
-          <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex justify-between border-b border-[var(--border)] pb-2">
-              <dt className="text-[var(--text-2)]">Club ID</dt>
-              <dd className="font-semibold">{config.clubId}</dd>
-            </div>
-            <div className="flex justify-between border-b border-[var(--border)] pb-2">
-              <dt className="text-[var(--text-2)]">Standard-Saison</dt>
-              <dd className="font-semibold">{config.defaultSeasonId}</dd>
-            </div>
-            {config.organisationId !== null && (
+      {/* ── Right column: Connection status + Diagnostics ─────────────────── */}
+      <div className="flex flex-col gap-6">
+        {/* Connection status */}
+        <SectionCard title="Verbindungsstatus">
+          <div className="flex items-center gap-3" data-testid="connection-status">
+            {isConfigured ? (
+              <StatusIndicator variant="success" label="Konfiguriert" data-testid="status-configured" />
+            ) : config !== null && !config.enabled ? (
+              <StatusIndicator variant="warning" label="Deaktiviert" data-testid="status-disabled" />
+            ) : (
+              <StatusIndicator variant="neutral" label="Nicht konfiguriert" data-testid="status-not-configured" />
+            )}
+          </div>
+          {config && (
+            <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between border-b border-[var(--border)] pb-2">
-                <dt className="text-[var(--text-2)]">Organisation ID</dt>
-                <dd className="font-semibold">{config.organisationId}</dd>
+                <dt className="text-[var(--text-2)]">Club ID</dt>
+                <dd className="font-semibold">{config.clubId}</dd>
+              </div>
+              <div className="flex justify-between border-b border-[var(--border)] pb-2">
+                <dt className="text-[var(--text-2)]">Standard-Saison</dt>
+                <dd className="font-semibold">{config.defaultSeasonId}</dd>
+              </div>
+              {config.organisationId !== null && (
+                <div className="flex justify-between border-b border-[var(--border)] pb-2">
+                  <dt className="text-[var(--text-2)]">Organisation ID</dt>
+                  <dd className="font-semibold">{config.organisationId}</dd>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <dt className="text-[var(--text-2)]">Zuletzt aktualisiert</dt>
+                <dd className="font-mono text-xs text-[var(--muted)]">
+                  {new Date(config.updatedAt).toLocaleString("de-CH")}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </SectionCard>
+
+        {/* Diagnostics */}
+        <SectionCard
+          title="Diagnose"
+          description="Vollständige SFV-Pipeline prüfen. Club-ID wird aus der gespeicherten Konfiguration gelesen."
+        >
+          <div className="space-y-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleRunDiagnostics}
+              loading={diagnostics.status === "loading"}
+              disabled={diagnostics.status === "loading" || !isConfigured}
+              data-testid="btn-run-diagnostics"
+            >
+              {diagnostics.status === "loading" ? "Diagnose läuft…" : "Diagnose ausführen"}
+            </Button>
+
+            {!isConfigured && diagnostics.status === "idle" && (
+              <p className="text-xs text-[var(--muted)]">
+                Konfigurieren und aktivieren Sie die Integration, um die Diagnose zu starten.
+              </p>
+            )}
+
+            {diagnostics.status === "loading" && (
+              <p className="text-sm text-[var(--text-2)]" data-testid="diagnostics-loading">
+                Diagnose wird ausgeführt — dies kann einige Sekunden dauern…
+              </p>
+            )}
+
+            {diagnostics.status === "error" && (
+              <div
+                className="rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-4 py-3"
+                data-testid="diagnostics-error"
+              >
+                <p className="text-sm font-medium text-[var(--sce-danger)]">{diagnostics.message}</p>
               </div>
             )}
-            <div className="flex justify-between">
-              <dt className="text-[var(--text-2)]">Zuletzt aktualisiert</dt>
-              <dd className="font-mono text-xs text-[var(--muted)]">
-                {new Date(config.updatedAt).toLocaleString("de-CH")}
-              </dd>
-            </div>
-          </dl>
-        )}
-      </SectionCard>
 
-      {/* ── Diagnostics ───────────────────────────────────────────────────── */}
-      <SectionCard
-        title="Diagnose"
-        description="Vollständige SFV-Pipeline prüfen. Club-ID wird aus der gespeicherten Konfiguration gelesen."
-      >
-        <div className="space-y-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleRunDiagnostics}
-            loading={diagnostics.status === "loading"}
-            disabled={diagnostics.status === "loading" || !isConfigured}
-            data-testid="btn-run-diagnostics"
-          >
-            {diagnostics.status === "loading" ? "Diagnose läuft…" : "Diagnose ausführen"}
-          </Button>
-
-          {!isConfigured && diagnostics.status === "idle" && (
-            <p className="text-xs text-[var(--muted)]">
-              Konfigurieren und aktivieren Sie die Integration, um die Diagnose zu starten.
-            </p>
-          )}
-
-          {diagnostics.status === "loading" && (
-            <p className="text-sm text-[var(--text-2)]" data-testid="diagnostics-loading">
-              Diagnose wird ausgeführt — dies kann einige Sekunden dauern…
-            </p>
-          )}
-
-          {diagnostics.status === "error" && (
-            <div
-              className="rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-4 py-3"
-              data-testid="diagnostics-error"
-            >
-              <p className="text-sm font-medium text-[var(--sce-danger)]">{diagnostics.message}</p>
-            </div>
-          )}
-
-          {diagnostics.status === "success" && (
-            <DiagnosticsResult data={diagnostics.data} />
-          )}
-        </div>
-      </SectionCard>
+            {diagnostics.status === "success" && (
+              <DiagnosticsResult data={diagnostics.data} />
+            )}
+          </div>
+        </SectionCard>
+      </div>
     </div>
   );
 }

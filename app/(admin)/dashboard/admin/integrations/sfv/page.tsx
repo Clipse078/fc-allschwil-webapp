@@ -40,7 +40,7 @@ export default async function SfvIntegrationPage() {
 
   return (
     <ToastProvider>
-      <div className="max-w-2xl space-y-8">
+      <div className="space-y-8">
         <AdminSectionHeader
           eyebrow="Integrationen"
           title="SFV / ClubCorner"
