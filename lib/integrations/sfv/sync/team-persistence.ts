@@ -24,6 +24,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@prisma/client";
 import type { TeamDetail } from "../client";
 import type { SfvTeamSyncContext } from "./types";
 import {
@@ -121,7 +122,7 @@ export async function createTeamWithMapping(
       : teamFields.slug;
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const team = await tx.team.create({
         data: {
           name: teamFields.name,
