@@ -228,11 +228,19 @@ export async function createConflictRule(input: {
 }
 
 /**
- * Delete a conflict rule. Tenant-scoped for safety.
+ * Delete a conflict rule scoped by tenant, facility, and rule ID.
+ *
+ * Returns { count: 1 } when a matching rule was deleted, { count: 0 } when
+ * no rule matched all three conditions (rule not found, wrong facility, or
+ * wrong tenant). Callers should treat count === 0 as 404.
  */
-export async function deleteConflictRule(id: string, tenantId: string) {
+export async function deleteConflictRule(
+  id: string,
+  tenantId: string,
+  facilityId: string,
+): Promise<{ count: number }> {
   return prisma.allocationConflictRule.deleteMany({
-    where: { id, tenantId },
+    where: { id, tenantId, facilityId },
   });
 }
 
