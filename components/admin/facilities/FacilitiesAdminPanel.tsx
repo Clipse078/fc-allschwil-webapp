@@ -9,6 +9,8 @@ import {
   ChevronRight,
   Building2,
   MapPin,
+  AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import type { FacilityType, FacilityResourceType, FacilityStatus } from "@prisma/client";
 
@@ -21,6 +23,16 @@ type ResourceRow = {
   type: FacilityResourceType;
   status: FacilityStatus;
   sortOrder: number;
+};
+
+type ConflictResource = { id: string; name: string; code: string };
+
+type ConflictRuleRow = {
+  id: string;
+  resourceAId: string;
+  resourceBId: string;
+  resourceA: ConflictResource;
+  resourceB: ConflictResource;
 };
 
 type FacilityRow = {
@@ -47,6 +59,8 @@ const FACILITY_TYPE_LABELS: Record<FacilityType, string> = {
   DRESSING_ROOM_BLOCK: "Garderobenblock",
   INDOOR_HALL: "Innenhalle",
   OTHER: "Sonstiges",
+  HALL: "Halle",
+  ROOM: "Raum",
 };
 
 const RESOURCE_TYPE_LABELS: Record<FacilityResourceType, string> = {
@@ -54,6 +68,9 @@ const RESOURCE_TYPE_LABELS: Record<FacilityResourceType, string> = {
   HALF_PITCH: "Halbes Feld",
   DRESSING_ROOM: "Garderobe",
   OTHER: "Sonstiges",
+  WHOLE_UNIT: "Gesamte Einheit",
+  PARTIAL_UNIT: "Teilbereich",
+  SINGLE_ROOM: "Einzelraum",
 };
 
 const STATUS_LABELS: Record<FacilityStatus, string> = {
@@ -295,6 +312,259 @@ function CreateResourceForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// ── Conflict rules panel ──────────────────────────────────────────────────────
+
+function AddConflictForm({
+  facilityId,
+  resources,
+  existingRules,
+  onAdded,
+  onCancel,
+}: {
+  facilityId: string;
+  resources: ResourceRow[];
+  existingRules: ConflictRuleRow[];
+  onAdded: (rule: ConflictRuleRow) => void;
+  onCancel: () => void;
+}) {
+  const activeResources = resources.filter((r) => r.status !== "ARCHIVED");
+  const [resourceAId, setResourceAId] = useState(activeResources[0]?.id ?? "");
+  const [resourceBId, setResourceBId] = useState(activeResources[1]?.id ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const isAlreadyExists = existingRules.some(
+    (r) =>
+      (r.resourceAId === resourceAId && r.resourceBId === resourceBId) ||
+      (r.resourceAId === resourceBId && r.resourceBId === resourceAId),
+  );
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resourceAId || !resourceBId || resourceAId === resourceBId) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await fetch(`/api/facilities/${facilityId}/conflicts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resourceAId, resourceBId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.error ?? "Fehler beim Erstellen.");
+        return;
+      }
+      const data = await res.json();
+      onAdded(data.rule);
+    });
+  }
+
+  if (activeResources.length < 2) {
+    return (
+      <p className="text-xs text-slate-400">
+        Mindestens 2 aktive Ressourcen werden für Konfliktregeln benötigt.
+      </p>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3"
+    >
+      <p className="text-xs font-semibold text-amber-800">Neue Konfliktregel</p>
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
+      {isAlreadyExists ? (
+        <p className="text-xs text-amber-600">Diese Kombination existiert bereits.</p>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="text-xs font-medium text-slate-500">Ressource A</label>
+          <select
+            value={resourceAId}
+            onChange={(e) => setResourceAId(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs outline-none"
+          >
+            {activeResources.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-500">
+            konfligiert mit Ressource B
+          </label>
+          <select
+            value={resourceBId}
+            onChange={(e) => setResourceBId(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs outline-none"
+          >
+            {activeResources.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={
+            pending ||
+            !resourceAId ||
+            !resourceBId ||
+            resourceAId === resourceBId ||
+            isAlreadyExists
+          }
+          className="fca-button-primary disabled:opacity-50"
+        >
+          {pending ? "Wird hinzugefügt…" : "Regel hinzufügen"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="fca-button-secondary"
+        >
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ConflictRulesSection({
+  facilityId,
+  resources,
+  canManage,
+}: {
+  facilityId: string;
+  resources: ResourceRow[];
+  canManage: boolean;
+}) {
+  const [rules, setRules] = useState<ConflictRuleRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [addingRule, setAddingRule] = useState(false);
+  const [, startTransition] = useTransition();
+
+  function loadRules() {
+    if (loaded) return;
+    startTransition(async () => {
+      const res = await fetch(`/api/facilities/${facilityId}/conflicts`);
+      if (res.ok) {
+        const data = await res.json();
+        setRules(data.rules ?? []);
+      }
+      setLoaded(true);
+    });
+  }
+
+  function toggle() {
+    if (!expanded) loadRules();
+    setExpanded((v) => !v);
+  }
+
+  async function removeRule(ruleId: string) {
+    const res = await fetch(`/api/facilities/${facilityId}/conflicts/${ruleId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setRules((prev) => prev.filter((r) => r.id !== ruleId));
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700"
+      >
+        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+        Konfliktregeln
+        {loaded && rules.length > 0 ? (
+          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+            {rules.length}
+          </span>
+        ) : null}
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5" />
+        )}
+      </button>
+
+      {expanded ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-[11px] text-slate-400">
+            Ressourcen, die nicht gleichzeitig belegt werden können.
+          </p>
+
+          {!loaded ? (
+            <p className="text-xs text-slate-400">Wird geladen…</p>
+          ) : rules.length === 0 ? (
+            <p className="text-xs text-slate-400">Noch keine Konfliktregeln definiert.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {rules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2"
+                >
+                  <span className="text-xs text-amber-900">
+                    <span className="font-medium">{rule.resourceA.name}</span>
+                    <span className="mx-1.5 text-amber-500">↔</span>
+                    <span className="font-medium">{rule.resourceB.name}</span>
+                  </span>
+                  {canManage ? (
+                    <button
+                      onClick={() =>
+                        startTransition(async () => {
+                          await removeRule(rule.id);
+                        })
+                      }
+                      className="rounded p-1 text-amber-400 hover:bg-amber-100 hover:text-amber-700"
+                      title="Regel entfernen"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {canManage && !addingRule ? (
+            <button
+              onClick={() => setAddingRule(true)}
+              className="mt-2 flex items-center gap-1.5 rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-600 transition hover:border-amber-400 hover:bg-amber-100"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Konflikt hinzufügen
+            </button>
+          ) : null}
+
+          {canManage && addingRule ? (
+            <AddConflictForm
+              facilityId={facilityId}
+              resources={resources}
+              existingRules={rules}
+              onAdded={(rule) => {
+                setRules((prev) => [...prev, rule]);
+                setAddingRule(false);
+              }}
+              onCancel={() => setAddingRule(false)}
+            />
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -549,6 +819,12 @@ function FacilityCard({
               </button>
             )
           ) : null}
+
+          <ConflictRulesSection
+            facilityId={facility.id}
+            resources={facility.resources}
+            canManage={canManage && !isArchived}
+          />
         </div>
       ) : null}
     </div>

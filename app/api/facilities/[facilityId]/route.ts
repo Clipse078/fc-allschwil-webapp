@@ -4,7 +4,14 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { updateFacility } from "@/lib/facilities/queries";
 import type { FacilityStatus, FacilityType } from "@prisma/client";
 
-const ALLOWED_TYPES: FacilityType[] = ["PITCH", "DRESSING_ROOM_BLOCK", "INDOOR_HALL", "OTHER"];
+const ALLOWED_TYPES: FacilityType[] = [
+  "PITCH",
+  "DRESSING_ROOM_BLOCK",
+  "INDOOR_HALL",
+  "OTHER",
+  "HALL",
+  "ROOM",
+];
 const ALLOWED_STATUSES: FacilityStatus[] = ["ACTIVE", "INACTIVE", "ARCHIVED"];
 
 type Params = { params: Promise<{ facilityId: string }> };

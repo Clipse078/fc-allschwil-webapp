@@ -170,3 +170,68 @@ export async function updateFacilityResource(
     data,
   });
 }
+
+// ── Allocation conflict rules ─────────────────────────────────────────────────
+
+/**
+ * Load all conflict rules for a facility, with resource names resolved.
+ * Returns both (A,B) and (B,A) orderings so the UI does not need to sort.
+ */
+export async function getConflictRulesForFacility(facilityId: string, tenantId: string) {
+  return prisma.allocationConflictRule.findMany({
+    where: { facilityId, tenantId },
+    select: {
+      id: true,
+      resourceAId: true,
+      resourceBId: true,
+      resourceA: { select: { id: true, name: true, code: true } },
+      resourceB: { select: { id: true, name: true, code: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export type ConflictRuleRow = Awaited<
+  ReturnType<typeof getConflictRulesForFacility>
+>[number];
+
+/**
+ * Create a conflict rule between two allocation units.
+ * Canonical ordering: resourceAId < resourceBId (lexicographic) to prevent duplicates.
+ */
+export async function createConflictRule(input: {
+  tenantId: string;
+  facilityId: string;
+  resourceAId: string;
+  resourceBId: string;
+}) {
+  const [a, b] =
+    input.resourceAId < input.resourceBId
+      ? [input.resourceAId, input.resourceBId]
+      : [input.resourceBId, input.resourceAId];
+
+  return prisma.allocationConflictRule.create({
+    data: {
+      tenantId: input.tenantId,
+      facilityId: input.facilityId,
+      resourceAId: a,
+      resourceBId: b,
+    },
+    select: {
+      id: true,
+      resourceAId: true,
+      resourceBId: true,
+      resourceA: { select: { id: true, name: true, code: true } },
+      resourceB: { select: { id: true, name: true, code: true } },
+    },
+  });
+}
+
+/**
+ * Delete a conflict rule. Tenant-scoped for safety.
+ */
+export async function deleteConflictRule(id: string, tenantId: string) {
+  return prisma.allocationConflictRule.deleteMany({
+    where: { id, tenantId },
+  });
+}

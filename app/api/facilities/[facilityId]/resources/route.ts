@@ -9,6 +9,9 @@ const ALLOWED_TYPES: FacilityResourceType[] = [
   "HALF_PITCH",
   "DRESSING_ROOM",
   "OTHER",
+  "WHOLE_UNIT",
+  "PARTIAL_UNIT",
+  "SINGLE_ROOM",
 ];
 
 type Params = { params: Promise<{ facilityId: string }> };

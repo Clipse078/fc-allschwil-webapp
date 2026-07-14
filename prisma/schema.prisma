@@ -65,6 +65,9 @@ enum FacilityType {
   DRESSING_ROOM_BLOCK
   INDOOR_HALL
   OTHER
+  // Generic categories (Phase 2A — no sport-specific terminology)
+  HALL
+  ROOM
 }
 
 enum FacilityResourceType {
@@ -72,6 +75,10 @@ enum FacilityResourceType {
   HALF_PITCH
   DRESSING_ROOM
   OTHER
+  // Generic allocation unit types (Phase 2A)
+  WHOLE_UNIT
+  PARTIAL_UNIT
+  SINGLE_ROOM
 }
 
 enum FacilityStatus {
@@ -393,6 +400,7 @@ model Tenant {
   contentRevisions       ContentRevision[]
   reusableComponents     ReusableComponent[]
   reusableComponentUsages ReusableComponentUsage[]
+  allocationConflictRules AllocationConflictRule[]
 
   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
@@ -841,6 +849,10 @@ model Event {
   homeDressingRoomCode  String?
   awayDressingRoomCode  String?
 
+  // Phase 2A — structured facility / allocation-unit references (nullable, backward-compat)
+  facilityId       String?
+  allocationUnitId String?
+
   // Tenant isolation (nullable: backward-compat with seed/legacy events)
   tenantId String?
   tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -851,6 +863,8 @@ model Event {
   season               Season                @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   team                 Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   matchExternalMapping MatchExternalMapping?
+  facility             Facility?             @relation(fields: [facilityId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  allocationUnit       FacilityResource?     @relation(fields: [allocationUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([seasonId, type])
   @@index([teamId, type])
@@ -869,6 +883,8 @@ model Event {
   @@index([tenantId])
   @@index([importBatchKey])
   @@index([pitchCode])
+  @@index([facilityId])
+  @@index([allocationUnitId])
 }
 
 model EventImportRun {
@@ -1319,8 +1335,10 @@ model Facility {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  resources FacilityResource[]
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  resources      FacilityResource[]
+  conflictRules  AllocationConflictRule[]
+  events         Event[]
 
   @@index([tenantId])
   @@index([tenantId, sortOrder])
@@ -1341,9 +1359,46 @@ model FacilityResource {
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
+  conflictsAsA AllocationConflictRule[] @relation("ConflictRuleA")
+  conflictsAsB AllocationConflictRule[] @relation("ConflictRuleB")
+  events       Event[]
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([facilityId])
+}
+
+// ---------------------------------------------------------------------------
+// AllocationConflictRule — Declares which allocation units cannot coexist.
+//
+// Examples:
+//   "Whole Pitch" conflicts with "Field A"  →  one rule row
+//   "Whole Pitch" conflicts with "Field B"  →  one rule row
+//   "Field A" and "Field B" may coexist     →  no rule row between them
+//
+// The conflict is undirected: (A,B) and (B,A) are the same constraint.
+// The unique index is enforced as (facilityId, resourceAId, resourceBId).
+// Application code should canonicalise by ordering IDs before inserting.
+// ---------------------------------------------------------------------------
+
+model AllocationConflictRule {
+  id         String   @id @default(cuid())
+  tenantId   String
+  facilityId String
+  resourceAId String
+  resourceBId String
+  createdAt  DateTime @default(now())
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facility  Facility         @relation(fields: [facilityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  resourceA FacilityResource @relation("ConflictRuleA", fields: [resourceAId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  resourceB FacilityResource @relation("ConflictRuleB", fields: [resourceBId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([facilityId, resourceAId, resourceBId])
+  @@index([tenantId])
+  @@index([facilityId])
+  @@index([resourceAId])
+  @@index([resourceBId])
 }
 
 // ---------------------------------------------------------------------------

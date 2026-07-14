@@ -4,7 +4,14 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { createFacility, getFacilitiesForTenant } from "@/lib/facilities/queries";
 import type { FacilityType } from "@prisma/client";
 
-const ALLOWED_TYPES: FacilityType[] = ["PITCH", "DRESSING_ROOM_BLOCK", "INDOOR_HALL", "OTHER"];
+const ALLOWED_TYPES: FacilityType[] = [
+  "PITCH",
+  "DRESSING_ROOM_BLOCK",
+  "INDOOR_HALL",
+  "OTHER",
+  "HALL",
+  "ROOM",
+];
 
 export async function GET() {
   const auth = await requireApiAnyPermission([
