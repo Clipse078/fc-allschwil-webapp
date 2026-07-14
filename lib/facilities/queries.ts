@@ -235,3 +235,92 @@ export async function deleteConflictRule(id: string, tenantId: string) {
     where: { id, tenantId },
   });
 }
+
+/**
+ * Application-layer precondition check for creating a conflict rule.
+ *
+ * Verifies (in two DB round-trips):
+ *  1. The facility exists and belongs to the authenticated tenant.
+ *  2. Both resources exist, belong to the authenticated tenant, belong to
+ *     the route facility, and have status ACTIVE.
+ *
+ * Cross-tenant IDs are treated as not found (404).
+ * Inactive resources return 400.
+ *
+ * Returns { ok: true } when all conditions pass, or a controlled
+ * { ok: false, status, error } when any condition fails.
+ */
+export async function validateConflictRuleResources(input: {
+  tenantId: string;
+  facilityId: string;
+  resourceAId: string;
+  resourceBId: string;
+}): Promise<{ ok: true } | { ok: false; status: 400 | 404; error: string }> {
+  const facility = await prisma.facility.findFirst({
+    where: { id: input.facilityId, tenantId: input.tenantId },
+    select: { id: true },
+  });
+  if (!facility) {
+    return { ok: false, status: 404, error: "Facility not found" };
+  }
+
+  const resources = await prisma.facilityResource.findMany({
+    where: {
+      id: { in: [input.resourceAId, input.resourceBId] },
+      tenantId: input.tenantId,
+      facilityId: input.facilityId,
+    },
+    select: { id: true, status: true },
+  });
+
+  const byId = new Map(resources.map((r) => [r.id, r]));
+
+  const rA = byId.get(input.resourceAId);
+  if (!rA) {
+    return { ok: false, status: 404, error: "Resource not found in this facility" };
+  }
+
+  const rB = byId.get(input.resourceBId);
+  if (!rB) {
+    return { ok: false, status: 404, error: "Resource not found in this facility" };
+  }
+
+  if (rA.status !== "ACTIVE") {
+    return { ok: false, status: 400, error: "Both resources must have status ACTIVE" };
+  }
+
+  if (rB.status !== "ACTIVE") {
+    return { ok: false, status: 400, error: "Both resources must have status ACTIVE" };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Check whether a conflict rule already exists for a pair of resources.
+ * Uses the same canonical ordering as createConflictRule.
+ * Call before inserting to return a controlled 409 instead of a raw DB error.
+ */
+export async function conflictRuleExists(input: {
+  facilityId: string;
+  resourceAId: string;
+  resourceBId: string;
+}): Promise<boolean> {
+  const [a, b] =
+    input.resourceAId < input.resourceBId
+      ? [input.resourceAId, input.resourceBId]
+      : [input.resourceBId, input.resourceAId];
+
+  const existing = await prisma.allocationConflictRule.findUnique({
+    where: {
+      facilityId_resourceAId_resourceBId: {
+        facilityId: input.facilityId,
+        resourceAId: a,
+        resourceBId: b,
+      },
+    },
+    select: { id: true },
+  });
+
+  return existing !== null;
+}
