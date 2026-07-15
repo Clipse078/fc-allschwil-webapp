@@ -11,6 +11,7 @@ import {
 import {
   createChildWorkspaceFolderAction,
   createRootWorkspaceFolderAction,
+  renameWorkspaceFolderAction,
 } from "@/app/(admin)/dashboard/workspace/actions";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -302,9 +303,43 @@ export default async function WorkspacePage({
                   <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
                     Name
                   </dt>
-                  <dd className="mt-1 text-sm font-medium text-[var(--text)]">
-                    {selectedFolder.name}
-                  </dd>
+
+                  {canManage ? (
+                    <dd className="mt-2">
+                      <form
+                        action={renameWorkspaceFolderAction}
+                        className="space-y-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="folderId"
+                          value={selectedFolder.id}
+                        />
+
+                        <input
+                          type="text"
+                          name="name"
+                          required
+                          maxLength={120}
+                          autoComplete="off"
+                          defaultValue={selectedFolder.name}
+                          aria-label="Folder name"
+                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition focus:border-[var(--blue)]"
+                        />
+
+                        <button
+                          type="submit"
+                          className="fca-button-secondary w-full justify-center text-sm"
+                        >
+                          Rename Folder
+                        </button>
+                      </form>
+                    </dd>
+                  ) : (
+                    <dd className="mt-1 text-sm font-medium text-[var(--text)]">
+                      {selectedFolder.name}
+                    </dd>
+                  )}
                 </div>
 
                 <div>

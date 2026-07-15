@@ -158,3 +158,86 @@ export async function createChildWorkspaceFolderAction(
 
   revalidatePath("/dashboard/workspace");
 }
+export async function renameWorkspaceFolderAction(
+  formData: FormData,
+): Promise<void> {
+  const session = await requirePermission(PERMISSIONS.WORKSPACE_MANAGE);
+
+  const tenantId = session.user?.tenantId;
+  const userId = session.user?.id;
+
+  if (!tenantId || !userId) {
+    throw new Error("Authenticated tenant and user are required.");
+  }
+
+  const folderId = normalizeFolderId(formData.get("folderId"));
+  const name = normalizeFolderName(formData.get("name"));
+
+  if (!folderId) {
+    throw new Error("Folder is required.");
+  }
+
+  validateFolderName(name);
+
+  const folder = await prisma.workspaceFolder.findFirst({
+    where: {
+      id: folderId,
+      tenantId,
+      archivedAt: null,
+    },
+    select: {
+      id: true,
+      parentId: true,
+      name: true,
+    },
+  });
+
+  if (!folder) {
+    throw new Error("Folder was not found.");
+  }
+
+  if (folder.name === name) {
+    revalidatePath("/dashboard/workspace");
+    return;
+  }
+
+  const duplicate = await prisma.workspaceFolder.findFirst({
+    where: {
+      tenantId,
+      parentId: folder.parentId,
+      archivedAt: null,
+      id: {
+        not: folder.id,
+      },
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (duplicate) {
+    throw new Error("A folder with this name already exists here.");
+  }
+
+  const updated = await prisma.workspaceFolder.updateMany({
+    where: {
+      id: folder.id,
+      tenantId,
+      archivedAt: null,
+    },
+    data: {
+      name,
+      updatedByUserId: userId,
+    },
+  });
+
+  if (updated.count !== 1) {
+    throw new Error("Folder could not be renamed.");
+  }
+
+  revalidatePath("/dashboard/workspace");
+}
