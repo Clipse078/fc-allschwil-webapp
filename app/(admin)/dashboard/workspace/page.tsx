@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import {
   FileText,
   FolderClosed,
@@ -6,17 +7,54 @@ import {
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { getWorkspaceFolderTree } from "@/lib/workspace/queries";
+import type { WorkspaceFolderDto } from "@/lib/workspace/dto";
 import {
   PageBreadcrumbs,
   PageHeader,
   PageShell,
 } from "@/components/ui/page";
 
+type FolderTreeProps = {
+  folders: WorkspaceFolderDto[];
+  depth?: number;
+};
+
+function FolderTree({ folders, depth = 0 }: FolderTreeProps) {
+  return (
+    <ul className={depth === 0 ? "space-y-1" : "mt-1 space-y-1"}>
+      {folders.map((folder) => (
+        <li key={folder.id}>
+          <div
+            className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--text)]"
+            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          >
+            <FolderClosed className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+            <span className="min-w-0 truncate font-medium">{folder.name}</span>
+          </div>
+
+          {folder.children.length > 0 ? (
+            <FolderTree folders={folder.children} depth={depth + 1} />
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default async function WorkspacePage() {
-  await requireAnyPermission([
+  const session = await requireAnyPermission([
     PERMISSIONS.WORKSPACE_VIEW,
     PERMISSIONS.WORKSPACE_MANAGE,
   ]);
+
+  const tenantId = session.user?.tenantId;
+
+  if (!tenantId) {
+    notFound();
+  }
+
+  const folders = await getWorkspaceFolderTree(tenantId);
 
   return (
     <PageShell fullWidth>
@@ -44,14 +82,20 @@ export default async function WorkspacePage() {
             </div>
           </div>
 
-          <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
-            <FolderClosed className="h-8 w-8 text-[var(--muted)]" />
-            <p className="mt-3 text-sm font-medium text-[var(--text)]">
-              No folders yet
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-2)]">
-              Your club can create its own folder structure.
-            </p>
+          <div className="px-3 py-3">
+            {folders.length > 0 ? (
+              <FolderTree folders={folders} />
+            ) : (
+              <div className="flex min-h-48 flex-col items-center justify-center px-3 py-10 text-center">
+                <FolderClosed className="h-8 w-8 text-[var(--muted)]" />
+                <p className="mt-3 text-sm font-medium text-[var(--text)]">
+                  No folders yet
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-2)]">
+                  Your club can create its own folder structure.
+                </p>
+              </div>
+            )}
           </div>
         </aside>
 
