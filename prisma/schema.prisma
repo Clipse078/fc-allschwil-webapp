@@ -58,6 +58,7 @@ enum PermissionModule {
   TENANTS
   ORG
   FACILITIES
+  WORKSPACE
 }
 
 enum FacilityType {
@@ -330,6 +331,39 @@ enum WorkflowAction {
   IMPORT
 }
 
+enum WorkspaceItemType {
+  FILE
+  FOLDER
+}
+
+enum WorkspaceDocumentStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum WorkspaceDocumentVersionStatus {
+  CURRENT
+  SUPERSEDED
+}
+
+enum WorkspaceAccessSubjectType {
+  USER
+  ROLE
+  ORG_UNIT
+  TEAM
+  TARGET_GROUP
+}
+
+enum WorkspaceAccessLevel {
+  VIEW
+  DOWNLOAD
+  UPLOAD
+  EDIT
+  DELETE
+  MANAGE
+  OWNER
+}
+
 model Tenant {
   id        String       @id @default(cuid())
   key       String       @unique
@@ -391,10 +425,13 @@ model Tenant {
   homepageSections       HomepageSection[]
   websiteNavItems        WebsiteNavItem[]
   contentRevisions       ContentRevision[]
-  reusableComponents     ReusableComponent[]
+  reusableComponents      ReusableComponent[]
   reusableComponentUsages ReusableComponentUsage[]
 
-  // SFV Integration — Slice: Tenant-Scoped SFV Configuration
+  // Workspace
+  workspaceFolders WorkspaceFolder[]
+
+   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
   sfvConfig              TenantSfvConfig?
   teamExternalMappings   TeamExternalMapping[]
@@ -436,6 +473,10 @@ model User {
   reviewedReusableComponents ReusableComponent[] @relation("ReusableComponentReviewer")
   approvedReusableComponents ReusableComponent[] @relation("ReusableComponentApprovedBy")
   rejectedReusableComponents ReusableComponent[] @relation("ReusableComponentRejectedBy")
+
+  // Workspace
+  createdWorkspaceFolders WorkspaceFolder[] @relation("WorkspaceFolderCreatedBy")
+  updatedWorkspaceFolders WorkspaceFolder[] @relation("WorkspaceFolderUpdatedBy")
 
   @@index([isActive])
   @@index([tenantId])
@@ -1936,6 +1977,50 @@ model MediaFolder {
 }
 
 // ---------------------------------------------------------------------------
+// WorkspaceFolder — Internal Workspace Folder Hierarchy
+//
+// Tenant-scoped folder hierarchy used by the internal Workspace module.
+// Supports unlimited nesting through a self-referencing parent/child relation.
+//
+// This model only represents folders.
+// Files, documents, permissions and versioning are introduced in later slices.
+// ---------------------------------------------------------------------------
+
+model WorkspaceFolder {
+  id String @id @default(cuid())
+
+  tenantId String
+  parentId String?
+
+  name String
+  description String?
+
+  displayOrder Int @default(0)
+
+  createdByUserId String?
+  updatedByUserId String?
+
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  parent WorkspaceFolder? @relation("WorkspaceFolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children WorkspaceFolder[] @relation("WorkspaceFolderHierarchy")
+
+  createdByUser User? @relation("WorkspaceFolderCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedByUser User? @relation("WorkspaceFolderUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, displayOrder])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+}
+
+// ---------------------------------------------------------------------------
 // MediaTag — Reusable DAM tags (CMS V2 Slice 11)
 //
 // Tenant-scoped controlled tag vocabulary. Tag names are unique per tenant.
@@ -2263,7 +2348,7 @@ model TenantSfvConfig {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([enabled])
 }
