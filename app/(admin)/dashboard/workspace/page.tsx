@@ -5,6 +5,8 @@ import {
   FolderPlus,
   LockKeyhole,
 } from "lucide-react";
+import { createRootWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
+import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getWorkspaceFolderTree } from "@/lib/workspace/queries";
@@ -42,6 +44,49 @@ function FolderTree({ folders, depth = 0 }: FolderTreeProps) {
   );
 }
 
+type CreateFolderFormProps = {
+  compact?: boolean;
+};
+
+function CreateFolderForm({ compact = false }: CreateFolderFormProps) {
+  return (
+    <form
+      action={createRootWorkspaceFolderAction}
+      className={compact ? "flex items-center gap-2" : "mx-auto max-w-sm"}
+    >
+      <label className={compact ? "sr-only" : "block text-left"}>
+        {!compact ? (
+          <span className="mb-2 block text-sm font-medium text-[var(--text)]">
+            Folder name
+          </span>
+        ) : null}
+
+        <input
+          type="text"
+          name="name"
+          required
+          maxLength={120}
+          autoComplete="off"
+          placeholder="New folder"
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--blue)]"
+        />
+      </label>
+
+      <button
+        type="submit"
+        className={
+          compact
+            ? "fca-button-primary shrink-0"
+            : "fca-button-primary mt-3 w-full justify-center"
+        }
+      >
+        <FolderPlus className="h-4 w-4" />
+        Create Folder
+      </button>
+    </form>
+  );
+}
+
 export default async function WorkspacePage() {
   const session = await requireAnyPermission([
     PERMISSIONS.WORKSPACE_VIEW,
@@ -53,6 +98,11 @@ export default async function WorkspacePage() {
   if (!tenantId) {
     notFound();
   }
+
+  const canManage = hasPermission(
+    session,
+    PERMISSIONS.WORKSPACE_MANAGE,
+  );
 
   const folders = await getWorkspaceFolderTree(tenantId);
 
@@ -71,15 +121,21 @@ export default async function WorkspacePage() {
         description="Secure internal document management for your organisation."
       />
 
-      <div className="grid min-h-[620px] gap-4 xl:grid-cols-[260px_minmax(0,1fr)_280px]">
+      <div className="grid min-h-[620px] gap-4 xl:grid-cols-[280px_minmax(0,1fr)_280px]">
         <aside className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="border-b border-[var(--border)] px-5 py-4">
+          <div className="border-b border-[var(--border)] px-4 py-4">
             <div className="flex items-center gap-2">
               <FolderClosed className="h-4 w-4 text-[var(--muted)]" />
               <h2 className="text-sm font-semibold text-[var(--text)]">
                 Folders
               </h2>
             </div>
+
+            {canManage && folders.length > 0 ? (
+              <div className="mt-3">
+                <CreateFolderForm compact />
+              </div>
+            ) : null}
           </div>
 
           <div className="px-3 py-3">
@@ -88,9 +144,11 @@ export default async function WorkspacePage() {
             ) : (
               <div className="flex min-h-48 flex-col items-center justify-center px-3 py-10 text-center">
                 <FolderClosed className="h-8 w-8 text-[var(--muted)]" />
+
                 <p className="mt-3 text-sm font-medium text-[var(--text)]">
                   No folders yet
                 </p>
+
                 <p className="mt-1 text-xs text-[var(--text-2)]">
                   Your club can create its own folder structure.
                 </p>
@@ -107,34 +165,34 @@ export default async function WorkspacePage() {
           </div>
 
           <div className="flex flex-1 items-center justify-center px-6 py-16">
-            <div className="max-w-md text-center">
+            <div className="w-full max-w-md text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-2)]">
                 <LockKeyhole className="h-7 w-7 text-[var(--blue)]" />
               </div>
 
               <h2 className="mt-5 text-xl font-semibold text-[var(--text)]">
-                Welcome to Workspace
+                {folders.length > 0
+                  ? "Select a folder"
+                  : "Welcome to Workspace"}
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-[var(--text-2)]">
-                Store, organise and securely manage your club&apos;s internal
-                documents.
+                {folders.length > 0
+                  ? "Choose a folder from the tree to view its contents."
+                  : "Create your club's first folder to begin organising internal documents."}
               </p>
 
-              <div className="mt-6 flex justify-center">
-                <button
-                  type="button"
-                  disabled
-                  className="fca-button-primary cursor-not-allowed opacity-50"
-                >
-                  <FolderPlus className="h-4 w-4" />
-                  Create Folder
-                </button>
-              </div>
+              {canManage && folders.length === 0 ? (
+                <div className="mt-6">
+                  <CreateFolderForm />
+                </div>
+              ) : null}
 
-              <span className="mt-3 inline-flex rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Coming soon
-              </span>
+              {!canManage && folders.length === 0 ? (
+                <p className="mt-5 text-xs text-[var(--muted)]">
+                  A Workspace manager must create the first folder.
+                </p>
+              ) : null}
             </div>
           </div>
         </section>
