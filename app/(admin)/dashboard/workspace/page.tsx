@@ -8,7 +8,10 @@ import {
   FolderPlus,
   LockKeyhole,
 } from "lucide-react";
-import { createRootWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
+import {
+  createChildWorkspaceFolderAction,
+  createRootWorkspaceFolderAction,
+} from "@/app/(admin)/dashboard/workspace/actions";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -84,14 +87,27 @@ function FolderTree({
 
 type CreateFolderFormProps = {
   compact?: boolean;
+  parentId?: string;
 };
 
-function CreateFolderForm({ compact = false }: CreateFolderFormProps) {
+function CreateFolderForm({
+  compact = false,
+  parentId,
+}: CreateFolderFormProps) {
+  const isChildFolder = Boolean(parentId);
+
   return (
     <form
-      action={createRootWorkspaceFolderAction}
+      action={
+        isChildFolder
+          ? createChildWorkspaceFolderAction
+          : createRootWorkspaceFolderAction
+      }
       className={compact ? "flex items-center gap-2" : "mx-auto max-w-sm"}
     >
+      {parentId ? (
+        <input type="hidden" name="parentId" value={parentId} />
+      ) : null}
       <label className={compact ? "sr-only" : "block text-left"}>
         {!compact ? (
           <span className="mb-2 block text-sm font-medium text-[var(--text)]">
@@ -105,7 +121,7 @@ function CreateFolderForm({ compact = false }: CreateFolderFormProps) {
           required
           maxLength={120}
           autoComplete="off"
-          placeholder="New folder"
+          placeholder={isChildFolder ? "New subfolder" : "New folder"}
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--blue)]"
         />
       </label>
@@ -119,7 +135,7 @@ function CreateFolderForm({ compact = false }: CreateFolderFormProps) {
         }
       >
         <FolderPlus className="h-4 w-4" />
-        Create Folder
+        {isChildFolder ? "Create Subfolder" : "Create Folder"}
       </button>
     </form>
   );
@@ -247,6 +263,12 @@ export default async function WorkspacePage({
                     ? "Choose a folder from the tree to view its contents."
                     : "Create your club's first folder to begin organising internal documents."}
               </p>
+
+              {canManage && selectedFolder ? (
+                <div className="mt-6">
+                  <CreateFolderForm parentId={selectedFolder.id} />
+                </div>
+              ) : null}
 
               {canManage && folders.length === 0 ? (
                 <div className="mt-6">
