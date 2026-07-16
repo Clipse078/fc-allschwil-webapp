@@ -14,10 +14,12 @@ import {
   renameWorkspaceFolderAction,
 } from "@/app/(admin)/dashboard/workspace/actions";
 import { ArchiveFolderButton } from "@/app/(admin)/dashboard/workspace/ArchiveFolderButton";
+import { RestoreFolderButton } from "@/app/(admin)/dashboard/workspace/RestoreFolderButton";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
+  getArchivedWorkspaceFolders,
   getWorkspaceFolderById,
   getWorkspaceFolderTree,
 } from "@/lib/workspace/queries";
@@ -172,11 +174,14 @@ export default async function WorkspacePage({
     PERMISSIONS.WORKSPACE_MANAGE,
   );
 
-  const [folders, selectedFolder] = await Promise.all([
+  const [folders, selectedFolder, archivedFolders] = await Promise.all([
     getWorkspaceFolderTree(tenantId),
     selectedFolderId
       ? getWorkspaceFolderById(tenantId, selectedFolderId)
       : Promise.resolve(null),
+    canManage
+      ? getArchivedWorkspaceFolders(tenantId)
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -392,6 +397,42 @@ export default async function WorkspacePage({
           </div>
         </aside>
       </div>
+
+      {canManage && archivedFolders.length > 0 ? (
+        <section className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+          <div className="border-b border-[var(--border)] px-5 py-4">
+            <h2 className="text-sm font-semibold text-[var(--text)]">
+              Archived folders
+            </h2>
+            <p className="mt-1 text-xs text-[var(--text-2)]">
+              Restore archived folders to return them to the active tree.
+            </p>
+          </div>
+
+          <div className="divide-y divide-[var(--border)]">
+            {archivedFolders.map((folder) => (
+              <div
+                key={folder.id}
+                className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[var(--text)]">
+                    {folder.name}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-2)]">
+                    Archived {formatDate(folder.archivedAt)}
+                  </p>
+                </div>
+
+                <RestoreFolderButton
+                  folderId={folder.id}
+                  folderName={folder.name}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </PageShell>
   );
 }

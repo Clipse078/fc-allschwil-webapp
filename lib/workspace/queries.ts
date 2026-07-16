@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import type {
+  WorkspaceArchivedFolderDto,
   WorkspaceFolderDto,
   WorkspaceFolderRecord,
 } from "@/lib/workspace/dto";
@@ -102,4 +103,51 @@ export async function getWorkspaceFolderById(
   return toWorkspaceFolderDto(
     folder satisfies WorkspaceFolderRecord,
   );
+}
+/**
+ * Returns archived Workspace folders for exactly one tenant.
+ */
+export async function getArchivedWorkspaceFolders(
+  tenantId: string,
+): Promise<WorkspaceArchivedFolderDto[]> {
+  const normalizedTenantId = normalizeTenantId(tenantId);
+
+  const folders = await prisma.workspaceFolder.findMany({
+    where: {
+      tenantId: normalizedTenantId,
+      archivedAt: {
+        not: null,
+      },
+    },
+    orderBy: [
+      { updatedAt: "desc" },
+      { name: "asc" },
+      { id: "asc" },
+    ],
+    select: {
+      id: true,
+      parentId: true,
+      name: true,
+      description: true,
+      archivedAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return folders.flatMap((folder) => {
+    if (!folder.archivedAt) {
+      return [];
+    }
+
+    return [
+      {
+        id: folder.id,
+        parentId: folder.parentId,
+        name: folder.name,
+        description: folder.description,
+        archivedAt: folder.archivedAt.toISOString(),
+        updatedAt: folder.updatedAt.toISOString(),
+      },
+    ];
+  });
 }

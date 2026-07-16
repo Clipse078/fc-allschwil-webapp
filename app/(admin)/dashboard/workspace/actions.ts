@@ -306,3 +306,106 @@ export async function archiveWorkspaceFolderAction(
 
   revalidatePath("/dashboard/workspace");
 }
+export async function restoreWorkspaceFolderAction(
+  formData: FormData,
+): Promise<void> {
+  const session = await requirePermission(PERMISSIONS.WORKSPACE_MANAGE);
+
+  const tenantId = session.user?.tenantId;
+  const userId = session.user?.id;
+
+  if (!tenantId || !userId) {
+    throw new Error("Authenticated tenant and user are required.");
+  }
+
+  const folderId = normalizeFolderId(formData.get("folderId"));
+
+  if (!folderId) {
+    throw new Error("Folder is required.");
+  }
+
+  const folder = await prisma.workspaceFolder.findFirst({
+    where: {
+      id: folderId,
+      tenantId,
+      archivedAt: {
+        not: null,
+      },
+    },
+    select: {
+      id: true,
+      parentId: true,
+      name: true,
+    },
+  });
+
+  if (!folder) {
+    throw new Error("Archived folder was not found.");
+  }
+
+  if (folder.parentId) {
+    const parent = await prisma.workspaceFolder.findFirst({
+      where: {
+        id: folder.parentId,
+        tenantId,
+      },
+      select: {
+        archivedAt: true,
+      },
+    });
+
+    if (!parent) {
+      throw new Error("Parent folder was not found.");
+    }
+
+    if (parent.archivedAt) {
+      throw new Error(
+        "Restore the parent folder before restoring this folder.",
+      );
+    }
+  }
+
+  const duplicate = await prisma.workspaceFolder.findFirst({
+    where: {
+      tenantId,
+      parentId: folder.parentId,
+      archivedAt: null,
+      id: {
+        not: folder.id,
+      },
+      name: {
+        equals: folder.name,
+        mode: "insensitive",
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (duplicate) {
+    throw new Error(
+      "An active folder with this name already exists in this location.",
+    );
+  }
+
+  const restored = await prisma.workspaceFolder.updateMany({
+    where: {
+      id: folder.id,
+      tenantId,
+      archivedAt: {
+        not: null,
+      },
+    },
+    data: {
+      archivedAt: null,
+      updatedByUserId: userId,
+    },
+  });
+
+  if (restored.count !== 1) {
+    throw new Error("Folder could not be restored.");
+  }
+
+  revalidatePath("/dashboard/workspace");
+}

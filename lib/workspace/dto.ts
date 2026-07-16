@@ -23,3 +23,11 @@ export type WorkspaceFolderRecord = Omit<
   createdAt: Date;
   updatedAt: Date;
 };
+export type WorkspaceArchivedFolderDto = {
+  id: string;
+  parentId: string | null;
+  name: string;
+  description: string | null;
+  archivedAt: string;
+  updatedAt: string;
+};
