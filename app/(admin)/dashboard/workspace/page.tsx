@@ -11,6 +11,7 @@ import {
 import {
   createChildWorkspaceFolderAction,
   createRootWorkspaceFolderAction,
+  moveWorkspaceFolderAction,
   renameWorkspaceFolderAction,
 } from "@/app/(admin)/dashboard/workspace/actions";
 import { ArchiveFolderButton } from "@/app/(admin)/dashboard/workspace/ArchiveFolderButton";
@@ -347,6 +348,62 @@ export default async function WorkspacePage({
                     </dd>
                   )}
                 </div>
+
+                {canManage ? (
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                      Location
+                    </dt>
+
+                    <dd className="mt-2">
+                      <form
+                        action={moveWorkspaceFolderAction}
+                        className="space-y-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="folderId"
+                          value={selectedFolder.id}
+                        />
+
+                        <select
+                          name="parentId"
+                          defaultValue={selectedFolder.parentId ?? ""}
+                          aria-label="Move folder to"
+                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition focus:border-[var(--blue)]"
+                        >
+                          <option value="">Workspace root</option>
+
+                          {folders
+                            .flatMap(function flattenFolderTree(
+                              folder: WorkspaceFolderDto,
+                            ): WorkspaceFolderDto[] {
+                              return [
+                                folder,
+                                ...folder.children.flatMap(flattenFolderTree),
+                              ];
+                            })
+                            .filter((folder) => folder.id !== selectedFolder.id)
+                            .map((folder) => (
+                              <option
+                                key={folder.id}
+                                value={folder.id}
+                              >
+                                {folder.name}
+                              </option>
+                            ))}
+                        </select>
+
+                        <button
+                          type="submit"
+                          className="fca-button-secondary w-full justify-center text-sm"
+                        >
+                          Move Folder
+                        </button>
+                      </form>
+                    </dd>
+                  </div>
+                ) : null}
 
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">

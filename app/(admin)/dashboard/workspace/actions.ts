@@ -409,3 +409,160 @@ export async function restoreWorkspaceFolderAction(
 
   revalidatePath("/dashboard/workspace");
 }
+async function isWorkspaceFolderDescendantOf(
+  tenantId: string,
+  candidateFolderId: string,
+  rootFolderId: string,
+): Promise<boolean> {
+  let currentId: string | null = candidateFolderId;
+  const visited = new Set<string>();
+
+  while (currentId) {
+    if (currentId === rootFolderId) {
+      return true;
+    }
+
+    if (visited.has(currentId)) {
+      throw new Error("The Workspace folder hierarchy contains a cycle.");
+    }
+
+    visited.add(currentId);
+
+    const currentFolder: { parentId: string | null } | null =
+      await prisma.workspaceFolder.findFirst({
+        where: {
+          id: currentId,
+          tenantId,
+        },
+        select: {
+          parentId: true,
+        },
+      });
+
+    if (!currentFolder) {
+      return false;
+    }
+
+    currentId = currentFolder.parentId;
+  }
+
+  return false;
+}
+
+export async function moveWorkspaceFolderAction(
+  formData: FormData,
+): Promise<void> {
+  const session = await requirePermission(PERMISSIONS.WORKSPACE_MANAGE);
+
+  const tenantId = session.user?.tenantId;
+  const userId = session.user?.id;
+
+  if (!tenantId || !userId) {
+    throw new Error("Authenticated tenant and user are required.");
+  }
+
+  const folderId = normalizeFolderId(formData.get("folderId"));
+  const requestedParentId = normalizeFolderId(formData.get("parentId"));
+  const newParentId = requestedParentId || null;
+
+  if (!folderId) {
+    throw new Error("Folder is required.");
+  }
+
+  const folder = await prisma.workspaceFolder.findFirst({
+    where: {
+      id: folderId,
+      tenantId,
+      archivedAt: null,
+    },
+    select: {
+      id: true,
+      parentId: true,
+      name: true,
+    },
+  });
+
+  if (!folder) {
+    throw new Error("Folder was not found.");
+  }
+
+  if (newParentId === folder.id) {
+    throw new Error("A folder cannot be moved into itself.");
+  }
+
+  if (newParentId === folder.parentId) {
+    revalidatePath("/dashboard/workspace");
+    return;
+  }
+
+  if (newParentId) {
+    const targetFolder = await prisma.workspaceFolder.findFirst({
+      where: {
+        id: newParentId,
+        tenantId,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!targetFolder) {
+      throw new Error("Target folder was not found or is unavailable.");
+    }
+
+    const targetIsDescendant = await isWorkspaceFolderDescendantOf(
+      tenantId,
+      targetFolder.id,
+      folder.id,
+    );
+
+    if (targetIsDescendant) {
+      throw new Error(
+        "A folder cannot be moved into one of its descendants.",
+      );
+    }
+  }
+
+  const duplicate = await prisma.workspaceFolder.findFirst({
+    where: {
+      tenantId,
+      parentId: newParentId,
+      archivedAt: null,
+      id: {
+        not: folder.id,
+      },
+      name: {
+        equals: folder.name,
+        mode: "insensitive",
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (duplicate) {
+    throw new Error(
+      "An active folder with this name already exists in the target location.",
+    );
+  }
+
+  const moved = await prisma.workspaceFolder.updateMany({
+    where: {
+      id: folder.id,
+      tenantId,
+      archivedAt: null,
+    },
+    data: {
+      parentId: newParentId,
+      updatedByUserId: userId,
+    },
+  });
+
+  if (moved.count !== 1) {
+    throw new Error("Folder could not be moved.");
+  }
+
+  revalidatePath("/dashboard/workspace");
+}
