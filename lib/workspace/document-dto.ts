@@ -35,6 +35,7 @@ export type WorkspaceDocumentDto = {
 };
 
 export type CreateWorkspaceDocumentInput = {
+  documentId: string;
   tenantId: string;
   folderId: string | null;
   name: string;

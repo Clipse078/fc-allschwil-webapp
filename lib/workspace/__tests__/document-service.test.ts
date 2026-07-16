@@ -31,6 +31,7 @@ import {
 } from "@/lib/workspace/document-service";
 
 const validInput = {
+  documentId: "document-1",
   tenantId: "tenant-1",
   folderId: "folder-1",
   name: "Trainerhandbuch",
@@ -151,6 +152,7 @@ describe("createWorkspaceDocumentWithInitialVersion", () => {
 
     expect(mocks.workspaceDocumentCreate).toHaveBeenCalledWith({
       data: {
+        id: "document-1",
         tenantId: "tenant-1",
         folderId: "folder-1",
         name: "Trainerhandbuch",
@@ -266,6 +268,7 @@ describe("createWorkspaceDocumentWithInitialVersion", () => {
   });
 
   it.each([
+    ["documentId", { documentId: "   " }],
     ["tenantId", { tenantId: "   " }],
     ["actorUserId", { actorUserId: "" }],
     ["name", { name: " " }],

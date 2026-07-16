@@ -57,6 +57,10 @@ function validateSizeBytes(sizeBytes: number): number {
 export async function createWorkspaceDocumentWithInitialVersion(
   input: CreateWorkspaceDocumentInput,
 ): Promise<WorkspaceDocumentDto> {
+  const documentId = normalizeRequiredText(
+    input.documentId,
+    "documentId",
+  );
   const tenantId = normalizeRequiredText(input.tenantId, "tenantId");
   const actorUserId = normalizeRequiredText(input.actorUserId, "actorUserId");
   const name = normalizeRequiredText(input.name, "name");
@@ -115,6 +119,7 @@ export async function createWorkspaceDocumentWithInitialVersion(
   return prisma.$transaction(async (transaction) => {
     const document = await transaction.workspaceDocument.create({
       data: {
+        id: documentId,
         tenantId,
         folderId,
         name,
