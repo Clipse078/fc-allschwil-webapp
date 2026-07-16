@@ -13,6 +13,7 @@ import {
   createRootWorkspaceFolderAction,
   renameWorkspaceFolderAction,
 } from "@/app/(admin)/dashboard/workspace/actions";
+import { ArchiveFolderButton } from "@/app/(admin)/dashboard/workspace/ArchiveFolderButton";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -370,6 +371,18 @@ export default async function WorkspacePage({
                     {formatDate(selectedFolder.updatedAt)}
                   </dd>
                 </div>
+
+                {canManage ? (
+                  <div className="border-t border-[var(--border)] pt-5">
+                    <ArchiveFolderButton
+                      folderId={selectedFolder.id}
+                      folderName={selectedFolder.name}
+                    />
+                    <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+                      Folders containing active subfolders cannot be archived.
+                    </p>
+                  </div>
+                ) : null}
               </dl>
             ) : (
               <p className="text-sm text-[var(--text-2)]">

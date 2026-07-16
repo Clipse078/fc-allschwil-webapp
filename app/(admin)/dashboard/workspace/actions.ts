@@ -241,3 +241,68 @@ export async function renameWorkspaceFolderAction(
 
   revalidatePath("/dashboard/workspace");
 }
+export async function archiveWorkspaceFolderAction(
+  formData: FormData,
+): Promise<void> {
+  const session = await requirePermission(PERMISSIONS.WORKSPACE_MANAGE);
+
+  const tenantId = session.user?.tenantId;
+  const userId = session.user?.id;
+
+  if (!tenantId || !userId) {
+    throw new Error("Authenticated tenant and user are required.");
+  }
+
+  const folderId = normalizeFolderId(formData.get("folderId"));
+
+  if (!folderId) {
+    throw new Error("Folder is required.");
+  }
+
+  const folder = await prisma.workspaceFolder.findFirst({
+    where: {
+      id: folderId,
+      tenantId,
+      archivedAt: null,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!folder) {
+    throw new Error("Folder was not found.");
+  }
+
+  const activeChildCount = await prisma.workspaceFolder.count({
+    where: {
+      tenantId,
+      parentId: folder.id,
+      archivedAt: null,
+    },
+  });
+
+  if (activeChildCount > 0) {
+    throw new Error(
+      "This folder cannot be archived while it contains active subfolders.",
+    );
+  }
+
+  const archived = await prisma.workspaceFolder.updateMany({
+    where: {
+      id: folder.id,
+      tenantId,
+      archivedAt: null,
+    },
+    data: {
+      archivedAt: new Date(),
+      updatedByUserId: userId,
+    },
+  });
+
+  if (archived.count !== 1) {
+    throw new Error("Folder could not be archived.");
+  }
+
+  revalidatePath("/dashboard/workspace");
+}
