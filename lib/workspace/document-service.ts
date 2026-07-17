@@ -6,7 +6,9 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import type {
   CreateWorkspaceDocumentInput,
+  ListWorkspaceDocumentsInput,
   WorkspaceDocumentDto,
+  WorkspaceDocumentListItemDto,
 } from "@/lib/workspace/document-dto";
 
 export type WorkspaceDocumentServiceErrorCode =
@@ -190,5 +192,49 @@ export async function createWorkspaceDocumentWithInitialVersion(
         },
       },
     });
+  });
+}
+export async function listWorkspaceDocuments(
+  input: ListWorkspaceDocumentsInput,
+): Promise<WorkspaceDocumentListItemDto[]> {
+  const tenantId = normalizeRequiredText(input.tenantId, "tenantId");
+  const folderId = normalizeOptionalText(input.folderId);
+
+  return prisma.workspaceDocument.findMany({
+    where: {
+      tenantId,
+      folderId,
+      status: WorkspaceDocumentStatus.ACTIVE,
+      archivedAt: null,
+    },
+    orderBy: [
+      {
+        name: "asc",
+      },
+      {
+        id: "asc",
+      },
+    ],
+    select: {
+      id: true,
+      folderId: true,
+      name: true,
+      status: true,
+      currentVersionId: true,
+      createdByUserId: true,
+      updatedByUserId: true,
+      createdAt: true,
+      updatedAt: true,
+      currentVersion: {
+        select: {
+          id: true,
+          versionNumber: true,
+          filename: true,
+          mimeType: true,
+          sizeBytes: true,
+          createdAt: true,
+        },
+      },
+    },
   });
 }

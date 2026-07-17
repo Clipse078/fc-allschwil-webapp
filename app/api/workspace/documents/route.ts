@@ -25,6 +25,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import {
   createWorkspaceDocumentWithInitialVersion,
+  listWorkspaceDocuments,
   WorkspaceDocumentServiceError,
 } from "@/lib/workspace/document-service";
 import { workspaceStorageProvider } from "@/lib/workspace/upload-storage";
@@ -60,6 +61,95 @@ function mapDocumentServiceError(
   }
 }
 
+export async function GET(request: NextRequest) {
+  const access = await requireApiPermission(
+    PERMISSIONS.WORKSPACE_VIEW,
+  );
+
+  if (!access.ok) {
+    return NextResponse.json(
+      {
+        error: access.error,
+      },
+      {
+        status: access.status,
+      },
+    );
+  }
+
+  const tenantId = access.session.user?.tenantId;
+
+  if (!tenantId) {
+    return NextResponse.json(
+      {
+        error: "Kein Mandant in der Sitzung.",
+      },
+      {
+        status: 403,
+      },
+    );
+  }
+
+  const tenant = await getTenantFromSession(tenantId);
+
+  if (!tenant) {
+    return NextResponse.json(
+      {
+        error: "Tenant nicht gefunden.",
+      },
+      {
+        status: 404,
+      },
+    );
+  }
+
+  const rawFolderId =
+    request.nextUrl.searchParams.get("folderId");
+
+  const folderId = rawFolderId?.trim() || null;
+
+  try {
+    const documents = await listWorkspaceDocuments({
+      tenantId: tenant.id,
+      folderId,
+    });
+
+    return NextResponse.json(
+      {
+        documents,
+      },
+      {
+        status: 200,
+      },
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceDocumentServiceError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        {
+          status: mapDocumentServiceError(error),
+        },
+      );
+    }
+
+    console.error(
+      "[workspace-documents] document listing failed",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        error: "Die Dokumente konnten nicht geladen werden.",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+}
 export async function POST(request: NextRequest) {
   const access = await requireApiPermission(
     PERMISSIONS.WORKSPACE_MANAGE,

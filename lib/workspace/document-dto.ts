@@ -48,3 +48,29 @@ export type CreateWorkspaceDocumentInput = {
   changeNote?: string | null;
   actorUserId: string;
 };
+export type WorkspaceDocumentListVersionDto = {
+  id: string;
+  versionNumber: number;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: Date;
+};
+
+export type WorkspaceDocumentListItemDto = {
+  id: string;
+  folderId: string | null;
+  name: string;
+  status: WorkspaceDocumentStatus;
+  currentVersionId: string | null;
+  createdByUserId: string | null;
+  updatedByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  currentVersion: WorkspaceDocumentListVersionDto | null;
+};
+
+export type ListWorkspaceDocumentsInput = {
+  tenantId: string;
+  folderId?: string | null;
+};
