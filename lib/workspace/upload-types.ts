@@ -75,10 +75,40 @@ export type WorkspaceStorageUploadResult =
   | WorkspaceStorageUploadSuccess
   | WorkspaceStorageUploadFailure;
 
+export type WorkspaceStorageDownloadInput = {
+  storageReference: string;
+  filename: string;
+  mimeType: string;
+};
+
+export type WorkspaceStorageDownloadSuccess = {
+  ok: true;
+  stream: ReadableStream<Uint8Array>;
+  filename: string;
+  contentType: string;
+  contentDisposition: string;
+  sizeBytes: number;
+  etag: string;
+};
+
+export type WorkspaceStorageDownloadFailure = {
+  ok: false;
+  status: number;
+  error: string;
+};
+
+export type WorkspaceStorageDownloadResult =
+  | WorkspaceStorageDownloadSuccess
+  | WorkspaceStorageDownloadFailure;
+
 export interface WorkspaceStorageProvider {
   upload(
     input: WorkspaceStorageUploadInput,
   ): Promise<WorkspaceStorageUploadResult>;
+
+  download(
+    input: WorkspaceStorageDownloadInput,
+  ): Promise<WorkspaceStorageDownloadResult>;
 
   delete(storageReference: string): Promise<void>;
 }

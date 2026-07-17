@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { del, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 
 import type {
+  WorkspaceStorageDownloadInput,
+  WorkspaceStorageDownloadResult,
   WorkspaceStorageProvider,
   WorkspaceStorageUploadInput,
   WorkspaceStorageUploadResult,
@@ -148,6 +150,78 @@ export class VercelBlobWorkspaceStorage
         ok: false,
         status: 500,
         error: "Die Datei konnte nicht gespeichert werden.",
+      };
+    }
+  }
+
+  async download(
+    input: WorkspaceStorageDownloadInput,
+  ): Promise<WorkspaceStorageDownloadResult> {
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    const storageReference = input.storageReference.trim();
+
+    if (!token) {
+      return {
+        ok: false,
+        status: 503,
+        error:
+          "Workspace-Download ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+      };
+    }
+
+    if (!storageReference) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Ungültige Speicherreferenz.",
+      };
+    }
+
+    try {
+      const result = await get(storageReference, {
+        access: "private",
+        token,
+      });
+
+      if (!result) {
+        return {
+          ok: false,
+          status: 404,
+          error: "Die Datei wurde im Speicher nicht gefunden.",
+        };
+      }
+
+      if (result.statusCode !== 200 || !result.stream) {
+        return {
+          ok: false,
+          status: 500,
+          error: "Die Datei konnte nicht geladen werden.",
+        };
+      }
+
+      return {
+        ok: true,
+        stream: result.stream,
+        filename: sanitizeWorkspaceFilename(input.filename),
+        contentType:
+          result.blob.contentType ||
+          input.mimeType ||
+          "application/octet-stream",
+        contentDisposition: result.blob.contentDisposition,
+        sizeBytes: result.blob.size,
+        etag: result.blob.etag,
+      };
+    } catch (error) {
+      console.error(
+        "[workspace-storage] download failed",
+        storageReference,
+        error,
+      );
+
+      return {
+        ok: false,
+        status: 500,
+        error: "Die Datei konnte nicht geladen werden.",
       };
     }
   }

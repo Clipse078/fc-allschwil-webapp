@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const blobMocks = vi.hoisted(() => ({
   put: vi.fn(),
+  get: vi.fn(),
   del: vi.fn(),
 }));
 
 vi.mock("@vercel/blob", () => ({
   put: blobMocks.put,
+  get: blobMocks.get,
   del: blobMocks.del,
 }));
 
@@ -222,6 +224,149 @@ describe("Workspace upload storage", () => {
       ok: false,
       status: 500,
       error: "Die Datei konnte nicht gespeichert werden.",
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
+
+  it("returns 503 when Blob download storage is not configured", async () => {
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: "workspace/file.pdf",
+      filename: "file.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      error:
+        "Workspace-Download ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+    });
+
+    expect(blobMocks.get).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty download storage reference", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: "   ",
+      filename: "file.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      error: "Ungültige Speicherreferenz.",
+    });
+
+    expect(blobMocks.get).not.toHaveBeenCalled();
+  });
+
+  it("downloads a private blob with metadata", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.close();
+      },
+    });
+
+    blobMocks.get.mockResolvedValue({
+      statusCode: 200,
+      stream,
+      headers: new Headers(),
+      blob: {
+        url: "https://blob.example.test/file.pdf",
+        downloadUrl:
+          "https://blob.example.test/file.pdf?download=1",
+        pathname: "workspace/file.pdf",
+        contentDisposition: 'attachment; filename="file.pdf"',
+        cacheControl: "public, max-age=31536000",
+        uploadedAt: new Date("2026-07-17T12:00:00.000Z"),
+        etag: "test-etag",
+        contentType: "application/pdf",
+        size: 3,
+      },
+    });
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: " workspace/file.pdf ",
+      filename: "../file.pdf",
+      mimeType: "application/octet-stream",
+    });
+
+    expect(blobMocks.get).toHaveBeenCalledWith(
+      "workspace/file.pdf",
+      {
+        access: "private",
+        token: "test-token",
+      },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      stream,
+      filename: "file.pdf",
+      contentType: "application/pdf",
+      contentDisposition: 'attachment; filename="file.pdf"',
+      sizeBytes: 3,
+      etag: "test-etag",
+    });
+  });
+
+  it("returns 404 when the Blob does not exist", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    blobMocks.get.mockResolvedValue(null);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: "workspace/missing.pdf",
+      filename: "missing.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 404,
+      error: "Die Datei wurde im Speicher nicht gefunden.",
+    });
+  });
+
+  it("returns a controlled error when Blob download fails", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+
+    blobMocks.get.mockRejectedValue(
+      new Error("Simulated Blob download failure"),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: "workspace/file.pdf",
+      filename: "file.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 500,
+      error: "Die Datei konnte nicht geladen werden.",
     });
 
     expect(consoleError).toHaveBeenCalled();

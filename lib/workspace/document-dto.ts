@@ -74,3 +74,20 @@ export type ListWorkspaceDocumentsInput = {
   tenantId: string;
   folderId?: string | null;
 };
+
+export type GetWorkspaceDocumentForDownloadInput = {
+  tenantId: string;
+  documentId: string;
+};
+
+export type WorkspaceDocumentDownloadDto = {
+  documentId: string;
+  documentName: string;
+  versionId: string;
+  versionNumber: number;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageKey: string;
+  checksum: string | null;
+};
