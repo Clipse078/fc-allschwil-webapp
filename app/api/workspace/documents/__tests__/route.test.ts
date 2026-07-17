@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   upload: vi.fn(),
   delete: vi.fn(),
   createDocument: vi.fn(),
+  listDocuments: vi.fn(),
   randomUUID: vi.fn(),
 }));
 
@@ -67,6 +68,7 @@ vi.mock("@/lib/workspace/document-service", () => {
     WorkspaceDocumentServiceError,
     createWorkspaceDocumentWithInitialVersion:
       mocks.createDocument,
+    listWorkspaceDocuments: mocks.listDocuments,
   };
 });
 
@@ -74,7 +76,10 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   WorkspaceDocumentServiceError,
 } from "@/lib/workspace/document-service";
-import { POST } from "@/app/api/workspace/documents/route";
+import {
+  GET,
+  POST,
+} from "@/app/api/workspace/documents/route";
 
 const SESSION_TENANT_ID = "tenant-session";
 const TENANT_ID = "tenant-1";
@@ -107,6 +112,20 @@ function mockAuthorizedSession(
   });
 }
 
+
+function makeGetRequest(folderId?: string): NextRequest {
+  const url = new URL(
+    "http://localhost/api/workspace/documents",
+  );
+
+  if (folderId !== undefined) {
+    url.searchParams.set("folderId", folderId);
+  }
+
+  return new NextRequest(url, {
+    method: "GET",
+  });
+}
 function makeMultipartRequest(
   input: {
     file?: File;
@@ -199,6 +218,268 @@ const createdDocument = {
   },
 };
 
+const listedDocuments = [
+  {
+    id: DOCUMENT_ID,
+    folderId: "folder-1",
+    name: "Trainer-Handbuch",
+    status: "ACTIVE",
+    currentVersionId: "version-1",
+    createdByUserId: ACTOR_USER_ID,
+    updatedByUserId: ACTOR_USER_ID,
+    createdAt: new Date("2026-07-16T20:00:00.000Z"),
+    updatedAt: new Date("2026-07-16T20:05:00.000Z"),
+    currentVersion: {
+      id: "version-1",
+      versionNumber: 1,
+      filename: "Trainer Handbuch.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 16,
+      createdAt: new Date("2026-07-16T20:00:00.000Z"),
+    },
+  },
+];
+
+describe("GET /api/workspace/documents", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockAuthorizedSession();
+
+    mocks.getTenantFromSession.mockResolvedValue({
+      id: TENANT_ID,
+      key: TENANT_KEY,
+    });
+
+    mocks.listDocuments.mockResolvedValue(
+      listedDocuments,
+    );
+  });
+
+  it("checks WORKSPACE_VIEW permission before resolving the tenant", async () => {
+    const response = await GET(makeGetRequest());
+
+    expect(response.status).toBe(200);
+
+    expect(
+      mocks.requireApiPermission,
+    ).toHaveBeenCalledTimes(1);
+
+    expect(
+      mocks.requireApiPermission,
+    ).toHaveBeenCalledWith(
+      PERMISSIONS.WORKSPACE_VIEW,
+    );
+
+    expect(
+      mocks.requireApiPermission.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      mocks.getTenantFromSession.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("returns the authorization failure without resolving the tenant", async () => {
+    mocks.requireApiPermission.mockResolvedValue({
+      ok: false,
+      status: 403,
+      error: "Forbidden",
+      session: null,
+    });
+
+    const response = await GET(makeGetRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "Forbidden",
+    });
+
+    expect(
+      mocks.getTenantFromSession,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      mocks.listDocuments,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when tenant context is missing", async () => {
+    mockAuthorizedSession({
+      tenantId: null,
+    });
+
+    const response = await GET(makeGetRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "Kein Mandant in der Sitzung.",
+    });
+
+    expect(
+      mocks.getTenantFromSession,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      mocks.listDocuments,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the session tenant cannot be resolved", async () => {
+    mocks.getTenantFromSession.mockResolvedValue(
+      null,
+    );
+
+    const response = await GET(makeGetRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({
+      error: "Tenant nicht gefunden.",
+    });
+
+    expect(
+      mocks.getTenantFromSession,
+    ).toHaveBeenCalledWith(
+      SESSION_TENANT_ID,
+    );
+
+    expect(
+      mocks.listDocuments,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("lists root documents using the resolved tenant", async () => {
+    const response = await GET(makeGetRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+
+    expect(
+      mocks.listDocuments,
+    ).toHaveBeenCalledTimes(1);
+
+    expect(
+      mocks.listDocuments,
+    ).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      folderId: null,
+    });
+
+    expect(body).toEqual({
+      documents: [
+        {
+          ...listedDocuments[0],
+          createdAt:
+            "2026-07-16T20:00:00.000Z",
+          updatedAt:
+            "2026-07-16T20:05:00.000Z",
+          currentVersion: {
+            ...listedDocuments[0].currentVersion,
+            createdAt:
+              "2026-07-16T20:00:00.000Z",
+          },
+        },
+      ],
+    });
+  });
+
+  it("trims and forwards the requested folder ID", async () => {
+    const response = await GET(
+      makeGetRequest("  folder-1  "),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(
+      mocks.listDocuments,
+    ).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      folderId: "folder-1",
+    });
+  });
+
+  it("normalizes a blank folder ID to the Workspace root", async () => {
+    const response = await GET(
+      makeGetRequest("   "),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(
+      mocks.listDocuments,
+    ).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      folderId: null,
+    });
+  });
+
+  it.each([
+    ["INVALID_INPUT", 400],
+    ["FOLDER_NOT_FOUND", 404],
+    ["DUPLICATE_DOCUMENT_NAME", 409],
+  ] as const)(
+    "maps %s listing errors to HTTP %i",
+    async (code, expectedStatus) => {
+      mocks.listDocuments.mockRejectedValue(
+        new WorkspaceDocumentServiceError(
+          code,
+          `Listing failed: ${code}`,
+        ),
+      );
+
+      const response = await GET(
+        makeGetRequest("folder-1"),
+      );
+
+      const body = await response.json();
+
+      expect(response.status).toBe(
+        expectedStatus,
+      );
+
+      expect(body).toEqual({
+        error: `Listing failed: ${code}`,
+        code,
+      });
+    },
+  );
+
+  it("returns 500 for an unexpected listing failure", async () => {
+    const unexpectedError = new Error(
+      "Database unavailable",
+    );
+
+    mocks.listDocuments.mockRejectedValue(
+      unexpectedError,
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    try {
+      const response = await GET(
+        makeGetRequest(),
+      );
+
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body).toEqual({
+        error:
+          "Die Dokumente konnten nicht geladen werden.",
+      });
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "[workspace-documents] document listing failed",
+        unexpectedError,
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+});
 describe("POST /api/workspace/documents", () => {
   beforeEach(() => {
     vi.clearAllMocks();
