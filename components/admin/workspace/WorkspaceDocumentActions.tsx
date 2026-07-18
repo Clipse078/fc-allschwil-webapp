@@ -19,6 +19,7 @@ import {
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
 
 import { WorkspaceDocumentDetailsDialog } from "./WorkspaceDocumentDetailsDialog";
+import { WorkspaceDocumentVersionHistoryDialog } from "./WorkspaceDocumentVersionHistoryDialog";
 
 type WorkspaceDocumentActionsProps = {
   document: WorkspaceDocumentListItemDto;
@@ -70,6 +71,8 @@ export function WorkspaceDocumentActions({
 }: WorkspaceDocumentActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] =
+    useState(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
 
   const hasDownload = Boolean(workspaceDocument.currentVersion);
@@ -133,6 +136,11 @@ export function WorkspaceDocumentActions({
     setDetailsOpen(true);
   }
 
+  function openVersionHistory() {
+    setMenuOpen(false);
+    setVersionHistoryOpen(true);
+  }
+
   return (
     <>
       <div
@@ -192,7 +200,7 @@ export function WorkspaceDocumentActions({
             <ActionButton
               icon={<History className="h-4 w-4" />}
               label="Version history"
-              disabled
+              onClick={openVersionHistory}
             />
 
             <ActionButton
@@ -209,6 +217,13 @@ export function WorkspaceDocumentActions({
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         onDownload={downloadDocument}
+      />
+
+      <WorkspaceDocumentVersionHistoryDialog
+        documentId={workspaceDocument.id}
+        documentName={workspaceDocument.name}
+        open={versionHistoryOpen}
+        onClose={() => setVersionHistoryOpen(false)}
       />
     </>
   );
