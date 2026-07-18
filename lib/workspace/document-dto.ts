@@ -91,3 +91,22 @@ export type WorkspaceDocumentDownloadDto = {
   storageKey: string;
   checksum: string | null;
 };
+export type GetWorkspaceDocumentVersionsInput = {
+  tenantId: string;
+  actorUserId: string;
+  documentId: string;
+};
+
+export type WorkspaceDocumentVersionHistoryItemDto = {
+  id: string;
+  versionNumber: number;
+  createdAt: Date;
+  createdByUserId: string | null;
+  createdByName: string | null;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string | null;
+  status: WorkspaceDocumentVersionStatus;
+  isCurrent: boolean;
+};
