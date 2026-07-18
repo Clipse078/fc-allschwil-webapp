@@ -25,6 +25,8 @@ import {
   getWorkspaceFolderTree,
 } from "@/lib/workspace/queries";
 import type { WorkspaceFolderDto } from "@/lib/workspace/dto";
+import { WorkspaceDocumentTable } from "@/components/admin/workspace/WorkspaceDocumentTable";
+import { listWorkspaceDocuments } from "@/lib/workspace/document-service";
 import {
   PageBreadcrumbs,
   PageHeader,
@@ -184,6 +186,12 @@ export default async function WorkspacePage({
       ? getArchivedWorkspaceFolders(tenantId)
       : Promise.resolve([]),
   ]);
+  const documents = selectedFolder
+    ? await listWorkspaceDocuments({
+        tenantId,
+        folderId: selectedFolder.id,
+      })
+    : [];
 
   return (
     <PageShell fullWidth>
@@ -240,57 +248,65 @@ export default async function WorkspacePage({
         </aside>
 
         <section className="flex min-h-[520px] flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="border-b border-[var(--border)] px-5 py-4">
-            <p className="text-xs font-medium text-[var(--text-2)]">
-              {selectedFolder ? selectedFolder.name : "Workspace"}
-            </p>
-          </div>
-
-          <div className="flex flex-1 items-center justify-center px-6 py-16">
-            <div className="w-full max-w-md text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-2)]">
-                {selectedFolder ? (
-                  <FolderOpen className="h-7 w-7 text-[var(--blue)]" />
-                ) : (
-                  <LockKeyhole className="h-7 w-7 text-[var(--blue)]" />
-                )}
-              </div>
-
-              <h2 className="mt-5 text-xl font-semibold text-[var(--text)]">
-                {selectedFolder
-                  ? selectedFolder.name
-                  : folders.length > 0
-                    ? "Select a folder"
-                    : "Welcome to Workspace"}
-              </h2>
-
-              <p className="mt-2 text-sm leading-6 text-[var(--text-2)]">
-                {selectedFolder
-                  ? "This folder is ready for documents and subfolders."
-                  : folders.length > 0
-                    ? "Choose a folder from the tree to view its contents."
-                    : "Create your club's first folder to begin organising internal documents."}
+          <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
+            <div>
+              <p className="text-xs font-medium text-[var(--text-2)]">
+                {selectedFolder ? selectedFolder.name : "Workspace"}
               </p>
 
-              {canManage && selectedFolder ? (
-                <div className="mt-6">
-                  <CreateFolderForm parentId={selectedFolder.id} />
-                </div>
-              ) : null}
-
-              {canManage && folders.length === 0 ? (
-                <div className="mt-6">
-                  <CreateFolderForm />
-                </div>
-              ) : null}
-
-              {!canManage && folders.length === 0 ? (
-                <p className="mt-5 text-xs text-[var(--muted)]">
-                  A Workspace manager must create the first folder.
+              {selectedFolder ? (
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {documents.length === 1
+                    ? "1 document"
+                    : `${documents.length} documents`}
                 </p>
               ) : null}
             </div>
+
+            {canManage && selectedFolder ? (
+              <div className="min-w-52">
+                <CreateFolderForm parentId={selectedFolder.id} />
+              </div>
+            ) : null}
           </div>
+
+          {selectedFolder ? (
+            <div className="flex-1">
+              <WorkspaceDocumentTable documents={documents} />
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center justify-center px-6 py-16">
+              <div className="w-full max-w-md text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-2)]">
+                  <LockKeyhole className="h-7 w-7 text-[var(--blue)]" />
+                </div>
+
+                <h2 className="mt-5 text-xl font-semibold text-[var(--text)]">
+                  {folders.length > 0
+                    ? "Select a folder"
+                    : "Welcome to Workspace"}
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-[var(--text-2)]">
+                  {folders.length > 0
+                    ? "Choose a folder from the tree to view its contents."
+                    : "Create your club's first folder to begin organising internal documents."}
+                </p>
+
+                {canManage && folders.length === 0 ? (
+                  <div className="mt-6">
+                    <CreateFolderForm />
+                  </div>
+                ) : null}
+
+                {!canManage && folders.length === 0 ? (
+                  <p className="mt-5 text-xs leading-5 text-[var(--muted)]">
+                    A Workspace manager must create the first folder.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
         </section>
 
         <aside className="rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
