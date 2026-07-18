@@ -26,7 +26,7 @@ import {
 } from "@/lib/workspace/queries";
 import type { WorkspaceFolderDto } from "@/lib/workspace/dto";
 import { WorkspaceDocumentTable } from "@/components/admin/workspace/WorkspaceDocumentTable";
-import { WorkspaceUploadButton } from "@/components/admin/workspace/WorkspaceUploadButton";
+import { WorkspaceUploadControls } from "@/components/admin/workspace/WorkspaceUploadControls";
 import { listWorkspaceDocuments } from "@/lib/workspace/document-service";
 import {
   PageBreadcrumbs,
@@ -274,8 +274,8 @@ export default async function WorkspacePage({
           {selectedFolder ? (
             <div className="flex-1">
               {canManage ? (
-                <div className="flex justify-end border-b border-[var(--border)] px-5 py-3">
-                  <WorkspaceUploadButton
+                <div className="border-b border-[var(--border)] px-5 py-4">
+                  <WorkspaceUploadControls
                     folderId={selectedFolder.id}
                   />
                 </div>
