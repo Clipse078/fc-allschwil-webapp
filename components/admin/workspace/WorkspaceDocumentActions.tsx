@@ -66,13 +66,13 @@ function ActionButton({
 }
 
 export function WorkspaceDocumentActions({
-  document,
+  document: workspaceDocument,
 }: WorkspaceDocumentActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
 
-  const hasDownload = Boolean(document.currentVersion);
+  const hasDownload = Boolean(workspaceDocument.currentVersion);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -96,18 +96,18 @@ export function WorkspaceDocumentActions({
       }
     }
 
-    document.addEventListener(
+    globalThis.document.addEventListener(
       "mousedown",
       handlePointerDown,
     );
-    document.addEventListener("keydown", handleKeyDown);
+    globalThis.document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener(
+      globalThis.document.removeEventListener(
         "mousedown",
         handlePointerDown,
       );
-      document.removeEventListener(
+      globalThis.document.removeEventListener(
         "keydown",
         handleKeyDown,
       );
@@ -123,7 +123,7 @@ export function WorkspaceDocumentActions({
 
     window.location.assign(
       `/api/workspace/documents/${encodeURIComponent(
-        document.id,
+        workspaceDocument.id,
       )}/download`,
     );
   }
@@ -141,7 +141,7 @@ export function WorkspaceDocumentActions({
       >
         <button
           type="button"
-          aria-label={`Actions for ${document.name}`}
+          aria-label={`Actions for ${workspaceDocument.name}`}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((current) => !current)}
@@ -156,7 +156,7 @@ export function WorkspaceDocumentActions({
         {menuOpen ? (
           <div
             role="menu"
-            aria-label={`Actions for ${document.name}`}
+            aria-label={`Actions for ${workspaceDocument.name}`}
             className="absolute right-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
           >
             <ActionButton
@@ -205,7 +205,7 @@ export function WorkspaceDocumentActions({
       </div>
 
       <WorkspaceDocumentDetailsDialog
-        document={document}
+        document={workspaceDocument}
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         onDownload={downloadDocument}
