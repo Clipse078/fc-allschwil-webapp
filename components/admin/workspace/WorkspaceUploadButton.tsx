@@ -26,6 +26,10 @@ export function WorkspaceUploadButton({
   const [error, setError] = useState<string | null>(null);
 
   async function uploadFile(file: File) {
+    if (isUploading) {
+      return;
+    }
+
     setIsUploading(true);
     setError(null);
 
@@ -35,12 +39,13 @@ export function WorkspaceUploadButton({
         folderId,
       });
 
+      setError(null);
       onUploadComplete?.();
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
           ? uploadError.message
-          : "The file could not be uploaded.",
+          : "Die Datei konnte nicht hochgeladen werden.",
       );
     } finally {
       setIsUploading(false);
@@ -64,7 +69,9 @@ export function WorkspaceUploadButton({
   }
 
   function openFilePicker() {
-    inputRef.current?.click();
+    if (!isUploading && !disabled) {
+      inputRef.current?.click();
+    }
   }
 
   return (

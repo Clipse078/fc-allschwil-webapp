@@ -29,6 +29,7 @@ vi.mock("@/lib/db/prisma", () => ({
 import {
   createWorkspaceFolder,
   listWorkspaceFolders,
+  normalizeWorkspaceFolderName,
   WorkspaceFolderServiceError,
 } from "@/lib/workspace/folder-service";
 
@@ -221,8 +222,11 @@ describe("workspace folder service", () => {
         where: {
           tenantId: "tenant-1",
           parentId: null,
-          name: "Trainer",
           archivedAt: null,
+          name: {
+            equals: "Trainer",
+            mode: "insensitive",
+          },
         },
         select: {
           id: true,
@@ -302,8 +306,11 @@ describe("workspace folder service", () => {
           where: {
             tenantId: "tenant-1",
             parentId: "folder-parent",
-            name: "HandbÃ¼cher",
             archivedAt: null,
+            name: {
+              equals: "HandbÃ¼cher",
+              mode: "insensitive",
+            },
           },
           select: {
             id: true,
@@ -419,7 +426,7 @@ describe("workspace folder service", () => {
           actorUserId: "user-1",
         }),
       ).rejects.toMatchObject({
-        code: "DUPLICATE_FOLDER_NAME",
+        code: "WORKSPACE_FOLDER_NAME_CONFLICT",
       });
 
       expect(
@@ -463,6 +470,177 @@ describe("workspace folder service", () => {
         "WorkspaceFolderServiceError",
       );
       expect(error.code).toBe("INVALID_INPUT");
+    });
+  });
+});
+
+describe("normalizeWorkspaceFolderName", () => {
+  it("trims leading and trailing whitespace", () => {
+    expect(normalizeWorkspaceFolderName("  Trainers  ")).toBe(
+      "trainers",
+    );
+  });
+
+  it("lowercases the name", () => {
+    expect(normalizeWorkspaceFolderName("TRAINERS")).toBe(
+      "trainers",
+    );
+  });
+
+  it("trims and lowercases together", () => {
+    expect(normalizeWorkspaceFolderName(" Trainers ")).toBe(
+      "trainers",
+    );
+  });
+
+  it("returns an empty string for whitespace-only input", () => {
+    expect(normalizeWorkspaceFolderName("   ")).toBe("");
+  });
+});
+
+describe("duplicate folder name detection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rejects a root folder duplicate (exact match)", async () => {
+    workspaceFolderFindFirstMock.mockResolvedValue({
+      id: "folder-existing",
+    });
+
+    await expect(
+      createWorkspaceFolder({
+        tenantId: "tenant-1",
+        name: "Trainers",
+        actorUserId: "user-1",
+      }),
+    ).rejects.toMatchObject({
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+      message: "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
+    });
+
+    expect(workspaceFolderCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a root folder duplicate (case-insensitive: 'trainers' vs 'Trainers')", async () => {
+    workspaceFolderFindFirstMock.mockResolvedValue({
+      id: "folder-existing",
+    });
+
+    await expect(
+      createWorkspaceFolder({
+        tenantId: "tenant-1",
+        name: "trainers",
+        actorUserId: "user-1",
+      }),
+    ).rejects.toMatchObject({
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    expect(workspaceFolderCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a root folder duplicate (whitespace-normalised: ' Trainers ')", async () => {
+    workspaceFolderFindFirstMock.mockResolvedValue({
+      id: "folder-existing",
+    });
+
+    await expect(
+      createWorkspaceFolder({
+        tenantId: "tenant-1",
+        name: " Trainers ",
+        actorUserId: "user-1",
+      }),
+    ).rejects.toMatchObject({
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    expect(workspaceFolderCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a subfolder duplicate (case-insensitive)", async () => {
+    workspaceFolderFindFirstMock
+      .mockResolvedValueOnce({ id: "folder-parent" })
+      .mockResolvedValueOnce({ id: "folder-existing" });
+
+    await expect(
+      createWorkspaceFolder({
+        tenantId: "tenant-1",
+        parentId: "folder-parent",
+        name: "TRAINERS",
+        actorUserId: "user-1",
+      }),
+    ).rejects.toMatchObject({
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    expect(workspaceFolderCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("allows the same name under a different parent", async () => {
+    workspaceFolderFindFirstMock
+      .mockResolvedValueOnce({ id: "folder-parent" })
+      .mockResolvedValueOnce(null);
+
+    workspaceFolderCreateMock.mockResolvedValue({
+      ...folderRecord,
+      parentId: "folder-parent",
+    });
+
+    await expect(
+      createWorkspaceFolder({
+        tenantId: "tenant-1",
+        parentId: "folder-parent",
+        name: "Trainers",
+        actorUserId: "user-1",
+      }),
+    ).resolves.toMatchObject({
+      parentId: "folder-parent",
+    });
+  });
+
+  it("archived folders do not block creation of a new active folder with the same name", async () => {
+    // The duplicate query filters archivedAt: null, so archived folders are excluded.
+    // Simulate: no active duplicate found (archived one is ignored by the query filter).
+    workspaceFolderFindFirstMock.mockResolvedValue(null);
+    workspaceFolderCreateMock.mockResolvedValue(folderRecord);
+
+    await expect(
+      createWorkspaceFolder({
+        tenantId: "tenant-1",
+        name: "Trainers",
+        actorUserId: "user-1",
+      }),
+    ).resolves.toMatchObject({
+      name: "Trainer",
+    });
+
+    expect(workspaceFolderCreateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses mode:insensitive in the duplicate-check Prisma query", async () => {
+    workspaceFolderFindFirstMock.mockResolvedValue(null);
+    workspaceFolderCreateMock.mockResolvedValue(folderRecord);
+
+    await createWorkspaceFolder({
+      tenantId: "tenant-1",
+      name: "Trainers",
+      actorUserId: "user-1",
+    });
+
+    const duplicateCheckCall = workspaceFolderFindFirstMock.mock.calls.find(
+      (call) => call[0]?.where?.name?.mode === "insensitive",
+    );
+
+    expect(duplicateCheckCall).toBeDefined();
+    expect(duplicateCheckCall![0].where).toMatchObject({
+      tenantId: "tenant-1",
+      parentId: null,
+      archivedAt: null,
+      name: {
+        equals: "Trainers",
+        mode: "insensitive",
+      },
     });
   });
 });

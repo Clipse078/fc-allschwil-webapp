@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requirePermission } from "@/lib/permissions/require-permission";
+import { normalizeWorkspaceFolderName } from "@/lib/workspace/folder-service";
 
 const MAX_FOLDER_NAME_LENGTH = 120;
 const DISPLAY_ORDER_STEP = 10;
@@ -51,6 +52,27 @@ export async function createRootWorkspaceFolderAction(
   const name = normalizeFolderName(formData.get("name"));
 
   validateFolderName(name);
+
+  const duplicate = await prisma.workspaceFolder.findFirst({
+    where: {
+      tenantId,
+      parentId: null,
+      archivedAt: null,
+      name: {
+        equals: normalizeWorkspaceFolderName(name),
+        mode: "insensitive",
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (duplicate) {
+    throw new Error(
+      "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
+    );
+  }
 
   const currentMaximum = await prisma.workspaceFolder.aggregate({
     where: {
@@ -130,7 +152,9 @@ export async function createChildWorkspaceFolderAction(
   });
 
   if (duplicate) {
-    throw new Error("A folder with this name already exists here.");
+    throw new Error(
+      "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
+    );
   }
 
   const currentMaximum = await prisma.workspaceFolder.aggregate({
@@ -220,7 +244,9 @@ export async function renameWorkspaceFolderAction(
   });
 
   if (duplicate) {
-    throw new Error("A folder with this name already exists here.");
+    throw new Error(
+      "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
+    );
   }
 
   const updated = await prisma.workspaceFolder.updateMany({
@@ -385,7 +411,7 @@ export async function restoreWorkspaceFolderAction(
 
   if (duplicate) {
     throw new Error(
-      "An active folder with this name already exists in this location.",
+      "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
     );
   }
 
@@ -544,7 +570,7 @@ export async function moveWorkspaceFolderAction(
 
   if (duplicate) {
     throw new Error(
-      "An active folder with this name already exists in the target location.",
+      "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
     );
   }
 

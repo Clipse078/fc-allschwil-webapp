@@ -48,7 +48,7 @@ function mapFolderServiceError(
     case "PARENT_FOLDER_NOT_FOUND":
       return 404;
 
-    case "DUPLICATE_FOLDER_NAME":
+    case "WORKSPACE_FOLDER_NAME_CONFLICT":
       return 409;
   }
 }

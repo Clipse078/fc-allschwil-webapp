@@ -40,12 +40,13 @@ export function WorkspaceUploadDropzone({
         folderId,
       });
 
+      setError(null);
       onUploadComplete?.();
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
           ? uploadError.message
-          : "The file could not be uploaded.",
+          : "Die Datei konnte nicht hochgeladen werden.",
       );
     } finally {
       setIsUploading(false);
