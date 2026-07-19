@@ -29,7 +29,7 @@ vi.mock("@/lib/workspace/folder-service", () => {
   type WorkspaceFolderServiceErrorCode =
     | "INVALID_INPUT"
     | "PARENT_FOLDER_NOT_FOUND"
-    | "DUPLICATE_FOLDER_NAME";
+    | "WORKSPACE_FOLDER_NAME_CONFLICT";
 
   class WorkspaceFolderServiceError extends Error {
     readonly code: WorkspaceFolderServiceErrorCode;
@@ -298,7 +298,7 @@ describe("GET /api/workspace/folders", () => {
   it.each([
     ["INVALID_INPUT", 400],
     ["PARENT_FOLDER_NOT_FOUND", 404],
-    ["DUPLICATE_FOLDER_NAME", 409],
+    ["WORKSPACE_FOLDER_NAME_CONFLICT", 409],
   ] as const)(
     "maps %s listing errors to HTTP %i",
     async (code, expectedStatus) => {
@@ -604,7 +604,7 @@ describe("POST /api/workspace/folders", () => {
   it.each([
     ["INVALID_INPUT", 400],
     ["PARENT_FOLDER_NOT_FOUND", 404],
-    ["DUPLICATE_FOLDER_NAME", 409],
+    ["WORKSPACE_FOLDER_NAME_CONFLICT", 409],
   ] as const)(
     "maps %s creation errors to HTTP %i",
     async (code, expectedStatus) => {

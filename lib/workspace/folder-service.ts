@@ -8,7 +8,7 @@ import {
 export type WorkspaceFolderServiceErrorCode =
   | "INVALID_INPUT"
   | "PARENT_FOLDER_NOT_FOUND"
-  | "DUPLICATE_FOLDER_NAME";
+  | "WORKSPACE_FOLDER_NAME_CONFLICT";
 
 export class WorkspaceFolderServiceError extends Error {
   constructor(
@@ -18,6 +18,17 @@ export class WorkspaceFolderServiceError extends Error {
     super(message);
     this.name = "WorkspaceFolderServiceError";
   }
+}
+
+/**
+ * Normalises a workspace folder name for duplicate detection.
+ * Trims surrounding whitespace and folds to locale-independent lowercase.
+ * Use this before any case-insensitive sibling-name comparison.
+ */
+export function normalizeWorkspaceFolderName(
+  name: string,
+): string {
+  return name.trim().toLowerCase();
 }
 
 function normalizeRequiredText(
@@ -99,22 +110,35 @@ async function assertParentFolderExists(
   if (!parent) {
     throw new WorkspaceFolderServiceError(
       "PARENT_FOLDER_NOT_FOUND",
-      "Ãœbergeordneter Workspace-Ordner wurde nicht gefunden.",
+      "Übergeordneter Workspace-Ordner wurde nicht gefunden.",
     );
   }
 }
 
+/**
+ * Checks that no active sibling folder in the same parent scope has the
+ * same name after normalisation (trimmed, case-insensitive).
+ * Optionally excludes a folder ID to support rename/move without
+ * self-collision.
+ */
 async function assertFolderNameAvailable(input: {
   tenantId: string;
   parentId: string | null;
   name: string;
+  excludeFolderId?: string;
 }): Promise<void> {
   const duplicate = await prisma.workspaceFolder.findFirst({
     where: {
       tenantId: input.tenantId,
       parentId: input.parentId,
-      name: input.name,
       archivedAt: null,
+      ...(input.excludeFolderId
+        ? { id: { not: input.excludeFolderId } }
+        : {}),
+      name: {
+        equals: input.name,
+        mode: "insensitive",
+      },
     },
     select: {
       id: true,
@@ -123,8 +147,8 @@ async function assertFolderNameAvailable(input: {
 
   if (duplicate) {
     throw new WorkspaceFolderServiceError(
-      "DUPLICATE_FOLDER_NAME",
-      "Ein Workspace-Ordner mit diesem Namen existiert bereits.",
+      "WORKSPACE_FOLDER_NAME_CONFLICT",
+      "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
     );
   }
 }

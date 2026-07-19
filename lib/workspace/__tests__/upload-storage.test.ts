@@ -1,15 +1,68 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const blobMocks = vi.hoisted(() => ({
-  put: vi.fn(),
-  get: vi.fn(),
-  del: vi.fn(),
-}));
+const {
+  blobMocks,
+  MockBlobAccessError,
+  MockBlobStoreNotFoundError,
+  MockBlobStoreSuspendedError,
+  MockBlobClientTokenExpiredError,
+} = vi.hoisted(() => {
+  class MockBlobError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "BlobError";
+    }
+  }
+
+  class MockBlobAccessError extends MockBlobError {
+    constructor() {
+      super("Access denied");
+      this.name = "BlobAccessError";
+    }
+  }
+
+  class MockBlobStoreNotFoundError extends MockBlobError {
+    constructor() {
+      super("Blob store not found");
+      this.name = "BlobStoreNotFoundError";
+    }
+  }
+
+  class MockBlobStoreSuspendedError extends MockBlobError {
+    constructor() {
+      super("Blob store suspended");
+      this.name = "BlobStoreSuspendedError";
+    }
+  }
+
+  class MockBlobClientTokenExpiredError extends MockBlobError {
+    constructor() {
+      super("Token expired");
+      this.name = "BlobClientTokenExpiredError";
+    }
+  }
+
+  return {
+    blobMocks: {
+      put: vi.fn(),
+      get: vi.fn(),
+      del: vi.fn(),
+    },
+    MockBlobAccessError,
+    MockBlobStoreNotFoundError,
+    MockBlobStoreSuspendedError,
+    MockBlobClientTokenExpiredError,
+  };
+});
 
 vi.mock("@vercel/blob", () => ({
   put: blobMocks.put,
   get: blobMocks.get,
   del: blobMocks.del,
+  BlobAccessError: MockBlobAccessError,
+  BlobStoreNotFoundError: MockBlobStoreNotFoundError,
+  BlobStoreSuspendedError: MockBlobStoreSuspendedError,
+  BlobClientTokenExpiredError: MockBlobClientTokenExpiredError,
 }));
 
 import {
@@ -427,5 +480,112 @@ describe("Workspace upload storage", () => {
     expect(consoleWarning).toHaveBeenCalled();
 
     consoleWarning.mockRestore();
+  });
+});
+
+describe("Workspace storage: BlobError classification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  });
+
+  it.each([
+    ["BlobAccessError", () => new MockBlobAccessError()],
+    ["BlobStoreNotFoundError", () => new MockBlobStoreNotFoundError()],
+    ["BlobStoreSuspendedError", () => new MockBlobStoreSuspendedError()],
+    ["BlobClientTokenExpiredError", () => new MockBlobClientTokenExpiredError()],
+  ])(
+    "returns 503 when upload throws %s (configuration error)",
+    async (_name, makeError) => {
+      blobMocks.put.mockRejectedValue(makeError());
+
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const storage = new VercelBlobWorkspaceStorage();
+
+      const result = await storage.upload({
+        tenantKey: "tenant-1",
+        documentId: "document-1",
+        versionNumber: 1,
+        filename: "document.pdf",
+        mimeType: "application/pdf",
+        buffer: new Uint8Array([1, 2, 3]),
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        status: 503,
+        error:
+          "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+      });
+
+      expect(consoleError).toHaveBeenCalled();
+
+      consoleError.mockRestore();
+    },
+  );
+
+  it.each([
+    ["BlobAccessError", () => new MockBlobAccessError()],
+    ["BlobStoreNotFoundError", () => new MockBlobStoreNotFoundError()],
+    ["BlobStoreSuspendedError", () => new MockBlobStoreSuspendedError()],
+    ["BlobClientTokenExpiredError", () => new MockBlobClientTokenExpiredError()],
+  ])(
+    "returns 503 when download throws %s (configuration error)",
+    async (_name, makeError) => {
+      blobMocks.get.mockRejectedValue(makeError());
+
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const storage = new VercelBlobWorkspaceStorage();
+
+      const result = await storage.download({
+        storageReference: "workspace/file.pdf",
+        filename: "file.pdf",
+        mimeType: "application/pdf",
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        status: 503,
+        error:
+          "Workspace-Download ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+      });
+
+      expect(consoleError).toHaveBeenCalled();
+
+      consoleError.mockRestore();
+    },
+  );
+
+  it("still returns 500 for non-configuration Blob errors during upload", async () => {
+    blobMocks.put.mockRejectedValue(new Error("Network timeout"));
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 500,
+      error: "Die Datei konnte nicht gespeichert werden.",
+    });
+
+    consoleError.mockRestore();
   });
 });

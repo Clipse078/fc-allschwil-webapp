@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 
-import { del, get, put } from "@vercel/blob";
+import {
+  BlobAccessError,
+  BlobClientTokenExpiredError,
+  BlobStoreNotFoundError,
+  BlobStoreSuspendedError,
+  del,
+  get,
+  put,
+} from "@vercel/blob";
 
 import type {
   WorkspaceStorageDownloadInput,
@@ -10,6 +18,15 @@ import type {
   WorkspaceStorageUploadResult,
 } from "@/lib/workspace/upload-types";
 import { sanitizeWorkspaceFilename } from "@/lib/workspace/upload-types";
+
+function isStorageConfigurationError(error: unknown): boolean {
+  return (
+    error instanceof BlobAccessError ||
+    error instanceof BlobClientTokenExpiredError ||
+    error instanceof BlobStoreNotFoundError ||
+    error instanceof BlobStoreSuspendedError
+  );
+}
 
 const WORKSPACE_STORAGE_PREFIX = "workspace";
 
@@ -140,6 +157,21 @@ export class VercelBlobWorkspaceStorage
         sizeBytes: input.buffer.byteLength,
       };
     } catch (error) {
+      if (isStorageConfigurationError(error)) {
+        console.error(
+          "[workspace-storage] upload failed: storage configuration error",
+          storageKey,
+          error,
+        );
+
+        return {
+          ok: false,
+          status: 503,
+          error:
+            "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+        };
+      }
+
       console.error(
         "[workspace-storage] upload failed",
         storageKey,
@@ -212,6 +244,21 @@ export class VercelBlobWorkspaceStorage
         etag: result.blob.etag,
       };
     } catch (error) {
+      if (isStorageConfigurationError(error)) {
+        console.error(
+          "[workspace-storage] download failed: storage configuration error",
+          storageReference,
+          error,
+        );
+
+        return {
+          ok: false,
+          status: 503,
+          error:
+            "Workspace-Download ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+        };
+      }
+
       console.error(
         "[workspace-storage] download failed",
         storageReference,
