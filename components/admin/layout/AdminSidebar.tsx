@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -16,6 +16,7 @@ import {
   ClipboardList,
   FileText,
   Flag,
+  FolderClosed,
   Globe,
   Home,
   ImageIcon,
@@ -64,6 +65,7 @@ function getNavIcon(label: string) {
     case "Organisation":                return Building2;
     case "Website":                     return Globe;
     case "Planung":                     return CalendarDays;
+    case "Workspace":                   return FolderClosed;
     case "Anmeldungen":                 return Inbox;
     case "Meetings":                    return ScrollText;
     case "Initiativen":                 return Flag;

@@ -101,6 +101,18 @@ export async function loadMappingsForDetailSync(
 // ── Change detection ───────────────────────────────────────────────────────────
 
 /**
+ * Parses an SFV match date consistently.
+ *
+ * SFV may return an ISO timestamp without an explicit timezone. Those values
+ * represent UTC provider timestamps and must not be interpreted in the
+ * server's local timezone.
+ */
+function parseProviderMatchDate(matchDate: string): Date {
+  const hasExplicitTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(matchDate);
+  return new Date(hasExplicitTimezone ? matchDate : `${matchDate}Z`);
+}
+
+/**
  * Determines whether the incoming MatchDetail requires an Event update.
  *
  * Compares only provider-managed fields. Club-managed fields are not compared.
@@ -109,7 +121,7 @@ export function detectDetailChanges(
   existing: DetailSyncMappingRow["event"],
   detail: MatchDetail,
 ): boolean {
-  const incomingKickoff = new Date(detail.matchDate);
+  const incomingKickoff = parseProviderMatchDate(detail.matchDate);
   const incomingStatus = mapMatchStateToEventStatus(detail.matchState, detail.matchStateName);
   const incomingLocation = detail.playgroundName ?? null;
   const incomingCompetition = detail.leagueName ?? detail.divisionName ?? null;
@@ -148,7 +160,7 @@ export async function applyDetailUpdate(
   detail: MatchDetail,
   context: SfvDetailSyncContext,
 ): Promise<DetailPersistenceOutcome> {
-  const kickoff = new Date(detail.matchDate);
+  const kickoff = parseProviderMatchDate(detail.matchDate);
   const status = mapMatchStateToEventStatus(detail.matchState, detail.matchStateName);
   const location = detail.playgroundName ?? null;
   const competition = detail.leagueName ?? detail.divisionName ?? null;

@@ -228,6 +228,15 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
+        key: "workspace",
+        label: "Workspace",
+        href: "/dashboard/workspace",
+        permissionKeys: [
+          PERMISSIONS.WORKSPACE_VIEW,
+          PERMISSIONS.WORKSPACE_MANAGE,
+        ],
+      },
+      {
         key: "anmeldungen",
         label: "Anmeldungen",
         href: "/dashboard/registrations",
