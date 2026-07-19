@@ -196,7 +196,7 @@ describe("applyDetailUpdate — exact Prisma payload", () => {
     const [updateCall] = mockEventUpdate.mock.calls[0] as [{ where: unknown; data: Record<string, unknown> }];
     const data = updateCall.data;
 
-    expect(data.startAt).toEqual(new Date("2026-09-13T16:00:00"));
+    expect(data.startAt).toEqual(new Date("2026-09-13T16:00:00.000Z"));
     expect(data.status).toBe("LIVE");
     expect(data.location).toBe("Neues Sportcenter");
     expect(data.competitionLabel).toBe("4. Liga Gruppe 2");
