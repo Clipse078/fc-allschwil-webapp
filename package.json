@@ -19,6 +19,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed-demo": "tsx prisma/seed-demo.ts",
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts",
+    "sync-workspace-permissions": "tsx scripts/sync-workspace-permissions.ts",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
