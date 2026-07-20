@@ -1,13 +1,19 @@
 import { createHash } from "node:crypto";
 
-// IMPORTANT: BLOB_READ_WRITE_TOKEN must be set in all deployment environments.
-// Configure it in:
+// IMPORTANT: WORKSPACE_BLOB_READ_WRITE_TOKEN and WORKSPACE_BLOB_STORE_ID
+// must be set in all deployment environments.
+//
+// Configure them in:
 //   - Vercel STAGE environment: Dashboard > Project > Settings > Environment Variables
 //   - Vercel Production environment: same location
-//   - Local development: .env.local (never commit this value)
-// Connect a Vercel Blob store to the project: Storage > Blob > your store > link to project.
-// The token is issued per-store and must match the store used by this application.
-// Without this token the upload route returns HTTP 503 with code WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED.
+//   - Local development: .env.local (never commit these values)
+//
+// These variables refer exclusively to the dedicated private Workspace Blob
+// store (sportclubevo-workspace-stage). They must never be changed to point
+// at the public asset store or any other store.
+//
+// Without these variables the upload route returns HTTP 503 with code
+// WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED.
 
 import {
   BlobAccessError,
@@ -28,6 +34,10 @@ import {
   put,
 } from "@vercel/blob";
 
+import {
+  getWorkspaceBlobConfig,
+  WorkspaceBlobConfigError,
+} from "@/lib/workspace/blob-config";
 import type {
   WorkspaceStorageDownloadInput,
   WorkspaceStorageDownloadResult,
@@ -138,9 +148,18 @@ export class VercelBlobWorkspaceStorage
   async upload(
     input: WorkspaceStorageUploadInput,
   ): Promise<WorkspaceStorageUploadResult> {
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    let blobConfig;
 
-    if (!token) {
+    try {
+      blobConfig = getWorkspaceBlobConfig();
+    } catch (configError) {
+      if (configError instanceof WorkspaceBlobConfigError) {
+        console.error(
+          "[workspace-storage] upload failed: Workspace Blob store not configured",
+          { errorClass: configError.constructor.name },
+        );
+      }
+
       return makeUploadFailure(
         503,
         "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
@@ -184,7 +203,8 @@ export class VercelBlobWorkspaceStorage
         Buffer.from(input.buffer),
         {
           access: "private",
-          token,
+          token: blobConfig.token,
+          storeId: blobConfig.storeId,
           contentType: input.mimeType,
           addRandomSuffix: false,
           allowOverwrite: false,
@@ -323,10 +343,18 @@ export class VercelBlobWorkspaceStorage
   async download(
     input: WorkspaceStorageDownloadInput,
   ): Promise<WorkspaceStorageDownloadResult> {
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
-    const storageReference = input.storageReference.trim();
+    let blobConfig;
 
-    if (!token) {
+    try {
+      blobConfig = getWorkspaceBlobConfig();
+    } catch (configError) {
+      if (configError instanceof WorkspaceBlobConfigError) {
+        console.error(
+          "[workspace-storage] download failed: Workspace Blob store not configured",
+          { errorClass: (configError as WorkspaceBlobConfigError).constructor.name },
+        );
+      }
+
       return {
         ok: false,
         status: 503,
@@ -334,6 +362,8 @@ export class VercelBlobWorkspaceStorage
           "Workspace-Download ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
       };
     }
+
+    const storageReference = input.storageReference.trim();
 
     if (!storageReference) {
       return {
@@ -346,7 +376,8 @@ export class VercelBlobWorkspaceStorage
     try {
       const result = await get(storageReference, {
         access: "private",
-        token,
+        token: blobConfig.token,
+        storeId: blobConfig.storeId,
       });
 
       if (!result) {
@@ -421,16 +452,24 @@ export class VercelBlobWorkspaceStorage
   }
 
   async delete(storageReference: string): Promise<void> {
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    let blobConfig;
+
+    try {
+      blobConfig = getWorkspaceBlobConfig();
+    } catch {
+      return;
+    }
+
     const normalizedReference = storageReference.trim();
 
-    if (!token || !normalizedReference) {
+    if (!normalizedReference) {
       return;
     }
 
     try {
       await del(normalizedReference, {
-        token,
+        token: blobConfig.token,
+        storeId: blobConfig.storeId,
       });
     } catch (error) {
       const details = getErrorDetails(error);

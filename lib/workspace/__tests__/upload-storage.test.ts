@@ -149,10 +149,23 @@ import {
   getWorkspaceStorageKey,
 } from "@/lib/workspace/upload-storage";
 
+const TEST_TOKEN = "ws-test-token";
+const TEST_STORE_ID = "ws-test-store-id";
+
+function setWorkspaceBlobEnv() {
+  process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN = TEST_TOKEN;
+  process.env.WORKSPACE_BLOB_STORE_ID = TEST_STORE_ID;
+}
+
+function clearWorkspaceBlobEnv() {
+  delete process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN;
+  delete process.env.WORKSPACE_BLOB_STORE_ID;
+}
+
 describe("Workspace upload storage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.BLOB_READ_WRITE_TOKEN;
+    clearWorkspaceBlobEnv();
   });
 
   it("creates deterministic tenant-scoped storage keys", () => {
@@ -207,7 +220,9 @@ describe("Workspace upload storage", () => {
     );
   });
 
-  it("returns 503 when Blob storage is not configured", async () => {
+  it("returns 503 when WORKSPACE_BLOB_READ_WRITE_TOKEN is missing", async () => {
+    process.env.WORKSPACE_BLOB_STORE_ID = TEST_STORE_ID;
+
     const storage = new VercelBlobWorkspaceStorage();
 
     const result = await storage.upload({
@@ -230,8 +245,98 @@ describe("Workspace upload storage", () => {
     expect(blobMocks.put).not.toHaveBeenCalled();
   });
 
+  it("returns 503 when WORKSPACE_BLOB_STORE_ID is missing", async () => {
+    process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN = TEST_TOKEN;
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      code: "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
+      error:
+        "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+    });
+
+    expect(blobMocks.put).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when both Workspace Blob variables are missing", async () => {
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      code: "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
+      error:
+        "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+    });
+
+    expect(blobMocks.put).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to BLOB_READ_WRITE_TOKEN for uploads", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "public-store-token";
+    process.env.WORKSPACE_BLOB_STORE_ID = TEST_STORE_ID;
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toMatchObject({ ok: false, status: 503 });
+    expect(blobMocks.put).not.toHaveBeenCalled();
+
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+  });
+
+  it("does not fall back to BLOB_STORE_ID for uploads", async () => {
+    process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN = TEST_TOKEN;
+    process.env.BLOB_STORE_ID = "public-store-id";
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toMatchObject({ ok: false, status: 503 });
+    expect(blobMocks.put).not.toHaveBeenCalled();
+
+    delete process.env.BLOB_STORE_ID;
+  });
+
   it("rejects an invalid version number before upload", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
 
     const storage = new VercelBlobWorkspaceStorage();
 
@@ -255,7 +360,7 @@ describe("Workspace upload storage", () => {
   });
 
   it("rejects an empty buffer before upload", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
 
     const storage = new VercelBlobWorkspaceStorage();
 
@@ -278,8 +383,8 @@ describe("Workspace upload storage", () => {
     expect(blobMocks.put).not.toHaveBeenCalled();
   });
 
-  it("uploads a private blob using deterministic options", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  it("uploads a private blob using the dedicated Workspace store", async () => {
+    setWorkspaceBlobEnv();
 
     blobMocks.put.mockResolvedValue({
       url: "https://blob.example.test/document.pdf",
@@ -311,7 +416,8 @@ describe("Workspace upload storage", () => {
       expect.any(Buffer),
       {
         access: "private",
-        token: "test-token",
+        token: TEST_TOKEN,
+        storeId: TEST_STORE_ID,
         contentType: "application/pdf",
         addRandomSuffix: false,
         allowOverwrite: false,
@@ -332,8 +438,38 @@ describe("Workspace upload storage", () => {
     });
   });
 
+  it("upload never uses BLOB_READ_WRITE_TOKEN even when it is present", async () => {
+    setWorkspaceBlobEnv();
+    process.env.BLOB_READ_WRITE_TOKEN = "public-store-token";
+
+    blobMocks.put.mockResolvedValue({
+      url: "https://blob.example.test/document.pdf",
+      downloadUrl: "https://blob.example.test/document.pdf?download=1",
+      pathname: "workspace/tenant-1/document-1/v1/document.pdf",
+      contentDisposition: 'attachment; filename="document.pdf"',
+      contentType: "application/pdf",
+    });
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new TextEncoder().encode("hello"),
+    });
+
+    const callArgs = blobMocks.put.mock.calls[0]?.[2] as Record<string, unknown>;
+    expect(callArgs.token).toBe(TEST_TOKEN);
+    expect(callArgs.token).not.toBe("public-store-token");
+
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+  });
+
   it("returns a controlled error when Blob upload fails", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
 
     blobMocks.put.mockRejectedValue(
       new Error("Simulated Blob failure"),
@@ -366,7 +502,9 @@ describe("Workspace upload storage", () => {
     consoleError.mockRestore();
   });
 
-  it("returns 503 when Blob download storage is not configured", async () => {
+  it("returns 503 when WORKSPACE_BLOB_READ_WRITE_TOKEN is missing for download", async () => {
+    process.env.WORKSPACE_BLOB_STORE_ID = TEST_STORE_ID;
+
     const storage = new VercelBlobWorkspaceStorage();
 
     const result = await storage.download({
@@ -385,8 +523,47 @@ describe("Workspace upload storage", () => {
     expect(blobMocks.get).not.toHaveBeenCalled();
   });
 
+  it("returns 503 when WORKSPACE_BLOB_STORE_ID is missing for download", async () => {
+    process.env.WORKSPACE_BLOB_READ_WRITE_TOKEN = TEST_TOKEN;
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: "workspace/file.pdf",
+      filename: "file.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      error:
+        "Workspace-Download ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+    });
+
+    expect(blobMocks.get).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to BLOB_READ_WRITE_TOKEN for downloads", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "public-store-token";
+    process.env.WORKSPACE_BLOB_STORE_ID = TEST_STORE_ID;
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: "workspace/file.pdf",
+      filename: "file.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toMatchObject({ ok: false, status: 503 });
+    expect(blobMocks.get).not.toHaveBeenCalled();
+
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+  });
+
   it("rejects an empty download storage reference", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
 
     const storage = new VercelBlobWorkspaceStorage();
 
@@ -405,8 +582,8 @@ describe("Workspace upload storage", () => {
     expect(blobMocks.get).not.toHaveBeenCalled();
   });
 
-  it("downloads a private blob with metadata", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  it("downloads a private blob using the dedicated Workspace store", async () => {
+    setWorkspaceBlobEnv();
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -445,7 +622,8 @@ describe("Workspace upload storage", () => {
       "workspace/file.pdf",
       {
         access: "private",
-        token: "test-token",
+        token: TEST_TOKEN,
+        storeId: TEST_STORE_ID,
       },
     );
 
@@ -460,8 +638,44 @@ describe("Workspace upload storage", () => {
     });
   });
 
+  it("download never uses BLOB_READ_WRITE_TOKEN even when it is present", async () => {
+    setWorkspaceBlobEnv();
+    process.env.BLOB_READ_WRITE_TOKEN = "public-store-token";
+
+    blobMocks.get.mockResolvedValue({
+      statusCode: 200,
+      stream: new ReadableStream(),
+      headers: new Headers(),
+      blob: {
+        url: "https://blob.example.test/file.pdf",
+        downloadUrl: "https://blob.example.test/file.pdf?download=1",
+        pathname: "workspace/file.pdf",
+        contentDisposition: 'attachment; filename="file.pdf"',
+        cacheControl: "public, max-age=31536000",
+        uploadedAt: new Date("2026-07-17T12:00:00.000Z"),
+        etag: "test-etag",
+        contentType: "application/pdf",
+        size: 1,
+      },
+    });
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    await storage.download({
+      storageReference: "workspace/file.pdf",
+      filename: "file.pdf",
+      mimeType: "application/pdf",
+    });
+
+    const callArgs = blobMocks.get.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(callArgs.token).toBe(TEST_TOKEN);
+    expect(callArgs.token).not.toBe("public-store-token");
+
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+  });
+
   it("returns 404 when the Blob does not exist", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
     blobMocks.get.mockResolvedValue(null);
 
     const storage = new VercelBlobWorkspaceStorage();
@@ -480,7 +694,7 @@ describe("Workspace upload storage", () => {
   });
 
   it("returns a controlled error when Blob download fails", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
 
     blobMocks.get.mockRejectedValue(
       new Error("Simulated Blob download failure"),
@@ -509,8 +723,8 @@ describe("Workspace upload storage", () => {
     consoleError.mockRestore();
   });
 
-  it("deletes a storage reference with the configured token", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  it("deletes a storage reference using the dedicated Workspace store", async () => {
+    setWorkspaceBlobEnv();
 
     blobMocks.del.mockResolvedValue(undefined);
 
@@ -523,27 +737,62 @@ describe("Workspace upload storage", () => {
     expect(blobMocks.del).toHaveBeenCalledWith(
       "workspace/tenant-1/document-1/v1/document.pdf",
       {
-        token: "test-token",
+        token: TEST_TOKEN,
+        storeId: TEST_STORE_ID,
       },
     );
   });
 
-  it("skips deletion without a token or storage reference", async () => {
+  it("skips deletion when Workspace Blob store is not configured", async () => {
     const storage = new VercelBlobWorkspaceStorage();
 
     await storage.delete("workspace/file.pdf");
 
     expect(blobMocks.del).not.toHaveBeenCalled();
+  });
 
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  it("skips deletion for an empty storage reference", async () => {
+    setWorkspaceBlobEnv();
+
+    const storage = new VercelBlobWorkspaceStorage();
 
     await storage.delete("   ");
 
     expect(blobMocks.del).not.toHaveBeenCalled();
   });
 
+  it("does not fall back to BLOB_READ_WRITE_TOKEN for cleanup", async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = "public-store-token";
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    await storage.delete("workspace/file.pdf");
+
+    expect(blobMocks.del).not.toHaveBeenCalled();
+
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+  });
+
+  it("cleanup uses the dedicated Workspace store token and store ID", async () => {
+    setWorkspaceBlobEnv();
+    process.env.BLOB_READ_WRITE_TOKEN = "public-store-token";
+
+    blobMocks.del.mockResolvedValue(undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    await storage.delete("workspace/tenant-1/document-1/v1/document.pdf");
+
+    const callArgs = blobMocks.del.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(callArgs.token).toBe(TEST_TOKEN);
+    expect(callArgs.token).not.toBe("public-store-token");
+    expect(callArgs.storeId).toBe(TEST_STORE_ID);
+
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+  });
+
   it("handles cleanup failures without throwing", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
 
     blobMocks.del.mockRejectedValue(
       new Error("Simulated cleanup failure"),
@@ -568,7 +817,7 @@ describe("Workspace upload storage", () => {
 describe("Workspace storage: BlobError classification", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+    setWorkspaceBlobEnv();
   });
 
   it.each([
@@ -855,7 +1104,7 @@ describe("Workspace storage: BlobError classification", () => {
     consoleError.mockRestore();
   });
 
-  it("logs structured error details including error class name", async () => {
+  it("logs structured error details including error class name but not the token", async () => {
     blobMocks.put.mockRejectedValue(
       new MockBlobUnknownError(),
     );
@@ -881,6 +1130,14 @@ describe("Workspace storage: BlobError classification", () => {
         errorClass: expect.stringContaining("BlobUnknownError"),
       }),
     );
+
+    const loggedArgs = consoleError.mock.calls
+      .flat()
+      .map((a) => JSON.stringify(a))
+      .join(" ");
+
+    expect(loggedArgs).not.toContain(TEST_TOKEN);
+    expect(loggedArgs).not.toContain(TEST_STORE_ID);
 
     consoleError.mockRestore();
   });
