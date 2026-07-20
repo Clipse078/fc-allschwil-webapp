@@ -1,15 +1,16 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
+import { resolveWorkspaceFileType } from "@/lib/workspace/file-type-util";
 
 import {
   formatWorkspaceDate,
   formatWorkspaceFileSize,
-  getWorkspaceFileTypeLabel,
 } from "./workspace-document-formatters";
 
 type WorkspaceDocumentDetailsDialogProps = {
@@ -25,37 +26,15 @@ type DetailRowProps = {
   title?: string;
 };
 
-function DetailRow({
-  label,
-  value,
-  title,
-}: DetailRowProps) {
+function DetailRow({ label, value, title }: DetailRowProps) {
   return (
     <div className="grid gap-1 border-b border-[var(--border)] py-3 last:border-b-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4">
-      <dt className="font-medium text-[var(--text-2)]">
-        {label}
-      </dt>
-
-      <dd
-        className="min-w-0 break-words text-[var(--foreground)]"
-        title={title}
-      >
+      <dt className="font-medium text-[var(--text-2)]">{label}</dt>
+      <dd className="min-w-0 break-words text-[var(--foreground)]" title={title}>
         {value}
       </dd>
     </div>
   );
-}
-
-function getStatusLabel(status: string): string {
-  if (status === "ACTIVE") {
-    return "Active";
-  }
-
-  if (status === "ARCHIVED") {
-    return "Archived";
-  }
-
-  return status;
 }
 
 export function WorkspaceDocumentDetailsDialog({
@@ -64,119 +43,95 @@ export function WorkspaceDocumentDetailsDialog({
   onClose,
   onDownload,
 }: WorkspaceDocumentDetailsDialogProps) {
+  const t = useTranslations("Workspace.detailsDialog");
+  const ft = useTranslations("Workspace.fileTypes");
   const currentVersion = document.currentVersion;
+  const fileTypeInfo = resolveWorkspaceFileType(
+    currentVersion?.mimeType ?? "application/octet-stream",
+    currentVersion?.filename,
+  );
+
+  function getCategoryLabel(): string {
+    switch (fileTypeInfo.category) {
+      case "pdf": return ft("pdf");
+      case "word": return ft("word");
+      case "excel": return ft("excel");
+      case "powerpoint": return ft("powerpoint");
+      case "image": return ft("image");
+      case "video": return ft("video");
+      case "audio": return ft("audio");
+      case "archive": return ft("archive");
+      case "text": return ft("text");
+      default: return ft("unknown");
+    }
+  }
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="Document details"
+      title={t("dialogTitle")}
       description={document.name}
       size="lg"
       footer={
         <>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-          >
-            Close
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("closeButton")}
           </Button>
-
           <Button
             type="button"
             onClick={onDownload}
             disabled={!currentVersion}
             iconLeft={<Download className="h-4 w-4" />}
           >
-            Download
+            {t("downloadButton")}
           </Button>
         </>
       }
     >
       <dl>
+        <DetailRow label={t("labelName")} value={document.name} />
+
+        {currentVersion?.filename &&
+        currentVersion.filename !== document.name ? (
+          <DetailRow
+            label={t("labelFilename")}
+            value={currentVersion.filename}
+            title={currentVersion.filename}
+          />
+        ) : null}
+
         <DetailRow
-          label="Document name"
-          value={document.name}
+          label={t("labelFileType")}
+          value={currentVersion ? getCategoryLabel() : t("notAvailable")}
         />
 
         <DetailRow
-          label="Original filename"
-          value={currentVersion?.filename ?? "Not available"}
-          title={currentVersion?.filename}
-        />
-
-        <DetailRow
-          label="File type"
+          label={t("labelSize")}
           value={
             currentVersion
-              ? getWorkspaceFileTypeLabel(
-                  currentVersion.mimeType,
-                )
-              : "Unknown"
-          }
-          title={currentVersion?.mimeType}
-        />
-
-        <DetailRow
-          label="MIME type"
-          value={
-            currentVersion?.mimeType ?? "Not available"
+              ? formatWorkspaceFileSize(currentVersion.sizeBytes)
+              : t("notAvailable")
           }
         />
 
         <DetailRow
-          label="File size"
+          label={t("labelUploaded")}
           value={
             currentVersion
-              ? formatWorkspaceFileSize(
-                  currentVersion.sizeBytes,
-                )
-              : "Not available"
+              ? formatWorkspaceDate(currentVersion.createdAt)
+              : t("notAvailable")
           }
         />
 
         <DetailRow
-          label="Created"
-          value={formatWorkspaceDate(document.createdAt)}
-        />
-
-        <DetailRow
-          label="Last updated"
+          label={t("labelModified")}
           value={formatWorkspaceDate(document.updatedAt)}
         />
 
         <DetailRow
-          label="Current version"
-          value={
-            currentVersion
-              ? `v${currentVersion.versionNumber}`
-              : "No version"
-          }
-        />
-
-        <DetailRow
-          label="Created by"
-          value={
-            document.createdByUserId ??
-            "User information unavailable"
-          }
-          title={document.createdByUserId ?? undefined}
-        />
-
-        <DetailRow
-          label="Folder"
-          value={
-            document.folderId
-              ? `Folder ${document.folderId}`
-              : "Workspace root"
-          }
-          title={document.folderId ?? undefined}
-        />
-
-        <DetailRow
-          label="Status"
-          value={getStatusLabel(document.status)}
+          label={t("labelVersion")}
+          value={currentVersion ? `v${currentVersion.versionNumber}` : t("notAvailable")}
         />
       </dl>
     </Dialog>

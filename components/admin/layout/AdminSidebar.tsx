@@ -66,6 +66,7 @@ function getNavIcon(label: string) {
     case "Website":                     return Globe;
     case "Planung":                     return CalendarDays;
     case "Workspace":                   return FolderClosed;
+    case "Dokumente":                   return FolderClosed;
     case "Anmeldungen":                 return Inbox;
     case "Meetings":                    return ScrollText;
     case "Initiativen":                 return Flag;

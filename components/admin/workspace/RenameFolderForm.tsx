@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { renameWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
 
@@ -10,15 +11,11 @@ type RenameFolderFormProps = {
   currentName: string;
 };
 
-/**
- * Client-side form for renaming an existing Workspace folder.
- * Returns a typed action result so that duplicate name conflicts are shown as
- * inline field-level messages rather than producing a Server Component digest error.
- */
 export function RenameFolderForm({
   folderId,
   currentName,
 }: RenameFolderFormProps) {
+  const t = useTranslations("Workspace.renameFolder");
   const router = useRouter();
   const [name, setName] = useState(currentName);
   const [error, setError] = useState<string | null>(null);
@@ -51,8 +48,8 @@ export function RenameFolderForm({
       if (!result.ok) {
         const message =
           result.code === "WORKSPACE_FOLDER_NAME_CONFLICT"
-            ? "Folder name already exists. Choose another name."
-            : result.message ?? "The folder could not be renamed.";
+            ? t("errorConflict")
+            : result.message ?? t("errorGeneric");
 
         setError(message);
 
@@ -86,7 +83,7 @@ export function RenameFolderForm({
         maxLength={120}
         autoComplete="off"
         disabled={isPending}
-        aria-label="Folder name"
+        aria-label={t("fieldAriaLabel")}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={error ? errorId : undefined}
         className={`w-full rounded-lg border px-3 py-2 text-sm text-[var(--text)] outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -112,7 +109,7 @@ export function RenameFolderForm({
         disabled={!canSubmit}
         className="fca-button-secondary w-full justify-center text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isPending ? "Renaming…" : "Rename Folder"}
+        {isPending ? t("submittingLabel") : t("submitButton")}
       </button>
     </form>
   );

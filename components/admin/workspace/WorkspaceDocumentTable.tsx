@@ -1,33 +1,49 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
 
-import { WorkspaceDocumentEmptyState } from "./WorkspaceDocumentEmptyState";
 import { WorkspaceDocumentRow } from "./WorkspaceDocumentRow";
 
 type WorkspaceDocumentTableProps = {
   documents: WorkspaceDocumentListItemDto[];
+  selectedDocumentId?: string | null;
+  onSelectDocument?: (id: string) => void;
 };
 
 export function WorkspaceDocumentTable({
   documents,
+  selectedDocumentId,
+  onSelectDocument,
 }: WorkspaceDocumentTableProps) {
+  const t = useTranslations("Workspace.table");
+
   if (documents.length === 0) {
-    return <WorkspaceDocumentEmptyState />;
+    return null;
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left">
+      <table
+        className="w-full border-collapse text-left"
+        role="grid"
+        aria-label={t("tableAriaLabel")}
+      >
         <thead>
-          <tr className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            <th className="w-12 px-4 py-3">
-              <span className="sr-only">File type</span>
+          <tr className="border-b border-[var(--border)] text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <th
+              className="w-10 pl-4 pr-2 py-2.5"
+            >
+              <span className="sr-only">{t("fileTypeLabel")}</span>
             </th>
-            <th className="px-4 py-3">Name</th>
-            <th className="px-4 py-3">Version</th>
-            <th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Size</th>
-            <th className="px-4 py-3">Updated</th>
-            <th className="px-4 py-3 text-right">Actions</th>
+            <th className="px-2 py-2.5">{t("nameHeader")}</th>
+            <th className="px-4 py-2.5">{t("modifiedHeader")}</th>
+            <th className="px-4 py-2.5">{t("sizeHeader")}</th>
+            <th className="px-4 py-2.5">{t("versionHeader")}</th>
+            <th className="py-2.5 pl-2 pr-4 text-right">
+              <span className="sr-only">{t("actionsHeader")}</span>
+            </th>
           </tr>
         </thead>
 
@@ -36,6 +52,8 @@ export function WorkspaceDocumentTable({
             <WorkspaceDocumentRow
               key={document.id}
               document={document}
+              isSelected={selectedDocumentId === document.id}
+              onSelect={onSelectDocument}
             />
           ))}
         </tbody>

@@ -20,6 +20,12 @@ import {
 
 import { WorkspaceDocumentVersionHistoryDialog } from "@/components/admin/workspace/WorkspaceDocumentVersionHistoryDialog";
 
+// Mock next-intl
+vi.mock("next-intl", () => ({
+  useTranslations: (namespace: string) =>
+    (key: string, _params?: Record<string, unknown>) => `${namespace}.${key}`,
+}));
+
 const DOCUMENT_ID = "document-1";
 
 function jsonResponse(
@@ -85,7 +91,7 @@ describe("WorkspaceDocumentVersionHistoryDialog", () => {
 
     expect(
       screen.getByRole("status", {
-        name: "Loading version history",
+        name: "Workspace.versionHistory.loadingAriaLabel",
       }),
     ).toBeTruthy();
 
@@ -162,11 +168,11 @@ describe("WorkspaceDocumentVersionHistoryDialog", () => {
     ).toBeTruthy();
 
     expect(
-      screen.getByText("Current"),
+      screen.getByText("Workspace.versionHistory.statusCurrent"),
     ).toBeTruthy();
 
     expect(
-      screen.getByText("Superseded"),
+      screen.getByText("Workspace.versionHistory.statusSuperseded"),
     ).toBeTruthy();
   });
 
@@ -184,7 +190,7 @@ describe("WorkspaceDocumentVersionHistoryDialog", () => {
 
     expect(
       await screen.findByText(
-        "No versions available.",
+        "Workspace.versionHistory.noVersions",
       ),
     ).toBeTruthy();
   });
@@ -214,7 +220,7 @@ describe("WorkspaceDocumentVersionHistoryDialog", () => {
 
     expect(
       screen.getByRole("button", {
-        name: "Retry",
+        name: "Workspace.versionHistory.retryButton",
       }),
     ).toBeTruthy();
   });
@@ -242,14 +248,14 @@ describe("WorkspaceDocumentVersionHistoryDialog", () => {
 
     const retryButton =
       await screen.findByRole("button", {
-        name: "Retry",
+        name: "Workspace.versionHistory.retryButton",
       });
 
     fireEvent.click(retryButton);
 
     expect(
       await screen.findByText(
-        "No versions available.",
+        "Workspace.versionHistory.noVersions",
       ),
     ).toBeTruthy();
 
@@ -287,12 +293,12 @@ describe("WorkspaceDocumentVersionHistoryDialog", () => {
     });
 
     await screen.findByText(
-      "No versions available.",
+      "Workspace.versionHistory.noVersions",
     );
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Close",
+        name: "Workspace.versionHistory.closeButton",
       }),
     );
 
@@ -316,7 +322,7 @@ describe("WorkspaceDocumentVersionHistoryDialog", () => {
     });
 
     await screen.findByText(
-      "No versions available.",
+      "Workspace.versionHistory.noVersions",
     );
 
     fireEvent.keyDown(document, {

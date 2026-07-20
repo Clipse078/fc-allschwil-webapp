@@ -1,8 +1,9 @@
 "use client";
 
-import { FolderPlus } from "lucide-react";
+import { FolderPlus, X } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { createChildWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
 
@@ -10,13 +11,10 @@ type CreateSubfolderFormProps = {
   parentId: string;
 };
 
-/**
- * Client-side form for creating a child (subfolder) inside an existing folder.
- * Returns a typed action result so that duplicate name conflicts are shown as
- * inline field-level messages rather than producing a Server Component digest error.
- */
 export function CreateSubfolderForm({ parentId }: CreateSubfolderFormProps) {
+  const t = useTranslations("Workspace.createSubfolder");
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -24,6 +22,20 @@ export function CreateSubfolderForm({ parentId }: CreateSubfolderFormProps) {
 
   const inputId = "create-subfolder-name";
   const errorId = "create-subfolder-name-error";
+
+  function openForm() {
+    setExpanded(true);
+    setName("");
+    setError(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  function closeForm() {
+    if (isPending) return;
+    setExpanded(false);
+    setName("");
+    setError(null);
+  }
 
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     setName(e.target.value);
@@ -48,8 +60,8 @@ export function CreateSubfolderForm({ parentId }: CreateSubfolderFormProps) {
       if (!result.ok) {
         const message =
           result.code === "WORKSPACE_FOLDER_NAME_CONFLICT"
-            ? "Folder name already exists. Choose another name."
-            : result.message ?? "The folder could not be created.";
+            ? t("errorConflict")
+            : result.message ?? t("errorGeneric");
 
         setError(message);
 
@@ -61,6 +73,7 @@ export function CreateSubfolderForm({ parentId }: CreateSubfolderFormProps) {
         return;
       }
 
+      setExpanded(false);
       setName("");
       setError(null);
       router.refresh();
@@ -69,19 +82,28 @@ export function CreateSubfolderForm({ parentId }: CreateSubfolderFormProps) {
 
   const canSubmit = name.trim().length > 0 && !isPending;
 
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={openForm}
+        className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
+      >
+        <FolderPlus className="h-3.5 w-3.5" aria-hidden="true" />
+        {t("toggleButton")}
+      </button>
+    );
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="mx-auto max-w-sm"
+      className="space-y-2 animate-in fade-in duration-150"
     >
       <input type="hidden" name="parentId" value={parentId} />
 
-      <label htmlFor={inputId} className="block text-left">
-        <span className="mb-2 block text-sm font-medium text-[var(--text)]">
-          Folder name
-        </span>
-
+      <div className="flex items-center gap-1">
         <input
           id={inputId}
           ref={inputRef}
@@ -92,23 +114,33 @@ export function CreateSubfolderForm({ parentId }: CreateSubfolderFormProps) {
           maxLength={120}
           autoComplete="off"
           disabled={isPending}
-          placeholder="New subfolder"
+          placeholder={t("fieldPlaceholder")}
+          aria-label={t("fieldLabel")}
           aria-invalid={error ? "true" : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={`w-full rounded-lg border px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-xs text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-60 ${
             error
               ? "border-[var(--sce-danger)] bg-[var(--surface)] focus:border-[var(--sce-danger)]"
               : "border-[var(--border)] bg-[var(--surface)] focus:border-[var(--blue)]"
           }`}
         />
-      </label>
+        <button
+          type="button"
+          onClick={closeForm}
+          disabled={isPending}
+          aria-label="Abbrechen"
+          className="shrink-0 rounded-md p-1 text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text-2)]"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
 
       {error ? (
         <p
           id={errorId}
           role="alert"
           aria-live="polite"
-          className="mt-1.5 text-xs leading-5 text-[var(--sce-danger)]"
+          className="text-[11px] leading-4 text-[var(--sce-danger)]"
         >
           {error}
         </p>
@@ -117,10 +149,10 @@ export function CreateSubfolderForm({ parentId }: CreateSubfolderFormProps) {
       <button
         type="submit"
         disabled={!canSubmit}
-        className="fca-button-primary mt-3 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--blue)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--blue-hover)] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <FolderPlus className="h-4 w-4" />
-        {isPending ? "Creating…" : "Create Subfolder"}
+        <FolderPlus className="h-3 w-3" aria-hidden="true" />
+        {isPending ? t("submittingLabel") : t("submitButton")}
       </button>
     </form>
   );

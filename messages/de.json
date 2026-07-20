@@ -1,0 +1,211 @@
+{
+  "Workspace": {
+    "page": {
+      "eyebrow": "Club Workspace",
+      "title": "Workspace",
+      "description": "Sichere interne Dokumentenverwaltung für Ihre Organisation."
+    },
+
+    "folders": {
+      "panelTitle": "Ordner",
+      "noFoldersTitle": "Noch keine Ordner",
+      "noFoldersDescription": "Ihr Verein kann eine eigene Ordnerstruktur erstellen.",
+      "selectFolder": "Ordner auswählen",
+      "selectFolderDescription": "Wählen Sie einen Ordner aus der Baumstruktur, um die Inhalte anzuzeigen.",
+      "welcomeTitle": "Willkommen im Workspace",
+      "welcomeDescription": "Erstellen Sie den ersten Ordner Ihres Vereins, um interne Dokumente zu verwalten.",
+      "noPermissionNote": "Ein Workspace-Manager muss den ersten Ordner erstellen.",
+      "cannotArchiveNote": "Ordner mit aktiven Unterordnern können nicht archiviert werden."
+    },
+
+    "breadcrumbs": {
+      "rootLabel": "Workspace"
+    },
+
+    "createFolder": {
+      "buttonLabel": "Ordner erstellen",
+      "dialogTitle": "Ordner erstellen",
+      "fieldLabel": "Ordnername",
+      "fieldPlaceholder": "z.B. Finanzdokumente",
+      "cancelButton": "Abbrechen",
+      "submitButton": "Erstellen",
+      "submittingLabel": "Wird erstellt …",
+      "errorConflict": "Ein Ordner mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.",
+      "errorGeneric": "Der Ordner konnte nicht erstellt werden."
+    },
+
+    "createSubfolder": {
+      "fieldLabel": "Ordnername",
+      "fieldPlaceholder": "Neuer Unterordner",
+      "submitButton": "Unterordner erstellen",
+      "submittingLabel": "Wird erstellt …",
+      "toggleButton": "+ Unterordner",
+      "errorConflict": "Ein Ordner mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.",
+      "errorGeneric": "Der Ordner konnte nicht erstellt werden."
+    },
+
+    "renameFolder": {
+      "fieldAriaLabel": "Ordnername",
+      "submitButton": "Ordner umbenennen",
+      "submittingLabel": "Wird umbenannt …",
+      "errorConflict": "Ein Ordner mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.",
+      "errorGeneric": "Der Ordner konnte nicht umbenannt werden."
+    },
+
+    "moveFolder": {
+      "fieldLabel": "Zielordner",
+      "rootOption": "Workspace-Stammordner",
+      "submitButton": "Ordner verschieben",
+      "submittingLabel": "Wird verschoben …",
+      "errorGeneric": "Der Ordner konnte nicht verschoben werden."
+    },
+
+    "archiveFolder": {
+      "buttonLabel": "Ordner archivieren",
+      "archivingLabel": "Wird archiviert …",
+      "confirmMessage": "«{name}» archivieren? Dieser Ordner wird aus der aktiven Workspace-Struktur entfernt.",
+      "errorGeneric": "Der Ordner konnte nicht archiviert werden."
+    },
+
+    "restoreFolder": {
+      "buttonLabel": "Wiederherstellen",
+      "restoringLabel": "Wird wiederhergestellt …",
+      "confirmMessage": "«{name}» in die aktive Workspace-Struktur wiederherstellen?",
+      "errorGeneric": "Der Ordner konnte nicht wiederhergestellt werden."
+    },
+
+    "archivedFolders": {
+      "sectionTitle": "Archivierte Ordner",
+      "sectionDescription": "Stellen Sie archivierte Ordner wieder her, um sie in die aktive Struktur zurückzuführen.",
+      "archivedAtLabel": "Archiviert {date}"
+    },
+
+    "documents": {
+      "countSingular": "1 Dokument",
+      "countPlural": "{count} Dokumente"
+    },
+
+    "table": {
+      "fileTypeLabel": "Dateityp",
+      "nameHeader": "Name",
+      "modifiedHeader": "Geändert",
+      "sizeHeader": "Grösse",
+      "versionHeader": "Version",
+      "actionsHeader": "Aktionen",
+      "tableAriaLabel": "Dokumente"
+    },
+
+    "emptyState": {
+      "title": "Dieser Ordner ist leer.",
+      "description": "Ziehen Sie Dateien hierher oder laden Sie Ihr erstes Dokument hoch.",
+      "uploadButton": "Datei hochladen"
+    },
+
+    "upload": {
+      "buttonLabel": "Datei hochladen",
+      "buttonLabelWithIcon": "+ Datei hochladen",
+      "uploadingLabel": "Wird hochgeladen …",
+      "dropzoneTitle": "Datei hier ablegen oder klicken",
+      "dropzoneHint": "Eine Datei auf einmal, bis zu 100 MB.",
+      "dragOverTitle": "Datei hier ablegen",
+      "successMessage": "Datei erfolgreich hochgeladen",
+      "errorStorageNotConfigured": "Upload ist momentan nicht verfügbar. Bitte wenden Sie sich an den Administrator.",
+      "errorFolderNotFound": "Der ausgewählte Ordner existiert nicht mehr. Bitte laden Sie die Seite neu.",
+      "errorTooLarge": "Die Datei ist zu gross für den Speicher.",
+      "errorInvalidFile": "Dieser Dateityp wird nicht akzeptiert.",
+      "errorConflict": "Diese Datei existiert bereits. Bitte benennen Sie die Datei um und versuchen Sie es erneut.",
+      "errorPersistenceFailed": "Das Dokument konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+      "errorGeneric": "Die Datei konnte nicht hochgeladen werden."
+    },
+
+    "actions": {
+      "menuAriaLabel": "Aktionen für {name}",
+      "download": "Herunterladen",
+      "rename": "Umbenennen",
+      "move": "Verschieben",
+      "versionHistory": "Versionsverlauf",
+      "archive": "Archivieren",
+      "comingSoon": "Demnächst"
+    },
+
+    "preview": {
+      "panelTitle": "Vorschau",
+      "loadingPreview": "Vorschau wird geladen …",
+      "previewNotAvailable": "Keine Vorschau verfügbar",
+      "previewNotAvailableHint": "Dieser Dateityp kann nicht direkt angezeigt werden.",
+      "downloadButton": "Herunterladen",
+      "versionHistoryButton": "Versionsverlauf",
+      "versionHistoryHint": "Diese Funktion ist in Vorbereitung.",
+      "metaVersion": "Version",
+      "metaSize": "Grösse",
+      "metaModified": "Geändert",
+      "metaUploaded": "Hochgeladen",
+      "metaFolder": "Ordner",
+      "metaFilename": "Dateiname",
+      "metaFileType": "Dateityp",
+      "metaName": "Name",
+      "metaCreated": "Erstellt"
+    },
+
+    "folderDetails": {
+      "panelTitle": "Details",
+      "nameLabelTitle": "Name",
+      "locationLabel": "Speicherort",
+      "descriptionLabel": "Beschreibung",
+      "createdLabel": "Erstellt",
+      "updatedLabel": "Aktualisiert",
+      "noDescription": "Keine Beschreibung vorhanden.",
+      "noItemSelected": "Kein Element ausgewählt."
+    },
+
+    "versionHistory": {
+      "dialogTitle": "Versionsverlauf",
+      "loadingAriaLabel": "Versionsverlauf wird geladen",
+      "loadingError": "Der Versionsverlauf konnte nicht geladen werden.",
+      "retryButton": "Erneut versuchen",
+      "noVersions": "Keine Versionen verfügbar.",
+      "closeButton": "Schliessen",
+      "versionHeader": "Version",
+      "createdHeader": "Erstellt",
+      "createdByHeader": "Erstellt von",
+      "filenameHeader": "Dateiname",
+      "sizeHeader": "Grösse",
+      "statusHeader": "Status",
+      "statusCurrent": "Aktuell",
+      "statusSuperseded": "Veraltet",
+      "unknownUser": "Unbekannt"
+    },
+
+    "detailsDialog": {
+      "dialogTitle": "Dokumentdetails",
+      "closeButton": "Schliessen",
+      "downloadButton": "Herunterladen",
+      "labelName": "Name",
+      "labelFilename": "Dateiname",
+      "labelFileType": "Dateityp",
+      "labelSize": "Grösse",
+      "labelUploaded": "Hochgeladen",
+      "labelModified": "Geändert",
+      "labelVersion": "Version",
+      "notAvailable": "Nicht verfügbar"
+    },
+
+    "fileTypes": {
+      "pdf": "PDF-Dokument",
+      "word": "Word-Dokument",
+      "excel": "Excel-Arbeitsmappe",
+      "powerpoint": "PowerPoint-Präsentation",
+      "image": "Bild",
+      "imageJpeg": "JPEG-Bild",
+      "imagePng": "PNG-Bild",
+      "imageWebp": "WebP-Bild",
+      "imageGif": "GIF-Bild",
+      "video": "Video",
+      "audio": "Audiodatei",
+      "archive": "ZIP-Archiv",
+      "text": "Textdokument",
+      "csv": "CSV-Datei",
+      "unknown": "Datei"
+    }
+  }
+}

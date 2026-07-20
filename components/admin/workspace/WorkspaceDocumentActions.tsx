@@ -3,7 +3,6 @@
 import {
   Archive,
   Download,
-  Eye,
   FolderInput,
   History,
   MoreHorizontal,
@@ -15,14 +14,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslations } from "next-intl";
 
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
 
-import { WorkspaceDocumentDetailsDialog } from "./WorkspaceDocumentDetailsDialog";
 import { WorkspaceDocumentVersionHistoryDialog } from "./WorkspaceDocumentVersionHistoryDialog";
 
 type WorkspaceDocumentActionsProps = {
   document: WorkspaceDocumentListItemDto;
+  onSelect?: () => void;
 };
 
 type ActionButtonProps = {
@@ -30,6 +30,7 @@ type ActionButtonProps = {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
+  comingSoonLabel?: string;
 };
 
 function ActionButton({
@@ -37,6 +38,7 @@ function ActionButton({
   label,
   onClick,
   disabled = false,
+  comingSoonLabel,
 }: ActionButtonProps) {
   return (
     <button
@@ -53,13 +55,11 @@ function ActionButton({
         {icon}
       </span>
 
-      <span className="min-w-0 flex-1">
-        {label}
-      </span>
+      <span className="min-w-0 flex-1">{label}</span>
 
-      {disabled ? (
+      {disabled && comingSoonLabel ? (
         <span className="whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-          Coming soon
+          {comingSoonLabel}
         </span>
       ) : null}
     </button>
@@ -68,72 +68,46 @@ function ActionButton({
 
 export function WorkspaceDocumentActions({
   document: workspaceDocument,
+  onSelect,
 }: WorkspaceDocumentActionsProps) {
+  const t = useTranslations("Workspace.actions");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [versionHistoryOpen, setVersionHistoryOpen] =
-    useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
 
   const hasDownload = Boolean(workspaceDocument.currentVersion);
 
   useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
+    if (!menuOpen) return;
 
     function handlePointerDown(event: MouseEvent) {
       if (
         menuContainerRef.current &&
-        !menuContainerRef.current.contains(
-          event.target as Node,
-        )
+        !menuContainerRef.current.contains(event.target as Node)
       ) {
         setMenuOpen(false);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
+      if (event.key === "Escape") setMenuOpen(false);
     }
 
-    globalThis.document.addEventListener(
-      "mousedown",
-      handlePointerDown,
-    );
+    globalThis.document.addEventListener("mousedown", handlePointerDown);
     globalThis.document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      globalThis.document.removeEventListener(
-        "mousedown",
-        handlePointerDown,
-      );
-      globalThis.document.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      );
+      globalThis.document.removeEventListener("mousedown", handlePointerDown);
+      globalThis.document.removeEventListener("keydown", handleKeyDown);
     };
   }, [menuOpen]);
 
   function downloadDocument() {
-    if (!hasDownload) {
-      return;
-    }
-
+    if (!hasDownload) return;
     setMenuOpen(false);
-
     window.location.assign(
-      `/api/workspace/documents/${encodeURIComponent(
-        workspaceDocument.id,
-      )}/download`,
+      `/api/workspace/documents/${encodeURIComponent(workspaceDocument.id)}/download`,
     );
-  }
-
-  function openDetails() {
-    setMenuOpen(false);
-    setDetailsOpen(true);
   }
 
   function openVersionHistory() {
@@ -141,83 +115,71 @@ export function WorkspaceDocumentActions({
     setVersionHistoryOpen(true);
   }
 
+  function handleToggleMenu(event: React.MouseEvent) {
+    event.stopPropagation();
+    setMenuOpen((current) => !current);
+  }
+
   return (
     <>
-      <div
-        ref={menuContainerRef}
-        className="relative inline-flex"
-      >
+      <div ref={menuContainerRef} className="relative inline-flex">
         <button
           type="button"
-          aria-label={`Actions for ${workspaceDocument.name}`}
+          aria-label={t("menuAriaLabel", { name: workspaceDocument.name })}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((current) => !current)}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-2)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
+          onClick={handleToggleMenu}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-2)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
         >
-          <MoreHorizontal
-            className="h-4 w-4"
-            aria-hidden="true"
-          />
+          <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
 
         {menuOpen ? (
           <div
             role="menu"
-            aria-label={`Actions for ${workspaceDocument.name}`}
-            className="absolute right-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+            aria-label={t("menuAriaLabel", { name: workspaceDocument.name })}
+            className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
           >
             <ActionButton
-              icon={<Eye className="h-4 w-4" />}
-              label="View details"
-              onClick={openDetails}
-            />
-
-            <ActionButton
               icon={<Download className="h-4 w-4" />}
-              label="Download"
+              label={t("download")}
               onClick={downloadDocument}
               disabled={!hasDownload}
             />
 
-            <div
-              className="my-1 border-t border-[var(--border)]"
-              role="separator"
-            />
+            <div className="my-1 border-t border-[var(--border)]" role="separator" />
 
             <ActionButton
               icon={<Pencil className="h-4 w-4" />}
-              label="Rename"
+              label={t("rename")}
               disabled
+              comingSoonLabel={t("comingSoon")}
             />
 
             <ActionButton
               icon={<FolderInput className="h-4 w-4" />}
-              label="Move"
+              label={t("move")}
               disabled
+              comingSoonLabel={t("comingSoon")}
             />
 
             <ActionButton
               icon={<History className="h-4 w-4" />}
-              label="Version history"
+              label={t("versionHistory")}
               onClick={openVersionHistory}
             />
 
+            <div className="my-1 border-t border-[var(--border)]" role="separator" />
+
             <ActionButton
               icon={<Archive className="h-4 w-4" />}
-              label="Archive"
+              label={t("archive")}
               disabled
+              comingSoonLabel={t("comingSoon")}
             />
           </div>
         ) : null}
       </div>
-
-      <WorkspaceDocumentDetailsDialog
-        document={workspaceDocument}
-        open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
-        onDownload={downloadDocument}
-      />
 
       <WorkspaceDocumentVersionHistoryDialog
         documentId={workspaceDocument.id}

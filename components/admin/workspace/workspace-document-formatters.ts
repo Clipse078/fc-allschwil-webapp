@@ -27,13 +27,10 @@ export function formatWorkspaceDate(
   }).format(new Date(value));
 }
 
-export function getWorkspaceFileTypeLabel(
-  mimeType: string,
+export function formatWorkspaceDateLong(
+  value: Date | string,
 ): string {
-  const parts = mimeType.split("/");
-
-  return (
-    parts.at(-1)?.replaceAll(".", " ").toUpperCase() ||
-    mimeType
-  );
+  return new Intl.DateTimeFormat("de-CH", {
+    dateStyle: "long",
+  }).format(new Date(value));
 }
