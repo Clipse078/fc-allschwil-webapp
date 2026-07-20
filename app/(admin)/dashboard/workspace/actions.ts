@@ -39,7 +39,7 @@ function validateFolderName(name: string): void {
 
 export async function createRootWorkspaceFolderAction(
   formData: FormData,
-): Promise<void> {
+): Promise<{ id: string }> {
   const session = await requirePermission(PERMISSIONS.WORKSPACE_MANAGE);
 
   const tenantId = session.user?.tenantId;
@@ -85,7 +85,7 @@ export async function createRootWorkspaceFolderAction(
     },
   });
 
-  await prisma.workspaceFolder.create({
+  const folder = await prisma.workspaceFolder.create({
     data: {
       tenantId,
       parentId: null,
@@ -95,9 +95,13 @@ export async function createRootWorkspaceFolderAction(
       createdByUserId: userId,
       updatedByUserId: userId,
     },
+    select: {
+      id: true,
+    },
   });
 
   revalidatePath("/dashboard/workspace");
+  return { id: folder.id };
 }
 
 export async function createChildWorkspaceFolderAction(

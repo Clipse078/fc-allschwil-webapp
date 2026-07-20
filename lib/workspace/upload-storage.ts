@@ -1,8 +1,23 @@
 import { createHash } from "node:crypto";
 
+// IMPORTANT: BLOB_READ_WRITE_TOKEN must be set in all deployment environments.
+// Configure it in:
+//   - Vercel STAGE environment: Dashboard > Project > Settings > Environment Variables
+//   - Vercel Production environment: same location
+//   - Local development: .env.local (never commit this value)
+// Connect a Vercel Blob store to the project: Storage > Blob > your store > link to project.
+// The token is issued per-store and must match the store used by this application.
+// Without this token the upload route returns HTTP 503 with code WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED.
+
 import {
   BlobAccessError,
   BlobClientTokenExpiredError,
+  BlobContentTypeNotAllowedError,
+  BlobFileTooLargeError,
+  BlobPathnameMismatchError,
+  BlobPreconditionFailedError,
+  BlobServiceNotAvailable,
+  BlobServiceRateLimited,
   BlobStoreNotFoundError,
   BlobStoreSuspendedError,
   del,
@@ -16,6 +31,7 @@ import type {
   WorkspaceStorageProvider,
   WorkspaceStorageUploadInput,
   WorkspaceStorageUploadResult,
+  WorkspaceUploadErrorCode,
 } from "@/lib/workspace/upload-types";
 import { sanitizeWorkspaceFilename } from "@/lib/workspace/upload-types";
 
@@ -24,8 +40,17 @@ function isStorageConfigurationError(error: unknown): boolean {
     error instanceof BlobAccessError ||
     error instanceof BlobClientTokenExpiredError ||
     error instanceof BlobStoreNotFoundError ||
-    error instanceof BlobStoreSuspendedError
+    error instanceof BlobStoreSuspendedError ||
+    error instanceof BlobPathnameMismatchError
   );
+}
+
+function makeUploadFailure(
+  status: number,
+  code: WorkspaceUploadErrorCode,
+  error: string,
+) {
+  return { ok: false as const, status, code, error };
 }
 
 const WORKSPACE_STORAGE_PREFIX = "workspace";
@@ -96,31 +121,30 @@ export class VercelBlobWorkspaceStorage
     const token = process.env.BLOB_READ_WRITE_TOKEN;
 
     if (!token) {
-      return {
-        ok: false,
-        status: 503,
-        error:
-          "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
-      };
+      return makeUploadFailure(
+        503,
+        "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
+        "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+      );
     }
 
     if (
       !Number.isSafeInteger(input.versionNumber) ||
       input.versionNumber < 1
     ) {
-      return {
-        ok: false,
-        status: 400,
-        error: "Ungültige Versionsnummer.",
-      };
+      return makeUploadFailure(
+        400,
+        "WORKSPACE_UPLOAD_INVALID_FILE",
+        "Ungültige Versionsnummer.",
+      );
     }
 
     if (input.buffer.byteLength === 0) {
-      return {
-        ok: false,
-        status: 400,
-        error: "Leere Dateien können nicht hochgeladen werden.",
-      };
+      return makeUploadFailure(
+        400,
+        "WORKSPACE_UPLOAD_INVALID_FILE",
+        "Leere Dateien können nicht hochgeladen werden.",
+      );
     }
 
     const filename = sanitizeWorkspaceFilename(input.filename);
@@ -164,12 +188,81 @@ export class VercelBlobWorkspaceStorage
           error,
         );
 
-        return {
-          ok: false,
-          status: 503,
-          error:
-            "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
-        };
+        return makeUploadFailure(
+          503,
+          "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
+          "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+        );
+      }
+
+      if (error instanceof BlobPreconditionFailedError) {
+        console.error(
+          "[workspace-storage] upload failed: blob key already exists",
+          storageKey,
+          error,
+        );
+
+        return makeUploadFailure(
+          409,
+          "WORKSPACE_UPLOAD_CONFLICT",
+          "Eine Version dieser Datei existiert bereits im Speicher.",
+        );
+      }
+
+      if (error instanceof BlobFileTooLargeError) {
+        console.error(
+          "[workspace-storage] upload failed: file too large for store",
+          storageKey,
+          error,
+        );
+
+        return makeUploadFailure(
+          413,
+          "WORKSPACE_UPLOAD_TOO_LARGE",
+          "Die Datei überschreitet die maximale Dateigrösse des Speichers.",
+        );
+      }
+
+      if (error instanceof BlobContentTypeNotAllowedError) {
+        console.error(
+          "[workspace-storage] upload failed: content type not allowed by store",
+          storageKey,
+          error,
+        );
+
+        return makeUploadFailure(
+          415,
+          "WORKSPACE_UPLOAD_INVALID_FILE",
+          "Dieser Dateityp wird vom Speicher nicht akzeptiert.",
+        );
+      }
+
+      if (error instanceof BlobServiceNotAvailable) {
+        console.error(
+          "[workspace-storage] upload failed: storage service unavailable",
+          storageKey,
+          error,
+        );
+
+        return makeUploadFailure(
+          503,
+          "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
+          "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
+        );
+      }
+
+      if (error instanceof BlobServiceRateLimited) {
+        console.error(
+          "[workspace-storage] upload failed: rate limited",
+          storageKey,
+          error,
+        );
+
+        return makeUploadFailure(
+          429,
+          "WORKSPACE_UPLOAD_STORAGE_FAILED",
+          "Zu viele Upload-Anfragen. Bitte versuchen Sie es später erneut.",
+        );
       }
 
       console.error(
@@ -178,11 +271,11 @@ export class VercelBlobWorkspaceStorage
         error,
       );
 
-      return {
-        ok: false,
-        status: 500,
-        error: "Die Datei konnte nicht gespeichert werden.",
-      };
+      return makeUploadFailure(
+        500,
+        "WORKSPACE_UPLOAD_STORAGE_FAILED",
+        "Die Datei konnte nicht gespeichert werden.",
+      );
     }
   }
 
