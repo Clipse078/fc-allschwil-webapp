@@ -5,12 +5,15 @@ import { Download } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
+import { getWorkspaceFileGermanLabel } from "@/lib/workspace/file-type-util";
+import { workspaceDE } from "@/lib/workspace/workspace-i18n";
 
 import {
   formatWorkspaceDate,
   formatWorkspaceFileSize,
-  getWorkspaceFileTypeLabel,
 } from "./workspace-document-formatters";
+
+const t = workspaceDE.preview;
 
 type WorkspaceDocumentDetailsDialogProps = {
   document: WorkspaceDocumentListItemDto;
@@ -25,17 +28,12 @@ type DetailRowProps = {
   title?: string;
 };
 
-function DetailRow({
-  label,
-  value,
-  title,
-}: DetailRowProps) {
+function DetailRow({ label, value, title }: DetailRowProps) {
   return (
     <div className="grid gap-1 border-b border-[var(--border)] py-3 last:border-b-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4">
       <dt className="font-medium text-[var(--text-2)]">
         {label}
       </dt>
-
       <dd
         className="min-w-0 break-words text-[var(--foreground)]"
         title={title}
@@ -44,18 +42,6 @@ function DetailRow({
       </dd>
     </div>
   );
-}
-
-function getStatusLabel(status: string): string {
-  if (status === "ACTIVE") {
-    return "Active";
-  }
-
-  if (status === "ARCHIVED") {
-    return "Archived";
-  }
-
-  return status;
 }
 
 export function WorkspaceDocumentDetailsDialog({
@@ -70,7 +56,7 @@ export function WorkspaceDocumentDetailsDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title="Document details"
+      title="Dokumentdetails"
       description={document.name}
       size="lg"
       footer={
@@ -80,7 +66,7 @@ export function WorkspaceDocumentDetailsDialog({
             variant="secondary"
             onClick={onClose}
           >
-            Close
+            Schliessen
           </Button>
 
           <Button
@@ -89,94 +75,70 @@ export function WorkspaceDocumentDetailsDialog({
             disabled={!currentVersion}
             iconLeft={<Download className="h-4 w-4" />}
           >
-            Download
+            {t.downloadButton}
           </Button>
         </>
       }
     >
       <dl>
         <DetailRow
-          label="Document name"
+          label={t.labels.name}
           value={document.name}
         />
 
-        <DetailRow
-          label="Original filename"
-          value={currentVersion?.filename ?? "Not available"}
-          title={currentVersion?.filename}
-        />
+        {currentVersion?.filename &&
+        currentVersion.filename !== document.name ? (
+          <DetailRow
+            label={t.labels.filename}
+            value={currentVersion.filename}
+            title={currentVersion.filename}
+          />
+        ) : null}
 
         <DetailRow
-          label="File type"
+          label={t.labels.fileType}
           value={
             currentVersion
-              ? getWorkspaceFileTypeLabel(
+              ? getWorkspaceFileGermanLabel(
                   currentVersion.mimeType,
+                  currentVersion.filename,
                 )
-              : "Unknown"
-          }
-          title={currentVersion?.mimeType}
-        />
-
-        <DetailRow
-          label="MIME type"
-          value={
-            currentVersion?.mimeType ?? "Not available"
+              : "—"
           }
         />
 
         <DetailRow
-          label="File size"
+          label={t.labels.fileSize}
           value={
             currentVersion
               ? formatWorkspaceFileSize(
                   currentVersion.sizeBytes,
                 )
-              : "Not available"
+              : "—"
           }
         />
 
         <DetailRow
-          label="Created"
-          value={formatWorkspaceDate(document.createdAt)}
+          label={t.labels.uploaded}
+          value={
+            currentVersion
+              ? formatWorkspaceDate(currentVersion.createdAt)
+              : "—"
+          }
         />
 
         <DetailRow
-          label="Last updated"
+          label={t.labels.modified}
           value={formatWorkspaceDate(document.updatedAt)}
         />
 
         <DetailRow
-          label="Current version"
+          label={t.labels.version}
           value={
             currentVersion
               ? `v${currentVersion.versionNumber}`
-              : "No version"
+              : "—"
           }
-        />
-
-        <DetailRow
-          label="Created by"
-          value={
-            document.createdByUserId ??
-            "User information unavailable"
-          }
-          title={document.createdByUserId ?? undefined}
-        />
-
-        <DetailRow
-          label="Folder"
-          value={
-            document.folderId
-              ? `Folder ${document.folderId}`
-              : "Workspace root"
-          }
-          title={document.folderId ?? undefined}
-        />
-
-        <DetailRow
-          label="Status"
-          value={getStatusLabel(document.status)}
         />
       </dl>
     </Dialog>

@@ -12,47 +12,70 @@ import {
   WorkspaceUploadError,
   uploadWorkspaceFile,
 } from "@/lib/workspace/upload-client";
+import { workspaceDE } from "@/lib/workspace/workspace-i18n";
 
 function resolveUploadErrorMessage(error: unknown): string {
+  const t = workspaceDE.upload.errors;
+
   if (error instanceof WorkspaceUploadError) {
     switch (error.code) {
       case "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED":
-        return "Upload ist momentan nicht verfügbar. Bitte wenden Sie sich an den Administrator.";
+        return t.storageNotConfigured;
       case "WORKSPACE_FOLDER_NOT_FOUND":
-        return "Der ausgewählte Ordner existiert nicht mehr. Bitte laden Sie die Seite neu.";
+        return t.folderNotFound;
       case "WORKSPACE_UPLOAD_TOO_LARGE":
-        return "Die Datei ist zu gross für den Speicher.";
+        return t.tooLarge;
       case "WORKSPACE_UPLOAD_INVALID_FILE":
-        return "Dieser Dateityp wird nicht akzeptiert.";
+        return t.invalidFile;
       case "WORKSPACE_UPLOAD_CONFLICT":
-        return "Diese Datei existiert bereits. Bitte benennen Sie die Datei um und versuchen Sie es erneut.";
+        return t.conflict;
       case "WORKSPACE_UPLOAD_PERSISTENCE_FAILED":
-        return "Das Dokument konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.";
+        return t.persistenceFailed;
       default:
         return error.message;
     }
   }
+
   if (error instanceof Error) {
     return error.message;
   }
-  return "Die Datei konnte nicht hochgeladen werden.";
+
+  return t.generic;
 }
 
 type WorkspaceUploadDropzoneProps = {
   folderId: string;
   disabled?: boolean;
-  onUploadComplete?: () => void;
+  /**
+   * When true, the dropzone fills the available space (used on empty folders).
+   * When false, it uses a minimal overlay on the document list.
+   */
+  expanded?: boolean;
+  /**
+   * Called when upload completes. Receives the new document ID.
+   */
+  onUploadComplete?: (documentId: string | null) => void;
+  /** Forwarded drag state so the parent can show drag-over styling. */
+  onDragStateChange?: (isDragging: boolean) => void;
 };
 
 export function WorkspaceUploadDropzone({
   folderId,
   disabled = false,
+  expanded = false,
   onUploadComplete,
+  onDragStateChange,
 }: WorkspaceUploadDropzoneProps) {
+  const t = workspaceDE.upload;
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function setDragging(value: boolean) {
+    setIsDragging(value);
+    onDragStateChange?.(value);
+  }
 
   async function uploadFile(file: File) {
     if (disabled || isUploading) {
@@ -63,13 +86,11 @@ export function WorkspaceUploadDropzone({
     setError(null);
 
     try {
-      await uploadWorkspaceFile({
-        file,
-        folderId,
-      });
+      const result = await uploadWorkspaceFile({ file, folderId });
+      const documentId = result.document?.id ?? null;
 
       setError(null);
-      onUploadComplete?.();
+      onUploadComplete?.(documentId);
     } catch (uploadError) {
       setError(resolveUploadErrorMessage(uploadError));
     } finally {
@@ -85,7 +106,7 @@ export function WorkspaceUploadDropzone({
     event.preventDefault();
 
     if (!disabled && !isUploading) {
-      setIsDragging(true);
+      setDragging(true);
     }
   }
 
@@ -96,16 +117,22 @@ export function WorkspaceUploadDropzone({
   function handleDragLeave(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
 
-    if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+    if (
+      event.currentTarget.contains(
+        event.relatedTarget as Node | null,
+      )
+    ) {
       return;
     }
 
-    setIsDragging(false);
+    setDragging(false);
   }
 
-  async function handleDrop(event: DragEvent<HTMLDivElement>) {
+  async function handleDrop(
+    event: DragEvent<HTMLDivElement>,
+  ) {
     event.preventDefault();
-    setIsDragging(false);
+    setDragging(false);
 
     const file = event.dataTransfer.files?.[0];
 
@@ -134,6 +161,52 @@ export function WorkspaceUploadDropzone({
     }
   }
 
+  if (!expanded) {
+    return (
+      <div
+        className={`relative rounded-lg border-2 border-dashed transition-colors ${
+          isDragging
+            ? "border-[var(--blue)] bg-[var(--blue-light)]"
+            : "border-transparent"
+        }`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        aria-hidden="true"
+      >
+        {isDragging ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-[var(--blue-light)]">
+            <div className="flex flex-col items-center gap-2 text-[var(--blue)]">
+              <UploadCloud className="h-8 w-8" />
+              <p className="text-sm font-semibold">
+                {t.dragOverTitle}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        <input
+          ref={inputRef}
+          type="file"
+          className="sr-only"
+          aria-hidden="true"
+          disabled={disabled || isUploading}
+          onChange={handleFileChange}
+        />
+
+        {error ? (
+          <p
+            role="alert"
+            className="px-5 pb-3 text-xs leading-5 text-[var(--sce-danger)]"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div
@@ -142,7 +215,7 @@ export function WorkspaceUploadDropzone({
         aria-disabled={disabled || isUploading}
         className={`flex min-h-40 flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition ${
           isDragging
-            ? "border-[var(--blue)] bg-[var(--surface-2)]"
+            ? "border-[var(--blue)] bg-[var(--blue-light)]"
             : "border-[var(--border-strong)] bg-[var(--surface)]"
         } ${
           disabled || isUploading
@@ -161,22 +234,26 @@ export function WorkspaceUploadDropzone({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <UploadCloud className="h-8 w-8 text-[var(--blue)]" />
+        <UploadCloud
+          className={`h-8 w-8 ${
+            isDragging ? "text-[var(--blue)]" : "text-[var(--blue)]"
+          }`}
+          aria-hidden="true"
+        />
 
         <p className="mt-3 text-sm font-semibold text-[var(--text)]">
-          {isUploading
-            ? "Uploading file…"
-            : "Drop a file here or click to browse"}
+          {isUploading ? t.uploadingLabel : t.dropzoneTitle}
         </p>
 
         <p className="mt-1 text-xs text-[var(--muted)]">
-          One file at a time, up to 100 MB.
+          {t.dropzoneHint}
         </p>
 
         <input
           ref={inputRef}
           type="file"
           className="sr-only"
+          aria-hidden="true"
           disabled={disabled || isUploading}
           onChange={handleFileChange}
         />

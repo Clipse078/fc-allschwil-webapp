@@ -12,36 +12,45 @@ import {
   WorkspaceUploadError,
   uploadWorkspaceFile,
 } from "@/lib/workspace/upload-client";
+import { workspaceDE } from "@/lib/workspace/workspace-i18n";
 
 function resolveUploadErrorMessage(error: unknown): string {
+  const t = workspaceDE.upload.errors;
+
   if (error instanceof WorkspaceUploadError) {
     switch (error.code) {
       case "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED":
-        return "Upload ist momentan nicht verfügbar. Bitte wenden Sie sich an den Administrator.";
+        return t.storageNotConfigured;
       case "WORKSPACE_FOLDER_NOT_FOUND":
-        return "Der ausgewählte Ordner existiert nicht mehr. Bitte laden Sie die Seite neu.";
+        return t.folderNotFound;
       case "WORKSPACE_UPLOAD_TOO_LARGE":
-        return "Die Datei ist zu gross für den Speicher.";
+        return t.tooLarge;
       case "WORKSPACE_UPLOAD_INVALID_FILE":
-        return "Dieser Dateityp wird nicht akzeptiert.";
+        return t.invalidFile;
       case "WORKSPACE_UPLOAD_CONFLICT":
-        return "Diese Datei existiert bereits. Bitte benennen Sie die Datei um und versuchen Sie es erneut.";
+        return t.conflict;
       case "WORKSPACE_UPLOAD_PERSISTENCE_FAILED":
-        return "Das Dokument konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.";
+        return t.persistenceFailed;
       default:
         return error.message;
     }
   }
+
   if (error instanceof Error) {
     return error.message;
   }
-  return "Die Datei konnte nicht hochgeladen werden.";
+
+  return t.generic;
 }
 
 type WorkspaceUploadButtonProps = {
   folderId: string;
   disabled?: boolean;
-  onUploadComplete?: () => void;
+  /**
+   * Called when upload completes successfully. Receives the new document ID
+   * so the caller can auto-select it in the document list.
+   */
+  onUploadComplete?: (documentId: string | null) => void;
 };
 
 export function WorkspaceUploadButton({
@@ -49,6 +58,7 @@ export function WorkspaceUploadButton({
   disabled = false,
   onUploadComplete,
 }: WorkspaceUploadButtonProps) {
+  const t = workspaceDE.upload;
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,13 +72,11 @@ export function WorkspaceUploadButton({
     setError(null);
 
     try {
-      await uploadWorkspaceFile({
-        file,
-        folderId,
-      });
+      const result = await uploadWorkspaceFile({ file, folderId });
+      const documentId = result.document?.id ?? null;
 
       setError(null);
-      onUploadComplete?.();
+      onUploadComplete?.(documentId);
     } catch (uploadError) {
       setError(resolveUploadErrorMessage(uploadError));
     } finally {
@@ -104,6 +112,7 @@ export function WorkspaceUploadButton({
         ref={inputRef}
         type="file"
         className="sr-only"
+        aria-hidden="true"
         disabled={disabled || isUploading}
         onChange={handleFileChange}
       />
@@ -115,8 +124,9 @@ export function WorkspaceUploadButton({
         disabled={disabled}
         iconLeft={<Upload className="h-4 w-4" />}
         onClick={openFilePicker}
+        aria-label={t.buttonLabel}
       >
-        {isUploading ? "Uploading…" : "Upload file"}
+        {isUploading ? t.uploadingLabel : t.buttonLabel}
       </Button>
 
       {error ? (

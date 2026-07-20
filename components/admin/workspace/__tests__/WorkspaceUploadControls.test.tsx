@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   uploadWorkspaceFile: vi.fn(),
   routerRefresh: vi.fn(),
+  onUploadComplete: vi.fn(),
 }));
 
 vi.mock(
@@ -42,7 +43,12 @@ vi.mock("next/navigation", () => ({
 import { WorkspaceUploadControls } from "@/components/admin/workspace/WorkspaceUploadControls";
 
 function renderControls(folderId = "folder-1") {
-  render(<WorkspaceUploadControls folderId={folderId} />);
+  render(
+    <WorkspaceUploadControls
+      folderId={folderId}
+      onUploadComplete={mocks.onUploadComplete}
+    />,
+  );
 }
 
 function getFileInput(): HTMLInputElement {
@@ -78,7 +84,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
     renderControls();
 
     expect(
-      screen.getByText(/drop a file here or click to browse/i),
+      screen.getByText(/datei hier ablegen oder klicken/i),
     ).toBeTruthy();
   });
 
@@ -104,8 +110,10 @@ describe("WorkspaceUploadControls – upload flow", () => {
     });
   });
 
-  it("refreshes the document list after a successful upload", async () => {
-    mocks.uploadWorkspaceFile.mockResolvedValue({ document: {} });
+  it("calls onUploadComplete after a successful upload", async () => {
+    mocks.uploadWorkspaceFile.mockResolvedValue({
+      document: { id: "doc-123", name: "report.pdf" },
+    });
 
     renderControls();
 
@@ -118,7 +126,9 @@ describe("WorkspaceUploadControls – upload flow", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.routerRefresh).toHaveBeenCalledTimes(1);
+      expect(mocks.onUploadComplete).toHaveBeenCalledWith(
+        "doc-123",
+      );
     });
   });
 
@@ -190,7 +200,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
     });
   });
 
-  it("does not refresh the list after a failed upload", async () => {
+  it("does not call onUploadComplete after a failed upload", async () => {
     mocks.uploadWorkspaceFile.mockRejectedValue(
       new Error("Upload failed."),
     );
@@ -209,7 +219,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
       ).toBeGreaterThan(0);
     });
 
-    expect(mocks.routerRefresh).not.toHaveBeenCalled();
+    expect(mocks.onUploadComplete).not.toHaveBeenCalled();
   });
 
   it("shows the storage-not-configured error code message", async () => {
@@ -268,7 +278,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
     renderControls();
 
     const uploadButton = screen.getByRole("button", {
-      name: /upload file/i,
+      name: /datei hochladen/i,
     });
 
     fireEvent.click(uploadButton);

@@ -12,8 +12,13 @@ export class WorkspaceUploadError extends Error {
   }
 }
 
+export type WorkspaceUploadedDocumentInfo = {
+  id: string;
+  name: string;
+};
+
 export type WorkspaceUploadResponse = {
-  document?: unknown;
+  document?: WorkspaceUploadedDocumentInfo;
   error?: string;
   code?: string;
 };

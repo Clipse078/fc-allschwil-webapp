@@ -27,6 +27,19 @@ export function formatWorkspaceDate(
   }).format(new Date(value));
 }
 
+export function formatWorkspaceDateLong(
+  value: Date | string,
+): string {
+  return new Intl.DateTimeFormat("de-CH", {
+    dateStyle: "long",
+  }).format(new Date(value));
+}
+
+/**
+ * @deprecated Use `getWorkspaceFileGermanLabel` from
+ *   `@/lib/workspace/file-type-util` instead. This wrapper exists only for
+ *   backward compatibility and will be removed in a future cleanup.
+ */
 export function getWorkspaceFileTypeLabel(
   mimeType: string,
 ): string {

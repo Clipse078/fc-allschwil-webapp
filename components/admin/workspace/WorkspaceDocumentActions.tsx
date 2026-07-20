@@ -3,7 +3,6 @@
 import {
   Archive,
   Download,
-  Eye,
   FolderInput,
   History,
   MoreHorizontal,
@@ -17,12 +16,15 @@ import {
 } from "react";
 
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
+import { workspaceDE } from "@/lib/workspace/workspace-i18n";
 
-import { WorkspaceDocumentDetailsDialog } from "./WorkspaceDocumentDetailsDialog";
 import { WorkspaceDocumentVersionHistoryDialog } from "./WorkspaceDocumentVersionHistoryDialog";
+
+const t = workspaceDE.actions;
 
 type WorkspaceDocumentActionsProps = {
   document: WorkspaceDocumentListItemDto;
+  onSelect?: () => void;
 };
 
 type ActionButtonProps = {
@@ -59,7 +61,7 @@ function ActionButton({
 
       {disabled ? (
         <span className="whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-          Coming soon
+          {t.comingSoon}
         </span>
       ) : null}
     </button>
@@ -68,9 +70,9 @@ function ActionButton({
 
 export function WorkspaceDocumentActions({
   document: workspaceDocument,
+  onSelect,
 }: WorkspaceDocumentActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] =
     useState(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
@@ -131,14 +133,14 @@ export function WorkspaceDocumentActions({
     );
   }
 
-  function openDetails() {
-    setMenuOpen(false);
-    setDetailsOpen(true);
-  }
-
   function openVersionHistory() {
     setMenuOpen(false);
     setVersionHistoryOpen(true);
+  }
+
+  function handleToggleMenu(event: React.MouseEvent) {
+    event.stopPropagation();
+    setMenuOpen((current) => !current);
   }
 
   return (
@@ -149,14 +151,14 @@ export function WorkspaceDocumentActions({
       >
         <button
           type="button"
-          aria-label={`Actions for ${workspaceDocument.name}`}
+          aria-label={t.menuLabel(workspaceDocument.name)}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((current) => !current)}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-2)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
+          onClick={handleToggleMenu}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] text-[var(--text-2)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
         >
           <MoreHorizontal
-            className="h-4 w-4"
+            className="h-3.5 w-3.5"
             aria-hidden="true"
           />
         </button>
@@ -164,18 +166,12 @@ export function WorkspaceDocumentActions({
         {menuOpen ? (
           <div
             role="menu"
-            aria-label={`Actions for ${workspaceDocument.name}`}
-            className="absolute right-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
+            aria-label={t.menuLabel(workspaceDocument.name)}
+            className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg"
           >
             <ActionButton
-              icon={<Eye className="h-4 w-4" />}
-              label="View details"
-              onClick={openDetails}
-            />
-
-            <ActionButton
               icon={<Download className="h-4 w-4" />}
-              label="Download"
+              label={t.download}
               onClick={downloadDocument}
               disabled={!hasDownload}
             />
@@ -187,37 +183,35 @@ export function WorkspaceDocumentActions({
 
             <ActionButton
               icon={<Pencil className="h-4 w-4" />}
-              label="Rename"
+              label={t.rename}
               disabled
             />
 
             <ActionButton
               icon={<FolderInput className="h-4 w-4" />}
-              label="Move"
+              label={t.move}
               disabled
             />
 
             <ActionButton
               icon={<History className="h-4 w-4" />}
-              label="Version history"
+              label={t.versionHistory}
               onClick={openVersionHistory}
+            />
+
+            <div
+              className="my-1 border-t border-[var(--border)]"
+              role="separator"
             />
 
             <ActionButton
               icon={<Archive className="h-4 w-4" />}
-              label="Archive"
+              label={t.archive}
               disabled
             />
           </div>
         ) : null}
       </div>
-
-      <WorkspaceDocumentDetailsDialog
-        document={workspaceDocument}
-        open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
-        onDownload={downloadDocument}
-      />
 
       <WorkspaceDocumentVersionHistoryDialog
         documentId={workspaceDocument.id}
