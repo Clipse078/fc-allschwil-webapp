@@ -1,7 +1,7 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
 import { Archive } from "lucide-react";
+import { useState, useTransition } from "react";
 import { archiveWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
 
 type ArchiveFolderButtonProps = {
@@ -9,42 +9,57 @@ type ArchiveFolderButtonProps = {
   folderName: string;
 };
 
-function ArchiveSubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <Archive className="h-4 w-4" />
-      {pending ? "Archiving..." : "Archive Folder"}
-    </button>
-  );
-}
-
 export function ArchiveFolderButton({
   folderId,
   folderName,
 }: ArchiveFolderButtonProps) {
-  function confirmArchive(event: React.FormEvent<HTMLFormElement>) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
     const confirmed = window.confirm(
       `Archive "${folderName}"? This folder will disappear from the active Workspace tree.`,
     );
 
-    if (!confirmed) {
-      event.preventDefault();
-    }
+    if (!confirmed) return;
+
+    setError(null);
+
+    const formData = new FormData();
+    formData.set("folderId", folderId);
+
+    startTransition(async () => {
+      const result = await archiveWorkspaceFolderAction(formData);
+
+      if (!result.ok) {
+        setError(result.message ?? "The folder could not be archived.");
+      }
+    });
   }
 
   return (
-    <form
-      action={archiveWorkspaceFolderAction}
-      onSubmit={confirmArchive}
-    >
-      <input type="hidden" name="folderId" value={folderId} />
-      <ArchiveSubmitButton />
-    </form>
+    <div>
+      <form onSubmit={handleSubmit}>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Archive className="h-4 w-4" />
+          {isPending ? "Archiving..." : "Archive Folder"}
+        </button>
+      </form>
+
+      {error ? (
+        <p
+          role="alert"
+          className="mt-2 text-xs leading-5 text-[var(--sce-danger)]"
+        >
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

@@ -9,6 +9,9 @@ const {
   MockBlobPreconditionFailedError,
   MockBlobFileTooLargeError,
   MockBlobContentTypeNotAllowedError,
+  MockBlobUnknownError,
+  MockBlobNotFoundError,
+  MockBlobRequestAbortedError,
 } = vi.hoisted(() => {
   class MockBlobError extends Error {
     constructor(message: string) {
@@ -66,6 +69,27 @@ const {
     }
   }
 
+  class MockBlobUnknownError extends MockBlobError {
+    constructor() {
+      super("Unknown blob error");
+      this.name = "BlobUnknownError";
+    }
+  }
+
+  class MockBlobNotFoundError extends MockBlobError {
+    constructor() {
+      super("Blob not found");
+      this.name = "BlobNotFoundError";
+    }
+  }
+
+  class MockBlobRequestAbortedError extends MockBlobError {
+    constructor() {
+      super("Request aborted");
+      this.name = "BlobRequestAbortedError";
+    }
+  }
+
   return {
     blobMocks: {
       put: vi.fn(),
@@ -79,6 +103,9 @@ const {
     MockBlobPreconditionFailedError,
     MockBlobFileTooLargeError,
     MockBlobContentTypeNotAllowedError,
+    MockBlobUnknownError,
+    MockBlobNotFoundError,
+    MockBlobRequestAbortedError,
   };
 });
 
@@ -93,6 +120,9 @@ vi.mock("@vercel/blob", () => ({
   BlobPreconditionFailedError: MockBlobPreconditionFailedError,
   BlobFileTooLargeError: MockBlobFileTooLargeError,
   BlobContentTypeNotAllowedError: MockBlobContentTypeNotAllowedError,
+  BlobUnknownError: MockBlobUnknownError,
+  BlobNotFoundError: MockBlobNotFoundError,
+  BlobRequestAbortedError: MockBlobRequestAbortedError,
   BlobPathnameMismatchError: class extends Error {
     constructor() {
       super("Pathname mismatch");
@@ -733,6 +763,125 @@ describe("Workspace storage: BlobError classification", () => {
     });
 
     expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("returns 500 with WORKSPACE_UPLOAD_STORAGE_FAILED when BlobUnknownError is thrown", async () => {
+    blobMocks.put.mockRejectedValue(
+      new MockBlobUnknownError(),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 500,
+      code: "WORKSPACE_UPLOAD_STORAGE_FAILED",
+      error: "Die Datei konnte nicht gespeichert werden.",
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("returns 500 with WORKSPACE_UPLOAD_STORAGE_FAILED when BlobRequestAbortedError is thrown", async () => {
+    blobMocks.put.mockRejectedValue(
+      new MockBlobRequestAbortedError(),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 500,
+      code: "WORKSPACE_UPLOAD_STORAGE_FAILED",
+      error: "Der Upload wurde unterbrochen. Bitte versuchen Sie es erneut.",
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("returns 404 when BlobNotFoundError is thrown during download", async () => {
+    blobMocks.get.mockRejectedValue(
+      new MockBlobNotFoundError(),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference: "workspace/file.pdf",
+      filename: "file.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 404,
+      error: "Die Datei wurde im Speicher nicht gefunden.",
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("logs structured error details including error class name", async () => {
+    blobMocks.put.mockRejectedValue(
+      new MockBlobUnknownError(),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining("[workspace-storage]"),
+      expect.objectContaining({
+        errorClass: expect.stringContaining("BlobUnknownError"),
+      }),
+    );
+
     consoleError.mockRestore();
   });
 });
