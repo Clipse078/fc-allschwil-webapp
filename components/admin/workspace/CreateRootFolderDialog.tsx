@@ -8,25 +8,13 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { createRootWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
 import { Dialog } from "@/components/ui/Dialog";
 
-type CreateRootFolderDialogProps = {
-  /** Label for the trigger button. */
-  buttonLabel?: string;
-};
-
-/**
- * Trigger button + accessible dialog for creating a root-level Workspace folder.
- *
- * Returns typed action results so that validation failures — including duplicate
- * name conflicts — are shown as calm, field-level inline messages without closing
- * the dialog or rendering a production digest error.
- */
-export function CreateRootFolderDialog({
-  buttonLabel = "Create Folder",
-}: CreateRootFolderDialogProps) {
+export function CreateRootFolderDialog() {
+  const t = useTranslations("Workspace.createFolder");
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
@@ -36,8 +24,6 @@ export function CreateRootFolderDialog({
 
   useEffect(() => {
     if (!isOpen) return;
-    // Wait for the Dialog primitive's rAF focus to complete before moving
-    // focus into the input so both accessibility targets are satisfied.
     const timer = setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
@@ -79,13 +65,11 @@ export function CreateRootFolderDialog({
       if (!result.ok) {
         const message =
           result.code === "WORKSPACE_FOLDER_NAME_CONFLICT"
-            ? "Folder name already exists. Choose another name."
-            : result.message ?? "The folder could not be created.";
+            ? t("errorConflict")
+            : result.message ?? t("errorGeneric");
 
         setError(message);
 
-        // Return focus to input and select the text so the user can
-        // replace it immediately without extra clicks.
         setTimeout(() => {
           inputRef.current?.focus();
           inputRef.current?.select();
@@ -113,14 +97,14 @@ export function CreateRootFolderDialog({
         onClick={openDialog}
         className="fca-button-primary shrink-0"
       >
-        <FolderPlus className="h-4 w-4" />
-        {buttonLabel}
+        <FolderPlus className="h-4 w-4" aria-hidden="true" />
+        {t("buttonLabel")}
       </button>
 
       <Dialog
         open={isOpen}
         onClose={closeDialog}
-        title="Create folder"
+        title={t("dialogTitle")}
         size="sm"
         footer={
           <>
@@ -130,7 +114,7 @@ export function CreateRootFolderDialog({
               disabled={isPending}
               className="fca-button-secondary"
             >
-              Cancel
+              {t("cancelButton")}
             </button>
             <button
               type="submit"
@@ -138,7 +122,7 @@ export function CreateRootFolderDialog({
               disabled={!canSubmit}
               className="fca-button-primary"
             >
-              {isPending ? "Creating…" : "Create"}
+              {isPending ? t("submittingLabel") : t("submitButton")}
             </button>
           </>
         }
@@ -150,7 +134,7 @@ export function CreateRootFolderDialog({
         >
           <label htmlFor={inputId} className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              Folder name
+              {t("fieldLabel")}
             </span>
             <input
               id={inputId}
@@ -161,7 +145,7 @@ export function CreateRootFolderDialog({
               maxLength={120}
               autoComplete="off"
               disabled={isPending}
-              placeholder="e.g. Finance Documents"
+              placeholder={t("fieldPlaceholder")}
               aria-invalid={error ? "true" : undefined}
               aria-describedby={error ? errorId : undefined}
               className={`w-full rounded-lg border px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-60 ${

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -42,30 +43,16 @@ type WorkspaceDocumentVersionHistoryDialogProps = {
   onClose: () => void;
 };
 
-function getStatusLabel(
-  version: WorkspaceDocumentVersionHistoryItem,
-): string {
-  if (version.isCurrent) {
-    return "Current";
-  }
-
-  if (version.status === "SUPERSEDED") {
-    return "Superseded";
-  }
-
-  return version.status;
-}
-
 export function WorkspaceDocumentVersionHistoryDialog({
   documentId,
   documentName,
   open,
   onClose,
 }: WorkspaceDocumentVersionHistoryDialogProps) {
+  const t = useTranslations("Workspace.versionHistory");
   const [versions, setVersions] = useState<
     WorkspaceDocumentVersionHistoryItem[]
   >([]);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
@@ -79,14 +66,10 @@ export function WorkspaceDocumentVersionHistoryDialog({
 
     try {
       const response = await fetch(
-        `/api/workspace/documents/${encodeURIComponent(
-          documentId,
-        )}/versions`,
+        `/api/workspace/documents/${encodeURIComponent(documentId)}/versions`,
         {
           method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
+          headers: { Accept: "application/json" },
         },
       );
 
@@ -95,37 +78,30 @@ export function WorkspaceDocumentVersionHistoryDialog({
         | null;
 
       if (!response.ok) {
-        throw new Error(
-          data?.error ??
-            "Version history could not be loaded.",
-        );
+        throw new Error(data?.error ?? "Versionsverlauf konnte nicht geladen werden.");
       }
 
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
+      if (requestIdRef.current !== requestId) return;
 
       setVersions(
-        Array.isArray(data?.versions)
-          ? data.versions
-          : [],
+        Array.isArray(data?.versions) ? data.versions : [],
       );
     } catch (caughtError) {
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
+      if (requestIdRef.current !== requestId) return;
 
       setVersions([]);
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Version history could not be loaded.",
+          : "Versionsverlauf konnte nicht geladen werden.",
       );
     } finally {
       if (requestIdRef.current === requestId) {
         setLoading(false);
       }
     }
+    // t is intentionally excluded — next-intl guarantees stable references
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
   useEffect(() => {
@@ -148,16 +124,12 @@ export function WorkspaceDocumentVersionHistoryDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title="Version history"
+      title={t("dialogTitle")}
       description={documentName}
       size="lg"
       footer={
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-        >
-          Close
+        <Button type="button" variant="secondary" onClick={onClose}>
+          {t("closeButton")}
         </Button>
       }
     >
@@ -166,7 +138,7 @@ export function WorkspaceDocumentVersionHistoryDialog({
           <div
             className="flex min-h-40 items-center justify-center"
             role="status"
-            aria-label="Loading version history"
+            aria-label={t("loadingAriaLabel")}
           >
             <Loader2
               className="h-6 w-6 animate-spin text-[var(--sce-primary)]"
@@ -185,73 +157,42 @@ export function WorkspaceDocumentVersionHistoryDialog({
                 className="mt-0.5 h-5 w-5 shrink-0"
                 aria-hidden="true"
               />
-
               <div className="min-w-0 flex-1">
-                <p className="font-medium">
-                  Version history could not be loaded.
-                </p>
-
-                <p className="mt-1 text-sm">
-                  {error}
-                </p>
-
+                <p className="font-medium">{t("loadingError")}</p>
+                <p className="mt-1 text-sm">{error}</p>
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
                   className="mt-3"
-                  onClick={() => {
-                    void loadVersions();
-                  }}
+                  onClick={() => void loadVersions()}
                 >
-                  Retry
+                  {t("retryButton")}
                 </Button>
               </div>
             </div>
           </div>
         ) : null}
 
-        {!loading &&
-        !error &&
-        versions.length === 0 ? (
+        {!loading && !error && versions.length === 0 ? (
           <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-[var(--border)] text-center text-[var(--muted)]">
-            No versions available.
+            {t("noVersions")}
           </div>
         ) : null}
 
-        {!loading &&
-        !error &&
-        versions.length > 0 ? (
+        {!loading && !error && versions.length > 0 ? (
           <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
             <table className="w-full min-w-[760px] border-collapse text-left text-sm">
               <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-wide text-[var(--muted)]">
                 <tr>
-                  <th className="px-4 py-3 font-medium">
-                    Version
-                  </th>
-
-                  <th className="px-4 py-3 font-medium">
-                    Created
-                  </th>
-
-                  <th className="px-4 py-3 font-medium">
-                    Created by
-                  </th>
-
-                  <th className="px-4 py-3 font-medium">
-                    Filename
-                  </th>
-
-                  <th className="px-4 py-3 font-medium">
-                    Size
-                  </th>
-
-                  <th className="px-4 py-3 font-medium">
-                    Status
-                  </th>
+                  <th className="px-4 py-3 font-medium">{t("versionHeader")}</th>
+                  <th className="px-4 py-3 font-medium">{t("createdHeader")}</th>
+                  <th className="px-4 py-3 font-medium">{t("createdByHeader")}</th>
+                  <th className="px-4 py-3 font-medium">{t("filenameHeader")}</th>
+                  <th className="px-4 py-3 font-medium">{t("sizeHeader")}</th>
+                  <th className="px-4 py-3 font-medium">{t("statusHeader")}</th>
                 </tr>
               </thead>
-
               <tbody>
                 {versions.map((version) => (
                   <tr
@@ -261,40 +202,33 @@ export function WorkspaceDocumentVersionHistoryDialog({
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-[var(--foreground)]">
                       v{version.versionNumber}
                     </td>
-
                     <td className="whitespace-nowrap px-4 py-3">
-                      {formatWorkspaceDate(
-                        version.createdAt,
-                      )}
+                      {formatWorkspaceDate(version.createdAt)}
                     </td>
-
                     <td className="max-w-48 truncate px-4 py-3">
                       {version.createdByName ??
                         version.createdByUserId ??
-                        "Unknown user"}
+                        t("unknownUser")}
                     </td>
-
                     <td
                       className="max-w-72 truncate px-4 py-3 text-[var(--foreground)]"
                       title={version.filename}
                     >
                       {version.filename}
                     </td>
-
                     <td className="whitespace-nowrap px-4 py-3">
-                      {formatWorkspaceFileSize(
-                        version.sizeBytes,
-                      )}
+                      {formatWorkspaceFileSize(version.sizeBytes)}
                     </td>
-
                     <td className="whitespace-nowrap px-4 py-3">
                       {version.isCurrent ? (
                         <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                          Current
+                          {t("statusCurrent")}
                         </span>
                       ) : (
                         <span className="text-[var(--text-2)]">
-                          {getStatusLabel(version)}
+                          {version.status === "SUPERSEDED"
+                            ? t("statusSuperseded")
+                            : version.status}
                         </span>
                       )}
                     </td>

@@ -34,19 +34,3 @@ export function formatWorkspaceDateLong(
     dateStyle: "long",
   }).format(new Date(value));
 }
-
-/**
- * @deprecated Use `getWorkspaceFileGermanLabel` from
- *   `@/lib/workspace/file-type-util` instead. This wrapper exists only for
- *   backward compatibility and will be removed in a future cleanup.
- */
-export function getWorkspaceFileTypeLabel(
-  mimeType: string,
-): string {
-  const parts = mimeType.split("/");
-
-  return (
-    parts.at(-1)?.replaceAll(".", " ").toUpperCase() ||
-    mimeType
-  );
-}

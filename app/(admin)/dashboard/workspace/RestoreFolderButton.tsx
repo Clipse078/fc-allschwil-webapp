@@ -2,6 +2,8 @@
 
 import { RotateCcw } from "lucide-react";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
+
 import { restoreWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
 
 type RestoreFolderButtonProps = {
@@ -13,6 +15,7 @@ export function RestoreFolderButton({
   folderId,
   folderName,
 }: RestoreFolderButtonProps) {
+  const t = useTranslations("Workspace.restoreFolder");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +23,7 @@ export function RestoreFolderButton({
     event.preventDefault();
 
     const confirmed = window.confirm(
-      `Restore "${folderName}" to the active Workspace tree?`,
+      t("confirmMessage", { name: folderName }),
     );
 
     if (!confirmed) return;
@@ -34,7 +37,7 @@ export function RestoreFolderButton({
       const result = await restoreWorkspaceFolderAction(formData);
 
       if (!result.ok) {
-        setError(result.message ?? "The folder could not be restored.");
+        setError(result.message ?? t("errorGeneric"));
       }
     });
   }
@@ -47,8 +50,8 @@ export function RestoreFolderButton({
           disabled={isPending}
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--text)] transition hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <RotateCcw className="h-4 w-4" />
-          {isPending ? "Restoring..." : "Restore"}
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          {isPending ? t("restoringLabel") : t("buttonLabel")}
         </button>
       </form>
 

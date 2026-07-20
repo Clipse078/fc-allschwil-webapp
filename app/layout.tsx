@@ -1,5 +1,6 @@
 ﻿import type { Metadata } from "next";
 import { Inter, Barlow_Condensed } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
 import "./globals.css";
 
 const inter = Inter({
@@ -31,7 +32,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="de">
       <body className={`${inter.variable} ${barlowCondensed.variable}`}>
-        {children}
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
     </html>
   );

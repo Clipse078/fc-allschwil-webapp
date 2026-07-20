@@ -38,10 +38,16 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+// Mock next-intl so the component renders without a provider.
+vi.mock("next-intl", () => ({
+  useTranslations: (namespace: string) =>
+    (key: string, _params?: Record<string, unknown>) => `${namespace}.${key}`,
+}));
+
 import { CreateRootFolderDialog } from "@/components/admin/workspace/CreateRootFolderDialog";
 
-function renderDialog(props: { buttonLabel?: string } = {}) {
-  render(<CreateRootFolderDialog {...props} />);
+function renderDialog() {
+  render(<CreateRootFolderDialog />);
 }
 
 /** Helper: type into the folder name input via fireEvent. */
@@ -60,20 +66,21 @@ describe("CreateRootFolderDialog", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the Create Folder trigger button", () => {
+  it("renders the Create Folder trigger button with translated label", () => {
     renderDialog();
 
     expect(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     ).toBeTruthy();
   });
 
-  it("accepts a custom button label", () => {
-    renderDialog({ buttonLabel: "Neuer Ordner" });
+  it("renders the translated button label from next-intl", () => {
+    renderDialog();
 
+    // With identity mock, the button text is the translation key path.
     expect(
-      screen.getByRole("button", { name: /neuer ordner/i }),
-    ).toBeTruthy();
+      screen.getAllByText("Workspace.createFolder.buttonLabel").length,
+    ).toBeGreaterThan(0);
   });
 
   it("does not show the dialog before the trigger is clicked", () => {
@@ -86,18 +93,18 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("Create folder")).toBeTruthy();
+    expect(screen.getByText("Workspace.createFolder.dialogTitle")).toBeTruthy();
   });
 
   it("renders a visible folder-name input inside the dialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     const input = screen.getByRole("textbox");
@@ -109,7 +116,7 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     const input = screen.getByRole("textbox");
@@ -126,11 +133,11 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     const createButton = screen.getByRole("button", {
-      name: /^create$/i,
+      name: /Workspace\.createFolder\.submitButton/i,
     });
     expect((createButton as HTMLButtonElement).disabled).toBe(true);
   });
@@ -139,13 +146,13 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("   ");
 
     const createButton = screen.getByRole("button", {
-      name: /^create$/i,
+      name: /Workspace\.createFolder\.submitButton/i,
     });
     expect((createButton as HTMLButtonElement).disabled).toBe(true);
   });
@@ -154,13 +161,13 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     const createButton = screen.getByRole("button", {
-      name: /^create$/i,
+      name: /Workspace\.createFolder\.submitButton/i,
     });
     expect((createButton as HTMLButtonElement).disabled).toBe(false);
   });
@@ -169,11 +176,11 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /cancel/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.cancelButton/i }),
     );
 
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -186,7 +193,7 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     expect(screen.getByRole("dialog")).toBeTruthy();
@@ -211,14 +218,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("  Finance Docs  ");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -242,14 +249,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("My Folder");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -267,14 +274,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("My Folder");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -289,20 +296,20 @@ describe("CreateRootFolderDialog", () => {
     mocks.createRootWorkspaceFolderAction.mockResolvedValue({
       ok: false,
       code: "WORKSPACE_FOLDER_NAME_CONFLICT",
-      message: "Folder name already exists. Choose another name.",
+      message: "Workspace.createFolder.errorConflict",
     });
 
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance Docs");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -310,7 +317,7 @@ describe("CreateRootFolderDialog", () => {
 
     expect(
       screen.getByText(
-        "Folder name already exists. Choose another name.",
+        "Workspace.createFolder.errorConflict",
       ),
     ).toBeTruthy();
 
@@ -326,14 +333,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Existing Folder");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -353,14 +360,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -381,14 +388,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -409,14 +416,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -441,14 +448,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -476,14 +483,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -507,14 +514,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("New Folder");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
@@ -540,25 +547,25 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 
     await screen.findByRole("alert");
 
     fireEvent.click(
-      screen.getByRole("button", { name: /cancel/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.cancelButton/i }),
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     expect(screen.queryByRole("alert")).toBeNull();
@@ -568,7 +575,7 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     const input = screen.getByRole("textbox") as HTMLInputElement;
@@ -579,7 +586,7 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     const form = document.querySelector(
@@ -602,13 +609,13 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     const createButton = screen.getByRole("button", {
-      name: /^create$/i,
+      name: /Workspace\.createFolder\.submitButton/i,
     });
 
     // First click starts the transition
@@ -643,14 +650,14 @@ describe("CreateRootFolderDialog", () => {
     renderDialog();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /create folder/i }),
+      screen.getByRole("button", { name: /Workspace\.createFolder\.buttonLabel/i }),
     );
 
     typeIntoInput("Finance");
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /^create$/i }),
+        screen.getByRole("button", { name: /Workspace\.createFolder\.submitButton/i }),
       );
     });
 

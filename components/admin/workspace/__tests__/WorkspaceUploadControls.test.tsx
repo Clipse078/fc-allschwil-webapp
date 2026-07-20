@@ -40,6 +40,12 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+// Mock next-intl so components render without a provider in tests.
+// The identity function returns the key itself, allowing text-free assertions.
+vi.mock("next-intl", () => ({
+  useTranslations: (namespace: string) => (key: string, _params?: Record<string, unknown>) => `${namespace}.${key}`,
+}));
+
 import { WorkspaceUploadControls } from "@/components/admin/workspace/WorkspaceUploadControls";
 
 function renderControls(folderId = "folder-1") {
@@ -80,16 +86,28 @@ describe("WorkspaceUploadControls – upload flow", () => {
     expect(fileInputs.length).toBeGreaterThan(0);
   });
 
-  it("renders the dropzone area", () => {
+  it("renders the dropzone area with translated text", () => {
     renderControls();
 
+    // With our identity mock, the text is the translation key.
+    // This confirms the component uses t('dropzoneTitle') from the upload namespace.
     expect(
-      screen.getByText(/datei hier ablegen oder klicken/i),
+      screen.getByText("Workspace.upload.dropzoneTitle"),
     ).toBeTruthy();
   });
 
+  it("renders the upload button with translated label", () => {
+    renderControls();
+
+    expect(
+      screen.getAllByText("Workspace.upload.buttonLabel").length,
+    ).toBeGreaterThan(0);
+  });
+
   it("calls uploadWorkspaceFile with the file and folderId on file selection", async () => {
-    mocks.uploadWorkspaceFile.mockResolvedValue({ document: {} });
+    mocks.uploadWorkspaceFile.mockResolvedValue({
+      document: { id: "doc-abc", name: "report.pdf" },
+    });
 
     renderControls("folder-test");
 
@@ -101,16 +119,14 @@ describe("WorkspaceUploadControls – upload flow", () => {
     });
 
     await waitFor(() => {
-      expect(
-        mocks.uploadWorkspaceFile,
-      ).toHaveBeenCalledWith({
+      expect(mocks.uploadWorkspaceFile).toHaveBeenCalledWith({
         file,
         folderId: "folder-test",
       });
     });
   });
 
-  it("calls onUploadComplete after a successful upload", async () => {
+  it("calls onUploadComplete with the document ID after a successful upload", async () => {
     mocks.uploadWorkspaceFile.mockResolvedValue({
       document: { id: "doc-123", name: "report.pdf" },
     });
@@ -120,20 +136,18 @@ describe("WorkspaceUploadControls – upload flow", () => {
     const input = getFileInput();
 
     await act(async () => {
-      fireEvent.change(input, {
-        target: { files: [makeFile()] },
-      });
+      fireEvent.change(input, { target: { files: [makeFile()] } });
     });
 
     await waitFor(() => {
-      expect(mocks.onUploadComplete).toHaveBeenCalledWith(
-        "doc-123",
-      );
+      expect(mocks.onUploadComplete).toHaveBeenCalledWith("doc-123");
     });
   });
 
   it("resets the file input after a successful upload", async () => {
-    mocks.uploadWorkspaceFile.mockResolvedValue({ document: {} });
+    mocks.uploadWorkspaceFile.mockResolvedValue({
+      document: { id: "doc-xyz", name: "report.pdf" },
+    });
 
     renderControls();
 
@@ -144,9 +158,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
     });
 
     await act(async () => {
-      fireEvent.change(input, {
-        target: { files: [makeFile()] },
-      });
+      fireEvent.change(input, { target: { files: [makeFile()] } });
     });
 
     await waitFor(() => {
@@ -168,9 +180,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
     });
 
     await act(async () => {
-      fireEvent.change(input, {
-        target: { files: [makeFile()] },
-      });
+      fireEvent.change(input, { target: { files: [makeFile()] } });
     });
 
     await waitFor(() => {
@@ -188,15 +198,11 @@ describe("WorkspaceUploadControls – upload flow", () => {
     const input = getFileInput();
 
     await act(async () => {
-      fireEvent.change(input, {
-        target: { files: [makeFile()] },
-      });
+      fireEvent.change(input, { target: { files: [makeFile()] } });
     });
 
     await waitFor(() => {
-      expect(
-        screen.getAllByRole("alert").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
     });
   });
 
@@ -214,15 +220,13 @@ describe("WorkspaceUploadControls – upload flow", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getAllByRole("alert").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
     });
 
     expect(mocks.onUploadComplete).not.toHaveBeenCalled();
   });
 
-  it("shows the storage-not-configured error code message", async () => {
+  it("shows a localised error for WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED", async () => {
     const { WorkspaceUploadError } = await import(
       "@/lib/workspace/upload-client"
     );
@@ -247,15 +251,16 @@ describe("WorkspaceUploadControls – upload flow", () => {
         .getAllByRole("alert")
         .map((el: HTMLElement) => el.textContent ?? "");
 
+      // The mocked t() returns the translation key, so we check for the key.
       expect(
-        alerts.some((t: string) =>
-          t.includes("Administrator"),
+        alerts.some((text) =>
+          text.includes("errorStorageNotConfigured"),
         ),
       ).toBe(true);
     });
   });
 
-  it("enforces one file at a time (single file input, no multiple attribute)", () => {
+  it("enforces one file at a time (no multiple attribute)", () => {
     renderControls();
 
     const fileInputs = document.querySelectorAll<HTMLInputElement>(
@@ -266,19 +271,19 @@ describe("WorkspaceUploadControls – upload flow", () => {
     }
   });
 
-  it("does not start a new upload while one is already in progress (button input)", async () => {
+  it("does not start a new upload while one is already in progress", async () => {
     let resolveUpload: (() => void) | undefined;
 
     mocks.uploadWorkspaceFile.mockReturnValue(
-      new Promise<{ document: unknown }>((res) => {
-        resolveUpload = () => res({ document: {} });
+      new Promise<{ document: { id: string; name: string } }>((res) => {
+        resolveUpload = () => res({ document: { id: "d", name: "f.pdf" } });
       }),
     );
 
     renderControls();
 
     const uploadButton = screen.getByRole("button", {
-      name: /datei hochladen/i,
+      name: /Workspace\.upload\.buttonLabel/i,
     });
 
     fireEvent.click(uploadButton);
@@ -287,9 +292,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
     resolveUpload?.();
 
     await waitFor(() => {
-      expect(
-        mocks.uploadWorkspaceFile,
-      ).toHaveBeenCalledTimes(0);
+      expect(mocks.uploadWorkspaceFile).toHaveBeenCalledTimes(0);
     });
   });
 });

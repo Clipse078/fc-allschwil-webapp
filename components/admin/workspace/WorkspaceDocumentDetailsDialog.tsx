@@ -1,19 +1,17 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
-import { getWorkspaceFileGermanLabel } from "@/lib/workspace/file-type-util";
-import { workspaceDE } from "@/lib/workspace/workspace-i18n";
+import { resolveWorkspaceFileType } from "@/lib/workspace/file-type-util";
 
 import {
   formatWorkspaceDate,
   formatWorkspaceFileSize,
 } from "./workspace-document-formatters";
-
-const t = workspaceDE.preview;
 
 type WorkspaceDocumentDetailsDialogProps = {
   document: WorkspaceDocumentListItemDto;
@@ -31,13 +29,8 @@ type DetailRowProps = {
 function DetailRow({ label, value, title }: DetailRowProps) {
   return (
     <div className="grid gap-1 border-b border-[var(--border)] py-3 last:border-b-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-4">
-      <dt className="font-medium text-[var(--text-2)]">
-        {label}
-      </dt>
-      <dd
-        className="min-w-0 break-words text-[var(--foreground)]"
-        title={title}
-      >
+      <dt className="font-medium text-[var(--text-2)]">{label}</dt>
+      <dd className="min-w-0 break-words text-[var(--foreground)]" title={title}>
         {value}
       </dd>
     </div>
@@ -50,95 +43,95 @@ export function WorkspaceDocumentDetailsDialog({
   onClose,
   onDownload,
 }: WorkspaceDocumentDetailsDialogProps) {
+  const t = useTranslations("Workspace.detailsDialog");
+  const ft = useTranslations("Workspace.fileTypes");
   const currentVersion = document.currentVersion;
+  const fileTypeInfo = resolveWorkspaceFileType(
+    currentVersion?.mimeType ?? "application/octet-stream",
+    currentVersion?.filename,
+  );
+
+  function getCategoryLabel(): string {
+    switch (fileTypeInfo.category) {
+      case "pdf": return ft("pdf");
+      case "word": return ft("word");
+      case "excel": return ft("excel");
+      case "powerpoint": return ft("powerpoint");
+      case "image": return ft("image");
+      case "video": return ft("video");
+      case "audio": return ft("audio");
+      case "archive": return ft("archive");
+      case "text": return ft("text");
+      default: return ft("unknown");
+    }
+  }
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="Dokumentdetails"
+      title={t("dialogTitle")}
       description={document.name}
       size="lg"
       footer={
         <>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-          >
-            Schliessen
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("closeButton")}
           </Button>
-
           <Button
             type="button"
             onClick={onDownload}
             disabled={!currentVersion}
             iconLeft={<Download className="h-4 w-4" />}
           >
-            {t.downloadButton}
+            {t("downloadButton")}
           </Button>
         </>
       }
     >
       <dl>
-        <DetailRow
-          label={t.labels.name}
-          value={document.name}
-        />
+        <DetailRow label={t("labelName")} value={document.name} />
 
         {currentVersion?.filename &&
         currentVersion.filename !== document.name ? (
           <DetailRow
-            label={t.labels.filename}
+            label={t("labelFilename")}
             value={currentVersion.filename}
             title={currentVersion.filename}
           />
         ) : null}
 
         <DetailRow
-          label={t.labels.fileType}
+          label={t("labelFileType")}
+          value={currentVersion ? getCategoryLabel() : t("notAvailable")}
+        />
+
+        <DetailRow
+          label={t("labelSize")}
           value={
             currentVersion
-              ? getWorkspaceFileGermanLabel(
-                  currentVersion.mimeType,
-                  currentVersion.filename,
-                )
-              : "—"
+              ? formatWorkspaceFileSize(currentVersion.sizeBytes)
+              : t("notAvailable")
           }
         />
 
         <DetailRow
-          label={t.labels.fileSize}
-          value={
-            currentVersion
-              ? formatWorkspaceFileSize(
-                  currentVersion.sizeBytes,
-                )
-              : "—"
-          }
-        />
-
-        <DetailRow
-          label={t.labels.uploaded}
+          label={t("labelUploaded")}
           value={
             currentVersion
               ? formatWorkspaceDate(currentVersion.createdAt)
-              : "—"
+              : t("notAvailable")
           }
         />
 
         <DetailRow
-          label={t.labels.modified}
+          label={t("labelModified")}
           value={formatWorkspaceDate(document.updatedAt)}
         />
 
         <DetailRow
-          label={t.labels.version}
-          value={
-            currentVersion
-              ? `v${currentVersion.versionNumber}`
-              : "—"
-          }
+          label={t("labelVersion")}
+          value={currentVersion ? `v${currentVersion.versionNumber}` : t("notAvailable")}
         />
       </dl>
     </Dialog>

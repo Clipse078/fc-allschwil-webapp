@@ -1,20 +1,20 @@
+"use client";
+
 import Link from "next/link";
 import { ChevronRight, FolderClosed } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import type { BreadcrumbItem } from "@/lib/workspace/breadcrumbs";
-import { workspaceDE } from "@/lib/workspace/workspace-i18n";
 
 type WorkspaceBreadcrumbsProps = {
   path: BreadcrumbItem[];
 };
 
-export function WorkspaceBreadcrumbs({
-  path,
-}: WorkspaceBreadcrumbsProps) {
-  const t = workspaceDE.breadcrumbs;
+export function WorkspaceBreadcrumbs({ path }: WorkspaceBreadcrumbsProps) {
+  const t = useTranslations("Workspace.breadcrumbs");
 
-  const allItems: Array<BreadcrumbItem | { id: null; name: string }> = [
-    { id: null, name: t.root },
+  const allItems: Array<{ id: string | null; name: string }> = [
+    { id: null, name: t("rootLabel") },
     ...path,
   ];
 
@@ -45,9 +45,7 @@ export function WorkspaceBreadcrumbs({
               {isLast || item.id === null ? (
                 <span
                   className={`max-w-32 truncate text-xs font-medium ${
-                    isLast
-                      ? "text-[var(--text)]"
-                      : "text-[var(--text-2)]"
+                    isLast ? "text-[var(--text)]" : "text-[var(--text-2)]"
                   }`}
                   aria-current={isLast ? "page" : undefined}
                   title={item.name}

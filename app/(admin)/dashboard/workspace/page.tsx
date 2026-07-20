@@ -5,6 +5,7 @@ import {
   FolderOpen,
   LockKeyhole,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import { CreateRootFolderDialog } from "@/components/admin/workspace/CreateRootFolderDialog";
 import { CreateSubfolderForm } from "@/components/admin/workspace/CreateSubfolderForm";
@@ -24,7 +25,6 @@ import {
 import type { WorkspaceFolderDto } from "@/lib/workspace/dto";
 import { listWorkspaceDocuments } from "@/lib/workspace/document-service";
 import { buildWorkspaceBreadcrumbs } from "@/lib/workspace/breadcrumbs";
-import { workspaceDE } from "@/lib/workspace/workspace-i18n";
 import {
   PageBreadcrumbs,
   PageHeader,
@@ -41,17 +41,13 @@ type FolderTreeProps = {
   folders: WorkspaceFolderDto[];
   selectedFolderId: string | null;
   depth?: number;
-  canManage: boolean;
 };
 
 function FolderTree({
   folders,
   selectedFolderId,
   depth = 0,
-  canManage,
 }: FolderTreeProps) {
-  const t = workspaceDE;
-
   return (
     <ul className={depth === 0 ? "space-y-0.5" : "mt-0.5 space-y-0.5"}>
       {folders.map((folder) => {
@@ -87,7 +83,6 @@ function FolderTree({
                 folders={folder.children}
                 selectedFolderId={selectedFolderId}
                 depth={depth + 1}
-                canManage={canManage}
               />
             ) : null}
           </li>
@@ -107,7 +102,8 @@ function formatDate(value: string): string {
 export default async function WorkspacePage({
   searchParams,
 }: WorkspacePageProps) {
-  const t = workspaceDE;
+  const t = await getTranslations("Workspace");
+
   const session = await requireAnyPermission([
     PERMISSIONS.WORKSPACE_VIEW,
     PERMISSIONS.WORKSPACE_MANAGE,
@@ -122,27 +118,20 @@ export default async function WorkspacePage({
   const params = (await searchParams) ?? {};
   const selectedFolderId = params.folder?.trim() || null;
 
-  const canManage = hasPermission(
-    session,
-    PERMISSIONS.WORKSPACE_MANAGE,
-  );
+  const canManage = hasPermission(session, PERMISSIONS.WORKSPACE_MANAGE);
 
-  const [folders, selectedFolder, archivedFolders] =
-    await Promise.all([
-      getWorkspaceFolderTree(tenantId),
-      selectedFolderId
-        ? getWorkspaceFolderById(tenantId, selectedFolderId)
-        : Promise.resolve(null),
-      canManage
-        ? getArchivedWorkspaceFolders(tenantId)
-        : Promise.resolve([]),
-    ]);
+  const [folders, selectedFolder, archivedFolders] = await Promise.all([
+    getWorkspaceFolderTree(tenantId),
+    selectedFolderId
+      ? getWorkspaceFolderById(tenantId, selectedFolderId)
+      : Promise.resolve(null),
+    canManage
+      ? getArchivedWorkspaceFolders(tenantId)
+      : Promise.resolve([]),
+  ]);
 
   const documents = selectedFolder
-    ? await listWorkspaceDocuments({
-        tenantId,
-        folderId: selectedFolder.id,
-      })
+    ? await listWorkspaceDocuments({ tenantId, folderId: selectedFolder.id })
     : [];
 
   const folderPath = selectedFolder
@@ -154,28 +143,24 @@ export default async function WorkspacePage({
       <PageBreadcrumbs
         items={[
           { label: "Dashboard", href: "/dashboard" },
-          { label: t.page.title },
+          { label: t("page.title") },
         ]}
       />
 
       <PageHeader
-        eyebrow={t.page.eyebrow}
-        title={t.page.title}
-        description={t.page.description}
+        eyebrow={t("page.eyebrow")}
+        title={t("page.title")}
+        description={t("page.description")}
       />
 
       <div className="grid min-h-[620px] gap-4 xl:grid-cols-[240px_minmax(0,1fr)_340px]">
-        {/* ── Left: folder tree ─────────────────────────────────── */}
+        {/* ── Left: folder tree ─────────────────────────────── */}
         <aside className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-          {/* Folder tree header */}
           <div className="border-b border-[var(--border)] px-4 py-3.5">
             <div className="flex items-center gap-2">
-              <FolderClosed
-                className="h-4 w-4 text-[var(--muted)]"
-                aria-hidden="true"
-              />
+              <FolderClosed className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />
               <h2 className="text-sm font-semibold text-[var(--text)]">
-                {t.folders.panelTitle}
+                {t("folders.panelTitle")}
               </h2>
             </div>
 
@@ -186,41 +171,33 @@ export default async function WorkspacePage({
             ) : null}
           </div>
 
-          {/* Folder tree */}
           <div className="flex-1 overflow-y-auto px-3 py-2">
             {folders.length > 0 ? (
               <FolderTree
                 folders={folders}
                 selectedFolderId={selectedFolder?.id ?? null}
-                canManage={canManage}
               />
             ) : (
               <div className="flex min-h-40 flex-col items-center justify-center px-3 py-8 text-center">
-                <FolderClosed
-                  className="h-7 w-7 text-[var(--muted)]"
-                  aria-hidden="true"
-                />
+                <FolderClosed className="h-7 w-7 text-[var(--muted)]" aria-hidden="true" />
                 <p className="mt-3 text-sm font-medium text-[var(--text)]">
-                  {t.folders.noFoldersTitle}
+                  {t("folders.noFoldersTitle")}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-2)]">
-                  {t.folders.noFoldersDescription}
+                  {t("folders.noFoldersDescription")}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Subfolder creation (bottom of tree panel) */}
           {canManage && selectedFolder ? (
             <div className="border-t border-[var(--border)] px-3 py-3">
-              <CreateSubfolderForm
-                parentId={selectedFolder.id}
-              />
+              <CreateSubfolderForm parentId={selectedFolder.id} />
             </div>
           ) : null}
         </aside>
 
-        {/* ── Centre + Right panels: client shell ─────────────── */}
+        {/* ── Centre + Right panels ─────────────────────────── */}
         {selectedFolder ? (
           <WorkspaceClientShell
             documents={documents}
@@ -238,20 +215,23 @@ export default async function WorkspacePage({
                     folderId={selectedFolder.id}
                     currentName={selectedFolder.name}
                   />
-                  <MoveFolderForm
-                    folderId={selectedFolder.id}
-                    currentParentId={
-                      selectedFolder.parentId ?? null
-                    }
-                    folders={folders}
-                  />
+                  <div className="border-t border-[var(--border)] pt-3">
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                      {t("folderDetails.locationLabel")}
+                    </p>
+                    <MoveFolderForm
+                      folderId={selectedFolder.id}
+                      currentParentId={selectedFolder.parentId ?? null}
+                      folders={folders}
+                    />
+                  </div>
                   <div className="border-t border-[var(--border)] pt-3">
                     <ArchiveFolderButton
                       folderId={selectedFolder.id}
                       folderName={selectedFolder.name}
                     />
                     <p className="mt-1.5 text-[11px] leading-4 text-[var(--muted)]">
-                      {t.folders.cannotArchive}
+                      {t("folders.cannotArchiveNote")}
                     </p>
                   </div>
                 </div>
@@ -260,26 +240,23 @@ export default async function WorkspacePage({
           />
         ) : (
           <>
-            {/* Centre: welcome / select-folder state */}
+            {/* Welcome / no-selection state */}
             <section className="flex min-h-[520px] flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-6 py-16">
               <div className="w-full max-w-md text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-2)]">
-                  <LockKeyhole
-                    className="h-7 w-7 text-[var(--blue)]"
-                    aria-hidden="true"
-                  />
+                  <LockKeyhole className="h-7 w-7 text-[var(--blue)]" aria-hidden="true" />
                 </div>
 
                 <h2 className="mt-5 text-xl font-semibold text-[var(--text)]">
                   {folders.length > 0
-                    ? t.folders.selectFolder
-                    : t.folders.welcomeTitle}
+                    ? t("folders.selectFolder")
+                    : t("folders.welcomeTitle")}
                 </h2>
 
                 <p className="mt-2 text-sm leading-6 text-[var(--text-2)]">
                   {folders.length > 0
-                    ? t.folders.selectFolderDescription
-                    : t.folders.welcomeDescription}
+                    ? t("folders.selectFolderDescription")
+                    : t("folders.welcomeDescription")}
                 </p>
 
                 {canManage && folders.length === 0 ? (
@@ -290,22 +267,21 @@ export default async function WorkspacePage({
 
                 {!canManage && folders.length === 0 ? (
                   <p className="mt-5 text-xs leading-5 text-[var(--muted)]">
-                    {t.folders.noPermissionNote}
+                    {t("folders.noPermissionNote")}
                   </p>
                 ) : null}
               </div>
             </section>
 
-            {/* Right: empty detail panel */}
             <aside className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
               <div className="border-b border-[var(--border)] px-5 py-3.5">
                 <h2 className="text-sm font-semibold text-[var(--text)]">
-                  {t.folderDetails.panelTitle}
+                  {t("folderDetails.panelTitle")}
                 </h2>
               </div>
               <div className="flex flex-1 items-center justify-center px-5 py-8">
                 <p className="text-sm text-[var(--text-2)]">
-                  {t.folderDetails.noItemSelected}
+                  {t("folderDetails.noItemSelected")}
                 </p>
               </div>
             </aside>
@@ -313,15 +289,15 @@ export default async function WorkspacePage({
         )}
       </div>
 
-      {/* ── Archived folders section ───────────────────────────── */}
+      {/* ── Archived folders ────────────────────────────────── */}
       {canManage && archivedFolders.length > 0 ? (
         <section className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="border-b border-[var(--border)] px-5 py-4">
             <h2 className="text-sm font-semibold text-[var(--text)]">
-              {t.archivedFolders.sectionTitle}
+              {t("archivedFolders.sectionTitle")}
             </h2>
             <p className="mt-1 text-xs text-[var(--text-2)]">
-              {t.archivedFolders.sectionDescription}
+              {t("archivedFolders.sectionDescription")}
             </p>
           </div>
 
@@ -336,9 +312,9 @@ export default async function WorkspacePage({
                     {folder.name}
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--text-2)]">
-                    {t.archivedFolders.archivedAt(
-                      formatDate(folder.archivedAt),
-                    )}
+                    {t("archivedFolders.archivedAtLabel", {
+                      date: formatDate(folder.archivedAt),
+                    })}
                   </p>
                 </div>
 

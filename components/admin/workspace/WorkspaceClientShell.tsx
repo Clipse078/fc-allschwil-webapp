@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState, useRef } from "react";
 import { CalendarClock, FolderClosed, FileText } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
 import type { BreadcrumbItem } from "@/lib/workspace/breadcrumbs";
-import { workspaceDE } from "@/lib/workspace/workspace-i18n";
 
 import { WorkspaceBreadcrumbs } from "./WorkspaceBreadcrumbs";
 import { WorkspaceDocumentTable } from "./WorkspaceDocumentTable";
@@ -24,7 +24,6 @@ type WorkspaceClientShellProps = {
   folderUpdatedAt: string;
   folderPath: BreadcrumbItem[];
   canManage: boolean;
-  /** JSX for folder management actions (Rename, Move, Archive) rendered server-side */
   folderManagementSlot?: React.ReactNode;
 };
 
@@ -46,46 +45,42 @@ export function WorkspaceClientShell({
   canManage,
   folderManagementSlot,
 }: WorkspaceClientShellProps) {
-  const t = workspaceDE;
+  const t = useTranslations("Workspace");
   const router = useRouter();
-  const [selectedDocumentId, setSelectedDocumentId] = useState<
-    string | null
-  >(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    null,
+  );
   const [isDragOver, setIsDragOver] = useState(false);
   const dropzoneRef = useRef<HTMLDivElement>(null);
 
-  const selectedDocument = documents.find(
-    (d) => d.id === selectedDocumentId,
-  ) ?? null;
+  const selectedDocument =
+    documents.find((d) => d.id === selectedDocumentId) ?? null;
 
   function handleUploadComplete(documentId: string | null) {
-    if (documentId) {
-      setSelectedDocumentId(documentId);
-    }
+    if (documentId) setSelectedDocumentId(documentId);
     router.refresh();
   }
 
   function handleSelectDocument(id: string) {
-    setSelectedDocumentId((current) =>
-      current === id ? null : id,
-    );
+    setSelectedDocumentId((current) => (current === id ? null : id));
   }
 
-  const hasDocuments = documents.length > 0;
+  const docCount = documents.length;
+  const hasDocuments = docCount > 0;
+  const countLabel =
+    docCount === 1
+      ? t("documents.countSingular")
+      : t("documents.countPlural", { count: docCount });
 
   return (
     <>
-      {/* ── Centre panel (document area) ────────────────────────── */}
+      {/* ── Centre panel ──────────────────────────────────────── */}
       <section className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
           <div className="min-w-0">
             <WorkspaceBreadcrumbs path={folderPath} />
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              {documents.length === 1
-                ? t.documents.countSingular
-                : t.documents.countPlural(documents.length)}
-            </p>
+            <p className="mt-1 text-xs text-[var(--muted)]">{countLabel}</p>
           </div>
 
           {canManage && hasDocuments ? (
@@ -98,7 +93,6 @@ export function WorkspaceClientShell({
 
         {/* Content */}
         <div className="relative flex-1">
-          {/* Invisible drag overlay when documents exist */}
           {canManage && hasDocuments ? (
             <WorkspaceUploadDropzone
               folderId={folderId}
@@ -126,12 +120,11 @@ export function WorkspaceClientShell({
               canManage={canManage}
               onUploadClick={
                 canManage
-                  ? () =>
+                  ? () => {
                       dropzoneRef.current
-                        ?.querySelector<HTMLInputElement>(
-                          'input[type="file"]',
-                        )
-                        ?.click()
+                        ?.querySelector<HTMLInputElement>('input[type="file"]')
+                        ?.click();
+                    }
                   : undefined
               }
             />
@@ -139,29 +132,21 @@ export function WorkspaceClientShell({
         </div>
       </section>
 
-      {/* ── Right panel (file preview or folder details) ─────────── */}
+      {/* ── Right panel ───────────────────────────────────────── */}
       <aside className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-        {/* Panel header */}
         <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-5 py-3.5">
           {selectedDocument ? (
-            <FileText
-              className="h-4 w-4 text-[var(--muted)]"
-              aria-hidden="true"
-            />
+            <FileText className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />
           ) : (
-            <FolderClosed
-              className="h-4 w-4 text-[var(--muted)]"
-              aria-hidden="true"
-            />
+            <FolderClosed className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />
           )}
           <h2 className="text-sm font-semibold text-[var(--text)]">
             {selectedDocument
-              ? t.preview.panelTitle
-              : t.folderDetails.panelTitle}
+              ? t("preview.panelTitle")
+              : t("folderDetails.panelTitle")}
           </h2>
         </div>
 
-        {/* Panel content */}
         <div className="flex-1 overflow-y-auto">
           {selectedDocument ? (
             <WorkspaceFilePreview
@@ -173,13 +158,10 @@ export function WorkspaceClientShell({
               <dl className="space-y-4">
                 <div>
                   <dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    {t.folderDetails.nameLabelTitle}
+                    {t("folderDetails.nameLabelTitle")}
                   </dt>
-
                   {folderManagementSlot ? (
-                    <dd className="mt-2">
-                      {folderManagementSlot}
-                    </dd>
+                    <dd className="mt-2">{folderManagementSlot}</dd>
                   ) : (
                     <dd className="mt-1 text-sm font-medium text-[var(--text)]">
                       {folderName}
@@ -189,21 +171,17 @@ export function WorkspaceClientShell({
 
                 <div>
                   <dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    {t.folderDetails.descriptionLabel}
+                    {t("folderDetails.descriptionLabel")}
                   </dt>
                   <dd className="mt-1 text-sm text-[var(--text-2)]">
-                    {folderDescription ||
-                      t.folderDetails.noDescription}
+                    {folderDescription || t("folderDetails.noDescription")}
                   </dd>
                 </div>
 
                 <div>
                   <dt className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    <CalendarClock
-                      className="h-3 w-3"
-                      aria-hidden="true"
-                    />
-                    {t.folderDetails.createdLabel}
+                    <CalendarClock className="h-3 w-3" aria-hidden="true" />
+                    {t("folderDetails.createdLabel")}
                   </dt>
                   <dd className="mt-1 text-sm text-[var(--text-2)]">
                     {formatDate(folderCreatedAt)}
@@ -212,11 +190,8 @@ export function WorkspaceClientShell({
 
                 <div>
                   <dt className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    <CalendarClock
-                      className="h-3 w-3"
-                      aria-hidden="true"
-                    />
-                    {t.folderDetails.updatedLabel}
+                    <CalendarClock className="h-3 w-3" aria-hidden="true" />
+                    {t("folderDetails.updatedLabel")}
                   </dt>
                   <dd className="mt-1 text-sm text-[var(--text-2)]">
                     {formatDate(folderUpdatedAt)}

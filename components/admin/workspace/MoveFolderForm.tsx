@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { moveWorkspaceFolderAction } from "@/app/(admin)/dashboard/workspace/actions";
 import type { WorkspaceFolderDto } from "@/lib/workspace/dto";
@@ -12,16 +13,12 @@ type MoveFolderFormProps = {
   folders: WorkspaceFolderDto[];
 };
 
-/**
- * Client-side form for moving a Workspace folder to a new parent.
- * Returns a typed action result so that conflicts and errors are shown
- * as inline messages rather than producing a Server Component digest error.
- */
 export function MoveFolderForm({
   folderId,
   currentParentId,
   folders,
 }: MoveFolderFormProps) {
+  const t = useTranslations("Workspace.moveFolder");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +33,8 @@ export function MoveFolderForm({
     e.preventDefault();
 
     const form = e.currentTarget;
-    const parentId = (form.elements.namedItem("parentId") as HTMLSelectElement)?.value ?? "";
+    const parentId =
+      (form.elements.namedItem("parentId") as HTMLSelectElement)?.value ?? "";
 
     setError(null);
 
@@ -48,7 +46,7 @@ export function MoveFolderForm({
       const result = await moveWorkspaceFolderAction(formData);
 
       if (!result.ok) {
-        setError(result.message ?? "The folder could not be moved.");
+        setError(result.message ?? t("errorGeneric"));
         return;
       }
 
@@ -61,23 +59,27 @@ export function MoveFolderForm({
     <form onSubmit={handleSubmit} noValidate className="space-y-2">
       <input type="hidden" name="folderId" value={folderId} />
 
-      <select
-        name="parentId"
-        defaultValue={currentParentId ?? ""}
-        disabled={isPending}
-        aria-label="Move folder to"
-        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition focus:border-[var(--blue)] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <option value="">Workspace root</option>
+      <label className="block">
+        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          {t("fieldLabel")}
+        </span>
+        <select
+          name="parentId"
+          defaultValue={currentParentId ?? ""}
+          disabled={isPending}
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition focus:border-[var(--blue)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="">{t("rootOption")}</option>
 
-        {flattenFolders(folders)
-          .filter((folder) => folder.id !== folderId)
-          .map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-      </select>
+          {flattenFolders(folders)
+            .filter((folder) => folder.id !== folderId)
+            .map((folder) => (
+              <option key={folder.id} value={folder.id}>
+                {folder.name}
+              </option>
+            ))}
+        </select>
+      </label>
 
       {error ? (
         <p
@@ -93,7 +95,7 @@ export function MoveFolderForm({
         disabled={isPending}
         className="fca-button-secondary w-full justify-center text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isPending ? "Moving…" : "Move Folder"}
+        {isPending ? t("submittingLabel") : t("submitButton")}
       </button>
     </form>
   );
