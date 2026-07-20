@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useRef } from "react";
-import { CalendarClock, FolderClosed, FileText } from "lucide-react";
+import { CalendarClock, CheckCircle2, FolderClosed, FileText } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
@@ -47,17 +47,23 @@ export function WorkspaceClientShell({
 }: WorkspaceClientShellProps) {
   const t = useTranslations("Workspace");
   const router = useRouter();
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
-    null,
-  );
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const dropzoneRef = useRef<HTMLDivElement>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedDocument =
     documents.find((d) => d.id === selectedDocumentId) ?? null;
 
   function handleUploadComplete(documentId: string | null) {
     if (documentId) setSelectedDocumentId(documentId);
+
+    // Show brief success indicator
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    setUploadSuccess(true);
+    successTimerRef.current = setTimeout(() => setUploadSuccess(false), 3000);
+
     router.refresh();
   }
 
@@ -74,13 +80,21 @@ export function WorkspaceClientShell({
 
   return (
     <>
-      {/* ── Centre panel ──────────────────────────────────────── */}
+      {/* ── Centre panel ──────────────────────────────────────────── */}
       <section className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-3">
           <div className="min-w-0">
             <WorkspaceBreadcrumbs path={folderPath} />
-            <p className="mt-1 text-xs text-[var(--muted)]">{countLabel}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-xs text-[var(--muted)]">{countLabel}</p>
+              {uploadSuccess ? (
+                <span className="flex items-center gap-1 text-xs font-medium text-[var(--sce-success)] transition-opacity duration-300">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t("upload.successMessage")}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           {canManage && hasDocuments ? (
@@ -93,6 +107,7 @@ export function WorkspaceClientShell({
 
         {/* Content */}
         <div className="relative flex-1">
+          {/* Invisible drag capture when documents exist */}
           {canManage && hasDocuments ? (
             <WorkspaceUploadDropzone
               folderId={folderId}
@@ -104,10 +119,19 @@ export function WorkspaceClientShell({
           {hasDocuments ? (
             <div
               ref={dropzoneRef}
-              className={`relative transition-colors ${
+              className={`relative transition-colors duration-150 ${
                 isDragOver ? "bg-[var(--blue-light)]" : ""
               }`}
             >
+              {isDragOver ? (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-2 rounded-xl bg-white/90 px-6 py-4 shadow-lg ring-1 ring-[var(--blue)]/20">
+                    <p className="text-sm font-semibold text-[var(--blue)]">
+                      {t("upload.dragOverTitle")}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
               <WorkspaceDocumentTable
                 documents={documents}
                 selectedDocumentId={selectedDocumentId}
@@ -118,21 +142,14 @@ export function WorkspaceClientShell({
             <WorkspaceDocumentEmptyState
               isDragging={isDragOver}
               canManage={canManage}
-              onUploadClick={
-                canManage
-                  ? () => {
-                      dropzoneRef.current
-                        ?.querySelector<HTMLInputElement>('input[type="file"]')
-                        ?.click();
-                    }
-                  : undefined
-              }
+              folderId={canManage ? folderId : undefined}
+              onUploadComplete={canManage ? handleUploadComplete : undefined}
             />
           )}
         </div>
       </section>
 
-      {/* ── Right panel ───────────────────────────────────────── */}
+      {/* ── Right panel ────────────────────────────────────────────── */}
       <aside className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
         <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-5 py-3.5">
           {selectedDocument ? (

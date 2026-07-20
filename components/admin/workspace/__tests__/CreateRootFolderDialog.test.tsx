@@ -77,10 +77,13 @@ describe("CreateRootFolderDialog", () => {
   it("renders the translated button label from next-intl", () => {
     renderDialog();
 
-    // With identity mock, the button text is the translation key path.
+    // The Create Folder button is now icon-only with aria-label.
+    // Verify the trigger button exists and has the correct accessible name.
     expect(
-      screen.getAllByText("Workspace.createFolder.buttonLabel").length,
-    ).toBeGreaterThan(0);
+      screen.getByRole("button", {
+        name: /Workspace\.createFolder\.buttonLabel/i,
+      }),
+    ).toBeTruthy();
   });
 
   it("does not show the dialog before the trigger is clicked", () => {

@@ -20,6 +20,8 @@ type WorkspaceFilePreviewProps = {
   folderName?: string;
 };
 
+/* ─── Image preview ──────────────────────────────────────────────────── */
+
 function ImagePreview({
   documentId,
   altText,
@@ -34,27 +36,25 @@ function ImagePreview({
   );
   const previewUrl = `/api/workspace/documents/${encodeURIComponent(documentId)}/preview`;
 
-  if (status === "error") {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-lg bg-[var(--surface-2)] py-8">
-        <WorkspaceFileIcon category="image" size="xl" />
-        <p className="text-xs text-[var(--muted)]">{notAvailableLabel}</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-[var(--surface-2)]">
+    <div className="relative flex min-h-48 items-center justify-center overflow-hidden rounded-xl bg-[var(--surface-2)]">
       {status === "loading" ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--blue)]" />
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--blue)]" />
+        </div>
+      ) : null}
+
+      {status === "error" ? (
+        <div className="flex flex-col items-center gap-2 p-6">
+          <WorkspaceFileIcon category="image" size="xl" />
+          <p className="text-xs text-[var(--muted)]">{notAvailableLabel}</p>
         </div>
       ) : null}
 
       <img
         src={previewUrl}
         alt={altText}
-        className={`max-h-56 w-full object-contain transition-opacity duration-200 ${
+        className={`max-h-64 w-full object-contain transition-opacity duration-300 ${
           status === "loaded" ? "opacity-100" : "opacity-0"
         }`}
         onLoad={() => setStatus("loaded")}
@@ -64,18 +64,20 @@ function ImagePreview({
   );
 }
 
+/* ─── PDF preview ────────────────────────────────────────────────────── */
+
 function PdfPreview({
   documentId,
-  germanLabel,
+  label,
   notAvailableHint,
 }: {
   documentId: string;
-  germanLabel: string;
+  label: string;
   notAvailableHint: string;
 }) {
-  const [status, setStatus] = useState<
-    "checking" | "available" | "unavailable"
-  >("checking");
+  const [status, setStatus] = useState<"checking" | "available" | "unavailable">(
+    "checking",
+  );
   const previewUrl = `/api/workspace/documents/${encodeURIComponent(documentId)}/preview`;
 
   useEffect(() => {
@@ -103,64 +105,96 @@ function PdfPreview({
 
   if (status === "checking") {
     return (
-      <div className="flex h-28 items-center justify-center rounded-lg bg-[var(--surface-2)]">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--blue)]" />
+      <div className="flex min-h-48 items-center justify-center rounded-xl bg-[var(--surface-2)]">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--blue)]" />
       </div>
     );
   }
 
-  if (status === "unavailable") {
+  if (status === "available") {
     return (
-      <PlaceholderPreview
-        category="pdf"
-        label={germanLabel}
-        hint={notAvailableHint}
-      />
+      <div className="overflow-hidden rounded-xl bg-[var(--surface-2)]">
+        <iframe
+          src={previewUrl}
+          title={label}
+          className="h-64 w-full"
+          aria-label={`PDF-Vorschau: ${label}`}
+          onError={() => setStatus("unavailable")}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-lg bg-[var(--surface-2)]">
-      <iframe
-        src={previewUrl}
-        title={germanLabel}
-        className="h-56 w-full"
-        aria-label={`PDF-Vorschau: ${germanLabel}`}
-        onError={() => setStatus("unavailable")}
-      />
-    </div>
+    <DocumentPlaceholder
+      category="pdf"
+      label={label}
+      hint={notAvailableHint}
+    />
   );
 }
 
-function PlaceholderPreview({
+/* ─── Premium document placeholder card ─────────────────────────────── */
+
+function DocumentPlaceholder({
   category,
   label,
   hint,
+  metaLine,
 }: {
   category: WorkspaceFileCategory;
   label: string;
-  hint?: string;
+  hint: string;
+  metaLine?: string;
 }) {
+  const CATEGORY_BG: Partial<Record<WorkspaceFileCategory, string>> = {
+    pdf: "bg-red-50",
+    word: "bg-blue-50",
+    excel: "bg-green-50",
+    powerpoint: "bg-orange-50",
+    video: "bg-purple-50",
+    audio: "bg-pink-50",
+    archive: "bg-gray-50",
+    text: "bg-slate-50",
+    image: "bg-sky-50",
+  };
+
+  const bgClass = CATEGORY_BG[category] ?? "bg-[var(--surface-2)]";
+
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg bg-[var(--surface-2)] py-8">
-      <WorkspaceFileIcon category={category} size="xl" />
-      <div className="text-center">
-        <p className="text-sm font-medium text-[var(--text)]">{label}</p>
-        {hint ? (
-          <p className="mt-1 text-xs text-[var(--muted)]">{hint}</p>
-        ) : null}
+    <div
+      className={`flex flex-col items-center overflow-hidden rounded-xl border border-[var(--border)] ${bgClass}`}
+    >
+      {/* Icon zone */}
+      <div className="flex flex-col items-center gap-2 px-6 py-7">
+        <WorkspaceFileIcon category={category} size="xl" />
+        <div className="text-center">
+          <p className="text-sm font-semibold text-[var(--text)]">{label}</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{hint}</p>
+        </div>
       </div>
+
+      {/* Metadata strip */}
+      {metaLine ? (
+        <div className="w-full border-t border-[var(--border)] bg-white/60 px-5 py-2.5">
+          <p className="text-center text-xs text-[var(--text-2)]">{metaLine}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-type MetaRowProps = {
+/* ─── Metadata row ───────────────────────────────────────────────────── */
+
+function MetaRow({
+  label,
+  value,
+  title,
+}: {
   label: string;
   value: string;
   title?: string;
-};
-
-function MetaRow({ label, value, title }: MetaRowProps) {
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
@@ -173,6 +207,8 @@ function MetaRow({ label, value, title }: MetaRowProps) {
   );
 }
 
+/* ─── Main component ─────────────────────────────────────────────────── */
+
 export function WorkspaceFilePreview({
   document,
   folderName,
@@ -182,20 +218,23 @@ export function WorkspaceFilePreview({
 
   const currentVersion = document.currentVersion;
   const mimeType = currentVersion?.mimeType ?? "application/octet-stream";
-  const fileTypeInfo = resolveWorkspaceFileType(mimeType, currentVersion?.filename);
+  const fileTypeInfo = resolveWorkspaceFileType(
+    mimeType,
+    currentVersion?.filename,
+  );
 
   function getCategoryLabel(): string {
     switch (fileTypeInfo.category) {
-      case "pdf": return ft("pdf");
-      case "word": return ft("word");
-      case "excel": return ft("excel");
-      case "powerpoint": return ft("powerpoint");
-      case "image": return ft("image");
-      case "video": return ft("video");
-      case "audio": return ft("audio");
-      case "archive": return ft("archive");
-      case "text": return ft("text");
-      default: return ft("unknown");
+      case "pdf":         return ft("pdf");
+      case "word":        return ft("word");
+      case "excel":       return ft("excel");
+      case "powerpoint":  return ft("powerpoint");
+      case "image":       return ft("image");
+      case "video":       return ft("video");
+      case "audio":       return ft("audio");
+      case "archive":     return ft("archive");
+      case "text":        return ft("text");
+      default:            return ft("unknown");
     }
   }
 
@@ -209,6 +248,10 @@ export function WorkspaceFilePreview({
   const uploadedLabel = currentVersion
     ? formatWorkspaceDate(currentVersion.createdAt)
     : "—";
+
+  const metaLine = currentVersion
+    ? `${sizeLabel} · ${versionLabel} · ${modifiedLabel}`
+    : undefined;
 
   function renderPreview() {
     if (fileTypeInfo.category === "image") {
@@ -225,17 +268,18 @@ export function WorkspaceFilePreview({
       return (
         <PdfPreview
           documentId={document.id}
-          germanLabel={categoryLabel}
+          label={categoryLabel}
           notAvailableHint={t("previewNotAvailableHint")}
         />
       );
     }
 
     return (
-      <PlaceholderPreview
+      <DocumentPlaceholder
         category={fileTypeInfo.category}
         label={categoryLabel}
         hint={t("previewNotAvailableHint")}
+        metaLine={metaLine}
       />
     );
   }
@@ -251,17 +295,15 @@ export function WorkspaceFilePreview({
       {/* Preview area */}
       <div className="shrink-0 px-4 pb-3 pt-4">{renderPreview()}</div>
 
-      {/* Filename */}
+      {/* Filename + type */}
       <div className="shrink-0 border-b border-[var(--border)] px-4 pb-3">
         <p
-          className="break-words text-sm font-semibold leading-tight text-[var(--text)]"
+          className="break-words text-sm font-semibold leading-snug text-[var(--text)]"
           title={displayName}
         >
           {displayName}
         </p>
-        <p className="mt-0.5 text-xs text-[var(--text-2)]">
-          {categoryLabel}
-        </p>
+        <p className="mt-0.5 text-xs text-[var(--text-2)]">{categoryLabel}</p>
       </div>
 
       {/* Metadata */}
@@ -290,12 +332,12 @@ export function WorkspaceFilePreview({
       </dl>
 
       {/* Actions */}
-      <div className="shrink-0 border-t border-[var(--border)] px-4 pb-4 pt-3">
+      <div className="shrink-0 border-t border-[var(--border)] px-4 pb-4 pt-3 space-y-2">
         <button
           type="button"
           disabled={!currentVersion}
           onClick={downloadDocument}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--blue-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--blue)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-150 hover:bg-[var(--blue-hover)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`${t("downloadButton")}: ${displayName}`}
         >
           <Download className="h-4 w-4" aria-hidden="true" />
@@ -306,10 +348,10 @@ export function WorkspaceFilePreview({
           type="button"
           disabled
           title={t("versionHistoryHint")}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted)] transition-colors disabled:cursor-not-allowed"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-4 py-2 text-xs font-medium text-[var(--muted)] transition-colors disabled:cursor-not-allowed"
           aria-label={t("versionHistoryHint")}
         >
-          <History className="h-4 w-4" aria-hidden="true" />
+          <History className="h-3.5 w-3.5" aria-hidden="true" />
           {t("versionHistoryButton")}
         </button>
       </div>

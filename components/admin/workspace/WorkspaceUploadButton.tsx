@@ -49,7 +49,6 @@ export function WorkspaceUploadButton({
           return err.message;
       }
     }
-
     if (err instanceof Error) return err.message;
     return t("errorGeneric");
   }
@@ -98,11 +97,11 @@ export function WorkspaceUploadButton({
         variant="primary"
         loading={isUploading}
         disabled={disabled}
-        iconLeft={<Upload className="h-4 w-4" />}
+        iconLeft={!isUploading ? <Upload className="h-4 w-4" /> : undefined}
         onClick={openFilePicker}
-        aria-label={t("buttonLabel")}
+        aria-label={t("buttonLabelWithIcon")}
       >
-        {isUploading ? t("uploadingLabel") : t("buttonLabel")}
+        {isUploading ? t("uploadingLabel") : t("buttonLabelWithIcon")}
       </Button>
 
       {error ? (

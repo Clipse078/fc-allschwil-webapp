@@ -40,48 +40,58 @@ type WorkspacePageProps = {
 type FolderTreeProps = {
   folders: WorkspaceFolderDto[];
   selectedFolderId: string | null;
+  canManage: boolean;
   depth?: number;
 };
 
 function FolderTree({
   folders,
   selectedFolderId,
+  canManage,
   depth = 0,
 }: FolderTreeProps) {
   return (
-    <ul className={depth === 0 ? "space-y-0.5" : "mt-0.5 space-y-0.5"}>
+    <ul className={depth === 0 ? "space-y-px" : "mt-px space-y-px"}>
       {folders.map((folder) => {
         const isSelected = folder.id === selectedFolderId;
         const FolderIcon = isSelected ? FolderOpen : FolderClosed;
+        const hasChildren = folder.children.length > 0;
 
         return (
           <li key={folder.id}>
             <Link
               href={`/dashboard/workspace?folder=${encodeURIComponent(folder.id)}`}
               aria-current={isSelected ? "page" : undefined}
-              title={folder.name}
-              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${
+              title={folder.name.length > 24 ? folder.name : undefined}
+              className={[
+                "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors duration-100",
                 isSelected
-                  ? "bg-[var(--blue)] text-white"
-                  : "text-[var(--text)] hover:bg-[var(--surface-2)]"
-              }`}
-              style={{ paddingLeft: `${depth * 14 + 8}px` }}
+                  ? "bg-[var(--blue)] font-semibold text-white"
+                  : "font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+              ].join(" ")}
+              style={{ paddingLeft: `${depth * 12 + 8}px` }}
             >
               <FolderIcon
-                className={`h-3.5 w-3.5 shrink-0 ${
-                  isSelected ? "text-white" : "text-[var(--muted)]"
+                className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                  isSelected ? "text-white/80" : "text-[var(--muted)] group-hover:text-[var(--text-2)]"
                 }`}
                 aria-hidden="true"
               />
-              <span className="min-w-0 truncate text-sm font-medium">
-                {folder.name}
-              </span>
+              <span className="min-w-0 truncate">{folder.name}</span>
             </Link>
 
-            {folder.children.length > 0 ? (
+            {/* Subfolder creation toggle — shown when this folder is selected */}
+            {canManage && isSelected ? (
+              <div style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }} className="mt-px pr-2">
+                <CreateSubfolderForm parentId={folder.id} />
+              </div>
+            ) : null}
+
+            {hasChildren ? (
               <FolderTree
                 folders={folder.children}
                 selectedFolderId={selectedFolderId}
+                canManage={canManage}
                 depth={depth + 1}
               />
             ) : null}
@@ -110,14 +120,10 @@ export default async function WorkspacePage({
   ]);
 
   const tenantId = session.user?.tenantId;
-
-  if (!tenantId) {
-    notFound();
-  }
+  if (!tenantId) notFound();
 
   const params = (await searchParams) ?? {};
   const selectedFolderId = params.folder?.trim() || null;
-
   const canManage = hasPermission(session, PERMISSIONS.WORKSPACE_MANAGE);
 
   const [folders, selectedFolder, archivedFolders] = await Promise.all([
@@ -154,32 +160,33 @@ export default async function WorkspacePage({
       />
 
       <div className="grid min-h-[620px] gap-4 xl:grid-cols-[240px_minmax(0,1fr)_340px]">
-        {/* ── Left: folder tree ─────────────────────────────── */}
+        {/* ── Left: folder tree ─────────────────────────────────────── */}
         <aside className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="border-b border-[var(--border)] px-4 py-3.5">
-            <div className="flex items-center gap-2">
-              <FolderClosed className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />
-              <h2 className="text-sm font-semibold text-[var(--text)]">
-                {t("folders.panelTitle")}
-              </h2>
-            </div>
-
-            {canManage ? (
-              <div className="mt-3">
-                <CreateRootFolderDialog />
+          <div className="shrink-0 border-b border-[var(--border)] px-3 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FolderClosed className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />
+                <h2 className="text-sm font-semibold text-[var(--text)]">
+                  {t("folders.panelTitle")}
+                </h2>
               </div>
-            ) : null}
+
+              {canManage ? (
+                <CreateRootFolderDialog />
+              ) : null}
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-2">
+          <div className="flex-1 overflow-y-auto px-2 py-2">
             {folders.length > 0 ? (
               <FolderTree
                 folders={folders}
                 selectedFolderId={selectedFolder?.id ?? null}
+                canManage={canManage}
               />
             ) : (
-              <div className="flex min-h-40 flex-col items-center justify-center px-3 py-8 text-center">
-                <FolderClosed className="h-7 w-7 text-[var(--muted)]" aria-hidden="true" />
+              <div className="flex min-h-40 flex-col items-center justify-center px-4 py-8 text-center">
+                <FolderClosed className="h-8 w-8 text-[var(--muted)]" aria-hidden="true" />
                 <p className="mt-3 text-sm font-medium text-[var(--text)]">
                   {t("folders.noFoldersTitle")}
                 </p>
@@ -189,15 +196,9 @@ export default async function WorkspacePage({
               </div>
             )}
           </div>
-
-          {canManage && selectedFolder ? (
-            <div className="border-t border-[var(--border)] px-3 py-3">
-              <CreateSubfolderForm parentId={selectedFolder.id} />
-            </div>
-          ) : null}
         </aside>
 
-        {/* ── Centre + Right panels ─────────────────────────── */}
+        {/* ── Centre + Right panels ─────────────────────────────────── */}
         {selectedFolder ? (
           <WorkspaceClientShell
             documents={documents}
@@ -240,7 +241,6 @@ export default async function WorkspacePage({
           />
         ) : (
           <>
-            {/* Welcome / no-selection state */}
             <section className="flex min-h-[520px] flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-6 py-16">
               <div className="w-full max-w-md text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-2)]">
@@ -289,7 +289,7 @@ export default async function WorkspacePage({
         )}
       </div>
 
-      {/* ── Archived folders ────────────────────────────────── */}
+      {/* ── Archived folders ──────────────────────────────────────── */}
       {canManage && archivedFolders.length > 0 ? (
         <section className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
           <div className="border-b border-[var(--border)] px-5 py-4">

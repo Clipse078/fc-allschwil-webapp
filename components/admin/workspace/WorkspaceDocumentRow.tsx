@@ -23,27 +23,25 @@ export function WorkspaceDocumentRow({
   isSelected = false,
   onSelect,
 }: WorkspaceDocumentRowProps) {
-  const t = useTranslations("Workspace.fileTypes");
+  const ft = useTranslations("Workspace.fileTypes");
   const currentVersion = document.currentVersion;
   const mimeType = currentVersion?.mimeType ?? "application/octet-stream";
   const fileTypeInfo = resolveWorkspaceFileType(mimeType, currentVersion?.filename);
 
   const displayName = document.name;
-  const hasLongName = displayName.length > 40;
 
-  // Map category to a translation key within fileTypes namespace
   function getCategoryLabel(): string {
     switch (fileTypeInfo.category) {
-      case "pdf": return t("pdf");
-      case "word": return t("word");
-      case "excel": return t("excel");
-      case "powerpoint": return t("powerpoint");
-      case "image": return t("image");
-      case "video": return t("video");
-      case "audio": return t("audio");
-      case "archive": return t("archive");
-      case "text": return t("text");
-      default: return t("unknown");
+      case "pdf":        return ft("pdf");
+      case "word":       return ft("word");
+      case "excel":      return ft("excel");
+      case "powerpoint": return ft("powerpoint");
+      case "image":      return ft("image");
+      case "video":      return ft("video");
+      case "audio":      return ft("audio");
+      case "archive":    return ft("archive");
+      case "text":       return ft("text");
+      default:           return ft("unknown");
     }
   }
 
@@ -65,48 +63,58 @@ export function WorkspaceDocumentRow({
       role="row"
       aria-selected={isSelected}
       tabIndex={0}
-      className={`group cursor-pointer border-t border-[var(--border)] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sce-primary)] ${
+      className={[
+        "group cursor-pointer outline-none transition-colors duration-100",
+        "border-t border-[var(--border)]",
+        "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sce-primary)]",
         isSelected
-          ? "bg-[var(--blue-light)]"
-          : "hover:bg-[var(--surface-2)]"
-      }`}
+          ? "border-l-2 border-l-[var(--blue)] bg-[var(--blue-light)]"
+          : "hover:bg-[var(--surface-2)]",
+      ].join(" ")}
       onClick={handleRowClick}
       onKeyDown={handleRowKeyDown}
     >
-      <td className="w-10 pl-4 pr-2 py-3">
+      {/* Icon */}
+      <td className="w-10 pl-4 pr-1 py-2.5">
         <WorkspaceFileIcon category={fileTypeInfo.category} size="md" />
       </td>
 
-      <td className="min-w-0 flex-1 px-2 py-3">
+      {/* Name + subtext */}
+      <td className="min-w-0 px-2 py-2.5">
         <div className="min-w-0">
           <p
-            className={`max-w-64 truncate text-sm font-medium leading-snug transition-colors ${
-              isSelected ? "text-[var(--blue)]" : "text-[var(--text)]"
-            }`}
-            title={hasLongName ? displayName : undefined}
+            className={[
+              "max-w-64 truncate text-sm font-medium leading-snug transition-colors duration-100",
+              isSelected ? "text-[var(--blue)]" : "text-[var(--text)] group-hover:text-[var(--blue)]",
+            ].join(" ")}
+            title={displayName.length > 36 ? displayName : undefined}
           >
             {displayName}
           </p>
-          <p className="mt-0.5 text-xs text-[var(--text-2)]">
+          <p className="mt-0.5 text-xs text-[var(--muted)]">
             {getCategoryLabel()}
           </p>
         </div>
       </td>
 
-      <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-2)]">
+      {/* Modified */}
+      <td className="whitespace-nowrap px-4 py-2.5 text-xs text-[var(--text-2)]">
         {formatWorkspaceDate(document.updatedAt)}
       </td>
 
-      <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-[var(--text-2)]">
+      {/* Size */}
+      <td className="whitespace-nowrap px-4 py-2.5 text-xs tabular-nums text-[var(--text-2)]">
         {currentVersion ? formatWorkspaceFileSize(currentVersion.sizeBytes) : "—"}
       </td>
 
-      <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-[var(--muted)]">
+      {/* Version */}
+      <td className="whitespace-nowrap px-4 py-2.5 text-xs tabular-nums text-[var(--muted)]">
         {currentVersion ? `v${currentVersion.versionNumber}` : "—"}
       </td>
 
+      {/* Actions */}
       <td
-        className="py-3 pl-2 pr-4 text-right"
+        className="py-2.5 pl-2 pr-4 text-right"
         onClick={(e) => e.stopPropagation()}
       >
         <WorkspaceDocumentActions

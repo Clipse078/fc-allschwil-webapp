@@ -39,6 +39,7 @@
       "fieldPlaceholder": "Neuer Unterordner",
       "submitButton": "Unterordner erstellen",
       "submittingLabel": "Wird erstellt …",
+      "toggleButton": "+ Unterordner",
       "errorConflict": "Ein Ordner mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.",
       "errorGeneric": "Der Ordner konnte nicht erstellt werden."
     },
@@ -102,10 +103,12 @@
 
     "upload": {
       "buttonLabel": "Datei hochladen",
+      "buttonLabelWithIcon": "+ Datei hochladen",
       "uploadingLabel": "Wird hochgeladen …",
       "dropzoneTitle": "Datei hier ablegen oder klicken",
       "dropzoneHint": "Eine Datei auf einmal, bis zu 100 MB.",
       "dragOverTitle": "Datei hier ablegen",
+      "successMessage": "Datei erfolgreich hochgeladen",
       "errorStorageNotConfigured": "Upload ist momentan nicht verfügbar. Bitte wenden Sie sich an den Administrator.",
       "errorFolderNotFound": "Der ausgewählte Ordner existiert nicht mehr. Bitte laden Sie die Seite neu.",
       "errorTooLarge": "Die Datei ist zu gross für den Speicher.",

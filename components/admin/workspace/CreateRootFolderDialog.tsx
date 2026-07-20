@@ -95,10 +95,11 @@ export function CreateRootFolderDialog() {
       <button
         type="button"
         onClick={openDialog}
-        className="fca-button-primary shrink-0"
+        title={t("buttonLabel")}
+        aria-label={t("buttonLabel")}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
       >
-        <FolderPlus className="h-4 w-4" aria-hidden="true" />
-        {t("buttonLabel")}
+        <FolderPlus className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
 
       <Dialog

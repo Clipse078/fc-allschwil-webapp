@@ -229,7 +229,7 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         key: "workspace",
-        label: "Workspace",
+        label: "Dokumente",
         href: "/dashboard/workspace",
         permissionKeys: [
           PERMISSIONS.WORKSPACE_VIEW,

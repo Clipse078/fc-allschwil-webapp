@@ -99,8 +99,9 @@ describe("WorkspaceUploadControls – upload flow", () => {
   it("renders the upload button with translated label", () => {
     renderControls();
 
+    // Upload button now uses 'buttonLabelWithIcon' key
     expect(
-      screen.getAllByText("Workspace.upload.buttonLabel").length,
+      screen.getAllByText("Workspace.upload.buttonLabelWithIcon").length,
     ).toBeGreaterThan(0);
   });
 
@@ -283,7 +284,7 @@ describe("WorkspaceUploadControls – upload flow", () => {
     renderControls();
 
     const uploadButton = screen.getByRole("button", {
-      name: /Workspace\.upload\.buttonLabel/i,
+      name: /Workspace\.upload\.buttonLabelWithIcon/i,
     });
 
     fireEvent.click(uploadButton);
