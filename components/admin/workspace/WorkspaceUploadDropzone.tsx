@@ -8,7 +8,35 @@ import {
   type DragEvent,
 } from "react";
 
-import { uploadWorkspaceFile } from "@/lib/workspace/upload-client";
+import {
+  WorkspaceUploadError,
+  uploadWorkspaceFile,
+} from "@/lib/workspace/upload-client";
+
+function resolveUploadErrorMessage(error: unknown): string {
+  if (error instanceof WorkspaceUploadError) {
+    switch (error.code) {
+      case "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED":
+        return "Upload ist momentan nicht verfügbar. Bitte wenden Sie sich an den Administrator.";
+      case "WORKSPACE_FOLDER_NOT_FOUND":
+        return "Der ausgewählte Ordner existiert nicht mehr. Bitte laden Sie die Seite neu.";
+      case "WORKSPACE_UPLOAD_TOO_LARGE":
+        return "Die Datei ist zu gross für den Speicher.";
+      case "WORKSPACE_UPLOAD_INVALID_FILE":
+        return "Dieser Dateityp wird nicht akzeptiert.";
+      case "WORKSPACE_UPLOAD_CONFLICT":
+        return "Diese Datei existiert bereits. Bitte benennen Sie die Datei um und versuchen Sie es erneut.";
+      case "WORKSPACE_UPLOAD_PERSISTENCE_FAILED":
+        return "Das Dokument konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.";
+      default:
+        return error.message;
+    }
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Die Datei konnte nicht hochgeladen werden.";
+}
 
 type WorkspaceUploadDropzoneProps = {
   folderId: string;
@@ -43,11 +71,7 @@ export function WorkspaceUploadDropzone({
       setError(null);
       onUploadComplete?.();
     } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Die Datei konnte nicht hochgeladen werden.",
-      );
+      setError(resolveUploadErrorMessage(uploadError));
     } finally {
       setIsUploading(false);
 

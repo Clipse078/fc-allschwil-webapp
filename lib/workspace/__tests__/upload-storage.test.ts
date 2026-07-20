@@ -6,6 +6,9 @@ const {
   MockBlobStoreNotFoundError,
   MockBlobStoreSuspendedError,
   MockBlobClientTokenExpiredError,
+  MockBlobPreconditionFailedError,
+  MockBlobFileTooLargeError,
+  MockBlobContentTypeNotAllowedError,
 } = vi.hoisted(() => {
   class MockBlobError extends Error {
     constructor(message: string) {
@@ -42,6 +45,27 @@ const {
     }
   }
 
+  class MockBlobPreconditionFailedError extends MockBlobError {
+    constructor() {
+      super("Precondition failed");
+      this.name = "BlobPreconditionFailedError";
+    }
+  }
+
+  class MockBlobFileTooLargeError extends MockBlobError {
+    constructor() {
+      super("File too large");
+      this.name = "BlobFileTooLargeError";
+    }
+  }
+
+  class MockBlobContentTypeNotAllowedError extends MockBlobError {
+    constructor() {
+      super("Content type not allowed");
+      this.name = "BlobContentTypeNotAllowedError";
+    }
+  }
+
   return {
     blobMocks: {
       put: vi.fn(),
@@ -52,6 +76,9 @@ const {
     MockBlobStoreNotFoundError,
     MockBlobStoreSuspendedError,
     MockBlobClientTokenExpiredError,
+    MockBlobPreconditionFailedError,
+    MockBlobFileTooLargeError,
+    MockBlobContentTypeNotAllowedError,
   };
 });
 
@@ -63,6 +90,27 @@ vi.mock("@vercel/blob", () => ({
   BlobStoreNotFoundError: MockBlobStoreNotFoundError,
   BlobStoreSuspendedError: MockBlobStoreSuspendedError,
   BlobClientTokenExpiredError: MockBlobClientTokenExpiredError,
+  BlobPreconditionFailedError: MockBlobPreconditionFailedError,
+  BlobFileTooLargeError: MockBlobFileTooLargeError,
+  BlobContentTypeNotAllowedError: MockBlobContentTypeNotAllowedError,
+  BlobPathnameMismatchError: class extends Error {
+    constructor() {
+      super("Pathname mismatch");
+      this.name = "BlobPathnameMismatchError";
+    }
+  },
+  BlobServiceNotAvailable: class extends Error {
+    constructor() {
+      super("Service not available");
+      this.name = "BlobServiceNotAvailable";
+    }
+  },
+  BlobServiceRateLimited: class extends Error {
+    constructor() {
+      super("Rate limited");
+      this.name = "BlobServiceRateLimited";
+    }
+  },
 }));
 
 import {
@@ -144,6 +192,7 @@ describe("Workspace upload storage", () => {
     expect(result).toEqual({
       ok: false,
       status: 503,
+      code: "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
       error:
         "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
     });
@@ -168,6 +217,7 @@ describe("Workspace upload storage", () => {
     expect(result).toEqual({
       ok: false,
       status: 400,
+      code: "WORKSPACE_UPLOAD_INVALID_FILE",
       error: "Ungültige Versionsnummer.",
     });
 
@@ -191,6 +241,7 @@ describe("Workspace upload storage", () => {
     expect(result).toEqual({
       ok: false,
       status: 400,
+      code: "WORKSPACE_UPLOAD_INVALID_FILE",
       error: "Leere Dateien können nicht hochgeladen werden.",
     });
 
@@ -276,6 +327,7 @@ describe("Workspace upload storage", () => {
     expect(result).toEqual({
       ok: false,
       status: 500,
+      code: "WORKSPACE_UPLOAD_STORAGE_FAILED",
       error: "Die Datei konnte nicht gespeichert werden.",
     });
 
@@ -517,6 +569,7 @@ describe("Workspace storage: BlobError classification", () => {
       expect(result).toEqual({
         ok: false,
         status: 503,
+        code: "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
         error:
           "Workspace-Upload ist derzeit nicht verfügbar, weil der Speicher nicht konfiguriert ist.",
       });
@@ -583,9 +636,103 @@ describe("Workspace storage: BlobError classification", () => {
     expect(result).toEqual({
       ok: false,
       status: 500,
+      code: "WORKSPACE_UPLOAD_STORAGE_FAILED",
       error: "Die Datei konnte nicht gespeichert werden.",
     });
 
+    consoleError.mockRestore();
+  });
+
+  it("returns 409 with WORKSPACE_UPLOAD_CONFLICT when blob key already exists", async () => {
+    blobMocks.put.mockRejectedValue(
+      new MockBlobPreconditionFailedError(),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      code: "WORKSPACE_UPLOAD_CONFLICT",
+      error: "Eine Version dieser Datei existiert bereits im Speicher.",
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("returns 413 with WORKSPACE_UPLOAD_TOO_LARGE when file exceeds store limit", async () => {
+    blobMocks.put.mockRejectedValue(
+      new MockBlobFileTooLargeError(),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 413,
+      code: "WORKSPACE_UPLOAD_TOO_LARGE",
+      error: "Die Datei überschreitet die maximale Dateigrösse des Speichers.",
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("returns 415 with WORKSPACE_UPLOAD_INVALID_FILE when content type is rejected", async () => {
+    blobMocks.put.mockRejectedValue(
+      new MockBlobContentTypeNotAllowedError(),
+    );
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.upload({
+      tenantKey: "tenant-1",
+      documentId: "document-1",
+      versionNumber: 1,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+      buffer: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 415,
+      code: "WORKSPACE_UPLOAD_INVALID_FILE",
+      error: "Dieser Dateityp wird vom Speicher nicht akzeptiert.",
+    });
+
+    expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });
 });

@@ -10,10 +10,10 @@ import {
 } from "lucide-react";
 import {
   createChildWorkspaceFolderAction,
-  createRootWorkspaceFolderAction,
   moveWorkspaceFolderAction,
   renameWorkspaceFolderAction,
 } from "@/app/(admin)/dashboard/workspace/actions";
+import { CreateRootFolderDialog } from "@/components/admin/workspace/CreateRootFolderDialog";
 import { ArchiveFolderButton } from "@/app/(admin)/dashboard/workspace/ArchiveFolderButton";
 import { RestoreFolderButton } from "@/app/(admin)/dashboard/workspace/RestoreFolderButton";
 import { hasPermission } from "@/lib/permissions/has-permission";
@@ -93,35 +93,22 @@ function FolderTree({
   );
 }
 
-type CreateFolderFormProps = {
-  compact?: boolean;
-  parentId?: string;
+type CreateChildFolderFormProps = {
+  parentId: string;
 };
 
-function CreateFolderForm({
-  compact = false,
-  parentId,
-}: CreateFolderFormProps) {
-  const isChildFolder = Boolean(parentId);
-
+function CreateFolderForm({ parentId }: CreateChildFolderFormProps) {
   return (
     <form
-      action={
-        isChildFolder
-          ? createChildWorkspaceFolderAction
-          : createRootWorkspaceFolderAction
-      }
-      className={compact ? "flex items-center gap-2" : "mx-auto max-w-sm"}
+      action={createChildWorkspaceFolderAction}
+      className="mx-auto max-w-sm"
     >
-      {parentId ? (
-        <input type="hidden" name="parentId" value={parentId} />
-      ) : null}
-      <label className={compact ? "sr-only" : "block text-left"}>
-        {!compact ? (
-          <span className="mb-2 block text-sm font-medium text-[var(--text)]">
-            Folder name
-          </span>
-        ) : null}
+      <input type="hidden" name="parentId" value={parentId} />
+
+      <label className="block text-left">
+        <span className="mb-2 block text-sm font-medium text-[var(--text)]">
+          Folder name
+        </span>
 
         <input
           type="text"
@@ -129,21 +116,17 @@ function CreateFolderForm({
           required
           maxLength={120}
           autoComplete="off"
-          placeholder={isChildFolder ? "New subfolder" : "New folder"}
+          placeholder="New subfolder"
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--blue)]"
         />
       </label>
 
       <button
         type="submit"
-        className={
-          compact
-            ? "fca-button-primary shrink-0"
-            : "fca-button-primary mt-3 w-full justify-center"
-        }
+        className="fca-button-primary mt-3 w-full justify-center"
       >
         <FolderPlus className="h-4 w-4" />
-        {isChildFolder ? "Create Subfolder" : "Create Folder"}
+        Create Subfolder
       </button>
     </form>
   );
@@ -221,7 +204,7 @@ export default async function WorkspacePage({
 
             {canManage && folders.length > 0 ? (
               <div className="mt-3">
-                <CreateFolderForm compact />
+                <CreateRootFolderDialog />
               </div>
             ) : null}
           </div>
@@ -304,7 +287,7 @@ export default async function WorkspacePage({
 
                 {canManage && folders.length === 0 ? (
                   <div className="mt-6">
-                    <CreateFolderForm />
+                    <CreateRootFolderDialog />
                   </div>
                 ) : null}
 

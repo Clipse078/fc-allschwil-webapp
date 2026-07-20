@@ -1,6 +1,21 @@
+/**
+ * Structured upload error that carries the server-side error code for
+ * reliable client-side message mapping.
+ */
+export class WorkspaceUploadError extends Error {
+  readonly code: string | undefined;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "WorkspaceUploadError";
+    this.code = code;
+  }
+}
+
 export type WorkspaceUploadResponse = {
   document?: unknown;
   error?: string;
+  code?: string;
 };
 
 type UploadWorkspaceFileInput = {
@@ -35,9 +50,10 @@ export async function uploadWorkspaceFile({
   const result = await readUploadResponse(response);
 
   if (!response.ok) {
-    throw new Error(
+    throw new WorkspaceUploadError(
       result.error ||
         `Upload failed with status ${response.status}.`,
+      result.code,
     );
   }
 

@@ -1,5 +1,20 @@
 export const MAX_WORKSPACE_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 
+/**
+ * Structured error codes for workspace upload failures.
+ * Returned in API responses so clients can map them to localized messages
+ * without relying on the server's error string content.
+ */
+export type WorkspaceUploadErrorCode =
+  | "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED"
+  | "WORKSPACE_UPLOAD_STORAGE_FAILED"
+  | "WORKSPACE_UPLOAD_INVALID_FILE"
+  | "WORKSPACE_UPLOAD_TOO_LARGE"
+  | "WORKSPACE_UPLOAD_CONFLICT"
+  | "WORKSPACE_FOLDER_NOT_FOUND"
+  | "WORKSPACE_FORBIDDEN"
+  | "WORKSPACE_UPLOAD_PERSISTENCE_FAILED";
+
 export const ALLOWED_WORKSPACE_MIME_TYPES = [
   "application/pdf",
 
@@ -69,6 +84,7 @@ export type WorkspaceStorageUploadFailure = {
   ok: false;
   status: number;
   error: string;
+  code: WorkspaceUploadErrorCode;
 };
 
 export type WorkspaceStorageUploadResult =

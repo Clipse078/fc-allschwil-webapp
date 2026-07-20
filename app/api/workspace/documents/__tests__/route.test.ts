@@ -812,6 +812,48 @@ describe("POST /api/workspace/documents", () => {
     expect(mocks.delete).not.toHaveBeenCalled();
   });
 
+  it("forwards a structured error code from the storage provider", async () => {
+    mocks.upload.mockResolvedValue({
+      ok: false,
+      status: 503,
+      error: "Speicher nicht konfiguriert.",
+      code: "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
+    });
+
+    const response = await POST(
+      makeMultipartRequest({
+        file: makePdfFile(),
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "Speicher nicht konfiguriert.",
+      code: "WORKSPACE_UPLOAD_STORAGE_NOT_CONFIGURED",
+    });
+
+    expect(mocks.createDocument).not.toHaveBeenCalled();
+  });
+
+  it("omits the code field when the storage provider does not supply one", async () => {
+    mocks.upload.mockResolvedValue({
+      ok: false,
+      status: 500,
+      error: "Upload failed.",
+    });
+
+    const response = await POST(
+      makeMultipartRequest({
+        file: makePdfFile(),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toBe("Upload failed.");
+    expect(Object.prototype.hasOwnProperty.call(body, "code")).toBe(false);
+  });
+
   it.each([
     ["INVALID_INPUT", 400],
     ["FOLDER_NOT_FOUND", 404],
@@ -887,6 +929,7 @@ describe("POST /api/workspace/documents", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       error: "Das Dokument konnte nicht erstellt werden.",
+      code: "WORKSPACE_UPLOAD_PERSISTENCE_FAILED",
     });
 
     expect(mocks.delete).toHaveBeenCalledWith(

@@ -271,14 +271,15 @@ export async function POST(request: NextRequest) {
   });
 
   if (!uploadResult.ok) {
-    return NextResponse.json(
-      {
-        error: uploadResult.error,
-      },
-      {
-        status: uploadResult.status,
-      },
-    );
+    const body: { error: string; code?: string } = {
+      error: uploadResult.error,
+    };
+    if (uploadResult.code !== undefined) {
+      body.code = uploadResult.code;
+    }
+    return NextResponse.json(body, {
+      status: uploadResult.status,
+    });
   }
 
   try {
@@ -332,6 +333,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Das Dokument konnte nicht erstellt werden.",
+        code: "WORKSPACE_UPLOAD_PERSISTENCE_FAILED",
       },
       {
         status: 500,
