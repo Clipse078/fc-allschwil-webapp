@@ -14,7 +14,13 @@
  *
  * Storage is written before the database transaction. If database creation
  * fails, the private Blob is deleted on a best-effort basis.
+ *
+ * Runtime: Node.js is required for multipart/form-data parsing and
+ * @vercel/blob server-side uploads. The Edge runtime does not support
+ * the Node.js crypto module used for checksums.
  */
+
+export const runtime = "nodejs";
 
 import { randomUUID } from "node:crypto";
 

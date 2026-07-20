@@ -204,7 +204,8 @@ describe("CreateRootFolderDialog", () => {
 
   it("trims whitespace before calling the action", async () => {
     mocks.createRootWorkspaceFolderAction.mockResolvedValue({
-      id: "folder-1",
+      ok: true,
+      data: { id: "folder-1" },
     });
 
     renderDialog();
@@ -234,7 +235,8 @@ describe("CreateRootFolderDialog", () => {
 
   it("closes the dialog on successful creation", async () => {
     mocks.createRootWorkspaceFolderAction.mockResolvedValue({
-      id: "folder-new",
+      ok: true,
+      data: { id: "folder-new" },
     });
 
     renderDialog();
@@ -258,7 +260,8 @@ describe("CreateRootFolderDialog", () => {
 
   it("navigates to the new folder on success", async () => {
     mocks.createRootWorkspaceFolderAction.mockResolvedValue({
-      id: "folder-abc",
+      ok: true,
+      data: { id: "folder-abc" },
     });
 
     renderDialog();
@@ -282,12 +285,12 @@ describe("CreateRootFolderDialog", () => {
     });
   });
 
-  it("shows a server-side error inside the dialog without closing it", async () => {
-    mocks.createRootWorkspaceFolderAction.mockRejectedValue(
-      new Error(
-        "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
-      ),
-    );
+  it("shows inline conflict message and keeps dialog open on duplicate name", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+      message: "Folder name already exists. Choose another name.",
+    });
 
     renderDialog();
 
@@ -307,7 +310,221 @@ describe("CreateRootFolderDialog", () => {
 
     expect(
       screen.getByText(
-        "In diesem Ordner existiert bereits ein Ordner mit diesem Namen.",
+        "Folder name already exists. Choose another name.",
+      ),
+    ).toBeTruthy();
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("does not close the dialog after a typed failure result", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("Existing Folder");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("preserves the entered name after a conflict failure", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("Finance");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+    expect(input.value).toBe("Finance");
+  });
+
+  it("sets aria-invalid on the input when there is an error", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("Finance");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("sets aria-describedby on the input pointing to the error element", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("Finance");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    const input = screen.getByRole("textbox");
+    const errorId = input.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+
+    const errorElement = document.getElementById(errorId!);
+    expect(errorElement).toBeTruthy();
+  });
+
+  it("clears the error message when the user edits the input", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("Finance");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    // Editing the input should clear the error
+    typeIntoInput("Finance Updated");
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+    expect(input.getAttribute("aria-invalid")).toBeNull();
+  });
+
+  it("does not show a production digest error message", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("Finance");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText.toLowerCase()).not.toContain("digest");
+    expect(bodyText.toLowerCase()).not.toContain("server component");
+    expect(bodyText.toLowerCase()).not.toContain("an error occurred");
+  });
+
+  it("shows a sanitized fallback message for unexpected typed failures", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_CREATE_FAILED",
+      message: "The folder could not be created. Please try again.",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("New Folder");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    expect(
+      screen.getByText(
+        "The folder could not be created. Please try again.",
       ),
     ).toBeTruthy();
 
@@ -315,9 +532,10 @@ describe("CreateRootFolderDialog", () => {
   });
 
   it("clears the error message when the dialog is closed and reopened", async () => {
-    mocks.createRootWorkspaceFolderAction.mockRejectedValue(
-      new Error("Something went wrong."),
-    );
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
 
     renderDialog();
 
@@ -373,10 +591,10 @@ describe("CreateRootFolderDialog", () => {
   });
 
   it("does not call the action a second time when already submitting", async () => {
-    let resolveAction: ((v: { id: string }) => void) | undefined;
+    let resolveAction: ((v: { ok: true; data: { id: string } }) => void) | undefined;
 
     mocks.createRootWorkspaceFolderAction.mockReturnValue(
-      new Promise<{ id: string }>((res) => {
+      new Promise<{ ok: true; data: { id: string } }>((res) => {
         resolveAction = res;
       }),
     );
@@ -407,12 +625,39 @@ describe("CreateRootFolderDialog", () => {
       expect(submitButton?.disabled).toBe(true);
     });
 
-    resolveAction?.({ id: "folder-1" });
+    resolveAction?.({ ok: true, data: { id: "folder-1" } });
 
     await waitFor(() => {
       expect(
         mocks.createRootWorkspaceFolderAction,
       ).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("does not navigate on conflict — only navigates on success", async () => {
+    mocks.createRootWorkspaceFolderAction.mockResolvedValue({
+      ok: false,
+      code: "WORKSPACE_FOLDER_NAME_CONFLICT",
+    });
+
+    renderDialog();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /create folder/i }),
+    );
+
+    typeIntoInput("Finance");
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^create$/i }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    expect(mocks.routerPush).not.toHaveBeenCalled();
   });
 });
