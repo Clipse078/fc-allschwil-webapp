@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, History } from "lucide-react";
 
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
@@ -35,13 +35,14 @@ function ImagePreview({
   documentId: string;
   altText: string;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState(false);
+  const [status, setStatus] = useState<
+    "loading" | "loaded" | "error"
+  >("loading");
   const previewUrl = `/api/workspace/documents/${encodeURIComponent(documentId)}/preview`;
 
-  if (error) {
+  if (status === "error") {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 py-6">
+      <div className="flex flex-col items-center justify-center gap-2 rounded-lg bg-[var(--surface-2)] py-8">
         <WorkspaceFileIcon category="image" size="xl" />
         <p className="text-xs text-[var(--muted)]">
           {workspaceDE.preview.previewNotAvailable}
@@ -52,7 +53,7 @@ function ImagePreview({
 
   return (
     <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-[var(--surface-2)]">
-      {!loaded ? (
+      {status === "loading" ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--blue)]" />
         </div>
@@ -62,10 +63,10 @@ function ImagePreview({
         src={previewUrl}
         alt={altText}
         className={`max-h-56 w-full object-contain transition-opacity duration-200 ${
-          loaded ? "opacity-100" : "opacity-0"
+          status === "loaded" ? "opacity-100" : "opacity-0"
         }`}
-        onLoad={() => setLoaded(true)}
-        onError={() => setError(true)}
+        onLoad={() => setStatus("loaded")}
+        onError={() => setStatus("error")}
       />
     </div>
   );
@@ -78,10 +79,43 @@ function PdfPreview({
   documentId: string;
   germanLabel: string;
 }) {
-  const [showEmbed, setShowEmbed] = useState(true);
+  const [status, setStatus] = useState<
+    "checking" | "available" | "unavailable"
+  >("checking");
   const previewUrl = `/api/workspace/documents/${encodeURIComponent(documentId)}/preview`;
 
-  if (!showEmbed) {
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(previewUrl, { method: "HEAD" })
+      .then((res) => {
+        if (
+          res.ok &&
+          res.headers.get("content-type")?.startsWith("application/pdf")
+        ) {
+          if (!cancelled) setStatus("available");
+        } else {
+          if (!cancelled) setStatus("unavailable");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewUrl]);
+
+  if (status === "checking") {
+    return (
+      <div className="flex h-28 items-center justify-center rounded-lg bg-[var(--surface-2)]">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--blue)]" />
+      </div>
+    );
+  }
+
+  if (status === "unavailable") {
     return (
       <PlaceholderPreview
         category="pdf"
@@ -98,7 +132,7 @@ function PdfPreview({
         title={germanLabel}
         className="h-56 w-full"
         aria-label={`PDF-Vorschau: ${germanLabel}`}
-        onError={() => setShowEmbed(false)}
+        onError={() => setStatus("unavailable")}
       />
     </div>
   );
