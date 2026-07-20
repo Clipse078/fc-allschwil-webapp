@@ -5,15 +5,12 @@ import {
   FileText,
   FolderClosed,
   FolderOpen,
-  FolderPlus,
   LockKeyhole,
 } from "lucide-react";
-import {
-  createChildWorkspaceFolderAction,
-  moveWorkspaceFolderAction,
-  renameWorkspaceFolderAction,
-} from "@/app/(admin)/dashboard/workspace/actions";
 import { CreateRootFolderDialog } from "@/components/admin/workspace/CreateRootFolderDialog";
+import { CreateSubfolderForm } from "@/components/admin/workspace/CreateSubfolderForm";
+import { RenameFolderForm } from "@/components/admin/workspace/RenameFolderForm";
+import { MoveFolderForm } from "@/components/admin/workspace/MoveFolderForm";
 import { ArchiveFolderButton } from "@/app/(admin)/dashboard/workspace/ArchiveFolderButton";
 import { RestoreFolderButton } from "@/app/(admin)/dashboard/workspace/RestoreFolderButton";
 import { hasPermission } from "@/lib/permissions/has-permission";
@@ -93,44 +90,6 @@ function FolderTree({
   );
 }
 
-type CreateChildFolderFormProps = {
-  parentId: string;
-};
-
-function CreateFolderForm({ parentId }: CreateChildFolderFormProps) {
-  return (
-    <form
-      action={createChildWorkspaceFolderAction}
-      className="mx-auto max-w-sm"
-    >
-      <input type="hidden" name="parentId" value={parentId} />
-
-      <label className="block text-left">
-        <span className="mb-2 block text-sm font-medium text-[var(--text)]">
-          Folder name
-        </span>
-
-        <input
-          type="text"
-          name="name"
-          required
-          maxLength={120}
-          autoComplete="off"
-          placeholder="New subfolder"
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--blue)]"
-        />
-      </label>
-
-      <button
-        type="submit"
-        className="fca-button-primary mt-3 w-full justify-center"
-      >
-        <FolderPlus className="h-4 w-4" />
-        Create Subfolder
-      </button>
-    </form>
-  );
-}
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("de-CH", {
@@ -249,7 +208,7 @@ export default async function WorkspacePage({
 
             {canManage && selectedFolder ? (
               <div className="min-w-52">
-                <CreateFolderForm parentId={selectedFolder.id} />
+                <CreateSubfolderForm parentId={selectedFolder.id} />
               </div>
             ) : null}
           </div>
@@ -321,34 +280,10 @@ export default async function WorkspacePage({
 
                   {canManage ? (
                     <dd className="mt-2">
-                      <form
-                        action={renameWorkspaceFolderAction}
-                        className="space-y-2"
-                      >
-                        <input
-                          type="hidden"
-                          name="folderId"
-                          value={selectedFolder.id}
-                        />
-
-                        <input
-                          type="text"
-                          name="name"
-                          required
-                          maxLength={120}
-                          autoComplete="off"
-                          defaultValue={selectedFolder.name}
-                          aria-label="Folder name"
-                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition focus:border-[var(--blue)]"
-                        />
-
-                        <button
-                          type="submit"
-                          className="fca-button-secondary w-full justify-center text-sm"
-                        >
-                          Rename Folder
-                        </button>
-                      </form>
+                      <RenameFolderForm
+                        folderId={selectedFolder.id}
+                        currentName={selectedFolder.name}
+                      />
                     </dd>
                   ) : (
                     <dd className="mt-1 text-sm font-medium text-[var(--text)]">
@@ -364,51 +299,11 @@ export default async function WorkspacePage({
                     </dt>
 
                     <dd className="mt-2">
-                      <form
-                        action={moveWorkspaceFolderAction}
-                        className="space-y-2"
-                      >
-                        <input
-                          type="hidden"
-                          name="folderId"
-                          value={selectedFolder.id}
-                        />
-
-                        <select
-                          name="parentId"
-                          defaultValue={selectedFolder.parentId ?? ""}
-                          aria-label="Move folder to"
-                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)] outline-none transition focus:border-[var(--blue)]"
-                        >
-                          <option value="">Workspace root</option>
-
-                          {folders
-                            .flatMap(function flattenFolderTree(
-                              folder: WorkspaceFolderDto,
-                            ): WorkspaceFolderDto[] {
-                              return [
-                                folder,
-                                ...folder.children.flatMap(flattenFolderTree),
-                              ];
-                            })
-                            .filter((folder) => folder.id !== selectedFolder.id)
-                            .map((folder) => (
-                              <option
-                                key={folder.id}
-                                value={folder.id}
-                              >
-                                {folder.name}
-                              </option>
-                            ))}
-                        </select>
-
-                        <button
-                          type="submit"
-                          className="fca-button-secondary w-full justify-center text-sm"
-                        >
-                          Move Folder
-                        </button>
-                      </form>
+                      <MoveFolderForm
+                        folderId={selectedFolder.id}
+                        currentParentId={selectedFolder.parentId ?? null}
+                        folders={folders}
+                      />
                     </dd>
                   </div>
                 ) : null}

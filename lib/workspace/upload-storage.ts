@@ -14,12 +14,15 @@ import {
   BlobClientTokenExpiredError,
   BlobContentTypeNotAllowedError,
   BlobFileTooLargeError,
+  BlobNotFoundError,
   BlobPathnameMismatchError,
   BlobPreconditionFailedError,
+  BlobRequestAbortedError,
   BlobServiceNotAvailable,
   BlobServiceRateLimited,
   BlobStoreNotFoundError,
   BlobStoreSuspendedError,
+  BlobUnknownError,
   del,
   get,
   put,
@@ -112,6 +115,23 @@ export function calculateWorkspaceChecksum(
     .digest("hex");
 }
 
+function getErrorDetails(error: unknown): {
+  class: string;
+  message: string;
+} {
+  if (error instanceof Error) {
+    return {
+      class: error.constructor.name,
+      message: error.message,
+    };
+  }
+
+  return {
+    class: typeof error,
+    message: String(error),
+  };
+}
+
 export class VercelBlobWorkspaceStorage
   implements WorkspaceStorageProvider
 {
@@ -181,11 +201,12 @@ export class VercelBlobWorkspaceStorage
         sizeBytes: input.buffer.byteLength,
       };
     } catch (error) {
+      const details = getErrorDetails(error);
+
       if (isStorageConfigurationError(error)) {
         console.error(
           "[workspace-storage] upload failed: storage configuration error",
-          storageKey,
-          error,
+          { storageKey, errorClass: details.class, errorMessage: details.message },
         );
 
         return makeUploadFailure(
@@ -198,8 +219,7 @@ export class VercelBlobWorkspaceStorage
       if (error instanceof BlobPreconditionFailedError) {
         console.error(
           "[workspace-storage] upload failed: blob key already exists",
-          storageKey,
-          error,
+          { storageKey, errorClass: details.class },
         );
 
         return makeUploadFailure(
@@ -212,8 +232,7 @@ export class VercelBlobWorkspaceStorage
       if (error instanceof BlobFileTooLargeError) {
         console.error(
           "[workspace-storage] upload failed: file too large for store",
-          storageKey,
-          error,
+          { storageKey, errorClass: details.class, errorMessage: details.message },
         );
 
         return makeUploadFailure(
@@ -226,8 +245,7 @@ export class VercelBlobWorkspaceStorage
       if (error instanceof BlobContentTypeNotAllowedError) {
         console.error(
           "[workspace-storage] upload failed: content type not allowed by store",
-          storageKey,
-          error,
+          { storageKey, errorClass: details.class, errorMessage: details.message },
         );
 
         return makeUploadFailure(
@@ -240,8 +258,7 @@ export class VercelBlobWorkspaceStorage
       if (error instanceof BlobServiceNotAvailable) {
         console.error(
           "[workspace-storage] upload failed: storage service unavailable",
-          storageKey,
-          error,
+          { storageKey, errorClass: details.class },
         );
 
         return makeUploadFailure(
@@ -254,8 +271,7 @@ export class VercelBlobWorkspaceStorage
       if (error instanceof BlobServiceRateLimited) {
         console.error(
           "[workspace-storage] upload failed: rate limited",
-          storageKey,
-          error,
+          { storageKey, errorClass: details.class },
         );
 
         return makeUploadFailure(
@@ -265,10 +281,35 @@ export class VercelBlobWorkspaceStorage
         );
       }
 
+      if (error instanceof BlobUnknownError) {
+        console.error(
+          "[workspace-storage] upload failed: unknown blob error",
+          { storageKey, errorClass: details.class, errorMessage: details.message },
+        );
+
+        return makeUploadFailure(
+          500,
+          "WORKSPACE_UPLOAD_STORAGE_FAILED",
+          "Die Datei konnte nicht gespeichert werden.",
+        );
+      }
+
+      if (error instanceof BlobRequestAbortedError) {
+        console.error(
+          "[workspace-storage] upload failed: request aborted",
+          { storageKey, errorClass: details.class },
+        );
+
+        return makeUploadFailure(
+          500,
+          "WORKSPACE_UPLOAD_STORAGE_FAILED",
+          "Der Upload wurde unterbrochen. Bitte versuchen Sie es erneut.",
+        );
+      }
+
       console.error(
         "[workspace-storage] upload failed",
-        storageKey,
-        error,
+        { storageKey, errorClass: details.class, errorMessage: details.message },
       );
 
       return makeUploadFailure(
@@ -337,11 +378,12 @@ export class VercelBlobWorkspaceStorage
         etag: result.blob.etag,
       };
     } catch (error) {
+      const details = getErrorDetails(error);
+
       if (isStorageConfigurationError(error)) {
         console.error(
           "[workspace-storage] download failed: storage configuration error",
-          storageReference,
-          error,
+          { storageReference, errorClass: details.class, errorMessage: details.message },
         );
 
         return {
@@ -352,10 +394,22 @@ export class VercelBlobWorkspaceStorage
         };
       }
 
+      if (error instanceof BlobNotFoundError) {
+        console.error(
+          "[workspace-storage] download failed: blob not found",
+          { storageReference, errorClass: details.class },
+        );
+
+        return {
+          ok: false,
+          status: 404,
+          error: "Die Datei wurde im Speicher nicht gefunden.",
+        };
+      }
+
       console.error(
         "[workspace-storage] download failed",
-        storageReference,
-        error,
+        { storageReference, errorClass: details.class, errorMessage: details.message },
       );
 
       return {
@@ -379,10 +433,10 @@ export class VercelBlobWorkspaceStorage
         token,
       });
     } catch (error) {
+      const details = getErrorDetails(error);
       console.warn(
         "[workspace-storage] cleanup failed",
-        normalizedReference,
-        error,
+        { storageReference: normalizedReference, errorClass: details.class, errorMessage: details.message },
       );
     }
   }
