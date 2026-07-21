@@ -344,6 +344,50 @@ describe("Configuration displayed", () => {
 
     expect(screen.getByText("999")).toBeTruthy();
   });
+
+  it("CFG-11. shows neutral values when no synchronization has completed", () => {
+    const config = makeConfig({
+      lastTeamSyncAt: null,
+      lastScheduleSyncAt: null,
+      lastMatchDetailSyncAt: null,
+    });
+
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    expect(screen.getByTestId("last-team-sync").textContent).toContain(
+      "Noch nie synchronisiert",
+    );
+    expect(screen.getByTestId("last-schedule-sync").textContent).toContain(
+      "Noch nie synchronisiert",
+    );
+    expect(screen.getByTestId("last-detail-sync").textContent).toContain(
+      "Noch nie synchronisiert",
+    );
+  });
+
+  it("CFG-12. formats persisted last-sync timestamps with the de-CH locale", () => {
+    const teamTimestamp = new Date("2026-07-21T10:15:00.000Z");
+    const scheduleTimestamp = new Date("2026-07-21T11:30:00.000Z");
+    const detailTimestamp = new Date("2026-07-21T12:45:00.000Z");
+
+    const config = makeConfig({
+      lastTeamSyncAt: teamTimestamp,
+      lastScheduleSyncAt: scheduleTimestamp,
+      lastMatchDetailSyncAt: detailTimestamp,
+    });
+
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    expect(screen.getByTestId("last-team-sync").textContent).toContain(
+      teamTimestamp.toLocaleString("de-CH"),
+    );
+    expect(screen.getByTestId("last-schedule-sync").textContent).toContain(
+      scheduleTimestamp.toLocaleString("de-CH"),
+    );
+    expect(screen.getByTestId("last-detail-sync").textContent).toContain(
+      detailTimestamp.toLocaleString("de-CH"),
+    );
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -899,5 +943,236 @@ describe("Diagnostics", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("diagnostics-loading")).toBeNull();
     });
+  });
+});
+// ═══════════════════════════════════════════════════════════════════════════════
+// Last-sync timestamp refresh
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Last-sync timestamp refresh", () => {
+  it("SYNC-TIME-1. updates the team timestamp after a fully successful team sync", async () => {
+    const finishedAt = "2026-07-21T13:00:00.000Z";
+
+    globalThis.fetch = mockFetchSuccess({
+      result: {
+        tenantId: TENANT_ID,
+        clubId: 483,
+        seasonId: 2027,
+        startedAt: "2026-07-21T12:59:59.000Z",
+        finishedAt,
+        durationMs: 1000,
+        fetched: 1,
+        created: 1,
+        updated: 0,
+        unchanged: 0,
+        markedInactive: 0,
+        failed: 0,
+        errors: [],
+      },
+    });
+
+    render(<SfvTenantConfigPanel initialConfig={makeConfig()} />);
+
+    fireEvent.click(screen.getByTestId("btn-team-sync"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("last-team-sync").textContent).toContain(
+        new Date(finishedAt).toLocaleString("de-CH"),
+      );
+    });
+  });
+
+  it("SYNC-TIME-2. updates the schedule timestamp after a fully successful schedule sync", async () => {
+    const finishedAt = "2026-07-21T13:10:00.000Z";
+
+    globalThis.fetch = mockFetchSuccess({
+      result: {
+        tenantId: TENANT_ID,
+        clubId: 483,
+        seasonId: 2027,
+        dateFrom: "2026-06-21",
+        dateTo: "2026-10-19",
+        startedAt: "2026-07-21T13:09:59.000Z",
+        finishedAt,
+        durationMs: 1000,
+        fetched: 1,
+        created: 1,
+        updated: 0,
+        unchanged: 0,
+        failed: 0,
+        scoresUpdated: 0,
+        kickoffChanges: 0,
+        statusChanges: 0,
+        unresolvedLocalTeamRefs: 0,
+        externalOpponents: 1,
+        errors: [],
+      },
+    });
+
+    render(<SfvTenantConfigPanel initialConfig={makeConfig()} />);
+
+    fireEvent.click(screen.getByTestId("btn-schedule-sync"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("last-schedule-sync").textContent).toContain(
+        new Date(finishedAt).toLocaleString("de-CH"),
+      );
+    });
+  });
+
+  it("SYNC-TIME-3. updates the detail timestamp after a fully successful detail sync", async () => {
+    const finishedAt = "2026-07-21T13:20:00.000Z";
+
+    globalThis.fetch = mockFetchSuccess({
+      result: {
+        tenantId: TENANT_ID,
+        startedAt: "2026-07-21T13:19:59.000Z",
+        finishedAt,
+        durationMs: 1000,
+        processed: 1,
+        updated: 1,
+        unchanged: 0,
+        failed: 0,
+        errors: [],
+      },
+    });
+
+    render(<SfvTenantConfigPanel initialConfig={makeConfig()} />);
+
+    fireEvent.click(screen.getByTestId("btn-detail-sync"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("last-detail-sync").textContent).toContain(
+        new Date(finishedAt).toLocaleString("de-CH"),
+      );
+    });
+  });
+
+  it("SYNC-TIME-4. does not update the team timestamp when the result contains failures", async () => {
+    const originalTimestamp = new Date("2026-07-20T10:00:00.000Z");
+
+    globalThis.fetch = mockFetchSuccess({
+      result: {
+        tenantId: TENANT_ID,
+        clubId: 483,
+        seasonId: 2027,
+        startedAt: "2026-07-21T12:59:59.000Z",
+        finishedAt: "2026-07-21T13:00:00.000Z",
+        durationMs: 1000,
+        fetched: 1,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        markedInactive: 0,
+        failed: 1,
+        errors: [
+          {
+            code: "TEAM_CREATE_FAILED",
+            message: "Team could not be created.",
+          },
+        ],
+      },
+    });
+
+    render(
+      <SfvTenantConfigPanel
+        initialConfig={makeConfig({ lastTeamSyncAt: originalTimestamp })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("btn-team-sync"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("team-sync-result")).toBeTruthy();
+    });
+
+    expect(screen.getByTestId("last-team-sync").textContent).toContain(
+      originalTimestamp.toLocaleString("de-CH"),
+    );
+  });
+
+  it("SYNC-TIME-5. updates the schedule timestamp when synchronization succeeds despite unresolved local team references", async () => {
+    const originalTimestamp = new Date("2026-07-20T11:00:00.000Z");
+    const finishedAt = "2026-07-21T13:10:00.000Z";
+
+    globalThis.fetch = mockFetchSuccess({
+      result: {
+        tenantId: TENANT_ID,
+        clubId: 483,
+        seasonId: 2027,
+        dateFrom: "2026-06-21",
+        dateTo: "2026-10-19",
+        startedAt: "2026-07-21T13:09:59.000Z",
+        finishedAt,
+        durationMs: 1000,
+        fetched: 1,
+        created: 1,
+        updated: 0,
+        unchanged: 0,
+        failed: 0,
+        scoresUpdated: 0,
+        kickoffChanges: 0,
+        statusChanges: 0,
+        unresolvedLocalTeamRefs: 1,
+        externalOpponents: 1,
+        errors: [],
+      },
+    });
+
+    render(
+      <SfvTenantConfigPanel
+        initialConfig={makeConfig({ lastScheduleSyncAt: originalTimestamp })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("btn-schedule-sync"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("last-schedule-sync").textContent).toContain(
+        new Date(finishedAt).toLocaleString("de-CH"),
+      );
+    });
+
+    expect(screen.getByTestId("last-schedule-sync").textContent).not.toContain(
+      originalTimestamp.toLocaleString("de-CH"),
+    );
+  });
+  it("SYNC-TIME-6. does not update the detail timestamp when the result contains errors", async () => {
+    const originalTimestamp = new Date("2026-07-20T12:00:00.000Z");
+
+    globalThis.fetch = mockFetchSuccess({
+      result: {
+        tenantId: TENANT_ID,
+        startedAt: "2026-07-21T13:19:59.000Z",
+        finishedAt: "2026-07-21T13:20:00.000Z",
+        durationMs: 1000,
+        processed: 1,
+        updated: 0,
+        unchanged: 0,
+        failed: 1,
+        errors: [
+          {
+            code: "MATCH_DETAIL_FAILED",
+            message: "Match detail could not be synchronized.",
+          },
+        ],
+      },
+    });
+
+    render(
+      <SfvTenantConfigPanel
+        initialConfig={makeConfig({ lastMatchDetailSyncAt: originalTimestamp })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("btn-detail-sync"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("detail-sync-result")).toBeTruthy();
+    });
+
+    expect(screen.getByTestId("last-detail-sync").textContent).toContain(
+      originalTimestamp.toLocaleString("de-CH"),
+    );
   });
 });

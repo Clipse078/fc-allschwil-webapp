@@ -98,6 +98,14 @@ function parsePositiveInt(value: string): number | null {
   return n;
 }
 
+function formatLastSync(value: Date | string | null): string {
+  if (value === null) {
+    return "Noch nie synchronisiert";
+  }
+
+  return new Date(value).toLocaleString("de-CH");
+}
+
 function validateForm(values: FormValues): FieldErrors {
   const errors: FieldErrors = {};
 
@@ -599,6 +607,17 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
       }
 
       setTeamSync({ status: "success", data: data.result });
+
+      if (data.result.failed === 0 && data.result.errors.length === 0) {
+        setConfig((current) =>
+          current
+            ? {
+                ...current,
+                lastTeamSyncAt: new Date(data.result!.finishedAt),
+              }
+            : current,
+        );
+      }
     } catch {
       setTeamSync({
         status: "error",
@@ -645,6 +664,17 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
       }
 
       setScheduleSync({ status: "success", data: data.result });
+
+      if (data.result.failed === 0 && data.result.errors.length === 0) {
+        setConfig((current) =>
+          current
+            ? {
+                ...current,
+                lastScheduleSyncAt: new Date(data.result!.finishedAt),
+              }
+            : current,
+        );
+      }
     } catch {
       setScheduleSync({
         status: "error",
@@ -691,6 +721,17 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
       }
 
       setDetailSync({ status: "success", data: data.result });
+
+      if (data.result.failed === 0 && data.result.errors.length === 0) {
+        setConfig((current) =>
+          current
+            ? {
+                ...current,
+                lastMatchDetailSyncAt: new Date(data.result!.finishedAt),
+              }
+            : current,
+        );
+      }
     } catch {
       setDetailSync({
         status: "error",
@@ -866,9 +907,36 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
                 <dd className="font-semibold">{config.organisationId}</dd>
               </div>
             )}
-            <div className="flex justify-between">
-              <dt className="text-[var(--text-2)]">Zuletzt aktualisiert</dt>
-              <dd className="font-mono text-xs text-[var(--muted)]">
+            <div
+              className="flex justify-between gap-4 border-b border-[var(--border)] pb-2"
+              data-testid="last-team-sync"
+            >
+              <dt className="text-[var(--text-2)]">Letzte Teams-Synchronisierung</dt>
+              <dd className="text-right font-mono text-xs text-[var(--muted)]">
+                {formatLastSync(config.lastTeamSyncAt)}
+              </dd>
+            </div>
+            <div
+              className="flex justify-between gap-4 border-b border-[var(--border)] pb-2"
+              data-testid="last-schedule-sync"
+            >
+              <dt className="text-[var(--text-2)]">Letzte Spielplan-Synchronisierung</dt>
+              <dd className="text-right font-mono text-xs text-[var(--muted)]">
+                {formatLastSync(config.lastScheduleSyncAt)}
+              </dd>
+            </div>
+            <div
+              className="flex justify-between gap-4 border-b border-[var(--border)] pb-2"
+              data-testid="last-detail-sync"
+            >
+              <dt className="text-[var(--text-2)]">Letzte Matchdetail-Synchronisierung</dt>
+              <dd className="text-right font-mono text-xs text-[var(--muted)]">
+                {formatLastSync(config.lastMatchDetailSyncAt)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--text-2)]">Konfiguration aktualisiert</dt>
+              <dd className="text-right font-mono text-xs text-[var(--muted)]">
                 {new Date(config.updatedAt).toLocaleString("de-CH")}
               </dd>
             </div>
