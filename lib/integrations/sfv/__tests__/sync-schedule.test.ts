@@ -90,6 +90,12 @@ vi.mock("../tenant-config-service", () => ({
     mockRequireEnabledSfvConfigForTenant(...args),
 }));
 
+const mockMarkScheduleSyncSuccessful = vi.fn();
+vi.mock("../tenant-config-repository", () => ({
+  markScheduleSyncSuccessful: (...args: unknown[]) =>
+    mockMarkScheduleSyncSuccessful(...args),
+}));
+
 // ── Mock: schedule-persistence ────────────────────────────────────────────────
 
 const mockLoadExistingMatchMappings = vi.fn();
@@ -125,6 +131,9 @@ function makeTenantConfig(
     defaultSeasonId: overrides.defaultSeasonId ?? 2027,
     organisationId: overrides.organisationId ?? null,
     enabled: true,
+    lastTeamSyncAt: null,
+    lastScheduleSyncAt: null,
+    lastMatchDetailSyncAt: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
     updatedAt: new Date("2026-07-01T00:00:00.000Z"),
   };

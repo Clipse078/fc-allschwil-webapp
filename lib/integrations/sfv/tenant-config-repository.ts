@@ -28,6 +28,9 @@ const sfvConfigSelect = {
   defaultSeasonId: true,
   organisationId: true,
   enabled: true,
+  lastTeamSyncAt: true,
+  lastScheduleSyncAt: true,
+  lastMatchDetailSyncAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -91,5 +94,44 @@ export async function upsertSfvConfigByTenantId(
     create: { tenantId, ...fields },
     update: fields,
     select: sfvConfigSelect,
+  });
+}
+
+/**
+ * Records completion of the most recent fully successful team synchronization.
+ */
+export async function markTeamSyncSuccessful(
+  tenantId: string,
+  finishedAt: Date,
+): Promise<void> {
+  await prisma.tenantSfvConfig.update({
+    where: { tenantId },
+    data: { lastTeamSyncAt: finishedAt },
+  });
+}
+
+/**
+ * Records completion of the most recent fully successful schedule synchronization.
+ */
+export async function markScheduleSyncSuccessful(
+  tenantId: string,
+  finishedAt: Date,
+): Promise<void> {
+  await prisma.tenantSfvConfig.update({
+    where: { tenantId },
+    data: { lastScheduleSyncAt: finishedAt },
+  });
+}
+
+/**
+ * Records completion of the most recent fully successful match-detail synchronization.
+ */
+export async function markMatchDetailSyncSuccessful(
+  tenantId: string,
+  finishedAt: Date,
+): Promise<void> {
+  await prisma.tenantSfvConfig.update({
+    where: { tenantId },
+    data: { lastMatchDetailSyncAt: finishedAt },
   });
 }

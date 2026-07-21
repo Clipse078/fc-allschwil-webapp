@@ -46,6 +46,7 @@
  */
 
 import { requireEnabledSfvConfigForTenant } from "../tenant-config-service";
+import { markScheduleSyncSuccessful } from "../tenant-config-repository";
 import { fetchClubSchedule, fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
 import type { SfvScheduleSyncContext, SfvScheduleSyncResult } from "./schedule-types";
@@ -291,6 +292,10 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
   });
 
   logScheduleSyncCompleted(result);
+
+  if (result.failed === 0 && result.errors.length === 0) {
+    await markScheduleSyncSuccessful(tenantId, finishedAt);
+  }
 
   return result;
 }

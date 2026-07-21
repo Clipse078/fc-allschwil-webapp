@@ -2430,6 +2430,12 @@ model TenantSfvConfig {
   /// When false, the SFV integration is administratively disabled.
   /// Consumers must treat disabled configs as "not configured".
   enabled         Boolean  @default(true)
+  /// Completion time of the most recent fully successful tenant-level team synchronization.
+  lastTeamSyncAt        DateTime?
+  /// Completion time of the most recent fully successful tenant-level schedule synchronization.
+  lastScheduleSyncAt    DateTime?
+  /// Completion time of the most recent fully successful tenant-level match-detail synchronization.
+  lastMatchDetailSyncAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

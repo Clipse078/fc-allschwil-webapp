@@ -30,6 +30,7 @@
  */
 
 import { requireEnabledSfvConfigForTenant } from "../tenant-config-service";
+import { markTeamSyncSuccessful } from "../tenant-config-repository";
 import { fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
 import type { SfvTeamSyncContext, SfvTeamSyncResult } from "./types";
@@ -195,6 +196,10 @@ export async function syncSfvTeams(tenantId: string): Promise<SfvTeamSyncResult>
   });
 
   logSyncCompleted(result);
+
+  if (result.failed === 0 && result.errors.length === 0) {
+    await markTeamSyncSuccessful(tenantId, finishedAt);
+  }
 
   return result;
 }

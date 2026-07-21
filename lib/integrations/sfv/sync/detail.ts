@@ -39,6 +39,7 @@
  */
 
 import { requireEnabledSfvConfigForTenant } from "../tenant-config-service";
+import { markMatchDetailSyncSuccessful } from "../tenant-config-repository";
 import { fetchMatchDetail } from "../client";
 import { toSafePublicError } from "../errors";
 import type { SfvDetailSyncContext, SfvDetailSyncResult } from "./detail-types";
@@ -147,7 +148,7 @@ export async function syncSfvMatchDetails(tenantId: string): Promise<SfvDetailSy
 
   const finishedAt = new Date();
 
-  return {
+  const result: SfvDetailSyncResult = {
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
     durationMs: finishedAt.getTime() - startedAt.getTime(),
@@ -159,4 +160,10 @@ export async function syncSfvMatchDetails(tenantId: string): Promise<SfvDetailSy
     failed,
     errors,
   };
+
+  if (result.failed === 0 && result.errors.length === 0) {
+    await markMatchDetailSyncSuccessful(tenantId, finishedAt);
+  }
+
+  return result;
 }

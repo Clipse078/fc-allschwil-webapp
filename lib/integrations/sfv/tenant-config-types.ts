@@ -54,6 +54,12 @@ export type TenantSfvConfig = {
    * Consumers MUST treat a disabled config as "not configured".
    */
   enabled: boolean;
+  /** Most recent fully successful team sync completion time. */
+  lastTeamSyncAt: Date | null;
+  /** Most recent fully successful schedule sync completion time. */
+  lastScheduleSyncAt: Date | null;
+  /** Most recent fully successful match-detail sync completion time. */
+  lastMatchDetailSyncAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
