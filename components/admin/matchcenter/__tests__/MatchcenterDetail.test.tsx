@@ -3,9 +3,20 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import MatchcenterDetail from "@/components/admin/matchcenter/MatchcenterDetail";
 import type { MatchcenterMatchDetail } from "@/lib/matchcenter/types";
+
+vi.mock(
+  "@/components/admin/matchcenter/MatchTeamMappingDialog",
+  () => ({
+    default: () => (
+      <button type="button">
+        Team zuordnen
+      </button>
+    ),
+  }),
+);
 
 function createMatch(
   overrides: Partial<MatchcenterMatchDetail> = {},
@@ -125,6 +136,54 @@ describe("MatchcenterDetail", () => {
       "href",
       "/dashboard/matchcenter",
     );
+  });
+
+  it("shows mapping action for an unresolved provider side when allowed", () => {
+    const base = createMatch();
+
+    render(
+      <MatchcenterDetail
+        match={createMatch({
+          away: {
+            ...base.away,
+            canonicalTeamId: null,
+            canonicalTeamName: null,
+            resolution: "UNRESOLVED",
+          },
+        })}
+        canManageMappings
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Team zuordnen",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("hides mapping action without manage permission", () => {
+    const base = createMatch();
+
+    render(
+      <MatchcenterDetail
+        match={createMatch({
+          away: {
+            ...base.away,
+            canonicalTeamId: null,
+            canonicalTeamName: null,
+            resolution: "UNRESOLVED",
+          },
+        })}
+        canManageMappings={false}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Team zuordnen",
+      }),
+    ).toBeNull();
   });
 
   it("renders a mapped score", () => {

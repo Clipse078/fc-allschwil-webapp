@@ -26,11 +26,13 @@ import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { PageShell } from "@/components/ui/page/PageShell";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import { DetailPagePattern } from "@/components/ui/patterns/DetailPagePattern";
+import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMappingDialog";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
   locale?: string;
   timezone?: string;
+  canManageMappings?: boolean;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -176,6 +178,7 @@ export default function MatchcenterDetail({
   match,
   locale = "de-CH",
   timezone = "Europe/Zurich",
+  canManageMappings = false,
 }: MatchcenterDetailProps) {
   const statusLabel =
     STATUS_LABELS[match.status] ?? match.status;
@@ -220,13 +223,34 @@ export default function MatchcenterDetail({
           },
         ]}
         headerActions={
-          <Link
-            href="/dashboard/matchcenter"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Zurück zum Matchcenter
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageMappings &&
+            match.source.provider &&
+            match.source.externalSeasonId !== null &&
+            (
+              match.home.resolution === "UNRESOLVED" ||
+              match.away.resolution === "UNRESOLVED"
+            ) ? (
+              <MatchTeamMappingDialog
+                provider={match.source.provider}
+                externalSeasonId={
+                  match.source.externalSeasonId
+                }
+                sides={[
+                  match.home,
+                  match.away,
+                ]}
+              />
+            ) : null}
+
+            <Link
+              href="/dashboard/matchcenter"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Zurück zum Matchcenter
+            </Link>
+          </div>
         }
         summary={
           <SectionCard
