@@ -3,9 +3,20 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import MatchcenterDetail from "@/components/admin/matchcenter/MatchcenterDetail";
 import type { MatchcenterMatchDetail } from "@/lib/matchcenter/types";
+
+vi.mock(
+  "@/components/admin/matchcenter/MatchTeamMappingDialog",
+  () => ({
+    default: () => (
+      <button type="button">
+        Team zuordnen
+      </button>
+    ),
+  }),
+);
 
 function createMatch(
   overrides: Partial<MatchcenterMatchDetail> = {},
@@ -125,6 +136,54 @@ describe("MatchcenterDetail", () => {
       "href",
       "/dashboard/matchcenter",
     );
+  });
+
+  it("shows mapping action for an unresolved provider side when allowed", () => {
+    const base = createMatch();
+
+    render(
+      <MatchcenterDetail
+        match={createMatch({
+          away: {
+            ...base.away,
+            canonicalTeamId: null,
+            canonicalTeamName: null,
+            resolution: "UNRESOLVED",
+          },
+        })}
+        canManageMappings
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Team zuordnen",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("hides mapping action without manage permission", () => {
+    const base = createMatch();
+
+    render(
+      <MatchcenterDetail
+        match={createMatch({
+          away: {
+            ...base.away,
+            canonicalTeamId: null,
+            canonicalTeamName: null,
+            resolution: "UNRESOLVED",
+          },
+        })}
+        canManageMappings={false}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Team zuordnen",
+      }),
+    ).toBeNull();
   });
 
   it("renders a mapped score", () => {
@@ -276,5 +335,65 @@ describe("MatchcenterDetail", () => {
     expect(
       screen.getAllByText("Nicht hinterlegt").length,
     ).toBeGreaterThan(5);
+  });
+  it("shows synchronization guidance for an unresolved provider mapping", () => {
+    const match = createMatch();
+
+    match.away = {
+      ...match.away,
+      canonicalTeamId: null,
+      canonicalTeamName: null,
+      resolution: "UNRESOLVED",
+    };
+
+    render(
+      <MatchcenterDetail
+        match={match}
+        canManageMappings
+      />,
+    );
+
+    expect(
+      screen.getByTestId(
+        "matchcenter-mapping-status-unresolved",
+      ),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Eine Team-Zuordnung ist offen"),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("link", {
+        name: "Zur Spielplansynchronisation",
+      }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/admin/integrations/sfv",
+    );
+  });
+
+  it("shows a resolved mapping status without synchronization guidance", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId(
+        "matchcenter-mapping-status-resolved",
+      ),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Teams vollständig zugeordnet"),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("link", {
+        name: "Zur Spielplansynchronisation",
+      }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
+  CheckCircle2,
+  CircleAlert,
   Clock3,
   Cloud,
   ExternalLink,
@@ -26,11 +28,13 @@ import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { PageShell } from "@/components/ui/page/PageShell";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import { DetailPagePattern } from "@/components/ui/patterns/DetailPagePattern";
+import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMappingDialog";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
   locale?: string;
   timezone?: string;
+  canManageMappings?: boolean;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -176,6 +180,7 @@ export default function MatchcenterDetail({
   match,
   locale = "de-CH",
   timezone = "Europe/Zurich",
+  canManageMappings = false,
 }: MatchcenterDetailProps) {
   const statusLabel =
     STATUS_LABELS[match.status] ?? match.status;
@@ -184,6 +189,20 @@ export default function MatchcenterDetail({
     STATUS_VARIANTS[match.status] ?? "default";
 
   const result = getResult(match);
+
+  const unresolvedSides = [
+    match.home,
+    match.away,
+  ].filter(
+    (side) => side.resolution === "UNRESOLVED",
+  );
+
+  const hasUnresolvedProviderMapping =
+    match.source.provider !== null &&
+    match.source.externalSeasonId !== null &&
+    unresolvedSides.some(
+      (side) => side.providerTeamId !== null,
+    );
 
   const sourceLabel =
     match.source.provider ??
@@ -220,13 +239,34 @@ export default function MatchcenterDetail({
           },
         ]}
         headerActions={
-          <Link
-            href="/dashboard/matchcenter"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Zurück zum Matchcenter
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageMappings &&
+            match.source.provider &&
+            match.source.externalSeasonId !== null &&
+            (
+              match.home.resolution === "UNRESOLVED" ||
+              match.away.resolution === "UNRESOLVED"
+            ) ? (
+              <MatchTeamMappingDialog
+                provider={match.source.provider}
+                externalSeasonId={
+                  match.source.externalSeasonId
+                }
+                sides={[
+                  match.home,
+                  match.away,
+                ]}
+              />
+            ) : null}
+
+            <Link
+              href="/dashboard/matchcenter"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Zurück zum Matchcenter
+            </Link>
+          </div>
         }
         summary={
           <SectionCard
@@ -403,6 +443,76 @@ export default function MatchcenterDetail({
           </>
         }
       >
+        <SectionCard
+          title="Team-Zuordnung"
+          description="Status der Provider-Teams im Matchcenter"
+          bodyClassName="px-5 py-5"
+        >
+          {unresolvedSides.length === 0 ? (
+            <div
+              className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+              data-testid="matchcenter-mapping-status-resolved"
+            >
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+
+              <div>
+                <p className="text-sm font-semibold text-emerald-900">
+                  Teams vollständig zugeordnet
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-emerald-800">
+                  Heim- und Auswärtsteam sind mit internen
+                  Matchcenter-Teams verknüpft.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+              data-testid="matchcenter-mapping-status-unresolved"
+            >
+              <div className="flex items-start gap-3">
+                <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-950">
+                    {unresolvedSides.length === 1
+                      ? "Eine Team-Zuordnung ist offen"
+                      : `${unresolvedSides.length} Team-Zuordnungen sind offen`}
+                  </p>
+
+                  <p className="mt-1 text-sm leading-relaxed text-amber-900">
+                    {unresolvedSides
+                      .map((side) => side.displayName)
+                      .join(" und ")}{" "}
+                    {unresolvedSides.length === 1
+                      ? "ist noch keinem internen Team zugeordnet."
+                      : "sind noch keinem internen Team zugeordnet."}
+                  </p>
+
+                  {hasUnresolvedProviderMapping ? (
+                    <>
+                      <p className="mt-2 text-sm leading-relaxed text-amber-900">
+                        Nach dem Speichern einer Zuordnung muss
+                        der Spielplan synchronisiert werden.
+                        Erst danach werden betroffene Matches
+                        mit der neuen Zuordnung aktualisiert.
+                      </p>
+
+                      <Link
+                        href="/dashboard/admin/integrations/sfv"
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Zur Spielplansynchronisation
+                      </Link>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )}
+        </SectionCard>
+
         <SectionCard
           title="Spieldaten"
           description="Zeitpunkt, Wettbewerb und Spielstätte"
