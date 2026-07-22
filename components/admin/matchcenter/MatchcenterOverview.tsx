@@ -148,7 +148,7 @@ export default function MatchcenterOverview({
             <article
               key={match.id}
               data-testid={`matchcenter-row-${match.id}`}
-              className="px-5 py-4 transition hover:bg-[var(--surface-2)]"
+              className="relative px-5 py-4 transition hover:bg-[var(--surface-2)]"
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -275,6 +275,16 @@ export default function MatchcenterOverview({
                     </>
                   )}
                 </div>
+
+                <Link
+                  href={`/dashboard/matchcenter/${match.id}`}
+                  aria-label={`Details zu ${match.title} anzeigen`}
+                  className="absolute inset-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2"
+                >
+                  <span className="sr-only">
+                    Details zu {match.title} anzeigen
+                  </span>
+                </Link>
               </div>
             </article>
           );

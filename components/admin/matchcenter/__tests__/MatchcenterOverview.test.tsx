@@ -115,6 +115,22 @@ describe("MatchcenterOverview", () => {
     ).toBeTruthy();
   });
 
+  it("links each match to its detail page", () => {
+    render(
+      <MatchcenterOverview
+        matches={[createMatch()]}
+      />,
+    );
+
+    const link = screen.getByRole("link", {
+      name: "Details zu FC Allschwil – Gegner anzeigen",
+    });
+
+    expect(link).toHaveAttribute(
+      "href",
+      "/dashboard/matchcenter/match-1",
+    );
+  });
   it("renders mapped score when available", () => {
     render(
       <MatchcenterOverview
