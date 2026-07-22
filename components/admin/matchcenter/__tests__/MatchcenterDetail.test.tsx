@@ -336,4 +336,64 @@ describe("MatchcenterDetail", () => {
       screen.getAllByText("Nicht hinterlegt").length,
     ).toBeGreaterThan(5);
   });
+  it("shows synchronization guidance for an unresolved provider mapping", () => {
+    const match = createMatch();
+
+    match.away = {
+      ...match.away,
+      canonicalTeamId: null,
+      canonicalTeamName: null,
+      resolution: "UNRESOLVED",
+    };
+
+    render(
+      <MatchcenterDetail
+        match={match}
+        canManageMappings
+      />,
+    );
+
+    expect(
+      screen.getByTestId(
+        "matchcenter-mapping-status-unresolved",
+      ),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Eine Team-Zuordnung ist offen"),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("link", {
+        name: "Zur Spielplansynchronisation",
+      }),
+    ).toHaveAttribute(
+      "href",
+      "/dashboard/admin/integrations/sfv",
+    );
+  });
+
+  it("shows a resolved mapping status without synchronization guidance", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId(
+        "matchcenter-mapping-status-resolved",
+      ),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Teams vollständig zugeordnet"),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("link", {
+        name: "Zur Spielplansynchronisation",
+      }),
+    ).not.toBeInTheDocument();
+  });
 });
