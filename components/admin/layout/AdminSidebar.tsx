@@ -37,6 +37,7 @@ import {
   UserCircle2,
   UserRound,
   Users,
+  Volleyball,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
 import SceWordmark from "@/components/admin/branding/SceWordmark";
@@ -71,6 +72,7 @@ function getNavIcon(label: string) {
     case "Meetings":                    return ScrollText;
     case "Initiativen":                 return Flag;
     case "Infoboard":                   return Monitor;
+    case "Matchcenter":                 return Volleyball;
     case "Administration":              return Settings2;
     // Organisation children
     case "Organisationseinheiten":      return Building2;

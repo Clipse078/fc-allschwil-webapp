@@ -228,6 +228,15 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
+        key: "matchcenter",
+        label: "Matchcenter",
+        href: "/dashboard/matchcenter",
+        permissionKeys: [
+          PERMISSIONS.EVENTS_VIEW,
+          PERMISSIONS.EVENTS_MANAGE,
+        ],
+      },
+      {
         key: "workspace",
         label: "Dokumente",
         href: "/dashboard/workspace",

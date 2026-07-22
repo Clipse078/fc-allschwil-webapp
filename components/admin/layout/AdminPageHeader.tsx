@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { usePathname } from "next/navigation";
 
@@ -166,6 +166,18 @@ function getHeaderContent(pathname: string): HeaderContent {
       title: "Vereinsleitung – Übersicht",
       description:
         "Strategische Steuerung des Vereins mit Zielen, Initiativen, Meetings, Aufgaben und Entscheidungen an einem Ort.",
+    };
+  }
+
+  if (
+    pathname === "/dashboard/matchcenter" ||
+    pathname.startsWith("/dashboard/matchcenter/")
+  ) {
+    return {
+      eyebrow: "Spielbetrieb",
+      title: "Matchcenter",
+      description:
+        "Zentrale Übersicht aller synchronisierten und manuell erfassten Matches.",
     };
   }
 
