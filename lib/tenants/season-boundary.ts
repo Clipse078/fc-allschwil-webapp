@@ -8,7 +8,7 @@
  * Design principles:
  * - Tenant config uses 1-based month numbers (1 = January … 12 = December).
  * - The existing Swiss football constants in season-logic.ts use 0-based indices
- *   (7 = August). Both represent the same convention for fc-allschwil (August 1).
+ *   (6 = July). The canonical Swiss football season boundary is July 1.
  * - The existing season-logic.ts functions are NOT removed or modified — they
  *   remain the implementation for the season planner, season admin, and team
  *   assignment logic that does not yet carry a TenantContext.
