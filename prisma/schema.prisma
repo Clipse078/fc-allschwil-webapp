@@ -438,6 +438,8 @@ model Tenant {
   sfvConfig              TenantSfvConfig?
   teamExternalMappings   TeamExternalMapping[]
   matchExternalMappings  MatchExternalMapping[]
+  opponents              Opponent[]
+  opponentExternalMappings OpponentExternalMapping[]
 
   @@index([status])
   @@index([name])
@@ -2442,4 +2444,63 @@ model TenantSfvConfig {
 tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([enabled])
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// Opponent — reusable tenant-scoped opponent identity.
+//
+// Opponents are deliberately separate from Team:
+// - Team represents a tenant-owned team.
+// - Opponent represents an external or manually managed opposing club/team.
+//
+// Local display-name overrides remain on Opponent and are never provider-owned.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Opponent {
+  id            String   @id @default(cuid())
+  tenantId      String
+  officialName  String
+  shortName     String?
+  websiteName   String?
+  infoboardName String?
+  notes         String?
+  archivedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  externalMappings OpponentExternalMapping[]
+
+  @@index([tenantId])
+  @@index([tenantId, archivedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OpponentExternalMapping — provider identity for a reusable Opponent.
+//
+// externalSeasonId uses 0 as the explicit seasonless sentinel. PostgreSQL unique
+// constraints allow multiple NULL values, so a nullable season identifier would
+// not safely prevent duplicate seasonless provider identities.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model OpponentExternalMapping {
+  id                     String   @id @default(cuid())
+  tenantId               String
+  opponentId             String
+  provider               String
+  externalTeamId         Int
+  externalSeasonId       Int      @default(0)
+  providerTeamName       String?
+  providerOrganisationId Int?
+  providerLogoUrl        String?
+  providerIsActive       Boolean  @default(true)
+  lastSyncedAt           DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  opponent Opponent @relation(fields: [opponentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, externalTeamId, externalSeasonId])
+  @@index([tenantId, provider])
+  @@index([opponentId])
 }
