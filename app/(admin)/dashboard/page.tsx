@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dashboard";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,18 +57,6 @@ function timeAgo(date: Date): string {
   if (diffH < 24) return `Vor ${diffH} Std.`;
   const diffD = Math.floor(diffH / 24);
   return `Vor ${diffD} Tag${diffD === 1 ? "" : "en"}`;
-}
-
-// ── Season display helper ─────────────────────────────────────────────────────
-
-function getActiveSeasonLabel(seasonStartMonth: number): string {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  if (month >= seasonStartMonth) {
-    return `${year}/${String(year + 1).slice(-2)}`;
-  }
-  return `${year - 1}/${String(year).slice(-2)}`;
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -239,7 +228,7 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
   // ── Presentation helpers ──────────────────────────────────────────────────
 
   const activeSeason = ctx
-    ? getActiveSeasonLabel(ctx.seasonStartMonth)
+    ? getCurrentSwissFootballSeason()?.label
     : undefined;
 
   const todayFormatted = new Intl.DateTimeFormat(fmtCfg.locale, {
