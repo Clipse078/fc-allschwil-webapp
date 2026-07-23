@@ -29,6 +29,9 @@ export default function InfoboardScreen1PreviewPage() {
         clubLogoSrc: "/images/logos/fc-allschwil.png",
         productLogoSrc: "/images/branding/sportclubevo_logo.png",
       }}
+      announcement={{
+        text: "WILLKOMMEN BEIM FC ALLSCHWIL – FAIRNESS, RESPEKT, LEIDENSCHAFT",
+      }}
     />
   );
 }

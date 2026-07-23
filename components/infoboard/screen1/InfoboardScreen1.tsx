@@ -29,6 +29,7 @@ import type {
   InfoboardAllocationDisplay,
   PublishingEventType,
 } from "@/lib/publishing/event-types";
+import { LiveClock } from "./LiveClock";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -46,9 +47,16 @@ export type InfoboardScreen1Branding = {
   productLogoSrc?: string | null;
 };
 
+export type InfoboardScreen1Announcement = {
+  text: string;
+  backgroundColor?: string | null;
+  textColor?: string | null;
+};
+
 export type InfoboardScreen1Props = {
   feed: InfoboardScreen1Feed;
   branding?: InfoboardScreen1Branding;
+  announcement?: InfoboardScreen1Announcement | null;
 };
 
 // ── Event-type labels (presentation-only, German) ─────────────────────────────
@@ -78,17 +86,24 @@ function formatTime(isoString: string, timeZone: string): string {
 }
 
 /**
- * Formats the display date (YYYY-MM-DD) for the header as a German long date.
- * Parses the date-only string at noon UTC to avoid any TZ edge cases.
+ * Returns the weekday name (uppercase) from a YYYY-MM-DD display date.
+ * Parses at noon UTC to avoid TZ edge cases.
  */
-function formatDisplayDate(dateKey: string): string {
+function formatHeaderWeekday(dateKey: string): string {
+  const d = new Date(dateKey + "T12:00:00.000Z");
+  return d.toLocaleDateString("de-CH", { weekday: "long" }).toUpperCase();
+}
+
+/**
+ * Returns "DD. MONTH YYYY" (uppercase) from a YYYY-MM-DD display date.
+ */
+function formatHeaderDate(dateKey: string): string {
   const d = new Date(dateKey + "T12:00:00.000Z");
   return d.toLocaleDateString("de-CH", {
-    weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  });
+  }).toUpperCase();
 }
 
 // ── Allocation helpers ────────────────────────────────────────────────────────
@@ -178,7 +193,7 @@ function EventCard({ event, timeZone, size }: EventCardProps): ReactElement {
       data-type={event.type}
       data-status={event.status}
     >
-      {/* Time + type label */}
+      {/* ── Meta: time + type label + live badge ── */}
       <div className={styles.eventMeta}>
         <time
           dateTime={event.startAt}
@@ -196,30 +211,31 @@ function EventCard({ event, timeZone, size }: EventCardProps): ReactElement {
         )}
       </div>
 
-      {/* Team / pairing */}
-      <div className={styles.eventTeams}>
-        {hasPairing ? (
-          <>
-            <span className={styles.eventTeamHome}>{event.teamDisplayName}</span>
-            <span className={styles.eventVs} aria-hidden="true">vs.</span>
-            <span className={styles.eventTeamAway}>{event.opponentDisplayName}</span>
-          </>
-        ) : (
-          event.teamDisplayName !== null && (
-            <span className={styles.eventTeamSingle}>{event.teamDisplayName}</span>
-          )
-        )}
-        {!isMatch && event.displayTitle && event.teamDisplayName === null && (
-          <span className={styles.eventTeamSingle}>{event.displayTitle}</span>
+      {/* ── Content: teams + competition ── */}
+      <div className={styles.eventContent}>
+        <div className={styles.eventTeams}>
+          {hasPairing ? (
+            <>
+              <span className={styles.eventTeamHome}>{event.teamDisplayName}</span>
+              <span className={styles.eventVs} aria-hidden="true">vs.</span>
+              <span className={styles.eventTeamAway}>{event.opponentDisplayName}</span>
+            </>
+          ) : (
+            event.teamDisplayName !== null && (
+              <span className={styles.eventTeamSingle}>{event.teamDisplayName}</span>
+            )
+          )}
+          {!isMatch && event.displayTitle && event.teamDisplayName === null && (
+            <span className={styles.eventTeamSingle}>{event.displayTitle}</span>
+          )}
+        </div>
+
+        {event.competitionLabel !== null && (
+          <div className={styles.eventCompetition}>{event.competitionLabel}</div>
         )}
       </div>
 
-      {/* Competition — only when present */}
-      {event.competitionLabel !== null && (
-        <div className={styles.eventCompetition}>{event.competitionLabel}</div>
-      )}
-
-      {/* Allocation */}
+      {/* ── Allocation ── */}
       <AllocationBlock allocation={event.allocation} eventType={event.type} />
     </li>
   );
@@ -292,6 +308,7 @@ function Section({
 export function InfoboardScreen1({
   feed,
   branding,
+  announcement,
 }: InfoboardScreen1Props): ReactElement {
   const { tenant, current, next, later } = feed;
   const timeZone = tenant.timezone;
@@ -307,6 +324,10 @@ export function InfoboardScreen1({
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
 
+  const announcementText = announcement?.text ?? null;
+  const announcementBg = announcement?.backgroundColor ?? null;
+  const announcementColor = announcement?.textColor ?? null;
+
   return (
     <div
       className={styles.root}
@@ -315,47 +336,58 @@ export function InfoboardScreen1({
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className={styles.header} data-testid="infoboard-header">
-        <div className={styles.headerBrand}>
+
+        {/* LEFT: club identity */}
+        <div className={styles.headerLeft}>
           {clubLogoSrc !== null ? (
             <img
               src={clubLogoSrc}
               alt={`${tenant.name} Wappen`}
               className={styles.clubLogo}
-              width={64}
-              height={64}
+              width={62}
+              height={62}
             />
           ) : (
             <div className={styles.clubLogoFallback} aria-hidden="true">
               {tenant.name.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <div className={styles.headerNames}>
-            <span className={styles.headerClubName}>{tenant.name}</span>
+          <span className={styles.headerClubName}>{tenant.name}</span>
+        </div>
+
+        {/* CENTER: product branding + live clock + display date */}
+        <div className={styles.headerCenter}>
+          <div className={styles.headerProduct} data-testid="product-branding">
+            {productLogoSrc !== null ? (
+              <img
+                src={productLogoSrc}
+                alt="SportClubEvo"
+                className={styles.productLogo}
+                width={80}
+                height={16}
+              />
+            ) : (
+              <span className={styles.productLogoFallback}>SportClubEvo</span>
+            )}
+          </div>
+          <LiveClock className={styles.headerClock} />
+          <div className={styles.headerDateZone}>
+            <span className={styles.headerWeekday}>
+              {formatHeaderWeekday(feed.displayDate)}
+            </span>
             <span className={styles.headerDate}>
-              {formatDisplayDate(feed.displayDate)}
+              {formatHeaderDate(feed.displayDate)}
             </span>
           </div>
         </div>
 
-        <div className={styles.headerProduct} data-testid="product-branding">
-          {productLogoSrc !== null ? (
-            <img
-              src={productLogoSrc}
-              alt="SportClubEvo"
-              className={styles.productLogo}
-              width={80}
-              height={24}
-            />
-          ) : (
-            <span className={styles.productLogoFallback}>SportClubEvo</span>
-          )}
-        </div>
+        {/* RIGHT: Alexa safe zone — intentionally empty */}
+        <div className={styles.headerRight} aria-hidden="true" />
       </header>
 
       {/* ── Main content ────────────────────────────────────────────────── */}
       <main className={styles.main}>
         {feed.isEmpty ? (
-          /* Full empty state */
           <div className={styles.emptyFull} data-testid="empty-state-full">
             <p className={styles.emptyFullMessage}>
               Heute keine Trainings, Heimspiele oder Turniere
@@ -408,6 +440,28 @@ export function InfoboardScreen1({
           </>
         )}
       </main>
+
+      {/* ── Announcement bar ────────────────────────────────────────────── */}
+      {announcementText !== null && announcementText.length > 0 && (
+        <div
+          className={styles.announcementBar}
+          role="marquee"
+          aria-live="off"
+          style={{
+            ...(announcementBg !== null ? { backgroundColor: announcementBg } : {}),
+            ...(announcementColor !== null ? { color: announcementColor } : {}),
+          }}
+        >
+          <span className={styles.announcementIcon} aria-hidden="true">📢</span>
+          <div className={styles.announcementScroll}>
+            {/* Duplicate text for seamless CSS marquee loop */}
+            <div className={styles.announcementInner}>
+              <span className={styles.announcementText}>{announcementText}</span>
+              <span className={styles.announcementText} aria-hidden="true">{announcementText}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
