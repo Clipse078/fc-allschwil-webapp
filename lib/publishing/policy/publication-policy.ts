@@ -12,49 +12,36 @@
  * Infoboard Screen 1 and Screen 2 share the same policy evaluation.
  */
 
-import type { PublishingEventStatus, PublishingEventType } from "../event-types";
-
 // ── Publication channels ───────────────────────────────────────────────────────
 
-export const PublicationChannel = {
-  INFOBOARD_SCREEN_1: "INFOBOARD_SCREEN_1",
-  INFOBOARD_SCREEN_2: "INFOBOARD_SCREEN_2",
-  WEBSITE_MATCHES: "WEBSITE_MATCHES",
-  WEBSITE_TRAININGSPLAN: "WEBSITE_TRAININGSPLAN",
-  WEBSITE_TOURNAMENTS: "WEBSITE_TOURNAMENTS",
-  WEBSITE_CLUB_EVENTS: "WEBSITE_CLUB_EVENTS",
-} as const;
-
 export type PublicationChannel =
-  (typeof PublicationChannel)[keyof typeof PublicationChannel];
+  | "INFOBOARD_SCREEN_1"
+  | "INFOBOARD_SCREEN_2"
+  | "WEBSITE_MATCHES"
+  | "WEBSITE_TRAININGS"
+  | "WEBSITE_TOURNAMENTS"
+  | "WEBSITE_CLUB_EVENTS";
 
 // ── Decision reasons ───────────────────────────────────────────────────────────
 
-export const DecisionReason = {
-  /** Tenant step: the tenant is not active. */
-  TENANT_INACTIVE: "TENANT_INACTIVE",
-  /** Status step: the event is a draft. */
-  STATUS_DRAFT: "STATUS_DRAFT",
-  /** Status step: the event has been cancelled. */
-  STATUS_CANCELLED: "STATUS_CANCELLED",
-  /** Status step: the event has been archived. */
-  STATUS_ARCHIVED: "STATUS_ARCHIVED",
-  /** Type step: the event type is not supported by this channel. */
-  TYPE_NOT_SUPPORTED: "TYPE_NOT_SUPPORTED",
-  /** Visibility step: the event's general visibility flag is off (infoboard channels). */
-  NOT_VISIBLE: "NOT_VISIBLE",
-  /** Channel-specific (infoboard): a match must be HOME to appear on the infoboard. */
-  INFOBOARD_MATCH_NOT_HOME: "INFOBOARD_MATCH_NOT_HOME",
-  /** Visibility / channel-specific (website channels): websiteVisible flag is not set. */
-  WEBSITE_VISIBILITY_REQUIRED: "WEBSITE_VISIBILITY_REQUIRED",
-  /** Channel-specific (website trainingsplan): trainingsplanVisible flag is not set. */
-  TRAININGSPLAN_VISIBILITY_REQUIRED: "TRAININGSPLAN_VISIBILITY_REQUIRED",
-  /** All checks passed — the event is eligible for this channel. */
-  ELIGIBLE: "ELIGIBLE",
-} as const;
+export type PublicationReason =
+  | "ELIGIBLE"
+  | "TENANT_MISMATCH"
+  | "TYPE_MISMATCH"
+  | "STATUS_NOT_PUBLISHABLE"
+  | "INFOBOARD_HIDDEN"
+  | "WEBSITE_HIDDEN"
+  | "TRAININGSPLAN_HIDDEN"
+  | "AWAY_MATCH"
+  | "HOME_AWAY_UNKNOWN"
+  | "TOURNAMENT_HOSTING_UNVERIFIED";
 
-export type DecisionReason =
-  (typeof DecisionReason)[keyof typeof DecisionReason];
+// ── Publication decision ───────────────────────────────────────────────────────
+
+export type PublicationDecision = {
+  eligible: boolean;
+  reason: PublicationReason;
+};
 
 // ── Event input type ───────────────────────────────────────────────────────────
 
@@ -62,26 +49,20 @@ export type DecisionReason =
  * Minimum event shape required for publication policy evaluation.
  *
  * Intentionally decoupled from Prisma models. Callers map their domain
- * objects to this shape before calling `evaluateForChannel`.
+ * objects to this shape before calling `evaluatePublication`.
  */
-export type PolicyEvent = {
-  /** Whether the tenant that owns this event is currently active. */
-  tenantActive: boolean;
-  /** Current lifecycle status of the event. */
-  status: PublishingEventStatus;
-  /** Categorisation of the event. */
-  type: PublishingEventType;
+export type PublicationPolicyEvent = {
+  /** The tenant that owns this event. Compared against the tenantId argument. */
+  tenantId: string | null;
+  /** Categorisation of the event (e.g. "MATCH", "TRAINING", "TOURNAMENT"). */
+  type: string;
+  /** Current lifecycle status (e.g. "SCHEDULED", "DRAFT"). */
+  status: string;
   /**
-   * Match location — relevant only for MATCH events.
-   * Must be null for non-match event types.
+   * Infoboard visibility toggle.
+   * When false the event is hidden from all infoboard screens.
    */
-  matchLocation: "HOME" | "AWAY" | "NEUTRAL" | null;
-  /**
-   * General event visibility toggle.
-   * Governs infoboard channels: when false the event is hidden from all
-   * infoboard screens regardless of other flags.
-   */
-  isVisible: boolean;
+  infoboardVisible: boolean;
   /**
    * Website publication flag.
    * Required for all website channels.
@@ -89,73 +70,70 @@ export type PolicyEvent = {
   websiteVisible: boolean;
   /**
    * Training-schedule publication flag.
-   * Required in addition to `websiteVisible` for WEBSITE_TRAININGSPLAN.
+   * Required in addition to `websiteVisible` for WEBSITE_TRAININGS.
    */
   trainingsplanVisible: boolean;
+  /**
+   * Match location — relevant only for MATCH events.
+   * Normalized via trim and uppercase before comparison.
+   * Must be null for non-match event types.
+   */
+  homeAway: string | null;
 };
 
-// ── Publication decision ───────────────────────────────────────────────────────
+// ── Status sets ────────────────────────────────────────────────────────────────
 
-export type PublicationDecision = {
-  eligible: boolean;
-  reason: DecisionReason;
-};
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-const INELIGIBLE_STATUSES = new Set<PublishingEventStatus>([
-  "DRAFT",
-  "CANCELLED",
-  "ARCHIVED",
+const PUBLISHABLE_STATUSES = new Set([
+  "SCHEDULED",
+  "LIVE",
+  "COMPLETED",
+  "POSTPONED",
 ]);
 
-function checkTenant(event: PolicyEvent): PublicationDecision | null {
-  if (!event.tenantActive) {
-    return { eligible: false, reason: DecisionReason.TENANT_INACTIVE };
+// ── Allowed types per channel ──────────────────────────────────────────────────
+
+const INFOBOARD_TYPES = new Set(["TRAINING", "MATCH", "TOURNAMENT"]);
+const WEBSITE_MATCH_TYPES = new Set(["MATCH"]);
+const WEBSITE_TRAINING_TYPES = new Set(["TRAINING"]);
+const WEBSITE_TOURNAMENT_TYPES = new Set(["TOURNAMENT"]);
+const WEBSITE_CLUB_EVENT_TYPES = new Set(["OTHER"]);
+
+// ── Private helpers ────────────────────────────────────────────────────────────
+
+function checkTenant(
+  event: PublicationPolicyEvent,
+  tenantId: string,
+): PublicationDecision | null {
+  if (event.tenantId !== tenantId) {
+    return { eligible: false, reason: "TENANT_MISMATCH" };
   }
   return null;
 }
 
-function checkStatus(event: PolicyEvent): PublicationDecision | null {
-  if (event.status === "DRAFT") {
-    return { eligible: false, reason: DecisionReason.STATUS_DRAFT };
-  }
-  if (event.status === "CANCELLED") {
-    return { eligible: false, reason: DecisionReason.STATUS_CANCELLED };
-  }
-  if (event.status === "ARCHIVED") {
-    return { eligible: false, reason: DecisionReason.STATUS_ARCHIVED };
+function checkStatus(event: PublicationPolicyEvent): PublicationDecision | null {
+  if (!PUBLISHABLE_STATUSES.has(event.status)) {
+    return { eligible: false, reason: "STATUS_NOT_PUBLISHABLE" };
   }
   return null;
 }
 
 function checkType(
-  event: PolicyEvent,
-  allowed: ReadonlySet<PublishingEventType>,
+  event: PublicationPolicyEvent,
+  allowed: ReadonlySet<string>,
 ): PublicationDecision | null {
   if (!allowed.has(event.type)) {
-    return { eligible: false, reason: DecisionReason.TYPE_NOT_SUPPORTED };
+    return { eligible: false, reason: "TYPE_MISMATCH" };
   }
   return null;
 }
 
-// ── Allowed types per channel ──────────────────────────────────────────────────
-
-const INFOBOARD_TYPES = new Set<PublishingEventType>([
-  "TRAINING",
-  "MATCH",
-  "TOURNAMENT",
-]);
-
-const WEBSITE_MATCH_TYPES = new Set<PublishingEventType>(["MATCH"]);
-const WEBSITE_TRAINING_TYPES = new Set<PublishingEventType>(["TRAINING"]);
-const WEBSITE_TOURNAMENT_TYPES = new Set<PublishingEventType>(["TOURNAMENT"]);
-const WEBSITE_CLUB_EVENT_TYPES = new Set<PublishingEventType>(["OTHER"]);
-
 // ── Infoboard shared policy (Screen 1 and Screen 2) ───────────────────────────
 
-function evaluateInfoboard(event: PolicyEvent): PublicationDecision {
-  const tenantCheck = checkTenant(event);
+function evaluateInfoboard(
+  event: PublicationPolicyEvent,
+  tenantId: string,
+): PublicationDecision {
+  const tenantCheck = checkTenant(event, tenantId);
   if (tenantCheck) return tenantCheck;
 
   const statusCheck = checkStatus(event);
@@ -164,22 +142,37 @@ function evaluateInfoboard(event: PolicyEvent): PublicationDecision {
   const typeCheck = checkType(event, INFOBOARD_TYPES);
   if (typeCheck) return typeCheck;
 
-  if (!event.isVisible) {
-    return { eligible: false, reason: DecisionReason.NOT_VISIBLE };
+  if (!event.infoboardVisible) {
+    return { eligible: false, reason: "INFOBOARD_HIDDEN" };
   }
 
-  // Channel-specific: MATCH must be HOME.
-  if (event.type === "MATCH" && event.matchLocation !== "HOME") {
-    return { eligible: false, reason: DecisionReason.INFOBOARD_MATCH_NOT_HOME };
+  if (event.type === "MATCH") {
+    const normalized =
+      event.homeAway != null ? event.homeAway.trim().toUpperCase() : null;
+
+    if (normalized === "HOME") {
+      return { eligible: true, reason: "ELIGIBLE" };
+    }
+    if (normalized === "AWAY") {
+      return { eligible: false, reason: "AWAY_MATCH" };
+    }
+    // null, blank, NEUTRAL, or any unrecognised value
+    return { eligible: false, reason: "HOME_AWAY_UNKNOWN" };
   }
 
-  return { eligible: true, reason: DecisionReason.ELIGIBLE };
+  // TRAINING and TOURNAMENT: a visible event is eligible.
+  // TOURNAMENT_HOSTING_UNVERIFIED is reserved for future administrative use
+  // and is not returned in the current evaluation flow.
+  return { eligible: true, reason: "ELIGIBLE" };
 }
 
 // ── Website channel policies ───────────────────────────────────────────────────
 
-function evaluateWebsiteMatches(event: PolicyEvent): PublicationDecision {
-  const tenantCheck = checkTenant(event);
+function evaluateWebsiteMatches(
+  event: PublicationPolicyEvent,
+  tenantId: string,
+): PublicationDecision {
+  const tenantCheck = checkTenant(event, tenantId);
   if (tenantCheck) return tenantCheck;
 
   const statusCheck = checkStatus(event);
@@ -189,15 +182,18 @@ function evaluateWebsiteMatches(event: PolicyEvent): PublicationDecision {
   if (typeCheck) return typeCheck;
 
   if (!event.websiteVisible) {
-    return { eligible: false, reason: DecisionReason.WEBSITE_VISIBILITY_REQUIRED };
+    return { eligible: false, reason: "WEBSITE_HIDDEN" };
   }
 
   // Both HOME and AWAY matches are eligible for the website.
-  return { eligible: true, reason: DecisionReason.ELIGIBLE };
+  return { eligible: true, reason: "ELIGIBLE" };
 }
 
-function evaluateWebsiteTrainingsplan(event: PolicyEvent): PublicationDecision {
-  const tenantCheck = checkTenant(event);
+function evaluateWebsiteTrainings(
+  event: PublicationPolicyEvent,
+  tenantId: string,
+): PublicationDecision {
+  const tenantCheck = checkTenant(event, tenantId);
   if (tenantCheck) return tenantCheck;
 
   const statusCheck = checkStatus(event);
@@ -207,21 +203,21 @@ function evaluateWebsiteTrainingsplan(event: PolicyEvent): PublicationDecision {
   if (typeCheck) return typeCheck;
 
   if (!event.websiteVisible) {
-    return { eligible: false, reason: DecisionReason.WEBSITE_VISIBILITY_REQUIRED };
+    return { eligible: false, reason: "WEBSITE_HIDDEN" };
   }
 
   if (!event.trainingsplanVisible) {
-    return {
-      eligible: false,
-      reason: DecisionReason.TRAININGSPLAN_VISIBILITY_REQUIRED,
-    };
+    return { eligible: false, reason: "TRAININGSPLAN_HIDDEN" };
   }
 
-  return { eligible: true, reason: DecisionReason.ELIGIBLE };
+  return { eligible: true, reason: "ELIGIBLE" };
 }
 
-function evaluateWebsiteTournaments(event: PolicyEvent): PublicationDecision {
-  const tenantCheck = checkTenant(event);
+function evaluateWebsiteTournaments(
+  event: PublicationPolicyEvent,
+  tenantId: string,
+): PublicationDecision {
+  const tenantCheck = checkTenant(event, tenantId);
   if (tenantCheck) return tenantCheck;
 
   const statusCheck = checkStatus(event);
@@ -231,14 +227,17 @@ function evaluateWebsiteTournaments(event: PolicyEvent): PublicationDecision {
   if (typeCheck) return typeCheck;
 
   if (!event.websiteVisible) {
-    return { eligible: false, reason: DecisionReason.WEBSITE_VISIBILITY_REQUIRED };
+    return { eligible: false, reason: "WEBSITE_HIDDEN" };
   }
 
-  return { eligible: true, reason: DecisionReason.ELIGIBLE };
+  return { eligible: true, reason: "ELIGIBLE" };
 }
 
-function evaluateWebsiteClubEvents(event: PolicyEvent): PublicationDecision {
-  const tenantCheck = checkTenant(event);
+function evaluateWebsiteClubEvents(
+  event: PublicationPolicyEvent,
+  tenantId: string,
+): PublicationDecision {
+  const tenantCheck = checkTenant(event, tenantId);
   if (tenantCheck) return tenantCheck;
 
   const statusCheck = checkStatus(event);
@@ -248,10 +247,10 @@ function evaluateWebsiteClubEvents(event: PolicyEvent): PublicationDecision {
   if (typeCheck) return typeCheck;
 
   if (!event.websiteVisible) {
-    return { eligible: false, reason: DecisionReason.WEBSITE_VISIBILITY_REQUIRED };
+    return { eligible: false, reason: "WEBSITE_HIDDEN" };
   }
 
-  return { eligible: true, reason: DecisionReason.ELIGIBLE };
+  return { eligible: true, reason: "ELIGIBLE" };
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
@@ -268,25 +267,26 @@ function evaluateWebsiteClubEvents(event: PolicyEvent): PublicationDecision {
  *
  * Infoboard Screen 1 and Screen 2 share identical policy logic.
  */
-export function evaluateForChannel(
-  event: PolicyEvent,
+export function evaluatePublication(
+  event: PublicationPolicyEvent,
   channel: PublicationChannel,
+  tenantId: string,
 ): PublicationDecision {
   switch (channel) {
-    case PublicationChannel.INFOBOARD_SCREEN_1:
-    case PublicationChannel.INFOBOARD_SCREEN_2:
-      return evaluateInfoboard(event);
+    case "INFOBOARD_SCREEN_1":
+    case "INFOBOARD_SCREEN_2":
+      return evaluateInfoboard(event, tenantId);
 
-    case PublicationChannel.WEBSITE_MATCHES:
-      return evaluateWebsiteMatches(event);
+    case "WEBSITE_MATCHES":
+      return evaluateWebsiteMatches(event, tenantId);
 
-    case PublicationChannel.WEBSITE_TRAININGSPLAN:
-      return evaluateWebsiteTrainingsplan(event);
+    case "WEBSITE_TRAININGS":
+      return evaluateWebsiteTrainings(event, tenantId);
 
-    case PublicationChannel.WEBSITE_TOURNAMENTS:
-      return evaluateWebsiteTournaments(event);
+    case "WEBSITE_TOURNAMENTS":
+      return evaluateWebsiteTournaments(event, tenantId);
 
-    case PublicationChannel.WEBSITE_CLUB_EVENTS:
-      return evaluateWebsiteClubEvents(event);
+    case "WEBSITE_CLUB_EVENTS":
+      return evaluateWebsiteClubEvents(event, tenantId);
   }
 }
