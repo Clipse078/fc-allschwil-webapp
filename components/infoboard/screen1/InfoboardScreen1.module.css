@@ -1,0 +1,546 @@
+/**
+ * components/infoboard/screen1/InfoboardScreen1.module.css
+ *
+ * Fully isolated CSS module for Infoboard Screen 1.
+ *
+ * Design principles:
+ *   - Deep-neutral dark background; bright, high-contrast foreground.
+ *   - SportClubEvo orange (#F97316) as restrained accent on key labels.
+ *   - Strong typographic hierarchy — time is the dominant element.
+ *   - No gradients that reduce readability.
+ *   - No glassmorphism.
+ *   - No hover-only behavior.
+ *   - No scrolling — content must fit within 100dvh at target densities.
+ *   - Primary target: 1920×1080; must remain usable at 1366×768 and 1280×720.
+ *
+ * Density modes applied via data-density attribute on the root element:
+ *   [data-density="normal"]  → ≤5 events — generous spacing
+ *   [data-density="compact"] → 6+ events — reduced gaps, preserved readability
+ */
+
+/* ─── Palette ────────────────────────────────────────────────────────────── */
+
+.root {
+  --ib-bg:           #0d1117;
+  --ib-bg-section:   #111820;
+  --ib-bg-card:      #161e2a;
+  --ib-bg-card-alt:  #1a2436;
+  --ib-border:       rgba(255, 255, 255, 0.08);
+  --ib-border-strong: rgba(255, 255, 255, 0.14);
+
+  --ib-text-primary:   #f0f4f8;
+  --ib-text-secondary: #94a3b8;
+  --ib-text-muted:     #4b6280;
+  --ib-text-time:      #ffffff;
+
+  --ib-orange:         #f97316;
+  --ib-orange-muted:   rgba(249, 115, 22, 0.70);
+  --ib-orange-subtle:  rgba(249, 115, 22, 0.12);
+
+  --ib-green:          #22c55e;
+  --ib-green-subtle:   rgba(34, 197, 94, 0.12);
+
+  --ib-cyan:           #38bdf8;
+  --ib-cyan-subtle:    rgba(56, 189, 248, 0.10);
+
+  --ib-amber:          #fbbf24;
+  --ib-amber-subtle:   rgba(251, 191, 36, 0.10);
+
+  --ib-live-color:     #ef4444;
+  --ib-live-subtle:    rgba(239, 68, 68, 0.15);
+
+  /* Sizing — TV-optimised */
+  --ib-header-height: 80px;
+  --ib-radius-card:   6px;
+  --ib-radius-badge:  4px;
+
+  /* Spacing scale */
+  --ib-sp-1: 4px;
+  --ib-sp-2: 8px;
+  --ib-sp-3: 12px;
+  --ib-sp-4: 16px;
+  --ib-sp-5: 20px;
+  --ib-sp-6: 24px;
+  --ib-sp-8: 32px;
+
+  /* Typography — TV-legible at several metres distance */
+  --ib-fs-time-large:   clamp(2.6rem, 3.2vw, 3.4rem);
+  --ib-fs-time-medium:  clamp(2rem,   2.4vw, 2.6rem);
+  --ib-fs-time-small:   clamp(1.4rem, 1.8vw, 1.9rem);
+
+  --ib-fs-team-large:   clamp(1.6rem, 2vw, 2.2rem);
+  --ib-fs-team-medium:  clamp(1.2rem, 1.5vw, 1.7rem);
+  --ib-fs-team-small:   clamp(0.95rem, 1.2vw, 1.25rem);
+
+  --ib-fs-label:        clamp(0.55rem, 0.7vw, 0.8rem);
+  --ib-fs-section-hdg:  clamp(0.65rem, 0.9vw, 1rem);
+
+  --ib-fs-alloc-label:  clamp(0.5rem, 0.65vw, 0.72rem);
+  --ib-fs-alloc-value:  clamp(0.7rem, 0.9vw, 1rem);
+}
+
+/* ─── Root container ─────────────────────────────────────────────────────── */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+  min-height: 100vh;       /* fallback when dvh unsupported */
+  background: var(--ib-bg);
+  color: var(--ib-text-primary);
+  font-family: var(--font-inter, Inter, system-ui, -apple-system, sans-serif);
+  overflow: hidden;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--ib-header-height);
+  padding: 0 var(--ib-sp-8);
+  border-bottom: 1px solid var(--ib-border-strong);
+  background: var(--ib-bg-section);
+  flex-shrink: 0;
+}
+
+.headerBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--ib-sp-4);
+}
+
+.clubLogo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.clubLogoFallback {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ib-orange-subtle);
+  border: 1px solid var(--ib-orange-muted);
+  border-radius: 4px;
+  color: var(--ib-orange);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.headerNames {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.headerClubName {
+  font-size: clamp(1.1rem, 1.4vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ib-text-primary);
+  line-height: 1;
+}
+
+.headerDate {
+  font-size: clamp(0.75rem, 0.95vw, 1rem);
+  font-weight: 400;
+  color: var(--ib-text-secondary);
+  letter-spacing: 0.01em;
+}
+
+.headerProduct {
+  display: flex;
+  align-items: center;
+  opacity: 0.55;
+}
+
+.productLogo {
+  height: 20px;
+  width: auto;
+  object-fit: contain;
+}
+
+.productLogoFallback {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--ib-text-muted);
+  letter-spacing: 0.05em;
+}
+
+/* ─── Main content ───────────────────────────────────────────────────────── */
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--ib-sp-4) var(--ib-sp-8) var(--ib-sp-4);
+  gap: var(--ib-sp-3);
+  min-height: 0;
+}
+
+/* ─── Sections ───────────────────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib-sp-2);
+}
+
+/* Section variant flex allocations */
+.sectionCurrent {
+  flex: 2.5;
+  min-height: 0;
+}
+
+.sectionNext {
+  flex: 2;
+  min-height: 0;
+}
+
+.sectionLater {
+  flex: 1.5;
+  min-height: 0;
+}
+
+.sectionHeading {
+  font-size: var(--ib-fs-section-hdg);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ib-orange);
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.sectionEmpty {
+  color: var(--ib-text-muted);
+  font-size: clamp(0.8rem, 1vw, 1rem);
+  font-weight: 400;
+  font-style: italic;
+  padding: var(--ib-sp-2) 0;
+  margin: 0;
+}
+
+/* ─── Event list ─────────────────────────────────────────────────────────── */
+
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib-sp-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Next/later section events laid in a row */
+.sectionNext .eventList,
+.sectionLater .eventList {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: var(--ib-sp-3);
+}
+
+/* ─── Event card ─────────────────────────────────────────────────────────── */
+
+.eventCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib-sp-1);
+  background: var(--ib-bg-card);
+  border: 1px solid var(--ib-border);
+  border-radius: var(--ib-radius-card);
+  padding: var(--ib-sp-4) var(--ib-sp-5);
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Current section cards: full-width row layout */
+.sectionCurrent .eventCard {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--ib-sp-6);
+  background: var(--ib-bg-card-alt);
+  border-color: var(--ib-border-strong);
+  border-left: 3px solid var(--ib-orange);
+}
+
+/* LIVE event highlight — .eventCard[attr] is pure because .eventCard is local */
+.eventCard[data-status="LIVE"] {
+  border-left-color: var(--ib-live-color);
+  background: color-mix(in srgb, var(--ib-live-color) 4%, var(--ib-bg-card-alt));
+}
+
+/* ─── Event meta (time + type label) ─────────────────────────────────────── */
+
+.eventMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ib-sp-1);
+  flex-shrink: 0;
+}
+
+.sectionCurrent .eventMeta {
+  align-items: center;
+  min-width: 120px;
+}
+
+.eventTime {
+  font-size: var(--ib-fs-time-large);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ib-text-time);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.eventCard[data-size="medium"] .eventTime {
+  font-size: var(--ib-fs-time-medium);
+}
+
+.eventCard[data-size="small"] .eventTime {
+  font-size: var(--ib-fs-time-small);
+}
+
+.eventTypeLabel {
+  font-size: var(--ib-fs-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ib-text-muted);
+  white-space: nowrap;
+}
+
+.liveIndicator {
+  font-size: var(--ib-fs-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ib-live-color);
+  background: var(--ib-live-subtle);
+  border: 1px solid rgba(239, 68, 68, 0.30);
+  border-radius: var(--ib-radius-badge);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+/* ─── Team / pairing ─────────────────────────────────────────────────────── */
+
+.eventTeams {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sectionCurrent .eventTeams {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ib-sp-2);
+}
+
+.eventTeamHome,
+.eventTeamAway,
+.eventTeamSingle {
+  font-size: var(--ib-fs-team-large);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ib-text-primary);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventCard[data-size="medium"] .eventTeamHome,
+.eventCard[data-size="medium"] .eventTeamAway,
+.eventCard[data-size="medium"] .eventTeamSingle {
+  font-size: var(--ib-fs-team-medium);
+}
+
+.eventCard[data-size="small"] .eventTeamHome,
+.eventCard[data-size="small"] .eventTeamAway,
+.eventCard[data-size="small"] .eventTeamSingle {
+  font-size: var(--ib-fs-team-small);
+}
+
+.eventVs {
+  font-size: clamp(0.9rem, 1.1vw, 1.2rem);
+  font-weight: 400;
+  color: var(--ib-text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ─── Competition ────────────────────────────────────────────────────────── */
+
+.eventCompetition {
+  font-size: clamp(0.65rem, 0.85vw, 0.9rem);
+  font-weight: 500;
+  color: var(--ib-text-secondary);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Allocation block ───────────────────────────────────────────────────── */
+
+.allocation {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--ib-sp-3);
+  margin-top: var(--ib-sp-1);
+}
+
+.sectionCurrent .allocation {
+  flex-shrink: 0;
+  margin-top: 0;
+  gap: var(--ib-sp-4);
+}
+
+.allocationPitch,
+.allocationHome,
+.allocationAway,
+.allocationReferee {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.allocationLabel {
+  font-size: var(--ib-fs-alloc-label);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.allocationValue {
+  font-size: var(--ib-fs-alloc-value);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.allocationPitch .allocationLabel { color: var(--ib-cyan); }
+.allocationPitch .allocationValue { color: var(--ib-cyan); }
+
+.allocationHome .allocationLabel  { color: var(--ib-green); }
+.allocationHome .allocationValue  { color: var(--ib-green); }
+
+.allocationAway .allocationLabel  { color: var(--ib-amber); }
+.allocationAway .allocationValue  { color: var(--ib-amber); }
+
+.allocationReferee .allocationLabel { color: var(--ib-text-secondary); }
+.allocationReferee .allocationValue { color: var(--ib-text-secondary); }
+
+/* ─── Empty states ───────────────────────────────────────────────────────── */
+
+.emptyFull {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyFullMessage {
+  font-size: clamp(1.2rem, 1.8vw, 2rem);
+  font-weight: 500;
+  color: var(--ib-text-muted);
+  text-align: center;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+/* ─── Overflow warning ───────────────────────────────────────────────────── */
+
+.overflowWarning {
+  font-size: var(--ib-fs-label);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ib-orange);
+  text-align: center;
+  padding: var(--ib-sp-2) 0;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* ─── Compact density overrides ──────────────────────────────────────────── */
+
+/* Compact density overrides. .root[data-density="compact"] is pure because
+   .root is a local class. All children must be reached via local classes. */
+.root[data-density="compact"] .main {
+  gap: var(--ib-sp-2);
+  padding-top: var(--ib-sp-3);
+  padding-bottom: var(--ib-sp-3);
+}
+
+.root[data-density="compact"] .eventList {
+  gap: var(--ib-sp-2);
+}
+
+.root[data-density="compact"] .sectionCurrent .eventCard {
+  padding: var(--ib-sp-3) var(--ib-sp-4);
+}
+
+.root[data-density="compact"] .eventCard[data-size="small"] .eventTime {
+  font-size: clamp(1.1rem, 1.4vw, 1.5rem);
+}
+
+.root[data-density="compact"] .eventCard[data-size="small"] .eventTeamHome,
+.root[data-density="compact"] .eventCard[data-size="small"] .eventTeamAway,
+.root[data-density="compact"] .eventCard[data-size="small"] .eventTeamSingle {
+  font-size: clamp(0.8rem, 1vw, 1.05rem);
+}
+
+/* ─── Breakpoint fallback: 1280×720 ─────────────────────────────────────── */
+
+@media (max-width: 1366px) {
+  .root {
+    --ib-header-height: 68px;
+    --ib-fs-time-large:   clamp(2rem,   3.5vw, 2.8rem);
+    --ib-fs-time-medium:  clamp(1.5rem,  2.5vw, 2rem);
+    --ib-fs-time-small:   clamp(1.1rem,  1.8vw, 1.5rem);
+    --ib-fs-team-large:   clamp(1.2rem,  1.8vw, 1.7rem);
+    --ib-fs-team-medium:  clamp(0.95rem, 1.4vw, 1.3rem);
+    --ib-fs-team-small:   clamp(0.78rem, 1.1vw, 1rem);
+  }
+
+  .main {
+    padding: var(--ib-sp-3) var(--ib-sp-6) var(--ib-sp-3);
+  }
+
+  .header {
+    padding: 0 var(--ib-sp-6);
+  }
+
+  .sectionCurrent .eventCard {
+    padding: var(--ib-sp-3) var(--ib-sp-4);
+    gap: var(--ib-sp-4);
+  }
+
+  .sectionCurrent .eventMeta {
+    min-width: 90px;
+  }
+}
