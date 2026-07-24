@@ -213,6 +213,7 @@ function makeExistingMatchMapping(externalMatchId = 99001) {
           startAt: new Date("2026-09-13T15:00:00.000Z"),
           status: "SCHEDULED",
           teamId: "team-local-1",
+          homeAway: "HOME",
         },
       },
     ],

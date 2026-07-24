@@ -10,6 +10,7 @@ import {
   mapMatchStateToEventStatus,
   buildResultLabel,
   buildMappingFields,
+  buildNewEventFields,
   detectChanges,
   classifyParticipant,
   resolvedTeamId,
@@ -19,6 +20,7 @@ import {
   resolveOpponentNameFromClassification,
   isLocalTeamId,
   resolveOpponentName,
+  mapSfvHomeAway,
 } from "../sync/schedule-mapper";
 import type { ClubScheduleEntry } from "../client";
 
@@ -72,6 +74,59 @@ function makeContext() {
     syncedAt: new Date("2026-07-13T10:00:00.000Z"),
   };
 }
+
+// ── mapSfvHomeAway ────────────────────────────────────────────────────────────
+
+describe("mapSfvHomeAway", () => {
+  it("maps isHome=true to 'HOME'", () => {
+    expect(mapSfvHomeAway(true)).toBe("HOME");
+  });
+
+  it("maps isHome=false to 'AWAY'", () => {
+    expect(mapSfvHomeAway(false)).toBe("AWAY");
+  });
+
+  it("never returns 'H'", () => {
+    expect(mapSfvHomeAway(true)).not.toBe("H");
+    expect(mapSfvHomeAway(false)).not.toBe("H");
+  });
+
+  it("never returns 'A'", () => {
+    expect(mapSfvHomeAway(true)).not.toBe("A");
+    expect(mapSfvHomeAway(false)).not.toBe("A");
+  });
+});
+
+// ── buildNewEventFields homeAway ──────────────────────────────────────────────
+
+describe("buildNewEventFields homeAway", () => {
+  it("home fixture maps homeAway to 'HOME'", () => {
+    const fields = buildNewEventFields(makeEntry(), makeContext(), "local-team-1", "FC Opponent", true);
+    expect(fields.homeAway).toBe("HOME");
+  });
+
+  it("away fixture maps homeAway to 'AWAY'", () => {
+    const fields = buildNewEventFields(makeEntry(), makeContext(), null, "FC Local", false);
+    expect(fields.homeAway).toBe("AWAY");
+  });
+
+  it("home fixture does not produce 'H'", () => {
+    const fields = buildNewEventFields(makeEntry(), makeContext(), "local-team-1", "FC Opponent", true);
+    expect(fields.homeAway).not.toBe("H");
+  });
+
+  it("away fixture does not produce 'A'", () => {
+    const fields = buildNewEventFields(makeEntry(), makeContext(), null, "FC Local", false);
+    expect(fields.homeAway).not.toBe("A");
+  });
+
+  it("does not mutate the input entry", () => {
+    const entry = makeEntry();
+    const original = JSON.stringify(entry);
+    buildNewEventFields(entry, makeContext(), "local-team-1", "FC Opponent", true);
+    expect(JSON.stringify(entry)).toBe(original);
+  });
+});
 
 // ── mapMatchStateToEventStatus ────────────────────────────────────────────────
 
@@ -219,18 +274,19 @@ describe("detectChanges", () => {
     };
   }
 
-  function makeExistingEvent(overrides: Partial<{ startAt: Date; status: string; teamId: string | null }> = {}) {
+  function makeExistingEvent(overrides: Partial<{ startAt: Date; status: string; teamId: string | null; homeAway: string | null }> = {}) {
     return {
       startAt: new Date("2026-09-13T15:00:00.000Z"),
       status: "SCHEDULED",
       teamId: null as string | null,
+      homeAway: "HOME" as string | null,
       ...overrides,
     };
   }
 
   it("returns hasAnyChange=false when nothing changed", () => {
     const mapping = makeExistingMapping();
-    const event = makeExistingEvent({ teamId: "team-1" });
+    const event = makeExistingEvent({ teamId: "team-1", homeAway: "HOME" });
     const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
     const result = detectChanges(
       mapping,
@@ -238,7 +294,8 @@ describe("detectChanges", () => {
       incoming,
       new Date("2026-09-13T15:00:00.000Z"),
       "SCHEDULED",
-      "team-1", // same localTeamId
+      "team-1",
+      "HOME",
     );
     expect(result.hasAnyChange).toBe(false);
     expect(result.scoreChanged).toBe(false);
@@ -248,7 +305,7 @@ describe("detectChanges", () => {
 
   it("detects score change", () => {
     const mapping = makeExistingMapping({ scoreHome: 0, scoreAway: 0 });
-    const event = makeExistingEvent({ teamId: "team-1" });
+    const event = makeExistingEvent({ teamId: "team-1", homeAway: "HOME" });
     const incoming = buildMappingFields(
       makeEntry({ scoreTeamA: 2, scoreTeamB: 1 }),
       makeContext(),
@@ -262,6 +319,7 @@ describe("detectChanges", () => {
       new Date("2026-09-13T15:00:00.000Z"),
       "SCHEDULED",
       "team-1",
+      "HOME",
     );
     expect(result.scoreChanged).toBe(true);
     expect(result.hasAnyChange).toBe(true);
@@ -269,7 +327,7 @@ describe("detectChanges", () => {
 
   it("detects kickoff change", () => {
     const mapping = makeExistingMapping();
-    const event = makeExistingEvent({ startAt: new Date("2026-09-13T15:00:00.000Z"), teamId: "team-1" });
+    const event = makeExistingEvent({ startAt: new Date("2026-09-13T15:00:00.000Z"), teamId: "team-1", homeAway: "HOME" });
     const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
     const result = detectChanges(
       mapping,
@@ -278,6 +336,7 @@ describe("detectChanges", () => {
       new Date("2026-09-20T18:00:00.000Z"), // changed kickoff
       "SCHEDULED",
       "team-1",
+      "HOME",
     );
     expect(result.kickoffChanged).toBe(true);
     expect(result.hasAnyChange).toBe(true);
@@ -285,7 +344,7 @@ describe("detectChanges", () => {
 
   it("detects status change", () => {
     const mapping = makeExistingMapping();
-    const event = makeExistingEvent({ status: "SCHEDULED", teamId: "team-1" });
+    const event = makeExistingEvent({ status: "SCHEDULED", teamId: "team-1", homeAway: "HOME" });
     const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
     const result = detectChanges(
       mapping,
@@ -294,15 +353,15 @@ describe("detectChanges", () => {
       new Date("2026-09-13T15:00:00.000Z"),
       "COMPLETED", // changed status
       "team-1",
+      "HOME",
     );
     expect(result.statusChanged).toBe(true);
     expect(result.hasAnyChange).toBe(true);
   });
 
   it("detects teamId improvement (null → resolved) as a change", () => {
-    // Before team sync: teamId was null; after team sync: can now be resolved
     const mapping = makeExistingMapping();
-    const event = makeExistingEvent({ teamId: null }); // was null
+    const event = makeExistingEvent({ teamId: null, homeAway: "HOME" });
     const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
     const result = detectChanges(
       mapping,
@@ -310,9 +369,74 @@ describe("detectChanges", () => {
       incoming,
       new Date("2026-09-13T15:00:00.000Z"),
       "SCHEDULED",
-      "team-1", // now resolved
+      "team-1",
+      "HOME",
     );
     expect(result.hasAnyChange).toBe(true); // must fire update to repair teamId
+  });
+
+  it("detects homeAway 'H' → 'HOME' as a change (legacy correction)", () => {
+    const mapping = makeExistingMapping();
+    const event = makeExistingEvent({ teamId: "team-1", homeAway: "H" }); // legacy value
+    const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "HOME", // canonical incoming
+    );
+    expect(result.hasAnyChange).toBe(true); // must trigger update
+  });
+
+  it("detects homeAway 'A' → 'AWAY' as a change (legacy correction)", () => {
+    const mapping = makeExistingMapping();
+    const event = makeExistingEvent({ teamId: null, homeAway: "A" }); // legacy value
+    const incoming = buildMappingFields(makeEntry(), makeContext(), null, null);
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      null,
+      "AWAY", // canonical incoming
+    );
+    expect(result.hasAnyChange).toBe(true); // must trigger update
+  });
+
+  it("homeAway 'HOME' → 'HOME' is idempotent (no change)", () => {
+    const mapping = makeExistingMapping();
+    const event = makeExistingEvent({ teamId: "team-1", homeAway: "HOME" });
+    const incoming = buildMappingFields(makeEntry(), makeContext(), "team-1", null);
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "HOME",
+    );
+    expect(result.hasAnyChange).toBe(false);
+  });
+
+  it("homeAway 'AWAY' → 'AWAY' is idempotent (no change)", () => {
+    const mapping = makeExistingMapping({ homeTeamId: null, awayTeamId: "team-1" });
+    const event = makeExistingEvent({ teamId: "team-1", homeAway: "AWAY" });
+    const incoming = buildMappingFields(makeEntry(), makeContext(), null, "team-1");
+    const result = detectChanges(
+      mapping,
+      event,
+      incoming,
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "AWAY",
+    );
+    expect(result.hasAnyChange).toBe(false);
   });
 });
 

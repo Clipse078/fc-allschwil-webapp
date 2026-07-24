@@ -40,6 +40,7 @@ import {
   isExternalOpponent,
   resolveEventTeamId,
   resolveOpponentNameFromClassification,
+  mapSfvHomeAway,
 } from "./schedule-mapper";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -81,6 +82,7 @@ export type ExistingMatchMappingRow = {
     startAt: Date;
     status: string;
     teamId: string | null;
+    homeAway: string | null;
   };
 };
 
@@ -119,7 +121,7 @@ export async function loadExistingMatchMappings(
       homeTeamId: true,
       awayTeamId: true,
       event: {
-        select: { startAt: true, status: true, teamId: true },
+        select: { startAt: true, status: true, teamId: true, homeAway: true },
       },
     },
   });
@@ -283,7 +285,7 @@ export async function createMatchWithMapping(
  *   - startAt (kickoff — may change after rescheduling)
  *   - status (derived from matchState)
  *   - teamId (canonical local Team — may newly resolve after team sync is run)
- *   - homeAway (H/A derived from team classification)
+ *   - homeAway (HOME/AWAY derived from team classification)
  *   - opponentName (display name may change)
  *   - competitionLabel (league name may change)
  *   - location (venue may change)
@@ -315,7 +317,7 @@ export async function updateMatchRecord(
   const resultLabel = buildResultLabel(entry.scoreTeamA, entry.scoreTeamB, status);
   const competition = entry.leagueName ?? entry.divisionName ?? null;
   const venue = entry.stadiumPlaygroundName ?? null;
-  const homeAway = isHome ? "H" : "A";
+  const homeAway = mapSfvHomeAway(isHome);
 
   try {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -450,6 +452,7 @@ export async function processScheduleEntry(
   const incomingMapping = buildMappingFields(entry, context, homeTeamId, awayTeamId);
   const incomingKickoff = new Date(entry.matchDate);
   const incomingStatus = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
+  const canonicalHomeAway = mapSfvHomeAway(isHome);
 
   const changes = detectChanges(
     existing,
@@ -458,6 +461,7 @@ export async function processScheduleEntry(
     incomingKickoff,
     incomingStatus,
     localTeamId,
+    canonicalHomeAway,
   );
 
   if (!changes.hasAnyChange) {
