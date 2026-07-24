@@ -604,7 +604,9 @@ export function InfoboardScreen1({
         {feed.isEmpty ? (
           <div className={styles.emptyFull} data-testid="empty-state-full">
             <p className={styles.emptyFullMessage}>
-              Heute keine Trainings, Heimspiele oder Turniere
+              {feed.emptyStateReason === "DAY_COMPLETED"
+                ? "Heute keine weiteren Trainings, Heimspiele oder Turniere."
+                : "Heute sind keine Trainings, Heimspiele oder Turniere geplant."}
             </p>
           </div>
         ) : (

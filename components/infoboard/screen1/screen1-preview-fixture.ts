@@ -181,6 +181,7 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
   ],
 
   isEmpty: false,
+  emptyStateReason: null,
 };
 
 // ── Presentation: current time and announcement ───────────────────────────────
@@ -275,6 +276,7 @@ export const PREVIEW_FIXTURE_TOURNAMENT_4TEAM: InfoboardScreen1Feed = {
   next: [],
   later: [],
   isEmpty: false,
+  emptyStateReason: null,
 };
 
 export const PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS: readonly InfoboardEventPresentationExtension[] = [
@@ -354,6 +356,7 @@ export const PREVIEW_FIXTURE_TOURNAMENT_6TEAM: InfoboardScreen1Feed = {
   next: [],
   later: [],
   isEmpty: false,
+  emptyStateReason: null,
 };
 
 export const PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS: readonly InfoboardEventPresentationExtension[] = [
@@ -553,6 +556,7 @@ export const PREVIEW_FIXTURE_HIGH_DENSITY_6: InfoboardScreen1Feed = {
   next: [],
   later: [],
   isEmpty: false,
+  emptyStateReason: null,
 };
 
 // ── Derived empty-state fixtures ──────────────────────────────────────────────
@@ -574,4 +578,5 @@ export const PREVIEW_FIXTURE_EMPTY: InfoboardScreen1Feed = {
   next: [],
   later: [],
   isEmpty: true,
+  emptyStateReason: "NO_EVENTS_TODAY",
 };

@@ -114,6 +114,7 @@ const MOCK_PAYLOAD = {
     ],
     later: [],
     isEmpty: false,
+    emptyStateReason: null,
   },
   eventPresentation: [],
   announcement: null,

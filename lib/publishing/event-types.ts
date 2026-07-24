@@ -83,6 +83,16 @@ export type InfoboardScreen1Event = {
   seasonKey: string;
 };
 
+/**
+ * Reason for an empty Screen 1 feed.
+ *
+ * NO_EVENTS_TODAY  — No eligible events exist for the evaluated local calendar
+ *                    day. The board has nothing to show and nothing ended.
+ * DAY_COMPLETED    — Eligible events existed for today but all display windows
+ *                    have ended. The day is over.
+ */
+export type EmptyStateReason = "NO_EVENTS_TODAY" | "DAY_COMPLETED";
+
 /** Complete payload for Infoboard Screen 1. */
 export type InfoboardScreen1Feed = {
   /** UTC ISO-8601 timestamp when the feed was assembled. */
@@ -94,11 +104,29 @@ export type InfoboardScreen1Feed = {
   isStale: boolean;
   /** Optional Wochenplan variant badge label. */
   wochenplanVariantBadge: string | null;
+  /**
+   * Currently active events: started at or before now, effective end after now.
+   * All active events are always included (no count cap).
+   */
   current: InfoboardScreen1Event[];
+  /**
+   * The next 2 upcoming eligible events on today's local calendar day,
+   * ordered by startAt ascending. If fewer than 2 upcoming events exist,
+   * all remaining ones are included.
+   */
   next: InfoboardScreen1Event[];
+  /**
+   * Additional eligible events on today's local calendar day beyond the
+   * first 2 upcoming events selected for the "next" bucket.
+   */
   later: InfoboardScreen1Event[];
   /** True when all three buckets are empty. */
   isEmpty: boolean;
+  /**
+   * Reason for the empty state. Present only when isEmpty is true.
+   * null when isEmpty is false.
+   */
+  emptyStateReason: EmptyStateReason | null;
 };
 
 /** Occupancy state of a pitch at the moment the feed was assembled. */

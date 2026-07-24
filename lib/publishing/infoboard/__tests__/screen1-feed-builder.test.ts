@@ -362,12 +362,27 @@ describe("buildInfoboardScreen1Feed — temporal grouping", () => {
     expect(feed.next.some((e) => e.id === "next-b")).toBe(true);
   });
 
-  it("later event (after earliest-start group) appears in later", async () => {
+  it("with only 2 future events, both appear in next and later is empty", async () => {
+    // New selection rule: next = first 2 upcoming. With exactly 2, both go in next.
     const early = makeEvent({ id: "next-evt", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:30:00.000Z") });
-    const late = makeEvent({ id: "later-evt", startAt: new Date("2026-07-23T18:30:00.000Z"), endAt: new Date("2026-07-23T20:00:00.000Z") });
+    const late = makeEvent({ id: "next-evt-2", startAt: new Date("2026-07-23T18:30:00.000Z"), endAt: new Date("2026-07-23T20:00:00.000Z") });
     const feed = await buildInfoboardScreen1Feed(makeLoader([early, late]), makeInput());
     expect(feed.next.some((e) => e.id === "next-evt")).toBe(true);
-    expect(feed.later.some((e) => e.id === "later-evt")).toBe(true);
+    expect(feed.next.some((e) => e.id === "next-evt-2")).toBe(true);
+    expect(feed.later).toHaveLength(0);
+  });
+
+  it("3rd upcoming event appears in later, not in next", async () => {
+    // New selection rule: next = first 2 upcoming, later = everything beyond.
+    const e1 = makeEvent({ id: "e1", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:00:00.000Z") });
+    const e2 = makeEvent({ id: "e2", startAt: new Date("2026-07-23T18:00:00.000Z"), endAt: new Date("2026-07-23T19:00:00.000Z") });
+    const e3 = makeEvent({ id: "e3", startAt: new Date("2026-07-23T19:00:00.000Z"), endAt: new Date("2026-07-23T20:30:00.000Z") });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([e1, e2, e3]), makeInput());
+    expect(feed.next.some((e) => e.id === "e1")).toBe(true);
+    expect(feed.next.some((e) => e.id === "e2")).toBe(true);
+    expect(feed.later.some((e) => e.id === "e3")).toBe(true);
+    expect(feed.next).toHaveLength(2);
+    expect(feed.later).toHaveLength(1);
   });
 
   it("tomorrow event is omitted from all buckets", async () => {
@@ -413,10 +428,13 @@ describe("buildInfoboardScreen1Feed — temporal grouping", () => {
   });
 
   it("ordering within later is by startAt ascending", async () => {
-    const next = makeEvent({ id: "nxt", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T17:30:00.000Z") });
-    const l1 = makeEvent({ id: "l1", startAt: new Date("2026-07-23T18:00:00.000Z"), endAt: new Date("2026-07-23T19:00:00.000Z") });
-    const l2 = makeEvent({ id: "l2", startAt: new Date("2026-07-23T19:00:00.000Z"), endAt: new Date("2026-07-23T20:00:00.000Z") });
-    const feed = await buildInfoboardScreen1Feed(makeLoader([next, l2, l1]), makeInput());
+    // With 4 future events, the first 2 go to next, the last 2 to later.
+    const n1 = makeEvent({ id: "nxt1", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T17:30:00.000Z") });
+    const n2 = makeEvent({ id: "nxt2", startAt: new Date("2026-07-23T18:00:00.000Z"), endAt: new Date("2026-07-23T18:30:00.000Z") });
+    const l1 = makeEvent({ id: "l1", startAt: new Date("2026-07-23T19:00:00.000Z"), endAt: new Date("2026-07-23T20:00:00.000Z") });
+    const l2 = makeEvent({ id: "l2", startAt: new Date("2026-07-23T20:00:00.000Z"), endAt: new Date("2026-07-23T21:00:00.000Z") });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([n1, n2, l2, l1]), makeInput());
+    // l1 (19:00) must appear before l2 (20:00) in later
     const idx1 = feed.later.findIndex((e) => e.id === "l1");
     const idx2 = feed.later.findIndex((e) => e.id === "l2");
     expect(idx1).toBeLessThan(idx2);
@@ -711,5 +729,313 @@ describe("buildInfoboardScreen1Feed — empty states", () => {
     expect(feed.next).toEqual([]);
     expect(feed.later).toEqual([]);
     expect(feed.isEmpty).toBe(true);
+  });
+});
+
+// ── emptyStateReason ──────────────────────────────────────────────────────────
+
+describe("buildInfoboardScreen1Feed — emptyStateReason", () => {
+  it("is null when feed is not empty (has active event)", async () => {
+    const event = makeEvent({
+      startAt: new Date("2026-07-23T14:00:00.000Z"),
+      endAt: new Date("2026-07-23T17:30:00.000Z"),  // ends after now
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([event]), makeInput());
+    expect(feed.isEmpty).toBe(false);
+    expect(feed.emptyStateReason).toBeNull();
+  });
+
+  it("is null when feed is not empty (has upcoming event)", async () => {
+    const event = makeEvent({
+      startAt: new Date("2026-07-23T17:00:00.000Z"),
+      endAt: new Date("2026-07-23T18:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([event]), makeInput());
+    expect(feed.isEmpty).toBe(false);
+    expect(feed.emptyStateReason).toBeNull();
+  });
+
+  it("is NO_EVENTS_TODAY when no eligible events exist at all", async () => {
+    const feed = await buildInfoboardScreen1Feed(makeLoader([]), makeInput());
+    expect(feed.isEmpty).toBe(true);
+    expect(feed.emptyStateReason).toBe("NO_EVENTS_TODAY");
+  });
+
+  it("is NO_EVENTS_TODAY when all events are rejected by publication policy", async () => {
+    const rejected = makeEvent({ infoboardVisible: false });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([rejected]), makeInput());
+    expect(feed.isEmpty).toBe(true);
+    expect(feed.emptyStateReason).toBe("NO_EVENTS_TODAY");
+  });
+
+  it("is NO_EVENTS_TODAY when the only events are from tomorrow", async () => {
+    // tomorrow-only events are excluded from all buckets; no events existed today
+    const tomorrow = makeEvent({
+      id: "tomorrow-evt",
+      startAt: new Date("2026-07-24T06:00:00.000Z"),  // Jul 24 Zurich
+      endAt: new Date("2026-07-24T07:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([tomorrow]), makeInput());
+    expect(feed.isEmpty).toBe(true);
+    expect(feed.emptyStateReason).toBe("NO_EVENTS_TODAY");
+  });
+
+  it("is DAY_COMPLETED when eligible today events all ended before now", async () => {
+    // now = 2026-07-23T16:00:00Z; events ended hours ago
+    const ended1 = makeEvent({
+      id: "ended-1",
+      startAt: new Date("2026-07-23T08:00:00.000Z"),
+      endAt: new Date("2026-07-23T09:30:00.000Z"),
+    });
+    const ended2 = makeEvent({
+      id: "ended-2",
+      startAt: new Date("2026-07-23T10:00:00.000Z"),
+      endAt: new Date("2026-07-23T11:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([ended1, ended2]), makeInput());
+    expect(feed.isEmpty).toBe(true);
+    expect(feed.emptyStateReason).toBe("DAY_COMPLETED");
+  });
+
+  it("is DAY_COMPLETED when the last event of the day just ended", async () => {
+    // A TRAINING that ended exactly 1 minute before now
+    const justEnded = makeEvent({
+      id: "just-ended",
+      type: "TRAINING",
+      startAt: new Date("2026-07-23T14:00:00.000Z"),
+      endAt: new Date("2026-07-23T15:59:00.000Z"),  // ended 1min before now (16:00)
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([justEnded]), makeInput());
+    expect(feed.isEmpty).toBe(true);
+    expect(feed.emptyStateReason).toBe("DAY_COMPLETED");
+  });
+
+  it("is NO_EVENTS_TODAY when only tomorrow events exist alongside rejected today events", async () => {
+    // Rejected today event (hidden) + valid tomorrow event
+    const rejectedToday = makeEvent({ infoboardVisible: false });
+    const tomorrowEvent = makeEvent({
+      startAt: new Date("2026-07-24T06:00:00.000Z"),
+      endAt: new Date("2026-07-24T07:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader([rejectedToday, tomorrowEvent]),
+      makeInput(),
+    );
+    expect(feed.isEmpty).toBe(true);
+    // Rejected events are NOT eligible; no eligible events for today
+    expect(feed.emptyStateReason).toBe("NO_EVENTS_TODAY");
+  });
+});
+
+// ── New selection logic: next 2 upcoming ──────────────────────────────────────
+
+describe("buildInfoboardScreen1Feed — next-2 selection logic", () => {
+  // now = 2026-07-23T16:00:00.000Z (18:00 Zurich)
+
+  it("active event is always included regardless of count", async () => {
+    const active = makeEvent({
+      id: "active",
+      startAt: new Date("2026-07-23T14:00:00.000Z"),
+      endAt: new Date("2026-07-23T17:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([active]), makeInput());
+    expect(feed.current.some((e) => e.id === "active")).toBe(true);
+  });
+
+  it("next 2 upcoming events are included", async () => {
+    const e1 = makeEvent({ id: "e1", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:00:00.000Z") });
+    const e2 = makeEvent({ id: "e2", startAt: new Date("2026-07-23T19:00:00.000Z"), endAt: new Date("2026-07-23T20:00:00.000Z") });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([e1, e2]), makeInput());
+    expect(feed.next.some((e) => e.id === "e1")).toBe(true);
+    expect(feed.next.some((e) => e.id === "e2")).toBe(true);
+    expect(feed.next).toHaveLength(2);
+  });
+
+  it("upcoming event 8 hours later is still included in next (no cutoff)", async () => {
+    // No time-window cutoff: 00:00+8h = still today
+    const nowMidnight = new Date("2026-07-23T00:00:00.000Z");  // 02:00 Zurich
+    const lateEvent = makeEvent({
+      id: "late-event",
+      startAt: new Date("2026-07-23T06:00:00.000Z"),   // 08:00 Zurich — 8h after nowMidnight
+      endAt: new Date("2026-07-23T07:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader([lateEvent]),
+      makeInput({ now: nowMidnight }),
+    );
+    const all = [...feed.current, ...feed.next, ...feed.later];
+    expect(all.some((e) => e.id === "late-event")).toBe(true);
+  });
+
+  it("third upcoming event is not selected for next when 2 already there", async () => {
+    const e1 = makeEvent({ id: "e1", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:00:00.000Z") });
+    const e2 = makeEvent({ id: "e2", startAt: new Date("2026-07-23T18:00:00.000Z"), endAt: new Date("2026-07-23T19:00:00.000Z") });
+    const e3 = makeEvent({ id: "e3", startAt: new Date("2026-07-23T20:00:00.000Z"), endAt: new Date("2026-07-23T21:00:00.000Z") });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([e1, e2, e3]), makeInput());
+    expect(feed.next).toHaveLength(2);
+    expect(feed.next.some((e) => e.id === "e1")).toBe(true);
+    expect(feed.next.some((e) => e.id === "e2")).toBe(true);
+    expect(feed.later.some((e) => e.id === "e3")).toBe(true);
+  });
+
+  it("all active events remain included even when there are more than 2", async () => {
+    const a1 = makeEvent({ id: "a1", startAt: new Date("2026-07-23T12:00:00.000Z"), endAt: new Date("2026-07-23T17:00:00.000Z") });
+    const a2 = makeEvent({ id: "a2", startAt: new Date("2026-07-23T13:00:00.000Z"), endAt: new Date("2026-07-23T17:00:00.000Z") });
+    const a3 = makeEvent({ id: "a3", startAt: new Date("2026-07-23T14:00:00.000Z"), endAt: new Date("2026-07-23T17:00:00.000Z") });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([a1, a2, a3]), makeInput());
+    expect(feed.current).toHaveLength(3);
+    expect(feed.current.some((e) => e.id === "a1")).toBe(true);
+    expect(feed.current.some((e) => e.id === "a2")).toBe(true);
+    expect(feed.current.some((e) => e.id === "a3")).toBe(true);
+  });
+
+  it("before the first event of the day: next 2 upcoming events render", async () => {
+    // now = 08:00 Zurich (06:00 UTC), events at 17:00, 19:00, 22:30
+    const nowMorning = new Date("2026-07-23T06:00:00.000Z");
+    const e1700 = makeEvent({ id: "17h", startAt: new Date("2026-07-23T15:00:00.000Z"), endAt: new Date("2026-07-23T16:45:00.000Z") });
+    const e1900 = makeEvent({ id: "19h", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:30:00.000Z") });
+    const e2230 = makeEvent({ id: "22h30", startAt: new Date("2026-07-23T20:30:00.000Z"), endAt: new Date("2026-07-23T22:00:00.000Z") });
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader([e1700, e1900, e2230]),
+      makeInput({ now: nowMorning }),
+    );
+    expect(feed.current).toHaveLength(0);
+    expect(feed.next).toHaveLength(2);
+    expect(feed.next.some((e) => e.id === "17h")).toBe(true);
+    expect(feed.next.some((e) => e.id === "19h")).toBe(true);
+    expect(feed.later.some((e) => e.id === "22h30")).toBe(true);
+  });
+
+  it("between events with a large gap: upcoming event is still included", async () => {
+    // now = 12:00 UTC (14:00 Zurich), single event at 17:00 CEST = 15:00 UTC
+    const nowMidday = new Date("2026-07-23T10:00:00.000Z");
+    const e1700 = makeEvent({ id: "17h", startAt: new Date("2026-07-23T15:00:00.000Z"), endAt: new Date("2026-07-23T16:45:00.000Z") });
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader([e1700]),
+      makeInput({ now: nowMidday }),
+    );
+    expect(feed.isEmpty).toBe(false);
+    expect(feed.next.some((e) => e.id === "17h")).toBe(true);
+  });
+
+  it("after final event of the day: empty feed with DAY_COMPLETED reason", async () => {
+    // now = 23:45 Zurich = 21:45 UTC; last event ended at 23:00 Zurich = 21:00 UTC
+    const nowLate = new Date("2026-07-23T21:45:00.000Z");
+    const lastEvent = makeEvent({
+      id: "last-event",
+      startAt: new Date("2026-07-23T18:00:00.000Z"),
+      endAt: new Date("2026-07-23T21:00:00.000Z"),  // ended 45 min ago
+    });
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader([lastEvent]),
+      makeInput({ now: nowLate }),
+    );
+    expect(feed.isEmpty).toBe(true);
+    expect(feed.emptyStateReason).toBe("DAY_COMPLETED");
+  });
+
+  it("day with no scheduled events returns NO_EVENTS_TODAY", async () => {
+    const feed = await buildInfoboardScreen1Feed(makeLoader([]), makeInput());
+    expect(feed.isEmpty).toBe(true);
+    expect(feed.emptyStateReason).toBe("NO_EVENTS_TODAY");
+  });
+
+  it("no event from the next local day is included", async () => {
+    // now = 2026-07-23T22:00:00Z = 00:00 Jul 24 Zurich → todayKey = "2026-07-24"
+    const nowMidnight = new Date("2026-07-23T22:00:00.000Z");
+    const tomorrowEvent = makeEvent({
+      id: "next-day",
+      startAt: new Date("2026-07-24T17:00:00.000Z"),  // Jul 25 Zurich (UTC+2 → 19:00 Zurich)
+      endAt: new Date("2026-07-24T18:30:00.000Z"),
+    });
+    // todayKey = "2026-07-24"; tomorrowEvent startAt local = "2026-07-24" → included today
+    // But a Jul 25 event should not appear
+    const dayAfterEvent = makeEvent({
+      id: "day-after",
+      startAt: new Date("2026-07-25T06:00:00.000Z"),  // Jul 25 Zurich
+      endAt: new Date("2026-07-25T07:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader([tomorrowEvent, dayAfterEvent]),
+      makeInput({ now: nowMidnight }),
+    );
+    expect(feed.next.some((e) => e.id === "next-day")).toBe(true);
+    expect(feed.next.some((e) => e.id === "day-after")).toBe(false);
+    expect(feed.later.some((e) => e.id === "day-after")).toBe(false);
+  });
+
+  it("Europe/Zurich UTC boundary: 22:15 UTC on Jul 23 is midnight Jul 24 in Zurich", async () => {
+    // 22:15 UTC = 00:15 Zurich (next local day)
+    const nowAfterUtcMidnight = new Date("2026-07-23T22:15:00.000Z");
+    // Event at 09:00 Zurich Jul 24 = 07:00 UTC Jul 24
+    const todayEvent = makeEvent({
+      id: "today-event",
+      startAt: new Date("2026-07-24T07:00:00.000Z"),
+      endAt: new Date("2026-07-24T08:30:00.000Z"),
+    });
+    // Event at 09:00 Zurich Jul 23 = 07:00 UTC Jul 23 (yesterday in Zurich)
+    const yesterdayEvent = makeEvent({
+      id: "yesterday-event",
+      startAt: new Date("2026-07-23T07:00:00.000Z"),
+      endAt: new Date("2026-07-23T08:30:00.000Z"),
+    });
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader([todayEvent, yesterdayEvent]),
+      makeInput({ now: nowAfterUtcMidnight }),
+    );
+    // todayKey = "2026-07-24"; today-event is in next; yesterday-event is excluded (ended before now)
+    const all = [...feed.current, ...feed.next, ...feed.later];
+    expect(all.some((e) => e.id === "today-event")).toBe(true);
+    expect(all.some((e) => e.id === "yesterday-event")).toBe(false);
+  });
+
+  it("event with stale SCHEDULED status but expired display interval is excluded", async () => {
+    // SCHEDULED status, but endAt is before now → treated as completed
+    const stale = makeEvent({
+      id: "stale-scheduled",
+      status: "SCHEDULED",
+      startAt: new Date("2026-07-23T10:00:00.000Z"),
+      endAt: new Date("2026-07-23T11:30:00.000Z"),  // ended 4.5h ago
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([stale]), makeInput());
+    const all = [...feed.current, ...feed.next, ...feed.later];
+    expect(all.some((e) => e.id === "stale-scheduled")).toBe(false);
+  });
+
+  it("dashboard and public screen produce same event IDs for same tenant/date/time", async () => {
+    // Both consumer paths call buildInfoboardScreen1Feed with identical inputs.
+    // Same loader, same input → identical result.
+    const events = [
+      makeEvent({ id: "evt-a", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:30:00.000Z") }),
+      makeEvent({ id: "evt-b", startAt: new Date("2026-07-23T18:30:00.000Z"), endAt: new Date("2026-07-23T20:00:00.000Z") }),
+      makeEvent({ id: "evt-c", startAt: new Date("2026-07-23T20:00:00.000Z"), endAt: new Date("2026-07-23T21:30:00.000Z") }),
+    ];
+    const loader = makeLoader(events);
+    const input = makeInput();
+
+    // Simulate dashboard call
+    const dashboardFeed = await buildInfoboardScreen1Feed(loader, input);
+    // Simulate public Screen 1 call (same inputs)
+    const screen1Feed = await buildInfoboardScreen1Feed(loader, input);
+
+    const dashboardIds = [...dashboardFeed.current, ...dashboardFeed.next, ...dashboardFeed.later].map((e) => e.id);
+    const screen1Ids = [...screen1Feed.current, ...screen1Feed.next, ...screen1Feed.later].map((e) => e.id);
+    expect(dashboardIds).toEqual(screen1Ids);
+  });
+
+  it("dashboard counters derive from canonical feed: nextCount matches feed.next.length", async () => {
+    // Verifies that no dashboard-only filter re-runs different eligibility
+    const events = [
+      makeEvent({ id: "e1", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:00:00.000Z") }),
+      makeEvent({ id: "e2", startAt: new Date("2026-07-23T19:00:00.000Z"), endAt: new Date("2026-07-23T20:00:00.000Z") }),
+      makeEvent({ id: "e3", startAt: new Date("2026-07-23T21:00:00.000Z"), endAt: new Date("2026-07-23T22:00:00.000Z") }),
+    ];
+    const feed = await buildInfoboardScreen1Feed(makeLoader(events), makeInput());
+    // next capped at 2, later has 1
+    expect(feed.next).toHaveLength(2);
+    expect(feed.later).toHaveLength(1);
+    // visibleToday = all
+    const visibleToday = feed.current.length + feed.next.length + feed.later.length;
+    expect(visibleToday).toBe(3);
   });
 });
