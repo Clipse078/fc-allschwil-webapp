@@ -69,32 +69,70 @@ function getResult(match: MatchcenterMatchSummary): string | null {
   return resultLabel ? resultLabel : null;
 }
 
+type MatchReadiness =
+  | "ready"
+  | "setup-required"
+  | "away-match";
+
+function getMatchReadiness(
+  match: MatchcenterMatchSummary,
+): MatchReadiness {
+  const homeAway = match.homeAway?.trim().toUpperCase() ?? null;
+
+  if (homeAway === "AWAY") {
+    return "away-match";
+  }
+
+  const hasTeam =
+    match.home.resolution === "RESOLVED" ||
+    match.away.resolution === "RESOLVED";
+  const hasPitch = Boolean(match.operational.pitchCode?.trim());
+  const hasHomeDR = Boolean(match.operational.homeDressingRoomCode?.trim());
+  const hasAwayDR = Boolean(match.operational.awayDressingRoomCode?.trim());
+  const infoboardOn = match.visibility.infoboardVisible;
+
+  if (homeAway === "HOME" && hasTeam && hasPitch && hasHomeDR && hasAwayDR && infoboardOn) {
+    return "ready";
+  }
+
+  return "setup-required";
+}
+
 function getOperationalWarnings(
   match: MatchcenterMatchSummary,
 ): string[] {
   const warnings: string[] = [];
+  const homeAway = match.homeAway?.trim().toUpperCase() ?? null;
+  const isAway = homeAway === "AWAY";
 
-  if (match.home.resolution === "UNRESOLVED") {
-    warnings.push("Heimteam nicht zugeordnet");
-  }
+  // For away matches, only warn if the away side (FC Allschwil) is unresolved.
+  // For home matches, warn if either side is unresolved.
+  const fcaIsUnresolved = isAway
+    ? match.away.resolution === "UNRESOLVED"
+    : match.home.resolution === "UNRESOLVED";
+  const opponentIsUnresolved = !isAway
+    ? match.away.resolution === "UNRESOLVED"
+    : false;
 
-  if (match.away.resolution === "UNRESOLVED") {
-    warnings.push("Auswärtsteam nicht zugeordnet");
-  }
-
-  if (!match.location?.trim()) {
-    warnings.push("Spielort fehlt");
+  if (fcaIsUnresolved || opponentIsUnresolved) {
+    warnings.push("Team nicht zugeordnet");
   }
 
   if (!match.operational.pitchCode?.trim()) {
-    warnings.push("Feld fehlt");
+    warnings.push("Spielfeld fehlt");
   }
 
-  if (
-    !match.operational.homeDressingRoomCode?.trim() ||
-    !match.operational.awayDressingRoomCode?.trim()
-  ) {
-    warnings.push("Garderobe fehlt");
+  if (!match.operational.homeDressingRoomCode?.trim()) {
+    warnings.push("Garderobe Heimteam fehlt");
+  }
+
+  if (!match.operational.awayDressingRoomCode?.trim()) {
+    warnings.push("Garderobe Gastteam fehlt");
+  }
+
+  // Only show infoboard warning for home matches
+  if (homeAway === "HOME" && !match.visibility.infoboardVisible) {
+    warnings.push("Infoboard nicht freigegeben");
   }
 
   return warnings;
@@ -139,10 +177,19 @@ export default function MatchcenterOverview({
         {matches.map((match) => {
           const result = getResult(match);
           const warnings = getOperationalWarnings(match);
+          const readiness = getMatchReadiness(match);
           const statusLabel =
             STATUS_LABELS[match.status] ?? match.status;
           const statusVariant =
             STATUS_VARIANTS[match.status] ?? "default";
+          const normalizedHomeAway =
+            match.homeAway?.trim().toUpperCase() ?? null;
+          const homeAwayLabel =
+            normalizedHomeAway === "HOME"
+              ? "Heimspiel"
+              : normalizedHomeAway === "AWAY"
+                ? "Auswärtsspiel"
+                : null;
 
           return (
             <article
@@ -167,6 +214,20 @@ export default function MatchcenterOverview({
                         ) : null}
                         {statusLabel}
                       </Badge>
+
+                      {homeAwayLabel ? (
+                        <Badge
+                          variant={
+                            normalizedHomeAway === "HOME"
+                              ? "success"
+                              : "default"
+                          }
+                          size="sm"
+                          data-testid={`matchcenter-homeaway-${match.id}`}
+                        >
+                          {homeAwayLabel}
+                        </Badge>
+                      ) : null}
 
                       {match.competitionLabel ? (
                         <span className="text-xs font-medium text-[var(--muted)]">
@@ -245,7 +306,24 @@ export default function MatchcenterOverview({
                 </div>
 
                 <div className="flex shrink-0 flex-wrap items-center gap-2 lg:max-w-xs lg:justify-end">
-                  {warnings.length === 0 ? (
+                  {/* Infoboard readiness badge */}
+                  {readiness === "ready" ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"
+                      data-testid={`matchcenter-readiness-${match.id}`}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Bereit für Infoboard
+                    </span>
+                  ) : readiness === "away-match" ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]"
+                      data-testid={`matchcenter-readiness-${match.id}`}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Auswärtsspiel
+                    </span>
+                  ) : warnings.length === 0 ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Operativ vollständig
@@ -254,7 +332,7 @@ export default function MatchcenterOverview({
                     <>
                       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
                         <CircleAlert className="h-3.5 w-3.5" />
-                        {warnings.length} Hinweise
+                        Einrichtung erforderlich
                       </span>
 
                       <div

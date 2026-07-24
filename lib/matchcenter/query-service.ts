@@ -383,6 +383,7 @@ function toDetail(
 
   return {
     ...summary,
+    teamId: event.team?.id ?? null,
     organizerName: event.organizerName,
     reviewRequestedAt: event.reviewRequestedAt,
     reviewedAt: event.reviewedAt,

@@ -29,6 +29,7 @@ import { PageShell } from "@/components/ui/page/PageShell";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import { DetailPagePattern } from "@/components/ui/patterns/DetailPagePattern";
 import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMappingDialog";
+import MatchcenterDetailOperational from "@/components/admin/matchcenter/MatchcenterDetailOperational";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
@@ -209,6 +210,26 @@ export default function MatchcenterDetail({
     match.source.externalSource ??
     match.source.eventSource;
 
+  const normalizedHomeAway =
+    match.homeAway?.trim().toUpperCase() ?? null;
+
+  const homeAwayLabel =
+    normalizedHomeAway === "HOME"
+      ? "Heimspiel"
+      : normalizedHomeAway === "AWAY"
+        ? "Auswärtsspiel"
+        : null;
+
+  const homeAwayVariant: BadgeVariant =
+    normalizedHomeAway === "HOME"
+      ? "success"
+      : normalizedHomeAway === "AWAY"
+        ? "default"
+        : "outline";
+
+  // ISO date string for the operational workspace (serializable to client)
+  const matchDateIso = match.startAt.toISOString();
+
   return (
     <PageShell fullWidth>
       <DetailPagePattern
@@ -219,15 +240,31 @@ export default function MatchcenterDetail({
           "Matchdetails und operative Informationen"
         }
         headerBadge={
-          <Badge
-            variant={statusVariant}
-            data-testid="matchcenter-detail-status"
-          >
-            {match.status === "LIVE" ? (
-              <Radio className="h-3.5 w-3.5" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant={statusVariant}
+              data-testid="matchcenter-detail-status"
+            >
+              {match.status === "LIVE" ? (
+                <Radio className="h-3.5 w-3.5" />
+              ) : null}
+              {statusLabel}
+            </Badge>
+
+            {homeAwayLabel ? (
+              <Badge
+                variant={homeAwayVariant}
+                data-testid="matchcenter-detail-homeaway"
+              >
+                {normalizedHomeAway === "HOME" ? (
+                  <Home className="h-3.5 w-3.5" />
+                ) : (
+                  <Flag className="h-3.5 w-3.5" />
+                )}
+                {homeAwayLabel}
+              </Badge>
             ) : null}
-            {statusLabel}
-          </Badge>
+          </div>
         }
         breadcrumbs={[
           {
@@ -443,6 +480,23 @@ export default function MatchcenterDetail({
           </>
         }
       >
+        <MatchcenterDetailOperational
+          matchId={match.id}
+          homeAway={match.homeAway}
+          homeDisplayName={match.home.displayName}
+          awayDisplayName={match.away.displayName}
+          homeIsOwnTeam={match.home.isOwnTeam}
+          awayIsOwnTeam={match.away.isOwnTeam}
+          currentTeamId={match.teamId}
+          currentPitchCode={match.operational.pitchCode}
+          currentHomeDressingRoomCode={match.operational.homeDressingRoomCode}
+          currentAwayDressingRoomCode={match.operational.awayDressingRoomCode}
+          currentWebsiteVisible={match.visibility.websiteVisible}
+          currentInfoboardVisible={match.visibility.infoboardVisible}
+          matchDateIso={matchDateIso}
+          canManage={canManageMappings}
+        />
+
         <SectionCard
           title="Team-Zuordnung"
           description="Status der Provider-Teams im Matchcenter"

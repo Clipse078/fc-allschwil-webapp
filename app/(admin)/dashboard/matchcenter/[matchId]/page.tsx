@@ -9,6 +9,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { getTenantContextFromSession } from "@/lib/tenants/context";
 import MatchcenterDetail from "@/components/admin/matchcenter/MatchcenterDetail";
 import { hasPermission } from "@/lib/permissions/has-permission";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 
 type MatchcenterDetailPageProps = {
   params: Promise<{
@@ -64,11 +65,13 @@ export default async function MatchcenterDetailPage({
   );
 
   return (
-    <MatchcenterDetail
-      match={match}
-      locale={tenantContext.locale ?? "de-CH"}
-      timezone={tenantContext.timezone ?? "Europe/Zurich"}
-      canManageMappings={canManageMappings}
-    />
+    <ToastProvider>
+      <MatchcenterDetail
+        match={match}
+        locale={tenantContext.locale ?? "de-CH"}
+        timezone={tenantContext.timezone ?? "Europe/Zurich"}
+        canManageMappings={canManageMappings}
+      />
+    </ToastProvider>
   );
 }
