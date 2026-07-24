@@ -287,10 +287,11 @@ describe("InfoboardAdminPage", () => {
     await expect(renderPage()).rejects.toThrow("notFound");
   });
 
-  it("renders legacy notice mentioning /infoboard", async () => {
+  it("renders legacy route notice with redirect explanation", async () => {
     await renderPage();
-    expect(screen.getByText("Legacy-Display")).toBeInTheDocument();
-    expect(screen.getByText(/Das frühere Display/i)).toBeInTheDocument();
+    expect(screen.getByText("Legacy-Route")).toBeInTheDocument();
+    expect(screen.getByText(/Die frühere Route/i)).toBeInTheDocument();
+    expect(screen.getByText(/leitet jetzt auf Display 1 weiter/i)).toBeInTheDocument();
   });
 
   it("renders roadmap section with 'In Vorbereitung' items", async () => {

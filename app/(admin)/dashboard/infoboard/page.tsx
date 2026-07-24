@@ -337,20 +337,19 @@ export default async function InfoboardAdminPage({
         </div>
       </div>
 
-      {/* Legacy display notice */}
+      {/* Legacy route notice */}
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
         <div className="flex flex-wrap items-start gap-3">
           <div className="flex-1 space-y-1">
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
-              Legacy-Display
+              Legacy-Route
             </p>
             <p className="text-sm text-[var(--muted)]">
-              Das frühere Display unter{" "}
+              Die frühere Route{" "}
               <code className="font-mono text-[0.72rem] text-[var(--foreground)]">
                 /infoboard
               </code>{" "}
-              bleibt vorübergehend technisch bestehen, wird jedoch nicht mehr als primäres
-              Infoboard verwendet.
+              leitet jetzt auf Display 1 weiter.
             </p>
           </div>
         </div>

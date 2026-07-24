@@ -1,12 +1,14 @@
-import InfoboardDisplay from "@/components/infoboard/InfoboardDisplay";
+import { redirect } from "next/navigation";
 
 /**
- * /infoboard — Public kiosk display.
+ * /infoboard — Compatibility redirect to the canonical Screen 1 route.
  *
- * No authentication required. The InfoboardDisplay client component
- * polls /api/public/infoboard every 60 seconds and renders events
- * grouped by date in a fullscreen layout.
+ * The legacy rotating display has been replaced by the new Publishing Platform
+ * Screen 1. This server-side redirect forwards all /infoboard requests to the
+ * canonical production route without any client-side flash, polling, or legacy
+ * feed call. Query parameters (e.g. ?date=) are intentionally dropped — the
+ * public Screen 1 always uses the real current date.
  */
 export default function InfoboardPage() {
-  return <InfoboardDisplay />;
+  redirect("/infoboard/screen-1");
 }
