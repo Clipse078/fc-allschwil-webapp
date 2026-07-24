@@ -10,6 +10,7 @@ import {
 const mocks = vi.hoisted(() => ({
   requireApiAnyPermission: vi.fn(),
   listOpponents: vi.fn(),
+  createOpponentQueryDatabase: vi.fn(),
 }));
 
 vi.mock(
@@ -37,6 +38,13 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {},
 }));
 
+vi.mock(
+  "@/lib/matchcenter/opponents/prisma-query-adapter",
+  () => ({
+    createOpponentQueryDatabase: mocks.createOpponentQueryDatabase,
+  }),
+);
+
 import { GET } from "../route";
 
 const BASE_URL = "http://localhost/api/matchcenter/opponents";
@@ -63,9 +71,18 @@ function makeOpponent(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const FAKE_DB = {
+  opponent: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+  },
+};
+
 describe("GET /api/matchcenter/opponents", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mocks.createOpponentQueryDatabase.mockReturnValue(FAKE_DB);
 
     mocks.requireApiAnyPermission.mockResolvedValue({
       ok: true,
@@ -136,11 +153,12 @@ describe("GET /api/matchcenter/opponents", () => {
     expect(Array.isArray(body.opponents)).toBe(true);
   });
 
-  it("calls listOpponents with the session tenantId", async () => {
+  it("calls listOpponents with a narrow database adapter and the session tenantId", async () => {
     await GET(makeRequest());
 
+    expect(mocks.createOpponentQueryDatabase).toHaveBeenCalledOnce();
     expect(mocks.listOpponents).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ tenantId: "tenant-1" }),
     );
   });
@@ -149,7 +167,7 @@ describe("GET /api/matchcenter/opponents", () => {
     await GET(makeRequest("search=Basel"));
 
     expect(mocks.listOpponents).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ search: "Basel" }),
     );
   });
@@ -158,7 +176,7 @@ describe("GET /api/matchcenter/opponents", () => {
     await GET(makeRequest("provider=SFV"));
 
     expect(mocks.listOpponents).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ provider: "SFV" }),
     );
   });
@@ -167,7 +185,7 @@ describe("GET /api/matchcenter/opponents", () => {
     await GET(makeRequest("limit=25"));
 
     expect(mocks.listOpponents).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ limit: 25 }),
     );
   });
@@ -176,7 +194,7 @@ describe("GET /api/matchcenter/opponents", () => {
     await GET(makeRequest("skip=10"));
 
     expect(mocks.listOpponents).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ skip: 10 }),
     );
   });
@@ -185,7 +203,7 @@ describe("GET /api/matchcenter/opponents", () => {
     await GET(makeRequest("includeArchived=true"));
 
     expect(mocks.listOpponents).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ includeArchived: true }),
     );
   });
@@ -194,7 +212,7 @@ describe("GET /api/matchcenter/opponents", () => {
     await GET(makeRequest());
 
     expect(mocks.listOpponents).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ includeArchived: false }),
     );
   });
