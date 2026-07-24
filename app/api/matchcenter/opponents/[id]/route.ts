@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
+import { createOpponentQueryDatabase } from "@/lib/matchcenter/opponents/prisma-query-adapter";
 import { getOpponentById } from "@/lib/matchcenter/opponents/query-service";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
@@ -35,7 +36,7 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const opponent = await getOpponentById(prisma, { tenantId, id });
+    const opponent = await getOpponentById(createOpponentQueryDatabase(prisma), { tenantId, id });
 
     if (opponent === null) {
       return NextResponse.json(

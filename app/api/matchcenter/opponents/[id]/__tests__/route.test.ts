@@ -10,6 +10,7 @@ import {
 const mocks = vi.hoisted(() => ({
   requireApiAnyPermission: vi.fn(),
   getOpponentById: vi.fn(),
+  createOpponentQueryDatabase: vi.fn(),
 }));
 
 vi.mock(
@@ -36,6 +37,13 @@ vi.mock(
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {},
 }));
+
+vi.mock(
+  "@/lib/matchcenter/opponents/prisma-query-adapter",
+  () => ({
+    createOpponentQueryDatabase: mocks.createOpponentQueryDatabase,
+  }),
+);
 
 import { GET } from "../route";
 
@@ -66,9 +74,18 @@ function makeOpponent(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const FAKE_DB = {
+  opponent: {
+    findMany: vi.fn(),
+    findFirst: vi.fn(),
+  },
+};
+
 describe("GET /api/matchcenter/opponents/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mocks.createOpponentQueryDatabase.mockReturnValue(FAKE_DB);
 
     mocks.requireApiAnyPermission.mockResolvedValue({
       ok: true,
@@ -164,11 +181,12 @@ describe("GET /api/matchcenter/opponents/[id]", () => {
     expect(body).toEqual({ error: "Opponent not found." });
   });
 
-  it("calls getOpponentById with the session tenantId and route id", async () => {
+  it("calls getOpponentById with a narrow database adapter and the session tenantId and route id", async () => {
     await GET(makeRequest("opponent-42"), makeRouteContext("opponent-42"));
 
+    expect(mocks.createOpponentQueryDatabase).toHaveBeenCalledOnce();
     expect(mocks.getOpponentById).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ tenantId: "tenant-1", id: "opponent-42" }),
     );
   });
@@ -205,11 +223,11 @@ describe("GET /api/matchcenter/opponents/[id]", () => {
     await GET(makeRequest("opponent-1"), makeRouteContext("opponent-1"));
 
     expect(mocks.getOpponentById).toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ tenantId: "tenant-1" }),
     );
     expect(mocks.getOpponentById).not.toHaveBeenCalledWith(
-      {},
+      FAKE_DB,
       expect.objectContaining({ tenantId: expect.not.stringContaining("tenant-1") }),
     );
   });

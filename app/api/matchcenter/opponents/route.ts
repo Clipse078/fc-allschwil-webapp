@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
+import { createOpponentQueryDatabase } from "@/lib/matchcenter/opponents/prisma-query-adapter";
 import {
   listOpponents,
   OPPONENT_DEFAULT_LIMIT,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
   const skip = rawSkip !== null ? parseInt(rawSkip, 10) : 0;
 
   try {
-    const opponents = await listOpponents(prisma, {
+    const opponents = await listOpponents(createOpponentQueryDatabase(prisma), {
       tenantId,
       search: rawSearch ?? undefined,
       provider: rawProvider ?? undefined,
