@@ -3,7 +3,19 @@
  *
  * Infoboard Screen 1 — full-screen TV event schedule board.
  *
- * Design constraints (PP-02B / PP-02B-F):
+ * Design (PP-02B-H — target-aligned premium redesign):
+ *   - White schedule surface; dark navy header and footer.
+ *   - One flat vertical event list — no section headings.
+ *   - Each event is one full-width horizontal row with four CSS grid columns:
+ *       STATUS/TIME | EVENT | PITCH | ALLOCATION (ZUTEILUNG)
+ *   - Temporal status (JETZT / IN X MIN.) shown inline per row.
+ *   - Club branding large in dark header, left side.
+ *   - Clock and date in header center-right zone.
+ *   - Alexa-safe zone in header far right — intentionally empty.
+ *   - SportClubEvo branding in footer, not in header.
+ *   - Announcement text in footer left; product branding in footer right.
+ *
+ * Invariants:
  *   - Pure presentational server component — no "use client", no effects,
  *     no timers, no fetch, no browser storage, no URL parameter logic.
  *   - No Prisma imports, no DB access.
@@ -15,28 +27,12 @@
  *   - Reusable: FC Allschwil content lives only in the preview fixture.
  *   - No referee dressing-room display (Screen 1 wayfinding contract).
  *   - currentTimeIso is always supplied explicitly; never implicitly derived.
- *
- * Density strategy:
- *   totalEvents = current.length + next.length + later.length
- *   NORMAL  → total ≤ 5  (generous spacing, largest type)
- *   COMPACT → total 6–11 (reduced gaps, slightly smaller later-section type)
- *   PROTOTYPE_CAPACITY = 12: if total > 12, show overflow warning and render
- *   only up to that capacity. No pagination, no carousel, no rotation.
- *
- * Simultaneous-event density (per section):
- *   NORMAL → max group-by-startAt count < 4
- *   HIGH   → max group-by-startAt count ≥ 4 (compact row layout used)
- *
- * Multi-team allocation:
- *   When eventPresentation supplies participantAllocations.length ≥ 3 for an
- *   event, the event renders in tournament allocation-matrix mode.
  */
 
 import type { ReactElement } from "react";
 import type {
   InfoboardScreen1Feed,
   InfoboardScreen1Event,
-  InfoboardAllocationDisplay,
   PublishingEventType,
 } from "@/lib/publishing/event-types";
 import type {
@@ -45,17 +41,6 @@ import type {
   InfoboardEventPresentationExtension,
 } from "./screen1-presentation-types";
 import styles from "./InfoboardScreen1.module.css";
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-/** Prototype max events rendered before showing overflow warning. */
-const PROTOTYPE_CAPACITY = 12;
-
-/** Normal/compact density boundary. */
-const COMPACT_THRESHOLD = 6;
-
-/** Simultaneous-event count that triggers high-density compact row layout. */
-const HIGH_DENSITY_THRESHOLD = 4;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -83,6 +68,11 @@ export type InfoboardScreen1Props = {
   currentTimeIso?: string | null;
 };
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** Prototype max events rendered before showing overflow warning. */
+const PROTOTYPE_CAPACITY = 12;
+
 // ── Event-type labels (presentation-only, German) ─────────────────────────────
 
 const EVENT_TYPE_LABELS: Record<PublishingEventType, string> = {
@@ -93,13 +83,17 @@ const EVENT_TYPE_LABELS: Record<PublishingEventType, string> = {
   VACATION_PERIOD: "FERIENBLOCK",
 };
 
+// ── Temporal types ────────────────────────────────────────────────────────────
+
+type TemporalBucket = "current" | "next" | "later";
+
+type FlatEvent = {
+  event: InfoboardScreen1Event;
+  temporal: TemporalBucket;
+};
+
 // ── Time / date formatting ────────────────────────────────────────────────────
 
-/**
- * Formats a UTC ISO-8601 string to HH:mm in the given IANA timezone.
- * Uses Intl.DateTimeFormat with an explicit timeZone — never relies on
- * server-local or browser-local timezone.
- */
 function formatTime(isoString: string, timeZone: string): string {
   return new Intl.DateTimeFormat("de-CH", {
     hour: "2-digit",
@@ -109,16 +103,15 @@ function formatTime(isoString: string, timeZone: string): string {
   }).format(new Date(isoString));
 }
 
-/**
- * Formats a UTC ISO-8601 timestamp to a long German date string using the
- * given explicit IANA timezone. CSS text-transform: uppercase is responsible
- * for the visual uppercase presentation.
- *
- * Example: "Samstag, 12. September 2026" → CSS uppercase → "SAMSTAG, 12. SEPTEMBER 2026"
- */
-function formatCurrentDate(isoString: string, timeZone: string): string {
+function formatWeekday(isoString: string, timeZone: string): string {
   return new Intl.DateTimeFormat("de-DE", {
     weekday: "long",
+    timeZone,
+  }).format(new Date(isoString));
+}
+
+function formatDateLine(isoString: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("de-DE", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -126,11 +119,6 @@ function formatCurrentDate(isoString: string, timeZone: string): string {
   }).format(new Date(isoString));
 }
 
-/**
- * Formats the display date (YYYY-MM-DD) for the header as a German long date.
- * Parses the date-only string at noon UTC to avoid any TZ edge cases.
- * Used as fallback when currentTimeIso is not supplied.
- */
 function formatDisplayDate(dateKey: string): string {
   const d = new Date(dateKey + "T12:00:00.000Z");
   return d.toLocaleDateString("de-CH", {
@@ -141,13 +129,46 @@ function formatDisplayDate(dateKey: string): string {
   });
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Temporal status helpers ───────────────────────────────────────────────────
 
 /**
- * Returns the first event presentation extension matching eventId.
- * Unknown IDs are ignored; duplicate IDs use first match.
- * Does not mutate the extensions array.
+ * Returns the number of minutes until the event starts.
+ * Returns null when the event has already started or times cannot be parsed.
+ * Uses only explicit ISO strings — no implicit current time.
  */
+function minutesUntil(startAt: string, currentTimeIso: string): number | null {
+  const start = new Date(startAt).getTime();
+  const now = new Date(currentTimeIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(now)) return null;
+  const diff = Math.round((start - now) / 60_000);
+  return diff >= 0 ? diff : null;
+}
+
+/**
+ * Returns the inline status label for an event row.
+ *   current → "JETZT"
+ *   next + computable → "IN X MIN."
+ *   next + not computable → "ALS NÄCHSTES"
+ *   later → null (no label)
+ */
+function statusLabel(
+  temporal: TemporalBucket,
+  startAt: string,
+  currentTimeIso: string | null | undefined,
+): string | null {
+  if (temporal === "current") return "JETZT";
+  if (temporal === "next") {
+    if (currentTimeIso != null) {
+      const mins = minutesUntil(startAt, currentTimeIso);
+      if (mins !== null) return `IN ${mins} MIN.`;
+    }
+    return "ALS NÄCHSTES";
+  }
+  return null;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function findEventExtension(
   eventId: string,
   extensions: readonly InfoboardEventPresentationExtension[] | undefined,
@@ -159,102 +180,39 @@ function findEventExtension(
   return null;
 }
 
-/**
- * Determines the simultaneous-event density for a section.
- * Groups events by startAt and returns "high" when any group has ≥ HIGH_DENSITY_THRESHOLD.
- * Uses event count and shared start time only — no DOM measurement.
- */
-function getSimultaneousDensity(
-  events: readonly InfoboardScreen1Event[],
-): "normal" | "high" {
-  if (events.length < HIGH_DENSITY_THRESHOLD) return "normal";
-  const counts = new Map<string, number>();
-  for (const event of events) {
-    counts.set(event.startAt, (counts.get(event.startAt) ?? 0) + 1);
+function buildFlatList(feed: InfoboardScreen1Feed): FlatEvent[] {
+  const result: FlatEvent[] = [];
+  for (const event of feed.current) {
+    result.push({ event, temporal: "current" });
   }
-  let max = 0;
-  for (const count of counts.values()) {
-    if (count > max) max = count;
+  for (const event of feed.next) {
+    result.push({ event, temporal: "next" });
   }
-  return max >= HIGH_DENSITY_THRESHOLD ? "high" : "normal";
+  for (const event of feed.later) {
+    result.push({ event, temporal: "later" });
+  }
+  return result;
 }
 
-// ── Allocation helpers ────────────────────────────────────────────────────────
-
-type AllocationProps = {
-  allocation: InfoboardAllocationDisplay;
-  eventType: PublishingEventType;
-};
-
-/**
- * Renders the standard allocation block (pitch + dressing rooms).
- * Referee dressing room is intentionally not rendered on Screen 1.
- */
-function AllocationBlock({ allocation, eventType }: AllocationProps): ReactElement | null {
-  const {
-    pitchLabel,
-    homeDressingRoomLabel,
-    awayDressingRoomLabel,
-  } = allocation;
-
-  const isMatch = eventType === "MATCH";
-
-  // refereeDressingRoomLabel is intentionally excluded from Screen 1 display.
-  const hasAny =
-    pitchLabel !== null ||
-    homeDressingRoomLabel !== null ||
-    awayDressingRoomLabel !== null;
-
-  if (!hasAny) return null;
-
-  return (
-    <div className={styles.allocation} data-testid="allocation-block">
-      {pitchLabel !== null && (
-        <span className={styles.allocationPitch}>
-          <span className={styles.allocationLabel} aria-hidden="true">PLATZ</span>
-          <span className={styles.allocationValue}>{pitchLabel}</span>
-        </span>
-      )}
-      {isMatch ? (
-        <>
-          {homeDressingRoomLabel !== null && (
-            <span className={styles.allocationHome}>
-              <span className={styles.allocationLabel} aria-hidden="true">HEIM</span>
-              <span className={styles.allocationValue}>{homeDressingRoomLabel}</span>
-            </span>
-          )}
-          {awayDressingRoomLabel !== null && (
-            <span className={styles.allocationAway}>
-              <span className={styles.allocationLabel} aria-hidden="true">GAST</span>
-              <span className={styles.allocationValue}>{awayDressingRoomLabel}</span>
-            </span>
-          )}
-        </>
-      ) : (
-        homeDressingRoomLabel !== null && (
-          <span className={styles.allocationHome}>
-            <span className={styles.allocationLabel} aria-hidden="true">GARDEROBE</span>
-            <span className={styles.allocationValue}>{homeDressingRoomLabel}</span>
-          </span>
-        )
-      )}
-    </div>
-  );
+/** Left-stripe accent color key for data attribute. */
+function stripeKey(temporal: TemporalBucket, type: PublishingEventType): string {
+  if (temporal === "current") return "red";
+  if (temporal === "next") return "blue";
+  if (type === "MATCH") return "red";
+  if (type === "TOURNAMENT") return "orange";
+  return "blue"; // training
 }
 
-// ── Multi-team allocation block ───────────────────────────────────────────────
+// ── Tournament allocation block ───────────────────────────────────────────────
 
 type ParticipantAllocationBlockProps = {
   allocations: readonly InfoboardTeamAllocationPresentation[];
 };
 
 /**
- * Renders the two-column TEAM | GARDEROBE allocation matrix for tournaments
- * with three or more participating teams. Each team is explicitly paired with
- * its assigned dressing room on the same row.
- *
- * When dressingRoomLabel is null, only the team row is rendered and the room
- * cell is omitted — no placeholder dash.
+ * Compact allocation matrix for tournaments with ≥ 3 participating teams.
+ * Each team is paired explicitly with its dressing room on the same row.
+ * When dressingRoomLabel is null, only the team name is shown.
  */
 function ParticipantAllocationBlock({
   allocations,
@@ -291,269 +249,252 @@ function ParticipantAllocationBlock({
   );
 }
 
-// ── Event card ────────────────────────────────────────────────────────────────
+// ── Match allocation ──────────────────────────────────────────────────────────
 
-type EventCardProps = {
+type MatchAllocationProps = {
   event: InfoboardScreen1Event;
-  timeZone: string;
-  size: "large" | "medium" | "small";
-  participantAllocations?: readonly InfoboardTeamAllocationPresentation[];
+  clubLogoSrc: string | null;
 };
 
-function EventCard({
-  event,
+/**
+ * Renders explicit home/away team-to-dressing-room pairings for a match.
+ * Shows the club logo for the home team when available.
+ * No HEIM/GAST labels. No referee room.
+ */
+function MatchAllocation({ event, clubLogoSrc }: MatchAllocationProps): ReactElement | null {
+  const { homeDressingRoomLabel, awayDressingRoomLabel } = event.allocation;
+  const hasHome = homeDressingRoomLabel !== null && event.teamDisplayName !== null;
+  const hasAway = awayDressingRoomLabel !== null && event.opponentDisplayName !== null;
+
+  if (!hasHome && !hasAway) return null;
+
+  return (
+    <div className={styles.matchAllocation} data-testid="match-allocation">
+      {hasHome && (
+        <div className={styles.matchAllocRow}>
+          <span className={styles.matchAllocRoom}>{homeDressingRoomLabel}</span>
+          <span className={styles.matchAllocLogoSlot} aria-hidden="true">
+            {clubLogoSrc !== null && (
+              <img
+                src={clubLogoSrc}
+                alt=""
+                className={styles.matchAllocLogo}
+                aria-hidden="true"
+              />
+            )}
+          </span>
+          <span className={styles.matchAllocTeam}>{event.teamDisplayName}</span>
+        </div>
+      )}
+      {hasAway && (
+        <div className={styles.matchAllocRow}>
+          <span className={styles.matchAllocRoom}>{awayDressingRoomLabel}</span>
+          <span className={styles.matchAllocLogoSlot} aria-hidden="true" />
+          <span className={styles.matchAllocTeam}>{event.opponentDisplayName}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Training allocation ───────────────────────────────────────────────────────
+
+type TrainingAllocationProps = {
+  event: InfoboardScreen1Event;
+};
+
+function TrainingAllocation({ event }: TrainingAllocationProps): ReactElement | null {
+  const { homeDressingRoomLabel } = event.allocation;
+  if (homeDressingRoomLabel === null) return null;
+
+  return (
+    <div className={styles.trainingAllocation} data-testid="training-allocation">
+      <span className={styles.trainingAllocRoom}>{homeDressingRoomLabel}</span>
+    </div>
+  );
+}
+
+// ── Event row ─────────────────────────────────────────────────────────────────
+
+type EventRowProps = {
+  item: FlatEvent;
+  timeZone: string;
+  currentTimeIso: string | null | undefined;
+  clubLogoSrc: string | null;
+  participantAllocations: readonly InfoboardTeamAllocationPresentation[] | undefined;
+};
+
+function EventRow({
+  item,
   timeZone,
-  size,
+  currentTimeIso,
+  clubLogoSrc,
   participantAllocations,
-}: EventCardProps): ReactElement {
-  const typeLabel = EVENT_TYPE_LABELS[event.type] ?? event.type;
+}: EventRowProps): ReactElement {
+  const { event, temporal } = item;
   const startTime = formatTime(event.startAt, timeZone);
   const isMatch = event.type === "MATCH";
-  const hasPairing = isMatch && event.opponentDisplayName !== null;
-
+  const isTournament = event.type === "TOURNAMENT";
   const isTournamentMultiTeam =
-    participantAllocations !== undefined &&
-    participantAllocations.length >= 3;
+    participantAllocations !== undefined && participantAllocations.length >= 3;
+
+  const label = statusLabel(temporal, event.startAt, currentTimeIso);
+  const stripe = stripeKey(temporal, event.type);
+
+  // Event column: competition/type label
+  // Matches show the competition label (e.g. "Meisterschaft") if available, else fallback.
+  const typeDisplayLabel = isMatch
+    ? (event.competitionLabel ?? EVENT_TYPE_LABELS["MATCH"])
+    : EVENT_TYPE_LABELS[event.type] ?? event.type;
 
   return (
     <li
-      className={styles.eventCard}
-      data-testid="event-card"
-      data-size={size}
+      className={styles.eventRow}
+      data-testid="event-row"
       data-type={event.type}
-      data-tournament-mode={isTournamentMultiTeam ? "multi-team" : undefined}
-      data-status={event.status}
+      data-temporal={temporal}
+      data-stripe={stripe}
     >
-      {/* Time + type label */}
-      <div className={styles.eventMeta}>
-        <time
-          dateTime={event.startAt}
-          className={styles.eventTime}
-        >
-          {startTime}
-        </time>
-        <span className={styles.eventTypeLabel} aria-label={`Typ: ${typeLabel}`}>
-          {typeLabel}
-        </span>
-        {event.status === "LIVE" && (
-          <span className={styles.liveIndicator} aria-label="Läuft jetzt">
-            LIVE
+      {/* ── Column 1: Status / Time ─────────────────────────────────────── */}
+      <div className={styles.colTime}>
+        {label !== null && (
+          <span
+            className={styles.statusLabel}
+            data-testid={`status-label-${temporal}`}
+            data-status={temporal === "current" ? "current" : "next"}
+          >
+            {label}
           </span>
         )}
+        <time className={styles.eventTime} dateTime={event.startAt}>
+          {startTime}
+        </time>
       </div>
 
-      {isTournamentMultiTeam ? (
-        /* ── Multi-team tournament allocation mode ─────────────────────── */
-        <div className={styles.eventTournamentContent}>
-          <div className={styles.tournamentTitle}>{event.displayTitle}</div>
-          {event.allocation.pitchLabel !== null && (
-            <span className={styles.allocationPitch}>
-              <span className={styles.allocationLabel} aria-hidden="true">PLATZ</span>
-              <span className={styles.allocationValue}>
-                {event.allocation.pitchLabel}
+      {/* ── Column 2: Event ─────────────────────────────────────────────── */}
+      <div className={styles.colEvent}>
+        <span
+          className={styles.eventTypeLabel}
+          data-event-type={event.type}
+        >
+          {typeDisplayLabel}
+        </span>
+        {isMatch ? (
+          <>
+            {event.teamDisplayName !== null && (
+              <span className={styles.eventTeamMain}>{event.teamDisplayName}</span>
+            )}
+            {event.opponentDisplayName !== null && (
+              <span className={styles.eventTeamOpponent}>
+                vs. {event.opponentDisplayName}
               </span>
-            </span>
-          )}
-          <ParticipantAllocationBlock allocations={participantAllocations} />
-        </div>
-      ) : (
-        /* ── Standard event mode ───────────────────────────────────────── */
-        <>
-          {/* Team / pairing */}
-          <div className={styles.eventTeams}>
-            {hasPairing ? (
-              <>
-                <span className={styles.eventTeamHome}>{event.teamDisplayName}</span>
-                <span className={styles.eventVs} aria-hidden="true">vs.</span>
-                <span className={styles.eventTeamAway}>{event.opponentDisplayName}</span>
-              </>
+            )}
+          </>
+        ) : isTournament ? (
+          <span className={styles.eventTeamMain}>{event.displayTitle}</span>
+        ) : (
+          <>
+            {event.teamDisplayName !== null ? (
+              <span className={styles.eventTeamMain}>{event.teamDisplayName}</span>
             ) : (
-              event.teamDisplayName !== null && (
-                <span className={styles.eventTeamSingle}>{event.teamDisplayName}</span>
+              event.displayTitle !== null && (
+                <span className={styles.eventTeamMain}>{event.displayTitle}</span>
               )
             )}
-            {!isMatch && event.displayTitle && event.teamDisplayName === null && (
-              <span className={styles.eventTeamSingle}>{event.displayTitle}</span>
+            {event.organizerDisplayName !== null && (
+              <span className={styles.eventTeamSubtitle}>
+                {event.organizerDisplayName}
+              </span>
             )}
-          </div>
-
-          {/* Competition — only when present */}
-          {event.competitionLabel !== null && (
-            <div className={styles.eventCompetition}>{event.competitionLabel}</div>
-          )}
-
-          {/* Standard allocation (no referee on Screen 1) */}
-          <AllocationBlock allocation={event.allocation} eventType={event.type} />
-        </>
-      )}
-    </li>
-  );
-}
-
-// ── Compact event row (high-density mode) ─────────────────────────────────────
-
-type CompactEventRowProps = {
-  event: InfoboardScreen1Event;
-  timeZone: string;
-};
-
-/**
- * Compact horizontal row for high-density sections (4–6 simultaneous events).
- * Shows: time · team · pitch · dressing room.
- * Text size is never smaller than the later-event minimum.
- */
-function CompactEventRow({ event, timeZone }: CompactEventRowProps): ReactElement {
-  const startTime = formatTime(event.startAt, timeZone);
-  const typeLabel = EVENT_TYPE_LABELS[event.type] ?? event.type;
-  const { pitchLabel, homeDressingRoomLabel } = event.allocation;
-
-  return (
-    <li
-      className={styles.compactEventRow}
-      data-testid="compact-event-row"
-      data-type={event.type}
-      data-status={event.status}
-    >
-      <time className={styles.compactTime} dateTime={event.startAt}>
-        {startTime}
-      </time>
-      <span className={styles.compactTypeLabel}>{typeLabel}</span>
-      {event.teamDisplayName !== null && (
-        <span className={styles.compactTeam}>{event.teamDisplayName}</span>
-      )}
-      <div className={styles.compactAllocation}>
-        {pitchLabel !== null && (
-          <span className={styles.compactPitch}>{pitchLabel}</span>
+          </>
         )}
-        {homeDressingRoomLabel !== null && (
-          <span className={styles.compactRoom}>{homeDressingRoomLabel}</span>
+      </div>
+
+      {/* ── Column 3: Pitch ─────────────────────────────────────────────── */}
+      <div className={styles.colPitch}>
+        <span className={styles.colLabel}>PLATZ</span>
+        {event.allocation.pitchLabel !== null && (
+          <span className={styles.pitchValue}>{event.allocation.pitchLabel}</span>
+        )}
+      </div>
+
+      {/* ── Column 4: Allocation (ZUTEILUNG) ────────────────────────────── */}
+      <div className={styles.colAllocation}>
+        <span className={styles.colLabel}>ZUTEILUNG</span>
+        {isTournamentMultiTeam ? (
+          <ParticipantAllocationBlock allocations={participantAllocations!} />
+        ) : isMatch ? (
+          <MatchAllocation event={event} clubLogoSrc={clubLogoSrc} />
+        ) : (
+          <TrainingAllocation event={event} />
         )}
       </div>
     </li>
   );
 }
 
-// ── Section ───────────────────────────────────────────────────────────────────
+// ── Footer ────────────────────────────────────────────────────────────────────
 
-type SectionVariant = "current" | "next" | "later";
-
-const SECTION_VARIANT_STYLES: Record<SectionVariant, string> = {
-  current: styles.sectionCurrent,
-  next: styles.sectionNext,
-  later: styles.sectionLater,
-};
-
-const SECTION_TEST_IDS: Record<SectionVariant, string> = {
-  current: "section-current",
-  next: "section-next",
-  later: "section-later",
-};
-
-type SectionProps = {
-  heading: string;
-  events: InfoboardScreen1Event[];
-  timeZone: string;
-  cardSize: "large" | "medium" | "small";
-  variant: SectionVariant;
-  emptyMessage?: string;
-  eventPresentation?: readonly InfoboardEventPresentationExtension[];
-};
-
-function Section({
-  heading,
-  events,
-  timeZone,
-  cardSize,
-  variant,
-  emptyMessage,
-  eventPresentation,
-}: SectionProps): ReactElement {
-  const variantClass = SECTION_VARIANT_STYLES[variant] ?? "";
-  const testId = SECTION_TEST_IDS[variant];
-  const simultaneousDensity = getSimultaneousDensity(events);
-
-  return (
-    <section
-      className={`${styles.section} ${variantClass}`}
-      data-testid={testId}
-      data-simultaneous-density={simultaneousDensity}
-    >
-      <h2 className={styles.sectionHeading}>{heading}</h2>
-      {events.length === 0 ? (
-        emptyMessage !== undefined ? (
-          <p className={styles.sectionEmpty}>{emptyMessage}</p>
-        ) : null
-      ) : simultaneousDensity === "high" ? (
-        /* High-density: compact rows for 4–6 simultaneous events */
-        <ul className={styles.compactEventList} role="list">
-          {events.map((event) => (
-            <CompactEventRow
-              key={event.id}
-              event={event}
-              timeZone={timeZone}
-            />
-          ))}
-        </ul>
-      ) : (
-        /* Normal density: standard event cards */
-        <ul className={styles.eventList} role="list">
-          {events.map((event) => {
-            const extension = findEventExtension(event.id, eventPresentation);
-            const allocs = extension?.participantAllocations;
-            const participantAllocations =
-              allocs !== undefined && allocs.length >= 3 ? allocs : undefined;
-            return (
-              <EventCard
-                key={event.id}
-                event={event}
-                timeZone={timeZone}
-                size={cardSize}
-                participantAllocations={participantAllocations}
-              />
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-// ── Announcement bar ──────────────────────────────────────────────────────────
-
-type AnnouncementBarProps = {
-  announcement: InfoboardAnnouncementPresentation;
+type FooterProps = {
+  announcement: InfoboardAnnouncementPresentation | undefined;
+  productLogoSrc: string | null;
 };
 
 /**
- * Bottom announcement strip. Renders only when:
- *   - announcement.enabled is true, and
- *   - announcement.text contains meaningful non-whitespace content.
+ * Dark navy footer.
+ * Left: tenant-configurable announcement text (when enabled and non-blank).
+ * Right: "POWERED BY" + SportClubEvo product logo.
  *
- * Uses backgroundColor and textColor when provided and non-blank.
- * Falls back to CSS defaults (blue bar, white text) when absent.
- * Does not hardcode any club-specific content.
+ * The announcement backgroundColor and textColor override the footer defaults
+ * when provided and non-blank.
+ *
+ * Does not hardcode any club-specific slogan.
  */
-function AnnouncementBar({ announcement }: AnnouncementBarProps): ReactElement | null {
-  if (!announcement.enabled) return null;
-  if (typeof announcement.text !== "string") return null;
-  if (announcement.text.trim().length === 0) return null;
+function Footer({ announcement, productLogoSrc }: FooterProps): ReactElement {
+  const announcementEnabled =
+    announcement !== undefined &&
+    announcement.enabled === true &&
+    typeof announcement.text === "string" &&
+    announcement.text.trim().length > 0;
 
-  const inlineStyle: React.CSSProperties = {};
-  if (announcement.backgroundColor && announcement.backgroundColor.trim().length > 0) {
-    inlineStyle.backgroundColor = announcement.backgroundColor;
+  const footerStyle: React.CSSProperties = {};
+  if (announcementEnabled && announcement !== undefined) {
+    if (announcement.backgroundColor && announcement.backgroundColor.trim().length > 0) {
+      footerStyle.backgroundColor = announcement.backgroundColor;
+    }
+    if (announcement.textColor && announcement.textColor.trim().length > 0) {
+      footerStyle.color = announcement.textColor;
+    }
   }
-  if (announcement.textColor && announcement.textColor.trim().length > 0) {
-    inlineStyle.color = announcement.textColor;
-  }
+
+  const hasInlineStyle = Object.keys(footerStyle).length > 0;
 
   return (
-    <div
-      className={styles.announcementBar}
-      data-testid="announcement-bar"
-      style={inlineStyle}
+    <footer
+      className={styles.footer}
+      data-testid={announcementEnabled ? "announcement-bar" : "infoboard-footer"}
+      style={hasInlineStyle ? footerStyle : undefined}
     >
-      <span className={styles.announcementText}>{announcement.text}</span>
-    </div>
+      <div className={styles.footerLeft}>
+        {announcementEnabled && announcement !== undefined && (
+          <span className={styles.footerAnnouncementText}>{announcement.text}</span>
+        )}
+      </div>
+      <div className={styles.footerRight} data-testid="product-branding">
+        <span className={styles.footerPoweredBy}>POWERED BY</span>
+        {productLogoSrc !== null ? (
+          <img
+            src={productLogoSrc}
+            alt="SportClubEvo"
+            className={styles.footerProductLogo}
+            width={120}
+            height={28}
+          />
+        ) : (
+          <span className={styles.footerProductFallback}>SportClubEvo</span>
+        )}
+      </div>
+    </footer>
   );
 }
 
@@ -569,13 +510,14 @@ export function InfoboardScreen1({
   const { tenant, current, next, later } = feed;
   const timeZone = tenant.timezone;
 
-  const totalEvents = current.length + next.length + later.length;
-  const density: "normal" | "compact" =
-    totalEvents >= COMPACT_THRESHOLD ? "compact" : "normal";
+  const flatList = buildFlatList(feed);
+  const totalEvents = flatList.length;
 
-  const overflowCount = totalEvents > PROTOTYPE_CAPACITY
-    ? totalEvents - PROTOTYPE_CAPACITY
-    : 0;
+  const overflowCount =
+    totalEvents > PROTOTYPE_CAPACITY ? totalEvents - PROTOTYPE_CAPACITY : 0;
+  const visibleList = overflowCount > 0
+    ? flatList.slice(0, PROTOTYPE_CAPACITY)
+    : flatList;
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
@@ -583,22 +525,28 @@ export function InfoboardScreen1({
   // Current time and date — explicit only, never implicit.
   const currentTime =
     currentTimeIso != null ? formatTime(currentTimeIso, timeZone) : null;
-  const headerDate =
+  const headerWeekday =
     currentTimeIso != null
-      ? formatCurrentDate(currentTimeIso, timeZone)
+      ? formatWeekday(currentTimeIso, timeZone)
+      : null;
+  const headerDateLine =
+    currentTimeIso != null
+      ? formatDateLine(currentTimeIso, timeZone)
       : formatDisplayDate(feed.displayDate);
+
+  // Suppress unused-variable warning for later/next (used only in flatList).
+  void current; void next; void later;
 
   return (
     <div
       className={styles.root}
       data-testid="infoboard-screen1-root"
-      data-density={density}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className={styles.header} data-testid="infoboard-header">
 
         {/* Left zone: club branding */}
-        <div className={styles.headerLeft}>
+        <div className={styles.headerLeft} data-testid="header-left">
           {clubLogoSrc !== null ? (
             <img
               src={clubLogoSrc}
@@ -612,35 +560,30 @@ export function InfoboardScreen1({
               {tenant.name.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <div className={styles.headerNames}>
-            <span className={styles.headerClubName}>{tenant.name}</span>
-          </div>
+          <span className={styles.headerClubName}>{tenant.name}</span>
         </div>
 
-        {/* Center zone: SportClubEvo logo + current time + current date */}
+        {/* Center zone: current time + date (no product logo here) */}
         <div className={styles.headerCenter} data-testid="header-center">
-          <div className={styles.headerProduct} data-testid="product-branding">
-            {productLogoSrc !== null ? (
-              <img
-                src={productLogoSrc}
-                alt="SportClubEvo"
-                className={styles.productLogo}
-                width={80}
-                height={24}
-              />
-            ) : (
-              <span className={styles.productLogoFallback}>SportClubEvo</span>
-            )}
-          </div>
-          {currentTime !== null && (
-            <time
-              className={styles.headerCurrentTime}
-              dateTime={currentTimeIso!}
-            >
-              {currentTime}
-            </time>
+          {currentTime !== null && headerWeekday !== null ? (
+            <>
+              <div className={styles.headerTimeBlock}>
+                <time
+                  className={styles.headerCurrentTime}
+                  dateTime={currentTimeIso!}
+                >
+                  {currentTime}
+                </time>
+                <span className={styles.headerTimeSeparator} aria-hidden="true">|</span>
+                <div className={styles.headerDateBlock}>
+                  <span className={styles.headerWeekday}>{headerWeekday}</span>
+                  <span className={styles.headerDateLine}>{headerDateLine}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <span className={styles.headerDateFallback}>{headerDateLine}</span>
           )}
-          <span className={styles.headerDate}>{headerDate}</span>
         </div>
 
         {/* Right zone: Alexa-safe — intentionally empty */}
@@ -651,10 +594,14 @@ export function InfoboardScreen1({
         />
       </header>
 
-      {/* ── Main content ────────────────────────────────────────────────── */}
+      {/* ── Board title ──────────────────────────────────────────────────── */}
+      <div className={styles.boardTitle} data-testid="board-title">
+        <span className={styles.boardTitleText}>HEUTE AUF DER SPORTANLAGE</span>
+      </div>
+
+      {/* ── Main: event list ─────────────────────────────────────────────── */}
       <main className={styles.main}>
         {feed.isEmpty ? (
-          /* Full empty state */
           <div className={styles.emptyFull} data-testid="empty-state-full">
             <p className={styles.emptyFullMessage}>
               Heute keine Trainings, Heimspiele oder Turniere
@@ -662,42 +609,29 @@ export function InfoboardScreen1({
           </div>
         ) : (
           <>
-            {/* JETZT */}
-            <Section
-              heading="JETZT"
-              events={current}
-              timeZone={timeZone}
-              cardSize="large"
-              variant="current"
-              emptyMessage="Aktuell keine Veranstaltung"
-              eventPresentation={eventPresentation}
-            />
+            <ul
+              className={styles.eventList}
+              role="list"
+              data-testid="event-list"
+            >
+              {visibleList.map((item) => {
+                const extension = findEventExtension(item.event.id, eventPresentation);
+                const allocs = extension?.participantAllocations;
+                const participantAllocations =
+                  allocs !== undefined && allocs.length >= 3 ? allocs : undefined;
+                return (
+                  <EventRow
+                    key={item.event.id}
+                    item={item}
+                    timeZone={timeZone}
+                    currentTimeIso={currentTimeIso}
+                    clubLogoSrc={clubLogoSrc}
+                    participantAllocations={participantAllocations}
+                  />
+                );
+              })}
+            </ul>
 
-            {/* ALS NÄCHSTES */}
-            {next.length > 0 && (
-              <Section
-                heading="ALS NÄCHSTES"
-                events={next}
-                timeZone={timeZone}
-                cardSize="medium"
-                variant="next"
-                eventPresentation={eventPresentation}
-              />
-            )}
-
-            {/* SPÄTER HEUTE */}
-            {later.length > 0 && (
-              <Section
-                heading="SPÄTER HEUTE"
-                events={later}
-                timeZone={timeZone}
-                cardSize="small"
-                variant="later"
-                eventPresentation={eventPresentation}
-              />
-            )}
-
-            {/* Overflow warning — only when prototype capacity exceeded */}
             {overflowCount > 0 && (
               <p
                 className={styles.overflowWarning}
@@ -711,10 +645,8 @@ export function InfoboardScreen1({
         )}
       </main>
 
-      {/* ── Announcement bar ─────────────────────────────────────────────── */}
-      {announcement !== undefined && (
-        <AnnouncementBar announcement={announcement} />
-      )}
+      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      <Footer announcement={announcement} productLogoSrc={productLogoSrc} />
     </div>
   );
 }

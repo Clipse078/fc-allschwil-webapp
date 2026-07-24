@@ -6,17 +6,24 @@
  * PREVIEW-ONLY — must never be imported by production feed builders or API
  * routes. All timestamps are fixed UTC ISO-8601 strings.
  *
- * Fixed display date: 2026-09-12 (Saturday, Europe/Zurich = UTC+2 in summer).
- * Tenant timezone: "Europe/Zurich".
- * Generated at:     2026-09-12T08:30:00.000Z  →  10:30 Zurich
+ * Target visual scenario (PP-02B-H):
+ *   Fixed display date: 2026-09-12 (Saturday, Europe/Zurich = UTC+2 in summer).
+ *   Tenant timezone: "Europe/Zurich".
+ *   Current time:     2026-09-12T15:35:00.000Z  →  17:35 Zurich
  *
  * Zurich offset (+2h in summer):
- *   08:00Z → 10:00 Zurich
- *   08:30Z → 10:30 Zurich
- *   09:00Z → 11:00 Zurich
- *   11:00Z → 13:00 Zurich
- *   12:00Z → 14:00 Zurich
- *   13:30Z → 15:30 Zurich
+ *   15:00Z → 17:00 Zurich
+ *   16:00Z → 18:00 Zurich
+ *   17:00Z → 19:00 Zurich
+ *   18:15Z → 20:15 Zurich
+ *   19:00Z → 21:00 Zurich
+ *
+ * At 17:35 Zurich:
+ *   - evt-1 (17:00, match) is CURRENT  → status: JETZT
+ *   - evt-2 (18:00, training) is NEXT  → status: IN 25 MIN.
+ *   - evt-3 (19:00, tournament) is LATER
+ *   - evt-4 (20:15, match) is LATER
+ *   - evt-5 (21:00, training) is LATER
  *
  * Referee dressing-room labels are retained in the DTO fields where the
  * existing data requires them, but Screen 1 does not render them.
@@ -37,151 +44,103 @@ const PREVIEW_TENANT = {
   timezone: "Europe/Zurich",
 } as const;
 
-// ── Main preview fixture ──────────────────────────────────────────────────────
+// ── Main preview fixture — 5 rows matching PP-02B-H target ───────────────────
 
 export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
-  generatedAt: "2026-09-12T08:30:00.000Z",
+  generatedAt: "2026-09-12T15:35:00.000Z",
   tenant: PREVIEW_TENANT,
   displayDate: "2026-09-12",
   isStale: false,
   wochenplanVariantBadge: null,
 
-  // ── CURRENT — events ongoing at 10:30 Zurich ─────────────────────────────
+  // ── CURRENT — FC Allschwil E1 match at 17:00 Zurich ──────────────────────
   current: [
     {
-      id: "evt-cur-1",
-      type: "TRAINING",
-      displayTitle: "U12 Training",
-      teamDisplayName: "FC Allschwil U12",
-      opponentDisplayName: null,
-      organizerDisplayName: null,
-      competitionLabel: null,
-      startAt: "2026-09-12T08:00:00.000Z",
-      endAt: "2026-09-12T09:30:00.000Z",
-      meetingTime: null,
-      status: "LIVE",
-      resultLabel: null,
-      intermediateResultLabel: null,
-      temporalBucket: "current",
-      seasonKey: "2026-27",
-      allocation: {
-        pitchLabel: "Platz 1",
-        homeDressingRoomLabel: "Kabine A",
-        awayDressingRoomLabel: null,
-        refereeDressingRoomLabel: null,
-      },
-    },
-    {
-      id: "evt-cur-2",
+      id: "evt-1",
       type: "MATCH",
       displayTitle: "FC Allschwil E1 – FC Binningen E1",
       teamDisplayName: "FC Allschwil E1",
       opponentDisplayName: "FC Binningen E1",
       organizerDisplayName: null,
-      competitionLabel: "Meisterschaft 3. Liga",
-      startAt: "2026-09-12T08:00:00.000Z",
-      endAt: "2026-09-12T09:45:00.000Z",
-      meetingTime: "2026-09-12T07:30:00.000Z",
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T15:00:00.000Z",
+      endAt: "2026-09-12T16:45:00.000Z",
+      meetingTime: null,
       status: "LIVE",
       resultLabel: null,
-      intermediateResultLabel: "1:0",
+      intermediateResultLabel: null,
       temporalBucket: "current",
       seasonKey: "2026-27",
       allocation: {
         pitchLabel: "Stadion",
         homeDressingRoomLabel: "Kabine E1",
         awayDressingRoomLabel: "Kabine E2",
-        // refereeDressingRoomLabel is retained in the DTO but not rendered on Screen 1
-        refereeDressingRoomLabel: "Kabine E3",
+        refereeDressingRoomLabel: null,
       },
     },
   ],
 
-  // ── NEXT — two simultaneous events at 11:00 Zurich (09:00Z) ──────────────
+  // ── NEXT — Juniorinnen FF-14 training at 18:00 Zurich (in 25 min) ────────
   next: [
     {
-      id: "evt-nxt-1",
+      id: "evt-2",
+      type: "TRAINING",
+      displayTitle: "Juniorinnen FF-14",
+      teamDisplayName: "Juniorinnen FF-14",
+      opponentDisplayName: null,
+      organizerDisplayName: "FC Allschwil",
+      competitionLabel: null,
+      startAt: "2026-09-12T16:00:00.000Z",
+      endAt: null,
+      meetingTime: null,
+      status: "SCHEDULED",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "next",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KR2",
+        homeDressingRoomLabel: "Kabine 04",
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+
+  // ── LATER ─────────────────────────────────────────────────────────────────
+  later: [
+    {
+      id: "evt-3",
       type: "TOURNAMENT",
-      displayTitle: "FC Allschwil Sommer-Cup Junioren 2026",
+      displayTitle: "Sommer-Cup Junioren E",
       teamDisplayName: "FC Allschwil Junioren",
       opponentDisplayName: null,
       organizerDisplayName: "FC Allschwil",
       competitionLabel: "Sommer-Cup",
-      startAt: "2026-09-12T09:00:00.000Z",
+      startAt: "2026-09-12T17:00:00.000Z",
       endAt: null,
       meetingTime: null,
       status: "SCHEDULED",
       resultLabel: null,
       intermediateResultLabel: null,
-      temporalBucket: "next",
+      temporalBucket: "later",
       seasonKey: "2026-27",
       allocation: {
-        pitchLabel: "Kunstrasen 2",
-        homeDressingRoomLabel: "Kabine O1",
+        pitchLabel: "KR2 + KR3",
+        homeDressingRoomLabel: null,
         awayDressingRoomLabel: null,
         refereeDressingRoomLabel: null,
       },
     },
     {
-      id: "evt-nxt-2",
-      type: "TRAINING",
-      displayTitle: "D1 Training",
-      teamDisplayName: "FC Allschwil D1",
-      opponentDisplayName: null,
-      organizerDisplayName: null,
-      competitionLabel: null,
-      startAt: "2026-09-12T09:00:00.000Z",
-      endAt: "2026-09-12T10:30:00.000Z",
-      meetingTime: null,
-      status: "SCHEDULED",
-      resultLabel: null,
-      intermediateResultLabel: null,
-      temporalBucket: "next",
-      seasonKey: "2026-27",
-      allocation: {
-        pitchLabel: "Kunstrasen 3",
-        homeDressingRoomLabel: "Kabine O2",
-        awayDressingRoomLabel: null,
-        refereeDressingRoomLabel: null,
-      },
-    },
-  ],
-
-  // ── LATER — mixed types, various allocation combinations ──────────────────
-  later: [
-    {
-      id: "evt-lat-1",
+      id: "evt-4",
       type: "MATCH",
-      displayTitle: "FC Allschwil 1. Mannschaft – FC Reinach 1",
-      teamDisplayName: "FC Allschwil 1. Mannschaft",
-      opponentDisplayName: "FC Reinach 1",
+      displayTitle: "FC Allschwil D1 – SC Basler Nord D1",
+      teamDisplayName: "FC Allschwil D1",
+      opponentDisplayName: "SC Basler Nord D1",
       organizerDisplayName: null,
-      competitionLabel: "Meisterschaft 2. Liga",
-      startAt: "2026-09-12T11:00:00.000Z",
-      endAt: "2026-09-12T12:45:00.000Z",
-      meetingTime: "2026-09-12T10:30:00.000Z",
-      status: "SCHEDULED",
-      resultLabel: null,
-      intermediateResultLabel: null,
-      temporalBucket: "later",
-      seasonKey: "2026-27",
-      allocation: {
-        pitchLabel: "Stadion",
-        homeDressingRoomLabel: "Kabine E1",
-        awayDressingRoomLabel: "Kabine E2",
-        // refereeDressingRoomLabel retained in DTO, not rendered on Screen 1
-        refereeDressingRoomLabel: "Kabine C",
-      },
-    },
-    {
-      id: "evt-lat-2",
-      type: "TRAINING",
-      displayTitle: "U8/U10 Minis Training",
-      teamDisplayName: "FC Allschwil U8/U10",
-      opponentDisplayName: null,
-      organizerDisplayName: null,
-      competitionLabel: null,
-      startAt: "2026-09-12T12:00:00.000Z",
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T18:15:00.000Z",
       endAt: null,
       meetingTime: null,
       status: "SCHEDULED",
@@ -190,21 +149,21 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
       temporalBucket: "later",
       seasonKey: "2026-27",
       allocation: {
-        pitchLabel: "Kunstrasen 3",
-        homeDressingRoomLabel: "Kabine A",
-        awayDressingRoomLabel: null,
+        pitchLabel: "KR1",
+        homeDressingRoomLabel: "Kabine D1",
+        awayDressingRoomLabel: "Kabine D2",
         refereeDressingRoomLabel: null,
       },
     },
     {
-      id: "evt-lat-3",
-      type: "TOURNAMENT",
-      displayTitle: "Hallenturnier FC Allschwil",
-      teamDisplayName: "FC Allschwil Damen",
+      id: "evt-5",
+      type: "TRAINING",
+      displayTitle: "Aktive Herren",
+      teamDisplayName: "Aktive Herren",
       opponentDisplayName: null,
       organizerDisplayName: "FC Allschwil",
-      competitionLabel: "Hallenturnier",
-      startAt: "2026-09-12T13:30:00.000Z",
+      competitionLabel: null,
+      startAt: "2026-09-12T19:00:00.000Z",
       endAt: null,
       meetingTime: null,
       status: "SCHEDULED",
@@ -213,8 +172,8 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
       temporalBucket: "later",
       seasonKey: "2026-27",
       allocation: {
-        pitchLabel: "Kunstrasen 2",
-        homeDressingRoomLabel: null,
+        pitchLabel: "Hauptplatz",
+        homeDressingRoomLabel: "Kabine A",
         awayDressingRoomLabel: null,
         refereeDressingRoomLabel: null,
       },
@@ -228,21 +187,47 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
 
 /**
  * Fixed current-time ISO string for the preview header.
- * 2026-09-12T08:30:00.000Z → 10:30 Europe/Zurich (UTC+2 in summer).
+ * 2026-09-12T15:35:00.000Z → 17:35 Europe/Zurich (UTC+2 in summer).
+ * At this time the next event (18:00) is in exactly 25 minutes.
  */
-export const PREVIEW_CURRENT_TIME_ISO = "2026-09-12T08:30:00.000Z" as const;
+export const PREVIEW_CURRENT_TIME_ISO = "2026-09-12T15:35:00.000Z" as const;
 
 /**
- * Preview announcement bar content.
+ * Preview announcement bar content matching the target image.
  * The reusable component must not hardcode any club-specific text.
  * This content belongs exclusively in the preview fixture.
  */
 export const PREVIEW_ANNOUNCEMENT: InfoboardAnnouncementPresentation = {
   enabled: true,
-  text: "WILLKOMMEN BEIM FC ALLSCHWIL – FAIRNESS, RESPEKT, LEIDENSCHAFT",
+  text: "WIR LEBEN FUSSBALL. FAIRNESS. RESPEKT. LEIDENSCHAFT.",
   backgroundColor: null,
   textColor: null,
 };
+
+// ── Target tournament: 5-team Sommer-Cup Junioren E ──────────────────────────
+
+/**
+ * Explicit participant-to-room allocations for the Sommer-Cup Junioren E
+ * in the primary preview fixture (evt-3).
+ *
+ *   FC Binningen    E1 → Kabine 01
+ *   SC Birsfelden   E1 → Kabine 02
+ *   SV Muttenz      E1 → Kabine 03
+ *   FC Reinach      E1 → Kabine 04
+ *   FC Oberwil      E1 → Kabine 05
+ */
+export const PREVIEW_TARGET_TOURNAMENT_EXTENSIONS: readonly InfoboardEventPresentationExtension[] = [
+  {
+    eventId: "evt-3",
+    participantAllocations: [
+      { id: "pt-1", teamDisplayName: "FC Binningen E1", dressingRoomLabel: "Kabine 01" },
+      { id: "pt-2", teamDisplayName: "SC Birsfelden E1", dressingRoomLabel: "Kabine 02" },
+      { id: "pt-3", teamDisplayName: "SV Muttenz E1", dressingRoomLabel: "Kabine 03" },
+      { id: "pt-4", teamDisplayName: "FC Reinach E1", dressingRoomLabel: "Kabine 04" },
+      { id: "pt-5", teamDisplayName: "FC Oberwil E1", dressingRoomLabel: "Kabine 05" },
+    ],
+  },
+];
 
 // ── Tournament Case A: 4-team Kinderfussball E-Junioren ───────────────────────
 
@@ -415,9 +400,9 @@ export const PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS: readonly InfoboardEventPresent
 // ── High-density: 6 simultaneous trainings ────────────────────────────────────
 
 /**
- * 6 simultaneous trainings — all share the same startAt to demonstrate
- * high-density compact row layout (4–6 simultaneous events).
- * Each training has a unique team, pitch, and dressing room.
+ * 6 simultaneous trainings — all share the same startAt.
+ * Used in tests to verify that all events remain individually visible
+ * in the flat event list model.
  */
 export const PREVIEW_FIXTURE_HIGH_DENSITY_6: InfoboardScreen1Feed = {
   generatedAt: "2026-09-12T08:30:00.000Z",
@@ -574,7 +559,6 @@ export const PREVIEW_FIXTURE_HIGH_DENSITY_6: InfoboardScreen1Feed = {
 
 /**
  * Fixture with an empty current section but populated future sections.
- * Used to verify the restrained "no current event" message.
  */
 export const PREVIEW_FIXTURE_EMPTY_CURRENT: InfoboardScreen1Feed = {
   ...PREVIEW_FIXTURE,
@@ -583,7 +567,6 @@ export const PREVIEW_FIXTURE_EMPTY_CURRENT: InfoboardScreen1Feed = {
 
 /**
  * Fixture with all buckets empty.
- * Used to verify the full empty-state rendering.
  */
 export const PREVIEW_FIXTURE_EMPTY: InfoboardScreen1Feed = {
   ...PREVIEW_FIXTURE,
