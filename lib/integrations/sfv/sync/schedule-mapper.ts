@@ -46,6 +46,25 @@
 import type { ClubScheduleEntry } from "../client";
 import type { SfvScheduleSyncContext } from "./schedule-types";
 
+// ── Canonical homeAway helper ─────────────────────────────────────────────────
+
+/**
+ * Canonical homeAway values used throughout the application.
+ * SFV-synced events must always store one of these two values.
+ */
+export type CanonicalHomeAway = "HOME" | "AWAY";
+
+/**
+ * Maps an SFV isHome boolean to the canonical internal homeAway value.
+ *
+ * Pure, deterministic, fully typed. Incapable of returning "H" or "A".
+ * Used by both the create path (buildNewEventFields) and the update path
+ * (updateMatchRecord), ensuring a single authoritative mapping.
+ */
+export function mapSfvHomeAway(isHome: boolean): CanonicalHomeAway {
+  return isHome ? "HOME" : "AWAY";
+}
+
 // ── EventStatus mapping ────────────────────────────────────────────────────────
 
 /**
@@ -160,7 +179,7 @@ export function buildNewEventFields(
 
   const competition = entry.leagueName ?? entry.divisionName ?? null;
   const venue = entry.stadiumPlaygroundName ?? null;
-  const homeAway = isHome ? "H" : "A";
+  const homeAway = mapSfvHomeAway(isHome);
 
   // Build a display title: "vs OpponentName" or competition label
   const titleParts: string[] = [];
@@ -280,6 +299,7 @@ type ExistingEventSnapshot = {
   startAt: Date;
   status: string;
   teamId: string | null;
+  homeAway: string | null;
 };
 
 /**
@@ -295,6 +315,7 @@ export function detectChanges(
   incomingKickoff: Date,
   incomingStatus: "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED" | "POSTPONED",
   incomingLocalTeamId: string | null,
+  incomingHomeAway: CanonicalHomeAway,
 ): {
   hasAnyChange: boolean;
   scoreChanged: boolean;
@@ -314,6 +335,10 @@ export function detectChanges(
   // was previously null and can now be resolved (after team sync is run).
   const teamIdChanged = existingEvent.teamId !== incomingLocalTeamId;
 
+  // Ensure existing "H"/"A" rows are corrected to "HOME"/"AWAY" on re-sync
+  // even when no other SFV field has changed.
+  const homeAwayChanged = existingEvent.homeAway !== incomingHomeAway;
+
   const otherMappingChanged =
     existingMapping.providerMatchState !== incomingMapping.providerMatchState ||
     existingMapping.providerMatchStateName !== incomingMapping.providerMatchStateName ||
@@ -329,7 +354,7 @@ export function detectChanges(
     existingMapping.awayTeamId !== incomingMapping.awayTeamId;
 
   const hasAnyChange =
-    scoreChanged || kickoffChanged || statusChanged || teamIdChanged || otherMappingChanged;
+    scoreChanged || kickoffChanged || statusChanged || teamIdChanged || homeAwayChanged || otherMappingChanged;
 
   return { hasAnyChange, scoreChanged, kickoffChanged, statusChanged };
 }

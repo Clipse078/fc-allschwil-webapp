@@ -1,0 +1,426 @@
+/**
+ * lib/integrations/sfv/__tests__/sync-schedule-persistence.test.ts
+ *
+ * Unit tests for the SFV schedule persistence layer.
+ *
+ * Verifies that:
+ *   - New events are created with homeAway = "HOME" or "AWAY" (never "H" or "A").
+ *   - Updates write homeAway = "HOME" or "AWAY".
+ *   - Existing "H"/"A" rows are detected as changed and corrected.
+ *   - Canonical "HOME"/"AWAY" rows are idempotent (no spurious update).
+ *   - infoboardVisible and other local fields are never overwritten.
+ *   - The homeAway-only change triggers an update with no other field changing.
+ *
+ * All Prisma calls are mocked — no real database access.
+ *
+ * TEST COVERAGE MAP:
+ *
+ * Create path:
+ *   C1. New home match persists homeAway = "HOME".
+ *   C2. New away match persists homeAway = "AWAY".
+ *   C3. "H" is never written on create.
+ *   C4. "A" is never written on create.
+ *   C5. infoboardVisible defaults to false (locally managed, not overwritten).
+ *
+ * Update path:
+ *   U1. Updated home match writes homeAway = "HOME".
+ *   U2. Updated away match writes homeAway = "AWAY".
+ *   U3. "H" is never written on update.
+ *   U4. "A" is never written on update.
+ *
+ * Change detection + correction:
+ *   D1. Existing homeAway="H" with incoming "HOME" → hasAnyChange=true (triggers update).
+ *   D2. Existing homeAway="A" with incoming "AWAY" → hasAnyChange=true (triggers update).
+ *   D3. Existing homeAway="HOME" with incoming "HOME" → idempotent (no change).
+ *   D4. Existing homeAway="AWAY" with incoming "AWAY" → idempotent (no change).
+ *   D5. homeAway-only difference is sufficient to trigger an update.
+ *   D6. No update when all synchronized values already match.
+ */
+
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ClubScheduleEntry } from "../client";
+
+// ── Mock Prisma ───────────────────────────────────────────────────────────────
+
+const mockEventCreate = vi.fn();
+const mockEventUpdate = vi.fn();
+const mockMappingCreate = vi.fn();
+const mockMappingUpdate = vi.fn();
+const mockTransaction = vi.fn();
+
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    $transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
+  },
+}));
+
+// ── Import under test ─────────────────────────────────────────────────────────
+
+const {
+  createMatchWithMapping,
+  updateMatchRecord,
+} = await import("../sync/schedule-persistence");
+
+const {
+  detectChanges,
+  buildMappingFields,
+} = await import("../sync/schedule-mapper");
+
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+
+function makeEntry(overrides: Partial<ClubScheduleEntry> = {}): ClubScheduleEntry {
+  return {
+    matchId: 99001,
+    matchNumber: 1,
+    matchDate: "2026-09-13T15:00:00",
+    groupId: null,
+    cupId: null,
+    groupName: null,
+    roundNbr: 3,
+    playgroundId: 1001,
+    stadiumPlaygroundName: "Testzentrum",
+    isUnkownPlayground: false,
+    leagueId: 17131,
+    leagueNumber: 1,
+    leagueName: "4. Liga",
+    divisionId: 999,
+    divisionName: "Gruppe 1",
+    organisationId: 8,
+    organisationName: "Testverband",
+    matchType: 1,
+    matchTypeName: "Meisterschaft",
+    matchState: 0,
+    matchStateName: "angesetzt",
+    playDay: 3,
+    playDayName: "3. Spieltag",
+    seasonId: 2027,
+    seasonName: "2026/2027",
+    scoreTeamA: 0,
+    scoreTeamB: 0,
+    teamAId: 31927,
+    teamNameA: "FC Local A",
+    teamBId: 44001,
+    teamNameB: "FC Opponent B",
+    ...overrides,
+  };
+}
+
+function makeContext() {
+  return {
+    tenantId: "tenant-test",
+    clubId: 483,
+    seasonId: 2027,
+    organisationId: null,
+    dateFrom: "2026-06-13",
+    dateTo: "2026-10-11",
+    syncedAt: new Date("2026-07-13T10:00:00.000Z"),
+  };
+}
+
+function makeExistingMappingSnapshot(overrides: Partial<{
+  providerMatchState: number | null;
+  providerMatchStateName: string | null;
+  scoreHome: number | null;
+  scoreAway: number | null;
+  providerLeagueId: number | null;
+  providerLeagueName: string | null;
+  providerDivisionId: number | null;
+  providerDivisionName: string | null;
+  providerRoundNbr: number | null;
+  providerVenueName: string | null;
+  providerHomeTeamName: string | null;
+  providerAwayTeamName: string | null;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+}> = {}) {
+  return {
+    providerMatchState: 0,
+    providerMatchStateName: "angesetzt",
+    scoreHome: 0,
+    scoreAway: 0,
+    providerLeagueId: 17131,
+    providerLeagueName: "4. Liga",
+    providerDivisionId: 999,
+    providerDivisionName: "Gruppe 1",
+    providerRoundNbr: 3,
+    providerVenueName: "Testzentrum",
+    providerHomeTeamName: "FC Local A",
+    providerAwayTeamName: "FC Opponent B",
+    homeTeamId: "team-1" as string | null,
+    awayTeamId: null as string | null,
+    ...overrides,
+  };
+}
+
+function makeExistingEventSnapshot(homeAway: string | null, overrides: Partial<{
+  startAt: Date;
+  status: string;
+  teamId: string | null;
+}> = {}) {
+  return {
+    startAt: new Date("2026-09-13T15:00:00.000Z"),
+    status: "SCHEDULED",
+    teamId: "team-1" as string | null,
+    homeAway,
+    ...overrides,
+  };
+}
+
+// ── Setup transaction mock ────────────────────────────────────────────────────
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+    const tx = {
+      event: { create: mockEventCreate, update: mockEventUpdate },
+      matchExternalMapping: { create: mockMappingCreate, update: mockMappingUpdate },
+    };
+    mockEventCreate.mockResolvedValue({ id: "new-event-id" });
+    mockEventUpdate.mockResolvedValue({});
+    mockMappingCreate.mockResolvedValue({});
+    mockMappingUpdate.mockResolvedValue({});
+    return fn(tx);
+  });
+});
+
+// ── C1–C5: Create path ────────────────────────────────────────────────────────
+
+describe("createMatchWithMapping — homeAway", () => {
+  it("C1: new home match persists homeAway='HOME'", async () => {
+    const result = await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      "team-1",
+      "FC Opponent B",
+      true, // isHome
+      "team-1",
+      null,
+    );
+
+    expect(result.status).toBe("created");
+    expect(mockEventCreate).toHaveBeenCalledOnce();
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.homeAway).toBe("HOME");
+  });
+
+  it("C2: new away match persists homeAway='AWAY'", async () => {
+    const result = await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      "team-1",
+      "FC Local A",
+      false, // isHome=false → AWAY
+      null,
+      "team-1",
+    );
+
+    expect(result.status).toBe("created");
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.homeAway).toBe("AWAY");
+  });
+
+  it("C3: 'H' is never written on create", async () => {
+    await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      "team-1",
+      "FC Opponent B",
+      true,
+      "team-1",
+      null,
+    );
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.homeAway).not.toBe("H");
+  });
+
+  it("C4: 'A' is never written on create", async () => {
+    await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      "team-1",
+      "FC Local A",
+      false,
+      null,
+      "team-1",
+    );
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.homeAway).not.toBe("A");
+  });
+
+  it("C5: infoboardVisible defaults to false (not overwritten by sync)", async () => {
+    await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      "team-1",
+      "FC Opponent B",
+      true,
+      "team-1",
+      null,
+    );
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.infoboardVisible).toBe(false);
+  });
+});
+
+// ── U1–U4: Update path ────────────────────────────────────────────────────────
+
+describe("updateMatchRecord — homeAway", () => {
+  it("U1: updated home match writes homeAway='HOME'", async () => {
+    const result = await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Opponent B",
+      "team-1",
+      null,
+      "team-1",
+      true, // isHome
+    );
+
+    expect(result.status).toBe("updated");
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    expect(updateData.homeAway).toBe("HOME");
+  });
+
+  it("U2: updated away match writes homeAway='AWAY'", async () => {
+    const result = await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Local A",
+      null,
+      "team-1",
+      "team-1",
+      false, // isHome=false → AWAY
+    );
+
+    expect(result.status).toBe("updated");
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    expect(updateData.homeAway).toBe("AWAY");
+  });
+
+  it("U3: 'H' is never written on update", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Opponent B",
+      "team-1",
+      null,
+      "team-1",
+      true,
+    );
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    expect(updateData.homeAway).not.toBe("H");
+  });
+
+  it("U4: 'A' is never written on update", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Local A",
+      null,
+      "team-1",
+      "team-1",
+      false,
+    );
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    expect(updateData.homeAway).not.toBe("A");
+  });
+});
+
+// ── D1–D6: Change detection + homeAway correction ────────────────────────────
+
+describe("detectChanges — homeAway correction", () => {
+  it("D1: existing 'H' → incoming 'HOME' triggers update (legacy correction)", () => {
+    const result = detectChanges(
+      makeExistingMappingSnapshot(),
+      makeExistingEventSnapshot("H"),
+      buildMappingFields(makeEntry(), makeContext(), "team-1", null),
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "HOME",
+    );
+    expect(result.hasAnyChange).toBe(true);
+  });
+
+  it("D2: existing 'A' → incoming 'AWAY' triggers update (legacy correction)", () => {
+    const result = detectChanges(
+      makeExistingMappingSnapshot({ homeTeamId: null, awayTeamId: "team-1" }),
+      makeExistingEventSnapshot("A", { teamId: "team-1" }),
+      buildMappingFields(makeEntry(), makeContext(), null, "team-1"),
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "AWAY",
+    );
+    expect(result.hasAnyChange).toBe(true);
+  });
+
+  it("D3: existing 'HOME' with incoming 'HOME' → idempotent (no change)", () => {
+    const result = detectChanges(
+      makeExistingMappingSnapshot(),
+      makeExistingEventSnapshot("HOME"),
+      buildMappingFields(makeEntry(), makeContext(), "team-1", null),
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "HOME",
+    );
+    expect(result.hasAnyChange).toBe(false);
+  });
+
+  it("D4: existing 'AWAY' with incoming 'AWAY' → idempotent (no change)", () => {
+    const result = detectChanges(
+      makeExistingMappingSnapshot({ homeTeamId: null, awayTeamId: "team-1" }),
+      makeExistingEventSnapshot("AWAY", { teamId: "team-1" }),
+      buildMappingFields(makeEntry(), makeContext(), null, "team-1"),
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "AWAY",
+    );
+    expect(result.hasAnyChange).toBe(false);
+  });
+
+  it("D5: homeAway-only difference is sufficient to trigger an update", () => {
+    // All other fields identical; only homeAway differs
+    const result = detectChanges(
+      makeExistingMappingSnapshot(),
+      makeExistingEventSnapshot("H"), // legacy value
+      buildMappingFields(makeEntry(), makeContext(), "team-1", null),
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "HOME",
+    );
+    expect(result.hasAnyChange).toBe(true);
+  });
+
+  it("D6: no update when all synchronized values already match", () => {
+    const result = detectChanges(
+      makeExistingMappingSnapshot(),
+      makeExistingEventSnapshot("HOME"),
+      buildMappingFields(makeEntry(), makeContext(), "team-1", null),
+      new Date("2026-09-13T15:00:00.000Z"),
+      "SCHEDULED",
+      "team-1",
+      "HOME",
+    );
+    expect(result.hasAnyChange).toBe(false);
+    expect(result.scoreChanged).toBe(false);
+    expect(result.kickoffChanged).toBe(false);
+    expect(result.statusChanged).toBe(false);
+  });
+});
