@@ -1,233 +1,391 @@
+/**
+ * app/(admin)/dashboard/infoboard/page.tsx
+ *
+ * Infoboard Administration — PP-02E
+ *
+ * Route: /dashboard/infoboard
+ *
+ * Architecture:
+ *   - Server component (no "use client").
+ *   - Uses the authenticated tenant from the session (never from query params).
+ *   - Accepts an optional `date` query parameter (YYYY-MM-DD) for admin preview.
+ *     Invalid dates fall back to today. The date parameter affects only the
+ *     admin preview; the public /infoboard/screen-1 is not modified.
+ *   - Calls buildScreen1LivePayload() directly — no HTTP fetch to own API.
+ *   - Does not use the legacy /api/public/infoboard feed.
+ *   - No preview fixtures are imported or used.
+ *
+ * Design constraints:
+ *   - No public Screen 1 redesign.
+ *   - No publication-policy duplication.
+ *   - No temporal-logic duplication.
+ *   - No schema or migration changes.
+ *   - No announcement persistence.
+ *   - No Screen 2 implementation.
+ *   - Tenant ID never accepted from query parameters.
+ *   - Date calculations use Intl.DateTimeFormat with the tenant timezone.
+ */
+
 import Link from "next/link";
-import { ExternalLink, Monitor } from "lucide-react";
+import { notFound } from "next/navigation";
+import { ExternalLink, Monitor, AlertCircle, Construction } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
-import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
+import { getTenantContextFromSession } from "@/lib/tenants/context";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import InfoboardEventList from "@/components/admin/infoboard/InfoboardEventList";
+import { InfoboardDisplayCard } from "@/components/infoboard/admin/InfoboardDisplayCard";
+import { InfoboardPublicationSummary } from "@/components/infoboard/admin/InfoboardPublicationSummary";
+import { InfoboardTodayList } from "@/components/infoboard/admin/InfoboardTodayList";
+import { InfoboardDateSelector } from "@/components/infoboard/admin/InfoboardDateSelector";
+import {
+  buildScreen1LivePayload,
+  type Screen1TenantContext,
+} from "@/lib/publishing/infoboard/screen1-live-service";
+import {
+  createScreen1SourceLoader,
+  type Screen1SourceDatabase,
+  type Screen1DbEventRow,
+  type Screen1FacilityResourceRow,
+} from "@/lib/publishing/infoboard/screen1-source-loader";
+import { buildScreen1AdminSummary } from "@/lib/publishing/infoboard/screen1-admin-summary";
+import { toLocalDateKey } from "@/lib/publishing/time/temporal-grouping";
 
-const EVENT_SELECT = {
-  id: true,
-  title: true,
-  type: true,
-  status: true,
-  startAt: true,
-  endAt: true,
-  opponentName: true,
-  location: true,
-  infoboardVisible: true,
-  team: { select: { name: true } },
-  season: { select: { name: true } },
-} as const;
+// ── Page props ─────────────────────────────────────────────────────────────────
 
-function toEventItem(e: {
-  id: string;
-  title: string;
-  type: string;
-  status: string;
-  startAt: Date;
-  endAt: Date | null;
-  opponentName: string | null;
-  location: string | null;
-  infoboardVisible: boolean;
-  team: { name: string } | null;
-  season: { name: string };
-}) {
+type InfoboardAdminPageProps = {
+  searchParams?: Promise<{
+    date?: string;
+  }>;
+};
+
+// ── Date utilities ────────────────────────────────────────────────────────────
+
+/** Validates a date string against strict YYYY-MM-DD format. */
+function isValidDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+/**
+ * Builds a Date representing approximately noon (12:00) in the given IANA
+ * timezone for the given YYYY-MM-DD date key.
+ *
+ * Uses a two-step Intl approach to avoid server-local timezone dependency:
+ *  1. Start with noon UTC on the given date as an estimate.
+ *  2. Format in the target timezone to find the local hour.
+ *  3. Compute delta from local noon and adjust the estimate.
+ *
+ * The resulting Date, when passed to toLocalDateKey(..., timezone), will
+ * return dateKey. Reference time of 12:00 local ensures the date window
+ * covers all reasonable events for that day.
+ *
+ * @throws {RangeError} When timezone is not a valid IANA identifier.
+ */
+function buildNoonForDateInTimezone(dateKey: string, timezone: string): Date {
+  const [yearStr, monthStr, dayStr] = dateKey.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  // Starting estimate: noon UTC on the given date.
+  const estimateMs = Date.UTC(year, month - 1, day, 12, 0, 0, 0);
+  const estimate = new Date(estimateMs);
+
+  // Format at our estimate in the target timezone to see the local time.
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(estimate);
+  let localHour = 12;
+  let localMinute = 0;
+
+  for (const part of parts) {
+    if (part.type === "hour") localHour = parseInt(part.value, 10);
+    else if (part.type === "minute") localMinute = parseInt(part.value, 10);
+  }
+
+  // Delta from current local time to noon local.
+  const currentLocalMs = (localHour * 60 + localMinute) * 60_000;
+  const targetLocalMs = 12 * 60 * 60_000;
+  const deltaMs = targetLocalMs - currentLocalMs;
+
+  return new Date(estimateMs + deltaMs);
+}
+
+/**
+ * Advances a YYYY-MM-DD date key by one calendar day.
+ * Uses the Date constructor without timezone to avoid drift.
+ */
+function addOneDay(dateKey: string): string {
+  const [yr, mo, dy] = dateKey.split("-").map(Number);
+  const d = new Date(Date.UTC(yr, mo - 1, dy + 1));
+  return d.toISOString().slice(0, 10);
+}
+
+// ── Prisma adapter ─────────────────────────────────────────────────────────────
+
+function createPrismaDb(): Screen1SourceDatabase {
   return {
-    id: e.id,
-    title: e.title,
-    type: e.type,
-    status: e.status,
-    startAt: e.startAt.toISOString(),
-    endAt: e.endAt?.toISOString() ?? null,
-    opponentName: e.opponentName,
-    location: e.location,
-    infoboardVisible: e.infoboardVisible,
-    teamName: e.team?.name ?? null,
-    seasonName: e.season.name,
+    event: {
+      findMany: (args) =>
+        prisma.event.findMany(
+          args as Parameters<typeof prisma.event.findMany>[0],
+        ) as unknown as Promise<Screen1DbEventRow[]>,
+    },
+    facilityResource: {
+      findMany: (args) =>
+        prisma.facilityResource.findMany(
+          args as Parameters<typeof prisma.facilityResource.findMany>[0],
+        ) as unknown as Promise<Screen1FacilityResourceRow[]>,
+    },
   };
 }
 
-export default async function InfoboardAdminPage() {
+// ── Page component ─────────────────────────────────────────────────────────────
+
+export default async function InfoboardAdminPage({
+  searchParams,
+}: InfoboardAdminPageProps) {
+  // ── Authentication ──────────────────────────────────────────────────────────
+  // requireAnyPermission redirects unauthenticated users and checks permissions.
   const session = await requireAnyPermission([
     PERMISSIONS.INFOBOARD_MANAGE,
     PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
   ]);
 
-  const canToggle = hasPermission(session, PERMISSIONS.INFOBOARD_MANAGE) ||
-    hasPermission(session, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD);
+  // ── Authenticated tenant resolution ─────────────────────────────────────────
+  // Tenant comes from the authenticated session — never from query parameters.
+  const tenantId = session.user?.tenantId;
+  const tenantContext = await getTenantContextFromSession(tenantId);
 
-  const now = new Date();
-  const thirtyDaysOut = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  if (!tenantContext) {
+    notFound();
+  }
 
-  const [onBoard, upcoming] = await Promise.all([
-    // Events currently visible on infoboard (upcoming + recent, ordered by startAt)
-    prisma.event.findMany({
-      where: {
-        infoboardVisible: true,
-        status: { in: ["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED"] },
-        startAt: { gte: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000) },
-      },
-      orderBy: [{ startAt: "asc" }],
-      take: 100,
-      select: EVENT_SELECT,
-    }),
-    // Upcoming events NOT yet on infoboard (next 30 days)
-    prisma.event.findMany({
-      where: {
-        infoboardVisible: false,
-        status: { in: ["SCHEDULED", "LIVE", "POSTPONED"] },
-        startAt: { gte: now, lte: thirtyDaysOut },
-      },
-      orderBy: [{ startAt: "asc" }],
-      take: 50,
-      select: EVENT_SELECT,
-    }),
-  ]);
+  if (!tenantContext.timezone) {
+    notFound();
+  }
 
-  const onBoardItems = onBoard.map(toEventItem);
-  const upcomingItems = upcoming.map(toEventItem);
+  const tenantTimezone = tenantContext.timezone;
 
-  const publicUrl = "/infoboard";
+  // ── Tenant reference for live service ───────────────────────────────────────
+  const tenant: Screen1TenantContext = {
+    id: tenantContext.id,
+    key: tenantContext.key,
+    name: tenantContext.name,
+    timezone: tenantTimezone,
+    logoUrl: tenantContext.logoUrl,
+  };
 
+  // ── Date resolution ─────────────────────────────────────────────────────────
+  // Validate the date query parameter. Invalid values safely fall back to today.
+  // The date parameter is strictly admin-only and cannot alter public Screen 1.
+  const params = (await searchParams) ?? {};
+  const rawDate = params.date;
+  const today = new Date();
+  const todayKey = toLocalDateKey(today, tenantTimezone);
+  const tomorrowKey = addOneDay(todayKey);
+
+  let selectedDateKey: string;
+  let now: Date;
+
+  if (rawDate && isValidDateKey(rawDate)) {
+    selectedDateKey = rawDate;
+    now = buildNoonForDateInTimezone(rawDate, tenantTimezone);
+  } else {
+    selectedDateKey = todayKey;
+    now = today;
+  }
+
+  const isPreviewDate = selectedDateKey !== todayKey;
+
+  // ── Build Screen 1 live payload ─────────────────────────────────────────────
+  // Calls the Screen 1 live service directly — no HTTP fetch to /api/public/*.
+  const db = createPrismaDb();
+  const loader = createScreen1SourceLoader(db);
+  const payload = await buildScreen1LivePayload({ tenant, now, loader });
+
+  // ── Admin summary ───────────────────────────────────────────────────────────
+  const summary = buildScreen1AdminSummary(payload.feed);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8 max-w-[1400px]">
+      {/* Header */}
       <AdminSectionHeader
         eyebrow="Spielbetrieb"
         title="Infoboard"
-        description="Öffentliches Anzeigeboard — steuere welche Events live auf dem Infoboard erscheinen."
+        description="Steuere und überwache die öffentlichen Infoboard-Displays."
         actions={
           <Link
-            href={publicUrl}
+            href="/infoboard/screen-1"
             target="_blank"
             rel="noopener noreferrer"
-            className="fca-button-secondary flex items-center gap-2"
+            className="fca-button-primary inline-flex items-center gap-2"
           >
-            <ExternalLink className="h-4 w-4" />
-            Öffentliches Display öffnen
+            <ExternalLink className="h-3.5 w-3.5" />
+            Display 1 öffnen
           </Link>
         }
       />
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Auf Infoboard</p>
-          <p className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-emerald-600"
-            style={{ fontFamily: "var(--font-display)" }}>
-            {onBoardItems.length}
+      {/* Preview date notice */}
+      {isPreviewDate ? (
+        <div className="flex items-center gap-3 rounded-[var(--radius-xl)] border border-amber-200 bg-amber-50 px-5 py-3.5">
+          <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+          <p className="text-sm text-amber-800">
+            Vorschau für{" "}
+            <span className="font-semibold font-mono">{selectedDateKey}</span> —
+            das öffentliche Display 1 ist davon nicht betroffen.
           </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">Aktive Events</p>
+          <Link
+            href="/dashboard/infoboard"
+            className="ml-auto shrink-0 text-[0.75rem] font-semibold text-amber-700 hover:text-amber-900"
+          >
+            Zurück zu Heute
+          </Link>
         </div>
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Live jetzt</p>
-          <p className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-blue-600"
-            style={{ fontFamily: "var(--font-display)" }}>
-            {onBoardItems.filter((e) => e.status === "LIVE").length}
-          </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">Status LIVE</p>
-        </div>
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Bereit (30 Tage)</p>
-          <p className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-amber-600"
-            style={{ fontFamily: "var(--font-display)" }}>
-            {upcomingItems.length}
-          </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">Nicht auf Infoboard</p>
-        </div>
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Display-URL</p>
-          <p className="mt-2 font-mono text-[0.75rem] text-[var(--blue)] break-all">
-            /infoboard
-          </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">Öffentlich zugänglich</p>
-        </div>
+      ) : null}
+
+      {/* Display cards */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Display 1 */}
+        <InfoboardDisplayCard
+          label="Display 1"
+          title="Tagesübersicht"
+          status="active"
+          description="Zeigt die heutigen Trainings, Heimspiele und Turniere inklusive Platz- und Garderobenzuteilung."
+          publicRoute="/infoboard/screen-1"
+          actions={[
+            {
+              label: "Öffnen",
+              href: "/infoboard/screen-1",
+              variant: "primary",
+            },
+            {
+              label: "Vorschau",
+              href: "/infoboard/preview/screen-1",
+              variant: "secondary",
+            },
+          ]}
+        />
+
+        {/* Display 2 */}
+        <InfoboardDisplayCard
+          label="Display 2"
+          title="Sportanlage"
+          status="planned"
+          description="Zeigt die aktuelle Belegung der Plätze und die Sportanlagenübersicht."
+          publicRoute="/infoboard/screen-2"
+        />
       </div>
 
-      {/* Public display link banner */}
-      <div className="flex items-center gap-4 rounded-[var(--radius-2xl)] border border-blue-200 bg-blue-50 px-5 py-4">
-        <Monitor className="h-6 w-6 shrink-0 text-[var(--blue)]" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-[var(--blue)]">
-            Öffentliches Infoboard-Display
-          </p>
-          <p className="mt-0.5 text-[0.78rem] text-[var(--text-2)]">
-            Das Display unter <code className="font-mono text-[var(--blue)]">/infoboard</code> ist
-            öffentlich zugänglich und lädt sich automatisch alle 60 Sekunden neu.
-            Für Kiosk-Modus: Browser-Vollbild (F11) und URL aufrufen.
-          </p>
-        </div>
-        <Link
-          href={publicUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 inline-flex items-center gap-2 rounded-[var(--radius-lg)] bg-[var(--blue)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--blue-dark)]"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Öffnen
-        </Link>
-      </div>
-
-      {/* Currently on infoboard */}
+      {/* Publication state section */}
       <div className="sce-detail-section">
         <div className="sce-detail-section-header">
-          <div className="flex items-center gap-2">
-            <Monitor className="h-4 w-4 text-[var(--muted)]" />
+          <div className="flex min-w-0 items-center gap-3">
+            <Monitor className="h-4 w-4 shrink-0 text-[var(--muted)]" />
             <div>
               <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
-                Aktuell
+                Aktueller Stand
               </p>
               <p className="text-sm font-semibold text-[var(--foreground)]">
-                Auf dem Infoboard
+                Publikationsstatus
               </p>
             </div>
           </div>
-          <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[0.72rem] font-semibold tabular-nums text-emerald-700">
-            {onBoardItems.length} Events
-          </span>
+          {/* Date selector: admin-only, affects only this admin preview */}
+          <InfoboardDateSelector
+            selectedDate={selectedDateKey}
+            todayKey={todayKey}
+            tomorrowKey={tomorrowKey}
+          />
         </div>
-        <div className="sce-detail-section-body p-0">
-          <InfoboardEventList
-            events={onBoardItems}
-            canToggle={canToggle}
-            emptyLabel="Keine Events auf dem Infoboard. Füge unten Events hinzu."
+        <div className="sce-detail-section-body">
+          <InfoboardPublicationSummary
+            counts={summary.counts}
+            displayDate={summary.displayDate}
           />
         </div>
       </div>
 
-      {/* Upcoming — not yet on infoboard */}
+      {/* Today's event list */}
       <div className="sce-detail-section">
         <div className="sce-detail-section-header">
-          <div>
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
-              Nächste 30 Tage
-            </p>
-            <p className="text-sm font-semibold text-[var(--foreground)]">
-              Nicht auf dem Infoboard
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <Monitor className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+            <div>
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                {isPreviewDate ? selectedDateKey : "Heute"}
+              </p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                Heute auf Display 1
+              </p>
+            </div>
           </div>
           <span className="shrink-0 rounded-full bg-[var(--surface-3)] px-2.5 py-1 text-[0.72rem] font-semibold tabular-nums text-[var(--text-2)]">
-            {upcomingItems.length} Events
+            {summary.counts.visibleToday}{" "}
+            {summary.counts.visibleToday === 1 ? "Event" : "Events"}
           </span>
         </div>
         <div className="sce-detail-section-body p-0">
-          <InfoboardEventList
-            events={upcomingItems}
-            canToggle={canToggle}
-            emptyLabel="Alle kommenden Events der nächsten 30 Tage sind bereits auf dem Infoboard."
-          />
+          <InfoboardTodayList events={summary.events} />
         </div>
       </div>
 
-      {/* Link to full events management */}
-      <div className="flex items-center justify-between rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
-        <p className="text-sm text-[var(--muted)]">
-          Events erstellen und bearbeiten im Events-Modul.
-        </p>
-        <Link href="/dashboard/events" className="fca-button-secondary text-sm">
-          Zum Events-Modul
-        </Link>
+      {/* Legacy display notice */}
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="flex-1 space-y-1">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+              Legacy-Display
+            </p>
+            <p className="text-sm text-[var(--muted)]">
+              Das frühere Display unter{" "}
+              <code className="font-mono text-[0.72rem] text-[var(--foreground)]">
+                /infoboard
+              </code>{" "}
+              bleibt vorübergehend technisch bestehen, wird jedoch nicht mehr als primäres
+              Infoboard verwendet.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Roadmap section */}
+      <div className="sce-detail-section">
+        <div className="sce-detail-section-header">
+          <div className="flex min-w-0 items-center gap-3">
+            <Construction className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+            <div>
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                Geplant
+              </p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                In Vorbereitung
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="sce-detail-section-body">
+          <ul className="space-y-2">
+            {[
+              "Display 2 — Sportanlage",
+              "Ankündigungsleiste verwalten",
+              "Branding verwalten",
+              "Live-Aktualisierung und Verbindungsstatus",
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--muted)] opacity-40" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
