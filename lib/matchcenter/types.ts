@@ -80,6 +80,8 @@ export interface MatchcenterMatchSummary {
 
 export interface MatchcenterMatchDetail
   extends MatchcenterMatchSummary {
+  /** Internal Event.teamId — the FC Allschwil team assigned to this event. */
+  teamId: string | null;
   organizerName: string | null;
   reviewRequestedAt: Date | null;
   reviewedAt: Date | null;

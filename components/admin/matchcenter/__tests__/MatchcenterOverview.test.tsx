@@ -166,7 +166,7 @@ describe("MatchcenterOverview", () => {
     ).toHaveTextContent("2:2");
   });
 
-  it("shows operational completeness for a complete match", () => {
+  it("shows Bereit für Infoboard for a fully set-up home match", () => {
     render(
       <MatchcenterOverview
         matches={[createMatch()]}
@@ -174,8 +174,42 @@ describe("MatchcenterOverview", () => {
     );
 
     expect(
-      screen.getByText("Operativ vollständig"),
+      screen.getByText("Bereit für Infoboard"),
     ).toBeTruthy();
+  });
+
+  it("shows Auswärtsspiel readiness for an away match", () => {
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            homeAway: "AWAY",
+            home: {
+              providerTeamId: 200,
+              providerTeamName: "FC Reinach E1",
+              canonicalTeamId: "team-home",
+              canonicalTeamName: "FC Reinach E1",
+              displayName: "FC Reinach E1",
+              resolution: "RESOLVED",
+              isOwnTeam: false,
+            },
+            away: {
+              providerTeamId: 100,
+              providerTeamName: "FC Allschwil E1",
+              canonicalTeamId: "team-away",
+              canonicalTeamName: "FC Allschwil E1",
+              displayName: "FC Allschwil E1",
+              resolution: "RESOLVED",
+              isOwnTeam: true,
+            },
+          }),
+        ]}
+      />,
+    );
+
+    // Both the homeaway badge and the readiness badge show "Auswärtsspiel"
+    expect(screen.getAllByText("Auswärtsspiel").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Infoboard nicht freigegeben")).toBeNull();
   });
 
   it("shows missing operational data as warnings", () => {
@@ -183,7 +217,14 @@ describe("MatchcenterOverview", () => {
       <MatchcenterOverview
         matches={[
           createMatch({
-            location: null,
+            visibility: {
+              websiteVisible: true,
+              infoboardVisible: false,
+              homepageVisible: false,
+              wochenplanVisible: true,
+              trainingsplanVisible: false,
+              teamPageVisible: true,
+            },
             operational: {
               pitchCode: null,
               homeDressingRoomCode: null,
@@ -196,9 +237,10 @@ describe("MatchcenterOverview", () => {
       />,
     );
 
-    expect(screen.getByText("Spielort fehlt")).toBeTruthy();
-    expect(screen.getByText("Feld fehlt")).toBeTruthy();
-    expect(screen.getByText("Garderobe fehlt")).toBeTruthy();
+    expect(screen.getByText("Spielfeld fehlt")).toBeTruthy();
+    expect(screen.getByText("Garderobe Heimteam fehlt")).toBeTruthy();
+    expect(screen.getByText("Garderobe Gastteam fehlt")).toBeTruthy();
+    expect(screen.getByText("Infoboard nicht freigegeben")).toBeTruthy();
   });
 
   it("shows unresolved team warnings", () => {
@@ -208,6 +250,13 @@ describe("MatchcenterOverview", () => {
       <MatchcenterOverview
         matches={[
           createMatch({
+            // Both sides unresolved so readiness is "setup-required" and warnings show
+            home: {
+              ...base.home,
+              canonicalTeamId: null,
+              canonicalTeamName: null,
+              resolution: "UNRESOLVED",
+            },
             away: {
               ...base.away,
               canonicalTeamId: null,
@@ -220,8 +269,30 @@ describe("MatchcenterOverview", () => {
     );
 
     expect(
-      screen.getByText("Auswärtsteam nicht zugeordnet"),
+      screen.getByText("Team nicht zugeordnet"),
     ).toBeTruthy();
+  });
+
+  it("does not show Infoboard warning for away matches", () => {
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            homeAway: "AWAY",
+            visibility: {
+              websiteVisible: true,
+              infoboardVisible: false,
+              homepageVisible: false,
+              wochenplanVisible: false,
+              trainingsplanVisible: false,
+              teamPageVisible: false,
+            },
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("Infoboard nicht freigegeben")).toBeNull();
   });
 
   it("renders live status in German", () => {

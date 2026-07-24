@@ -18,6 +18,27 @@ vi.mock(
   }),
 );
 
+vi.mock(
+  "@/components/admin/matchcenter/MatchcenterDetailOperational",
+  () => ({
+    default: ({
+      matchId,
+      homeAway,
+    }: {
+      matchId: string;
+      homeAway: string | null;
+    }) => (
+      <div
+        data-testid="matchcenter-detail-operational"
+        data-match-id={matchId}
+        data-homeaway={homeAway ?? ""}
+      >
+        MatchcenterDetailOperational
+      </div>
+    ),
+  }),
+);
+
 function createMatch(
   overrides: Partial<MatchcenterMatchDetail> = {},
 ): MatchcenterMatchDetail {
@@ -99,6 +120,7 @@ function createMatch(
     reviewedAt:
       new Date("2026-08-19T09:00:00.000Z"),
     reviewNotes: "Freigegeben",
+    teamId: "team-fca",
     providerLeagueId: 10,
     providerLeagueName: "Junioren E",
     providerDivisionId: 20,
@@ -395,5 +417,89 @@ describe("MatchcenterDetail", () => {
         name: "Zur Spielplansynchronisation",
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows Heimspiel badge for a HOME match", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch({ homeAway: "HOME" })}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("matchcenter-detail-homeaway"),
+    ).toHaveTextContent("Heimspiel");
+  });
+
+  it("shows Auswärtsspiel badge for an AWAY match", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch({ homeAway: "AWAY" })}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("matchcenter-detail-homeaway"),
+    ).toHaveTextContent("Auswärtsspiel");
+  });
+
+  it("does not show homeAway badge when homeAway is null", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch({ homeAway: null })}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId("matchcenter-detail-homeaway"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the operational workspace section", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("matchcenter-detail-operational"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not crash with all optional fields null", () => {
+    expect(() =>
+      render(
+        <MatchcenterDetail
+          match={createMatch({
+            homeAway: null,
+            teamId: null,
+            location: null,
+            competitionLabel: null,
+            organizerName: null,
+            providerLeagueId: null,
+            providerLeagueName: null,
+            providerDivisionId: null,
+            providerDivisionName: null,
+            providerRoundNumber: null,
+            providerOrganisationId: null,
+            providerPlaygroundId: null,
+            providerVenueName: null,
+            providerSeasonName: null,
+            reviewRequestedAt: null,
+            reviewedAt: null,
+            reviewNotes: null,
+            publishedAt: null,
+            operational: {
+              pitchCode: null,
+              homeDressingRoomCode: null,
+              awayDressingRoomCode: null,
+              meetingTime: null,
+              remarks: null,
+            },
+          })}
+        />,
+      ),
+    ).not.toThrow();
   });
 });
