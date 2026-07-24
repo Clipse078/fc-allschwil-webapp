@@ -82,13 +82,13 @@ export function InfoboardPublicationSummary({
         <KpiCard
           label="Als Nächstes"
           value={counts.nextCount}
-          sublabel="Nächste Gruppe"
+          sublabel="Auf Display 1"
           colorClass="text-[var(--blue)]"
         />
         <KpiCard
           label="Später heute"
           value={counts.laterCount}
-          sublabel="Später am Tag"
+          sublabel="Weitere heute"
           colorClass="text-amber-600"
         />
       </div>

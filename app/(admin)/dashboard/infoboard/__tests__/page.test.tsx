@@ -110,6 +110,7 @@ const EMPTY_FEED = {
   next: [],
   later: [],
   isEmpty: true,
+  emptyStateReason: "NO_EVENTS_TODAY" as const,
 };
 
 const EMPTY_PAYLOAD = {

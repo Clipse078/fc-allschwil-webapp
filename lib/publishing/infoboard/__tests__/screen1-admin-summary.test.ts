@@ -69,6 +69,7 @@ function makeFeed(
     next: [],
     later: [],
     isEmpty: true,
+    emptyStateReason: "NO_EVENTS_TODAY",
     ...overrides,
   };
 }
