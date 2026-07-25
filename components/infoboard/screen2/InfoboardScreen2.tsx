@@ -321,6 +321,14 @@ function WeatherPanel({ weather }: WeatherPanelProps): ReactElement {
           </div>
         </div>
       </div>
+      {/* CC BY 4.0 attribution required by Open-Meteo terms */}
+      <div
+        className={styles.weatherAttribution}
+        data-testid="weather-attribution"
+        aria-label="Wetterdaten-Quelle"
+      >
+        Wetterdaten: Open-Meteo.com
+      </div>
     </section>
   );
 }
@@ -331,7 +339,11 @@ type SponsorSectionProps = {
   sponsors: readonly InfoboardSponsor[];
 };
 
-function SponsorSection({ sponsors }: SponsorSectionProps): ReactElement {
+function SponsorSection({ sponsors }: SponsorSectionProps): ReactElement | null {
+  if (sponsors.length === 0) {
+    return null;
+  }
+
   const goldSponsors = sponsors.filter((s) => s.tier === "gold");
   const silverSponsors = sponsors.filter((s) => s.tier === "silver");
   const partnerSponsors = sponsors.filter((s) => s.tier === "partner");

@@ -462,6 +462,24 @@ describe("Weather panel — unavailable", () => {
   });
 });
 
+describe("Weather — CC BY 4.0 attribution (Open-Meteo)", () => {
+  it("renders weather-attribution when weather data is available", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    expect(screen.getByTestId("weather-attribution")).toBeTruthy();
+  });
+
+  it("attribution text contains 'Open-Meteo'", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const attribution = screen.getByTestId("weather-attribution");
+    expect(attribution.textContent).toContain("Open-Meteo");
+  });
+
+  it("attribution is not shown when weather is unavailable", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
+    expect(screen.queryByTestId("weather-attribution")).toBeNull();
+  });
+});
+
 describe("Weather — preview fixture", () => {
   it("PREVIEW_WEATHER renders correctly in preview", () => {
     render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} weather={PREVIEW_WEATHER} sponsors={PREVIEW_SPONSORS} />);
@@ -486,9 +504,9 @@ describe("Sponsor section", () => {
     expect(screen.getByTestId("sponsor-aside")).toBeTruthy();
   });
 
-  it("sponsor section is present even when sponsors array is empty", () => {
+  it("sponsor section is hidden when sponsors array is empty", () => {
     render(<InfoboardScreen2 feed={makeFeed()} sponsors={[]} />);
-    expect(screen.getByTestId("sponsor-section")).toBeTruthy();
+    expect(screen.queryByTestId("sponsor-section")).toBeNull();
   });
 
   it("sponsor-grid renders within sponsor section", () => {

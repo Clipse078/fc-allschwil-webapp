@@ -839,3 +839,13 @@
   text-transform: uppercase;
   color: var(--ib2-text-dim);
 }
+
+/* CC BY 4.0 attribution required by Open-Meteo terms */
+.weatherAttribution {
+  margin-top: var(--ib2-sp-2);
+  font-size: clamp(0.52rem, 0.65vw, 0.72rem);
+  color: var(--ib2-text-dim);
+  opacity: 0.7;
+  text-align: right;
+  letter-spacing: 0.01em;
+}

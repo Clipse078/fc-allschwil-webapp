@@ -13,7 +13,7 @@
  *   5. Wind conversion / mapping (km/h)
  *   6. Optional precipitation → null (not in current endpoint)
  *   7. Allschwil coordinates passed correctly (lat/lon in URL)
- *   8. API key NOT present in URL (Open-Meteo requires none)
+ *   8. Commercial endpoint used (customer-api.open-meteo.com) when key is set
  *   9. Network failure → WEATHER_UNAVAILABLE
  *  10. Timeout behavior → WEATHER_UNAVAILABLE
  *  11. Non-2xx response → WEATHER_UNAVAILABLE
@@ -26,9 +26,11 @@
  *  18. Production route receives weather DTO (tested via parseOpenMeteoResponse)
  *  19. Preview does not make a weather API request (checked separately)
  *  20. No fake production temperature (WEATHER_UNAVAILABLE on failure)
+ *  21. Returns WEATHER_UNAVAILABLE when WEATHER_API_KEY is not configured
+ *  22. API key appears in URL as query parameter (not leaked to logs)
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   fetchCurrentWeather,
   parseOpenMeteoResponse,
@@ -76,6 +78,12 @@ function makeValidOpenMeteoBody(overrides: Record<string, unknown> = {}) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("fetchCurrentWeather — successful response", () => {
+  beforeEach(() => {
+    process.env["WEATHER_API_KEY"] = "test-key";
+  });
+  afterEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
   it("returns isAvailable: true on success", async () => {
     const result = await fetchCurrentWeather(
       makeFetchOk(makeValidOpenMeteoBody()),
@@ -164,10 +172,42 @@ describe("fetchCurrentWeather — successful response", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── 7. Coordinates ────────────────────────────────────────────────────────────
+// ── 21. No API key → WEATHER_UNAVAILABLE (no non-commercial request made) ────
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("fetchCurrentWeather — coordinates", () => {
+describe("fetchCurrentWeather — no WEATHER_API_KEY configured", () => {
+  beforeEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
+
+  it("21. returns WEATHER_UNAVAILABLE when WEATHER_API_KEY is not set", async () => {
+    const mockFetch = makeFetchOk(makeValidOpenMeteoBody());
+    const result = await fetchCurrentWeather(mockFetch);
+    expect(result.isAvailable).toBe(false);
+  });
+
+  it("21. does NOT call fetch at all when no API key is configured", async () => {
+    const mockFetch = makeFetchOk(makeValidOpenMeteoBody());
+    await fetchCurrentWeather(mockFetch);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── 7 & 8 & 22. Coordinates and commercial endpoint ──────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("fetchCurrentWeather — commercial endpoint and coordinates", () => {
+  const TEST_API_KEY = "test-commercial-key-abc123";
+
+  beforeEach(() => {
+    process.env["WEATHER_API_KEY"] = TEST_API_KEY;
+  });
+
+  afterEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
+
   it("7. passes Allschwil latitude 47.5519 in URL", async () => {
     const mockFetch = makeFetchOk(makeValidOpenMeteoBody());
     await fetchCurrentWeather(mockFetch);
@@ -182,20 +222,32 @@ describe("fetchCurrentWeather — coordinates", () => {
     expect(calledUrl).toContain("longitude=7.5351");
   });
 
-  it("8. URL does not contain an API key parameter", async () => {
+  it("8. uses commercial customer-api.open-meteo.com endpoint", async () => {
     const mockFetch = makeFetchOk(makeValidOpenMeteoBody());
     await fetchCurrentWeather(mockFetch);
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).not.toContain("apikey");
-    expect(calledUrl).not.toContain("api_key");
-    expect(calledUrl).not.toContain("appid");
+    expect(calledUrl).toContain("customer-api.open-meteo.com");
   });
 
-  it("uses open-meteo.com domain", async () => {
+  it("8. does NOT use the non-commercial api.open-meteo.com endpoint", async () => {
     const mockFetch = makeFetchOk(makeValidOpenMeteoBody());
     await fetchCurrentWeather(mockFetch);
     const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toContain("api.open-meteo.com");
+    expect(calledUrl).not.toMatch(/^https:\/\/api\.open-meteo\.com/);
+  });
+
+  it("22. API key appears in URL query parameter as required by Open-Meteo", async () => {
+    const mockFetch = makeFetchOk(makeValidOpenMeteoBody());
+    await fetchCurrentWeather(mockFetch);
+    const calledUrl = mockFetch.mock.calls[0][0] as string;
+    expect(calledUrl).toContain(`apikey=${TEST_API_KEY}`);
+  });
+
+  it("returns isAvailable: true on success with commercial key", async () => {
+    const result = await fetchCurrentWeather(
+      makeFetchOk(makeValidOpenMeteoBody()),
+    );
+    expect(result.isAvailable).toBe(true);
   });
 });
 
@@ -204,6 +256,13 @@ describe("fetchCurrentWeather — coordinates", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("fetchCurrentWeather — cache/revalidation", () => {
+  beforeEach(() => {
+    process.env["WEATHER_API_KEY"] = "test-key";
+  });
+  afterEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
+
   it("17. passes next.revalidate = 900 in fetch options", async () => {
     const mockFetch = makeFetchOk(makeValidOpenMeteoBody());
     await fetchCurrentWeather(mockFetch);
@@ -219,6 +278,12 @@ describe("fetchCurrentWeather — cache/revalidation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("fetchCurrentWeather — network failure", () => {
+  beforeEach(() => {
+    process.env["WEATHER_API_KEY"] = "test-key";
+  });
+  afterEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
   it("9. returns WEATHER_UNAVAILABLE on network error", async () => {
     const result = await fetchCurrentWeather(
       makeFetchError(new Error("fetch failed")),
@@ -241,6 +306,12 @@ describe("fetchCurrentWeather — network failure", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("fetchCurrentWeather — timeout", () => {
+  beforeEach(() => {
+    process.env["WEATHER_API_KEY"] = "test-key";
+  });
+  afterEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
   it("10. returns WEATHER_UNAVAILABLE when fetch throws AbortError", async () => {
     const abortError = new DOMException("The operation was aborted.", "AbortError");
     const result = await fetchCurrentWeather(makeFetchError(abortError as Error));
@@ -253,6 +324,12 @@ describe("fetchCurrentWeather — timeout", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("fetchCurrentWeather — non-2xx response", () => {
+  beforeEach(() => {
+    process.env["WEATHER_API_KEY"] = "test-key";
+  });
+  afterEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
   it("11. returns WEATHER_UNAVAILABLE on 500", async () => {
     const result = await fetchCurrentWeather(makeFetchStatus(500));
     expect(result.isAvailable).toBe(false);
@@ -274,6 +351,12 @@ describe("fetchCurrentWeather — non-2xx response", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("fetchCurrentWeather — invalid JSON", () => {
+  beforeEach(() => {
+    process.env["WEATHER_API_KEY"] = "test-key";
+  });
+  afterEach(() => {
+    delete process.env["WEATHER_API_KEY"];
+  });
   it("12. returns WEATHER_UNAVAILABLE on JSON parse failure", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

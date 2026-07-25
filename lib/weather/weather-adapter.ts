@@ -3,20 +3,33 @@
  *
  * Server-side weather adapter — Open-Meteo (https://open-meteo.com).
  *
- * Provider selection rationale:
- *   Provider:       Open-Meteo (open-source weather API)
- *   Endpoint:       https://api.open-meteo.com/v1/forecast
- *   Authentication: None — Open-Meteo is free for non-commercial use with
- *                   no API key requirement.
- *   Rate limits:    No documented hard limit; 10,000 req/day typical free tier.
- *                   The 15-minute Next.js cache keeps actual request volume
- *                   well within any reasonable limit for two infoboard screens.
- *   Attribution:    "Weather data by Open-Meteo.com" (open-source, CC BY 4.0).
- *   Cache strategy: Next.js fetch cache with `next: { revalidate: 900 }` (15 min).
- *                   Both infoboard screens share the same cached response.
- *                   A recent cached value is served on transient provider failure.
- *   Fallback:       On any error (network, timeout, non-2xx, invalid JSON, or
- *                   missing fields), returns WEATHER_UNAVAILABLE. No request loop.
+ * Commercial use:
+ *   SportClubEvo is a commercial SaaS. The Open-Meteo free endpoint
+ *   (api.open-meteo.com) is restricted to non-commercial use under its
+ *   terms. Commercial use requires a paid subscription and the dedicated
+ *   customer endpoint (customer-api.open-meteo.com) with an API key.
+ *
+ *   This adapter enforces that:
+ *     - If WEATHER_API_KEY is NOT set, weather is disabled (returns
+ *       WEATHER_UNAVAILABLE). No request to the non-commercial endpoint
+ *       is ever made.
+ *     - If WEATHER_API_KEY IS set, the commercial customer endpoint is
+ *       used with the key as a query parameter. The key is server-side
+ *       only and is never logged, rendered in HTML, or exposed to clients.
+ *
+ *   To activate weather: subscribe to the Open-Meteo API Standard plan at
+ *   https://open-meteo.com/en/pricing, obtain the API key, and set the
+ *   WEATHER_API_KEY environment variable on the server.
+ *
+ * Provider:
+ *   Open-Meteo (https://open-meteo.com)
+ *   Commercial endpoint: https://customer-api.open-meteo.com/v1/forecast
+ *   Attribution required: "Wetterdaten: Open-Meteo.com" (CC BY 4.0).
+ *
+ * Cache strategy:
+ *   Next.js fetch cache with `next: { revalidate: 900 }` (15 min).
+ *   Both infoboard screens share the same cached response.
+ *   A recent cached value is served on transient provider failure.
  *
  * Facility location:
  *   Sportanlage Im Brüel, Allschwil, Basel-Landschaft, Switzerland.
@@ -24,7 +37,7 @@
  *   Env vars WEATHER_LAT / WEATHER_LON override the defaults for portability.
  *
  * Design constraints:
- *   - No API key committed or exposed in client-side JavaScript.
+ *   - WEATHER_API_KEY is never committed, logged, or exposed to clients.
  *   - The fetch function is injected for testability (default: globalThis.fetch).
  *   - Only current-conditions fields are requested — no forecast.
  *   - All temperature values are °C, wind values are km/h.
@@ -61,15 +74,28 @@ const TIMEOUT_MS = 8_000;
 /** Open-Meteo current-conditions variables. */
 const CURRENT_VARS = "temperature_2m,weather_code,wind_speed_10m";
 
-function buildOpenMeteoUrl(lat: string, lon: string): string {
+/**
+ * Commercial customer endpoint hostname.
+ * Requires a valid WEATHER_API_KEY from an Open-Meteo paid subscription.
+ * The free endpoint (api.open-meteo.com) must not be used for commercial SaaS.
+ */
+const COMMERCIAL_HOST = "customer-api.open-meteo.com";
+
+/**
+ * Builds the commercial Open-Meteo URL.
+ * The API key is included as a query parameter as required by Open-Meteo.
+ * The key is never logged; callers must not include the returned URL in logs.
+ */
+function buildOpenMeteoUrl(lat: string, lon: string, apiKey: string): string {
   const params = new URLSearchParams({
     latitude: lat,
     longitude: lon,
     current: CURRENT_VARS,
     wind_speed_unit: "kmh",
     timezone: "UTC",
+    apikey: apiKey,
   });
-  return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+  return `https://${COMMERCIAL_HOST}/v1/forecast?${params.toString()}`;
 }
 
 // ── WMO weather code → German condition label ─────────────────────────────────
@@ -145,16 +171,30 @@ export type FetchFn = (
 /**
  * Fetches current weather for the configured facility location.
  *
+ * Requires WEATHER_API_KEY to be set (commercial Open-Meteo subscription).
+ * If the key is absent, returns WEATHER_UNAVAILABLE immediately without
+ * making any request to a non-commercial endpoint.
+ *
  * @param fetchFn - Injected fetch function. Defaults to `globalThis.fetch`.
  *   Supply a mock in tests to avoid network calls.
- * @returns A WeatherResult. Returns WEATHER_UNAVAILABLE on any failure.
+ * @returns A WeatherResult. Returns WEATHER_UNAVAILABLE on any failure or
+ *   when no commercial API key is configured.
  */
 export async function fetchCurrentWeather(
   fetchFn: FetchFn = globalThis.fetch as FetchFn,
 ): Promise<WeatherResult> {
+  const apiKey = process.env["WEATHER_API_KEY"];
+
+  if (!apiKey) {
+    // No commercial API key configured. The free Open-Meteo endpoint may not
+    // be used for commercial SaaS. Weather is unavailable until a valid
+    // WEATHER_API_KEY is set (Open-Meteo API Standard plan or higher).
+    return WEATHER_UNAVAILABLE;
+  }
+
   const lat = process.env["WEATHER_LAT"] ?? DEFAULT_LAT;
   const lon = process.env["WEATHER_LON"] ?? DEFAULT_LON;
-  const url = buildOpenMeteoUrl(lat, lon);
+  const url = buildOpenMeteoUrl(lat, lon, apiKey);
 
   let response: { ok: boolean; status: number; json: () => Promise<unknown> };
 
