@@ -321,13 +321,13 @@ function WeatherPanel({ weather }: WeatherPanelProps): ReactElement {
           </div>
         </div>
       </div>
-      {/* CC BY 4.0 attribution required by Open-Meteo terms */}
+      {/* Attribution required by MeteoSwiss OGD terms: "Source: MeteoSwiss" */}
       <div
         className={styles.weatherAttribution}
         data-testid="weather-attribution"
         aria-label="Wetterdaten-Quelle"
       >
-        Wetterdaten: Open-Meteo.com
+        Quelle: MeteoSwiss
       </div>
     </section>
   );

@@ -19,8 +19,9 @@
  *   - Tenant resolved from DB by DEFAULT_TENANT_KEY.
  *   - Pitches: all active FULL_PITCH / HALF_PITCH facility resources for tenant.
  *   - Events: eligible events per INFOBOARD_SCREEN_2 publication policy.
- *   - Weather: Open-Meteo for Sportanlage Im Brüel, Allschwil (server-side,
- *     no API key required, 15-minute cache).
+ *   - Weather: MeteoSwiss Open Data (SwissMetNet VQHA80, station BAS
+ *     Basel/Binningen, ≈3.8 km) for Sportanlage Im Brüel, Allschwil
+ *     (server-side, no API key required, 10-minute cache).
  *   - Sponsors: no canonical sponsor source exists; empty array used.
  *
  * Failure behaviour:
@@ -53,7 +54,7 @@ import {
 } from "@/lib/publishing/infoboard/screen2-live-service";
 import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
 import type { Screen1DbEventRow } from "@/lib/publishing/infoboard/screen1-source-loader";
-import { fetchCurrentWeather } from "@/lib/weather/weather-adapter";
+import { fetchCurrentWeather } from "@/lib/weather/weather-service";
 
 export const metadata: Metadata = {
   title: "Infoboard — Screen 2",
