@@ -7,7 +7,7 @@
  *   - The deterministic 5-row preview fixture (PP-02B-H target scenario)
  *   - Tournament participant allocations for the Sommer-Cup Junioren E row
  *   - Verified existing logo assets
- *   - Fixed current-time (17:35 Zurich → IN 25 MIN. for the 18:00 training)
+ *   - Fixed current-time (17:35 Zurich; evt-2 at 18:00 shows ALS NÄCHSTES)
  *   - Tenant announcement matching the target image
  *
  * Constraints:
