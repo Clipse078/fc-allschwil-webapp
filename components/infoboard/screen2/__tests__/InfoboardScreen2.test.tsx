@@ -462,16 +462,28 @@ describe("Weather panel — unavailable", () => {
   });
 });
 
-describe("Weather — CC BY 4.0 attribution (Open-Meteo)", () => {
+describe("Weather — MeteoSwiss OGD attribution (WEATHER-01)", () => {
   it("renders weather-attribution when weather data is available", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
     expect(screen.getByTestId("weather-attribution")).toBeTruthy();
   });
 
-  it("attribution text contains 'Open-Meteo'", () => {
+  it("attribution text contains 'MeteoSwiss'", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
     const attribution = screen.getByTestId("weather-attribution");
-    expect(attribution.textContent).toContain("Open-Meteo");
+    expect(attribution.textContent).toContain("MeteoSwiss");
+  });
+
+  it("attribution uses 'Quelle: MeteoSwiss' wording (OGD requirement)", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const attribution = screen.getByTestId("weather-attribution");
+    expect(attribution.textContent).toContain("Quelle");
+  });
+
+  it("attribution does NOT contain 'Open-Meteo' (Open-Meteo is dormant)", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const attribution = screen.getByTestId("weather-attribution");
+    expect(attribution.textContent).not.toContain("Open-Meteo");
   });
 
   it("attribution is not shown when weather is unavailable", () => {
