@@ -5,17 +5,32 @@
  *
  * Route: /infoboard/screen-2
  *
+ * LIVE DATA STATUS: PENDING
+ *
+ * The Screen 2 live feed builder requires a dedicated backend slice
+ * (see follow-up task below). Until that slice is shipped, this route
+ * renders the facility screen with live header/clock and an explicit
+ * "KEINE FELDDATEN VERFÜGBAR" state in the pitch overview.
+ *
+ * The presentation component (InfoboardScreen2) is fully functional;
+ * only the data pipeline is pending.
+ *
+ * REQUIRED FOLLOW-UP SLICE: "INFOBOARD-05 — Screen 2 live data"
+ *   - Implement buildInfoboardScreen2Feed() in lib/publishing/infoboard/
+ *   - Compose: getFacilitiesForTenant() for pitch list
+ *             + Screen1 event loader for occupancy and dressing rooms
+ *   - Map PitchOccupancy state from temporal grouping of events per pitch
+ *   - Map DressingRoomAssignment from event.homeDressingRoom / awayDressingRoom
+ *   - Implement screen2-live-service.ts (mirrors screen1-live-service pattern)
+ *   - Wire sponsor data when BusinessClub API is available
+ *   - No new publication rules or event-selection policy
+ *   - Tenant-scoped; Europe/Zurich consistent
+ *
  * Architecture:
  *   - Server component (no "use client").
- *   - Screen 2 live feed builder is pending a future backend slice.
- *   - Until the live service is wired, this page renders a static
- *     placeholder using a minimal empty feed with tenant branding.
- *   - Sponsor data is placeholder until the Business Club API is wired.
- *
- * Note:
- *   This page intentionally defers live data to a future slice.
- *   The presentation component (InfoboardScreen2) is fully functional
- *   and tested; only the data pipeline is pending.
+ *   - No Prisma import, no DB access in this file.
+ *   - The pending state is explicit and honest: empty pitch grid is
+ *     shown with an appropriate UI message (not false operational data).
  */
 
 import type { Metadata } from "next";
@@ -28,28 +43,32 @@ export const metadata: Metadata = {
 
 export default function InfoboardScreen2Page() {
   const now = new Date();
-  const placeholderFeed: InfoboardScreen2Feed = {
-    generatedAt: now.toISOString(),
+  const currentTimeIso = now.toISOString();
+
+  const pendingFeed: InfoboardScreen2Feed = {
+    generatedAt: currentTimeIso,
     tenant: {
-      id: "placeholder",
+      id: "fc-allschwil",
       key: "fc-allschwil",
       name: "FC Allschwil",
       timezone: "Europe/Zurich",
     },
-    displayDate: now.toISOString().slice(0, 10),
+    displayDate: currentTimeIso.slice(0, 10),
     isStale: false,
     facilityName: "Brüelstadion",
+    // Live feed builder pending — pitches are empty, empty-state UI shown
     pitches: [],
     dressingRooms: [],
   };
 
   return (
     <InfoboardScreen2
-      feed={placeholderFeed}
+      feed={pendingFeed}
       branding={{
         clubLogoSrc: "/images/logos/fc-allschwil.png",
         productLogoSrc: "/images/branding/sportclubevo_logo.png",
       }}
+      currentTimeIso={currentTimeIso}
       sponsors={[]}
     />
   );

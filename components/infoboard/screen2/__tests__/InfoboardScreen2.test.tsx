@@ -25,6 +25,7 @@ import type { InfoboardSponsor } from "@/components/infoboard/screen2/InfoboardS
 import {
   PREVIEW_FIXTURE_SCREEN2,
   PREVIEW_FIXTURE_SCREEN2_ALL_FREE,
+  PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED,
   PREVIEW_SPONSORS,
   PREVIEW_CURRENT_TIME_ISO_S2,
 } from "@/components/infoboard/screen2/screen2-preview-fixture";
@@ -598,5 +599,252 @@ describe("Missing optional data safety", () => {
     );
     expect(screen.queryByText("null")).toBeNull();
     expect(screen.queryByText("undefined")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04B: Dressing-room section ─────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Dressing-room section", () => {
+  it("renders dressing-room-section when dressingRooms are present in feed", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            {
+              code: "DR-E1",
+              displayLabel: "Kabine E1",
+              role: "HOME",
+              assignedTo: "FC Allschwil E1",
+              eventId: "evt-1",
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
+  });
+
+  it("does not render dressing-room-section when all rooms are unassigned", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            {
+              code: "DR-E1",
+              displayLabel: "Kabine E1",
+              role: "HOME",
+              assignedTo: null,
+              eventId: null,
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("dressing-room-section")).toBeNull();
+  });
+
+  it("renders assigned team name in dressing-room row", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            {
+              code: "DR-E1",
+              displayLabel: "Kabine E1",
+              role: "HOME",
+              assignedTo: "FC Allschwil E1",
+              eventId: "evt-1",
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("FC Allschwil E1")).toBeTruthy();
+  });
+
+  it("renders dressing-room display label", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            {
+              code: "DR-A",
+              displayLabel: "Kabine A",
+              role: "TRAINING",
+              assignedTo: "Aktive Herren",
+              eventId: "evt-2",
+            },
+          ],
+        })}
+      />,
+    );
+    const section = screen.getByTestId("dressing-room-section");
+    expect(section.textContent).toContain("Kabine A");
+  });
+
+  it("renders multiple dressing-room assignments", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "Team A", eventId: "e1" },
+            { code: "DR-E2", displayLabel: "Kabine E2", role: "AWAY", assignedTo: "Team B", eventId: "e1" },
+            { code: "DR-04", displayLabel: "Kabine 04", role: "TRAINING", assignedTo: "Team C", eventId: "e2" },
+          ],
+        })}
+      />,
+    );
+    const rows = screen.getAllByTestId("dressing-room-row");
+    expect(rows).toHaveLength(3);
+  });
+
+  it("does not render referee dressing rooms in section", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "FC Allschwil", eventId: "e1" },
+            { code: "DR-REF", displayLabel: "Kabine Schiri", role: "REFEREE", assignedTo: "Schiedsrichter", eventId: "e1" },
+          ],
+        })}
+      />,
+    );
+    const section = screen.getByTestId("dressing-room-section");
+    expect(section.textContent).not.toContain("Schiedsrichter");
+    expect(section.textContent).not.toContain("Schiri");
+  });
+
+  it("full preview fixture renders dressing-room section with E1, E2, and 04", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2}
+        sponsors={PREVIEW_SPONSORS}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
+      />,
+    );
+    const section = screen.getByTestId("dressing-room-section");
+    expect(section.textContent).toContain("Kabine E1");
+    expect(section.textContent).toContain("Kabine E2");
+    expect(section.textContent).toContain("Kabine 04");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04B: All-occupied fixture ───────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("All pitches occupied fixture", () => {
+  it("renders all 4 pitch cards as occupied", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
+        sponsors={PREVIEW_SPONSORS}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
+      />,
+    );
+    const cards = screen.getAllByTestId("pitch-card");
+    expect(cards.length).toBe(4);
+    const occupiedCards = cards.filter(
+      (c) => c.getAttribute("data-state") === "occupied",
+    );
+    expect(occupiedCards.length).toBe(4);
+  });
+
+  it("sponsor section present in all-occupied scenario", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
+        sponsors={PREVIEW_SPONSORS}
+      />,
+    );
+    expect(screen.getByTestId("sponsor-section")).toBeTruthy();
+  });
+
+  it("dressing-room section visible in all-occupied scenario", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
+        sponsors={PREVIEW_SPONSORS}
+      />,
+    );
+    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04B: Sponsor image presentation ─────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04B: Live route safety (Option B) ───────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Live route safety — Option B pending state", () => {
+  it("empty pitches renders pitch-grid-empty with informative message (not false operational data)", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({ pitches: [], dressingRooms: [] })}
+        branding={{ clubLogoSrc: "/logo.png" }}
+      />,
+    );
+    // Empty state is shown honestly — the design shows KEINE FELDDATEN VERFÜGBAR
+    expect(screen.getByTestId("pitch-grid-empty")).toBeTruthy();
+    expect(screen.getByTestId("pitch-grid-empty").textContent).toContain("KEINE FELDDATEN");
+  });
+
+  it("empty state does not render any pitch-card (no false occupied indicators)", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({ pitches: [], dressingRooms: [] })}
+      />,
+    );
+    expect(screen.queryAllByTestId("pitch-card")).toHaveLength(0);
+  });
+
+  it("facility-overview section is still present in pending state", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({ pitches: [], dressingRooms: [] })}
+      />,
+    );
+    expect(screen.getByTestId("facility-overview")).toBeTruthy();
+  });
+
+  it("sponsor section still renders in pending state", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({ pitches: [], dressingRooms: [] })}
+        sponsors={PREVIEW_SPONSORS}
+      />,
+    );
+    expect(screen.getByTestId("sponsor-section")).toBeTruthy();
+  });
+});
+
+describe("Sponsor image presentation", () => {
+  it("sponsor logo uses img element (object-fit: contain via CSS)", () => {
+    const sponsor = {
+      id: "sp1",
+      name: "Test Sponsor",
+      logoSrc: "/sponsors/test.png",
+      tier: "gold" as const,
+    };
+    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[sponsor]} />);
+    const logo = screen.getByTestId("sponsor-logo");
+    expect(logo.tagName.toLowerCase()).toBe("img");
+    expect(logo.getAttribute("src")).toBe("/sponsors/test.png");
+  });
+
+  it("sponsor fallback name rendered when logoSrc is null", () => {
+    const sponsor = {
+      id: "sp2",
+      name: "Fallback Sponsor",
+      logoSrc: null,
+      tier: "silver" as const,
+    };
+    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[sponsor]} />);
+    expect(screen.getByText("Fallback Sponsor")).toBeTruthy();
   });
 });

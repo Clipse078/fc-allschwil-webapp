@@ -6,13 +6,15 @@
  * Purpose:
  *   "What is currently happening across the sports facility?"
  *
- * Design (INFOBOARD-04A — premium dark stadium design):
+ * Design (INFOBOARD-04B — premium dark facility overview):
  *   - Full dark navy stadium palette, consistent with Screen 1.
- *   - Left section (dominant): pitch/facility overview with status cards.
- *   - Right section: sponsor display (retained from existing sponsor data).
- *   - Footer: dressing-room orientation quick reference.
- *   - Facility overview shows each pitch as a status card: name, event type
- *     color, current activity, and FREE state when unoccupied.
+ *   - Left section (~65% width, dominant): large pitch overview cards +
+ *     dressing-room orientation section.
+ *   - Right section (~35% width): sponsor display.
+ *   - Pitch cards fill the available facility area, substantially larger
+ *     than in 04A.
+ *   - Dressing-room section renders all feed.dressingRooms assignments as
+ *     a readable orientation block.
  *
  * Invariants:
  *   - Pure presentational server component — no "use client", no effects,
@@ -21,7 +23,7 @@
  *   - Tenant timezone always taken from feed.tenant.timezone.
  *   - No new Date() without argument; no implicit timezone.
  *   - null / undefined values are never rendered as strings.
- *   - No "Next Events" panel — pitch occupancy only.
+ *   - No "Next Events" panel — pitch occupancy and dressing rooms only.
  *   - No scrolling — content must fit within 100dvh.
  */
 
@@ -31,6 +33,7 @@ import type {
   PitchOccupancy,
   PitchOccupancyState,
   PublishingEventType,
+  DressingRoomAssignment,
 } from "@/lib/publishing/event-types";
 import styles from "./InfoboardScreen2.module.css";
 
@@ -108,36 +111,36 @@ function formatDisplayDate(dateKey: string): string {
 function pitchStateLabel(state: PitchOccupancyState): string {
   switch (state) {
     case "OCCUPIED_NOW": return "BELEGT";
-    case "FREE_NOW": return "FREI";
-    case "UPCOMING": return "DEMNÄCHST";
-    case "UNKNOWN": return "UNBEKANNT";
+    case "FREE_NOW":     return "FREI";
+    case "UPCOMING":     return "DEMNÄCHST";
+    case "UNKNOWN":      return "UNBEKANNT";
   }
 }
 
 function pitchStateKey(state: PitchOccupancyState): string {
   switch (state) {
     case "OCCUPIED_NOW": return "occupied";
-    case "FREE_NOW": return "free";
-    case "UPCOMING": return "upcoming";
-    case "UNKNOWN": return "unknown";
+    case "FREE_NOW":     return "free";
+    case "UPCOMING":     return "upcoming";
+    case "UNKNOWN":      return "unknown";
   }
 }
 
 function eventTypeKey(type: PublishingEventType): string {
   switch (type) {
-    case "MATCH": return "match";
-    case "TRAINING": return "training";
+    case "MATCH":      return "match";
+    case "TRAINING":   return "training";
     case "TOURNAMENT": return "tournament";
-    default: return "other";
+    default:           return "other";
   }
 }
 
 function eventTypeLabel(type: PublishingEventType): string {
   switch (type) {
-    case "MATCH": return "SPIEL";
-    case "TRAINING": return "TRAINING";
+    case "MATCH":      return "SPIEL";
+    case "TRAINING":   return "TRAINING";
     case "TOURNAMENT": return "TURNIER";
-    default: return "EVENT";
+    default:           return "EVENT";
   }
 }
 
@@ -187,8 +190,18 @@ function PitchCard({ pitch, timeZone }: PitchCardProps): ReactElement {
           <span className={styles.pitchCardEventTitle}>
             {event.teamDisplayName ?? event.displayTitle}
           </span>
+          {event.opponentDisplayName !== null && (
+            <span className={styles.pitchCardEventOpponent}>
+              vs. {event.opponentDisplayName}
+            </span>
+          )}
           <span className={styles.pitchCardEventTime}>
             {formatTime(event.startAt, timeZone)}
+            {event.endAt !== null && (
+              <span className={styles.pitchCardEventEndTime}>
+                {" "}–{formatTime(event.endAt, timeZone)}
+              </span>
+            )}
           </span>
         </div>
       ) : (
@@ -197,6 +210,58 @@ function PitchCard({ pitch, timeZone }: PitchCardProps): ReactElement {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Dressing-room section ─────────────────────────────────────────────────────
+
+type DressingRoomSectionProps = {
+  dressingRooms: readonly DressingRoomAssignment[];
+};
+
+/**
+ * Renders all dressing-room assignments as a compact orientation block.
+ * Sorted referencing order: referee rooms are excluded (Screen 2 contract).
+ * Shows "NOCH NICHT ZUGETEILT" rows for unassigned entries.
+ */
+function DressingRoomSection({ dressingRooms }: DressingRoomSectionProps): ReactElement {
+  const visibleRooms = dressingRooms.filter(
+    (dr) => dr.role !== "REFEREE" && dr.assignedTo !== null,
+  );
+
+  return (
+    <section
+      className={styles.dressingRoomSection}
+      aria-label="Garderoben"
+      data-testid="dressing-room-section"
+    >
+      <div className={styles.dressingRoomHeader}>
+        <span className={styles.dressingRoomSectionTitle}>KABINEN</span>
+      </div>
+
+      {visibleRooms.length > 0 ? (
+        <div className={styles.dressingRoomList} data-testid="dressing-room-list">
+          {visibleRooms.map((dr) => (
+            <div
+              key={dr.code}
+              className={styles.dressingRoomRow}
+              data-testid="dressing-room-row"
+            >
+              <span className={styles.dressingRoomCode}>
+                {dr.displayLabel}
+              </span>
+              <span className={styles.dressingRoomTeam}>
+                {dr.assignedTo}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={styles.dressingRoomEmpty} data-testid="dressing-room-empty">
+          <span className={styles.dressingRoomEmptyText}>KEINE KABINENZUTEILUNGEN</span>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -222,7 +287,6 @@ function SponsorSection({ sponsors }: SponsorSectionProps): ReactElement {
       </div>
 
       <div className={styles.sponsorGrid} data-testid="sponsor-grid">
-        {/* Gold: full-width prominent */}
         {goldSponsors.map((sponsor) => (
           <div
             key={sponsor.id}
@@ -243,7 +307,6 @@ function SponsorSection({ sponsors }: SponsorSectionProps): ReactElement {
           </div>
         ))}
 
-        {/* Silver: half-width */}
         {silverSponsors.map((sponsor) => (
           <div
             key={sponsor.id}
@@ -264,7 +327,6 @@ function SponsorSection({ sponsors }: SponsorSectionProps): ReactElement {
           </div>
         ))}
 
-        {/* Partner: smaller cells */}
         {partnerSponsors.map((sponsor) => (
           <div
             key={sponsor.id}
@@ -297,7 +359,7 @@ export function InfoboardScreen2({
   sponsors = [],
   currentTimeIso,
 }: InfoboardScreen2Props): ReactElement {
-  const { tenant, pitches } = feed;
+  const { tenant, pitches, dressingRooms } = feed;
   const timeZone = tenant.timezone;
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
@@ -313,6 +375,9 @@ export function InfoboardScreen2({
       : formatDisplayDate(feed.displayDate);
 
   const hasPitches = pitches.length > 0;
+  const hasDressingRooms = dressingRooms.some(
+    (dr) => dr.role !== "REFEREE" && dr.assignedTo !== null,
+  );
 
   return (
     <div
@@ -373,41 +438,50 @@ export function InfoboardScreen2({
         />
       </header>
 
-      {/* ── Main content: facility overview + sponsors ────────────────────── */}
+      {/* ── Main content: facility + dressing rooms | sponsors ───────────── */}
       <main className={styles.main}>
 
-        {/* Left column: pitch overview */}
-        <section
-          className={styles.facilitySection}
-          aria-label="Feldbelegung"
-          data-testid="facility-overview"
-        >
-          <div className={styles.facilitySectionTitle}>
-            <span className={styles.sectionLabel}>FELDBELEGUNG</span>
-          </div>
+        {/* Left column: pitch overview + dressing rooms */}
+        <div className={styles.facilityColumn}>
 
-          {hasPitches ? (
-            <div
-              className={styles.pitchGrid}
-              data-testid="pitch-grid"
-              data-count={pitches.length}
-            >
-              {pitches.map((pitch) => (
-                <PitchCard
-                  key={pitch.code}
-                  pitch={pitch}
-                  timeZone={timeZone}
-                />
-              ))}
+          {/* Pitch overview */}
+          <section
+            className={styles.facilitySection}
+            aria-label="Feldbelegung"
+            data-testid="facility-overview"
+          >
+            <div className={styles.facilitySectionTitle}>
+              <span className={styles.sectionLabel}>FELDBELEGUNG</span>
             </div>
-          ) : (
-            <div className={styles.pitchGridEmpty} data-testid="pitch-grid-empty">
-              <span className={styles.pitchGridEmptyText}>
-                KEINE FELDDATEN VERFÜGBAR
-              </span>
-            </div>
+
+            {hasPitches ? (
+              <div
+                className={styles.pitchGrid}
+                data-testid="pitch-grid"
+                data-count={pitches.length}
+              >
+                {pitches.map((pitch) => (
+                  <PitchCard
+                    key={pitch.code}
+                    pitch={pitch}
+                    timeZone={timeZone}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className={styles.pitchGridEmpty} data-testid="pitch-grid-empty">
+                <span className={styles.pitchGridEmptyText}>
+                  KEINE FELDDATEN VERFÜGBAR
+                </span>
+              </div>
+            )}
+          </section>
+
+          {/* Dressing-room orientation */}
+          {hasDressingRooms && (
+            <DressingRoomSection dressingRooms={dressingRooms} />
           )}
-        </section>
+        </div>
 
         {/* Right column: sponsor section */}
         <aside className={styles.sponsorAside} data-testid="sponsor-aside">

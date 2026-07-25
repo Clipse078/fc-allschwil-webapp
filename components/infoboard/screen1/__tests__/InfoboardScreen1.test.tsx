@@ -484,9 +484,8 @@ describe("Temporal status — JETZT label", () => {
   });
 });
 
-describe("Temporal status — relative next label", () => {
-  it("next event shows IN X MIN. when currentTimeIso is provided", () => {
-    // 16:00Z = 18:00 Zurich; current time 15:35Z = 17:35 → 25 min until
+describe("Temporal status — next label (no countdown)", () => {
+  it("next event always shows ALS NÄCHSTES (never countdown) when currentTimeIso provided", () => {
     const feed = makeFeed({
       next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:00:00.000Z" })],
       isEmpty: false,
@@ -498,8 +497,7 @@ describe("Temporal status — relative next label", () => {
       />,
     );
     const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toMatch(/IN \d+ MIN\./);
-    expect(label.textContent).toContain("25");
+    expect(label.textContent).toBe("ALS NÄCHSTES");
   });
 
   it("next event shows ALS NÄCHSTES when currentTimeIso is not provided", () => {
@@ -512,27 +510,52 @@ describe("Temporal status — relative next label", () => {
     expect(label.textContent).toBe("ALS NÄCHSTES");
   });
 
-  it("relative label uses tenant timezone for minutes calculation", () => {
-    // 5 minutes until: start at 16:05Z, now at 16:00Z
-    const feed = makeFeed({
-      next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:05:00.000Z" })],
-      isEmpty: false,
-    });
-    render(
-      <InfoboardScreen1
-        feed={feed}
-        currentTimeIso="2026-09-12T16:00:00.000Z"
-      />,
-    );
-    const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toContain("5");
-  });
-
   it("next label has next status data attribute", () => {
     const feed = makeFeed({ next: [makeEvent({ id: "n1" })], isEmpty: false });
     render(<InfoboardScreen1 feed={feed} />);
     const label = screen.getByTestId("status-label-next");
     expect(label.getAttribute("data-status")).toBe("next");
+  });
+});
+
+describe("No countdown text", () => {
+  it("no 'IN X MIN.' countdown text is ever rendered for next events", () => {
+    const feed = makeFeed({
+      next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:00:00.000Z" })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        currentTimeIso="2026-09-12T15:35:00.000Z"
+      />,
+    );
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.textContent).not.toMatch(/IN \d+ MIN\./);
+    expect(root.textContent).not.toContain("IN 25");
+  });
+
+  it("no countdown text for next events without currentTimeIso", () => {
+    const feed = makeFeed({
+      next: [makeEvent({ id: "n1" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.textContent).not.toMatch(/IN \d+ MIN\./);
+  });
+
+  it("full preview fixture contains no countdown text", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+        eventPresentation={PREVIEW_TARGET_TOURNAMENT_EXTENSIONS}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.textContent).not.toMatch(/IN \d+ MIN\./);
+    expect(root.textContent).not.toMatch(/MINUTEN/i);
   });
 });
 
@@ -592,13 +615,13 @@ describe("Training row", () => {
     expect(screen.getAllByText("PLATZ").length).toBeGreaterThan(0);
   });
 
-  it("renders ZUTEILUNG column label", () => {
+  it("renders KABINE destination label in destination zone", () => {
     const feed = makeFeed({
-      current: [makeEvent()],
+      current: [makeEvent({ allocation: { pitchLabel: "KR2", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    expect(screen.getAllByText("ZUTEILUNG").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("KABINE").length).toBeGreaterThan(0);
   });
 
   it("renders dressing room in allocation column", () => {
@@ -803,7 +826,7 @@ describe("Match row", () => {
     expect(screen.queryByText("GAST")).toBeNull();
   });
 
-  it("shows club logo for home team when clubLogoSrc provided", () => {
+  it("shows club logo beside home team name in event identity zone (not in dressing-room allocation)", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine E1", awayDressingRoomLabel: "Kabine E2", refereeDressingRoomLabel: null } })],
       isEmpty: false,
@@ -814,11 +837,26 @@ describe("Match row", () => {
         branding={{ clubLogoSrc: "/images/logos/fc-allschwil.png" }}
       />,
     );
-    // Club logo should appear in match allocation area
-    const matchAlloc = screen.getByTestId("match-allocation");
-    const img = matchAlloc.querySelector("img");
+    // Logo should appear in home team row in the event identity section
+    const homeTeamRow = screen.getByTestId("match-home-team-row");
+    const img = homeTeamRow.querySelector("img");
     expect(img).not.toBeNull();
     expect(img?.getAttribute("src")).toBe("/images/logos/fc-allschwil.png");
+  });
+
+  it("no logo appears inside the dressing-room allocation area", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine E1", awayDressingRoomLabel: "Kabine E2", refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/images/logos/fc-allschwil.png" }}
+      />,
+    );
+    const matchAlloc = screen.getByTestId("match-allocation");
+    expect(matchAlloc.querySelector("img")).toBeNull();
   });
 });
 
@@ -875,7 +913,7 @@ describe("4-team tournament allocation", () => {
     expect(block.textContent).toContain("Kabine D");
   });
 
-  it("each team and its dressing room share the same allocation row", () => {
+  it("each team and its dressing room appear in the same text block (room code before team name)", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
@@ -884,18 +922,19 @@ describe("4-team tournament allocation", () => {
     );
     const block = screen.getByTestId("participant-allocation-block");
     const text = block.textContent ?? "";
-    const e1Idx = text.indexOf("FC Allschwil E1");
+    // In the new design room code appears before team name in each row (for fast scanning)
     const ka = text.indexOf("Kabine A");
-    const e2Idx = text.indexOf("FC Allschwil E2");
+    const e1Idx = text.indexOf("FC Allschwil E1");
     const kb = text.indexOf("Kabine B");
-    const aeschIdx = text.indexOf("FC Aesch");
+    const e2Idx = text.indexOf("FC Allschwil E2");
     const kd = text.indexOf("Kabine D");
-    expect(e1Idx).toBeLessThan(ka);
-    expect(e2Idx).toBeLessThan(kb);
-    expect(aeschIdx).toBeLessThan(kd);
+    const aeschIdx = text.indexOf("FC Aesch");
+    expect(ka).toBeLessThan(e1Idx);
+    expect(kb).toBeLessThan(e2Idx);
+    expect(kd).toBeLessThan(aeschIdx);
   });
 
-  it("renders TEAM allocation header", () => {
+  it("participant-allocation-block contains team and room data (no separate TEAM/GARDEROBE column headers required)", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
@@ -903,18 +942,9 @@ describe("4-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    expect(block.textContent).toContain("TEAM");
-  });
-
-  it("renders GARDEROBE allocation header", () => {
-    render(
-      <InfoboardScreen1
-        feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
-        eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
-      />,
-    );
-    const block = screen.getByTestId("participant-allocation-block");
-    expect(block.textContent).toContain("GARDEROBE");
+    // Block contains team names and room codes — header row not required in new card design
+    expect(block.textContent).toContain("FC Allschwil E1");
+    expect(block.textContent).toContain("Kabine A");
   });
 
   it("does not render a standard match-allocation or training-allocation block", () => {
@@ -1015,7 +1045,7 @@ describe("6-team tournament allocation", () => {
     expect(screen.getByText("FC Aesch")).toBeTruthy();
   });
 
-  it("renders TEAM and GARDEROBE headers", () => {
+  it("participant-allocation-block contains all 6 team names and room codes without TEAM/GARDEROBE column headers", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_6TEAM}
@@ -1023,8 +1053,8 @@ describe("6-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    expect(block.textContent).toContain("TEAM");
-    expect(block.textContent).toContain("GARDEROBE");
+    expect(block.textContent).toContain("FC Allschwil F1");
+    expect(block.textContent).toContain("FC Aesch");
   });
 
   it("home-club teams are visible", () => {
@@ -1755,5 +1785,167 @@ describe("Missing and optional data safety", () => {
     expect(screen.getByText("Team A")).toBeTruthy();
     expect(screen.getByText("Team C")).toBeTruthy();
     expect(screen.queryByText("null")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04B: Card-based layout requirements ────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Card-based layout — no table-row appearance", () => {
+  it("event-list is a <ul> element (not <table>)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    const eventList = screen.getByTestId("event-list");
+    expect(eventList.tagName.toLowerCase()).toBe("ul");
+  });
+
+  it("event rows are <li> elements", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    const rows = screen.getAllByTestId("event-row");
+    for (const row of rows) {
+      expect(row.tagName.toLowerCase()).toBe("li");
+    }
+  });
+
+  it("event list carries data-count attribute reflecting number of rendered events", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent({ id: "c1" })], next: [makeEvent({ id: "n1" })], isEmpty: false })}
+      />,
+    );
+    const eventList = screen.getByTestId("event-list");
+    expect(eventList.getAttribute("data-count")).toBe("2");
+  });
+
+  it("data-count is 5 for the full preview fixture", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+        eventPresentation={PREVIEW_TARGET_TOURNAMENT_EXTENSIONS}
+      />,
+    );
+    const eventList = screen.getByTestId("event-list");
+    expect(eventList.getAttribute("data-count")).toBe("5");
+  });
+});
+
+describe("Match logo placement — beside team name, not in dressing room rows", () => {
+  it("home team logo is inside match-home-team-row (event identity zone)", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Home", opponentDisplayName: "FC Away", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logo.png" }}
+      />,
+    );
+    const homeRow = screen.getByTestId("match-home-team-row");
+    expect(homeRow.querySelector("img")).not.toBeNull();
+  });
+
+  it("no logo anywhere inside match-allocation (destination zone)", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Home", opponentDisplayName: "FC Away", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logo.png" }}
+      />,
+    );
+    const matchAlloc = screen.getByTestId("match-allocation");
+    expect(matchAlloc.querySelector("img")).toBeNull();
+  });
+
+  it("no logo appears in training-allocation section even with branding", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: "KR2", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logo.png" }}
+      />,
+    );
+    const trainingAlloc = screen.getByTestId("training-allocation");
+    expect(trainingAlloc.querySelector("img")).toBeNull();
+  });
+});
+
+describe("Adaptive event count marker", () => {
+  it("1 event → data-count=1 on event list", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    expect(screen.getByTestId("event-list").getAttribute("data-count")).toBe("1");
+  });
+
+  it("3 events → data-count=3 on event list", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({
+          current: [makeEvent({ id: "a" })],
+          next: [makeEvent({ id: "b" })],
+          later: [makeEvent({ id: "c" })],
+          isEmpty: false,
+        })}
+      />,
+    );
+    expect(screen.getByTestId("event-list").getAttribute("data-count")).toBe("3");
+  });
+});
+
+describe("No interaction affordances (INFOBOARD-04B)", () => {
+  it("no button elements in any event card", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    const rows = screen.getAllByTestId("event-row");
+    for (const row of rows) {
+      expect(row.querySelector("button")).toBeNull();
+    }
+  });
+
+  it("no anchor elements in any event card", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    const rows = screen.getAllByTestId("event-row");
+    for (const row of rows) {
+      expect(row.querySelector("a")).toBeNull();
+    }
+  });
+});
+
+describe("Alexa safe zone — INFOBOARD-04B", () => {
+  it("alexa-safe-zone is empty in full preview", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+        branding={{ clubLogoSrc: "/logo.png", productLogoSrc: "/sce.png" }}
+      />,
+    );
+    const safe = screen.getByTestId("alexa-safe-zone");
+    expect(safe.textContent?.trim()).toBe("");
   });
 });

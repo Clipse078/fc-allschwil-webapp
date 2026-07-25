@@ -1,56 +1,51 @@
 /**
  * components/infoboard/screen2/InfoboardScreen2.module.css
  *
- * INFOBOARD-04A: Premium dark stadium design (Screen 2).
+ * INFOBOARD-04B: Premium dark facility orientation design (Screen 2).
  *
- * Purpose: Facility orientation screen.
- * Layout:
- *   - Dark page background (consistent with Screen 1).
- *   - Header: club logo + facility name | time/date | Alexa-safe zone.
- *   - Main: 2-column split — facility/pitch overview (left) + sponsors (right).
- *   - Footer: facility name + "Powered by SportClubEvo".
- *
- * Pitch status colors:
- *   FREE:     green
- *   MATCH:    red
- *   TRAINING: blue
- *   TOURNAMENT: orange
- *   UPCOMING: muted blue
- *   UNKNOWN:  amber warning
- *
- * TV target: 1920×1080 primary; 1280×720 fallback.
- * No scrolling. No hover-dependent information.
+ * Design principles:
+ *   - Full dark stadium palette — deep navy background, dark card surfaces.
+ *   - Barlow Condensed for dominant headings and status labels.
+ *   - Two-column layout: left ~65% (facility overview + dressing rooms),
+ *     right ~35% (sponsors).
+ *   - Pitch cards are substantially larger than 04A, filling the facility area.
+ *   - Dressing-room section below pitch grid, integrated in the left column.
+ *   - Sponsor section: right column, full height.
+ *   - Status colors: SPIEL red, TRAINING blue, TURNIER orange, FREI green.
+ *   - No Next Events panel.
+ *   - No scrolling — content must fit within 100dvh.
+ *   - Values must be readable from TV distance (5–8 m).
  */
 
-/* ─── Design tokens (mirrored from Screen 1 palette) ────────────────────── */
+/* ─── Semantic dark palette (mirrors Screen 1) ───────────────────────────── */
 
 .root {
   /* Page and card backgrounds */
   --ib2-page-bg:        #07111E;
   --ib2-card-bg:        #0F1C2E;
-  --ib2-panel-bg:       #12213A;
   --ib2-header-bg:      #0A1828;
+  --ib2-surface:        #12213A;
 
   /* Borders */
-  --ib2-border:         rgba(99, 135, 175, 0.14);
-  --ib2-border-strong:  rgba(99, 135, 175, 0.28);
+  --ib2-border:         rgba(99, 135, 175, 0.16);
+  --ib2-border-strong:  rgba(99, 135, 175, 0.32);
 
   /* Text */
   --ib2-text:           #E8EEF4;
   --ib2-text-muted:     #6E87A0;
   --ib2-text-dim:       #4A6078;
 
-  /* Status / event type colors */
+  /* Status colors */
   --ib2-match:          #D83033;
   --ib2-training:       #1E5BC6;
   --ib2-tournament:     #E87C24;
   --ib2-free:           #1A7A4A;
-  --ib2-upcoming:       #2A4A7A;
+  --ib2-upcoming:       #1E5BC6;
   --ib2-warning:        #CC8B14;
 
   /* Sizing */
   --ib2-header-height:  clamp(72px, 8vh, 96px);
-  --ib2-footer-height:  clamp(40px, 5vh, 52px);
+  --ib2-footer-height:  clamp(40px, 5vh, 56px);
 
   /* Spacing */
   --ib2-sp-1: 4px;
@@ -62,24 +57,32 @@
   --ib2-sp-8: 32px;
 
   /* Typography */
-  --ib2-fs-header-time:   clamp(2.6rem, 3.4vw, 4rem);
-  --ib2-fs-header-date:   clamp(0.7rem, 0.9vw, 1rem);
-  --ib2-fs-club-name:     clamp(1.2rem, 1.6vw, 2rem);
-  --ib2-fs-facility-name: clamp(0.7rem, 0.9vw, 1rem);
-  --ib2-fs-section-label: clamp(0.6rem, 0.75vw, 0.85rem);
-  --ib2-fs-pitch-name:    clamp(1.2rem, 1.6vw, 2rem);
-  --ib2-fs-pitch-status:  clamp(0.6rem, 0.75vw, 0.85rem);
-  --ib2-fs-pitch-event:   clamp(0.85rem, 1.1vw, 1.3rem);
-  --ib2-fs-pitch-type:    clamp(0.55rem, 0.65vw, 0.75rem);
-  --ib2-fs-pitch-time:    clamp(0.75rem, 0.95vw, 1.1rem);
-  --ib2-fs-sponsor-title: clamp(0.55rem, 0.7vw, 0.8rem);
-  --ib2-fs-sponsor-name:  clamp(0.85rem, 1.1vw, 1.3rem);
-  --ib2-fs-footer:        clamp(0.72rem, 0.9vw, 1rem);
-  --ib2-fs-powered-by:    clamp(0.5rem, 0.6vw, 0.7rem);
+  --ib2-fs-header-time:    clamp(2.6rem, 3.4vw, 4rem);
+  --ib2-fs-club-name:      clamp(1.4rem, 1.8vw, 2.2rem);
+  --ib2-fs-facility-name:  clamp(0.7rem, 0.9vw, 1.1rem);
+
+  --ib2-fs-section-label:  clamp(0.65rem, 0.8vw, 0.95rem);
+  --ib2-fs-pitch-name:     clamp(1.3rem, 1.8vw, 2.4rem);
+  --ib2-fs-pitch-status:   clamp(0.7rem, 0.9vw, 1.1rem);
+  --ib2-fs-pitch-type:     clamp(0.65rem, 0.82vw, 1rem);
+  --ib2-fs-pitch-title:    clamp(1rem, 1.4vw, 1.9rem);
+  --ib2-fs-pitch-opponent: clamp(0.8rem, 1.1vw, 1.5rem);
+  --ib2-fs-pitch-time:     clamp(0.85rem, 1.1vw, 1.4rem);
+
+  --ib2-fs-dr-title:       clamp(0.65rem, 0.8vw, 0.95rem);
+  --ib2-fs-dr-code:        clamp(0.95rem, 1.3vw, 1.7rem);
+  --ib2-fs-dr-team:        clamp(0.85rem, 1.1vw, 1.45rem);
+
+  --ib2-fs-sponsor-title:  clamp(0.65rem, 0.8vw, 0.95rem);
+  --ib2-fs-sponsor-name:   clamp(0.9rem, 1.2vw, 1.6rem);
+
+  --ib2-fs-footer:         clamp(0.75rem, 0.9vw, 1.05rem);
+  --ib2-fs-powered-by:     clamp(0.5rem, 0.6vw, 0.72rem);
 
   /* Border radius */
-  --ib2-radius:    8px;
-  --ib2-radius-sm: 4px;
+  --ib2-radius:            8px;
+  --ib2-radius-sm:         4px;
+  --ib2-radius-xs:         3px;
 }
 
 /* ─── Root container ─────────────────────────────────────────────────────── */
@@ -105,7 +108,7 @@
   height: var(--ib2-header-height);
   padding: 0 var(--ib2-sp-8);
   background: var(--ib2-header-bg);
-  border-bottom: 2px solid var(--ib2-training);
+  border-bottom: 2px solid var(--ib2-tournament);
   flex-shrink: 0;
   gap: var(--ib2-sp-4);
 }
@@ -118,23 +121,23 @@
 }
 
 .clubLogo {
-  width: clamp(44px, 5vh, 64px);
-  height: clamp(44px, 5vh, 64px);
+  width: clamp(40px, 5vh, 60px);
+  height: clamp(40px, 5vh, 60px);
   object-fit: contain;
   flex-shrink: 0;
 }
 
 .clubLogoFallback {
-  width: clamp(44px, 5vh, 64px);
-  height: clamp(44px, 5vh, 64px);
+  width: clamp(40px, 5vh, 60px);
+  height: clamp(40px, 5vh, 60px);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(30, 91, 198, 0.15);
-  border: 1px solid rgba(30, 91, 198, 0.4);
+  background: rgba(232, 124, 36, 0.15);
+  border: 1px solid rgba(232, 124, 36, 0.4);
   border-radius: var(--ib2-radius-sm);
-  color: var(--ib2-training);
-  font-size: 1.4rem;
+  color: var(--ib2-tournament);
+  font-size: 1.3rem;
   font-weight: 700;
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   letter-spacing: 0.05em;
@@ -162,16 +165,12 @@
 }
 
 .headerFacilityName {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-facility-name);
-  font-weight: 500;
+  color: var(--ib2-text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ib2-text-muted);
   line-height: 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .headerCenter {
@@ -202,91 +201,82 @@
 .headerTimeSeparator {
   font-size: var(--ib2-fs-header-time);
   color: var(--ib2-border-strong);
-  font-weight: 300;
   line-height: 1;
-  flex-shrink: 0;
 }
 
 .headerDateBlock {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
 .headerWeekday {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-header-date);
+  font-size: clamp(0.7rem, 0.95vw, 1.1rem);
   font-weight: 600;
-  color: rgba(232, 238, 244, 0.7);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  white-space: nowrap;
-  line-height: 1.2;
+  color: var(--ib2-text);
+  line-height: 1;
 }
 
 .headerDateLine {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-header-date);
-  font-weight: 500;
+  font-size: clamp(0.65rem, 0.82vw, 0.95rem);
   color: var(--ib2-text-muted);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  line-height: 1.2;
+  line-height: 1;
 }
 
 .headerDateFallback {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-header-date);
-  font-weight: 500;
+  font-size: clamp(0.85rem, 1.1vw, 1.3rem);
   color: var(--ib2-text-muted);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .headerRight {
-  /* Intentionally empty — Fire TV Alexa overlay occupies this area on-device. */
+  /* intentionally empty — Alexa-safe zone */
 }
 
-/* ─── Main: 2-column layout ──────────────────────────────────────────────── */
+/* ─── Main layout ─────────────────────────────────────────────────────────── */
 
 .main {
   flex: 1;
   display: grid;
-  grid-template-columns: 62% 38%;
-  min-height: 0;
+  grid-template-columns: 1fr 34%;
+  gap: var(--ib2-sp-4);
+  padding: var(--ib2-sp-4) var(--ib2-sp-8);
   overflow: hidden;
-  gap: 0;
+  min-height: 0;
 }
 
-/* ─── Left: facility section ─────────────────────────────────────────────── */
+/* ─── Left column: facility + dressing rooms ─────────────────────────────── */
+
+.facilityColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib2-sp-3);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─── Facility section ───────────────────────────────────────────────────── */
 
 .facilitySection {
   display: flex;
   flex-direction: column;
-  padding: var(--ib2-sp-5) var(--ib2-sp-6) var(--ib2-sp-5) var(--ib2-sp-8);
-  gap: var(--ib2-sp-4);
-  border-right: 1px solid var(--ib2-border);
-  overflow: hidden;
+  gap: var(--ib2-sp-2);
+  flex: 1;
   min-height: 0;
 }
 
 .facilitySectionTitle {
-  display: flex;
-  align-items: center;
-  gap: var(--ib2-sp-3);
+  padding: 0 var(--ib2-sp-1);
   flex-shrink: 0;
 }
 
 .sectionLabel {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-section-label);
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ib2-text-dim);
-  line-height: 1;
 }
 
 /* ─── Pitch grid ─────────────────────────────────────────────────────────── */
@@ -294,11 +284,9 @@
 .pitchGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--ib2-sp-4);
+  gap: var(--ib2-sp-3);
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  align-content: start;
 }
 
 /* 1 pitch: full width */
@@ -306,19 +294,14 @@
   grid-template-columns: 1fr;
 }
 
-/* 2 pitches: 2 columns */
-.pitchGrid[data-count="2"] {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-/* 3 pitches: 3 columns */
+/* 3 pitches: 2-1 layout */
 .pitchGrid[data-count="3"] {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr;
 }
 
-/* 4+ pitches: 2×2 grid */
-.pitchGrid[data-count="4"] {
-  grid-template-columns: repeat(2, 1fr);
+.pitchGrid[data-count="3"] .pitchCard:last-child {
+  grid-column: 1 / -1;
+  max-height: 40%;
 }
 
 .pitchGridEmpty {
@@ -326,14 +309,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px dashed var(--ib2-border);
+  border-radius: var(--ib2-radius);
 }
 
 .pitchGridEmptyText {
-  font-size: clamp(0.9rem, 1.2vw, 1.4rem);
-  font-weight: 500;
-  color: var(--ib2-text-dim);
-  letter-spacing: 0.08em;
+  font-size: clamp(0.9rem, 1.2vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: var(--ib2-text-dim);
 }
 
 /* ─── Pitch card ─────────────────────────────────────────────────────────── */
@@ -342,25 +327,48 @@
   display: flex;
   flex-direction: column;
   gap: var(--ib2-sp-2);
-  padding: var(--ib2-sp-4) var(--ib2-sp-5);
   background: var(--ib2-card-bg);
   border: 1px solid var(--ib2-border);
   border-radius: var(--ib2-radius);
-  border-left: 4px solid transparent;
+  padding: clamp(14px, 2vh, 28px) clamp(16px, 2vw, 28px);
+  position: relative;
   overflow: hidden;
   min-height: 0;
 }
 
-/* Card accent by status */
-.pitchCard[data-state="free"]     { border-left-color: var(--ib2-free); }
-.pitchCard[data-state="occupied"] { border-left-color: var(--ib2-training); }
-.pitchCard[data-state="upcoming"] { border-left-color: var(--ib2-upcoming); }
-.pitchCard[data-state="unknown"]  { border-left-color: var(--ib2-warning); }
+/* Left color stripe based on state */
+.pitchCard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--ib2-border);
+  border-radius: var(--ib2-radius) 0 0 var(--ib2-radius);
+}
 
-/* Card accent override by event type when occupied */
-.pitchCard[data-event-type="match"]      { border-left-color: var(--ib2-match); }
-.pitchCard[data-event-type="training"]   { border-left-color: var(--ib2-training); }
-.pitchCard[data-event-type="tournament"] { border-left-color: var(--ib2-tournament); }
+.pitchCard[data-state="occupied"]::before,
+.pitchCard[data-event-type="match"]::before {
+  background: var(--ib2-match);
+}
+
+.pitchCard[data-event-type="training"]::before {
+  background: var(--ib2-training);
+}
+
+.pitchCard[data-event-type="tournament"]::before {
+  background: var(--ib2-tournament);
+}
+
+.pitchCard[data-state="upcoming"]::before {
+  background: var(--ib2-upcoming);
+  opacity: 0.6;
+}
+
+.pitchCard[data-state="free"]::before {
+  background: var(--ib2-free);
+}
 
 .pitchCardName {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
@@ -370,46 +378,44 @@
   text-transform: uppercase;
   color: var(--ib2-text);
   line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding-left: 10px;
 }
 
 .pitchCardStatus {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: 3px;
+  padding: 3px 8px;
+  border-radius: var(--ib2-radius-xs);
   font-size: var(--ib2-fs-pitch-status);
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  line-height: 1.4;
-  align-self: flex-start;
-}
-
-/* Status badge colors */
-.pitchCardStatus[data-state="free"] {
-  background: rgba(26, 122, 74, 0.2);
-  color: #3DBA7A;
-  border: 1px solid rgba(26, 122, 74, 0.4);
+  line-height: 1;
+  width: fit-content;
+  margin-left: 10px;
 }
 
 .pitchCardStatus[data-state="occupied"] {
-  background: rgba(30, 91, 198, 0.2);
-  color: #6099E8;
-  border: 1px solid rgba(30, 91, 198, 0.4);
+  background: rgba(216, 48, 51, 0.18);
+  color: #f07072;
+  border: 1px solid rgba(216, 48, 51, 0.3);
+}
+
+.pitchCardStatus[data-state="free"] {
+  background: rgba(26, 122, 74, 0.18);
+  color: #4caf83;
+  border: 1px solid rgba(26, 122, 74, 0.3);
 }
 
 .pitchCardStatus[data-state="upcoming"] {
-  background: rgba(42, 74, 122, 0.2);
-  color: #6E87A0;
-  border: 1px solid rgba(42, 74, 122, 0.3);
+  background: rgba(30, 91, 198, 0.18);
+  color: #6a9cec;
+  border: 1px solid rgba(30, 91, 198, 0.3);
 }
 
 .pitchCardStatus[data-state="unknown"] {
-  background: rgba(204, 139, 20, 0.15);
-  color: var(--ib2-warning);
+  background: rgba(204, 139, 20, 0.18);
+  color: #e0ab45;
   border: 1px solid rgba(204, 139, 20, 0.3);
 }
 
@@ -417,7 +423,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
+  padding-left: 10px;
+  margin-top: auto;
 }
 
 .pitchCardEventType {
@@ -428,54 +435,151 @@
   line-height: 1;
 }
 
-.pitchCardEventType[data-event-type="match"]      { color: var(--ib2-match); }
-.pitchCardEventType[data-event-type="training"]   { color: var(--ib2-training); }
-.pitchCardEventType[data-event-type="tournament"] { color: var(--ib2-tournament); }
-.pitchCardEventType[data-event-type="other"]      { color: var(--ib2-text-dim); }
+.pitchCardEventType[data-event-type="match"]      { color: rgba(216, 48, 51, 0.85); }
+.pitchCardEventType[data-event-type="training"]   { color: rgba(30, 91, 198, 0.85); }
+.pitchCardEventType[data-event-type="tournament"] { color: rgba(232, 124, 36, 0.85); }
 
 .pitchCardEventTitle {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-pitch-event);
+  font-size: var(--ib2-fs-pitch-title);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--ib2-text);
-  line-height: 1.2;
+  line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.pitchCardEventOpponent {
+  font-size: var(--ib2-fs-pitch-opponent);
+  font-weight: 500;
+  color: rgba(232, 238, 244, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .pitchCardEventTime {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-pitch-time);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ib2-text-muted);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
+.pitchCardEventEndTime {
+  color: var(--ib2-text-dim);
+}
+
 .pitchCardFree {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding-left: 10px;
 }
 
 .pitchCardFreeLine {
-  font-size: var(--ib2-fs-pitch-type);
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: clamp(1.1rem, 1.6vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(26, 122, 74, 0.6);
+}
+
+/* ─── Dressing-room section ──────────────────────────────────────────────── */
+
+.dressingRoomSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib2-sp-2);
+  flex-shrink: 0;
+  background: var(--ib2-card-bg);
+  border: 1px solid var(--ib2-border);
+  border-radius: var(--ib2-radius);
+  padding: clamp(10px, 1.5vh, 18px) clamp(14px, 1.8vw, 22px);
+}
+
+.dressingRoomHeader {
+  border-bottom: 1px solid var(--ib2-border);
+  padding-bottom: var(--ib2-sp-2);
+  flex-shrink: 0;
+}
+
+.dressingRoomSectionTitle {
+  font-size: var(--ib2-fs-dr-title);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
+}
+
+.dressingRoomList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--ib2-sp-1) var(--ib2-sp-4);
+}
+
+.dressingRoomRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ib2-sp-2);
+  min-width: 0;
+}
+
+.dressingRoomCode {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib2-fs-dr-code);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ib2-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: clamp(55px, 5vw, 80px);
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.dressingRoomTeam {
+  font-size: var(--ib2-fs-dr-team);
+  font-weight: 500;
+  color: var(--ib2-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
+}
+
+.dressingRoomEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ib2-sp-3);
+}
+
+.dressingRoomEmptyText {
+  font-size: clamp(0.7rem, 0.9vw, 1.1rem);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ib2-free);
-  opacity: 0.8;
+  color: var(--ib2-text-dim);
 }
 
-/* ─── Right: sponsor aside ───────────────────────────────────────────────── */
+/* ─── Sponsor aside (right column) ──────────────────────────────────────── */
 
 .sponsorAside {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* ─── Sponsor section ────────────────────────────────────────────────────── */
@@ -483,27 +587,27 @@
 .sponsorSection {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  padding: var(--ib2-sp-5) var(--ib2-sp-8) var(--ib2-sp-5) var(--ib2-sp-6);
-  gap: var(--ib2-sp-5);
+  gap: var(--ib2-sp-3);
+  height: 100%;
+  background: var(--ib2-card-bg);
+  border: 1px solid var(--ib2-border);
+  border-radius: var(--ib2-radius);
+  padding: clamp(14px, 2vh, 24px) clamp(14px, 1.8vw, 22px);
   overflow: hidden;
-  min-height: 0;
 }
 
 .sponsorSectionHeader {
-  display: flex;
-  align-items: center;
+  border-bottom: 1px solid var(--ib2-border);
+  padding-bottom: var(--ib2-sp-2);
   flex-shrink: 0;
 }
 
 .sponsorSectionTitle {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-sponsor-title);
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ib2-text-dim);
-  line-height: 1;
 }
 
 .sponsorGrid {
@@ -514,85 +618,78 @@
   overflow: hidden;
 }
 
-/* ─── Sponsor cards ──────────────────────────────────────────────────────── */
-
 .sponsorCard {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--ib2-sp-3) var(--ib2-sp-4);
-  background: var(--ib2-card-bg);
+  background: var(--ib2-surface);
   border: 1px solid var(--ib2-border);
-  border-radius: var(--ib2-radius);
+  border-radius: var(--ib2-radius-sm);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .sponsorCardGold {
-  padding: var(--ib2-sp-5) var(--ib2-sp-4);
-  background: rgba(15, 28, 46, 0.9);
-  border-color: rgba(99, 135, 175, 0.25);
+  flex: 2;
+  min-height: clamp(60px, 10vh, 100px);
+  border-color: rgba(232, 124, 36, 0.2);
 }
 
 .sponsorCardSilver {
-  padding: var(--ib2-sp-4) var(--ib2-sp-4);
+  flex: 1.4;
+  min-height: clamp(48px, 8vh, 80px);
 }
 
 .sponsorCardPartner {
-  padding: var(--ib2-sp-3) var(--ib2-sp-3);
+  flex: 1;
+  min-height: clamp(36px, 6vh, 60px);
 }
 
 .sponsorLogo {
-  max-width: 100%;
-  max-height: clamp(36px, 5vh, 60px);
+  max-width: 90%;
+  max-height: 90%;
   width: auto;
   height: auto;
   object-fit: contain;
-  /* Neutral canvas for transparent logos */
-  filter: none;
+  display: block;
 }
 
 .sponsorName {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-sponsor-name);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--ib2-text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ib2-text-muted);
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: var(--ib2-sp-2) var(--ib2-sp-3);
 }
 
 /* ─── Footer ─────────────────────────────────────────────────────────────── */
 
 .footer {
-  flex-shrink: 0;
-  min-height: var(--ib2-footer-height);
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  height: var(--ib2-footer-height);
+  padding: 0 var(--ib2-sp-8);
   background: var(--ib2-header-bg);
   border-top: 1px solid var(--ib2-border);
-  padding: 0 var(--ib2-sp-8);
-  gap: var(--ib2-sp-6);
-  overflow: hidden;
+  flex-shrink: 0;
+  gap: var(--ib2-sp-4);
 }
 
 .footerLeft {
   flex: 1;
-  display: flex;
-  align-items: center;
   min-width: 0;
 }
 
 .footerFacility {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-footer);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ib2-text-dim);
+  color: var(--ib2-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -606,62 +703,37 @@
 }
 
 .footerPoweredBy {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-powered-by);
-  font-weight: 600;
-  letter-spacing: 0.15em;
+  font-weight: 700;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ib2-text-dim);
-  white-space: nowrap;
 }
 
 .footerProductLogo {
-  height: clamp(18px, 2.5vh, 28px);
+  height: clamp(18px, 2.2vh, 28px);
   width: auto;
   object-fit: contain;
   opacity: 0.7;
 }
 
 .footerProductFallback {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-footer);
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: clamp(0.7rem, 0.9vw, 1.05rem);
+  font-weight: 600;
   color: var(--ib2-text-muted);
   white-space: nowrap;
 }
 
-/* ─── Breakpoint: 1366×768 and 1280×720 ─────────────────────────────────── */
+/* ─── Responsive: 1280×720 ───────────────────────────────────────────────── */
 
-@media (max-width: 1400px) {
-  .root {
-    --ib2-header-height:  clamp(60px, 7vh, 80px);
-    --ib2-footer-height:  clamp(34px, 4.5vh, 46px);
-
-    --ib2-fs-header-time:   clamp(2rem, 3.2vw, 3rem);
-    --ib2-fs-club-name:     clamp(1rem, 1.4vw, 1.7rem);
-    --ib2-fs-pitch-name:    clamp(1rem, 1.3vw, 1.6rem);
-    --ib2-fs-pitch-event:   clamp(0.75rem, 0.95vw, 1.1rem);
-    --ib2-fs-sponsor-name:  clamp(0.75rem, 0.95vw, 1.1rem);
-  }
-
-  .header {
-    padding: 0 var(--ib2-sp-6);
-  }
-
-  .facilitySection {
-    padding: var(--ib2-sp-4) var(--ib2-sp-4) var(--ib2-sp-4) var(--ib2-sp-6);
-  }
-
-  .sponsorSection {
-    padding: var(--ib2-sp-4) var(--ib2-sp-6) var(--ib2-sp-4) var(--ib2-sp-4);
-  }
-
-  .pitchGrid {
+@media (max-width: 1366px) {
+  .main {
+    grid-template-columns: 1fr 32%;
     gap: var(--ib2-sp-3);
+    padding: var(--ib2-sp-3) var(--ib2-sp-5);
   }
 
-  .footer {
-    padding: 0 var(--ib2-sp-6);
+  .pitchCard {
+    padding: clamp(10px, 1.5vh, 18px) clamp(12px, 1.5vw, 18px);
   }
 }
