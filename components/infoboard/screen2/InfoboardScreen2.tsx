@@ -8,13 +8,14 @@
  *
  * Design (INFOBOARD-04B — premium dark facility overview):
  *   - Full dark navy stadium palette, consistent with Screen 1.
- *   - Left section (~65% width, dominant): large pitch overview cards +
- *     dressing-room orientation section.
- *   - Right section (~35% width): sponsor display.
- *   - Pitch cards fill the available facility area, substantially larger
- *     than in 04A.
- *   - Dressing-room section renders all feed.dressingRooms assignments as
- *     a readable orientation block.
+ *   - Left section (~65% width, dominant): large pitch overview cards.
+ *   - Right section (~35% width): weather panel + sponsor display.
+ *   - Pitch cards fill the available facility area.
+ *
+ * INFOBOARD-05 changes:
+ *   - Dressing-room/cabin section removed from Screen 2.
+ *     Cabin assignments belong exclusively on Screen 1.
+ *   - Weather panel added to the right column (above sponsors).
  *
  * Invariants:
  *   - Pure presentational server component — no "use client", no effects,
@@ -23,18 +24,29 @@
  *   - Tenant timezone always taken from feed.tenant.timezone.
  *   - No new Date() without argument; no implicit timezone.
  *   - null / undefined values are never rendered as strings.
- *   - No "Next Events" panel — pitch occupancy and dressing rooms only.
+ *   - No "Next Events" panel — pitch occupancy only.
+ *   - No dressing-room / cabin section.
  *   - No scrolling — content must fit within 100dvh.
  */
 
 import type { ReactElement } from "react";
+import {
+  Sun,
+  CloudSun,
+  Cloud,
+  CloudRain,
+  CloudSnow,
+  Zap,
+  CloudDrizzle,
+  Wind,
+} from "lucide-react";
 import type {
   InfoboardScreen2Feed,
   PitchOccupancy,
   PitchOccupancyState,
   PublishingEventType,
-  DressingRoomAssignment,
 } from "@/lib/publishing/event-types";
+import type { WeatherResult } from "@/lib/weather/weather-types";
 import styles from "./InfoboardScreen2.module.css";
 
 // ── Public sponsor types ──────────────────────────────────────────────────────
@@ -62,9 +74,13 @@ export type InfoboardScreen2Props = {
   branding?: InfoboardScreen2Branding;
   sponsors?: readonly InfoboardSponsor[];
   /**
+   * Current weather for the facility location.
+   * When absent or unavailable, renders the "WETTER NICHT VERFÜGBAR" fallback.
+   */
+  weather?: WeatherResult | null;
+  /**
    * Current moment as a UTC ISO-8601 string.
    * When absent, the clock display falls back to feed.displayDate.
-   * Never call new Date() without an argument.
    */
   currentTimeIso?: string | null;
 };
@@ -144,6 +160,25 @@ function eventTypeLabel(type: PublishingEventType): string {
   }
 }
 
+// ── Weather icon helper ───────────────────────────────────────────────────────
+
+type LucideIconProps = { size?: number; strokeWidth?: number; "aria-hidden"?: boolean };
+type LucideIcon = (props: LucideIconProps) => ReactElement;
+
+function getWeatherIcon(conditionCode: number): LucideIcon {
+  if (conditionCode === 0 || conditionCode === 1) return Sun as LucideIcon;
+  if (conditionCode === 2) return CloudSun as LucideIcon;
+  if (conditionCode === 3) return Cloud as LucideIcon;
+  if (conditionCode >= 45 && conditionCode <= 48) return Cloud as LucideIcon;
+  if (conditionCode >= 51 && conditionCode <= 57) return CloudDrizzle as LucideIcon;
+  if (conditionCode >= 61 && conditionCode <= 67) return CloudRain as LucideIcon;
+  if (conditionCode >= 71 && conditionCode <= 77) return CloudSnow as LucideIcon;
+  if (conditionCode >= 80 && conditionCode <= 82) return CloudRain as LucideIcon;
+  if (conditionCode >= 85 && conditionCode <= 86) return CloudSnow as LucideIcon;
+  if (conditionCode >= 95) return Zap as LucideIcon;
+  return Cloud as LucideIcon;
+}
+
 // ── Pitch card ────────────────────────────────────────────────────────────────
 
 type PitchCardProps = {
@@ -213,54 +248,79 @@ function PitchCard({ pitch, timeZone }: PitchCardProps): ReactElement {
   );
 }
 
-// ── Dressing-room section ─────────────────────────────────────────────────────
+// ── Weather panel ─────────────────────────────────────────────────────────────
 
-type DressingRoomSectionProps = {
-  dressingRooms: readonly DressingRoomAssignment[];
+type WeatherPanelProps = {
+  weather: WeatherResult | null | undefined;
 };
 
-/**
- * Renders all dressing-room assignments as a compact orientation block.
- * Sorted referencing order: referee rooms are excluded (Screen 2 contract).
- * Shows "NOCH NICHT ZUGETEILT" rows for unassigned entries.
- */
-function DressingRoomSection({ dressingRooms }: DressingRoomSectionProps): ReactElement {
-  const visibleRooms = dressingRooms.filter(
-    (dr) => dr.role !== "REFEREE" && dr.assignedTo !== null,
-  );
+function WeatherPanel({ weather }: WeatherPanelProps): ReactElement {
+  const isAvailable = weather?.isAvailable === true;
+
+  if (!isAvailable || !weather) {
+    return (
+      <section
+        className={styles.weatherPanel}
+        data-testid="weather-panel"
+        aria-label="Wetter"
+      >
+        <div className={styles.weatherPanelHeader}>
+          <span className={styles.weatherPanelTitle}>WETTER</span>
+        </div>
+        <div
+          className={styles.weatherUnavailable}
+          data-testid="weather-unavailable"
+        >
+          <span>WETTER NICHT VERFÜGBAR</span>
+        </div>
+      </section>
+    );
+  }
+
+  const w = weather;
+  const IconComponent = getWeatherIcon(w.conditionCode);
 
   return (
     <section
-      className={styles.dressingRoomSection}
-      aria-label="Garderoben"
-      data-testid="dressing-room-section"
+      className={styles.weatherPanel}
+      data-testid="weather-panel"
+      aria-label="Wetter"
     >
-      <div className={styles.dressingRoomHeader}>
-        <span className={styles.dressingRoomSectionTitle}>KABINEN</span>
+      <div className={styles.weatherPanelHeader}>
+        <span className={styles.weatherPanelTitle}>WETTER</span>
       </div>
-
-      {visibleRooms.length > 0 ? (
-        <div className={styles.dressingRoomList} data-testid="dressing-room-list">
-          {visibleRooms.map((dr) => (
-            <div
-              key={dr.code}
-              className={styles.dressingRoomRow}
-              data-testid="dressing-room-row"
+      <div className={styles.weatherBody} data-testid="weather-body">
+        <div className={styles.weatherTempBlock}>
+          <span className={styles.weatherTemp} data-testid="weather-temperature">
+            {w.temperatureC}
+            <span className={styles.weatherTempUnit}>&thinsp;°C</span>
+          </span>
+        </div>
+        <div className={styles.weatherDetails}>
+          <div className={styles.weatherIconCondition}>
+            <IconComponent
+              size={20}
+              strokeWidth={1.5}
+              aria-hidden={true}
+            />
+            <span
+              className={styles.weatherCondition}
+              data-testid="weather-condition"
             >
-              <span className={styles.dressingRoomCode}>
-                {dr.displayLabel}
-              </span>
-              <span className={styles.dressingRoomTeam}>
-                {dr.assignedTo}
-              </span>
-            </div>
-          ))}
+              {w.conditionLabel}
+            </span>
+          </div>
+          <div className={styles.weatherWindRow}>
+            <Wind size={14} strokeWidth={1.5} aria-hidden={true} />
+            <span
+              className={styles.weatherWind}
+              data-testid="weather-wind"
+            >
+              {w.windKmh}&thinsp;km/h
+            </span>
+          </div>
         </div>
-      ) : (
-        <div className={styles.dressingRoomEmpty} data-testid="dressing-room-empty">
-          <span className={styles.dressingRoomEmptyText}>KEINE KABINENZUTEILUNGEN</span>
-        </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -357,9 +417,10 @@ export function InfoboardScreen2({
   feed,
   branding,
   sponsors = [],
+  weather,
   currentTimeIso,
 }: InfoboardScreen2Props): ReactElement {
-  const { tenant, pitches, dressingRooms } = feed;
+  const { tenant, pitches } = feed;
   const timeZone = tenant.timezone;
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
@@ -375,9 +436,6 @@ export function InfoboardScreen2({
       : formatDisplayDate(feed.displayDate);
 
   const hasPitches = pitches.length > 0;
-  const hasDressingRooms = dressingRooms.some(
-    (dr) => dr.role !== "REFEREE" && dr.assignedTo !== null,
-  );
 
   return (
     <div
@@ -438,10 +496,10 @@ export function InfoboardScreen2({
         />
       </header>
 
-      {/* ── Main content: facility + dressing rooms | sponsors ───────────── */}
+      {/* ── Main content: facility | weather + sponsors ───────────────────── */}
       <main className={styles.main}>
 
-        {/* Left column: pitch overview + dressing rooms */}
+        {/* Left column: pitch overview */}
         <div className={styles.facilityColumn}>
 
           {/* Pitch overview */}
@@ -476,15 +534,11 @@ export function InfoboardScreen2({
               </div>
             )}
           </section>
-
-          {/* Dressing-room orientation */}
-          {hasDressingRooms && (
-            <DressingRoomSection dressingRooms={dressingRooms} />
-          )}
         </div>
 
-        {/* Right column: sponsor section */}
+        {/* Right column: weather + sponsors */}
         <aside className={styles.sponsorAside} data-testid="sponsor-aside">
+          <WeatherPanel weather={weather} />
           <SponsorSection sponsors={sponsors} />
         </aside>
       </main>

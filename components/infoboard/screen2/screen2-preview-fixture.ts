@@ -12,10 +12,15 @@
  *   - Kunstrasen 1: UPCOMING (Training Juniorinnen FF-14 – in 25 min)
  *   - Kunstrasen 2: FREE
  *   - Kunstrasen 3: OCCUPIED (Tournament Sommer-Cup Junioren E)
+ *
+ * INFOBOARD-05: dressingRooms retained in feed for type compatibility only.
+ * Screen 2 no longer renders cabin assignments.
+ * Weather fixture data is non-production sample data for visual preview.
  */
 
 import type { InfoboardScreen2Feed } from "@/lib/publishing/event-types";
 import type { InfoboardSponsor } from "./InfoboardScreen2";
+import type { WeatherDto } from "@/lib/weather/weather-types";
 
 // ── Shared tenant reference ───────────────────────────────────────────────────
 
@@ -210,6 +215,22 @@ export const PREVIEW_SPONSORS: readonly InfoboardSponsor[] = [
 
 /** Current-time ISO for Screen 2 preview (same as Screen 1). */
 export const PREVIEW_CURRENT_TIME_ISO_S2 = "2026-09-12T15:35:00.000Z" as const;
+
+/**
+ * Sample weather data for Screen 2 preview.
+ *
+ * NON-PRODUCTION — represents a representative September afternoon in Allschwil.
+ * This data is for visual preview only and must never be used in production routes.
+ */
+export const PREVIEW_WEATHER: WeatherDto = {
+  isAvailable: true,
+  temperatureC: 22,
+  conditionCode: 2,
+  conditionLabel: "Teilweise bewölkt",
+  windKmh: 6,
+  precipitationProbability: null,
+  observedAt: "2026-09-12T15:30:00Z",
+};
 
 // ── All-occupied fixture ──────────────────────────────────────────────────────
 

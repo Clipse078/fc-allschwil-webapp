@@ -3,7 +3,7 @@
  */
 
 /**
- * Component tests for InfoboardScreen2 (INFOBOARD-04A premium dark design).
+ * Component tests for InfoboardScreen2 (INFOBOARD-05 live facility + weather).
  *
  * Verifies:
  *   - Dark-theme root attribute
@@ -13,8 +13,13 @@
  *   - Sponsor section present (not replaced by "Next Events")
  *   - Sponsor logos retain expected data rendering
  *   - No duplicate next-event list
- *   - Dressing-room information where previously supported
- *   - Weather fallback intact (no weather = no section rendered)
+ *   - Weather panel renders when data is available (INFOBOARD-05)
+ *   - Temperature renders in °C
+ *   - Wind renders in km/h
+ *   - German condition text renders
+ *   - Weather-unavailable fallback renders safely
+ *   - No cabin section renders (INFOBOARD-05)
+ *   - No dressing-room assignment renders (INFOBOARD-05)
  *   - Alexa-safe zone present
  */
 
@@ -28,11 +33,14 @@ import {
   PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED,
   PREVIEW_SPONSORS,
   PREVIEW_CURRENT_TIME_ISO_S2,
+  PREVIEW_WEATHER,
 } from "@/components/infoboard/screen2/screen2-preview-fixture";
 import type {
   InfoboardScreen2Feed,
   PitchOccupancy,
 } from "@/lib/publishing/event-types";
+import type { WeatherDto } from "@/lib/weather/weather-types";
+import { WEATHER_UNAVAILABLE } from "@/lib/weather/weather-types";
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -68,6 +76,16 @@ function makePitch(overrides: Partial<PitchOccupancy> = {}): PitchOccupancy {
     ...overrides,
   };
 }
+
+const SAMPLE_WEATHER: WeatherDto = {
+  isAvailable: true,
+  temperatureC: 22,
+  conditionCode: 2,
+  conditionLabel: "Teilweise bewölkt",
+  windKmh: 6,
+  precipitationProbability: null,
+  observedAt: "2026-09-12T15:30:00Z",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Dark theme ────────────────────────────────────────────────────────────────
@@ -144,7 +162,7 @@ describe("Facility overview", () => {
     expect(screen.getByTestId("facility-overview")).toBeTruthy();
   });
 
-  it("renders pitch grid when pitches are present", () => {
+  it("11. renders pitch grid when pitches are present", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [makePitch()] })}
@@ -153,7 +171,7 @@ describe("Facility overview", () => {
     expect(screen.getByTestId("pitch-grid")).toBeTruthy();
   });
 
-  it("renders one pitch card per pitch", () => {
+  it("11. renders one pitch card per pitch", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -369,16 +387,101 @@ describe("Free pitch status", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ── Weather panel (INFOBOARD-05) ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Weather panel — available", () => {
+  it("2. renders weather panel when weather data is available", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    expect(screen.getByTestId("weather-panel")).toBeTruthy();
+  });
+
+  it("3. temperature renders in °C", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const temp = screen.getByTestId("weather-temperature");
+    expect(temp.textContent).toContain("22");
+    expect(temp.textContent).toContain("°C");
+  });
+
+  it("5. wind renders in km/h", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const wind = screen.getByTestId("weather-wind");
+    expect(wind.textContent).toContain("6");
+    expect(wind.textContent).toContain("km/h");
+  });
+
+  it("4 & 5. German condition text renders", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const condition = screen.getByTestId("weather-condition");
+    expect(condition.textContent).toBe("Teilweise bewölkt");
+  });
+
+  it("weather body is present when data is available", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    expect(screen.getByTestId("weather-body")).toBeTruthy();
+  });
+
+  it("does not render weather-unavailable when data is available", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    expect(screen.queryByTestId("weather-unavailable")).toBeNull();
+  });
+});
+
+describe("Weather panel — unavailable", () => {
+  it("6. renders fallback safely when weather is null", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
+    expect(screen.getByTestId("weather-panel")).toBeTruthy();
+    expect(screen.getByTestId("weather-unavailable")).toBeTruthy();
+  });
+
+  it("6. renders fallback when weather is WEATHER_UNAVAILABLE", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={WEATHER_UNAVAILABLE} />);
+    expect(screen.getByTestId("weather-unavailable")).toBeTruthy();
+  });
+
+  it("6. fallback text is 'WETTER NICHT VERFÜGBAR'", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
+    const fallback = screen.getByTestId("weather-unavailable");
+    expect(fallback.textContent?.toUpperCase()).toContain("WETTER NICHT VERFÜGBAR");
+  });
+
+  it("6. weather panel still renders (panel present even if unavailable)", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={WEATHER_UNAVAILABLE} />);
+    expect(screen.getByTestId("weather-panel")).toBeTruthy();
+  });
+
+  it("no weather-body when unavailable", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
+    expect(screen.queryByTestId("weather-body")).toBeNull();
+  });
+
+  it("renders without crashing when weather prop is omitted", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} />);
+    expect(screen.getByTestId("weather-panel")).toBeTruthy();
+    expect(screen.getByTestId("weather-unavailable")).toBeTruthy();
+  });
+});
+
+describe("Weather — preview fixture", () => {
+  it("PREVIEW_WEATHER renders correctly in preview", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} weather={PREVIEW_WEATHER} sponsors={PREVIEW_SPONSORS} />);
+    const panel = screen.getByTestId("weather-panel");
+    expect(panel).toBeTruthy();
+    expect(screen.getByTestId("weather-body")).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ── Sponsor section ───────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Sponsor section", () => {
-  it("sponsor-section test id is present", () => {
+  it("7. sponsor-section test id is present", () => {
     render(<InfoboardScreen2 feed={makeFeed()} sponsors={PREVIEW_SPONSORS} />);
     expect(screen.getByTestId("sponsor-section")).toBeTruthy();
   });
 
-  it("sponsor-aside is rendered", () => {
+  it("7. sponsor-aside is rendered", () => {
     render(<InfoboardScreen2 feed={makeFeed()} sponsors={[]} />);
     expect(screen.getByTestId("sponsor-aside")).toBeTruthy();
   });
@@ -448,7 +551,7 @@ describe("Sponsor section", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("No Next Events panel", () => {
-  it("does not render a 'next events' heading anywhere", () => {
+  it("10. does not render a 'next events' heading anywhere", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
@@ -463,7 +566,7 @@ describe("No Next Events panel", () => {
     }
   });
 
-  it("does not render a test-id 'next-events-section'", () => {
+  it("10. does not render a test-id 'next-events-section'", () => {
     render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} sponsors={PREVIEW_SPONSORS} />);
     expect(screen.queryByTestId("next-events-section")).toBeNull();
   });
@@ -471,6 +574,92 @@ describe("No Next Events panel", () => {
   it("does not contain 'next-events-list' test id", () => {
     render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} sponsors={PREVIEW_SPONSORS} />);
     expect(screen.queryByTestId("next-events-list")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── No cabin / dressing-room section (INFOBOARD-05) ──────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("No cabin section (INFOBOARD-05)", () => {
+  it("8. does not render dressing-room-section even when dressingRooms present in feed", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            {
+              code: "DR-E1",
+              displayLabel: "Kabine E1",
+              role: "HOME",
+              assignedTo: "FC Allschwil E1",
+              eventId: "evt-1",
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("dressing-room-section")).toBeNull();
+  });
+
+  it("9. does not render dressing-room-list", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            { code: "DR-E2", displayLabel: "Kabine E2", role: "AWAY", assignedTo: "Team B", eventId: "e1" },
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("dressing-room-list")).toBeNull();
+  });
+
+  it("9. does not render any cabin assignment text", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "FC Test Team", eventId: "e1" },
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByText("FC Test Team")).toBeNull();
+    expect(screen.queryByText("Kabine E1")).toBeNull();
+  });
+
+  it("8. full preview fixture does NOT render dressing-room-section", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2}
+        sponsors={PREVIEW_SPONSORS}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
+      />,
+    );
+    expect(screen.queryByTestId("dressing-room-section")).toBeNull();
+  });
+
+  it("does not render KABINEN heading", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2}
+        sponsors={PREVIEW_SPONSORS}
+      />,
+    );
+    expect(screen.queryByText("KABINEN")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── 12. Alexa-safe zone ───────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("12. Alexa-safe zone", () => {
+  it("Alexa-safe zone is present and empty", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} />);
+    const safe = screen.getByTestId("screen2-alexa-safe-zone");
+    expect(safe).toBeTruthy();
+    expect(safe.textContent?.trim()).toBe("");
   });
 });
 
@@ -508,23 +697,11 @@ describe("Footer — product branding", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Weather fallback ──────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("Weather fallback", () => {
-  it("does not render any weather section (weather not implemented)", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} />);
-    expect(screen.queryByTestId("weather-section")).toBeNull();
-    expect(screen.queryByTestId("weather-widget")).toBeNull();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // ── Full preview fixture ──────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Full preview fixture", () => {
-  it("renders 4 pitch cards for the preview fixture", () => {
+  it("1. renders 4 pitch cards for the preview fixture", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
@@ -570,7 +747,6 @@ describe("Full preview fixture", () => {
     const aside = screen.getByTestId("sponsor-aside");
     const sponsorSection = within(aside).getByTestId("sponsor-section");
     expect(sponsorSection).toBeTruthy();
-    // No event-row items inside the sponsor aside
     expect(within(aside).queryByTestId("event-row")).toBeNull();
   });
 });
@@ -603,136 +779,7 @@ describe("Missing optional data safety", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04B: Dressing-room section ─────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("Dressing-room section", () => {
-  it("renders dressing-room-section when dressingRooms are present in feed", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          dressingRooms: [
-            {
-              code: "DR-E1",
-              displayLabel: "Kabine E1",
-              role: "HOME",
-              assignedTo: "FC Allschwil E1",
-              eventId: "evt-1",
-            },
-          ],
-        })}
-      />,
-    );
-    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
-  });
-
-  it("does not render dressing-room-section when all rooms are unassigned", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          dressingRooms: [
-            {
-              code: "DR-E1",
-              displayLabel: "Kabine E1",
-              role: "HOME",
-              assignedTo: null,
-              eventId: null,
-            },
-          ],
-        })}
-      />,
-    );
-    expect(screen.queryByTestId("dressing-room-section")).toBeNull();
-  });
-
-  it("renders assigned team name in dressing-room row", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          dressingRooms: [
-            {
-              code: "DR-E1",
-              displayLabel: "Kabine E1",
-              role: "HOME",
-              assignedTo: "FC Allschwil E1",
-              eventId: "evt-1",
-            },
-          ],
-        })}
-      />,
-    );
-    expect(screen.getByText("FC Allschwil E1")).toBeTruthy();
-  });
-
-  it("renders dressing-room display label", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          dressingRooms: [
-            {
-              code: "DR-A",
-              displayLabel: "Kabine A",
-              role: "TRAINING",
-              assignedTo: "Aktive Herren",
-              eventId: "evt-2",
-            },
-          ],
-        })}
-      />,
-    );
-    const section = screen.getByTestId("dressing-room-section");
-    expect(section.textContent).toContain("Kabine A");
-  });
-
-  it("renders multiple dressing-room assignments", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          dressingRooms: [
-            { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "Team A", eventId: "e1" },
-            { code: "DR-E2", displayLabel: "Kabine E2", role: "AWAY", assignedTo: "Team B", eventId: "e1" },
-            { code: "DR-04", displayLabel: "Kabine 04", role: "TRAINING", assignedTo: "Team C", eventId: "e2" },
-          ],
-        })}
-      />,
-    );
-    const rows = screen.getAllByTestId("dressing-room-row");
-    expect(rows).toHaveLength(3);
-  });
-
-  it("does not render referee dressing rooms in section", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          dressingRooms: [
-            { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "FC Allschwil", eventId: "e1" },
-            { code: "DR-REF", displayLabel: "Kabine Schiri", role: "REFEREE", assignedTo: "Schiedsrichter", eventId: "e1" },
-          ],
-        })}
-      />,
-    );
-    const section = screen.getByTestId("dressing-room-section");
-    expect(section.textContent).not.toContain("Schiedsrichter");
-    expect(section.textContent).not.toContain("Schiri");
-  });
-
-  it("full preview fixture renders dressing-room section with E1, E2, and 04", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
-        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
-      />,
-    );
-    const section = screen.getByTestId("dressing-room-section");
-    expect(section.textContent).toContain("Kabine E1");
-    expect(section.textContent).toContain("Kabine E2");
-    expect(section.textContent).toContain("Kabine 04");
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04B: All-occupied fixture ───────────────────────────────────────
+// ── All pitches occupied fixture ──────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("All pitches occupied fixture", () => {
@@ -762,39 +809,34 @@ describe("All pitches occupied fixture", () => {
     expect(screen.getByTestId("sponsor-section")).toBeTruthy();
   });
 
-  it("dressing-room section visible in all-occupied scenario", () => {
+  it("8. no dressing-room-section in all-occupied scenario (INFOBOARD-05)", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
         sponsors={PREVIEW_SPONSORS}
       />,
     );
-    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
+    expect(screen.queryByTestId("dressing-room-section")).toBeNull();
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04B: Sponsor image presentation ─────────────────────────────────
+// ── Live route safety ─────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04B: Live route safety (Option B) ───────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("Live route safety — Option B pending state", () => {
-  it("empty pitches renders pitch-grid-empty with informative message (not false operational data)", () => {
+describe("Live route safety", () => {
+  it("empty pitches renders pitch-grid-empty with informative message", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [], dressingRooms: [] })}
         branding={{ clubLogoSrc: "/logo.png" }}
       />,
     );
-    // Empty state is shown honestly — the design shows KEINE FELDDATEN VERFÜGBAR
     expect(screen.getByTestId("pitch-grid-empty")).toBeTruthy();
     expect(screen.getByTestId("pitch-grid-empty").textContent).toContain("KEINE FELDDATEN");
   });
 
-  it("empty state does not render any pitch-card (no false occupied indicators)", () => {
+  it("empty state does not render any pitch-card", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [], dressingRooms: [] })}
@@ -803,7 +845,7 @@ describe("Live route safety — Option B pending state", () => {
     expect(screen.queryAllByTestId("pitch-card")).toHaveLength(0);
   });
 
-  it("facility-overview section is still present in pending state", () => {
+  it("facility-overview section is still present in empty state", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [], dressingRooms: [] })}
@@ -812,7 +854,7 @@ describe("Live route safety — Option B pending state", () => {
     expect(screen.getByTestId("facility-overview")).toBeTruthy();
   });
 
-  it("sponsor section still renders in pending state", () => {
+  it("sponsor section still renders in empty state", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [], dressingRooms: [] })}
@@ -821,10 +863,24 @@ describe("Live route safety — Option B pending state", () => {
     );
     expect(screen.getByTestId("sponsor-section")).toBeTruthy();
   });
+
+  it("weather panel still renders in empty pitch state", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({ pitches: [], dressingRooms: [] })}
+        weather={SAMPLE_WEATHER}
+      />,
+    );
+    expect(screen.getByTestId("weather-panel")).toBeTruthy();
+  });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Sponsor image presentation ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
 describe("Sponsor image presentation", () => {
-  it("sponsor logo uses img element (object-fit: contain via CSS)", () => {
+  it("sponsor logo uses img element", () => {
     const sponsor = {
       id: "sp1",
       name: "Test Sponsor",
@@ -846,5 +902,18 @@ describe("Sponsor image presentation", () => {
     };
     render(<InfoboardScreen2 feed={makeFeed()} sponsors={[sponsor]} />);
     expect(screen.getByText("Fallback Sponsor")).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── 13. No visual regression to Screen 1 ─────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("13. No visual regression to Screen 1", () => {
+  it("does not render screen1-specific test ids", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} />);
+    expect(screen.queryByTestId("infoboard-screen1-root")).toBeNull();
+    expect(screen.queryByTestId("event-card")).toBeNull();
+    expect(screen.queryByTestId("event-list")).toBeNull();
   });
 });

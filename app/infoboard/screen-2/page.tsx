@@ -1,74 +1,135 @@
 /**
  * app/infoboard/screen-2/page.tsx
  *
- * Infoboard Screen 2 — Facility Orientation Screen.
+ * Production Infoboard Screen 2 page.
  *
  * Route: /infoboard/screen-2
  *
- * LIVE DATA STATUS: PENDING
- *
- * The Screen 2 live feed builder requires a dedicated backend slice
- * (see follow-up task below). Until that slice is shipped, this route
- * renders the facility screen with live header/clock and an explicit
- * "KEINE FELDDATEN VERFÜGBAR" state in the pitch overview.
- *
- * The presentation component (InfoboardScreen2) is fully functional;
- * only the data pipeline is pending.
- *
- * REQUIRED FOLLOW-UP SLICE: "INFOBOARD-05 — Screen 2 live data"
- *   - Implement buildInfoboardScreen2Feed() in lib/publishing/infoboard/
- *   - Compose: getFacilitiesForTenant() for pitch list
- *             + Screen1 event loader for occupancy and dressing rooms
- *   - Map PitchOccupancy state from temporal grouping of events per pitch
- *   - Map DressingRoomAssignment from event.homeDressingRoom / awayDressingRoom
- *   - Implement screen2-live-service.ts (mirrors screen1-live-service pattern)
- *   - Wire sponsor data when BusinessClub API is available
- *   - No new publication rules or event-selection policy
- *   - Tenant-scoped; Europe/Zurich consistent
- *
  * Architecture:
  *   - Server component (no "use client").
- *   - No Prisma import, no DB access in this file.
- *   - The pending state is explicit and honest: empty pitch grid is
- *     shown with an appropriate UI message (not false operational data).
+ *   - Resolves the active tenant from the database.
+ *   - Creates one `now` value at request time.
+ *   - Calls buildScreen2LivePayload() for facility/pitch data.
+ *   - Calls fetchCurrentWeather() for live weather — server-side only,
+ *     cached by Next.js fetch cache (15-minute revalidation).
+ *   - Renders InfoboardScreen2 with live data.
+ *   - No preview fixture content is imported or used.
+ *
+ * Live data sources:
+ *   - Tenant resolved from DB by DEFAULT_TENANT_KEY.
+ *   - Pitches: all active FULL_PITCH / HALF_PITCH facility resources for tenant.
+ *   - Events: eligible events per INFOBOARD_SCREEN_2 publication policy.
+ *   - Weather: Open-Meteo for Sportanlage Im Brüel, Allschwil (server-side,
+ *     no API key required, 15-minute cache).
+ *   - Sponsors: no canonical sponsor source exists; empty array used.
+ *
+ * Failure behaviour:
+ *   - Tenant not found → notFound() (404).
+ *   - Tenant timezone not configured → notFound().
+ *   - Weather unavailable → renders "WETTER NICHT VERFÜGBAR" fallback;
+ *     facility data and sponsors remain visible.
+ *   - Loader/service failure → error propagates to nearest error boundary.
+ *
+ * Screen 2 does NOT render:
+ *   - Dressing-room / cabin assignments (Screen 1 only).
+ *   - Next Events panel.
+ *
+ * Design constraints:
+ *   - No "use client", no useEffect, no browser fetch.
+ *   - No preview fixture imports.
+ *   - No hardcoded tenant ID or domain.
+ *   - Prisma used at this composition boundary only.
  */
 
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/db/prisma";
+import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
 import { InfoboardScreen2 } from "@/components/infoboard/screen2/InfoboardScreen2";
-import type { InfoboardScreen2Feed } from "@/lib/publishing/event-types";
+import {
+  buildScreen2LivePayload,
+  type Screen2SourceDatabase,
+  type Screen2PitchRow,
+} from "@/lib/publishing/infoboard/screen2-live-service";
+import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
+import type { Screen1DbEventRow } from "@/lib/publishing/infoboard/screen1-source-loader";
+import { fetchCurrentWeather } from "@/lib/weather/weather-adapter";
 
 export const metadata: Metadata = {
   title: "Infoboard — Screen 2",
 };
 
-export default function InfoboardScreen2Page() {
-  const now = new Date();
-  const currentTimeIso = now.toISOString();
+// ── Prisma adapter ────────────────────────────────────────────────────────────
 
-  const pendingFeed: InfoboardScreen2Feed = {
-    generatedAt: currentTimeIso,
-    tenant: {
-      id: "fc-allschwil",
-      key: "fc-allschwil",
-      name: "FC Allschwil",
-      timezone: "Europe/Zurich",
+function createPrismaScreen2Db(): Screen2SourceDatabase {
+  return {
+    event: {
+      findMany: (args) =>
+        prisma.event.findMany(
+          args as Parameters<typeof prisma.event.findMany>[0],
+        ) as unknown as Promise<Screen1DbEventRow[]>,
     },
-    displayDate: currentTimeIso.slice(0, 10),
-    isStale: false,
-    facilityName: "Brüelstadion",
-    // Live feed builder pending — pitches are empty, empty-state UI shown
-    pitches: [],
-    dressingRooms: [],
+    facilityResource: {
+      findMany: (args) =>
+        prisma.facilityResource.findMany(
+          args as Parameters<typeof prisma.facilityResource.findMany>[0],
+        ) as unknown as Promise<Screen2PitchRow[]>,
+    },
+  };
+}
+
+// ── Page component ────────────────────────────────────────────────────────────
+
+export default async function InfoboardScreen2Page() {
+  // ── Resolve tenant ─────────────────────────────────────────────────────────
+  const tenantRow = await prisma.tenant.findFirst({
+    where: { key: DEFAULT_TENANT_KEY, status: "ACTIVE" },
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      timezone: true,
+      logoUrl: true,
+    },
+  });
+
+  if (!tenantRow) {
+    notFound();
+  }
+
+  if (!tenantRow.timezone) {
+    notFound();
+  }
+
+  const tenant: Screen2TenantContext = {
+    id: tenantRow.id,
+    key: tenantRow.key,
+    name: tenantRow.name,
+    timezone: tenantRow.timezone,
+    logoUrl: tenantRow.logoUrl,
   };
 
+  // ── Request time ───────────────────────────────────────────────────────────
+  const now = new Date();
+
+  // ── Build live facility payload ────────────────────────────────────────────
+  const database = createPrismaScreen2Db();
+  const payload = await buildScreen2LivePayload({ tenant, now, database });
+
+  // ── Fetch live weather (server-side, cached 15 min) ────────────────────────
+  // Failure returns WEATHER_UNAVAILABLE; the component renders a safe fallback.
+  // No production weather is hardcoded or substituted on failure.
+  const weather = await fetchCurrentWeather();
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  // Sponsors: no canonical sponsor source exists in this slice.
+  // The sponsor section renders with an empty array (no fake data).
   return (
     <InfoboardScreen2
-      feed={pendingFeed}
-      branding={{
-        clubLogoSrc: "/images/logos/fc-allschwil.png",
-        productLogoSrc: "/images/branding/sportclubevo_logo.png",
-      }}
-      currentTimeIso={currentTimeIso}
+      feed={payload.feed}
+      branding={payload.branding}
+      currentTimeIso={payload.currentTimeIso}
+      weather={weather}
       sponsors={[]}
     />
   );

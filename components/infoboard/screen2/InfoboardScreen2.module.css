@@ -588,7 +588,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--ib2-sp-3);
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: var(--ib2-card-bg);
   border: 1px solid var(--ib2-border);
   border-radius: var(--ib2-radius);
@@ -736,4 +737,105 @@
   .pitchCard {
     padding: clamp(10px, 1.5vh, 18px) clamp(12px, 1.5vw, 18px);
   }
+}
+
+/* ─── Weather panel (INFOBOARD-05) ──────────────────────────────────────── */
+
+.weatherPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib2-sp-2);
+  background: var(--ib2-card-bg);
+  border: 1px solid var(--ib2-border);
+  border-radius: var(--ib2-radius);
+  padding: clamp(10px, 1.5vh, 18px) clamp(14px, 1.8vw, 22px);
+  flex-shrink: 0;
+  margin-bottom: var(--ib2-sp-3);
+}
+
+.weatherPanelHeader {
+  border-bottom: 1px solid var(--ib2-border);
+  padding-bottom: var(--ib2-sp-2);
+}
+
+.weatherPanelTitle {
+  font-size: var(--ib2-fs-section-label);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
+}
+
+.weatherBody {
+  display: flex;
+  align-items: center;
+  gap: var(--ib2-sp-5);
+  padding-top: var(--ib2-sp-1);
+}
+
+.weatherTempBlock {
+  flex-shrink: 0;
+}
+
+.weatherTemp {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: clamp(2rem, 3.2vw, 4.2rem);
+  font-weight: 700;
+  color: var(--ib2-text);
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+}
+
+.weatherTempUnit {
+  font-size: clamp(1.1rem, 1.6vw, 2rem);
+  font-weight: 500;
+  color: var(--ib2-text-muted);
+}
+
+.weatherDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib2-sp-2);
+  min-width: 0;
+}
+
+.weatherIconCondition {
+  display: flex;
+  align-items: center;
+  gap: var(--ib2-sp-2);
+  color: var(--ib2-text-muted);
+}
+
+.weatherCondition {
+  font-size: clamp(0.75rem, 1vw, 1.3rem);
+  font-weight: 500;
+  color: var(--ib2-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weatherWindRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ib2-sp-1);
+  color: var(--ib2-text-dim);
+}
+
+.weatherWind {
+  font-size: clamp(0.65rem, 0.85vw, 1.05rem);
+  color: var(--ib2-text-dim);
+}
+
+.weatherUnavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ib2-sp-3) 0;
+  font-size: clamp(0.6rem, 0.78vw, 0.95rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
 }
