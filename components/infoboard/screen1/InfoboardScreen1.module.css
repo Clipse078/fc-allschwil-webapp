@@ -1,47 +1,58 @@
 /**
  * components/infoboard/screen1/InfoboardScreen1.module.css
  *
- * Target-aligned premium operational palette (PP-02B-H).
+ * INFOBOARD-04A: Premium dark stadium design (Screen 1).
  *
  * Design principles:
- *   - White schedule surface; dark navy header and footer.
+ *   - Full dark stadium palette — deep navy background, dark card surfaces.
  *   - Barlow Condensed (--font-display) for all dominant information.
  *   - Uppercase presentation via CSS text-transform.
- *   - No dark-card styling, no glassmorphism, no neon-on-dark palette.
  *   - Horizontal event rows with CSS Grid: STATUS/TIME | EVENT | PITCH | ZUTEILUNG.
- *   - Thin colored left stripe per row (red: match/current; blue: training/next;
- *     orange: tournament).
- *   - Primary target: 1920×1080; must remain usable at 1366×768 and 1280×720.
+ *   - Colored left stripe per row: red = match; blue = training/next; orange = tournament.
+ *   - Primary target: 1920×1080; remains usable at 1366×768 and 1280×720.
  *   - No referee dressing-room display.
  *   - No scrolling — content must fit within 100dvh at 5 target rows.
+ *   - No neon, no glassmorphism, no heavy drop shadows.
+ *   - Amber warning for unassigned pitch/dressing-room.
  */
 
-/* ─── Semantic palette ───────────────────────────────────────────────────── */
+/* ─── Semantic dark palette ──────────────────────────────────────────────── */
 
 .root {
-  /* Core surface and text */
-  --ib-navy:           #1a2535;
-  --ib-surface:        #ffffff;
-  --ib-surface-muted:  #f4f6f9;
-  --ib-border:         #dde2e9;
-  --ib-text:           #1a2535;
-  --ib-text-muted:     #6b7c93;
-  --ib-text-light:     #ffffff;
+  /* Page and card backgrounds */
+  --ib-page-bg:        #07111E;
+  --ib-card-bg:        #0F1C2E;
+  --ib-panel-bg:       #12213A;
+  --ib-header-bg:      #0A1828;
+
+  /* Borders */
+  --ib-border:         rgba(99, 135, 175, 0.14);
+  --ib-border-strong:  rgba(99, 135, 175, 0.28);
+
+  /* Text */
+  --ib-text:           #E8EEF4;
+  --ib-text-muted:     #6E87A0;
+  --ib-text-dim:       #4A6078;
 
   /* Event type / status accents */
-  --ib-orange:         #f97316;
-  --ib-red:            #dc2626;
-  --ib-blue:           #1d4ed8;
+  --ib-match:          #D83033;
+  --ib-training:       #1E5BC6;
+  --ib-tournament:     #E87C24;
+  --ib-free:           #1A7A4A;
+  --ib-warning:        #CC8B14;
 
-  /* Stripe opacities */
+  /* Aliases used in stripe logic */
+  --ib-red:            var(--ib-match);
+  --ib-blue:           var(--ib-training);
+  --ib-orange:         var(--ib-tournament);
+
+  /* Stripe */
   --ib-stripe-width:   5px;
 
   /* Sizing */
   --ib-header-height:  clamp(72px, 8vh, 96px);
-  --ib-board-title-h:  clamp(36px, 4.5vh, 52px);
-  --ib-footer-height:  clamp(44px, 5.5vh, 60px);
-  --ib-row-h-std:      1fr;
-  --ib-radius-row:     3px;
+  --ib-board-title-h:  clamp(32px, 4vh, 48px);
+  --ib-footer-height:  clamp(40px, 5vh, 56px);
 
   /* Spacing */
   --ib-sp-1: 4px;
@@ -56,7 +67,7 @@
   --ib-fs-header-time:    clamp(2.6rem, 3.4vw, 4rem);
   --ib-fs-header-date:    clamp(0.7rem, 0.9vw, 1rem);
   --ib-fs-club-name:      clamp(1.5rem, 2vw, 2.4rem);
-  --ib-fs-board-title:    clamp(1rem, 1.3vw, 1.5rem);
+  --ib-fs-board-title:    clamp(0.9rem, 1.1vw, 1.3rem);
 
   --ib-fs-status-label:   clamp(0.65rem, 0.85vw, 0.95rem);
   --ib-fs-event-time:     clamp(1.7rem, 2.3vw, 2.8rem);
@@ -77,6 +88,10 @@
   --ib-col-event:      41%;
   --ib-col-pitch:      17%;
   --ib-col-alloc:      29%;
+
+  /* Border radius */
+  --ib-radius:         6px;
+  --ib-radius-sm:      4px;
 }
 
 /* ─── Root container ─────────────────────────────────────────────────────── */
@@ -87,7 +102,7 @@
   width: 100%;
   height: 100dvh;
   min-height: 100vh;
-  background: var(--ib-surface-muted);
+  background: var(--ib-page-bg);
   color: var(--ib-text);
   font-family: var(--font-inter, Inter, system-ui, -apple-system, sans-serif);
   overflow: hidden;
@@ -101,8 +116,8 @@
   align-items: center;
   height: var(--ib-header-height);
   padding: 0 var(--ib-sp-8);
-  background: var(--ib-navy);
-  border-bottom: 3px solid var(--ib-orange);
+  background: var(--ib-header-bg);
+  border-bottom: 2px solid var(--ib-orange);
   flex-shrink: 0;
   gap: var(--ib-sp-4);
 }
@@ -129,9 +144,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(249, 115, 22, 0.2);
-  border: 1px solid rgba(249, 115, 22, 0.5);
-  border-radius: 3px;
+  background: rgba(232, 124, 36, 0.15);
+  border: 1px solid rgba(232, 124, 36, 0.4);
+  border-radius: var(--ib-radius-sm);
   color: var(--ib-orange);
   font-size: 1.4rem;
   font-weight: 700;
@@ -146,7 +161,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ib-text-light);
+  color: var(--ib-text);
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -174,7 +189,7 @@
   font-size: var(--ib-fs-header-time);
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--ib-text-light);
+  color: var(--ib-text);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -182,7 +197,7 @@
 
 .headerTimeSeparator {
   font-size: var(--ib-fs-header-time);
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--ib-border-strong);
   font-weight: 300;
   line-height: 1;
   flex-shrink: 0;
@@ -198,7 +213,7 @@
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-header-date);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(232, 238, 244, 0.7);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -209,7 +224,7 @@
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-header-date);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--ib-text-muted);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -220,7 +235,7 @@
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-header-date);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--ib-text-muted);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -232,11 +247,11 @@
   /* Intentionally empty. Fire TV Alexa overlay occupies this area on-device. */
 }
 
-/* ─── Board title ────────────────────────────────────────────────────────── */
+/* ─── Board title bar ────────────────────────────────────────────────────── */
 
 .boardTitle {
-  background: var(--ib-surface);
-  border-bottom: 2px solid var(--ib-orange);
+  background: var(--ib-panel-bg);
+  border-bottom: 1px solid var(--ib-border);
   padding: 0 var(--ib-sp-8);
   height: var(--ib-board-title-h);
   display: flex;
@@ -248,9 +263,9 @@
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-board-title);
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ib-text);
+  color: var(--ib-text-muted);
   line-height: 1;
 }
 
@@ -261,10 +276,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: var(--ib-sp-3) var(--ib-sp-8);
-  gap: var(--ib-sp-2);
+  padding: var(--ib-sp-4) var(--ib-sp-8);
+  gap: var(--ib-sp-3);
   min-height: 0;
-  background: var(--ib-surface);
+  background: var(--ib-page-bg);
 }
 
 /* ─── Event list ─────────────────────────────────────────────────────────── */
@@ -275,21 +290,21 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--ib-sp-2);
+  gap: var(--ib-sp-3);
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-/* ─── Event row ──────────────────────────────────────────────────────────── */
+/* ─── Event row (dark card) ──────────────────────────────────────────────── */
 
 .eventRow {
   display: grid;
   grid-template-columns: var(--ib-col-time) var(--ib-col-event) var(--ib-col-pitch) var(--ib-col-alloc);
   align-items: start;
-  background: var(--ib-surface);
+  background: var(--ib-card-bg);
   border: 1px solid var(--ib-border);
-  border-radius: var(--ib-radius-row);
+  border-radius: var(--ib-radius);
   border-left: var(--ib-stripe-width) solid transparent;
   padding: var(--ib-sp-3) var(--ib-sp-4);
   gap: 0;
@@ -298,17 +313,18 @@
   overflow: hidden;
 }
 
-/* Stripe colors by temporal bucket and event type */
-.eventRow[data-stripe="red"]    { border-left-color: var(--ib-red); }
-.eventRow[data-stripe="blue"]   { border-left-color: var(--ib-blue); }
-.eventRow[data-stripe="orange"] { border-left-color: var(--ib-orange); }
+/* Stripe colors by event type */
+.eventRow[data-stripe="red"]    { border-left-color: var(--ib-match); }
+.eventRow[data-stripe="blue"]   { border-left-color: var(--ib-training); }
+.eventRow[data-stripe="orange"] { border-left-color: var(--ib-tournament); }
 
-/* Very light background tint for current events */
+/* Subtle highlight for active/current events */
 .eventRow[data-temporal="current"] {
-  background: #fafbfc;
+  background: #102236;
+  border-color: var(--ib-border-strong);
 }
 
-/* ─── Column separators (thin vertical lines) ────────────────────────────── */
+/* ─── Column separators (subtle vertical lines) ──────────────────────────── */
 
 .colTime,
 .colEvent,
@@ -339,9 +355,9 @@
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ib-text-muted);
+  color: var(--ib-text-dim);
   line-height: 1;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 /* ─── Column 1: Status / Time ────────────────────────────────────────────── */
@@ -365,11 +381,11 @@
 }
 
 .statusLabel[data-status="current"] {
-  color: var(--ib-red);
+  color: var(--ib-match);
 }
 
 .statusLabel[data-status="next"] {
-  color: var(--ib-blue);
+  color: var(--ib-training);
 }
 
 .eventTime {
@@ -404,11 +420,11 @@
 }
 
 /* Event type accent colors */
-.eventTypeLabel[data-event-type="MATCH"]      { color: var(--ib-red); }
-.eventTypeLabel[data-event-type="TRAINING"]   { color: var(--ib-blue); }
-.eventTypeLabel[data-event-type="TOURNAMENT"] { color: var(--ib-orange); }
-.eventTypeLabel[data-event-type="OTHER"]      { color: var(--ib-text-muted); }
-.eventTypeLabel[data-event-type="VACATION_PERIOD"] { color: var(--ib-text-muted); }
+.eventTypeLabel[data-event-type="MATCH"]      { color: var(--ib-match); }
+.eventTypeLabel[data-event-type="TRAINING"]   { color: var(--ib-training); }
+.eventTypeLabel[data-event-type="TOURNAMENT"] { color: var(--ib-tournament); }
+.eventTypeLabel[data-event-type="OTHER"]      { color: var(--ib-text-dim); }
+.eventTypeLabel[data-event-type="VACATION_PERIOD"] { color: var(--ib-text-dim); }
 
 .eventTeamMain {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
@@ -469,6 +485,18 @@
   white-space: nowrap;
 }
 
+/* Amber warning for missing pitch — never blank */
+.pitchMissing {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib-fs-col-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ib-warning);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 /* ─── Column 4: Allocation (ZUTEILUNG) ──────────────────────────────────── */
 
 .colAllocation {
@@ -477,12 +505,24 @@
   gap: 3px;
 }
 
+/* Amber warning for missing dressing room */
+.dressingRoomMissing {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib-fs-col-label);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ib-warning);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 /* ── Match allocation ────────────────────────────────────────────────────── */
 
 .matchAllocation {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .matchAllocRow {
@@ -564,7 +604,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   gap: var(--ib-sp-4);
-  padding: 1px 0 3px;
+  padding: 1px 0 4px;
   border-bottom: 1px solid var(--ib-border);
   margin-bottom: 1px;
 }
@@ -575,7 +615,7 @@
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ib-text-muted);
+  color: var(--ib-text-dim);
   line-height: 1;
 }
 
@@ -616,6 +656,7 @@
   text-align: right;
 }
 
+/* Home team rows slightly brighter for emphasis */
 .homeTeamEmphasis .participantTeamName {
   color: var(--ib-orange);
 }
@@ -661,7 +702,8 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  background: var(--ib-navy);
+  background: var(--ib-header-bg);
+  border-top: 1px solid var(--ib-border);
   padding: 0 var(--ib-sp-8);
   gap: var(--ib-sp-6);
   overflow: hidden;
@@ -681,7 +723,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ib-text-light);
+  color: var(--ib-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -700,7 +742,7 @@
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--ib-text-dim);
   white-space: nowrap;
 }
 
@@ -708,7 +750,7 @@
   height: clamp(18px, 2.5vh, 28px);
   width: auto;
   object-fit: contain;
-  opacity: 0.9;
+  opacity: 0.75;
 }
 
 .footerProductFallback {
@@ -716,26 +758,21 @@
   font-size: var(--ib-fs-footer);
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--ib-text-muted);
   white-space: nowrap;
 }
-
-/* ─── Tournament row height expansion ────────────────────────────────────── */
-
-/* Tournament rows with multi-team allocation are naturally taller.
-   No fixed height override needed; flex: 1 distributes space proportionally. */
 
 /* ─── Breakpoint: 1366×768 and 1280×720 ─────────────────────────────────── */
 
 @media (max-width: 1400px) {
   .root {
-    --ib-header-height:  clamp(64px, 7vh, 80px);
-    --ib-board-title-h:  clamp(30px, 4vh, 44px);
-    --ib-footer-height:  clamp(38px, 5vh, 52px);
+    --ib-header-height:  clamp(60px, 7vh, 80px);
+    --ib-board-title-h:  clamp(28px, 3.8vh, 40px);
+    --ib-footer-height:  clamp(36px, 4.8vh, 50px);
 
     --ib-fs-header-time:    clamp(2rem, 3.2vw, 3rem);
     --ib-fs-club-name:      clamp(1.2rem, 1.7vw, 1.9rem);
-    --ib-fs-board-title:    clamp(0.85rem, 1.1vw, 1.25rem);
+    --ib-fs-board-title:    clamp(0.75rem, 1vw, 1.1rem);
 
     --ib-fs-event-time:     clamp(1.4rem, 2vw, 2.2rem);
     --ib-fs-event-team:     clamp(0.95rem, 1.25vw, 1.5rem);
@@ -758,11 +795,11 @@
 
   .main {
     padding: var(--ib-sp-2) var(--ib-sp-6);
-    gap: var(--ib-sp-1);
+    gap: var(--ib-sp-2);
   }
 
   .eventList {
-    gap: var(--ib-sp-1);
+    gap: var(--ib-sp-2);
   }
 
   .eventRow {

@@ -261,12 +261,21 @@ type MatchAllocationProps = {
  * Shows the club logo for the home team when available.
  * No HEIM/GAST labels. No referee room.
  */
-function MatchAllocation({ event, clubLogoSrc }: MatchAllocationProps): ReactElement | null {
+function MatchAllocation({ event, clubLogoSrc }: MatchAllocationProps): ReactElement {
   const { homeDressingRoomLabel, awayDressingRoomLabel } = event.allocation;
   const hasHome = homeDressingRoomLabel !== null && event.teamDisplayName !== null;
   const hasAway = awayDressingRoomLabel !== null && event.opponentDisplayName !== null;
 
-  if (!hasHome && !hasAway) return null;
+  if (!hasHome && !hasAway) {
+    return (
+      <span
+        className={styles.dressingRoomMissing}
+        data-testid="dressing-room-unassigned-warning"
+      >
+        NOCH NICHT ZUGETEILT
+      </span>
+    );
+  }
 
   return (
     <div className={styles.matchAllocation} data-testid="match-allocation">
@@ -303,13 +312,21 @@ type TrainingAllocationProps = {
   event: InfoboardScreen1Event;
 };
 
-function TrainingAllocation({ event }: TrainingAllocationProps): ReactElement | null {
+function TrainingAllocation({ event }: TrainingAllocationProps): ReactElement {
   const { homeDressingRoomLabel } = event.allocation;
-  if (homeDressingRoomLabel === null) return null;
 
   return (
     <div className={styles.trainingAllocation} data-testid="training-allocation">
-      <span className={styles.trainingAllocRoom}>{homeDressingRoomLabel}</span>
+      {homeDressingRoomLabel !== null ? (
+        <span className={styles.trainingAllocRoom}>{homeDressingRoomLabel}</span>
+      ) : (
+        <span
+          className={styles.dressingRoomMissing}
+          data-testid="dressing-room-unassigned-warning"
+        >
+          NOCH NICHT ZUGETEILT
+        </span>
+      )}
     </div>
   );
 }
@@ -413,8 +430,15 @@ function EventRow({
       {/* ── Column 3: Pitch ─────────────────────────────────────────────── */}
       <div className={styles.colPitch}>
         <span className={styles.colLabel}>PLATZ</span>
-        {event.allocation.pitchLabel !== null && (
+        {event.allocation.pitchLabel !== null ? (
           <span className={styles.pitchValue}>{event.allocation.pitchLabel}</span>
+        ) : (
+          <span
+            className={styles.pitchMissing}
+            data-testid="pitch-unassigned-warning"
+          >
+            NOCH NICHT ZUGETEILT
+          </span>
         )}
       </div>
 
@@ -541,6 +565,7 @@ export function InfoboardScreen1({
     <div
       className={styles.root}
       data-testid="infoboard-screen1-root"
+      data-theme="dark"
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className={styles.header} data-testid="infoboard-header">

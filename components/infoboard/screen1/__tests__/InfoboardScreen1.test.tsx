@@ -1591,6 +1591,108 @@ describe("Purity", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04A: Dark theme ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Dark theme — INFOBOARD-04A", () => {
+  it("root element has data-theme='dark' attribute", () => {
+    render(<InfoboardScreen1 feed={makeFeed()} />);
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("event-list is rendered (card-based, not light table)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    expect(screen.getByTestId("event-list")).toBeTruthy();
+    // Event rows are present (no table element)
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("no <table> element is rendered", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.querySelector("table")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04A: Unassigned warnings (amber) ───────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Unassigned pitch warning", () => {
+  it("shows NOCH NICHT ZUGETEILT when pitch is null", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("pitch-unassigned-warning")).toBeTruthy();
+    expect(screen.getByTestId("pitch-unassigned-warning").textContent).toContain("NOCH NICHT ZUGETEILT");
+  });
+
+  it("does not show unassigned pitch warning when pitch is present", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ allocation: { pitchLabel: "Stadion", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.queryByTestId("pitch-unassigned-warning")).toBeNull();
+    expect(screen.getByText("Stadion")).toBeTruthy();
+  });
+});
+
+describe("Unassigned dressing-room warning (training)", () => {
+  it("shows NOCH NICHT ZUGETEILT when training dressing room is null", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("dressing-room-unassigned-warning")).toBeTruthy();
+    expect(screen.getByTestId("dressing-room-unassigned-warning").textContent).toContain("NOCH NICHT ZUGETEILT");
+  });
+
+  it("does not show dressing-room warning when training has a room", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.queryByTestId("dressing-room-unassigned-warning")).toBeNull();
+    expect(screen.getByText("Kabine A")).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-04A: No interaction affordances ────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("No interaction affordances", () => {
+  it("no clickable arrow or chevron button in event rows", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+      />,
+    );
+    const rows = screen.getAllByTestId("event-row");
+    for (const row of rows) {
+      // No button or anchor inside event rows
+      expect(row.querySelector("button")).toBeNull();
+      expect(row.querySelector("a")).toBeNull();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ── Missing / null data safety ────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
