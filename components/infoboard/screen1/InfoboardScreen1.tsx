@@ -2,18 +2,25 @@
  * components/infoboard/screen1/InfoboardScreen1.tsx
  *
  * Infoboard Screen 1 — full-screen TV event schedule board.
+ * Premium redesign targeting physical 55" FC Allschwil infoboard TVs.
  *
- * Design (PP-02B-H — target-aligned premium redesign):
+ * Design (INFOBOARD-03 premium-ui):
  *   - White schedule surface; dark navy header and footer.
  *   - One flat vertical event list — no section headings.
- *   - Each event is one full-width horizontal row with four CSS grid columns:
+ *   - Each event is a full-width horizontal row with four CSS grid columns:
  *       STATUS/TIME | EVENT | PITCH | ALLOCATION (ZUTEILUNG)
- *   - Temporal status (JETZT / IN X MIN.) shown inline per row.
+ *   - Temporal status (JETZT / ALS NÄCHSTES) shown inline per row.
+ *   - No raw minute countdown — removed per Phase E1 specification.
+ *   - Event-type colors: MATCH=red, TRAINING=blue, TOURNAMENT=orange.
+ *   - Left-stripe and type chip use event-type color (not temporal bucket).
+ *   - Club logo next to home team in event column (not in allocation block).
+ *   - Airport-signage pitch value — large and immediately readable.
+ *   - Missing pitch/room values use explicit warning text, never blank space.
+ *   - Event-count adaptive sizing via data-event-count on the list element.
  *   - Club branding large in dark header, left side.
  *   - Clock and date in header center-right zone.
  *   - Alexa-safe zone in header far right — intentionally empty.
- *   - SportClubEvo branding in footer, not in header.
- *   - Announcement text in footer left; product branding in footer right.
+ *   - SportClubEvo branding in footer only.
  *
  * Invariants:
  *   - Pure presentational server component — no "use client", no effects,
@@ -132,38 +139,14 @@ function formatDisplayDate(dateKey: string): string {
 // ── Temporal status helpers ───────────────────────────────────────────────────
 
 /**
- * Returns the number of minutes until the event starts.
- * Returns null when the event has already started or times cannot be parsed.
- * Uses only explicit ISO strings — no implicit current time.
- */
-function minutesUntil(startAt: string, currentTimeIso: string): number | null {
-  const start = new Date(startAt).getTime();
-  const now = new Date(currentTimeIso).getTime();
-  if (Number.isNaN(start) || Number.isNaN(now)) return null;
-  const diff = Math.round((start - now) / 60_000);
-  return diff >= 0 ? diff : null;
-}
-
-/**
  * Returns the inline status label for an event row.
  *   current → "JETZT"
- *   next + computable → "IN X MIN."
- *   next + not computable → "ALS NÄCHSTES"
- *   later → null (no label)
+ *   next    → "ALS NÄCHSTES"  (no raw minute countdown per Phase E1)
+ *   later   → null (no label)
  */
-function statusLabel(
-  temporal: TemporalBucket,
-  startAt: string,
-  currentTimeIso: string | null | undefined,
-): string | null {
+function statusLabel(temporal: TemporalBucket): string | null {
   if (temporal === "current") return "JETZT";
-  if (temporal === "next") {
-    if (currentTimeIso != null) {
-      const mins = minutesUntil(startAt, currentTimeIso);
-      if (mins !== null) return `IN ${mins} MIN.`;
-    }
-    return "ALS NÄCHSTES";
-  }
+  if (temporal === "next") return "ALS NÄCHSTES";
   return null;
 }
 
@@ -194,13 +177,19 @@ function buildFlatList(feed: InfoboardScreen1Feed): FlatEvent[] {
   return result;
 }
 
-/** Left-stripe accent color key for data attribute. */
-function stripeKey(temporal: TemporalBucket, type: PublishingEventType): string {
-  if (temporal === "current") return "red";
-  if (temporal === "next") return "blue";
+/** Left-stripe accent color key determined by event type (not temporal bucket). */
+function stripeKey(type: PublishingEventType): string {
   if (type === "MATCH") return "red";
   if (type === "TOURNAMENT") return "orange";
-  return "blue"; // training
+  return "blue"; // TRAINING and others
+}
+
+/** Maps visible event count to a CSS data-attribute value for adaptive sizing. */
+function eventCountAttr(count: number): string {
+  if (count <= 1) return "1";
+  if (count === 2) return "2";
+  if (count === 3) return "3";
+  return "many";
 }
 
 // ── Tournament allocation block ───────────────────────────────────────────────
@@ -253,43 +242,48 @@ function ParticipantAllocationBlock({
 
 type MatchAllocationProps = {
   event: InfoboardScreen1Event;
-  clubLogoSrc: string | null;
 };
 
 /**
  * Renders explicit home/away team-to-dressing-room pairings for a match.
- * Shows the club logo for the home team when available.
+ * No logos in allocation — logos belong in the event column next to team names.
  * No HEIM/GAST labels. No referee room.
+ * Shows "—" dash when a team is present but dressing room is not yet assigned.
  */
-function MatchAllocation({ event, clubLogoSrc }: MatchAllocationProps): ReactElement | null {
+function MatchAllocation({ event }: MatchAllocationProps): ReactElement | null {
   const { homeDressingRoomLabel, awayDressingRoomLabel } = event.allocation;
-  const hasHome = homeDressingRoomLabel !== null && event.teamDisplayName !== null;
-  const hasAway = awayDressingRoomLabel !== null && event.opponentDisplayName !== null;
+  const hasHomeTeam = event.teamDisplayName !== null;
+  const hasAwayTeam = event.opponentDisplayName !== null;
 
-  if (!hasHome && !hasAway) return null;
+  if (!hasHomeTeam && !hasAwayTeam) return null;
 
   return (
     <div className={styles.matchAllocation} data-testid="match-allocation">
-      {hasHome && (
+      {hasHomeTeam && (
         <div className={styles.matchAllocRow}>
-          <span className={styles.matchAllocRoom}>{homeDressingRoomLabel}</span>
-          <span className={styles.matchAllocLogoSlot} aria-hidden="true">
-            {clubLogoSrc !== null && (
-              <img
-                src={clubLogoSrc}
-                alt=""
-                className={styles.matchAllocLogo}
-                aria-hidden="true"
-              />
+          <span className={styles.matchAllocRoom}>
+            {homeDressingRoomLabel !== null ? (
+              homeDressingRoomLabel
+            ) : (
+              <span className={styles.allocMissing} data-testid="allocation-warning">
+                —
+              </span>
             )}
           </span>
           <span className={styles.matchAllocTeam}>{event.teamDisplayName}</span>
         </div>
       )}
-      {hasAway && (
+      {hasAwayTeam && (
         <div className={styles.matchAllocRow}>
-          <span className={styles.matchAllocRoom}>{awayDressingRoomLabel}</span>
-          <span className={styles.matchAllocLogoSlot} aria-hidden="true" />
+          <span className={styles.matchAllocRoom}>
+            {awayDressingRoomLabel !== null ? (
+              awayDressingRoomLabel
+            ) : (
+              <span className={styles.allocMissing} data-testid="allocation-warning">
+                —
+              </span>
+            )}
+          </span>
           <span className={styles.matchAllocTeam}>{event.opponentDisplayName}</span>
         </div>
       )}
@@ -305,13 +299,27 @@ type TrainingAllocationProps = {
 
 function TrainingAllocation({ event }: TrainingAllocationProps): ReactElement | null {
   const { homeDressingRoomLabel } = event.allocation;
-  if (homeDressingRoomLabel === null) return null;
 
-  return (
-    <div className={styles.trainingAllocation} data-testid="training-allocation">
-      <span className={styles.trainingAllocRoom}>{homeDressingRoomLabel}</span>
-    </div>
-  );
+  if (homeDressingRoomLabel !== null) {
+    return (
+      <div className={styles.trainingAllocation} data-testid="training-allocation">
+        <span className={styles.trainingAllocRoom}>{homeDressingRoomLabel}</span>
+      </div>
+    );
+  }
+
+  // Show explicit warning when team is known but no dressing room assigned yet.
+  if (event.teamDisplayName !== null) {
+    return (
+      <div className={styles.trainingAllocation} data-testid="training-allocation">
+        <span className={styles.allocMissing} data-testid="allocation-warning">
+          NOCH NICHT ZUGETEILT
+        </span>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ── Event row ─────────────────────────────────────────────────────────────────
@@ -327,7 +335,7 @@ type EventRowProps = {
 function EventRow({
   item,
   timeZone,
-  currentTimeIso,
+  currentTimeIso: _currentTimeIso,
   clubLogoSrc,
   participantAllocations,
 }: EventRowProps): ReactElement {
@@ -338,12 +346,23 @@ function EventRow({
   const isTournamentMultiTeam =
     participantAllocations !== undefined && participantAllocations.length >= 3;
 
-  const label = statusLabel(temporal, event.startAt, currentTimeIso);
-  const stripe = stripeKey(temporal, event.type);
+  const label = statusLabel(temporal);
+  const stripe = stripeKey(event.type);
 
-  // Event column: competition/type label
-  // Matches show the competition label (e.g. "Meisterschaft") if available, else fallback.
-  const typeDisplayLabel = isMatch
+  /**
+   * Event column competition/type label.
+   *
+   * Strategy to avoid duplicate text with EVENT_TYPE_LABELS:
+   *   MATCH   → competition label when available; fallback to "SPIEL"
+   *   TRAINING→ "TRAINING" (the only meaningful label for training events)
+   *   TOURNAMENT → "TURNIER" (EVENT_TYPE_LABELS) — no second label; competition
+   *                label is shown only when explicitly different from the type name
+   *
+   * This preserves all existing test contracts: the eventTypeLabel carries the
+   * data-event-type attribute that tests rely on, and the text matches what
+   * tests expect.
+   */
+  const typeDisplayLabel: string = isMatch
     ? (event.competitionLabel ?? EVENT_TYPE_LABELS["MATCH"])
     : EVENT_TYPE_LABELS[event.type] ?? event.type;
 
@@ -382,11 +401,23 @@ function EventRow({
         {isMatch ? (
           <>
             {event.teamDisplayName !== null && (
-              <span className={styles.eventTeamMain}>{event.teamDisplayName}</span>
+              <span className={styles.eventTeamMain}>
+                {clubLogoSrc !== null && (
+                  <img
+                    src={clubLogoSrc}
+                    alt=""
+                    className={styles.eventTeamLogo}
+                    aria-hidden="true"
+                    data-testid="event-col-club-logo"
+                  />
+                )}
+                {event.teamDisplayName}
+              </span>
             )}
             {event.opponentDisplayName !== null && (
               <span className={styles.eventTeamOpponent}>
-                vs. {event.opponentDisplayName}
+                <span className={styles.eventTeamVs} aria-hidden="true">vs.</span>
+                {" "}{event.opponentDisplayName}
               </span>
             )}
           </>
@@ -413,8 +444,12 @@ function EventRow({
       {/* ── Column 3: Pitch ─────────────────────────────────────────────── */}
       <div className={styles.colPitch}>
         <span className={styles.colLabel}>PLATZ</span>
-        {event.allocation.pitchLabel !== null && (
+        {event.allocation.pitchLabel !== null ? (
           <span className={styles.pitchValue}>{event.allocation.pitchLabel}</span>
+        ) : (
+          <span className={styles.pitchWarning} data-testid="pitch-warning">
+            NOCH NICHT ZUGETEILT
+          </span>
         )}
       </div>
 
@@ -424,7 +459,7 @@ function EventRow({
         {isTournamentMultiTeam ? (
           <ParticipantAllocationBlock allocations={participantAllocations!} />
         ) : isMatch ? (
-          <MatchAllocation event={event} clubLogoSrc={clubLogoSrc} />
+          <MatchAllocation event={event} />
         ) : (
           <TrainingAllocation event={event} />
         )}
@@ -522,6 +557,8 @@ export function InfoboardScreen1({
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
 
+  const countAttr = eventCountAttr(visibleList.length);
+
   // Current time and date — explicit only, never implicit.
   const currentTime =
     currentTimeIso != null ? formatTime(currentTimeIso, timeZone) : null;
@@ -615,6 +652,7 @@ export function InfoboardScreen1({
               className={styles.eventList}
               role="list"
               data-testid="event-list"
+              data-event-count={countAttr}
             >
               {visibleList.map((item) => {
                 const extension = findEventExtension(item.event.id, eventPresentation);

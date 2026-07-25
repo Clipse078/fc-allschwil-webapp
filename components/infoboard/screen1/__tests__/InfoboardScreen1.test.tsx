@@ -484,9 +484,8 @@ describe("Temporal status — JETZT label", () => {
   });
 });
 
-describe("Temporal status — relative next label", () => {
-  it("next event shows IN X MIN. when currentTimeIso is provided", () => {
-    // 16:00Z = 18:00 Zurich; current time 15:35Z = 17:35 → 25 min until
+describe("Temporal status — next label (no countdown)", () => {
+  it("next event shows ALS NÄCHSTES when currentTimeIso is provided", () => {
     const feed = makeFeed({
       next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:00:00.000Z" })],
       isEmpty: false,
@@ -498,8 +497,7 @@ describe("Temporal status — relative next label", () => {
       />,
     );
     const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toMatch(/IN \d+ MIN\./);
-    expect(label.textContent).toContain("25");
+    expect(label.textContent).toBe("ALS NÄCHSTES");
   });
 
   it("next event shows ALS NÄCHSTES when currentTimeIso is not provided", () => {
@@ -512,20 +510,19 @@ describe("Temporal status — relative next label", () => {
     expect(label.textContent).toBe("ALS NÄCHSTES");
   });
 
-  it("relative label uses tenant timezone for minutes calculation", () => {
-    // 5 minutes until: start at 16:05Z, now at 16:00Z
+  it("raw minute countdown is never rendered when currentTimeIso is provided", () => {
     const feed = makeFeed({
-      next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:05:00.000Z" })],
+      next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:00:00.000Z" })],
       isEmpty: false,
     });
     render(
       <InfoboardScreen1
         feed={feed}
-        currentTimeIso="2026-09-12T16:00:00.000Z"
+        currentTimeIso="2026-09-12T15:35:00.000Z"
       />,
     );
-    const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toContain("5");
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.textContent).not.toMatch(/IN \d+ MIN\./);
   });
 
   it("next label has next status data attribute", () => {
@@ -671,7 +668,8 @@ describe("Match row", () => {
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    expect(screen.getByText("FC Allschwil E1")).toBeTruthy();
+    // Team name appears in both event column and allocation column — check at least one occurrence
+    expect(screen.getAllByText("FC Allschwil E1").length).toBeGreaterThan(0);
   });
 
   it("renders opponent name with vs. prefix", () => {
@@ -814,9 +812,9 @@ describe("Match row", () => {
         branding={{ clubLogoSrc: "/images/logos/fc-allschwil.png" }}
       />,
     );
-    // Club logo should appear in match allocation area
-    const matchAlloc = screen.getByTestId("match-allocation");
-    const img = matchAlloc.querySelector("img");
+    // Club logo is in the event column (next to home team name), not in allocation
+    const row = screen.getByTestId("event-row");
+    const img = row.querySelector('[data-testid="event-col-club-logo"]');
     expect(img).not.toBeNull();
     expect(img?.getAttribute("src")).toBe("/images/logos/fc-allschwil.png");
   });
@@ -1653,5 +1651,280 @@ describe("Missing and optional data safety", () => {
     expect(screen.getByText("Team A")).toBeTruthy();
     expect(screen.getByText("Team C")).toBeTruthy();
     expect(screen.queryByText("null")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Phase J — INFOBOARD-03 premium redesign tests ─────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Phase J — Event count layout data attribute", () => {
+  it("one-event layout: event list has data-event-count='1'", () => {
+    const feed = makeFeed({ current: [makeEvent()], isEmpty: false });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-event-count")).toBe("1");
+  });
+
+  it("two-event layout: event list has data-event-count='2'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ id: "e1" })],
+      next: [makeEvent({ id: "e2" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-event-count")).toBe("2");
+  });
+
+  it("three-event layout: event list has data-event-count='3'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ id: "e1" })],
+      next: [makeEvent({ id: "e2" })],
+      later: [makeEvent({ id: "e3" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-event-count")).toBe("3");
+  });
+
+  it("four or more events: event list has data-event-count='many'", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "e1" }),
+        makeEvent({ id: "e2" }),
+        makeEvent({ id: "e3" }),
+        makeEvent({ id: "e4" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-event-count")).toBe("many");
+  });
+});
+
+describe("Phase J — No minute countdown", () => {
+  it("ALS NÄCHSTES is shown for next event with currentTimeIso", () => {
+    const feed = makeFeed({
+      next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:00:00.000Z" })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        currentTimeIso="2026-09-12T15:00:00.000Z"
+      />,
+    );
+    expect(screen.getByTestId("status-label-next").textContent).toBe("ALS NÄCHSTES");
+  });
+
+  it("no 'IN ... MIN.' pattern in rendered output", () => {
+    const feed = makeFeed({
+      next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:00:00.000Z" })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        currentTimeIso="2026-09-12T15:00:00.000Z"
+      />,
+    );
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.textContent).not.toMatch(/IN \d+ MIN\./);
+  });
+});
+
+describe("Phase J — Event type visual state", () => {
+  it("match event row has data-type='MATCH'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const row = screen.getByTestId("event-row");
+    expect(row.getAttribute("data-type")).toBe("MATCH");
+  });
+
+  it("training event row has data-type='TRAINING'", () => {
+    const feed = makeFeed({ current: [makeEvent({ type: "TRAINING" })], isEmpty: false });
+    render(<InfoboardScreen1 feed={feed} />);
+    const row = screen.getByTestId("event-row");
+    expect(row.getAttribute("data-type")).toBe("TRAINING");
+  });
+
+  it("tournament event row has data-type='TOURNAMENT'", () => {
+    const feed = makeFeed({ current: [makeEvent({ type: "TOURNAMENT" })], isEmpty: false });
+    render(<InfoboardScreen1 feed={feed} />);
+    const row = screen.getByTestId("event-row");
+    expect(row.getAttribute("data-type")).toBe("TOURNAMENT");
+  });
+
+  it("match row has stripe 'red'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("event-row").getAttribute("data-stripe")).toBe("red");
+  });
+
+  it("training row has stripe 'blue'", () => {
+    const feed = makeFeed({ current: [makeEvent({ type: "TRAINING" })], isEmpty: false });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("event-row").getAttribute("data-stripe")).toBe("blue");
+  });
+
+  it("tournament row has stripe 'orange'", () => {
+    const feed = makeFeed({ current: [makeEvent({ type: "TOURNAMENT" })], isEmpty: false });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("event-row").getAttribute("data-stripe")).toBe("orange");
+  });
+});
+
+describe("Phase J — Pitch warning", () => {
+  it("shows pitch warning when pitchLabel is null", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ allocation: { pitchLabel: null, homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("pitch-warning")).toBeTruthy();
+    expect(screen.getByTestId("pitch-warning").textContent).toContain("NOCH NICHT ZUGETEILT");
+  });
+
+  it("does not show pitch warning when pitchLabel is present", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ allocation: { pitchLabel: "Stadion", homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.queryByTestId("pitch-warning")).toBeNull();
+    expect(screen.getByText("Stadion")).toBeTruthy();
+  });
+
+  it("pitch value is shown for PLATZ column", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ allocation: { pitchLabel: "BRÜHL 1", homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByText("BRÜHL 1")).toBeTruthy();
+  });
+});
+
+describe("Phase J — Dressing-room allocation warnings", () => {
+  it("shows allocation warning for match when home dressing room is null", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Home", opponentDisplayName: "FC Away", allocation: { pitchLabel: null, homeDressingRoomLabel: null, awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const warnings = screen.getAllByTestId("allocation-warning");
+    expect(warnings.length).toBeGreaterThan(0);
+  });
+
+  it("shows allocation warning for training when dressing room is null but team is set", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "TRAINING", teamDisplayName: "FC Test", allocation: { pitchLabel: null, homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("allocation-warning")).toBeTruthy();
+    expect(screen.getByTestId("allocation-warning").textContent).toContain("NOCH NICHT ZUGETEILT");
+  });
+
+  it("match allocation shows team names even when rooms are null", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Home", opponentDisplayName: "FC Away", allocation: { pitchLabel: null, homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const matchAlloc = screen.getByTestId("match-allocation");
+    expect(matchAlloc.textContent).toContain("FC Home");
+    expect(matchAlloc.textContent).toContain("FC Away");
+  });
+
+  it("dressing-room allocation renders in home-first order for match", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Home", opponentDisplayName: "FC Away", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine H", awayDressingRoomLabel: "Kabine A", refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const matchAlloc = screen.getByTestId("match-allocation");
+    const text = matchAlloc.textContent ?? "";
+    expect(text.indexOf("FC Home")).toBeLessThan(text.indexOf("FC Away"));
+  });
+});
+
+describe("Phase J — Logo placement", () => {
+  it("match logos appear in the event column (next to club name), not allocation", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other", allocation: { pitchLabel: null, homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null } })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logo.png" }}
+      />,
+    );
+    const row = screen.getByTestId("event-row");
+    const logoInEventCol = row.querySelector('[data-testid="event-col-club-logo"]');
+    expect(logoInEventCol).not.toBeNull();
+    // No logo in match allocation
+    const matchAlloc = screen.getByTestId("match-allocation");
+    expect(matchAlloc.querySelector("img")).toBeNull();
+  });
+
+  it("training event contains no club logo anywhere in the row", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ type: "TRAINING", teamDisplayName: "FC Test" })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logo.png" }}
+      />,
+    );
+    const row = screen.getByTestId("event-row");
+    expect(row.querySelector('[data-testid="event-col-club-logo"]')).toBeNull();
+  });
+});
+
+describe("Phase J — Empty states (redesign)", () => {
+  it("NO_EVENTS_TODAY renders correct message", () => {
+    const feed = makeFeed({ isEmpty: true, emptyStateReason: "NO_EVENTS_TODAY" });
+    render(<InfoboardScreen1 feed={feed} />);
+    const emptyState = screen.getByTestId("empty-state-full");
+    expect(emptyState.textContent).toContain("Heute sind keine Trainings, Heimspiele oder Turniere geplant.");
+  });
+
+  it("DAY_COMPLETED renders correct message", () => {
+    const feed = makeFeed({ isEmpty: true, emptyStateReason: "DAY_COMPLETED" });
+    render(<InfoboardScreen1 feed={feed} />);
+    const emptyState = screen.getByTestId("empty-state-full");
+    expect(emptyState.textContent).toContain("Heute keine weiteren Trainings, Heimspiele oder Turniere.");
+  });
+
+  it("empty state has no event-row elements", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_EMPTY} />);
+    expect(screen.queryAllByTestId("event-row")).toHaveLength(0);
+  });
+});
+
+describe("Phase J — Footer branding appears once", () => {
+  it("footer product branding appears exactly once", () => {
+    render(<InfoboardScreen1 feed={makeFeed()} />);
+    const brandingElements = screen.getAllByTestId("product-branding");
+    expect(brandingElements).toHaveLength(1);
+  });
+
+  it("POWERED BY text appears exactly once", () => {
+    render(<InfoboardScreen1 feed={makeFeed()} />);
+    const poweredByElements = screen.getAllByText("POWERED BY");
+    expect(poweredByElements).toHaveLength(1);
   });
 });
