@@ -580,3 +580,151 @@ export const PREVIEW_FIXTURE_EMPTY: InfoboardScreen1Feed = {
   isEmpty: true,
   emptyStateReason: "NO_EVENTS_TODAY",
 };
+
+// ── Adaptive event-count fixtures ─────────────────────────────────────────────
+
+/**
+ * 1-event hero scenario: one current match on the Stadion.
+ * Demonstrates the hero card layout for a single event.
+ */
+export const PREVIEW_FIXTURE_1EVENT: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+  current: [
+    {
+      id: "evt-hero-1",
+      type: "MATCH",
+      displayTitle: "FC Allschwil Aktive – FC Concordia Basel",
+      teamDisplayName: "FC Allschwil Aktive",
+      opponentDisplayName: "FC Concordia Basel",
+      organizerDisplayName: null,
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T15:00:00.000Z",
+      endAt: "2026-09-12T16:45:00.000Z",
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "Stadion",
+        homeDressingRoomLabel: "Kabine A",
+        awayDressingRoomLabel: "Kabine B",
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  next: [],
+  later: [],
+  isEmpty: false,
+  emptyStateReason: null,
+};
+
+/**
+ * 2-event balanced scenario: one current training + one upcoming match.
+ */
+export const PREVIEW_FIXTURE_2EVENTS: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+  current: [
+    {
+      id: "evt-2ev-1",
+      type: "TRAINING",
+      displayTitle: "Aktive Herren Training",
+      teamDisplayName: "Aktive Herren",
+      opponentDisplayName: null,
+      organizerDisplayName: "FC Allschwil",
+      competitionLabel: null,
+      startAt: "2026-09-12T14:30:00.000Z",
+      endAt: "2026-09-12T16:30:00.000Z",
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KR1",
+        homeDressingRoomLabel: "Kabine A",
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  next: [
+    {
+      id: "evt-2ev-2",
+      type: "MATCH",
+      displayTitle: "FC Allschwil E1 – FC Binningen E1",
+      teamDisplayName: "FC Allschwil E1",
+      opponentDisplayName: "FC Binningen E1",
+      organizerDisplayName: null,
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T17:00:00.000Z",
+      endAt: null,
+      meetingTime: null,
+      status: "SCHEDULED",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "next",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "Stadion",
+        homeDressingRoomLabel: "Kabine E1",
+        awayDressingRoomLabel: "Kabine E2",
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  later: [],
+  isEmpty: false,
+  emptyStateReason: null,
+};
+
+/**
+ * Missing allocation scenario: one event with no pitch and no dressing room.
+ * Used to test the amber NOCH NICHT ZUGETEILT warning display.
+ */
+export const PREVIEW_FIXTURE_MISSING_ALLOCATION: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+  current: [
+    {
+      id: "evt-missing-1",
+      type: "TRAINING",
+      displayTitle: "Juniorinnen FF-14",
+      teamDisplayName: "Juniorinnen FF-14",
+      opponentDisplayName: null,
+      organizerDisplayName: "FC Allschwil",
+      competitionLabel: null,
+      startAt: "2026-09-12T15:00:00.000Z",
+      endAt: null,
+      meetingTime: null,
+      status: "SCHEDULED",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: null,
+        homeDressingRoomLabel: null,
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  next: [],
+  later: [],
+  isEmpty: false,
+  emptyStateReason: null,
+};

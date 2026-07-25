@@ -1,0 +1,351 @@
+/**
+ * components/infoboard/screen2/screen2-preview-fixture.ts
+ *
+ * Deterministic preview fixture for Infoboard Screen 2.
+ *
+ * PREVIEW-ONLY — must never be imported by production feed builders or
+ * API routes.
+ *
+ * Scenario: Same display date as Screen 1 preview (2026-09-12).
+ * The Brüelstadion facility has 4 pitches:
+ *   - Stadion: OCCUPIED (Match FC Allschwil E1 – JETZT)
+ *   - Kunstrasen 1: UPCOMING (Training Juniorinnen FF-14 – in 25 min)
+ *   - Kunstrasen 2: FREE
+ *   - Kunstrasen 3: OCCUPIED (Tournament Sommer-Cup Junioren E)
+ *
+ * INFOBOARD-05: dressingRooms retained in feed for type compatibility only.
+ * Screen 2 no longer renders cabin assignments.
+ * Weather fixture data is non-production sample data for visual preview.
+ */
+
+import type { InfoboardScreen2Feed } from "@/lib/publishing/event-types";
+import type { InfoboardSponsor } from "./InfoboardScreen2";
+import type { WeatherDto } from "@/lib/weather/weather-types";
+
+// ── Shared tenant reference ───────────────────────────────────────────────────
+
+const PREVIEW_TENANT_S2 = {
+  id: "tenant-preview-fca",
+  key: "fc-allschwil",
+  name: "FC Allschwil",
+  timezone: "Europe/Zurich",
+} as const;
+
+// ── Main Screen 2 preview fixture ─────────────────────────────────────────────
+
+export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT_S2,
+  displayDate: "2026-09-12",
+  isStale: false,
+  facilityName: "Brüelstadion",
+
+  pitches: [
+    {
+      code: "P-STADION",
+      displayLabel: "Stadion",
+      facilityName: "Brüelstadion",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "evt-1",
+        displayTitle: "FC Allschwil E1 – FC Binningen E1",
+        teamDisplayName: "FC Allschwil E1",
+        opponentDisplayName: "FC Binningen E1",
+        startAt: "2026-09-12T15:00:00.000Z",
+        endAt: "2026-09-12T16:45:00.000Z",
+        status: "LIVE",
+        type: "MATCH",
+        temporalRelation: "current",
+        dressingRooms: [
+          {
+            code: "DR-E1",
+            displayLabel: "Kabine E1",
+            role: "HOME",
+            assignedTo: "FC Allschwil E1",
+            eventId: "evt-1",
+          },
+          {
+            code: "DR-E2",
+            displayLabel: "Kabine E2",
+            role: "AWAY",
+            assignedTo: "FC Binningen E1",
+            eventId: "evt-1",
+          },
+        ],
+      },
+      nextEvent: null,
+    },
+    {
+      code: "P-KR1",
+      displayLabel: "Kunstrasen 1",
+      facilityName: "Brüelstadion",
+      state: "UPCOMING",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      nextEvent: {
+        eventId: "evt-2",
+        displayTitle: "Juniorinnen FF-14",
+        teamDisplayName: "Juniorinnen FF-14",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T16:00:00.000Z",
+        endAt: null,
+        status: "SCHEDULED",
+        type: "TRAINING",
+        temporalRelation: "next",
+        dressingRooms: [
+          {
+            code: "DR-04",
+            displayLabel: "Kabine 04",
+            role: "TRAINING",
+            assignedTo: "Juniorinnen FF-14",
+            eventId: "evt-2",
+          },
+        ],
+      },
+    },
+    {
+      code: "P-KR2",
+      displayLabel: "Kunstrasen 2",
+      facilityName: "Brüelstadion",
+      state: "FREE_NOW",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      nextEvent: null,
+    },
+    {
+      code: "P-KR3",
+      displayLabel: "Kunstrasen 3",
+      facilityName: "Brüelstadion",
+      state: "UPCOMING",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      nextEvent: {
+        eventId: "evt-3",
+        displayTitle: "Sommer-Cup Junioren E",
+        teamDisplayName: "FC Allschwil Junioren",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T17:00:00.000Z",
+        endAt: null,
+        status: "SCHEDULED",
+        type: "TOURNAMENT",
+        temporalRelation: "next",
+        dressingRooms: [],
+      },
+    },
+  ],
+
+  dressingRooms: [
+    {
+      code: "DR-E1",
+      displayLabel: "Kabine E1",
+      role: "HOME",
+      assignedTo: "FC Allschwil E1",
+      eventId: "evt-1",
+    },
+    {
+      code: "DR-E2",
+      displayLabel: "Kabine E2",
+      role: "AWAY",
+      assignedTo: "FC Binningen E1",
+      eventId: "evt-1",
+    },
+    {
+      code: "DR-04",
+      displayLabel: "Kabine 04",
+      role: "TRAINING",
+      assignedTo: "Juniorinnen FF-14",
+      eventId: "evt-2",
+    },
+  ],
+};
+
+// ── All-free fixture ──────────────────────────────────────────────────────────
+
+export const PREVIEW_FIXTURE_SCREEN2_ALL_FREE: InfoboardScreen2Feed = {
+  ...PREVIEW_FIXTURE_SCREEN2,
+  pitches: PREVIEW_FIXTURE_SCREEN2.pitches.map((p) => ({
+    ...p,
+    state: "FREE_NOW" as const,
+    currentEvent: null,
+    nextEvent: null,
+  })),
+  dressingRooms: [],
+};
+
+// ── Sponsor placeholder data ──────────────────────────────────────────────────
+
+/**
+ * Placeholder sponsors for preview rendering.
+ * These represent the types of data the sponsor section accepts.
+ * No production sponsor data is hardcoded here.
+ */
+export const PREVIEW_SPONSORS: readonly InfoboardSponsor[] = [
+  {
+    id: "s1",
+    name: "Hauptsponsor",
+    logoSrc: null,
+    tier: "gold",
+  },
+  {
+    id: "s2",
+    name: "Sponsor B",
+    logoSrc: null,
+    tier: "silver",
+  },
+  {
+    id: "s3",
+    name: "Sponsor C",
+    logoSrc: null,
+    tier: "silver",
+  },
+  {
+    id: "s4",
+    name: "Partner D",
+    logoSrc: null,
+    tier: "partner",
+  },
+  {
+    id: "s5",
+    name: "Partner E",
+    logoSrc: null,
+    tier: "partner",
+  },
+];
+
+/** Current-time ISO for Screen 2 preview (same as Screen 1). */
+export const PREVIEW_CURRENT_TIME_ISO_S2 = "2026-09-12T15:35:00.000Z" as const;
+
+/**
+ * Sample weather data for Screen 2 preview.
+ *
+ * NON-PRODUCTION — represents a representative September afternoon in Allschwil.
+ * This data is for visual preview only and must never be used in production routes.
+ */
+export const PREVIEW_WEATHER: WeatherDto = {
+  isAvailable: true,
+  temperatureC: 22,
+  conditionCode: 2,
+  conditionLabel: "Teilweise bewölkt",
+  windKmh: 6,
+  precipitationProbability: null,
+  observedAt: "2026-09-12T15:30:00Z",
+};
+
+// ── All-occupied fixture ──────────────────────────────────────────────────────
+
+export const PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED: InfoboardScreen2Feed = {
+  ...PREVIEW_FIXTURE_SCREEN2,
+  pitches: [
+    {
+      code: "P-STADION",
+      displayLabel: "Stadion",
+      facilityName: "Brüelstadion",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "evt-ao-1",
+        displayTitle: "FC Allschwil E1 – FC Binningen E1",
+        teamDisplayName: "FC Allschwil E1",
+        opponentDisplayName: "FC Binningen E1",
+        startAt: "2026-09-12T15:00:00.000Z",
+        endAt: "2026-09-12T16:45:00.000Z",
+        status: "LIVE",
+        type: "MATCH",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: null,
+    },
+    {
+      code: "P-KR1",
+      displayLabel: "Kunstrasen 1",
+      facilityName: "Brüelstadion",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "evt-ao-2",
+        displayTitle: "Juniorinnen FF-14",
+        teamDisplayName: "Juniorinnen FF-14",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T14:00:00.000Z",
+        endAt: null,
+        status: "LIVE",
+        type: "TRAINING",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: null,
+    },
+    {
+      code: "P-KR2",
+      displayLabel: "Kunstrasen 2",
+      facilityName: "Brüelstadion",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "evt-ao-3",
+        displayTitle: "Sommer-Cup Junioren E",
+        teamDisplayName: "FC Allschwil Junioren",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T14:30:00.000Z",
+        endAt: null,
+        status: "LIVE",
+        type: "TOURNAMENT",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: null,
+    },
+    {
+      code: "P-KR3",
+      displayLabel: "Kunstrasen 3",
+      facilityName: "Brüelstadion",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "evt-ao-4",
+        displayTitle: "Aktive Herren",
+        teamDisplayName: "Aktive Herren",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T15:00:00.000Z",
+        endAt: null,
+        status: "LIVE",
+        type: "TRAINING",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: null,
+    },
+  ],
+  dressingRooms: [
+    {
+      code: "DR-E1",
+      displayLabel: "Kabine E1",
+      role: "HOME",
+      assignedTo: "FC Allschwil E1",
+      eventId: "evt-ao-1",
+    },
+    {
+      code: "DR-E2",
+      displayLabel: "Kabine E2",
+      role: "AWAY",
+      assignedTo: "FC Binningen E1",
+      eventId: "evt-ao-1",
+    },
+    {
+      code: "DR-04",
+      displayLabel: "Kabine 04",
+      role: "TRAINING",
+      assignedTo: "Juniorinnen FF-14",
+      eventId: "evt-ao-2",
+    },
+    {
+      code: "DR-A",
+      displayLabel: "Kabine A",
+      role: "TRAINING",
+      assignedTo: "Aktive Herren",
+      eventId: "evt-ao-4",
+    },
+  ],
+};
