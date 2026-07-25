@@ -441,7 +441,7 @@ describe("14. Genuine empty facility state", () => {
       loader: makeLoader([]),
     });
     expect(feed.pitches).toHaveLength(0);
-    expect(feed.isEmpty).toBeUndefined();
+    expect(feed.dressingRooms).toHaveLength(0);
   });
 });
 
