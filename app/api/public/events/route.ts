@@ -124,14 +124,8 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Public events feed failed:", error);
-
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? "Technischer Fehler: " + error.message
-            : "Public Events Feed konnte nicht geladen werden.",
-      },
+      { error: "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut." },
       { status: 500 }
     );
   }

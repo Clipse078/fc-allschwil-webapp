@@ -109,13 +109,17 @@ describe("GET /api/public/events — tenant isolation", () => {
     expect(body.surface).toBe("all");
   });
 
-  it("500 response does not expose stack traces or Prisma internals", async () => {
-    mocks.eventFindMany.mockRejectedValue(new Error("DB error"));
+  it("500 response returns safe generic message, not internal error.message", async () => {
+    mocks.eventFindMany.mockRejectedValue(
+      new Error("Connection refused to database at host db.internal:5432 user=app_user"),
+    );
     const res = await GET(makeRequest());
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body).toHaveProperty("error");
-    // Must not expose stack frames or ORM query details.
-    expect(JSON.stringify(body)).not.toMatch(/at Object\.|at Module\.|stack|prisma\.event/i);
+    // Internal exception text must NOT appear in the public response.
+    expect(JSON.stringify(body)).not.toMatch(/db\.internal|5432|app_user|Connection refused/);
+    // A safe, generic message is returned instead.
+    expect(body.error).toMatch(/technischer Fehler/i);
   });
 });

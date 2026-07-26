@@ -196,17 +196,22 @@ describe("GET /api/public/[tenant]/website/club-events", () => {
     expect(item).not.toHaveProperty("awayDressingRoomCode");
   });
 
-  it("500 error response does not expose stack traces", async () => {
-    mocks.eventFindMany.mockRejectedValue(new Error("DB error"));
+  it("500 response returns safe generic message — internal Prisma details not exposed", async () => {
+    mocks.eventFindMany.mockRejectedValue(
+      new Error("Unique constraint failed on field `Event.tenantId`"),
+    );
     const res = await getClubEvents(makeRequest("/club-events"), makeParams());
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body).toHaveProperty("error");
-    expect(JSON.stringify(body)).not.toMatch(/at Object\.|at Module\.|stack/i);
+    // Internal Prisma details must NOT appear in the public HTTP response body.
+    expect(JSON.stringify(body)).not.toMatch(/Unique constraint|Event\.tenantId/);
+    expect(body.error).toMatch(/technischer Fehler/i);
   });
 });
 
 // ── B. Matches ─────────────────────────────────────────────────────────────────
+
 
 describe("GET /api/public/[tenant]/website/matches", () => {
   beforeEach(() => {
@@ -247,6 +252,15 @@ describe("GET /api/public/[tenant]/website/matches", () => {
     expect(body.data.matches[0].type).toBe("MATCH");
   });
 });
+
+  it("matches 500 response: safe generic message, not internal error text", async () => {
+    mocks.eventFindMany.mockRejectedValue(new Error("connection reset by peer at 10.0.0.1:5432"));
+    const res = await getMatches(makeRequest("/matches"), makeParams());
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(JSON.stringify(body)).not.toMatch(/10\.0\.0\.1|5432|connection reset/);
+    expect(body.error).toMatch(/technischer Fehler/i);
+  });
 
 // ── C. Tournaments ─────────────────────────────────────────────────────────────
 
@@ -303,6 +317,15 @@ describe("GET /api/public/[tenant]/website/tournaments", () => {
     expect(call.where.tenantId).toBe("tenant-other");
   });
 });
+
+  it("tournaments 500 response: safe generic message, not internal error text", async () => {
+    mocks.eventFindMany.mockRejectedValue(new Error("Invalid value for argument `where`"));
+    const res = await getTournaments(makeRequest("/tournaments"), makeParams());
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(JSON.stringify(body)).not.toMatch(/Invalid value for argument/);
+    expect(body.error).toMatch(/technischer Fehler/i);
+  });
 
 // ── D. Trainings ───────────────────────────────────────────────────────────────
 
@@ -372,6 +395,15 @@ describe("GET /api/public/[tenant]/website/trainings", () => {
     expect(item).not.toHaveProperty("pitchCode");
   });
 });
+
+  it("trainings 500 response: safe generic message, not internal error text", async () => {
+    mocks.eventFindMany.mockRejectedValue(new Error("PrismaClientKnownRequestError: table Event"));
+    const res = await getTrainings(makeRequest("/trainings"), makeParams());
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(JSON.stringify(body)).not.toMatch(/PrismaClientKnownRequestError|table Event/);
+    expect(body.error).toMatch(/technischer Fehler/i);
+  });
 
 // ── G. Compatibility — /website/events ────────────────────────────────────────
 

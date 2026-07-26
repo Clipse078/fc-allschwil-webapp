@@ -87,12 +87,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   } catch (error) {
     console.error("[public/[tenant]/website/tournaments] GET failed:", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? "Technischer Fehler: " + error.message
-            : "Tournaments Feed konnte nicht geladen werden.",
-      },
+      { error: "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut." },
       { status: 500 },
     );
   }
