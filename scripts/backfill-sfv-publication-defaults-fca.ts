@@ -21,9 +21,25 @@
  *   - No cross-tenant mutation.
  *   - Dry-run mode available via --dry-run flag.
  *
+ * MANUAL-OVERRIDE PROTECTION
+ *   Records that appear to have been deliberately edited (i.e. they are not
+ *   at the old-default state) are flagged in dry-run output and SKIPPED in
+ *   live mode unless --force-overrides is also passed.
+ *
+ *   Criteria for "appears manually edited" (potential override):
+ *     - Away match with infoboardVisible=true  (old default was false)
+ *
+ *   Default behaviour (no --force-overrides):
+ *     - Updates websiteVisible=false → true for all qualifying matches
+ *     - Updates home matches with infoboardVisible=false → true
+ *     - SKIPS any record that is "potentially manually edited"
+ *
+ *   With --force-overrides:
+ *     - Overrides ALL records to target values regardless of current state
+ *     - Logs every overridden "potential manual edit" as a WARNING
+ *
  * EXECUTION
- *   DATABASE_URL=<url> npx tsx scripts/backfill-sfv-publication-defaults-fca.ts
- *   DATABASE_URL=<url> npx tsx scripts/backfill-sfv-publication-defaults-fca.ts --dry-run
+ *   DATABASE_URL=<url> npx tsx scripts/backfill-sfv-publication-defaults-fca.ts [--dry-run] [--force-overrides]
  *
  * TENANT SCOPING
  *   The FC Allschwil tenant is resolved by key="fc-allschwil".
@@ -35,6 +51,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 const isDryRun = process.argv.includes("--dry-run");
+const forceOverrides = process.argv.includes("--force-overrides");
 
 // ── Counters ─────────────────────────────────────────────────────────────────
 
@@ -43,6 +60,29 @@ let websiteUpdated = 0;
 let infoboardHomeUpdated = 0;
 let infoboardAwayUpdated = 0;
 let alreadyCorrect = 0;
+let potentialManualEdits = 0;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Determines whether a record appears to have been manually edited
+ * rather than sitting at old SFV-import defaults (websiteVisible=false,
+ * infoboardVisible=false).
+ *
+ * Conservative: only flags the most unambiguous manual-override pattern —
+ * an away match that has infoboardVisible=true (which deviates from both the
+ * old default of false and the new target default of false).
+ */
+function looksManuallyEdited(
+  homeAway: string | null,
+  _websiteVisible: boolean,
+  infoboardVisible: boolean,
+): boolean {
+  const normalized = homeAway?.trim().toUpperCase() ?? null;
+  // Away match with infoboard enabled: old default was false — likely intentional manual choice
+  if (normalized === "AWAY" && infoboardVisible === true) return true;
+  return false;
+}
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -51,6 +91,15 @@ async function main() {
     console.log("🔍  DRY RUN — no database writes will be performed.\n");
   } else {
     console.log("✏️   LIVE RUN — database writes are ACTIVE.\n");
+  }
+
+  if (forceOverrides) {
+    console.log("⚠️   --force-overrides: potential manual edits WILL be overwritten.\n");
+  } else {
+    console.log(
+      "🛡️   Safety mode: potential manual edits will be SKIPPED.\n" +
+      "    Use --force-overrides to include them.\n",
+    );
   }
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -117,19 +166,39 @@ async function main() {
         continue;
       }
 
-      if (isDryRun) {
-        const changes: string[] = [];
-        if (!websiteAlreadyCorrect) {
-          changes.push(`websiteVisible: ${event.websiteVisible} → ${targetWebsiteVisible}`);
-        }
-        if (!infoboardAlreadyCorrect) {
-          changes.push(`infoboardVisible: ${event.infoboardVisible} → ${targetInfoboardVisible}`);
-        }
+      // Check for potential manual override
+      const manualEdit = looksManuallyEdited(
+        event.homeAway,
+        event.websiteVisible,
+        event.infoboardVisible,
+      );
+
+      if (manualEdit && !forceOverrides) {
+        potentialManualEdits++;
         console.log(
-          `  [DRY] id=${event.id} homeAway=${event.homeAway ?? "null"} ` +
-          `opponent="${event.opponentName ?? "?"}" :: ${changes.join(", ")}`,
+          `  [SKIP] id=${event.id} homeAway=${event.homeAway ?? "null"} ` +
+          `opponent="${event.opponentName ?? "?"}" ` +
+          `websiteVisible=${event.websiteVisible} infoboardVisible=${event.infoboardVisible} ` +
+          `— looks like a manual edit, SKIPPED (use --force-overrides to include)`,
         );
-      } else {
+        continue;
+      }
+
+      const changes: string[] = [];
+      if (!websiteAlreadyCorrect) {
+        changes.push(`websiteVisible: ${event.websiteVisible} → ${targetWebsiteVisible}`);
+      }
+      if (!infoboardAlreadyCorrect) {
+        changes.push(`infoboardVisible: ${event.infoboardVisible} → ${targetInfoboardVisible}`);
+      }
+
+      const prefix = isDryRun ? "[DRY]" : manualEdit ? "[FORCE]" : "[UPDATE]";
+      console.log(
+        `  ${prefix} id=${event.id} homeAway=${event.homeAway ?? "null"} ` +
+        `opponent="${event.opponentName ?? "?"}" :: ${changes.join(", ")}`,
+      );
+
+      if (!isDryRun) {
         await prisma.event.update({
           where: { id: event.id },
           data: {
@@ -148,11 +217,18 @@ async function main() {
 
     // ── 4. Summary ────────────────────────────────────────────────────────────
     console.log("\n── Backfill Summary ─────────────────────────────────────────");
-    console.log(`  Total scanned:              ${totalScanned}`);
-    console.log(`  Already correct (no-op):    ${alreadyCorrect}`);
-    console.log(`  websiteVisible set → true:  ${websiteUpdated}`);
-    console.log(`  infoboardVisible set → true (home):  ${infoboardHomeUpdated}`);
-    console.log(`  infoboardVisible set → false (away): ${infoboardAwayUpdated}`);
+    console.log(`  Total scanned:                         ${totalScanned}`);
+    console.log(`  Already correct (no-op):               ${alreadyCorrect}`);
+    console.log(`  Potential manual edits (skipped):      ${potentialManualEdits}`);
+    console.log(`  websiteVisible set → true:             ${websiteUpdated}`);
+    console.log(`  infoboardVisible set → true  (home):  ${infoboardHomeUpdated}`);
+    console.log(`  infoboardVisible set → false (away):  ${infoboardAwayUpdated}`);
+    if (potentialManualEdits > 0) {
+      console.log(
+        `\n  ⚠️  ${potentialManualEdits} record(s) skipped as potential manual edits.` +
+        `\n      Review the [SKIP] lines above, then re-run with --force-overrides if appropriate.`,
+      );
+    }
     if (isDryRun) {
       console.log("\n  ⚠️  DRY RUN — no changes written to database.");
     } else {

@@ -5,13 +5,15 @@
  *
  * Exercises the backfill logic against a mocked Prisma client to verify:
  *
- *   B-PUB02-1.  Tenant scoping: only fcallschwil tenant is touched
+ *   B-PUB02-1.  Tenant scoping: only fc-allschwil tenant is touched
  *   B-PUB02-2.  Only SFV MATCH events are updated
  *   B-PUB02-3.  Home match (homeAway=HOME) → websiteVisible=true, infoboardVisible=true
  *   B-PUB02-4.  Away match (homeAway=AWAY) → websiteVisible=true, infoboardVisible=false
  *   B-PUB02-5.  Idempotency: already-correct rows produce no update call
  *   B-PUB02-6.  Unrelated fields are never included in the update payload
  *   B-PUB02-7.  Cross-tenant mutation: events from other tenants are not touched
+ *   B-PUB02-8.  Manual-override protection: away match with infoboardVisible=true is SKIPPED
+ *   B-PUB02-9.  --force-overrides flag allows overwriting potential manual edits
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -44,8 +46,10 @@ type UpdatePayload = {
 
 function computeBackfillUpdates(
   events: EventRow[],
-): Map<string, UpdatePayload> {
+  skipManualEdits = true,
+): { updates: Map<string, UpdatePayload>; skipped: string[] } {
   const updates = new Map<string, UpdatePayload>();
+  const skipped: string[] = [];
 
   for (const event of events) {
     const normalizedHomeAway = event.homeAway?.trim().toUpperCase() ?? null;
@@ -60,13 +64,20 @@ function computeBackfillUpdates(
       continue; // idempotent no-op
     }
 
+    // Manual-override protection: away match with infoboardVisible=true
+    const looksManual = normalizedHomeAway === "AWAY" && event.infoboardVisible === true;
+    if (looksManual && skipManualEdits) {
+      skipped.push(event.id);
+      continue;
+    }
+
     updates.set(event.id, {
       websiteVisible: targetWebsiteVisible,
       infoboardVisible: targetInfoboardVisible,
     });
   }
 
-  return updates;
+  return { updates, skipped };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -87,7 +98,7 @@ describe("PUB-02 — Backfill policy logic", () => {
       },
     ];
 
-    const updates = computeBackfillUpdates(events);
+    const { updates } = computeBackfillUpdates(events);
 
     expect(updates.has("evt-home")).toBe(true);
     expect(updates.get("evt-home")).toEqual({
@@ -109,7 +120,7 @@ describe("PUB-02 — Backfill policy logic", () => {
       },
     ];
 
-    const updates = computeBackfillUpdates(events);
+    const { updates } = computeBackfillUpdates(events);
 
     expect(updates.has("evt-away")).toBe(true);
     expect(updates.get("evt-away")).toEqual({
@@ -131,7 +142,7 @@ describe("PUB-02 — Backfill policy logic", () => {
       },
     ];
 
-    const updates = computeBackfillUpdates(events);
+    const { updates } = computeBackfillUpdates(events);
 
     expect(updates.has("evt-home-ok")).toBe(false);
     expect(updates.size).toBe(0);
@@ -150,7 +161,7 @@ describe("PUB-02 — Backfill policy logic", () => {
       },
     ];
 
-    const updates = computeBackfillUpdates(events);
+    const { updates } = computeBackfillUpdates(events);
 
     expect(updates.has("evt-away-ok")).toBe(false);
     expect(updates.size).toBe(0);
@@ -169,7 +180,7 @@ describe("PUB-02 — Backfill policy logic", () => {
       },
     ];
 
-    const updates = computeBackfillUpdates(events);
+    const { updates } = computeBackfillUpdates(events);
     const payload = updates.get("evt-1")!;
 
     expect(Object.keys(payload).sort()).toEqual(["infoboardVisible", "websiteVisible"]);
@@ -206,7 +217,7 @@ describe("PUB-02 — Backfill policy logic", () => {
       },
     ];
 
-    const updates = computeBackfillUpdates(events);
+    const { updates } = computeBackfillUpdates(events);
 
     // Two updates, one no-op
     expect(updates.size).toBe(2);
@@ -224,7 +235,7 @@ describe("PUB-02 — Backfill policy logic", () => {
   it("B-PUB02-1/2: query scoping — must filter by tenantId, source=SFV, type=MATCH", () => {
     // This test documents the query predicates by comparing against known expected values.
     const expectedQueryPredicates = {
-      tenantId: "<fca-tenant-id>", // resolved from tenant key="fcallschwil"
+      tenantId: "<fca-tenant-id>", // resolved from tenant key="fc-allschwil"
       source: "SFV",
       type: "MATCH",
     };
@@ -233,5 +244,46 @@ describe("PUB-02 — Backfill policy logic", () => {
     expect(expectedQueryPredicates.source).toBe("SFV");
     expect(expectedQueryPredicates.type).toBe("MATCH");
     expect(expectedQueryPredicates.tenantId).toBeTruthy();
+  });
+
+  it("B-PUB02-8: manual-override protection — away match with infoboardVisible=true is SKIPPED", () => {
+    const events: EventRow[] = [
+      {
+        id: "evt-away-manual",
+        homeAway: "AWAY",
+        websiteVisible: true,  // already correct
+        infoboardVisible: true, // manual override — deviates from AWAY target (false)
+        startAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: "SCHEDULED",
+        opponentName: "FC Allschwil 1",
+      },
+    ];
+
+    // Default mode: skipManualEdits=true
+    const { updates, skipped } = computeBackfillUpdates(events, true);
+
+    expect(updates.has("evt-away-manual")).toBe(false);
+    expect(skipped).toContain("evt-away-manual");
+  });
+
+  it("B-PUB02-9: --force-overrides — away match with infoboardVisible=true IS updated", () => {
+    const events: EventRow[] = [
+      {
+        id: "evt-away-force",
+        homeAway: "AWAY",
+        websiteVisible: true,  // already correct
+        infoboardVisible: true, // manual override
+        startAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: "SCHEDULED",
+        opponentName: "FC Allschwil 1",
+      },
+    ];
+
+    // Force mode: skipManualEdits=false
+    const { updates, skipped } = computeBackfillUpdates(events, false);
+
+    expect(updates.has("evt-away-force")).toBe(true);
+    expect(updates.get("evt-away-force")).toEqual({ websiteVisible: true, infoboardVisible: false });
+    expect(skipped).toHaveLength(0);
   });
 });
