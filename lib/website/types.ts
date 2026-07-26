@@ -172,6 +172,18 @@ export type MatchesData = {
   matches: PublicWebsiteEventItem[];
 };
 
+export type ClubEventsData = {
+  clubEvents: PublicWebsiteEventItem[];
+};
+
+export type TournamentsData = {
+  tournaments: PublicWebsiteEventItem[];
+};
+
+export type TrainingsData = {
+  trainings: PublicWebsiteEventItem[];
+};
+
 // ---------------------------------------------------------------------------
 // Public team — website-safe shapes
 //

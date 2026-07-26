@@ -1,5 +1,39 @@
 import { prisma } from "@/lib/db/prisma";
 import { batchGetEventAllocationDisplayForTenant } from "@/lib/facilities/display-helpers";
+import { toLocalDateKey } from "@/lib/publishing/time/temporal-grouping";
+
+// ---------------------------------------------------------------------------
+// Domain classification constants
+//
+// These are the authoritative EventType sets for each public domain feed.
+// All new endpoints MUST derive their event-type filtering from these constants
+// rather than duplicating string literals.
+//
+// EventType enum: MATCH | TOURNAMENT | TRAINING | OTHER | VACATION_PERIOD
+//   - Club events are EventType.OTHER (general club activities not classified as
+//     matches, tournaments, or trainings).
+//   - VACATION_PERIOD is an administrative planning type and is intentionally
+//     excluded from all public website feeds.
+// ---------------------------------------------------------------------------
+
+/** EventType values for the /website/club-events feed. */
+export const CLUB_EVENT_TYPES: string[] = ["OTHER"];
+
+/** EventType values for the /website/matches feed. */
+export const MATCH_EVENT_TYPES: string[] = ["MATCH"];
+
+/** EventType values for the /website/tournaments feed. */
+export const TOURNAMENT_EVENT_TYPES: string[] = ["TOURNAMENT"];
+
+/** EventType values for the /website/trainings feed. */
+export const TRAINING_EVENT_TYPES: string[] = ["TRAINING"];
+
+// ---------------------------------------------------------------------------
+// Timezone
+// ---------------------------------------------------------------------------
+
+/** Canonical IANA timezone for all public website date grouping. */
+const WEBSITE_TIMEZONE = "Europe/Zurich";
 
 export type PublicEventSurface =
   | "all"
@@ -22,6 +56,13 @@ export type GetPublicEventsInput = {
   dateFrom?: string | null;
   dateTo?: string | null;
   limit?: number | null;
+  /**
+   * When provided, restricts results to events of the given EventType values.
+   * Filtering is applied at the database query level.
+   * Use the exported domain constants (MATCH_EVENT_TYPES, TRAINING_EVENT_TYPES,
+   * TOURNAMENT_EVENT_TYPES, CLUB_EVENT_TYPES) rather than raw string literals.
+   */
+  eventTypes?: string[] | null;
 };
 
 export type PublicEventItem = {
@@ -189,6 +230,10 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
     where.tenantId = input.tenantId;
   }
 
+  if (input.eventTypes && input.eventTypes.length > 0) {
+    where.type = { in: input.eventTypes };
+  }
+
   if (input.seasonKey) {
     where.season = {
       key: input.seasonKey,
@@ -275,19 +320,37 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
   return events.map((event) => toPublicEventItem(event));
 }
 
-function toSwissDateKey(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return year + "-" + month + "-" + day;
+/**
+ * Returns the calendar date of `value` in Europe/Zurich as a `YYYY-MM-DD` string.
+ * Uses `toLocalDateKey` from the temporal-grouping utility so the result is
+ * independent of the server's local timezone.
+ */
+function toSwissDateKey(value: Date): string {
+  return toLocalDateKey(value, WEBSITE_TIMEZONE);
 }
 
-function getCalendarWeek(value: Date) {
-  const date = new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+/**
+ * Returns the ISO calendar week number for `value`, computed from its
+ * Europe/Zurich local date rather than the server's local timezone.
+ */
+function getCalendarWeek(value: Date): number {
+  const dateKey = toLocalDateKey(value, WEBSITE_TIMEZONE);
+  const [yearStr, monthStr, dayStr] = dateKey.split("-");
+  const d = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+}
+
+/** Weekday label formatter — always uses Europe/Zurich, never server-local timezone. */
+const SWISS_WEEKDAY_FORMATTER = new Intl.DateTimeFormat("de-CH", {
+  weekday: "long",
+  timeZone: WEBSITE_TIMEZONE,
+});
+
+function toSwissWeekdayLabel(value: Date): string {
+  return SWISS_WEEKDAY_FORMATTER.format(value);
 }
 
 export async function getGroupedWochenplan(input: Omit<GetPublicEventsInput, "surface">) {
@@ -310,9 +373,7 @@ export async function getGroupedWochenplan(input: Omit<GetPublicEventsInput, "su
       grouped.set(key, {
         date: key,
         calendarWeek: getCalendarWeek(event.startAt),
-        weekdayLabel: event.startAt.toLocaleDateString("de-CH", {
-          weekday: "long",
-        }),
+        weekdayLabel: toSwissWeekdayLabel(event.startAt),
         events: [],
       });
     }

@@ -1,6 +1,23 @@
 /**
  * GET /api/public/[tenant]/website/events
  *
+ * ⚠️  COMPATIBILITY / AGGREGATE FEED
+ *
+ * This endpoint is a backward-compatible aggregate that returns all
+ * website-visible event types (MATCH, TOURNAMENT, TRAINING, OTHER, etc.)
+ * for the given surface. It exists to preserve existing consumer contracts
+ * for the FC Allschwil website and must not be deleted without a migration plan.
+ *
+ * New public API consumers should prefer the domain-specific endpoints:
+ *   - Club events (EventType.OTHER):    GET /api/public/[tenant]/website/club-events
+ *   - Matches (EventType.MATCH):        GET /api/public/[tenant]/website/matches
+ *   - Tournaments (EventType.TOURNAMENT): GET /api/public/[tenant]/website/tournaments
+ *   - Trainings (EventType.TRAINING):   GET /api/public/[tenant]/website/trainings
+ *   - Weekly schedule:                  GET /api/public/[tenant]/website/weekplan
+ *
+ * Do not change the response contract of this endpoint without a coordinated
+ * consumer migration.
+ *
  * Returns website-visible events for the specified tenant, scoped to the
  * requested surface. Only events with status SCHEDULED, LIVE, COMPLETED, or
  * POSTPONED are included. Draft, Archived, and Cancelled events are excluded.
@@ -101,12 +118,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   } catch (error) {
     console.error("[public/[tenant]/website/events] GET failed:", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? "Technischer Fehler: " + error.message
-            : "Events Feed konnte nicht geladen werden.",
-      },
+      { error: "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut." },
       { status: 500 },
     );
   }

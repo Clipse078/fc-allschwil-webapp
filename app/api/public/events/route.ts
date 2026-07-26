@@ -1,12 +1,43 @@
+/**
+ * GET /api/public/events
+ *
+ * ⚠️  LEGACY / DEPRECATED UNVERSIONED ROUTE
+ *
+ * This route predates the tenant-scoped public API surface. It is preserved
+ * for backward compatibility but MUST NOT be used by new consumers.
+ *
+ * New consumers should use the tenant-scoped canonical endpoints instead:
+ *   GET /api/public/[tenant]/website/club-events
+ *   GET /api/public/[tenant]/website/matches
+ *   GET /api/public/[tenant]/website/tournaments
+ *   GET /api/public/[tenant]/website/trainings
+ *   GET /api/public/[tenant]/website/weekplan
+ *
+ * TENANT ISOLATION
+ * All queries are tenant-scoped. Resolution order:
+ *   1. X-Tenant-Slug request header (multi-tenant override).
+ *   2. Default tenant fallback (single-tenant path, currently fc-allschwil).
+ * Requests that cannot resolve a tenant receive a 404 response.
+ * It is not possible for this route to return events from multiple tenants.
+ *
+ * Query params:
+ *   surface    — "all" | "homepage" | "wochenplan" | "trainingsplan" | "team-page" | "infoboard"
+ *                Default: "all"
+ *   seasonKey  — ISO season key (e.g. "2025-26"). Default: all seasons.
+ *   teamSlug   — Filter by team slug. Default: all teams.
+ *   dateFrom   — ISO date lower bound for startAt (inclusive). Default: no lower bound.
+ *   dateTo     — ISO date upper bound for startAt (inclusive). Default: no upper bound.
+ *   limit      — Max events returned (default 100).
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import {
   getPublicEvents,
   type PublicEventSurface,
 } from "@/lib/events/public-event-feed";
-
-// TODO(tenant-isolation): Public events feed is currently not tenant-scoped.
-// See app/api/public/infoboard/route.ts for the full tracking note.
-// When multi-tenant public websites go live, add tenant resolution here too.
+import {
+  resolveTenantFromRequest,
+} from "@/lib/website/response-helpers";
 
 const ALLOWED_SURFACES: PublicEventSurface[] = [
   "all",
@@ -45,6 +76,13 @@ function parseLimit(value: string | null) {
 
 export async function GET(request: NextRequest) {
   try {
+    // Tenant isolation: resolve from X-Tenant-Slug header or default tenant.
+    const tenant = await resolveTenantFromRequest(request);
+
+    if (!tenant) {
+      return NextResponse.json({ error: "Tenant not found." }, { status: 404 });
+    }
+
     const { searchParams } = new URL(request.url);
 
     const surface = parseSurface(searchParams.get("surface"));
@@ -56,6 +94,7 @@ export async function GET(request: NextRequest) {
 
     const rawEvents = await getPublicEvents({
       surface,
+      tenantId: tenant.id,
       seasonKey,
       teamSlug,
       dateFrom,
@@ -85,14 +124,8 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Public events feed failed:", error);
-
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? "Technischer Fehler: " + error.message
-            : "Public Events Feed konnte nicht geladen werden.",
-      },
+      { error: "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut." },
       { status: 500 }
     );
   }

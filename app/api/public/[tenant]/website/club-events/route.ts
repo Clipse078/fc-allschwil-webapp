@@ -1,27 +1,37 @@
 /**
- * GET /api/public/[tenant]/website/matches
+ * GET /api/public/[tenant]/website/club-events
  *
- * Returns only EventType.MATCH events that are visible on the website for the
- * specified tenant. The event-type filter is applied at the database level via
- * getPublicEvents({ eventTypes: MATCH_EVENT_TYPES }).
+ * Returns general club-event records (EventType.OTHER) that are visible on the
+ * website for the specified tenant.
  *
- * Only MATCH events with status SCHEDULED, LIVE, COMPLETED, or POSTPONED are
- * included. All other event types are excluded at the database level.
- * Draft, Archived, and Cancelled events are excluded.
+ * "Club events" are general club activities that are not matches, tournaments,
+ * or trainings. Examples: Generalversammlung, Sponsorenlauf, Public Viewing,
+ * Vereinsanlass, Helfereinsatz, Informationsabend.
+ *
+ * In the SportClubEvo data model these events carry EventType.OTHER.
+ * EventType.MATCH, EventType.TOURNAMENT, and EventType.TRAINING are strictly
+ * excluded. EventType.VACATION_PERIOD is an administrative planning type and
+ * is also excluded.
+ *
+ * The event-type filter is applied at the database level via
+ * getPublicEvents({ eventTypes: CLUB_EVENT_TYPES }).
+ *
+ * Only events with status SCHEDULED, LIVE, COMPLETED, or POSTPONED are
+ * included. Draft, Archived, and Cancelled events are excluded.
  *
  * Tenant is resolved from the [tenant] path segment.
- * Results are always tenant-isolated.
+ * Results are always tenant-isolated — no cross-tenant data is returned.
  *
  * Query params:
  *   seasonKey  — ISO season key (e.g. "2025-26"). Default: all seasons.
  *   teamSlug   — Filter by team slug. Default: all teams.
  *   dateFrom   — ISO date lower bound for startAt (inclusive). Default: no lower bound.
  *   dateTo     — ISO date upper bound for startAt (inclusive). Default: no upper bound.
- *   limit      — Max matches returned (1–250, default 100).
+ *   limit      — Max events returned (1–250, default 100).
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { getPublicEvents, MATCH_EVENT_TYPES } from "@/lib/events/public-event-feed";
+import { getPublicEvents, CLUB_EVENT_TYPES } from "@/lib/events/public-event-feed";
 import { toPublicWebsiteEvent } from "@/lib/website/public-events-mapper";
 import {
   buildWebsiteEnvelope,
@@ -65,24 +75,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       dateFrom,
       dateTo,
       limit,
-      // DB-level type filter: only MATCH events are retrieved.
-      eventTypes: MATCH_EVENT_TYPES,
+      eventTypes: CLUB_EVENT_TYPES,
     });
 
-    const matches = rawEvents.map(toPublicWebsiteEvent);
+    const clubEvents = rawEvents.map(toPublicWebsiteEvent);
 
     return NextResponse.json(
       buildWebsiteEnvelope(
         tenant,
-        { matches },
+        { clubEvents },
         {
-          total: matches.length,
+          total: clubEvents.length,
           filters: { seasonKey, teamSlug, dateFrom, dateTo, limit },
         },
       ),
     );
   } catch (error) {
-    console.error("[public/[tenant]/website/matches] GET failed:", error);
+    console.error("[public/[tenant]/website/club-events] GET failed:", error);
     return NextResponse.json(
       { error: "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut." },
       { status: 500 },
