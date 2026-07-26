@@ -26,7 +26,7 @@
  *   DATABASE_URL=<url> npx tsx scripts/backfill-sfv-publication-defaults-fca.ts --dry-run
  *
  * TENANT SCOPING
- *   The FC Allschwil tenant is resolved by key="fcallschwil".
+ *   The FC Allschwil tenant is resolved by key="fc-allschwil".
  *   If no such tenant exists the script exits with a clear error.
  */
 
@@ -60,13 +60,13 @@ async function main() {
   try {
     // ── 1. Resolve FC Allschwil tenant ────────────────────────────────────────
     const tenant = await prisma.tenant.findUnique({
-      where: { key: "fcallschwil" },
+      where: { key: "fc-allschwil" },
       select: { id: true, key: true, name: true },
     });
 
     if (!tenant) {
       console.error(
-        "❌  Tenant with key=\"fcallschwil\" not found. " +
+        "❌  Tenant with key=\"fc-allschwil\" not found. " +
         "Verify the tenant exists and re-run.",
       );
       process.exit(1);
