@@ -28,6 +28,7 @@ import {
 } from "vitest";
 import MatchcenterDetailOperational, {
   type MatchcenterDetailOperationalProps,
+  computeAllocationWarning,
 } from "@/components/admin/matchcenter/MatchcenterDetailOperational";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -387,5 +388,54 @@ describe("MatchcenterDetailOperational", () => {
         screen.getByTestId("away-dressing-room-select"),
       ).toBeDisabled();
     });
+  });
+});
+
+// ── PUB-02: computeAllocationWarning unit tests ────────────────────────────────
+
+describe("PUB-02 — computeAllocationWarning", () => {
+  it("AW-1: missing pitch only → 'Es fehlt noch die Platzzuteilung.'", () => {
+    const result = computeAllocationWarning("HOME", true, null, "E1", "E2");
+    expect(result).toBe("Es fehlt noch die Platzzuteilung.");
+  });
+
+  it("AW-2: missing home dressing room only → 'Es fehlt noch Heimkabine.'", () => {
+    const result = computeAllocationWarning("HOME", true, "STADION", null, "E2");
+    expect(result).toBe("Es fehlt noch Heimkabine.");
+  });
+
+  it("AW-3: missing away dressing room only → 'Es fehlt noch Gästekabine.'", () => {
+    const result = computeAllocationWarning("HOME", true, "STADION", "E1", null);
+    expect(result).toBe("Es fehlt noch Gästekabine.");
+  });
+
+  it("AW-4: missing home and away dressing rooms → 'Es fehlen noch Heimkabine und Gästekabine.'", () => {
+    const result = computeAllocationWarning("HOME", true, "STADION", null, null);
+    expect(result).toBe("Es fehlen noch Heimkabine und Gästekabine.");
+  });
+
+  it("AW-5: all missing → 'Es fehlen noch Platz, Heimkabine und Gästekabine.'", () => {
+    const result = computeAllocationWarning("HOME", true, null, null, null);
+    expect(result).toBe("Es fehlen noch Platz, Heimkabine und Gästekabine.");
+  });
+
+  it("AW-6: fully allocated → null (no warning)", () => {
+    const result = computeAllocationWarning("HOME", true, "STADION", "E1", "E2");
+    expect(result).toBeNull();
+  });
+
+  it("AW-7: away match → null (no warning regardless of allocations)", () => {
+    const result = computeAllocationWarning("AWAY", true, null, null, null);
+    expect(result).toBeNull();
+  });
+
+  it("AW-8: infoboard disabled → null (no warning)", () => {
+    const result = computeAllocationWarning("HOME", false, null, null, null);
+    expect(result).toBeNull();
+  });
+
+  it("AW-9: homeAway=null → null (no warning)", () => {
+    const result = computeAllocationWarning(null, true, null, null, null);
+    expect(result).toBeNull();
   });
 });

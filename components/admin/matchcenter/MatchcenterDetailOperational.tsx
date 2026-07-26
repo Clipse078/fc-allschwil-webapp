@@ -116,6 +116,51 @@ function computeReadiness(
   };
 }
 
+/**
+ * Computes a specific German allocation warning message for the infoboard
+ * readiness section.
+ *
+ * Returns a message string when all of the following are true:
+ *   - homeAway = "HOME"
+ *   - infoboardVisible = true
+ *   - at least one allocation is missing (pitch, home dressing room, or away dressing room)
+ *
+ * Returns null when no warning applies (away match, infoboard disabled, or fully allocated).
+ *
+ * Example messages:
+ *   "Es fehlt noch die Platzzuteilung."
+ *   "Es fehlen noch Heimkabine und Gästekabine."
+ *   "Es fehlen noch Platz, Heimkabine und Gästekabine."
+ */
+export function computeAllocationWarning(
+  homeAway: string | null,
+  infoboardVisible: boolean,
+  pitchCode: string | null,
+  homeDressingRoomCode: string | null,
+  awayDressingRoomCode: string | null,
+): string | null {
+  const isHome = homeAway?.trim().toUpperCase() === "HOME";
+  if (!isHome || !infoboardVisible) return null;
+
+  const missing: string[] = [];
+  if (!pitchCode?.trim()) missing.push("Platz");
+  if (!homeDressingRoomCode?.trim()) missing.push("Heimkabine");
+  if (!awayDressingRoomCode?.trim()) missing.push("Gästekabine");
+
+  if (missing.length === 0) return null;
+
+  if (missing.length === 1) {
+    const item = missing[0]!;
+    // "die" for "Platz" → "die Platzzuteilung", for rooms use nominative
+    if (item === "Platz") return "Es fehlt noch die Platzzuteilung.";
+    return `Es fehlt noch ${item}.`;
+  }
+
+  const last = missing[missing.length - 1]!;
+  const rest = missing.slice(0, -1);
+  return `Es fehlen noch ${rest.join(", ")} und ${last}.`;
+}
+
 function formatTeamLabel(team: TeamItem): string {
   const suffix = [team.ageGroup, team.genderGroup]
     .filter(Boolean)
@@ -263,6 +308,14 @@ export default function MatchcenterDetailOperational({
     infoboardVisible,
   );
 
+  const allocationWarning = computeAllocationWarning(
+    homeAway,
+    infoboardVisible,
+    pitchCode,
+    homeDressingRoomCode,
+    awayDressingRoomCode,
+  );
+
   const previewDate = matchDateIso.split("T")[0] ?? matchDateIso;
   const previewHref = `/dashboard/infoboard?date=${previewDate}`;
 
@@ -355,6 +408,26 @@ export default function MatchcenterDetailOperational({
               </li>
             ))}
           </ul>
+        )}
+
+        {allocationWarning && (
+          <div
+            className="mt-4 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3"
+            data-testid="infoboard-allocation-warning"
+          >
+            <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div>
+              <p className="text-sm font-semibold text-amber-950">
+                Infoboard-Zuteilung unvollständig
+              </p>
+              <p
+                className="mt-1 text-sm text-amber-900"
+                data-testid="infoboard-allocation-warning-text"
+              >
+                {allocationWarning}
+              </p>
+            </div>
+          </div>
         )}
       </SectionCard>
 
@@ -517,7 +590,7 @@ export default function MatchcenterDetailOperational({
                 Auf Website anzeigen
               </p>
               <p className="text-xs text-[var(--muted)]">
-                Sichtbar auf der öffentlichen Website.
+                Das Spiel wird im Spielplan und in den nächsten Spielen auf der Website angezeigt.
               </p>
             </div>
 

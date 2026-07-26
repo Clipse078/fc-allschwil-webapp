@@ -20,7 +20,10 @@
  *   C2. New away match persists homeAway = "AWAY".
  *   C3. "H" is never written on create.
  *   C4. "A" is never written on create.
- *   C5. infoboardVisible defaults to false (locally managed, not overwritten).
+ *   C5. websiteVisible defaults to true for home match (PUB-02).
+ *   C6. websiteVisible defaults to true for away match (PUB-02).
+ *   C7. infoboardVisible defaults to true for home match (PUB-02).
+ *   C8. infoboardVisible defaults to false for away match (PUB-02).
  *
  * Update path:
  *   U1. Updated home match writes homeAway = "HOME".
@@ -255,16 +258,61 @@ describe("createMatchWithMapping — homeAway", () => {
     expect(createData.homeAway).not.toBe("A");
   });
 
-  it("C5: infoboardVisible defaults to false (not overwritten by sync)", async () => {
+  it("C5: websiteVisible defaults to true for home match (PUB-02)", async () => {
     await createMatchWithMapping(
       makeEntry(),
       makeContext(),
       "season-1",
       "team-1",
       "FC Opponent B",
-      true,
+      true, // isHome
       "team-1",
       null,
+    );
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.websiteVisible).toBe(true);
+  });
+
+  it("C6: websiteVisible defaults to true for away match (PUB-02)", async () => {
+    await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      null,
+      "FC Allschwil",
+      false, // isHome → away match
+      null,
+      "team-1",
+    );
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.websiteVisible).toBe(true);
+  });
+
+  it("C7: infoboardVisible defaults to true for home match (PUB-02)", async () => {
+    await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      "team-1",
+      "FC Opponent B",
+      true, // isHome
+      "team-1",
+      null,
+    );
+    const createData = mockEventCreate.mock.calls[0][0].data;
+    expect(createData.infoboardVisible).toBe(true);
+  });
+
+  it("C8: infoboardVisible defaults to false for away match (PUB-02)", async () => {
+    await createMatchWithMapping(
+      makeEntry(),
+      makeContext(),
+      "season-1",
+      null,
+      "FC Allschwil",
+      false, // isHome → away match
+      null,
+      "team-1",
     );
     const createData = mockEventCreate.mock.calls[0][0].data;
     expect(createData.infoboardVisible).toBe(false);

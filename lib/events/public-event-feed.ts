@@ -167,7 +167,10 @@ function normalizeLimit(value?: number | null) {
 function buildSurfaceWhere(surface: PublicEventSurface) {
   switch (surface) {
     case "homepage":
-      return { websiteVisible: true, homepageVisible: true };
+      // Homepage uses the same predicate as the website feed: websiteVisible only.
+      // homepageVisible is a legacy field and must not independently gate homepage
+      // match eligibility (PUB-02 policy decision — see docs/public-website-api.md).
+      return { websiteVisible: true };
     case "wochenplan":
       return { websiteVisible: true, wochenplanVisible: true };
     case "trainingsplan":

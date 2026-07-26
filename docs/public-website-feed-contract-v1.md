@@ -3,7 +3,7 @@
 > **Audience**: FC Allschwil website team, external integrators.
 > **Base URL**: Configured per environment via `NEXT_PUBLIC_API_BASE_URL`.
 >   - STAGE: `https://stage-webapp.fcallschwil.ch`
->   - PROD:  `https://webapp.fcallschwil.ch`
+>   - PROD:  `https://fcallschwil.sportclubevo.com`
 >
 > **Authentication**: None. All endpoints are public and read-only.
 > **HTTP method**: GET only. Any other method returns `405 Method Not Allowed`.
@@ -340,6 +340,6 @@ limits.
 | Environment | API Base URL                        | Website URL                    |
 |-------------|-------------------------------------|--------------------------------|
 | STAGE       | `https://stage-webapp.fcallschwil.ch` | `https://stage.fcallschwil.ch` |
-| PROD        | `https://webapp.fcallschwil.ch`     | `https://www.fcallschwil.ch`   |
+| PROD        | `https://fcallschwil.sportclubevo.com` | `https://www.fcallschwil.ch`   |
 
 Never mix environments. The STAGE website must only call the STAGE WebApp.

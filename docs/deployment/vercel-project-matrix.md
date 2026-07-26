@@ -24,7 +24,7 @@
 - Project name: `fc-allschwil-webapp-prod`
 - Git branch: `main`
 - Purpose: live internal operations system
-- Suggested domain later: `webapp.fcallschwil.ch`
+- Canonical domain: `fcallschwil.sportclubevo.com` (SportClubEvo tenant endpoint)
 
 ---
 
@@ -76,8 +76,8 @@ Optional later:
 ### PROD
 - `NODE_ENV=production`
 - `APP_ENV=prod`
-- `APP_BASE_URL=https://webapp.fcallschwil.ch`
-- `NEXTAUTH_URL=https://webapp.fcallschwil.ch`
+- `APP_BASE_URL=https://fcallschwil.sportclubevo.com`
+- `NEXTAUTH_URL=https://fcallschwil.sportclubevo.com`
 - `NEXTAUTH_SECRET=<unique-prod-secret>`
 - `DATABASE_URL=<prod-db-url>`
 - `DIRECT_URL=<prod-direct-db-url>`

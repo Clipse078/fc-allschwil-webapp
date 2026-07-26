@@ -245,9 +245,12 @@ export async function createMatchWithMapping(
           externalSource: eventFields.externalSource,
           externalSourceId: eventFields.externalSourceId,
           lastSyncedAt: eventFields.lastSyncedAt,
-          // Safe defaults for locally managed fields
-          websiteVisible: false,
-          infoboardVisible: false,
+          // Publication defaults (PUB-02):
+          //   websiteVisible: all SFV-imported matches are visible on the website
+          //   infoboardVisible: home matches are infoboard-visible by default; away are not
+          //   All other visibility fields default to false (schema defaults).
+          websiteVisible: true,
+          infoboardVisible: isHome,
           wochenplanVisible: false,
           homepageVisible: false,
           trainingsplanVisible: false,

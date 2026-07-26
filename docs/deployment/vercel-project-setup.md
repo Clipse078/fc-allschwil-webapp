@@ -92,7 +92,7 @@ are provided by Vercel automatically and should not be manually overridden unles
 ## Recommended first DNS targets later
 
 - STAGE: `stage-webapp.fcallschwil.ch`
-- PROD: `webapp.fcallschwil.ch`
+- PROD: `fcallschwil.sportclubevo.com` (canonical SportClubEvo tenant endpoint)
 
 ---
 

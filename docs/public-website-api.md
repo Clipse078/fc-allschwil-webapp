@@ -3,7 +3,7 @@
 > **Audience**: FC Allschwil website team, external integrators.
 > **Base URL**: Configured per environment via `NEXT_PUBLIC_API_BASE_URL`.
 >   - STAGE: `https://stage-webapp.fcallschwil.ch`
->   - PROD:  `https://webapp.fcallschwil.ch`
+>   - PROD:  `https://fcallschwil.sportclubevo.com`
 >
 > **Authentication**: None. All `/api/public/*` endpoints are public and read-only.
 > **HTTP method**: GET only. Any other method returns `405 Method Not Allowed`.
