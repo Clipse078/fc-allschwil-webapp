@@ -416,15 +416,11 @@ export default function MatchcenterDetail({
               <div className="space-y-2">
                 <BooleanStatus
                   active={match.visibility.websiteVisible}
-                  label="Website"
+                  label="Website (inkl. Homepage)"
                 />
                 <BooleanStatus
                   active={match.visibility.infoboardVisible}
                   label="Infoboard"
-                />
-                <BooleanStatus
-                  active={match.visibility.homepageVisible}
-                  label="Homepage"
                 />
                 <BooleanStatus
                   active={match.visibility.wochenplanVisible}

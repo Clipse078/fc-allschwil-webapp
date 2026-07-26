@@ -268,9 +268,10 @@ describe("MatchcenterDetail", () => {
   it("renders visibility destinations", () => {
     render(<MatchcenterDetail match={createMatch()} />);
 
-    expect(screen.getByText("Website")).toBeTruthy();
+    expect(screen.getByText("Website (inkl. Homepage)")).toBeTruthy();
     expect(screen.getByText("Infoboard")).toBeTruthy();
-    expect(screen.getByText("Homepage")).toBeTruthy();
+    // Homepage badge removed — website visibility controls both (PUB-02).
+    expect(screen.queryByText("Homepage")).toBeNull();
     expect(screen.getByText("Wochenplan")).toBeTruthy();
     expect(screen.getByText("Trainingsplan")).toBeTruthy();
     expect(screen.getByText("Teamseite")).toBeTruthy();

@@ -14,8 +14,8 @@ DIRECT_URL=<paste-stage-direct-database-url>
 
 NODE_ENV=production
 APP_ENV=prod
-APP_BASE_URL=https://webapp.fcallschwil.ch
-NEXTAUTH_URL=https://webapp.fcallschwil.ch
+APP_BASE_URL=https://fcallschwil.sportclubevo.com
+NEXTAUTH_URL=https://fcallschwil.sportclubevo.com
 NEXTAUTH_SECRET=<paste-unique-prod-secret>
 DATABASE_URL=<paste-prod-database-url>
 DIRECT_URL=<paste-prod-direct-database-url>
