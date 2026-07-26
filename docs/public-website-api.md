@@ -22,11 +22,14 @@
 7. [Privacy and Exclusions](#privacy-and-exclusions)
 8. [Endpoints (v2 — path-based tenant)](#endpoints-v2--path-based-tenant)
    - [GET /api/public/[tenant]/website/news](#get-apipublictenantwebsitenews)
-   - [GET /api/public/[tenant]/website/events](#get-apipublictenantwebsiteevents)
-   - [GET /api/public/[tenant]/website/matches](#get-apipublictenantwebsitematches)
+   - [GET /api/public/[tenant]/website/events](#get-apipublictenantwebsiteevents) ⚠️ compatibility aggregate
+   - [GET /api/public/[tenant]/website/club-events](#get-apipublictenantwebsiteclub-events) ✅ canonical
+   - [GET /api/public/[tenant]/website/matches](#get-apipublictenantwebsitematches) ✅ canonical
+   - [GET /api/public/[tenant]/website/tournaments](#get-apipublictenantwebsitetournaments) ✅ canonical
+   - [GET /api/public/[tenant]/website/trainings](#get-apipublictenantwebsitetrainings) ✅ canonical
    - [GET /api/public/[tenant]/website/teams](#get-apipublictenantwebsiteteams)
    - [GET /api/public/[tenant]/website/teams/[slug]](#get-apipublictenantwebsiteteamsslug)
-   - [GET /api/public/[tenant]/website/weekplan](#get-apipublictenantwebsiteweekplan)
+   - [GET /api/public/[tenant]/website/weekplan](#get-apipublictenantwebsiteweekplan) ✅ canonical
    - [GET /api/public/[tenant]/website/homepage](#get-apipublictenantwebsitehomepage)
    - [GET /api/public/[tenant]/website/navigation](#get-apipublictenantwebsitenavigation)
 9. [Endpoints (v1 — header-based tenant, legacy)](#endpoints-v1--header-based-tenant-legacy)
@@ -225,6 +228,8 @@ GET /api/public/fc-allschwil/website/news?limit=5
 
 ### GET /api/public/[tenant]/website/events
 
+> ⚠️ **Compatibility / aggregate feed.** This endpoint returns all visible event types together. New consumers should prefer the domain-specific feeds below (`/club-events`, `/matches`, `/tournaments`, `/trainings`). This endpoint will remain available for backward compatibility until a formal migration window is opened.
+
 Returns all website-visible events for the tenant. Use the `surface` parameter to request a specific placement context.
 
 #### Query parameters
@@ -363,6 +368,203 @@ GET /api/public/fc-allschwil/website/matches?seasonKey=2025-26&teamSlug=1-mannsc
 ```
 
 Response items use the same shape as `data.events[]` above.
+
+---
+
+### GET /api/public/[tenant]/website/club-events
+
+Returns general club-event records only (`EventType.OTHER`). These are general club activities that are **not** matches, tournaments, or trainings. Examples: Generalversammlung, Sponsorenlauf, Public Viewing, Vereinsanlass, Helfereinsatz, Informationsabend.
+
+The event-type filter is applied at the **database level** — only `EventType.OTHER` events are retrieved.
+
+#### Query parameters
+
+Same as `/matches`:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seasonKey` | string | — | Filter by season key. |
+| `teamSlug` | string | — | Filter by team slug. |
+| `dateFrom` | string | — | ISO date lower bound for `startAt`. |
+| `dateTo` | string | — | ISO date upper bound for `startAt`. |
+| `limit` | number | `100` | Max club events (1–250). |
+
+#### Example request
+
+```
+GET /api/public/fc-allschwil/website/club-events?dateFrom=2026-07-01&dateTo=2026-12-31
+```
+
+#### Example response (200)
+
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-07-26T08:00:00.000Z",
+  "data": {
+    "clubEvents": [
+      {
+        "id": "clevt-001",
+        "title": "Generalversammlung 2026",
+        "type": "OTHER",
+        "status": "SCHEDULED",
+        "startAt": "2026-11-12T19:00:00.000Z",
+        "endAt": null,
+        "location": "Clubhaus Mühlmatt",
+        "description": "Ordentliche Generalversammlung des FC Allschwil.",
+        "opponentName": null,
+        "organizerName": "FC Allschwil",
+        "competitionLabel": null,
+        "homeAway": null,
+        "resultLabel": null,
+        "meetingTime": null,
+        "team": null,
+        "season": { "key": "2025-26", "name": "Saison 2025/26" }
+      }
+    ]
+  },
+  "meta": {
+    "total": 1,
+    "filters": { "seasonKey": null, "teamSlug": null, "dateFrom": "2026-07-01", "dateTo": "2026-12-31", "limit": null }
+  }
+}
+```
+
+Response items use the same shape as `data.events[]`.
+
+**EventType mapping**: Club events are stored as `EventType.OTHER`. `MATCH`, `TOURNAMENT`, `TRAINING`, and `VACATION_PERIOD` events are excluded.
+
+---
+
+### GET /api/public/[tenant]/website/tournaments
+
+Returns only `EventType.TOURNAMENT` events. The event-type filter is applied at the **database level**.
+
+Intended use: `/turnierplan` page migration for the FC Allschwil website.
+
+#### Query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seasonKey` | string | — | Filter by season key. |
+| `teamSlug` | string | — | Filter by team slug. |
+| `dateFrom` | string | — | ISO date lower bound for `startAt`. |
+| `dateTo` | string | — | ISO date upper bound for `startAt`. |
+| `limit` | number | `100` | Max tournaments (1–250). |
+
+#### Example request
+
+```
+GET /api/public/fc-allschwil/website/tournaments?seasonKey=2025-26
+```
+
+#### Example response (200)
+
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-07-26T08:00:00.000Z",
+  "data": {
+    "tournaments": [
+      {
+        "id": "clevt-002",
+        "title": "Jugend-Hallenturnier 2026",
+        "type": "TOURNAMENT",
+        "status": "SCHEDULED",
+        "startAt": "2026-12-28T09:00:00.000Z",
+        "endAt": "2026-12-28T17:00:00.000Z",
+        "location": "Sporthalle Allschwil",
+        "description": null,
+        "opponentName": null,
+        "organizerName": "FC Allschwil",
+        "competitionLabel": null,
+        "homeAway": null,
+        "resultLabel": null,
+        "meetingTime": null,
+        "team": null,
+        "season": { "key": "2025-26", "name": "Saison 2025/26" }
+      }
+    ]
+  },
+  "meta": {
+    "total": 1,
+    "filters": { "seasonKey": "2025-26", "teamSlug": null, "dateFrom": null, "dateTo": null, "limit": null }
+  }
+}
+```
+
+Response items use the same shape as `data.events[]`.
+
+---
+
+### GET /api/public/[tenant]/website/trainings
+
+Returns individual `EventType.TRAINING` records. The event-type filter is applied at the **database level**. Only trainings with both `websiteVisible = true` and `trainingsplanVisible = true` are included (`surface: "trainingsplan"`).
+
+> **Note**: This is the individual training event feed. It does **not** replace `/weekplan`, which is a composed weekly schedule that aggregates trainings, matches, and tournaments according to `wochenplanVisible` publication rules.
+
+#### Query parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `seasonKey` | string | — | Filter by season key. |
+| `teamSlug` | string | — | Filter by team slug. |
+| `dateFrom` | string | — | ISO date lower bound for `startAt`. |
+| `dateTo` | string | — | ISO date upper bound for `startAt`. |
+| `limit` | number | `100` | Max trainings (1–250). |
+
+#### Example request
+
+```
+GET /api/public/fc-allschwil/website/trainings?teamSlug=1-mannschaft&dateFrom=2026-08-01
+```
+
+#### Example response (200)
+
+```json
+{
+  "version": "1",
+  "tenant": { "key": "fc-allschwil", "name": "FC Allschwil" },
+  "generatedAt": "2026-07-26T08:00:00.000Z",
+  "data": {
+    "trainings": [
+      {
+        "id": "clevt-003",
+        "title": "Training 1. Mannschaft",
+        "type": "TRAINING",
+        "status": "SCHEDULED",
+        "startAt": "2026-08-05T18:30:00.000Z",
+        "endAt": "2026-08-05T20:00:00.000Z",
+        "location": "Sportanlage Mühlmatt",
+        "description": null,
+        "opponentName": null,
+        "organizerName": null,
+        "competitionLabel": null,
+        "homeAway": null,
+        "resultLabel": null,
+        "meetingTime": null,
+        "team": {
+          "id": "clteam1",
+          "name": "1. Mannschaft",
+          "slug": "1-mannschaft",
+          "category": "AKTIVE",
+          "genderGroup": null,
+          "ageGroup": null
+        },
+        "season": { "key": "2025-26", "name": "Saison 2025/26" }
+      }
+    ]
+  },
+  "meta": {
+    "total": 1,
+    "filters": { "seasonKey": null, "teamSlug": "1-mannschaft", "dateFrom": "2026-08-01", "dateTo": null, "limit": null }
+  }
+}
+```
+
+Response items use the same shape as `data.events[]`.
 
 ---
 
@@ -563,6 +765,8 @@ Upcoming TRAINING events for this team (next 28 days, `websiteVisible = true`), 
 ### GET /api/public/[tenant]/website/weekplan
 
 Returns the Wochenplan (week plan) grouped by calendar day. Optionally includes the active publication state for a specific week.
+
+**Date grouping timezone**: All `date` keys and `weekdayLabel` values use **Europe/Zurich** local calendar dates, regardless of server timezone. Events occurring near UTC midnight are correctly assigned to the Swiss local date (e.g. 22:15 UTC in summer CEST = 00:15 next day in Zurich → grouped under the next day's date key). `calendarWeek` is computed from the Zurich local date.
 
 #### Query parameters
 
@@ -767,8 +971,11 @@ type PublicWochenplanPublication = {
 | Endpoint | Tenant check | DB isolation | Status |
 |----------|-------------|--------------|--------|
 | `[tenant]/website/news` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` in all Prisma WHERE clauses | ✅ Safe |
-| `[tenant]/website/events` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` | ✅ Safe |
-| `[tenant]/website/matches` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` | ✅ Safe |
+| `[tenant]/website/events` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicEvents()` | ✅ Safe (aggregate/compatibility) |
+| `[tenant]/website/club-events` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` + `type:{in:["OTHER"]}` in DB | ✅ Safe |
+| `[tenant]/website/matches` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` + `type:{in:["MATCH"]}` in DB | ✅ Safe |
+| `[tenant]/website/tournaments` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` + `type:{in:["TOURNAMENT"]}` in DB | ✅ Safe |
+| `[tenant]/website/trainings` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` + `type:{in:["TRAINING"]}` + trainingsplanVisible in DB | ✅ Safe |
 | `[tenant]/website/teams` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getPublicTeams()` | ✅ Safe |
 | `[tenant]/website/teams/[slug]` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` in Team, Event, FacilityResource WHERE clauses | ✅ Safe |
 | `[tenant]/website/weekplan` | `resolveTenantFromParams` + `assertWebsiteEnabled` | `tenantId` passed to `getGroupedWochenplan()` + `getWochenplanPublication()` | ✅ Safe |
