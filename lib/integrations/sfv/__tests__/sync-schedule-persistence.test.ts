@@ -27,6 +27,10 @@
  *   U2. Updated away match writes homeAway = "AWAY".
  *   U3. "H" is never written on update.
  *   U4. "A" is never written on update.
+ *   U5. SFV resync does NOT overwrite websiteVisible (PUB-01).
+ *   U6. SFV resync does NOT overwrite infoboardVisible (PUB-01).
+ *   U7. SFV resync does NOT overwrite homepageVisible (PUB-01).
+ *   U8. SFV resync does NOT overwrite pitchCode or dressingRoom codes (PUB-01).
  *
  * Change detection + correction:
  *   D1. Existing homeAway="H" with incoming "HOME" → hasAnyChange=true (triggers update).
@@ -336,6 +340,85 @@ describe("updateMatchRecord — homeAway", () => {
     );
     const updateData = mockEventUpdate.mock.calls[0][0].data;
     expect(updateData.homeAway).not.toBe("A");
+  });
+
+  // ── U5–U8: PUB-01 — SFV resync must NOT overwrite manually managed fields ──
+  //
+  // When the admin sets websiteVisible=true and a subsequent SFV schedule sync
+  // runs, the update must NOT reset websiteVisible to false or touch ANY
+  // locally managed field. Only the SFV-owned fields listed in updateMatchRecord
+  // may appear in the Prisma update data.
+
+  it("U5: SFV resync does NOT overwrite websiteVisible (PUB-01 mandatory)", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Concordia Basel",
+      null,
+      "team-1",
+      "team-1",
+      false, // isHome=false → AWAY (the test match scenario)
+    );
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    // websiteVisible must NOT appear in the update payload at all
+    expect(updateData).not.toHaveProperty("websiteVisible");
+  });
+
+  it("U6: SFV resync does NOT overwrite infoboardVisible (PUB-01 mandatory)", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Concordia Basel",
+      null,
+      "team-1",
+      "team-1",
+      false,
+    );
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    expect(updateData).not.toHaveProperty("infoboardVisible");
+  });
+
+  it("U7: SFV resync does NOT overwrite homepageVisible (PUB-01 mandatory)", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Concordia Basel",
+      null,
+      "team-1",
+      "team-1",
+      false,
+    );
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    expect(updateData).not.toHaveProperty("homepageVisible");
+  });
+
+  it("U8: SFV resync does NOT overwrite pitchCode or dressingRoom codes (PUB-01 mandatory)", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry(),
+      makeContext(),
+      "FC Concordia Basel",
+      null,
+      "team-1",
+      "team-1",
+      false,
+    );
+    const updateData = mockEventUpdate.mock.calls[0][0].data;
+    expect(updateData).not.toHaveProperty("pitchCode");
+    expect(updateData).not.toHaveProperty("homeDressingRoomCode");
+    expect(updateData).not.toHaveProperty("awayDressingRoomCode");
+    expect(updateData).not.toHaveProperty("wochenplanVisible");
+    expect(updateData).not.toHaveProperty("trainingsplanVisible");
+    expect(updateData).not.toHaveProperty("teamPageVisible");
+    expect(updateData).not.toHaveProperty("remarks");
+    expect(updateData).not.toHaveProperty("sortOrder");
   });
 });
 

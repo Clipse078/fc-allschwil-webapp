@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   eventFindFirst: vi.fn(),
   teamFindFirst: vi.fn(),
   eventUpdate: vi.fn(),
+  revalidatePath: vi.fn(),
 }));
 
 vi.mock(
@@ -45,6 +46,10 @@ vi.mock("@/lib/db/prisma", () => ({
       findFirst: mocks.teamFindFirst,
     },
   },
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: mocks.revalidatePath,
 }));
 
 import { PATCH } from "../route";
