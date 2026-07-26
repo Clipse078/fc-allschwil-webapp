@@ -19,6 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -151,6 +152,10 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       infoboardVisible: true,
     },
   });
+
+  // Invalidate the admin Matchcenter pages so the next visit reflects the saved state.
+  revalidatePath("/dashboard/matchcenter");
+  revalidatePath(`/dashboard/matchcenter/${matchId}`);
 
   return NextResponse.json(updated);
 }
