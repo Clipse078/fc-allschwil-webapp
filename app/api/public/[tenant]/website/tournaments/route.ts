@@ -1,27 +1,31 @@
 /**
- * GET /api/public/[tenant]/website/matches
+ * GET /api/public/[tenant]/website/tournaments
  *
- * Returns only EventType.MATCH events that are visible on the website for the
- * specified tenant. The event-type filter is applied at the database level via
- * getPublicEvents({ eventTypes: MATCH_EVENT_TYPES }).
+ * Returns only EventType.TOURNAMENT events that are visible on the website
+ * for the specified tenant. The event-type filter is applied at the database
+ * level via getPublicEvents({ eventTypes: TOURNAMENT_EVENT_TYPES }).
  *
- * Only MATCH events with status SCHEDULED, LIVE, COMPLETED, or POSTPONED are
- * included. All other event types are excluded at the database level.
- * Draft, Archived, and Cancelled events are excluded.
+ * Only tournaments with status SCHEDULED, LIVE, COMPLETED, or POSTPONED are
+ * included. All other event types (MATCH, TRAINING, OTHER, VACATION_PERIOD)
+ * are excluded at the database level. Draft, Archived, and Cancelled events
+ * are excluded.
+ *
+ * This endpoint supports the /turnierplan migration for the FC Allschwil website.
+ * No tournament bracket or participant model is included in this slice.
  *
  * Tenant is resolved from the [tenant] path segment.
- * Results are always tenant-isolated.
+ * Results are always tenant-isolated — no cross-tenant data is returned.
  *
  * Query params:
  *   seasonKey  — ISO season key (e.g. "2025-26"). Default: all seasons.
  *   teamSlug   — Filter by team slug. Default: all teams.
  *   dateFrom   — ISO date lower bound for startAt (inclusive). Default: no lower bound.
  *   dateTo     — ISO date upper bound for startAt (inclusive). Default: no upper bound.
- *   limit      — Max matches returned (1–250, default 100).
+ *   limit      — Max tournaments returned (1–250, default 100).
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { getPublicEvents, MATCH_EVENT_TYPES } from "@/lib/events/public-event-feed";
+import { getPublicEvents, TOURNAMENT_EVENT_TYPES } from "@/lib/events/public-event-feed";
 import { toPublicWebsiteEvent } from "@/lib/website/public-events-mapper";
 import {
   buildWebsiteEnvelope,
@@ -65,30 +69,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       dateFrom,
       dateTo,
       limit,
-      // DB-level type filter: only MATCH events are retrieved.
-      eventTypes: MATCH_EVENT_TYPES,
+      eventTypes: TOURNAMENT_EVENT_TYPES,
     });
 
-    const matches = rawEvents.map(toPublicWebsiteEvent);
+    const tournaments = rawEvents.map(toPublicWebsiteEvent);
 
     return NextResponse.json(
       buildWebsiteEnvelope(
         tenant,
-        { matches },
+        { tournaments },
         {
-          total: matches.length,
+          total: tournaments.length,
           filters: { seasonKey, teamSlug, dateFrom, dateTo, limit },
         },
       ),
     );
   } catch (error) {
-    console.error("[public/[tenant]/website/matches] GET failed:", error);
+    console.error("[public/[tenant]/website/tournaments] GET failed:", error);
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? "Technischer Fehler: " + error.message
-            : "Matches Feed konnte nicht geladen werden.",
+            : "Tournaments Feed konnte nicht geladen werden.",
       },
       { status: 500 },
     );
