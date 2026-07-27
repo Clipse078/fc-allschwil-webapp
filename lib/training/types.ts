@@ -1,7 +1,8 @@
 /**
  * lib/training/types.ts
  *
- * Public TypeScript types for the canonical Training Foundation.
+ * Public TypeScript types for the canonical Training Foundation and
+ * Training Plans (TRAINING-CORE-01 + TRAINING-PLANS-01).
  *
  * These types are the stable public contract for every downstream consumer:
  * Training Planner, Website Weekplanner, Team Pages, Infoboards,
@@ -26,6 +27,14 @@ export type Weekday =
   | "SATURDAY"
   | "SUNDAY";
 
+// TRAINING-PLANS-01 types
+
+export type TrainingPlanStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
+
+export type MissingAssignmentBehavior = "FALLBACK_TO_DEFAULT" | "NOT_SCHEDULED";
+
+export type TrainingPlanAssignmentStatus = "SCHEDULED" | "NOT_SCHEDULED";
+
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
 /** The resolved public shape returned by every service method. */
@@ -46,6 +55,46 @@ export interface TrainingSeriesDto {
   validFrom: string | null;
   validUntil: string | null;
   archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Public shape for a tenant-defined training plan. */
+export interface TrainingPlanDto {
+  id: string;
+  tenantId: string;
+  seasonId: string;
+  name: string;
+  description: string | null;
+  status: TrainingPlanStatus;
+  isDefault: boolean;
+  displayOrder: number;
+  missingAssignmentBehavior: MissingAssignmentBehavior;
+  /** Number of TrainingPlanAssignment rows for this plan. */
+  assignmentCount: number;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+}
+
+/** Public shape for a plan assignment connecting a series to a plan. */
+export interface TrainingPlanAssignmentDto {
+  id: string;
+  tenantId: string;
+  trainingPlanId: string;
+  trainingSeriesId: string;
+  trainingSeriesTitle: string;
+  teamSeasonId: string;
+  status: TrainingPlanAssignmentStatus;
+  startTimeOverride: string | null;
+  endTimeOverride: string | null;
+  timezoneOverride: string | null;
+  /** Effective start time: override ?? canonical series value. */
+  effectiveStartTime: string;
+  /** Effective end time: override ?? canonical series value. */
+  effectiveEndTime: string;
+  /** Effective timezone: override ?? canonical series value. */
+  effectiveTimezone: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -84,5 +133,47 @@ export interface ListTrainingSeriesFilter {
   teamSeasonId?: string;
   status?: TrainingSeriesStatus;
   /** Include archived series in results. Defaults to false. */
+  includeArchived?: boolean;
+}
+
+// TRAINING-PLANS-01 input shapes
+
+export interface CreateTrainingPlanInput {
+  seasonId: string;
+  name: string;
+  description?: string | null;
+  status?: Exclude<TrainingPlanStatus, "ARCHIVED">;
+  isDefault?: boolean;
+  displayOrder?: number;
+  missingAssignmentBehavior?: MissingAssignmentBehavior;
+}
+
+export interface UpdateTrainingPlanInput {
+  name?: string;
+  description?: string | null;
+  status?: Exclude<TrainingPlanStatus, "ARCHIVED">;
+  displayOrder?: number;
+  missingAssignmentBehavior?: MissingAssignmentBehavior;
+}
+
+export interface CopyTrainingPlanInput {
+  name: string;
+  description?: string | null;
+  seasonId: string;
+}
+
+export interface UpsertTrainingPlanAssignmentInput {
+  trainingPlanId: string;
+  trainingSeriesId: string;
+  startTimeOverride?: string | null;
+  endTimeOverride?: string | null;
+  timezoneOverride?: string | null;
+  status?: TrainingPlanAssignmentStatus;
+}
+
+export interface ListTrainingPlansFilter {
+  seasonId?: string;
+  status?: TrainingPlanStatus;
+  /** Include archived plans. Defaults to false. */
   includeArchived?: boolean;
 }
