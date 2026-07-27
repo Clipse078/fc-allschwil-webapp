@@ -324,8 +324,15 @@ Demo FC Aktive`,
   const createdTeams: Record<string, { id: string; name: string; slug: string }> = {};
 
   for (const teamData of teams) {
+    // TEAM-CORE-02: slug uniqueness is now tenant-scoped.
+    // Use compound key (tenantId_slug) for upsert instead of global slug.
     const team = await prisma.team.upsert({
-      where: { slug: teamData.slug },
+      where: {
+        tenantId_slug: {
+          tenantId: fcAllschwilTenant.id,
+          slug: teamData.slug,
+        },
+      },
       update: {
         name: teamData.name,
         category: teamData.category,
@@ -346,6 +353,7 @@ Demo FC Aktive`,
         isActive: true,
         websiteVisible: true,
         infoboardVisible: true,
+        tenantId: fcAllschwilTenant.id,
       },
     });
 

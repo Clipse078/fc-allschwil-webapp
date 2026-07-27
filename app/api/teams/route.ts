@@ -260,18 +260,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existingTeamBySlug = await prisma.team.findUnique({
-      where: { slug },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        category: true,
-        genderGroup: true,
-        ageGroup: true,
-        sortOrder: true,
-      },
-    });
+    // TEAM-CORE-02: slug uniqueness is now tenant-scoped.
+    // Use compound key lookup (tenantId + slug) instead of global slug findUnique.
+    const currentTenantForSlugCheck = await getTenantFromSession(access.session.user?.tenantId);
+    const existingTeamBySlug = currentTenantForSlugCheck
+      ? await prisma.team.findUnique({
+          where: {
+            tenantId_slug: {
+              tenantId: currentTenantForSlugCheck.id,
+              slug,
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            category: true,
+            genderGroup: true,
+            ageGroup: true,
+            sortOrder: true,
+          },
+        })
+      : await prisma.team.findFirst({
+          where: { slug },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            category: true,
+            genderGroup: true,
+            ageGroup: true,
+            sortOrder: true,
+          },
+        });
 
     if (
       existingTeamBySlug &&
@@ -294,6 +315,10 @@ export async function POST(request: NextRequest) {
           equals: name,
           mode: "insensitive",
         },
+        // Scope name uniqueness check to same tenant when tenantId is known.
+        ...(currentTenantForSlugCheck
+          ? { tenantId: currentTenantForSlugCheck.id }
+          : {}),
       },
       select: {
         id: true,
