@@ -97,9 +97,9 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
           { label: "Teams" },
         ]}
         headerActions={
-          <Link href="/dashboard/teams/new" className="fca-button-primary">
+          <Link href="/dashboard/teams/register" className="fca-button-primary">
             <Plus className="h-4 w-4" />
-            Neues Team
+            Team registrieren
           </Link>
         }
         stats={
@@ -129,8 +129,8 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
             : "Noch keine Teams im System erfasst."
         }
         emptyAction={
-          <Link href="/dashboard/teams/new" className="fca-button-primary">
-            Erstes Team anlegen
+          <Link href="/dashboard/teams/register" className="fca-button-primary">
+            Erstes Team registrieren
           </Link>
         }
       >

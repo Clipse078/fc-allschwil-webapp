@@ -32,7 +32,8 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import type { Prisma, TeamSeasonStatus, OrgUnitStatus } from "@prisma/client";
+import { TeamSeasonStatus } from "@prisma/client";
+import type { Prisma, OrgUnitStatus } from "@prisma/client";
 import {
   buildTeamSeasonDisplayName,
   buildTeamSeasonShortName,
@@ -218,34 +219,17 @@ export async function createCanonicalTeamSeason(
   // 7. Create TeamSeason + TeamSeasonOrgUnit atomically
   try {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const teamSeason = await tx.teamSeason.create({
-        data: {
-          teamId: input.teamId,
-          seasonId: input.seasonId,
-          displayName,
-          shortName,
-          status: input.status ?? "ACTIVE",
-          websiteVisible: input.websiteVisible ?? true,
-          infoboardVisible: input.infoboardVisible ?? true,
-        },
-        select: { id: true },
-      });
-
-      // Create TeamSeasonOrgUnit rows; first OrgUnit is primary.
-      // IDs are omitted so Prisma uses @default(cuid()) — prevents ID collisions
-      // that would arise from synchronous Date.now() inside map() when creating
-      // multiple OrgUnit assignments for the same TeamSeason.
-      const orgUnitData = uniqueOrgUnitIds.map((orgUnitId, index) => ({
+      return writeTeamSeasonInTx(tx, {
+        teamId: input.teamId,
+        seasonId: input.seasonId,
         tenantId: input.tenantId,
-        teamSeasonId: teamSeason.id,
-        orgUnitId,
-        isPrimary: index === 0,
-        displayOrder: index,
-      }));
-
-      await tx.teamSeasonOrgUnit.createMany({ data: orgUnitData });
-
-      return teamSeason.id;
+        uniqueOrgUnitIds,
+        displayName,
+        shortName,
+        status: input.status ?? TeamSeasonStatus.ACTIVE,
+        websiteVisible: input.websiteVisible ?? true,
+        infoboardVisible: input.infoboardVisible ?? true,
+      });
     });
 
     return { ok: true, teamSeasonId: result, orgUnitCount: uniqueOrgUnitIds.length };
@@ -266,6 +250,74 @@ export async function createCanonicalTeamSeason(
       message: err instanceof Error ? err.message : "Unbekannter Fehler.",
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Shared transaction-aware write primitive
+// ---------------------------------------------------------------------------
+
+export type WriteTeamSeasonInTxInput = {
+  teamId: string;
+  seasonId: string;
+  tenantId: string;
+  /** Deduplicated, ordered list of OrgUnit IDs. First is primary. */
+  uniqueOrgUnitIds: string[];
+  displayName: string;
+  shortName: string | null;
+  status: TeamSeasonStatus;
+  websiteVisible: boolean;
+  infoboardVisible: boolean;
+};
+
+/**
+ * writeTeamSeasonInTx
+ *
+ * Transaction-aware primitive that creates one TeamSeason and its
+ * TeamSeasonOrgUnit rows within a caller-supplied transaction client.
+ *
+ * This is the single canonical write implementation for TeamSeason creation.
+ *
+ * Rules:
+ *   - IDs are omitted so Prisma uses @default(cuid()) — prevents ID collisions
+ *     from synchronous Date.now() in map() when creating multiple OrgUnit rows.
+ *   - First OrgUnit in uniqueOrgUnitIds is isPrimary = true.
+ *   - displayOrder follows the array index.
+ *
+ * Callers are responsible for all validation (OrgUnit existence, tenant match,
+ * status, Season existence, duplicate TeamSeason) before calling this function.
+ *
+ * Used by:
+ *   - createCanonicalTeamSeason() — wraps in its own Prisma $transaction
+ *   - registerTeamSeason() — called inside a larger outer transaction
+ */
+export async function writeTeamSeasonInTx(
+  tx: Prisma.TransactionClient,
+  input: WriteTeamSeasonInTxInput,
+): Promise<string> {
+  const teamSeason = await tx.teamSeason.create({
+    data: {
+      teamId: input.teamId,
+      seasonId: input.seasonId,
+      displayName: input.displayName,
+      shortName: input.shortName,
+      status: input.status,
+      websiteVisible: input.websiteVisible,
+      infoboardVisible: input.infoboardVisible,
+    },
+    select: { id: true },
+  });
+
+  const orgUnitData = input.uniqueOrgUnitIds.map((orgUnitId, index) => ({
+    tenantId: input.tenantId,
+    teamSeasonId: teamSeason.id,
+    orgUnitId,
+    isPrimary: index === 0,
+    displayOrder: index,
+  }));
+
+  await tx.teamSeasonOrgUnit.createMany({ data: orgUnitData });
+
+  return teamSeason.id;
 }
 
 // ---------------------------------------------------------------------------

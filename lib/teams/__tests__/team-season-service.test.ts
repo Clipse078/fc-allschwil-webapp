@@ -30,10 +30,13 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
+import { TeamSeasonStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
   createCanonicalTeamSeason,
   validateMappingTeamSeasonConsistency,
+  writeTeamSeasonInTx,
+  type WriteTeamSeasonInTxInput,
 } from "../team-season-service";
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -436,6 +439,102 @@ describe("validateMappingTeamSeasonConsistency", () => {
 
     expect(typeof result).toBe("string");
     expect(result).toContain("Mandanten");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C. writeTeamSeasonInTx — shared write primitive
+// ---------------------------------------------------------------------------
+
+describe("writeTeamSeasonInTx — shared canonical write primitive", () => {
+  const BASE_TX_INPUT: WriteTeamSeasonInTxInput = {
+    teamId: TEAM_ID,
+    seasonId: SEASON_ID,
+    tenantId: TENANT_A,
+    uniqueOrgUnitIds: [ORG_UNIT_ID_1],
+    displayName: "Frauen 1",
+    shortName: "F1",
+    status: TeamSeasonStatus.ACTIVE,
+    websiteVisible: true,
+    infoboardVisible: true,
+  };
+
+  it("creates TeamSeason and returns its ID", async () => {
+    const txMock = {
+      teamSeason: { create: vi.fn().mockResolvedValue({ id: TEAM_SEASON_ID }) },
+      teamSeasonOrgUnit: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    } as never;
+
+    const result = await writeTeamSeasonInTx(txMock, BASE_TX_INPUT);
+
+    expect(result).toBe(TEAM_SEASON_ID);
+  });
+
+  it("creates TeamSeasonOrgUnit rows with first as primary", async () => {
+    let capturedData: Array<{ orgUnitId: string; isPrimary: boolean; displayOrder: number }> = [];
+
+    const txMock = {
+      teamSeason: { create: vi.fn().mockResolvedValue({ id: TEAM_SEASON_ID }) },
+      teamSeasonOrgUnit: {
+        createMany: vi.fn().mockImplementation(
+          (args: { data: typeof capturedData }) => {
+            capturedData = args.data;
+            return Promise.resolve({ count: args.data.length });
+          },
+        ),
+      },
+    } as never;
+
+    await writeTeamSeasonInTx(txMock, {
+      ...BASE_TX_INPUT,
+      uniqueOrgUnitIds: [ORG_UNIT_ID_1, ORG_UNIT_ID_2],
+    });
+
+    expect(capturedData).toHaveLength(2);
+    expect(capturedData[0].orgUnitId).toBe(ORG_UNIT_ID_1);
+    expect(capturedData[0].isPrimary).toBe(true);
+    expect(capturedData[0].displayOrder).toBe(0);
+    expect(capturedData[1].orgUnitId).toBe(ORG_UNIT_ID_2);
+    expect(capturedData[1].isPrimary).toBe(false);
+    expect(capturedData[1].displayOrder).toBe(1);
+  });
+
+  it("passes websiteVisible and infoboardVisible correctly", async () => {
+    let capturedTeamSeasonData: Record<string, unknown> = {};
+
+    const txMock = {
+      teamSeason: {
+        create: vi.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
+          capturedTeamSeasonData = args.data;
+          return Promise.resolve({ id: TEAM_SEASON_ID });
+        }),
+      },
+      teamSeasonOrgUnit: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    } as never;
+
+    await writeTeamSeasonInTx(txMock, {
+      ...BASE_TX_INPUT,
+      websiteVisible: false,
+      infoboardVisible: true,
+    });
+
+    expect(capturedTeamSeasonData.websiteVisible).toBe(false);
+    expect(capturedTeamSeasonData.infoboardVisible).toBe(true);
+  });
+
+  it("createCanonicalTeamSeason delegates write to writeTeamSeasonInTx pattern", async () => {
+    // Verify createCanonicalTeamSeason still works correctly (regression guard).
+    const result = await createCanonicalTeamSeason({
+      teamId: TEAM_ID,
+      seasonId: SEASON_ID,
+      tenantId: TENANT_A,
+      orgUnitIds: [ORG_UNIT_ID_1],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.teamSeasonId).toBe(TEAM_SEASON_ID);
+    }
   });
 });
 
