@@ -508,6 +508,8 @@ model Tenant {
   // TRAINING-PLANS-01: tenant-defined training plans and assignments
   trainingPlans          TrainingPlan[]
   trainingPlanAssignments TrainingPlanAssignment[]
+  // TRAINING-ALLOCATIONS-01: canonical facility resource allocations
+  trainingAllocations    TrainingAllocation[]
 
   @@index([status])
   @@index([name])
@@ -1670,6 +1672,8 @@ model FacilityResource {
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  trainingAllocations TrainingAllocation[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2891,6 +2895,7 @@ model TrainingSeries {
   teamSeason          TeamSeason                    @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   recurrenceDays      TrainingSeriesRecurrenceDay[]
   planAssignments     TrainingPlanAssignment[]
+  allocations         TrainingAllocation[]
 
   @@index([tenantId])
   @@index([teamSeasonId])
@@ -3081,4 +3086,70 @@ model TrainingPlanAssignment {
   @@index([trainingPlanId])
   @@index([trainingSeriesId])
   @@index([tenantId, trainingPlanId])
+}
+
+// =============================================================================
+// TRAINING-ALLOCATIONS-01: Canonical Training Resource Allocation
+//
+// Introduces TrainingAllocation — the single source of truth for which
+// FacilityResources are allocated to a canonical TrainingSeries.
+//
+// Architecture:
+//   TrainingSeries → TrainingAllocation → FacilityResource
+//
+// Canonical principles:
+//   - One TrainingSeries may hold many TrainingAllocation rows (one per
+//     FacilityResource used: full pitch, half-pitch pairs, dressing room, etc.).
+//   - Duplicate allocation of the same resource to the same series is prevented
+//     at DB level via @@unique([trainingSeriesId, facilityResourceId]).
+//   - All queries must be scoped by tenantId.
+//   - Archived FacilityResources (status = ARCHIVED) cannot receive new
+//     allocations; existing historical rows are preserved.
+//   - No resource-type-specific code — everything works through FacilityResource.
+//   - No weekplanner, infoboard, or website publication at this layer.
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// TrainingAllocation — connects one TrainingSeries to one FacilityResource.
+//
+// Each row represents a single resource allocation for a recurring training:
+//   e.g. "E1 Tuesday Training uses Half Pitch A West"
+//
+// Architecture invariants:
+//   - tenantId must match both TrainingSeries.tenantId and FacilityResource.tenantId.
+//   - @@unique([trainingSeriesId, facilityResourceId]) prevents duplicates.
+//   - displayOrder controls the UI presentation sequence.
+//   - notes is optional free text (e.g. "shared with another team").
+//   - Cascade-delete when the parent TrainingSeries is deleted.
+//   - Cascade-delete when the parent FacilityResource is deleted.
+//
+// Security invariants:
+//   - All queries must scope by tenantId.
+//   - Tenant A cannot read or modify Tenant B's allocations.
+// ---------------------------------------------------------------------------
+model TrainingAllocation {
+  id                 String   @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId           String
+  /// The canonical training series this allocation belongs to.
+  trainingSeriesId   String
+  /// The facility resource allocated to this training series.
+  facilityResourceId String
+  /// Optional free-text note for this allocation.
+  notes              String?
+  /// Display position within the allocations for this training series.
+  displayOrder       Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSeries   TrainingSeries   @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facilityResource FacilityResource @relation(fields: [facilityResourceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Prevent duplicate allocation of the same resource to the same training series.
+  @@unique([trainingSeriesId, facilityResourceId])
+  @@index([tenantId])
+  @@index([trainingSeriesId])
+  @@index([facilityResourceId])
+  @@index([tenantId, trainingSeriesId])
 }

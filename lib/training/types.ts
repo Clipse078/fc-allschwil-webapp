@@ -177,3 +177,46 @@ export interface ListTrainingPlansFilter {
   /** Include archived plans. Defaults to false. */
   includeArchived?: boolean;
 }
+
+// =============================================================================
+// TRAINING-ALLOCATIONS-01: Canonical facility resource allocation types
+// =============================================================================
+
+/** Public shape for a canonical training resource allocation. */
+export interface TrainingAllocationDto {
+  id: string;
+  tenantId: string;
+  trainingSeriesId: string;
+  facilityResourceId: string;
+  /** Human-readable resource name, denormalised from FacilityResource. */
+  facilityResourceName: string;
+  /** Resource code, denormalised from FacilityResource. */
+  facilityResourceCode: string;
+  /** Resource type, denormalised from FacilityResource. */
+  facilityResourceType: string;
+  /** Facility id owning the resource. */
+  facilityId: string;
+  /** Facility name, denormalised from Facility. */
+  facilityName: string;
+  notes: string | null;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTrainingAllocationInput {
+  trainingSeriesId: string;
+  facilityResourceId: string;
+  notes?: string | null;
+  displayOrder?: number;
+}
+
+export interface UpdateTrainingAllocationInput {
+  notes?: string | null;
+  displayOrder?: number;
+}
+
+export interface ListTrainingAllocationsFilter {
+  trainingSeriesId?: string;
+  facilityResourceId?: string;
+}
