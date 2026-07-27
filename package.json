@@ -7,7 +7,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "dev": "next dev --turbopack",
-    "build": "prisma generate && next build --turbopack",
+    "build": "prisma generate && prisma migrate deploy && next build --turbopack",
     "start": "next start",
     "lint": "eslint . --ignore-pattern baseline-backups/**",
     "postinstall": "[ -n \"$DATABASE_URL\" ] && prisma generate || true",
@@ -20,6 +20,7 @@
     "db:seed-demo": "tsx prisma/seed-demo.ts",
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts",
     "sync-workspace-permissions": "tsx scripts/sync-workspace-permissions.ts",
+    "sync-training-permissions": "tsx scripts/sync-training-permissions.ts",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
