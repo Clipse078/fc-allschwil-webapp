@@ -20,10 +20,14 @@ export async function GET(_request: NextRequest, { params }: Params) {
   const tenantId = auth.session.user?.tenantId;
   if (!tenantId) return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
 
-  const { allocationId } = await params;
+  const { seriesId, allocationId } = await params;
 
   try {
     const allocation = await getTrainingAllocation(tenantId, allocationId);
+    // Enforce URL ownership: the allocation must belong to the URL series
+    if (allocation.trainingSeriesId !== seriesId) {
+      return NextResponse.json({ error: "Allocation not found" }, { status: 404 });
+    }
     return NextResponse.json({ allocation });
   } catch (err) {
     if (err instanceof TrainingAllocationNotFoundError) {
@@ -40,7 +44,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const tenantId = auth.session.user?.tenantId;
   if (!tenantId) return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
 
-  const { allocationId } = await params;
+  const { seriesId, allocationId } = await params;
 
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Request body required" }, { status: 400 });
@@ -58,6 +62,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   try {
+    // Enforce URL ownership before mutation
+    const existing = await getTrainingAllocation(tenantId, allocationId);
+    if (existing.trainingSeriesId !== seriesId) {
+      return NextResponse.json({ error: "Allocation not found" }, { status: 404 });
+    }
     const allocation = await updateTrainingAllocation(tenantId, allocationId, input);
     return NextResponse.json({ allocation });
   } catch (err) {
@@ -75,9 +84,14 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   const tenantId = auth.session.user?.tenantId;
   if (!tenantId) return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
 
-  const { allocationId } = await params;
+  const { seriesId, allocationId } = await params;
 
   try {
+    // Enforce URL ownership before mutation
+    const existing = await getTrainingAllocation(tenantId, allocationId);
+    if (existing.trainingSeriesId !== seriesId) {
+      return NextResponse.json({ error: "Allocation not found" }, { status: 404 });
+    }
     await deleteTrainingAllocation(tenantId, allocationId);
     return NextResponse.json({ ok: true });
   } catch (err) {

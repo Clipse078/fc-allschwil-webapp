@@ -9,6 +9,7 @@ import {
   TrainingSeriesNotFoundError,
   TrainingAllocationResourceNotFoundError,
   TrainingAllocationArchivedResourceError,
+  TrainingAllocationArchivedFacilityError,
   TrainingAllocationDuplicateError,
 } from "@/lib/training/errors";
 
@@ -69,6 +70,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Facility resource not found" }, { status: 404 });
     }
     if (err instanceof TrainingAllocationArchivedResourceError) {
+      return NextResponse.json({ error: err.message }, { status: 422 });
+    }
+    if (err instanceof TrainingAllocationArchivedFacilityError) {
       return NextResponse.json({ error: err.message }, { status: 422 });
     }
     if (err instanceof TrainingAllocationDuplicateError) {

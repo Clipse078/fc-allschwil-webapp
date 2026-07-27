@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useCallback } from "react";
-import { Loader2, X, Plus, Building2, MapPin } from "lucide-react";
+import { Loader2, Plus, Building2, MapPin } from "lucide-react";
 import type { FacilityResourceType } from "@prisma/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

@@ -154,6 +154,15 @@ describe("GET /api/training-series/:seriesId/allocations/:allocationId", () => {
     await GET(makeGetReq(SERIES_ID, ALLOCATION_ID), makeParams(SERIES_ID, ALLOCATION_ID));
     expect(mocks.getTrainingAllocation).toHaveBeenCalledWith(TENANT_A, ALLOCATION_ID);
   });
+
+  it("returns 404 when allocation belongs to a different series (URL mismatch)", async () => {
+    const WRONG_SERIES = "series-wrong";
+    mocks.getTrainingAllocation.mockResolvedValue(
+      makeAllocationDto({ trainingSeriesId: SERIES_ID }),
+    );
+    const res = await GET(makeGetReq(WRONG_SERIES, ALLOCATION_ID), makeParams(WRONG_SERIES, ALLOCATION_ID));
+    expect(res.status).toBe(404);
+  });
 });
 
 // ── PATCH ─────────────────────────────────────────────────────────────────────
@@ -209,12 +218,24 @@ describe("PATCH /api/training-series/:seriesId/allocations/:allocationId", () =>
 
   it("wrong tenant gets 404 when allocation not found for that tenant", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_B));
-    mocks.updateTrainingAllocation.mockRejectedValue(
+    mocks.getTrainingAllocation.mockRejectedValue(
       new TrainingAllocationNotFoundError(ALLOCATION_ID),
     );
     const res = await PATCH(
       makePatchReq(SERIES_ID, ALLOCATION_ID, { notes: "x" }),
       makeParams(SERIES_ID, ALLOCATION_ID),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 when allocation belongs to a different series (URL mismatch)", async () => {
+    const WRONG_SERIES = "series-wrong";
+    mocks.getTrainingAllocation.mockResolvedValue(
+      makeAllocationDto({ trainingSeriesId: SERIES_ID }),
+    );
+    const res = await PATCH(
+      makePatchReq(WRONG_SERIES, ALLOCATION_ID, { notes: "x" }),
+      makeParams(WRONG_SERIES, ALLOCATION_ID),
     );
     expect(res.status).toBe(404);
   });
@@ -251,10 +272,19 @@ describe("DELETE /api/training-series/:seriesId/allocations/:allocationId", () =
 
   it("wrong tenant gets 404 for cross-tenant delete attempt", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_B));
-    mocks.deleteTrainingAllocation.mockRejectedValue(
+    mocks.getTrainingAllocation.mockRejectedValue(
       new TrainingAllocationNotFoundError(ALLOCATION_ID),
     );
     const res = await DELETE(makeDeleteReq(SERIES_ID, ALLOCATION_ID), makeParams(SERIES_ID, ALLOCATION_ID));
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 when allocation belongs to a different series (URL mismatch)", async () => {
+    const WRONG_SERIES = "series-wrong";
+    mocks.getTrainingAllocation.mockResolvedValue(
+      makeAllocationDto({ trainingSeriesId: SERIES_ID }),
+    );
+    const res = await DELETE(makeDeleteReq(WRONG_SERIES, ALLOCATION_ID), makeParams(WRONG_SERIES, ALLOCATION_ID));
     expect(res.status).toBe(404);
   });
 });

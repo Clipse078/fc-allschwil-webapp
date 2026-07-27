@@ -229,3 +229,12 @@ export class TrainingAllocationTenantMismatchError extends Error {
     this.name = "TrainingAllocationTenantMismatchError";
   }
 }
+
+/** The parent Facility of the FacilityResource is archived and cannot receive new allocations. */
+export class TrainingAllocationArchivedFacilityError extends Error {
+  readonly code = "TRAINING_ALLOCATION_ARCHIVED_FACILITY" as const;
+  constructor(facilityId: string) {
+    super(`Facility "${facilityId}" is archived. Its resources cannot receive new allocations.`);
+    this.name = "TrainingAllocationArchivedFacilityError";
+  }
+}

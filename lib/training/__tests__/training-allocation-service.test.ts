@@ -17,6 +17,7 @@
  *       A9. tenant isolation — series belongs to different tenant
  *       A10. tenant isolation — resource belongs to different tenant
  *       A11. multiple resources per training (multi-allocation)
+ *       A12. archived parent facility rejected
  *
  *   B. updateTrainingAllocation
  *       B1. update notes
@@ -85,6 +86,7 @@ import {
   TrainingAllocationNotFoundError,
   TrainingAllocationDuplicateError,
   TrainingAllocationArchivedResourceError,
+  TrainingAllocationArchivedFacilityError,
   TrainingAllocationResourceNotFoundError,
 } from "../errors";
 
@@ -113,6 +115,7 @@ function makeResourceRow(overrides: Record<string, unknown> = {}) {
     id: RESOURCE_ID,
     tenantId: TENANT_A,
     status: "ACTIVE",
+    facility: { id: FACILITY_ID, status: "ACTIVE" },
     ...overrides,
   };
 }
@@ -347,6 +350,21 @@ describe("A. createTrainingAllocation", () => {
     expect(first.facilityResourceCode).toBe("HP_A_WEST");
     expect(second.facilityResourceCode).toBe("HP_A_EAST");
     expect(prisma.trainingAllocation.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("A12. throws TrainingAllocationArchivedFacilityError when parent facility is archived", async () => {
+    vi.mocked(prisma.facilityResource.findFirst).mockResolvedValue(
+      makeResourceRow({ facility: { id: FACILITY_ID, status: "ARCHIVED" } }) as never,
+    );
+
+    await expect(
+      createTrainingAllocation(TENANT_A, {
+        trainingSeriesId: SERIES_ID,
+        facilityResourceId: RESOURCE_ID,
+      }),
+    ).rejects.toThrow(TrainingAllocationArchivedFacilityError);
+
+    expect(prisma.trainingAllocation.create).not.toHaveBeenCalled();
   });
 });
 

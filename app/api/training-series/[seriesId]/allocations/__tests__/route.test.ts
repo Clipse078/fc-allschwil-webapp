@@ -38,6 +38,7 @@ import {
   TrainingSeriesNotFoundError,
   TrainingAllocationResourceNotFoundError,
   TrainingAllocationArchivedResourceError,
+  TrainingAllocationArchivedFacilityError,
   TrainingAllocationDuplicateError,
 } from "@/lib/training/errors";
 
@@ -283,6 +284,21 @@ describe("B. POST /api/training-series/:seriesId/allocations", () => {
   it("B8. returns 422 when facility resource is archived", async () => {
     mocks.createTrainingAllocation.mockRejectedValue(
       new TrainingAllocationArchivedResourceError(RESOURCE_ID),
+    );
+
+    const res = await POST(
+      makePostRequest(SERIES_ID, { facilityResourceId: RESOURCE_ID }),
+      makeParams(SERIES_ID),
+    );
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toMatch(/archived/i);
+  });
+
+  it("B8b. returns 422 when parent facility is archived", async () => {
+    mocks.createTrainingAllocation.mockRejectedValue(
+      new TrainingAllocationArchivedFacilityError("facility-01"),
     );
 
     const res = await POST(

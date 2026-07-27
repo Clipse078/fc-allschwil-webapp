@@ -128,6 +128,9 @@ async function main() {
 
     { key: "facilities.view", name: "View facilities & resources", module: PermissionModule.FACILITIES },
     { key: "facilities.manage", name: "Manage facilities & resources", module: PermissionModule.FACILITIES },
+
+    { key: "trainings.view", name: "View training allocations", module: PermissionModule.TRAININGS },
+    { key: "trainings.manage", name: "Manage training allocations", module: PermissionModule.TRAININGS },
   ] as const;
 
   for (const permission of permissions) {
@@ -205,6 +208,8 @@ async function main() {
         "fixtures.view",
         "fixtures.create",
         "fixtures.submit_for_publication",
+        "trainings.view",
+        "trainings.manage",
       ],
     },
     {

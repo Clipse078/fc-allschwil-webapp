@@ -32,6 +32,7 @@ import {
   TrainingAllocationNotFoundError,
   TrainingAllocationDuplicateError,
   TrainingAllocationArchivedResourceError,
+  TrainingAllocationArchivedFacilityError,
   TrainingAllocationResourceNotFoundError,
   TrainingAllocationTenantMismatchError,
   TrainingSeriesNotFoundError,
@@ -135,10 +136,15 @@ export async function createTrainingAllocation(
   });
   if (!series) throw new TrainingSeriesNotFoundError(trainingSeriesId);
 
-  // Verify resource exists and get its status
+  // Verify resource exists, including parent facility for archive checks
   const resource = await prisma.facilityResource.findFirst({
     where: { id: facilityResourceId, tenantId },
-    select: { id: true, tenantId: true, status: true },
+    select: {
+      id: true,
+      tenantId: true,
+      status: true,
+      facility: { select: { id: true, status: true } },
+    },
   });
   if (!resource) throw new TrainingAllocationResourceNotFoundError(facilityResourceId);
 
@@ -150,6 +156,11 @@ export async function createTrainingAllocation(
   // Archived resources cannot receive new allocations
   if (resource.status === "ARCHIVED") {
     throw new TrainingAllocationArchivedResourceError(facilityResourceId);
+  }
+
+  // Archived parent facility — resources in archived facilities cannot receive new allocations
+  if (resource.facility.status === "ARCHIVED") {
+    throw new TrainingAllocationArchivedFacilityError(resource.facility.id);
   }
 
   // Determine next displayOrder when not supplied
