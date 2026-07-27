@@ -139,6 +139,7 @@ function makeConfig(overrides: Partial<TenantSfvConfig> = {}): TenantSfvConfig {
     lastTeamSyncAt: null,
     lastScheduleSyncAt: null,
     lastMatchDetailSyncAt: null,
+    lastCompetitionSyncAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     ...overrides,

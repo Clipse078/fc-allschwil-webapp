@@ -42,6 +42,7 @@ enum PermissionModule {
   USERS
   SEASONS
   TEAMS
+  COMPETITIONS
   PEOPLE
   EVENTS
   FIXTURES
@@ -59,6 +60,38 @@ enum PermissionModule {
   ORG
   FACILITIES
   WORKSPACE
+}
+
+// ---------------------------------------------------------------------------
+// Competition canonical domain entity.
+//
+// Competition is a first-class canonical entity independent of any single
+// provider. It can be reused by Teams, Matchcenter, Website, Infoboard,
+// Results, Standings, Statistics, and future federation providers.
+//
+// Architecture invariants:
+//   - Provider-neutral: the `provider` field distinguishes origin (e.g. "SFV").
+//   - Tenant-scoped: all lookups and mutations must include tenantId.
+//   - Idempotent upsert keyed on (tenantId, provider, externalCompetitionId,
+//     externalSeasonId) prevents duplicates across sync runs.
+//   - No standings, results, rankings, or scheduling data live here.
+//     Competition represents only competition metadata.
+//   - isArchived = true means the competition is hidden from active workflows
+//     but is retained for historical references.
+//   - lastSyncedAt is set by the sync service on every successful run.
+// ---------------------------------------------------------------------------
+
+enum CompetitionType {
+  LEAGUE
+  CUP
+  TOURNAMENT_SERIES
+  OTHER
+}
+
+enum CompetitionGender {
+  MALE
+  FEMALE
+  MIXED
 }
 
 enum FacilityType {
@@ -442,6 +475,8 @@ model Tenant {
   opponentExternalMappings OpponentExternalMapping[]
   // TEAM-CORE-02: canonical seasonal OrgUnit assignments
   teamSeasonOrgUnits     TeamSeasonOrgUnit[]
+  // COMPETITION-01: canonical competition entities
+  competitions           Competition[]
 
   @@index([status])
   @@index([name])
@@ -647,6 +682,108 @@ model Season {
   @@index([isActive])
 }
 
+// ---------------------------------------------------------------------------
+// Competition — canonical competition metadata entity.
+//
+// Represents league / cup / tournament series metadata imported from an
+// external provider (e.g. SFV) or entered manually. This is NOT a standings,
+// results, or scheduling entity — it holds only the descriptive metadata.
+//
+// Sync invariants:
+//   - Idempotent: (tenantId, provider, externalCompetitionId, externalSeasonId)
+//     is unique, preventing duplicate rows across sync runs.
+//   - When externalCompetitionId or externalSeasonId is null (manual entry),
+//     uniqueness is on (tenantId, provider, officialName).
+//   - Sync service sets isArchived = false when a competition reappears after
+//     being absent, and lastSyncedAt on every sync touch.
+//
+// Usage:
+//   - TeamSeasonCompetition links a TeamSeason to one or more Competitions.
+//   - getEligibleCompetitions(seasonId) returns non-archived competitions for
+//     team registration workflows.
+//   - resolveCompetition(provider, externalCompetitionId, externalSeasonId)
+//     returns the canonical Competition for matchcenter use.
+// ---------------------------------------------------------------------------
+
+model Competition {
+  id                    String             @id @default(cuid())
+  /// Owning tenant. All queries must scope by tenantId.
+  tenantId              String
+  /// External provider identifier, e.g. "SFV" or "MANUAL".
+  provider              String
+  /// Provider-assigned competition/league/cup identifier. Null for manual entries.
+  externalCompetitionId Int?
+  /// Provider-assigned season identifier. Null for manual entries or seasonless competitions.
+  externalSeasonId      Int?
+  /// Full official name as reported by the provider or entered manually.
+  officialName          String
+  /// Short display name (local override; not overwritten by sync).
+  shortName             String?
+  /// Group/division name within the competition (e.g. "Gruppe A").
+  groupName             String?
+  /// Structural classification of the competition.
+  competitionType       CompetitionType    @default(LEAGUE)
+  /// Gender category as reported by the provider.
+  gender                CompetitionGender?
+  /// Age category label (e.g. "U15", "Junioren", "Frauen").
+  ageCategory           String?
+  /// When true, the competition is hidden from active team registration and
+  /// display surfaces. Retained for historical references.
+  isArchived            Boolean            @default(false)
+  /// Timestamp of the last successful sync that touched this competition.
+  lastSyncedAt          DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeasonCompetitions TeamSeasonCompetition[]
+
+  /// Prevents duplicate provider competitions per tenant per season.
+  @@unique([tenantId, provider, externalCompetitionId, externalSeasonId])
+  @@index([tenantId])
+  @@index([tenantId, provider])
+  @@index([tenantId, isArchived])
+  @@index([tenantId, provider, externalSeasonId])
+}
+
+// ---------------------------------------------------------------------------
+// TeamSeasonCompetition — join between TeamSeason and Competition.
+//
+// A TeamSeason may have 0, 1, or multiple competitions (e.g. League + Cup).
+// Competition is OPTIONAL for TeamSeason; training teams and non-competitive
+// groups have no competition entry.
+//
+// Architecture invariants:
+//   - Duplicate (teamSeasonId, competitionId) is prevented at DB level.
+//   - isPrimary = true indicates the primary competition for display purposes.
+//     Service layer enforces at most one isPrimary per TeamSeason.
+//   - displayOrder controls ordering when multiple competitions exist.
+//   - onDelete: Cascade on teamSeason — deleting a TeamSeason removes all links.
+//   - onDelete: Restrict on competition — prevents silent deletion of
+//     referenced competitions. Archive competitions instead of deleting.
+// ---------------------------------------------------------------------------
+
+model TeamSeasonCompetition {
+  id            String      @id @default(cuid())
+  teamSeasonId  String
+  competitionId String
+  /// When true, this is the primary competition for this TeamSeason.
+  /// At most one row per TeamSeason should have isPrimary = true.
+  isPrimary     Boolean     @default(false)
+  /// Controls display order when a TeamSeason belongs to multiple competitions.
+  displayOrder  Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  teamSeason  TeamSeason  @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([teamSeasonId, competitionId])
+  @@index([teamSeasonId])
+  @@index([competitionId])
+  @@index([teamSeasonId, isPrimary])
+}
+
 model Person {
   id          String    @id @default(cuid())
   firstName   String
@@ -805,6 +942,8 @@ model TeamSeason {
   orgUnits           TeamSeasonOrgUnit[]
   // TEAM-CORE-02: seasonal link on external provider mappings
   externalMappings   TeamExternalMapping[]
+  // COMPETITION-01: optional competitions for this TeamSeason
+  competitions       TeamSeasonCompetition[]
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -2519,6 +2658,8 @@ model TenantSfvConfig {
   lastScheduleSyncAt    DateTime?
   /// Completion time of the most recent fully successful tenant-level match-detail synchronization.
   lastMatchDetailSyncAt DateTime?
+  /// Completion time of the most recent fully successful tenant-level competition synchronization.
+  lastCompetitionSyncAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

@@ -8,6 +8,9 @@ export const PERMISSIONS = {
   TEAMS_VIEW: "teams.view",
   TEAMS_MANAGE: "teams.manage",
 
+  COMPETITIONS_VIEW: "competitions.view",
+  COMPETITIONS_MANAGE: "competitions.manage",
+
   PEOPLE_VIEW: "people.view",
   PEOPLE_MANAGE: "people.manage",
 
