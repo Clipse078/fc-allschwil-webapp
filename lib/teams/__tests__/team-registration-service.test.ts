@@ -34,7 +34,8 @@ vi.mock("@/lib/db/prisma", () => ({
     teamSeasonOrgUnit: { createMany: vi.fn() },
     teamExternalMapping: {
       findUnique: vi.fn(),
-      upsert: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -105,7 +106,9 @@ beforeEach(() => {
         createMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       teamExternalMapping: {
-        upsert: vi.fn().mockResolvedValue({}),
+        findUnique: vi.fn().mockResolvedValue(null),
+        update: vi.fn().mockResolvedValue({}),
+        create: vi.fn().mockResolvedValue({}),
       },
     };
     return fn(tx);
@@ -195,7 +198,9 @@ describe("registerTeamSeason — existing Team reuse", () => {
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         teamExternalMapping: {
-          upsert: vi.fn().mockResolvedValue({}),
+          findUnique: vi.fn().mockResolvedValue(null),
+          update: vi.fn().mockResolvedValue({}),
+          create: vi.fn().mockResolvedValue({}),
         },
       };
       return fn(tx);
@@ -366,7 +371,11 @@ describe("registerTeamSeason — duplicate TeamSeason", () => {
           create: vi.fn(),
         },
         teamSeasonOrgUnit: { createMany: vi.fn() },
-        teamExternalMapping: { upsert: vi.fn() },
+        teamExternalMapping: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
       };
       return fn(tx);
     });
@@ -392,7 +401,11 @@ describe("registerTeamSeason — duplicate TeamSeason", () => {
         },
         teamSeason: { findUnique: vi.fn(), create: vi.fn() },
         teamSeasonOrgUnit: { createMany: vi.fn() },
-        teamExternalMapping: { upsert: vi.fn() },
+        teamExternalMapping: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
       };
       return fn(tx);
     });
@@ -418,11 +431,7 @@ describe("registerTeamSeason — federation mapping", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("valid federation mapping succeeds", async () => {
-    vi.mocked(prisma.teamExternalMapping.findUnique).mockResolvedValue(
-      null as never,
-    );
-
+  it("valid federation mapping succeeds (no existing row — create path)", async () => {
     const result = await registerTeamSeason({
       ...baseInput,
       federationMapping: {
@@ -437,12 +446,75 @@ describe("registerTeamSeason — federation mapping", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("valid federation mapping succeeds (existing unclaimed row — update path)", async () => {
+    // Simulate existing unmapped row (teamSeasonId = null)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+      const tx = {
+        team: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: TEAM_ID }),
+        },
+        teamSeason: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: TEAM_SEASON_ID }),
+        },
+        teamSeasonOrgUnit: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        teamExternalMapping: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "existing-unclaimed-mapping",
+            teamSeasonId: null, // unclaimed
+          }),
+          update: vi.fn().mockResolvedValue({}),
+          create: vi.fn(),
+        },
+      };
+      return fn(tx);
+    });
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      federationMapping: {
+        provider: "SFV",
+        externalTeamId: 12345,
+        externalSeasonId: 67,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects duplicate federation mapping (already linked to a TeamSeason)", async () => {
-    vi.mocked(prisma.teamExternalMapping.findUnique).mockResolvedValue({
-      id: "existing-mapping",
-      teamSeasonId: "some-team-season-id", // already linked
-      teamId: "some-team-id",
-    } as never);
+    // The authoritative check is inside the transaction.
+    // Override the default $transaction mock so the federation findUnique
+    // returns an already-claimed mapping.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+      const tx = {
+        team: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: TEAM_ID }),
+        },
+        teamSeason: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: TEAM_SEASON_ID }),
+        },
+        teamSeasonOrgUnit: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        teamExternalMapping: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "existing-mapping",
+            teamSeasonId: "some-team-season-id", // already claimed
+          }),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
+      };
+      return fn(tx);
+    });
 
     const result = await registerTeamSeason({
       ...baseInput,
@@ -492,7 +564,11 @@ describe("registerTeamSeason — OrgUnit ordering", () => {
             return Promise.resolve({ count: args.data.length });
           }),
         },
-        teamExternalMapping: { upsert: vi.fn() },
+        teamExternalMapping: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
       };
       return fn(tx);
     });
@@ -521,7 +597,7 @@ describe("registerTeamSeason — required field validation", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("ORG_UNIT_REQUIRED"); // triggers name check before OrgUnit
+      expect(result.code).toBe("TEAM_NAME_REQUIRED");
     }
   });
 });

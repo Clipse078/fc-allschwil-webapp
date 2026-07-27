@@ -243,6 +243,17 @@ describe("POST /api/teams/register — domain errors", () => {
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(409);
   });
+
+  it("returns 400 for TEAM_NAME_REQUIRED", async () => {
+    mocks.registerTeamSeason.mockResolvedValue({
+      ok: false,
+      code: "TEAM_NAME_REQUIRED",
+      message: "Teamname ist erforderlich.",
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── Successful registration ────────────────────────────────────────────────────

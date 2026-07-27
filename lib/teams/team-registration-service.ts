@@ -8,24 +8,21 @@
  *   2. Season validity is validated.
  *   3. OrgUnit eligibility is validated (≥1 required, active, tenant-scoped).
  *   4. Team identity is either created fresh or an explicit existing Team is reused.
- *   5. TeamSeason is created with mandatory OrgUnit assignments.
- *   6. TeamSeasonOrgUnit rows are created (first = primary).
- *   7. Optional TeamExternalMapping is created/updated.
- *   8. All mandatory writes are atomic within a single Prisma transaction.
+ *   5. TeamSeason + TeamSeasonOrgUnit are written via writeTeamSeasonInTx().
+ *   6. Optional TeamExternalMapping is created/claimed (guarded against races).
+ *   7. All mandatory writes are atomic within a single Prisma transaction.
  *
- * Relationship to createCanonicalTeamSeason():
- *   This service handles the FULL registration orchestration including Team
- *   identity creation and optional federation mapping. It inlines the core
- *   TeamSeason+OrgUnit logic (reusing pure helpers from team-season-rules.ts)
- *   rather than calling createCanonicalTeamSeason() because a nested transaction
- *   would be required. createCanonicalTeamSeason() remains the canonical path
- *   for creating a TeamSeason for an ALREADY-EXISTING Team when no outer
- *   transaction is needed.
+ * Canonical TeamSeason write:
+ *   This service uses writeTeamSeasonInTx() from team-season-service.ts as the
+ *   single canonical implementation of the TeamSeason + TeamSeasonOrgUnit write.
+ *   No TeamSeason write logic is duplicated here.
  *
  * Transaction safety:
  *   All mandatory writes (Team optional, TeamSeason, TeamSeasonOrgUnit) are
  *   wrapped in a single Prisma $transaction. The optional TeamExternalMapping
- *   is included in the same transaction to ensure atomicity.
+ *   is included in the same transaction to ensure atomicity. The pre-transaction
+ *   validation checks are fail-fast gates; authoritative checks run inside the
+ *   transaction to guard against TOCTOU race conditions.
  *
  * Tenant isolation:
  *   tenantId always originates from the session (never from the request body).
@@ -34,12 +31,14 @@
 
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma, OrgUnitStatus } from "@prisma/client";
+import { TeamSeasonStatus } from "@prisma/client";
 import {
   normalizeTeamName,
   normalizeTeamSlug,
   buildTeamSeasonDisplayName,
   buildTeamSeasonShortName,
 } from "./team-season-rules";
+import { writeTeamSeasonInTx } from "./team-season-service";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,7 +75,7 @@ export type RegisterTeamInput = {
   };
   /**
    * Optional federation mapping for the newly created TeamSeason.
-   * When provided, a TeamExternalMapping row is created/updated.
+   * When provided, a TeamExternalMapping row is claimed/created.
    */
   federationMapping?: {
     provider: string;
@@ -102,6 +101,7 @@ export type RegisterTeamResult =
   | { ok: false; code: RegisterTeamErrorCode; message: string };
 
 export type RegisterTeamErrorCode =
+  | "TEAM_NAME_REQUIRED"
   | "SEASON_NOT_FOUND"
   | "ORG_UNIT_REQUIRED"
   | "ORG_UNIT_NOT_FOUND"
@@ -112,12 +112,14 @@ export type RegisterTeamErrorCode =
   | "TEAM_SEASON_ALREADY_EXISTS"
   | "SLUG_CONFLICT"
   | "FEDERATION_MAPPING_CONFLICT"
-  | "FEDERATION_MAPPING_MISMATCH"
   | "UNKNOWN_ERROR";
 
 const ACTIVE_ORG_UNIT_STATUSES: OrgUnitStatus[] = ["ACTIVE"];
 
-// Default legacy TeamCategory for new teams (not used for business logic).
+// Default legacy TeamCategory for new teams.
+// TeamCategory is a required DB field retained for backward compatibility.
+// It is NOT used for new business logic; removal is planned for TEAM-CORE-03+.
+// Callers MUST NOT derive grouping, filtering, or display from this value.
 const DEFAULT_LEGACY_CATEGORY = "AKTIVE" as const;
 
 // ---------------------------------------------------------------------------
@@ -129,6 +131,9 @@ const DEFAULT_LEGACY_CATEGORY = "AKTIVE" as const;
  *
  * This is the canonical full-registration path for the TEAM-CREATE-01 wizard.
  * All writes are atomic; no partial records are left on failure.
+ *
+ * TeamSeason + TeamSeasonOrgUnit are written via the shared writeTeamSeasonInTx()
+ * primitive from team-season-service.ts. No TeamSeason write logic is duplicated.
  *
  * Idempotency: the caller is responsible for preventing duplicate submissions.
  * The service returns TEAM_SEASON_ALREADY_EXISTS on duplicate attempts.
@@ -145,7 +150,7 @@ export async function registerTeamSeason(
   if (!teamName) {
     return {
       ok: false,
-      code: "ORG_UNIT_REQUIRED",
+      code: "TEAM_NAME_REQUIRED",
       message: "Teamname ist erforderlich.",
     };
   }
@@ -162,7 +167,7 @@ export async function registerTeamSeason(
   // 2. Pre-validate Season (outside transaction — fail fast)
   const season = await prisma.season.findUnique({
     where: { id: input.seasonId },
-    select: { id: true, name: true, key: true, startDate: true, endDate: true, isActive: true },
+    select: { id: true, name: true },
   });
 
   if (!season) {
@@ -229,41 +234,18 @@ export async function registerTeamSeason(
     }
   }
 
-  // 5. Pre-validate federation mapping conflict (outside transaction)
-  if (input.federationMapping) {
-    const { provider, externalTeamId, externalSeasonId } = input.federationMapping;
-    const conflictingMapping = await prisma.teamExternalMapping.findUnique({
-      where: {
-        tenantId_provider_externalTeamId_externalSeasonId: {
-          tenantId: input.tenantId,
-          provider,
-          externalTeamId,
-          externalSeasonId,
-        },
-      },
-      select: { id: true, teamSeasonId: true, teamId: true },
-    });
-
-    if (conflictingMapping && conflictingMapping.teamSeasonId !== null) {
-      return {
-        ok: false,
-        code: "FEDERATION_MAPPING_CONFLICT",
-        message:
-          "Dieses Verbandsteam ist für die ausgewählte Saison bereits einem Team zugeordnet.",
-      };
-    }
-  }
-
-  // 6. Run everything in a single transaction
+  // 5. Run everything in a single transaction.
+  //    Authoritative conflict checks happen inside the transaction to guard
+  //    against TOCTOU races (pre-validation above is fail-fast only).
   try {
     const result = await prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
-        // 6a. Find or create the Team identity
+        // 5a. Find or create Team identity
         let teamId: string;
         let createdTeamIdentity = false;
 
         if (input.existingTeamId) {
-          // Reuse existing Team — verify TeamSeason doesn't already exist
+          // Authoritative duplicate TeamSeason check inside transaction
           const existingSeason = await tx.teamSeason.findUnique({
             where: {
               teamId_seasonId: {
@@ -283,7 +265,7 @@ export async function registerTeamSeason(
 
           teamId = input.existingTeamId;
         } else {
-          // Check slug uniqueness within tenant
+          // Authoritative slug uniqueness check inside transaction
           const slugConflict = await tx.team.findUnique({
             where: {
               tenantId_slug: {
@@ -301,13 +283,12 @@ export async function registerTeamSeason(
             );
           }
 
-          // Create new Team identity
+          // Create new Team identity (legacy category as neutral compatibility default)
           const newTeam = await tx.team.create({
             data: {
               name: teamName,
               slug: teamSlug,
               tenantId: input.tenantId,
-              // Legacy compatibility field — not used for new business logic
               category: DEFAULT_LEGACY_CATEGORY,
               genderGroup: input.team.genderGroup?.trim() || null,
               ageGroup: input.team.ageGroup?.trim() || null,
@@ -323,40 +304,28 @@ export async function registerTeamSeason(
           createdTeamIdentity = true;
         }
 
-        // 6b. Build display name
-        const displayName =
-          buildTeamSeasonDisplayName(teamName);
-
+        // 5b. Write TeamSeason + TeamSeasonOrgUnit via canonical shared primitive
+        const displayName = buildTeamSeasonDisplayName(teamName);
         const shortName =
           input.team.shortName?.trim() ||
           buildTeamSeasonShortName(teamName);
 
-        // 6c. Create TeamSeason
-        const teamSeason = await tx.teamSeason.create({
-          data: {
-            teamId,
-            seasonId: input.seasonId,
-            displayName,
-            shortName,
-            status: "ACTIVE",
-            websiteVisible: input.websiteVisible,
-            infoboardVisible: input.infoboardVisible,
-          },
-          select: { id: true },
+        const teamSeasonId = await writeTeamSeasonInTx(tx, {
+          teamId,
+          seasonId: input.seasonId,
+          tenantId: input.tenantId,
+          uniqueOrgUnitIds,
+          displayName,
+          shortName,
+          status: TeamSeasonStatus.ACTIVE,
+          websiteVisible: input.websiteVisible,
+          infoboardVisible: input.infoboardVisible,
         });
 
-        // 6d. Create TeamSeasonOrgUnit rows — first OrgUnit is primary
-        const orgUnitData = uniqueOrgUnitIds.map((orgUnitId, index) => ({
-          tenantId: input.tenantId,
-          teamSeasonId: teamSeason.id,
-          orgUnitId,
-          isPrimary: index === 0,
-          displayOrder: index,
-        }));
-
-        await tx.teamSeasonOrgUnit.createMany({ data: orgUnitData });
-
-        // 6e. Create/update optional federation mapping
+        // 5c. Claim optional federation mapping inside transaction
+        //     Authoritative conflict check happens here (not only pre-tx) to
+        //     guard against TOCTOU: another request may claim the mapping between
+        //     our pre-validation and this transaction.
         if (input.federationMapping) {
           const {
             provider,
@@ -366,7 +335,7 @@ export async function registerTeamSeason(
             providerLeagueName,
           } = input.federationMapping;
 
-          await tx.teamExternalMapping.upsert({
+          const existingMapping = await tx.teamExternalMapping.findUnique({
             where: {
               tenantId_provider_externalTeamId_externalSeasonId: {
                 tenantId: input.tenantId,
@@ -375,31 +344,51 @@ export async function registerTeamSeason(
                 externalSeasonId,
               },
             },
-            update: {
-              teamId,
-              teamSeasonId: teamSeason.id,
-              providerTeamName: providerTeamName ?? null,
-              providerLeagueName: providerLeagueName ?? null,
-              lastSyncedAt: new Date(),
-            },
-            create: {
-              tenantId: input.tenantId,
-              teamId,
-              provider,
-              externalTeamId,
-              externalSeasonId,
-              teamSeasonId: teamSeason.id,
-              providerTeamName: providerTeamName ?? null,
-              providerLeagueName: providerLeagueName ?? null,
-              providerIsActive: true,
-              lastSyncedAt: new Date(),
-            },
+            select: { id: true, teamSeasonId: true },
           });
+
+          if (existingMapping?.teamSeasonId != null) {
+            // Another registration has already claimed this mapping
+            throw new RegistrationError(
+              "FEDERATION_MAPPING_CONFLICT",
+              "Dieses Verbandsteam ist für die ausgewählte Saison bereits einem Team zugeordnet.",
+            );
+          }
+
+          if (existingMapping) {
+            // Row exists but is unclaimed — update it
+            await tx.teamExternalMapping.update({
+              where: { id: existingMapping.id },
+              data: {
+                teamId,
+                teamSeasonId,
+                providerTeamName: providerTeamName ?? null,
+                providerLeagueName: providerLeagueName ?? null,
+                lastSyncedAt: new Date(),
+              },
+            });
+          } else {
+            // No row — create it
+            await tx.teamExternalMapping.create({
+              data: {
+                tenantId: input.tenantId,
+                teamId,
+                provider,
+                externalTeamId,
+                externalSeasonId,
+                teamSeasonId,
+                providerTeamName: providerTeamName ?? null,
+                providerLeagueName: providerLeagueName ?? null,
+                providerIsActive: true,
+                lastSyncedAt: new Date(),
+              },
+            });
+          }
         }
 
         return {
           teamId,
-          teamSeasonId: teamSeason.id,
+          teamSeasonId,
           slug: teamSlug,
           createdTeamIdentity,
         };
@@ -448,9 +437,7 @@ class RegistrationError extends Error {
 
 /**
  * Returns seasons available for Team registration.
- *
- * All seasons are returned with lifecycle status.
- * Ordering: most recent first.
+ * All seasons are returned with lifecycle status, ordered most-recent first.
  */
 export async function getRegistrationEligibleSeasons() {
   const { getSeasonLifecycleStatus } = await import("@/lib/seasons/season-logic");
@@ -484,10 +471,8 @@ export async function getRegistrationEligibleSeasons() {
 }
 
 /**
- * Returns existing Teams for a tenant — used for the "reuse existing Team" feature.
- *
- * Returns name, slug, and ID so the wizard can offer matching teams.
- * Results are filtered to the given tenant.
+ * Returns existing active Teams for a tenant.
+ * Used for the "reuse existing Team identity" feature in the wizard.
  */
 export async function getExistingTeamsForTenant(
   tenantId: string,
@@ -501,9 +486,7 @@ export async function getExistingTeamsForTenant(
 
 /**
  * Returns unmapped federation teams available for the Verband step.
- *
- * Returns TeamExternalMapping rows where teamSeasonId IS NULL — these are
- * provider-known teams that have not yet been linked to a seasonal team.
+ * Only returns TeamExternalMapping rows where teamSeasonId IS NULL (unclaimed).
  */
 export async function getUnmappedFederationTeams(tenantId: string): Promise<
   Array<{

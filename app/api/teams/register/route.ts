@@ -168,12 +168,12 @@ export async function POST(request: NextRequest) {
   const registrationResult = await registerTeamSeason(input);
 
   if (!registrationResult.ok) {
-    const conflictCodes = [
+    const conflictCodes: string[] = [
       "TEAM_SEASON_ALREADY_EXISTS",
       "SLUG_CONFLICT",
       "FEDERATION_MAPPING_CONFLICT",
     ];
-    const notFoundCodes = [
+    const notFoundCodes: string[] = [
       "SEASON_NOT_FOUND",
       "ORG_UNIT_NOT_FOUND",
       "TEAM_NOT_FOUND",
