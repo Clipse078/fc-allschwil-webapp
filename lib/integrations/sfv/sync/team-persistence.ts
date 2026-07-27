@@ -110,9 +110,15 @@ export async function createTeamWithMapping(
   const teamFields = buildNewTeamFields(detail, context);
   const mappingFields = buildMappingFields(detail, context);
 
-  // Check for slug conflict before entering the transaction.
+  // TEAM-CORE-02: slug uniqueness is now tenant-scoped.
+  // Check for slug conflict within the same tenant using compound key lookup.
   const slugConflict = await prisma.team.findUnique({
-    where: { slug: teamFields.slug },
+    where: {
+      tenantId_slug: {
+        tenantId: context.tenantId,
+        slug: teamFields.slug,
+      },
+    },
     select: { id: true },
   });
 

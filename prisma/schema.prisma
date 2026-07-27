@@ -440,6 +440,8 @@ model Tenant {
   matchExternalMappings  MatchExternalMapping[]
   opponents              Opponent[]
   opponentExternalMappings OpponentExternalMapping[]
+  // TEAM-CORE-02: canonical seasonal OrgUnit assignments
+  teamSeasonOrgUnits     TeamSeasonOrgUnit[]
 
   @@index([status])
   @@index([name])
@@ -676,14 +678,27 @@ model Person {
 model Team {
   id               String       @id @default(cuid())
   name             String
-  slug             String       @unique
+  // slug is unique per tenant (tenant-scoped) since TEAM-CORE-02.
+  // Legacy global @unique dropped; replaced by @@unique([tenantId, slug]) below.
+  // Queries must always scope by tenantId when resolving by slug.
+  slug             String
+  // @deprecated TeamCategory — legacy compatibility field retained for existing APIs,
+  //   website fallbacks, and admin UI. New business logic must use TeamSeasonOrgUnit.
+  //   Do not add new rules based on TeamCategory. Removal planned for TEAM-CORE-03+.
   category         TeamCategory
   genderGroup      String?
   ageGroup         String?
   sortOrder        Int          @default(0)
   isActive         Boolean      @default(true)
+  // websiteVisible / infoboardVisible — transitional fallback fields.
+  // Canonical seasonal visibility lives on TeamSeason. These fields are read
+  // when a TeamSeason record is absent or as legacy fallback.
+  // Removal planned once all reads use the getEffectiveTeamSeasonVisibility() helper.
   websiteVisible   Boolean      @default(true)
   infoboardVisible Boolean      @default(true)
+  // @deprecated orgUnitId — legacy single OrgUnit link. Retained for backward
+  //   compatibility. New canonical relationship is TeamSeasonOrgUnit (many-to-many).
+  //   Do not use for new business logic. Removal planned after full migration.
   orgUnitId        String?
 
   // Tenant isolation (nullable: backward-compat; backfill in 20260626000000_team_tenant_isolation)
@@ -701,6 +716,7 @@ model Team {
   homeMatchMappings       MatchExternalMapping[] @relation("MatchHomeTeam")
   awayMatchMappings       MatchExternalMapping[] @relation("MatchAwayTeam")
 
+  @@unique([tenantId, slug])
   @@index([category, sortOrder])
   @@index([isActive])
   @@index([orgUnitId])
@@ -749,13 +765,21 @@ model TeamExternalMapping {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  /// Preferred seasonal link (TEAM-CORE-02). Nullable during transition.
+  /// When set, teamSeason.teamId MUST equal teamId and externalSeasonId MUST
+  /// correspond to the TeamSeason's season. Null for historical rows or when
+  /// resolution is ambiguous (multiple matching TeamSeasons).
+  teamSeasonId         String?
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason TeamSeason? @relation(fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   /// Prevents duplicate mappings for the same external team/season/provider/tenant.
   @@unique([tenantId, provider, externalTeamId, externalSeasonId])
   @@index([tenantId, provider])
   @@index([teamId])
+  @@index([teamSeasonId])
   @@index([providerIsActive])
 }
 
@@ -777,12 +801,66 @@ model TeamSeason {
   season             Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   playerSquadMembers PlayerSquadMember[]
   trainerTeamMembers TrainerTeamMember[]
+  // TEAM-CORE-02: canonical many-to-many Organisationseinheit assignment
+  orgUnits           TeamSeasonOrgUnit[]
+  // TEAM-CORE-02: seasonal link on external provider mappings
+  externalMappings   TeamExternalMapping[]
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
   @@index([status])
   @@index([squadWebsiteVisible])
   @@index([trainerTeamWebsiteVisible])
+}
+
+// ---------------------------------------------------------------------------
+// TeamSeasonOrgUnit — canonical many-to-many join between TeamSeason and OrgUnit
+//
+// TEAM-CORE-02: replaces the legacy single Team.orgUnitId link.
+//
+// Architecture invariants:
+//   - One TeamSeason may belong to multiple OrgUnits (e.g. Junioren + Aktive).
+//   - One OrgUnit may contain multiple TeamSeasons across seasons.
+//   - Duplicate (teamSeasonId, orgUnitId) is prevented at DB level.
+//   - tenantId must match both the TeamSeason tenant and the OrgUnit tenant.
+//   - Archived OrgUnits remain historically linked (no retroactive removal).
+//   - Service layer must reject archived OrgUnits for NEW assignments.
+//   - onDelete: Restrict on orgUnit prevents silent deletion of historical links.
+//     OrgUnit archival is preferred over deletion to preserve history.
+//   - onDelete: Cascade on teamSeason cascades with the seasonal record.
+//
+// Legacy compatibility:
+//   - Team.orgUnitId is kept as a deprecated transitional field.
+//   - Existing single-OrgUnit data is backfilled into this table on migration.
+//
+// Eligibility rules (enforced at service layer, not DB):
+//   - OrgUnit must belong to the same tenant.
+//   - OrgUnit must be ACTIVE (not ARCHIVED or INACTIVE) for new assignments.
+// ---------------------------------------------------------------------------
+model TeamSeasonOrgUnit {
+  id           String   @id @default(cuid())
+  tenantId     String
+  teamSeasonId String
+  orgUnitId    String
+  /// When true, this OrgUnit is the primary grouping for display purposes.
+  /// At most one row per TeamSeason should have isPrimary = true.
+  isPrimary    Boolean  @default(false)
+  /// Controls display order when a TeamSeason belongs to multiple OrgUnits.
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason TeamSeason @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  /// Restrict prevents silent deletion of historical TeamSeason→OrgUnit links.
+  /// Archive OrgUnits instead of deleting them to preserve history.
+  orgUnit    OrgUnit    @relation(fields: [orgUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([teamSeasonId, orgUnitId])
+  @@index([tenantId])
+  @@index([teamSeasonId])
+  @@index([orgUnitId])
+  @@index([tenantId, isPrimary])
 }
 
 model PlayerSquadMember {
@@ -1096,10 +1174,13 @@ model OrgUnit {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  parent      OrgUnit?            @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  children    OrgUnit[]           @relation("OrgUnitHierarchy")
-  memberships OrgUnitMembership[]
-  teams       Team[]
+  parent              OrgUnit?            @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children            OrgUnit[]           @relation("OrgUnitHierarchy")
+  memberships         OrgUnitMembership[]
+  // @deprecated teams — legacy via Team.orgUnitId. Use teamSeasonOrgUnits for new logic.
+  teams               Team[]
+  // TEAM-CORE-02: canonical many-to-many seasonal team assignment
+  teamSeasonOrgUnits  TeamSeasonOrgUnit[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
