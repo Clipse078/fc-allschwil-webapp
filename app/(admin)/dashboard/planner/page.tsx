@@ -1,13 +1,10 @@
-﻿import SeasonPlannerPage from "@/components/admin/planner/SeasonPlannerPage";
+﻿import { redirect } from "next/navigation";
 
-type PlannerPageProps = {
-  searchParams?: Promise<{
-    season?: string;
-    status?: string;
-  }>;
-};
-
-export default async function PlannerPage({ searchParams }: PlannerPageProps) {
-  const params = (await searchParams) ?? {};
-  return <SeasonPlannerPage seasonKey={params.season} status={params.status} />;
+/**
+ * The former Saisonplanung hub is now retired from primary navigation.
+ * Training-series management lives in the dedicated Training Planner.
+ * This redirect preserves the old URL for bookmarks and direct links.
+ */
+export default function PlannerRedirectPage() {
+  redirect("/dashboard/training");
 }

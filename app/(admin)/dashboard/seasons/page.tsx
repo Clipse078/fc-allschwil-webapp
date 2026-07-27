@@ -10,6 +10,9 @@ import {
   createNextSeasonAction,
   deletePlannedSeasonAction,
 } from "@/app/(admin)/dashboard/seasons/actions";
+import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
+import { hasPermission } from "@/lib/permissions/has-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getSeasonsOverviewData } from "@/lib/seasons/queries";
 import {
   getSeasonLifecycleStatusClasses,
@@ -104,6 +107,12 @@ function getFeedbackBanner(status?: string): FeedbackBanner | null {
 }
 
 export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
+  const session = await requireAnyPermission([
+    PERMISSIONS.SEASONS_VIEW,
+    PERMISSIONS.SEASONS_MANAGE,
+  ]);
+  const canManage = hasPermission(session, PERMISSIONS.SEASONS_MANAGE);
+
   const params = (await searchParams) ?? {};
   const seasons = (await getSeasonsOverviewData()) as SeasonSummary[];
   const feedback = getFeedbackBanner(params.status);
@@ -126,12 +135,14 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
         title="Saisonverwaltung"
         description="Lifecycle-geführte Saisons als führende Entität für Teams und Events. Neue Saisons werden automatisch In Planung gesetzt und beim Start laufend."
         actions={
-          <form action={createNextSeasonAction}>
-            <button type="submit" className="fca-button-primary">
-              <Plus className="h-4 w-4" />
-              Neue Saison planen
-            </button>
-          </form>
+          canManage ? (
+            <form action={createNextSeasonAction}>
+              <button type="submit" className="fca-button-primary">
+                <Plus className="h-4 w-4" />
+                Neue Saison planen
+              </button>
+            </form>
+          ) : null
         }
       />
 
