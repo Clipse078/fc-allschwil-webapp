@@ -505,6 +505,9 @@ model Tenant {
   competitions           Competition[]
   // TRAINING-CORE-01: canonical recurring training series
   trainingSeries         TrainingSeries[]
+  // TRAINING-PLANS-01: tenant-defined training plans and assignments
+  trainingPlans          TrainingPlan[]
+  trainingPlanAssignments TrainingPlanAssignment[]
 
   @@index([status])
   @@index([name])
@@ -706,6 +709,7 @@ model Season {
   events             Event[]
   eventImportRuns    EventImportRun[]
   orgUnitMemberships OrgUnitMembership[]
+  trainingPlans      TrainingPlan[]
 
   @@index([isActive])
 }
@@ -2841,11 +2845,17 @@ enum Weekday {
 // Architecture invariants:
 //   - tenantId always comes from a trusted session context.
 //   - Belongs to exactly one TeamSeason (TeamSeason owns it via teamSeasonId).
-//   - title is unique per TeamSeason: prevents accidental duplication.
 //   - Soft-archive: archivedAt is set on archive; no hard delete.
 //   - startsAt / endsAt are time-of-day strings ("HH:mm") in the given timezone.
 //   - validFrom / validUntil define the calendar span of the series.
 //   - Recurrence is represented by TrainingSeriesRecurrenceDay rows.
+//
+// Title uniqueness: TRAINING-PLANS-01 corrective — the strict @@unique([teamSeasonId, title])
+// constraint introduced by TRAINING-CORE-01 was removed because it blocks valid operational
+// scenarios (e.g. two parallel training groups sharing the same display title within a
+// TeamSeason, such as "Goalkeeping Training" on both Monday and Wednesday). Title validation
+// (non-empty, trimmed, reasonable length) is retained at the service layer. True duplicate
+// identity prevention relies on plan assignments rather than title uniqueness alone.
 //
 // Security invariants:
 //   - All queries scope by tenantId (via team.tenantId join).
@@ -2857,7 +2867,7 @@ model TrainingSeries {
   tenantId     String
   /// Owning TeamSeason. One series belongs to exactly one TeamSeason.
   teamSeasonId String
-  /// Human-readable training identity. Unique within a TeamSeason.
+  /// Human-readable training identity. Non-empty, trimmed; validated at service layer.
   title        String
   description  String?
   /// Lifecycle status of this series.
@@ -2877,12 +2887,11 @@ model TrainingSeries {
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
-  tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  teamSeason     TeamSeason                   @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  recurrenceDays TrainingSeriesRecurrenceDay[]
+  tenant              Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason          TeamSeason                    @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  recurrenceDays      TrainingSeriesRecurrenceDay[]
+  planAssignments     TrainingPlanAssignment[]
 
-  /// Prevents duplicate training identities within the same TeamSeason.
-  @@unique([teamSeasonId, title])
   @@index([tenantId])
   @@index([teamSeasonId])
   @@index([tenantId, status])
@@ -2911,4 +2920,165 @@ model TrainingSeriesRecurrenceDay {
 
   @@unique([trainingSeriesId, weekday])
   @@index([trainingSeriesId])
+}
+
+// =============================================================================
+// TRAINING-PLANS-01: Tenant-Defined Training Plans
+//
+// Introduces TrainingPlan — a tenant-defined operational configuration
+// container that configures existing canonical TrainingSeries records.
+//
+// Architecture:
+//   TeamSeason → TrainingSeries → TrainingPlanAssignment → TrainingPlan
+//
+// Canonical principles:
+//   - A TrainingPlan NEVER duplicates TrainingSeries — it configures them.
+//   - One TrainingSeries may appear in multiple plans with different schedules.
+//   - Tenants freely name plans ("Standard-Wochenplan", "Ferienplan", etc.).
+//   - No plan names or plan types are hard-coded.
+//   - At most one non-archived default plan per (tenantId, seasonId).
+//   - No activation, resource allocation, or dated occurrence resolution here.
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// TrainingPlanStatus — administrative lifecycle status of a TrainingPlan.
+//
+// ACTIVE   — Plan is administratively available for use.
+// INACTIVE — Plan is paused / draft. Can be reactivated.
+// ARCHIVED — Plan is closed. archivedAt is set. Cannot be the default plan.
+//
+// Note: ACTIVE/INACTIVE/ARCHIVED describe administrative availability.
+//       They do NOT indicate operational activation (which is TRAINING-ACTIVATION-01).
+// ---------------------------------------------------------------------------
+enum TrainingPlanStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+// ---------------------------------------------------------------------------
+// MissingAssignmentBehavior — fallback strategy when a TrainingSeries has no
+// TrainingPlanAssignment in a given plan.
+//
+// FALLBACK_TO_DEFAULT — Future resolution may use the assignment from the
+//                        season's default plan (relevant for non-default plans).
+// NOT_SCHEDULED       — The training is not scheduled under this plan.
+// ---------------------------------------------------------------------------
+enum MissingAssignmentBehavior {
+  FALLBACK_TO_DEFAULT
+  NOT_SCHEDULED
+}
+
+// ---------------------------------------------------------------------------
+// TrainingPlanAssignmentStatus — whether a specific series is scheduled
+// within a given plan assignment.
+//
+// SCHEDULED     — The series is scheduled (possibly with time overrides).
+// NOT_SCHEDULED — The series is explicitly excluded in this plan.
+// ---------------------------------------------------------------------------
+enum TrainingPlanAssignmentStatus {
+  SCHEDULED
+  NOT_SCHEDULED
+}
+
+// ---------------------------------------------------------------------------
+// TrainingPlan — tenant-defined operational configuration for a season.
+//
+// Each plan configures the same canonical TrainingSeries records with
+// potentially different times or scheduled/not-scheduled status.
+//
+// Architecture invariants:
+//   - Belongs to exactly one tenant and one season.
+//   - isDefault: at most one non-archived default per (tenantId, seasonId).
+//     Enforced via a partial unique index (archivedAt IS NULL AND isDefault = true).
+//   - Name uniqueness: unique among non-archived plans within (tenantId, seasonId).
+//     Enforced via a partial unique index (archivedAt IS NULL).
+//   - Archiving the current default plan is rejected at the service layer.
+//   - displayOrder: tenant-controlled display sequence.
+//   - missingAssignmentBehavior: what to do when a TrainingSeries has no
+//     assignment in this plan.
+//
+// Security invariants:
+//   - All queries must scope by tenantId.
+//   - Tenant A cannot read or modify Tenant B's plans.
+// ---------------------------------------------------------------------------
+model TrainingPlan {
+  id                       String                   @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId                 String
+  /// Owning season. A plan is always season-specific.
+  seasonId                 String
+  /// Tenant-defined plan name (e.g. "Standard-Wochenplan", "Ferienplan").
+  name                     String
+  description              String?
+  /// Administrative lifecycle status. Not equivalent to operational activation.
+  status                   TrainingPlanStatus       @default(ACTIVE)
+  /// True for at most one non-archived plan per (tenantId, seasonId).
+  isDefault                Boolean                  @default(false)
+  /// Tenant-controlled display sequence.
+  displayOrder             Int                      @default(0)
+  /// Fallback strategy when a TrainingSeries has no assignment in this plan.
+  missingAssignmentBehavior MissingAssignmentBehavior @default(FALLBACK_TO_DEFAULT)
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  /// Set when the plan is archived. Null when not archived.
+  archivedAt               DateTime?
+
+  tenant      Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  season      Season                   @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assignments TrainingPlanAssignment[]
+
+  @@index([tenantId])
+  @@index([tenantId, seasonId])
+  @@index([tenantId, seasonId, status])
+  @@index([tenantId, isDefault])
+}
+
+// ---------------------------------------------------------------------------
+// TrainingPlanAssignment — connects one TrainingSeries to one TrainingPlan.
+//
+// Provides plan-specific configuration (time overrides, scheduled status)
+// for a canonical TrainingSeries within a given plan.
+//
+// Time overrides:
+//   - startTimeOverride / endTimeOverride: "HH:mm" strings (same format as
+//     TrainingSeries.startsAt / endsAt). Null means inherit from series.
+//   - timezoneOverride: IANA timezone. Null means inherit from series.
+//   - Effective values = override ?? trainingSeries.canonical value.
+//
+// Architecture invariants:
+//   - At most one assignment per (trainingPlanId, trainingSeriesId).
+//   - tenantId must match both TrainingPlan.tenantId and TrainingSeries.tenantId.
+//   - Season consistency: TrainingPlan.seasonId must match the season context
+//     of the TrainingSeries' TeamSeason.
+//   - No resource allocation fields (pitches, halls, coaches) — those are
+//     TRAINING-ALLOCATIONS-01.
+// ---------------------------------------------------------------------------
+model TrainingPlanAssignment {
+  id               String                      @id @default(cuid())
+  /// Owning tenant. Must match both TrainingPlan and TrainingSeries tenantId.
+  tenantId         String
+  trainingPlanId   String
+  trainingSeriesId String
+  /// Override the canonical startTime for this series within this plan.
+  startTimeOverride String?
+  /// Override the canonical endTime for this series within this plan.
+  endTimeOverride  String?
+  /// Override the canonical timezone for this series within this plan.
+  timezoneOverride String?
+  /// Whether the series is scheduled within this plan.
+  status           TrainingPlanAssignmentStatus @default(SCHEDULED)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingPlan   TrainingPlan   @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSeries TrainingSeries @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// At most one assignment per plan+series combination.
+  @@unique([trainingPlanId, trainingSeriesId])
+  @@index([tenantId])
+  @@index([trainingPlanId])
+  @@index([trainingSeriesId])
+  @@index([tenantId, trainingPlanId])
 }
