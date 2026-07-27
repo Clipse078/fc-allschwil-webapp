@@ -60,6 +60,9 @@ export const PERMISSIONS = {
 
   WORKSPACE_VIEW: "workspace.view",
   WORKSPACE_MANAGE: "workspace.manage",
+
+  TRAININGS_VIEW: "trainings.view",
+  TRAININGS_MANAGE: "trainings.manage",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

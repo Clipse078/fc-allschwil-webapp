@@ -1,0 +1,134 @@
+"use client";
+
+import { useState, useTransition, useCallback } from "react";
+import { Loader2, Plus, Building2, MapPin } from "lucide-react";
+import type { FacilityResourceType } from "@prisma/client";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type ResourceOption = {
+  id: string;
+  name: string;
+  code: string;
+  type: FacilityResourceType;
+  facilityId: string;
+  facilityName: string;
+};
+
+export type FacilityGroup = {
+  facilityId: string;
+  facilityName: string;
+  resources: ResourceOption[];
+};
+
+type Props = {
+  /** All non-archived resources grouped by facility. */
+  facilityGroups: FacilityGroup[];
+  /** IDs of resources already allocated (will be shown as disabled). */
+  allocatedResourceIds: Set<string>;
+  /** Called when the user selects a resource to add. */
+  onAdd: (resourceId: string) => Promise<void>;
+  disabled?: boolean;
+};
+
+// ── Resource type label map ───────────────────────────────────────────────────
+
+const RESOURCE_TYPE_LABELS: Record<FacilityResourceType, string> = {
+  FULL_PITCH: "Ganzes Feld",
+  HALF_PITCH: "Halbes Feld",
+  DRESSING_ROOM: "Garderobe",
+  OTHER: "Sonstiges",
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function FacilityResourceSelector({
+  facilityGroups,
+  allocatedResourceIds,
+  onAdd,
+  disabled = false,
+}: Props) {
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const hasAvailable = facilityGroups.some((fg) =>
+    fg.resources.some((r) => !allocatedResourceIds.has(r.id)),
+  );
+
+  const handleAdd = useCallback(() => {
+    if (!selectedId) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await onAdd(selectedId);
+        setSelectedId("");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Fehler beim Hinzufügen");
+      }
+    });
+  }, [selectedId, onAdd]);
+
+  if (!hasAvailable) {
+    return (
+      <p className="text-sm text-gray-500 italic">
+        Alle verfügbaren Ressourcen wurden bereits zugewiesen.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <select
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+          disabled={disabled || isPending}
+          className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+        >
+          <option value="">Ressource auswählen…</option>
+          {facilityGroups.map((fg) => {
+            const available = fg.resources.filter((r) => !allocatedResourceIds.has(r.id));
+            if (available.length === 0) return null;
+            return (
+              <optgroup key={fg.facilityId} label={fg.facilityName}>
+                {available.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} ({RESOURCE_TYPE_LABELS[r.type] ?? r.type})
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
+        </select>
+
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!selectedId || disabled || isPending}
+          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isPending ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Plus size={14} />
+          )}
+          Hinzufügen
+        </button>
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      )}
+
+      <p className="text-xs text-gray-400">
+        <Building2 size={12} className="inline mr-1" />
+        Ressourcen sind nach Anlage gruppiert.{" "}
+        <MapPin size={12} className="inline mr-1" />
+        Archivierte Ressourcen werden nicht angezeigt.
+      </p>
+    </div>
+  );
+}

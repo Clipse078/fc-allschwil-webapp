@@ -440,9 +440,9 @@ model Tenant {
   timezone              String?
   currency              String?
   // Season integers have a neutral structural default (August 1st European convention).
-  seasonStartMonth      Int    @default(8)
-  seasonTransitionDay   Int    @default(1)
-  seasonTransitionMonth Int    @default(8)
+  seasonStartMonth      Int     @default(8)
+  seasonTransitionDay   Int     @default(1)
+  seasonTransitionMonth Int     @default(8)
 
   // Branding v1 — Slice 10.6
   // All nullable: no DB default for white-label safety.
@@ -465,25 +465,25 @@ model Tenant {
   // Non-destructive: existing tenants receive defaults automatically without migration data.
   websiteDesignSystem Json?
 
-  registrations          Registration[]
-  users                  User[]
-  events                 Event[]
-  teams                  Team[]
-  facilities             Facility[]
-  facilityResources      FacilityResource[]
-  wochenplanPublications WochenplanPublication[]
-  newsArticles           NewsArticle[]
-  mediaAssets            MediaAsset[]
-  mediaFolders           MediaFolder[]
-  mediaTags              MediaTag[]
-  mediaAssetTags         MediaAssetTag[]
-  mediaAssetUsages       MediaAssetUsage[]
-  newsArticleMedia       NewsArticleMedia[]
-  websitePages           WebsitePage[]
-  websitePageSections    WebsitePageSection[]
-  homepageSections       HomepageSection[]
-  websiteNavItems        WebsiteNavItem[]
-  contentRevisions       ContentRevision[]
+  registrations           Registration[]
+  users                   User[]
+  events                  Event[]
+  teams                   Team[]
+  facilities              Facility[]
+  facilityResources       FacilityResource[]
+  wochenplanPublications  WochenplanPublication[]
+  newsArticles            NewsArticle[]
+  mediaAssets             MediaAsset[]
+  mediaFolders            MediaFolder[]
+  mediaTags               MediaTag[]
+  mediaAssetTags          MediaAssetTag[]
+  mediaAssetUsages        MediaAssetUsage[]
+  newsArticleMedia        NewsArticleMedia[]
+  websitePages            WebsitePage[]
+  websitePageSections     WebsitePageSection[]
+  homepageSections        HomepageSection[]
+  websiteNavItems         WebsiteNavItem[]
+  contentRevisions        ContentRevision[]
   reusableComponents      ReusableComponent[]
   reusableComponentUsages ReusableComponentUsage[]
 
@@ -492,22 +492,24 @@ model Tenant {
   workspaceDocuments        WorkspaceDocument[]
   workspaceDocumentVersions WorkspaceDocumentVersion[]
 
-   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
+  // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
-  sfvConfig              TenantSfvConfig?
-  teamExternalMappings   TeamExternalMapping[]
-  matchExternalMappings  MatchExternalMapping[]
-  opponents              Opponent[]
+  sfvConfig                TenantSfvConfig?
+  teamExternalMappings     TeamExternalMapping[]
+  matchExternalMappings    MatchExternalMapping[]
+  opponents                Opponent[]
   opponentExternalMappings OpponentExternalMapping[]
   // TEAM-CORE-02: canonical seasonal OrgUnit assignments
-  teamSeasonOrgUnits     TeamSeasonOrgUnit[]
+  teamSeasonOrgUnits       TeamSeasonOrgUnit[]
   // COMPETITION-01: canonical competition entities
-  competitions           Competition[]
+  competitions             Competition[]
   // TRAINING-CORE-01: canonical recurring training series
-  trainingSeries         TrainingSeries[]
+  trainingSeries           TrainingSeries[]
   // TRAINING-PLANS-01: tenant-defined training plans and assignments
-  trainingPlans          TrainingPlan[]
-  trainingPlanAssignments TrainingPlanAssignment[]
+  trainingPlans            TrainingPlan[]
+  trainingPlanAssignments  TrainingPlanAssignment[]
+  // TRAINING-ALLOCATIONS-01: canonical facility resource allocations
+  trainingAllocations      TrainingAllocation[]
 
   @@index([status])
   @@index([name])
@@ -527,24 +529,24 @@ model User {
   // Slice 11.2b: tenantId added so the JWT can carry tenant context.
   // Nullable: legacy users are backfilled in 20260604064000_user_tenant_fk.
   // getDefaultTenant() retained as fallback only for seed/bootstrap paths.
-  tenantId     String?
-  tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
-  userRoles             UserRole[]
-  auditLogs             AuditLog[]      @relation("AuditActor")
-  assignedRegistrations Registration[]  @relation("RegistrationAssignedUser")
-  orgUnitMemberships    OrgUnitMembership[]
-  reviewedHomepageSections  HomepageSection[] @relation("HomepageSectionReviewer")
-  approvedHomepageSections  HomepageSection[] @relation("HomepageSectionApprovedBy")
-  rejectedHomepageSections  HomepageSection[] @relation("HomepageSectionRejectedBy")
-  reviewedPageSections  WebsitePageSection[] @relation("PageSectionReviewer")
-  approvedPageSections  WebsitePageSection[] @relation("PageSectionApprovedBy")
-  rejectedPageSections  WebsitePageSection[] @relation("PageSectionRejectedBy")
-  contentRevisions      ContentRevision[]
-  createdReusableComponents  ReusableComponent[] @relation("ReusableComponentCreatedBy")
-  reviewedReusableComponents ReusableComponent[] @relation("ReusableComponentReviewer")
-  approvedReusableComponents ReusableComponent[] @relation("ReusableComponentApprovedBy")
-  rejectedReusableComponents ReusableComponent[] @relation("ReusableComponentRejectedBy")
+  userRoles                  UserRole[]
+  auditLogs                  AuditLog[]           @relation("AuditActor")
+  assignedRegistrations      Registration[]       @relation("RegistrationAssignedUser")
+  orgUnitMemberships         OrgUnitMembership[]
+  reviewedHomepageSections   HomepageSection[]    @relation("HomepageSectionReviewer")
+  approvedHomepageSections   HomepageSection[]    @relation("HomepageSectionApprovedBy")
+  rejectedHomepageSections   HomepageSection[]    @relation("HomepageSectionRejectedBy")
+  reviewedPageSections       WebsitePageSection[] @relation("PageSectionReviewer")
+  approvedPageSections       WebsitePageSection[] @relation("PageSectionApprovedBy")
+  rejectedPageSections       WebsitePageSection[] @relation("PageSectionRejectedBy")
+  contentRevisions           ContentRevision[]
+  createdReusableComponents  ReusableComponent[]  @relation("ReusableComponentCreatedBy")
+  reviewedReusableComponents ReusableComponent[]  @relation("ReusableComponentReviewer")
+  approvedReusableComponents ReusableComponent[]  @relation("ReusableComponentApprovedBy")
+  rejectedReusableComponents ReusableComponent[]  @relation("ReusableComponentRejectedBy")
 
   // Workspace
   createdWorkspaceFolders          WorkspaceFolder[]          @relation("WorkspaceFolderCreatedBy")
@@ -581,8 +583,8 @@ model Registration {
 
   submittedAt DateTime @default(now())
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   assignedToUser User?        @relation("RegistrationAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -798,16 +800,16 @@ model Competition {
 // ---------------------------------------------------------------------------
 
 model TeamSeasonCompetition {
-  id            String      @id @default(cuid())
+  id            String   @id @default(cuid())
   teamSeasonId  String
   competitionId String
   /// When true, this is the primary competition for this TeamSeason.
   /// At most one row per TeamSeason should have isPrimary = true.
-  isPrimary     Boolean     @default(false)
+  isPrimary     Boolean  @default(false)
   /// Controls display order when a TeamSeason belongs to multiple competitions.
-  displayOrder  Int         @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   teamSeason  TeamSeason  @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -873,19 +875,19 @@ model Team {
   orgUnitId        String?
 
   // Tenant isolation (nullable: backward-compat; backfill in 20260626000000_team_tenant_isolation)
-  tenantId         String?
-  tenant           Tenant?      @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  teamSeasons             TeamSeason[]
-  events                  Event[]
-  eventImportRuns         EventImportRun[]
-  orgUnit                 OrgUnit?               @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  externalMappings        TeamExternalMapping[]
-  homeMatchMappings       MatchExternalMapping[] @relation("MatchHomeTeam")
-  awayMatchMappings       MatchExternalMapping[] @relation("MatchAwayTeam")
+  teamSeasons       TeamSeason[]
+  events            Event[]
+  eventImportRuns   EventImportRun[]
+  orgUnit           OrgUnit?               @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  externalMappings  TeamExternalMapping[]
+  homeMatchMappings MatchExternalMapping[] @relation("MatchHomeTeam")
+  awayMatchMappings MatchExternalMapping[] @relation("MatchAwayTeam")
 
   @@unique([tenantId, slug])
   @@index([category, sortOrder])
@@ -910,43 +912,43 @@ model Team {
 // ---------------------------------------------------------------------------
 
 model TeamExternalMapping {
-  id                   String   @id @default(cuid())
+  id                     String   @id @default(cuid())
   /// Owning tenant. Scopes all lookups and mutations to a single tenant.
-  tenantId             String
+  tenantId               String
   /// The canonical Team this mapping belongs to.
-  teamId               String
+  teamId                 String
   /// External provider identifier, e.g. "SFV".
-  provider             String
+  provider               String
   /// Provider-assigned team identifier (e.g. SFV teamId integer).
-  externalTeamId       Int
+  externalTeamId         Int
   /// Provider-assigned season identifier used at time of sync (e.g. SFV seasonId integer).
-  externalSeasonId     Int
+  externalSeasonId       Int
   /// Provider-reported team name at time of last sync.
-  providerTeamName     String?
+  providerTeamName       String?
   /// Provider-reported league identifier at time of last sync.
-  providerLeagueId     Int?
+  providerLeagueId       Int?
   /// Provider-reported league name at time of last sync.
-  providerLeagueName   String?
+  providerLeagueName     String?
   /// Provider-reported organisation identifier at time of last sync.
   providerOrganisationId Int?
   /// Whether the provider reports this team as active.
-  providerIsActive     Boolean  @default(true)
+  providerIsActive       Boolean  @default(true)
   /// Timestamp of the last successful sync that touched this mapping.
-  lastSyncedAt         DateTime
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  lastSyncedAt           DateTime
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   /// Preferred seasonal link (TEAM-CORE-02). Nullable during transition.
   /// When set, teamSeason.teamId MUST equal teamId and externalSeasonId MUST
   /// correspond to the TeamSeason's season. Null for historical rows or when
   /// resolution is ambiguous (multiple matching TeamSeasons).
-  teamSeasonId         String?
+  teamSeasonId String?
 
   // ── TEAM-PROVIDER-01: canonical provider mapping workflow ─────────────────
   /// How this mapping was created.
   /// "SYNC" = created automatically by provider sync.
   /// "MANUAL" = created explicitly by an administrator through the mapping workflow.
-  mappingSource        String   @default("SYNC")
+  mappingSource        String  @default("SYNC")
   /// Suggestion-engine confidence level at the time of creation or last suggestion.
   /// "HIGH" | "MEDIUM" | "LOW" — null for SYNC-created rows and for confirmed
   /// manual mappings where confidence is not applicable.
@@ -955,12 +957,15 @@ model TeamExternalMapping {
   /// Assists traceability — Competition does NOT own the provider mapping.
   mappingCompetitionId String?
 
-  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  teamSeason TeamSeason? @relation(fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant             Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team               Team         @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason         TeamSeason?  @relation(fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   /// The Competition used as mapping context (TEAM-PROVIDER-01). Does NOT mean
   /// Competition owns the mapping — it is informational context only.
   mappingCompetition Competition? @relation("TeamExternalMappingCompetition", fields: [mappingCompetitionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  // TEAM-PROVIDER-01-V: partial unique index (teamSeasonId, provider) WHERE teamSeasonId IS NOT NULL
+  // enforced via raw migration; Prisma schema documents the intent here.
+  // One TeamSeason may have at most one active mapping per provider.
 
   /// Prevents duplicate mappings for the same external team/season/provider/tenant.
   @@unique([tenantId, provider, externalTeamId, externalSeasonId])
@@ -970,9 +975,6 @@ model TeamExternalMapping {
   @@index([providerIsActive])
   @@index([mappingSource])
   @@index([mappingCompetitionId])
-  // TEAM-PROVIDER-01-V: partial unique index (teamSeasonId, provider) WHERE teamSeasonId IS NOT NULL
-  // enforced via raw migration; Prisma schema documents the intent here.
-  // One TeamSeason may have at most one active mapping per provider.
 }
 
 model TeamSeason {
@@ -993,8 +995,8 @@ model TeamSeason {
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
 
-  team               Team                @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  season             Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team               Team                    @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  season             Season                  @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   playerSquadMembers PlayerSquadMember[]
   trainerTeamMembers TrainerTeamMember[]
   // TEAM-CORE-02: canonical many-to-many Organisationseinheit assignment
@@ -1142,16 +1144,16 @@ model Event {
   importBatchKey   String?
   lastSyncedAt     DateTime?
 
-  opponentName              String?
-  organizerName             String?
-  competitionLabel          String?
-  homeAway                  String?
-  resultLabel               String?
+  opponentName            String?
+  organizerName           String?
+  competitionLabel        String?
+  homeAway                String?
+  resultLabel             String?
   /// Live or half-time intermediate score label (e.g. "1:0 (HZ)").
   /// Set and updated exclusively by match-detail synchronization (Slice 3C).
   /// Null until a detail sync has been run and an intermediate result is available.
-  intermediateResultLabel   String?
-  meetingTime               DateTime?
+  intermediateResultLabel String?
+  meetingTime             DateTime?
 
   websiteVisible       Boolean @default(true)
   infoboardVisible     Boolean @default(false)
@@ -1164,9 +1166,9 @@ model Event {
   remarks   String?
 
   // Wochenplan pitch + dressing-room allocation (Week Planner V1)
-  pitchCode             String?
-  homeDressingRoomCode  String?
-  awayDressingRoomCode  String?
+  pitchCode            String?
+  homeDressingRoomCode String?
+  awayDressingRoomCode String?
 
   // Tenant isolation (nullable: backward-compat with seed/legacy events)
   tenantId String?
@@ -1375,13 +1377,13 @@ model OrgUnit {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  parent              OrgUnit?            @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  children            OrgUnit[]           @relation("OrgUnitHierarchy")
-  memberships         OrgUnitMembership[]
+  parent             OrgUnit?            @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children           OrgUnit[]           @relation("OrgUnitHierarchy")
+  memberships        OrgUnitMembership[]
   // @deprecated teams — legacy via Team.orgUnitId. Use teamSeasonOrgUnits for new logic.
-  teams               Team[]
+  teams              Team[]
   // TEAM-CORE-02: canonical many-to-many seasonal team assignment
-  teamSeasonOrgUnits  TeamSeasonOrgUnit[]
+  teamSeasonOrgUnits TeamSeasonOrgUnit[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -1671,6 +1673,8 @@ model FacilityResource {
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
+  trainingAllocations TrainingAllocation[]
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([facilityId])
@@ -1693,7 +1697,7 @@ model FacilityResource {
 model WochenplanPublication {
   id                String    @id @default(cuid())
   tenantId          String
-  weekId            String    // ISO week identifier, e.g. "2026-W23"
+  weekId            String // ISO week identifier, e.g. "2026-W23"
   variantLabel      String    @default("Standard-Wochenplan")
   isPublished       Boolean   @default(false)
   publishedAt       DateTime?
@@ -1738,12 +1742,12 @@ model MediaAsset {
   updatedAt       DateTime         @updatedAt
 
   // DAM V1 extensions — additive, all nullable for backward compatibility
-  description  String?   // Long description / notes
-  copyright    String?   // © copyright / rights information
-  photographer String?   // Photographer / creator name
-  folderId     String?   // Optional folder placement
+  description  String? // Long description / notes
+  copyright    String? // © copyright / rights information
+  photographer String? // Photographer / creator name
+  folderId     String? // Optional folder placement
   archivedAt   DateTime? // Set when status → ARCHIVED; null when active
-  storageKey   String?   // Blob storage key for lifecycle management
+  storageKey   String? // Blob storage key for lifecycle management
 
   tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   folder           MediaFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -1780,36 +1784,36 @@ model MediaAsset {
 // ---------------------------------------------------------------------------
 
 model NewsArticle {
-  id           String            @id @default(cuid())
-  tenantId     String
-  slug         String
-  title        String
-  excerpt      String?
-  content      String
-  imageUrl     String?
-  status       NewsArticleStatus @default(DRAFT)
-  publishedAt  DateTime?
+  id          String            @id @default(cuid())
+  tenantId    String
+  slug        String
+  title       String
+  excerpt     String?
+  content     String
+  imageUrl    String?
+  status      NewsArticleStatus @default(DRAFT)
+  publishedAt DateTime?
 
   // V2 extensions
-  heroMediaId    String?
-  channels       Json?
-  scheduledAt    DateTime?
-  authorName     String?
-  tags           Json?
+  heroMediaId String?
+  channels    Json?
+  scheduledAt DateTime?
+  authorName  String?
+  tags        Json?
 
   // V2.1 extensions
   authorPersonId String?
   reviewNotes    String?
 
   // V4.2 extensions — rich text foundation
-  contentJson    Json?
+  contentJson Json?
 
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  heroMedia      MediaAsset?        @relation("NewsArticleHeroMedia", fields: [heroMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  authorPerson   Person?            @relation("NewsArticleAuthorPerson", fields: [authorPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  heroMedia       MediaAsset?        @relation("NewsArticleHeroMedia", fields: [heroMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  authorPerson    Person?            @relation("NewsArticleAuthorPerson", fields: [authorPersonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   additionalMedia NewsArticleMedia[]
 
   @@unique([tenantId, slug])
@@ -1831,16 +1835,16 @@ model NewsArticle {
 // ---------------------------------------------------------------------------
 
 model NewsArticleMedia {
-  id           String    @id @default(cuid())
+  id           String  @id @default(cuid())
   tenantId     String
   articleId    String
   mediaAssetId String
-  sortOrder    Int       @default(0)
+  sortOrder    Int     @default(0)
   caption      String?
   placement    String?
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   article    NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -1927,20 +1931,20 @@ model WebsitePage {
 // ---------------------------------------------------------------------------
 
 model WebsitePageSection {
-  id        String   @id @default(cuid())
-  tenantId  String
-  pageId    String
+  id                 String    @id @default(cuid())
+  tenantId           String
+  pageId             String
   /// Section type key — must match a key in the shared block registry.
-  type      String
+  type               String
   /// Human-readable admin label (editable by the tenant admin).
-  label     String
+  label              String
   /// Display order (ascending). Lower values render first.
-  sortOrder Int      @default(0)
+  sortOrder          Int       @default(0)
   /// When false the section is hidden from the public layout API.
-  isEnabled Boolean  @default(true)
+  isEnabled          Boolean   @default(true)
   /// Type-specific configuration stored as a JSON object.
   /// Validated at the application layer via the shared block registry helpers.
-  config    Json     @default("{}")
+  config             Json      @default("{}")
   // ── Publishing workflow fields (CMS V2 Slice 9) ──────────────────────────
   /// Publish status gate — "DRAFT" | "PUBLISHED".
   /// Default "PUBLISHED" preserves backwards compatibility for all pre-Slice-9 rows.
@@ -1967,14 +1971,14 @@ model WebsitePageSection {
   approvalNote       String?
   approvedByUserId   String?
   rejectedByUserId   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  tenant           Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  page             WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  reviewerUser     User?       @relation("PageSectionReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  approvedByUser   User?       @relation("PageSectionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  rejectedByUser   User?       @relation("PageSectionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  page           WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewerUser   User?       @relation("PageSectionReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedByUser User?       @relation("PageSectionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  rejectedByUser User?       @relation("PageSectionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([tenantId])
   @@index([tenantId, pageId])
@@ -2041,23 +2045,23 @@ model WebsitePageSection {
 // ---------------------------------------------------------------------------
 
 model HomepageSection {
-  id        String   @id @default(cuid())
-  tenantId  String
+  id                 String    @id @default(cuid())
+  tenantId           String
   /// Section type key — must match a key in HOMEPAGE_SECTION_TYPES registry.
-  type      String
+  type               String
   /// Human-readable admin label (editable by the tenant admin).
-  label     String
+  label              String
   /// Display order (ascending). Lower values render first.
-  sortOrder Int      @default(0)
+  sortOrder          Int       @default(0)
   /// When false the section is hidden from the public API (gate 1).
-  isEnabled Boolean  @default(true)
+  isEnabled          Boolean   @default(true)
   /// Type-specific configuration stored as a JSON object.
   /// Validated at the application layer via section-type helpers.
-  config    Json     @default("{}")
+  config             Json      @default("{}")
   // ── Publishing workflow fields (CMS V2 Slice 5) ──────────────────────────
   /// Publish status gate 2 — "DRAFT" | "PUBLISHED".
   /// Default "PUBLISHED" preserves backwards compatibility for all pre-Slice-5 rows.
-  publishStatus      String   @default("PUBLISHED")
+  publishStatus      String    @default("PUBLISHED")
   /// Timestamp of the most recent publish action.
   publishedAt        DateTime?
   /// Timestamp of the most recent unpublish action.
@@ -2089,13 +2093,13 @@ model HomepageSection {
   approvedByUserId   String?
   /// Nullable FK to the User who most recently rejected this section.
   rejectedByUserId   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  tenant           Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  reviewerUser     User?   @relation("HomepageSectionReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  approvedByUser   User?   @relation("HomepageSectionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  rejectedByUser   User?   @relation("HomepageSectionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewerUser   User?  @relation("HomepageSectionReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedByUser User?  @relation("HomepageSectionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  rejectedByUser User?  @relation("HomepageSectionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([tenantId])
   @@index([tenantId, isEnabled])
@@ -2142,7 +2146,7 @@ model HomepageSection {
 // ---------------------------------------------------------------------------
 
 model WebsiteNavItem {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   tenantId       String
   /// Nullable self-reference: null = top-level item in its area.
   parentId       String?
@@ -2151,20 +2155,20 @@ model WebsiteNavItem {
   /// Display label for this navigation item.
   label          String
   /// Link type. One of: "INTERNAL" | "EXTERNAL" | "CUSTOM"
-  linkType       String    @default("INTERNAL")
+  linkType       String   @default("INTERNAL")
   /// URL or path for this item. Null for non-linking parent items.
   href           String?
   /// Link target. One of: "SELF" | "BLANK". Default SELF.
-  target         String    @default("SELF")
+  target         String   @default("SELF")
   /// Display order within the same parent/area (ascending, 0-based).
-  sortOrder      Int       @default(0)
+  sortOrder      Int      @default(0)
   /// Primary visibility gate. false = hidden from public API.
-  isVisible      Boolean   @default(true)
+  isVisible      Boolean  @default(true)
   /// Visibility mode. One of: "ALWAYS" | "AUTHENTICATED" | "ANONYMOUS".
   /// Foundation-level: public API currently only filters by isVisible.
-  visibilityMode String    @default("ALWAYS")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  visibilityMode String   @default("ALWAYS")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   parent   WebsiteNavItem?  @relation("NavItemChildren", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -2197,34 +2201,34 @@ model WebsiteNavItem {
 // ---------------------------------------------------------------------------
 
 model ContentRevision {
-  id              String   @id @default(cuid())
-  tenantId        String
+  id               String   @id @default(cuid())
+  tenantId         String
   /// Entity type key: "WebsitePageSection" | "WebsitePage" | "HomepageSection"
   /// Future: "NewsArticle" | "Event" | "LandingPage" — no schema change needed.
-  entityType      String
+  entityType       String
   /// ID of the entity this revision belongs to.
-  entityId        String
+  entityId         String
   /// Monotonically increasing version number per (entityType, entityId).
-  versionNumber   Int
+  versionNumber    Int
   /// User who created this revision (nullable for system-generated revisions).
-  createdByUserId String?
+  createdByUserId  String?
   /// Optional human-readable note describing what changed.
-  changeNote      String?
+  changeNote       String?
   /// Full JSON snapshot of the entity at this revision.
-  snapshot        Json
+  snapshot         Json
   /// When true, this revision was created by a restore action.
   /// Makes restored revisions easy to identify for diffing and rollback chains.
-  isRestore       Boolean  @default(false)
+  isRestore        Boolean  @default(false)
   /// FK to the source revision this was restored from (nullable).
   /// Enables: visual diffing, rollback chains, branching, merge history.
   /// Set when isRestore = true; null for normal edits.
   parentRevisionId String?
-  createdAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  createdByUser   User?            @relation(fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  parentRevision  ContentRevision? @relation("RevisionParent", fields: [parentRevisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  childRevisions  ContentRevision[] @relation("RevisionParent")
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser  User?             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  parentRevision ContentRevision?  @relation("RevisionParent", fields: [parentRevisionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  childRevisions ContentRevision[] @relation("RevisionParent")
 
   @@unique([entityType, entityId, versionNumber])
   @@index([tenantId])
@@ -2281,7 +2285,7 @@ model WorkspaceFolder {
   tenantId String
   parentId String?
 
-  name String
+  name        String
   description String?
 
   displayOrder Int @default(0)
@@ -2296,8 +2300,8 @@ model WorkspaceFolder {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  parent WorkspaceFolder? @relation("WorkspaceFolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  children WorkspaceFolder[] @relation("WorkspaceFolderHierarchy")
+  parent    WorkspaceFolder?    @relation("WorkspaceFolderHierarchy", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children  WorkspaceFolder[]   @relation("WorkspaceFolderHierarchy")
   documents WorkspaceDocument[]
 
   createdByUser User? @relation("WorkspaceFolderCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -2333,7 +2337,7 @@ model WorkspaceDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   folder WorkspaceFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   currentVersion WorkspaceDocumentVersion?  @relation("WorkspaceDocumentCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -2357,7 +2361,7 @@ model WorkspaceDocument {
 model WorkspaceDocumentVersion {
   id String @id @default(cuid())
 
-  tenantId  String
+  tenantId   String
   documentId String
 
   versionNumber Int
@@ -2389,6 +2393,7 @@ model WorkspaceDocumentVersion {
   @@index([createdByUserId])
   @@index([createdAt])
 }
+
 // ---------------------------------------------------------------------------
 // MediaTag — Reusable DAM tags (CMS V2 Slice 11)
 //
@@ -2403,7 +2408,7 @@ model MediaTag {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   assets MediaAssetTag[]
 
   @@unique([tenantId, name])
@@ -2480,7 +2485,7 @@ model MediaAssetUsage {
 // ---------------------------------------------------------------------------
 
 model ReusableComponent {
-  id          String    @id @default(cuid())
+  id          String  @id @default(cuid())
   tenantId    String
   /// Component type key — one of the REUSABLE_COMPONENT_TYPES registry keys.
   type        String
@@ -2491,7 +2496,7 @@ model ReusableComponent {
   /// Optional description shown in the picker and library view.
   description String?
   /// Type-specific configuration stored as a JSON object.
-  config      Json      @default("{}")
+  config      Json    @default("{}")
 
   // ── Publishing workflow (mirrors HomepageSection / WebsitePageSection) ──────
   /// Publish status — "DRAFT" | "PUBLISHED".
@@ -2503,15 +2508,15 @@ model ReusableComponent {
 
   // ── Editorial approval workflow ─────────────────────────────────────────────
   /// Approval status — "NOT_REQUIRED" | "DRAFT" | "IN_REVIEW" | "APPROVED" | "CHANGES_REQUESTED".
-  approvalStatus     String    @default("NOT_REQUIRED")
-  reviewerUserId     String?
-  reviewRequestedAt  DateTime?
-  reviewedAt         DateTime?
-  approvedAt         DateTime?
-  rejectedAt         DateTime?
-  approvalNote       String?
-  approvedByUserId   String?
-  rejectedByUserId   String?
+  approvalStatus    String    @default("NOT_REQUIRED")
+  reviewerUserId    String?
+  reviewRequestedAt DateTime?
+  reviewedAt        DateTime?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  approvalNote      String?
+  approvedByUserId  String?
+  rejectedByUserId  String?
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   createdByUserId String?
@@ -2519,11 +2524,11 @@ model ReusableComponent {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  createdByUser  User?   @relation("ReusableComponentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  reviewerUser   User?   @relation("ReusableComponentReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  approvedByUser User?   @relation("ReusableComponentApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  rejectedByUser User?   @relation("ReusableComponentRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser  User?  @relation("ReusableComponentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  reviewerUser   User?  @relation("ReusableComponentReviewer", fields: [reviewerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedByUser User?  @relation("ReusableComponentApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  rejectedByUser User?  @relation("ReusableComponentRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   usages ReusableComponentUsage[]
 
@@ -2701,19 +2706,19 @@ model MatchExternalMapping {
 }
 
 model TenantSfvConfig {
-  id              String   @id @default(cuid())
-  tenantId        String   @unique
+  id                    String    @id @default(cuid())
+  tenantId              String    @unique
   /// Positive integer SFV club identifier (e.g. 483 for FC Allschwil).
   /// Must be a numeric identifier as returned by the SFV API.
-  clubId          Int
+  clubId                Int
   /// Positive integer SFV season identifier used as the default when no
   /// explicit seasonId is provided (e.g. 2027 for the 2026/2027 season).
-  defaultSeasonId Int
+  defaultSeasonId       Int
   /// Optional SFV organisation identifier. Null when not assigned or not required.
-  organisationId  Int?
+  organisationId        Int?
   /// When false, the SFV integration is administratively disabled.
   /// Consumers must treat disabled configs as "not configured".
-  enabled         Boolean  @default(true)
+  enabled               Boolean   @default(true)
   /// Completion time of the most recent fully successful tenant-level team synchronization.
   lastTeamSyncAt        DateTime?
   /// Completion time of the most recent fully successful tenant-level schedule synchronization.
@@ -2722,13 +2727,14 @@ model TenantSfvConfig {
   lastMatchDetailSyncAt DateTime?
   /// Completion time of the most recent fully successful tenant-level competition synchronization.
   lastCompetitionSyncAt DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([enabled])
 }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Opponent — reusable tenant-scoped opponent identity.
 //
@@ -2740,7 +2746,7 @@ tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade,
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Opponent {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   tenantId      String
   officialName  String
   shortName     String?
@@ -2748,8 +2754,8 @@ model Opponent {
   infoboardName String?
   notes         String?
   archivedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   externalMappings OpponentExternalMapping[]
@@ -2767,19 +2773,19 @@ model Opponent {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model OpponentExternalMapping {
-  id                     String   @id @default(cuid())
+  id                     String    @id @default(cuid())
   tenantId               String
   opponentId             String
   provider               String
   externalTeamId         Int
-  externalSeasonId       Int      @default(0)
+  externalSeasonId       Int       @default(0)
   providerTeamName       String?
   providerOrganisationId Int?
   providerLogoUrl        String?
-  providerIsActive       Boolean  @default(true)
+  providerIsActive       Boolean   @default(true)
   lastSyncedAt           DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   opponent Opponent @relation(fields: [opponentId], references: [id], onDelete: Cascade)
@@ -2887,10 +2893,11 @@ model TrainingSeries {
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
-  tenant              Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  teamSeason          TeamSeason                    @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  recurrenceDays      TrainingSeriesRecurrenceDay[]
-  planAssignments     TrainingPlanAssignment[]
+  tenant          Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason      TeamSeason                    @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  recurrenceDays  TrainingSeriesRecurrenceDay[]
+  planAssignments TrainingPlanAssignment[]
+  allocations     TrainingAllocation[]
 
   @@index([tenantId])
   @@index([teamSeasonId])
@@ -2911,10 +2918,10 @@ model TrainingSeries {
 //     new fields or sibling models without changing this table.
 // ---------------------------------------------------------------------------
 model TrainingSeriesRecurrenceDay {
-  id               String         @id @default(cuid())
+  id               String   @id @default(cuid())
   trainingSeriesId String
   weekday          Weekday
-  createdAt        DateTime       @default(now())
+  createdAt        DateTime @default(now())
 
   trainingSeries TrainingSeries @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
@@ -3003,26 +3010,26 @@ enum TrainingPlanAssignmentStatus {
 //   - Tenant A cannot read or modify Tenant B's plans.
 // ---------------------------------------------------------------------------
 model TrainingPlan {
-  id                       String                   @id @default(cuid())
+  id                        String                    @id @default(cuid())
   /// Owning tenant. All queries must be scoped by tenantId.
-  tenantId                 String
+  tenantId                  String
   /// Owning season. A plan is always season-specific.
-  seasonId                 String
+  seasonId                  String
   /// Tenant-defined plan name (e.g. "Standard-Wochenplan", "Ferienplan").
-  name                     String
-  description              String?
+  name                      String
+  description               String?
   /// Administrative lifecycle status. Not equivalent to operational activation.
-  status                   TrainingPlanStatus       @default(ACTIVE)
+  status                    TrainingPlanStatus        @default(ACTIVE)
   /// True for at most one non-archived plan per (tenantId, seasonId).
-  isDefault                Boolean                  @default(false)
+  isDefault                 Boolean                   @default(false)
   /// Tenant-controlled display sequence.
-  displayOrder             Int                      @default(0)
+  displayOrder              Int                       @default(0)
   /// Fallback strategy when a TrainingSeries has no assignment in this plan.
   missingAssignmentBehavior MissingAssignmentBehavior @default(FALLBACK_TO_DEFAULT)
-  createdAt                DateTime                 @default(now())
-  updatedAt                DateTime                 @updatedAt
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
   /// Set when the plan is archived. Null when not archived.
-  archivedAt               DateTime?
+  archivedAt                DateTime?
 
   tenant      Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   season      Season                   @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -3055,21 +3062,21 @@ model TrainingPlan {
 //     TRAINING-ALLOCATIONS-01.
 // ---------------------------------------------------------------------------
 model TrainingPlanAssignment {
-  id               String                      @id @default(cuid())
+  id                String                       @id @default(cuid())
   /// Owning tenant. Must match both TrainingPlan and TrainingSeries tenantId.
-  tenantId         String
-  trainingPlanId   String
-  trainingSeriesId String
+  tenantId          String
+  trainingPlanId    String
+  trainingSeriesId  String
   /// Override the canonical startTime for this series within this plan.
   startTimeOverride String?
   /// Override the canonical endTime for this series within this plan.
-  endTimeOverride  String?
+  endTimeOverride   String?
   /// Override the canonical timezone for this series within this plan.
-  timezoneOverride String?
+  timezoneOverride  String?
   /// Whether the series is scheduled within this plan.
-  status           TrainingPlanAssignmentStatus @default(SCHEDULED)
-  createdAt        DateTime                    @default(now())
-  updatedAt        DateTime                    @updatedAt
+  status            TrainingPlanAssignmentStatus @default(SCHEDULED)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
 
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   trainingPlan   TrainingPlan   @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -3081,4 +3088,70 @@ model TrainingPlanAssignment {
   @@index([trainingPlanId])
   @@index([trainingSeriesId])
   @@index([tenantId, trainingPlanId])
+}
+
+// =============================================================================
+// TRAINING-ALLOCATIONS-01: Canonical Training Resource Allocation
+//
+// Introduces TrainingAllocation — the single source of truth for which
+// FacilityResources are allocated to a canonical TrainingSeries.
+//
+// Architecture:
+//   TrainingSeries → TrainingAllocation → FacilityResource
+//
+// Canonical principles:
+//   - One TrainingSeries may hold many TrainingAllocation rows (one per
+//     FacilityResource used: full pitch, half-pitch pairs, dressing room, etc.).
+//   - Duplicate allocation of the same resource to the same series is prevented
+//     at DB level via @@unique([trainingSeriesId, facilityResourceId]).
+//   - All queries must be scoped by tenantId.
+//   - Archived FacilityResources (status = ARCHIVED) cannot receive new
+//     allocations; existing historical rows are preserved.
+//   - No resource-type-specific code — everything works through FacilityResource.
+//   - No weekplanner, infoboard, or website publication at this layer.
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// TrainingAllocation — connects one TrainingSeries to one FacilityResource.
+//
+// Each row represents a single resource allocation for a recurring training:
+//   e.g. "E1 Tuesday Training uses Half Pitch A West"
+//
+// Architecture invariants:
+//   - tenantId must match both TrainingSeries.tenantId and FacilityResource.tenantId.
+//   - @@unique([trainingSeriesId, facilityResourceId]) prevents duplicates.
+//   - displayOrder controls the UI presentation sequence.
+//   - notes is optional free text (e.g. "shared with another team").
+//   - Cascade-delete when the parent TrainingSeries is deleted.
+//   - Cascade-delete when the parent FacilityResource is deleted.
+//
+// Security invariants:
+//   - All queries must scope by tenantId.
+//   - Tenant A cannot read or modify Tenant B's allocations.
+// ---------------------------------------------------------------------------
+model TrainingAllocation {
+  id                 String   @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId           String
+  /// The canonical training series this allocation belongs to.
+  trainingSeriesId   String
+  /// The facility resource allocated to this training series.
+  facilityResourceId String
+  /// Optional free-text note for this allocation.
+  notes              String?
+  /// Display position within the allocations for this training series.
+  displayOrder       Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSeries   TrainingSeries   @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facilityResource FacilityResource @relation(fields: [facilityResourceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Prevent duplicate allocation of the same resource to the same training series.
+  @@unique([trainingSeriesId, facilityResourceId])
+  @@index([tenantId])
+  @@index([trainingSeriesId])
+  @@index([facilityResourceId])
+  @@index([tenantId, trainingSeriesId])
 }

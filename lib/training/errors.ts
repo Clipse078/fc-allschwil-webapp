@@ -178,3 +178,63 @@ export class SeasonNotFoundError extends Error {
     this.name = "SeasonNotFoundError";
   }
 }
+
+// =============================================================================
+// TRAINING-ALLOCATIONS-01 errors
+// =============================================================================
+
+/** The requested TrainingAllocation was not found (or belongs to another tenant). */
+export class TrainingAllocationNotFoundError extends Error {
+  readonly code = "TRAINING_ALLOCATION_NOT_FOUND" as const;
+  constructor(allocationId: string) {
+    super(`TrainingAllocation not found: ${allocationId}`);
+    this.name = "TrainingAllocationNotFoundError";
+  }
+}
+
+/** A duplicate allocation of the same resource to the same training series. */
+export class TrainingAllocationDuplicateError extends Error {
+  readonly code = "TRAINING_ALLOCATION_DUPLICATE" as const;
+  constructor(trainingSeriesId: string, facilityResourceId: string) {
+    super(
+      `FacilityResource "${facilityResourceId}" is already allocated to TrainingSeries "${trainingSeriesId}"`,
+    );
+    this.name = "TrainingAllocationDuplicateError";
+  }
+}
+
+/** The FacilityResource is archived and cannot receive new allocations. */
+export class TrainingAllocationArchivedResourceError extends Error {
+  readonly code = "TRAINING_ALLOCATION_ARCHIVED_RESOURCE" as const;
+  constructor(facilityResourceId: string) {
+    super(`FacilityResource "${facilityResourceId}" is archived and cannot receive new allocations`);
+    this.name = "TrainingAllocationArchivedResourceError";
+  }
+}
+
+/** The FacilityResource does not belong to the tenant or does not exist. */
+export class TrainingAllocationResourceNotFoundError extends Error {
+  readonly code = "TRAINING_ALLOCATION_RESOURCE_NOT_FOUND" as const;
+  constructor(facilityResourceId: string) {
+    super(`FacilityResource not found: ${facilityResourceId}`);
+    this.name = "TrainingAllocationResourceNotFoundError";
+  }
+}
+
+/** The TrainingSeries and FacilityResource belong to different tenants. */
+export class TrainingAllocationTenantMismatchError extends Error {
+  readonly code = "TRAINING_ALLOCATION_TENANT_MISMATCH" as const;
+  constructor() {
+    super("TrainingSeries and FacilityResource belong to different tenants");
+    this.name = "TrainingAllocationTenantMismatchError";
+  }
+}
+
+/** The parent Facility of the FacilityResource is archived and cannot receive new allocations. */
+export class TrainingAllocationArchivedFacilityError extends Error {
+  readonly code = "TRAINING_ALLOCATION_ARCHIVED_FACILITY" as const;
+  constructor(facilityId: string) {
+    super(`Facility "${facilityId}" is archived. Its resources cannot receive new allocations.`);
+    this.name = "TrainingAllocationArchivedFacilityError";
+  }
+}
