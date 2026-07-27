@@ -110,6 +110,14 @@ vi.mock("../sync/schedule-persistence", () => ({
   processScheduleEntry: (...args: unknown[]) => mockProcessScheduleEntry(...args),
 }));
 
+// ── Mock: match-resolution-service (MATCH-RESOLUTION-01) ─────────────────────
+// Prevents Prisma import at module load time when running this test in isolation.
+
+const mockResolveScheduleBatch = vi.fn();
+vi.mock("@/lib/match-resolution/match-resolution-service", () => ({
+  resolveScheduleBatch: (...args: unknown[]) => mockResolveScheduleBatch(...args),
+}));
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 const { syncSfvSchedule } = await import("../sync/schedule");
@@ -234,6 +242,16 @@ beforeEach(() => {
       clubName: "FC Testclub", teamLeagueId: 17131, teamLeagueName: "4. Liga",
       teamDivisionName: "Gruppe 1", teamOrganisationId: 8, isTeamActive: true, isHomeTeam: false },
   ]);
+  // Default: resolution batch returns empty summary (no DB access in sync-schedule tests)
+  mockResolveScheduleBatch.mockResolvedValue({
+    resolved: 0,
+    partiallyResolved: 0,
+    unresolved: 0,
+    invalid: 0,
+    conflicts: 0,
+    failed: 0,
+    total: 0,
+  });
 });
 
 // ── 1-3: First synchronization ────────────────────────────────────────────────

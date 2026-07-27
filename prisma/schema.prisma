@@ -764,6 +764,8 @@ model Competition {
   teamSeasonCompetitions TeamSeasonCompetition[]
   /// Back-relation for TeamExternalMapping.mappingCompetitionId (TEAM-PROVIDER-01).
   teamExternalMappings   TeamExternalMapping[]   @relation("TeamExternalMappingCompetition")
+  /// Back-relation for MatchExternalMapping.resolvedCompetitionId (MATCH-RESOLUTION-01).
+  resolvedMatchMappings  MatchExternalMapping[]  @relation("MatchResolvedCompetition")
 
   /// Prevents duplicate provider competitions per tenant per season.
   @@unique([tenantId, provider, externalCompetitionId, externalSeasonId])
@@ -996,6 +998,9 @@ model TeamSeason {
   externalMappings   TeamExternalMapping[]
   // COMPETITION-01: optional competitions for this TeamSeason
   competitions       TeamSeasonCompetition[]
+  // MATCH-RESOLUTION-01: back-relations for resolved match references
+  resolvedHomeMatchMappings MatchExternalMapping[] @relation("MatchResolvedHomeTeamSeason")
+  resolvedAwayMatchMappings MatchExternalMapping[] @relation("MatchResolvedAwayTeamSeason")
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -2674,6 +2679,21 @@ model MatchExternalMapping {
   /// Timestamp of the last successful match-detail sync for this mapping.
   /// Null until the first match-detail synchronization run has been executed.
   detailSyncedAt         DateTime?
+  // ── MATCH-RESOLUTION-01: canonical resolution columns ────────────────────
+  /// Canonical TeamSeason for the home side. Populated by MatchResolutionService.
+  /// Null when the home participant is an external opponent or resolution has not run.
+  resolvedHomeTeamSeasonId  String?
+  /// Canonical TeamSeason for the away side. Populated by MatchResolutionService.
+  /// Null when the away participant is an external opponent or resolution has not run.
+  resolvedAwayTeamSeasonId  String?
+  /// Canonical Competition used as validation context. Populated by MatchResolutionService.
+  /// Null when no competition was resolved (provider competition not synced yet).
+  resolvedCompetitionId     String?
+  /// Resolution status from the last MatchResolutionService run.
+  /// One of: RESOLVED | PARTIALLY_RESOLVED | UNRESOLVED | INVALID_MAPPING | CONFLICT
+  resolutionStatus          String?
+  /// Timestamp of the last resolution run.
+  resolvedAt                DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -2681,6 +2701,12 @@ model MatchExternalMapping {
   event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   homeTeam Team?  @relation("MatchHomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   awayTeam Team?  @relation("MatchAwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  /// Resolved canonical TeamSeason for the home side (MATCH-RESOLUTION-01).
+  resolvedHomeTeamSeason    TeamSeason?  @relation("MatchResolvedHomeTeamSeason", fields: [resolvedHomeTeamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  /// Resolved canonical TeamSeason for the away side (MATCH-RESOLUTION-01).
+  resolvedAwayTeamSeason    TeamSeason?  @relation("MatchResolvedAwayTeamSeason", fields: [resolvedAwayTeamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  /// Resolved canonical Competition (validation context) (MATCH-RESOLUTION-01).
+  resolvedCompetition       Competition? @relation("MatchResolvedCompetition", fields: [resolvedCompetitionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   /// Prevents duplicate SFV match mappings within the same tenant.
   @@unique([tenantId, provider, externalMatchId])
@@ -2689,6 +2715,9 @@ model MatchExternalMapping {
   @@index([eventId])
   @@index([homeTeamId])
   @@index([awayTeamId])
+  @@index([resolutionStatus])
+  @@index([resolvedHomeTeamSeasonId])
+  @@index([resolvedAwayTeamSeasonId])
 }
 
 model TenantSfvConfig {

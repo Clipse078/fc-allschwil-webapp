@@ -13,6 +13,7 @@
  */
 
 import type { SyncErrorEntry } from "./types";
+import type { BatchResolutionSummary } from "@/lib/match-resolution/types";
 
 // ── Sync result ────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,13 @@ export type SfvScheduleSyncResult = {
   externalOpponents: number;
   /** Sanitized per-match error entries. Empty when failed === 0. */
   errors: SyncErrorEntry[];
+  /**
+   * Canonical match resolution summary (MATCH-RESOLUTION-01).
+   *
+   * Present when resolution ran after the import loop.
+   * Null when the import failed before resolution could run.
+   */
+  resolution: BatchResolutionSummary | null;
 };
 
 // ── Internal sync context ──────────────────────────────────────────────────────

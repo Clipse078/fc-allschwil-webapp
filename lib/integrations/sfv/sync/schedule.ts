@@ -51,6 +51,8 @@ import { fetchClubSchedule, fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
 import type { SfvScheduleSyncContext, SfvScheduleSyncResult } from "./schedule-types";
 import type { SyncErrorEntry } from "./types";
+import { resolveScheduleBatch } from "@/lib/match-resolution/match-resolution-service";
+import type { BatchResolutionSummary } from "@/lib/match-resolution/types";
 import {
   computeDefaultWindow,
   validateWindow,
@@ -125,6 +127,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
         unresolvedLocalTeamRefs: 0,
         externalOpponents: 0,
         errors: [{ code: "INVALID_DATE_WINDOW", message: windowError }],
+        resolution: null,
       },
     );
   }
@@ -179,6 +182,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
           message: `Failed to fetch schedule from SFV: ${safe.message}`,
         },
       ],
+      resolution: null,
     });
   }
 
@@ -273,6 +277,30 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     }
   }
 
+  // ── Canonical match resolution ───────────────────────────────────────────
+  //
+  // Run batch resolution for all matches in this provider/season scope.
+  // This links MatchExternalMapping rows to the correct canonical TeamSeason
+  // using TeamExternalMapping as the authoritative mapping source.
+  //
+  // Resolution runs after the import loop so that newly created and updated
+  // MatchExternalMapping rows are included. Resolution is idempotent and
+  // safe to re-run — it overwrites previous resolution results.
+  //
+  // A resolution failure does not cause the sync to fail. The sync result
+  // includes a resolution summary for admin visibility (MATCH-RESOLUTION-01).
+
+  let resolution: BatchResolutionSummary | null = null;
+  try {
+    resolution = await resolveScheduleBatch({
+      tenantId,
+      provider: PROVIDER,
+      externalSeasonId: context.seasonId,
+    });
+  } catch {
+    // Resolution batch failure is non-fatal. Logged implicitly via null resolution.
+  }
+
   // ── Build and return result ──────────────────────────────────────────────
 
   const finishedAt = new Date();
@@ -289,6 +317,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     unresolvedLocalTeamRefs,
     externalOpponents,
     errors,
+    resolution,
   });
 
   logScheduleSyncCompleted(result);
@@ -315,7 +344,7 @@ type CountFields = Pick<
   | "unresolvedLocalTeamRefs"
   | "externalOpponents"
   | "errors"
->;
+> & { resolution?: BatchResolutionSummary | null };
 
 function buildResult(
   context: SfvScheduleSyncContext,
@@ -333,6 +362,17 @@ function buildResult(
     seasonId: context.seasonId,
     dateFrom: context.dateFrom,
     dateTo: context.dateTo,
-    ...counts,
+    resolution: counts.resolution ?? null,
+    fetched: counts.fetched,
+    created: counts.created,
+    updated: counts.updated,
+    unchanged: counts.unchanged,
+    failed: counts.failed,
+    scoresUpdated: counts.scoresUpdated,
+    kickoffChanges: counts.kickoffChanges,
+    statusChanges: counts.statusChanges,
+    unresolvedLocalTeamRefs: counts.unresolvedLocalTeamRefs,
+    externalOpponents: counts.externalOpponents,
+    errors: counts.errors,
   };
 }
