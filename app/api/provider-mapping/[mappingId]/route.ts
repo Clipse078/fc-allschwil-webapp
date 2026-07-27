@@ -23,6 +23,7 @@ import {
   removeProviderMapping,
 } from "@/lib/provider-mapping/provider-mapping-service";
 import { ensureSfvAdapterRegistered } from "@/lib/integrations/sfv/register-adapter";
+import { parseConfidenceLevel } from "@/lib/provider-mapping/validators";
 import type { CreateProviderMappingInput } from "@/lib/provider-mapping/types";
 
 export const dynamic = "force-dynamic";
@@ -96,9 +97,7 @@ export async function PUT(request: NextRequest, { params }: Params): Promise<Nex
     externalTeamId: body.externalTeamId as number,
     externalSeasonId: body.externalSeasonId as number,
     competitionId: typeof body.competitionId === "string" ? body.competitionId : undefined,
-    confidenceLevel: typeof body.confidenceLevel === "string"
-      ? (body.confidenceLevel as CreateProviderMappingInput["confidenceLevel"])
-      : undefined,
+    confidenceLevel: parseConfidenceLevel(body.confidenceLevel),
   };
 
   const result = await replaceProviderMapping(tenantId, mappingId, input);

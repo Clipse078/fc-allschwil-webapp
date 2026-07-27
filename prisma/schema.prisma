@@ -963,6 +963,9 @@ model TeamExternalMapping {
   @@index([providerIsActive])
   @@index([mappingSource])
   @@index([mappingCompetitionId])
+  // TEAM-PROVIDER-01-V: partial unique index (teamSeasonId, provider) WHERE teamSeasonId IS NOT NULL
+  // enforced via raw migration; Prisma schema documents the intent here.
+  // One TeamSeason may have at most one active mapping per provider.
 }
 
 model TeamSeason {

@@ -16,15 +16,15 @@ import {
   getRegisteredProviders,
   _clearRegistryForTests,
 } from "../provider-registry";
-import type { IProviderAdapter, FetchProviderTeamsInput, ProviderTeam } from "../types";
+import type { IProviderAdapter, ProviderTeam } from "../types";
 
 // ── Mock adapter ───────────────────────────────────────────────────────────────
 
 function makeAdapter(key: string): IProviderAdapter {
   return {
     providerKey: key,
-    fetchProviderTeams: async (_input: FetchProviderTeamsInput): Promise<ProviderTeam[]> => [],
-    getProviderSeasonId: async (_tenantId: string): Promise<number> => 1,
+    fetchProviderTeams: async (): Promise<ProviderTeam[]> => [],
+    getProviderSeasonId: async (): Promise<number> => 1,
   };
 }
 

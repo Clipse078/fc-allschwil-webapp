@@ -26,9 +26,7 @@ import type { Prisma } from "@prisma/client";
 import { getProviderAdapter } from "./provider-registry";
 import {
   listProviderMappings,
-  getMappingsForTeamSeason,
   getMappedExternalTeamIds,
-  getMappedTeamSeasonIds,
   externalTeamIsMapped,
   teamSeasonHasMappingForProvider,
 } from "./provider-mapping-queries";
@@ -39,6 +37,7 @@ import type {
   MappingSuggestion,
   CreateProviderMappingInput,
   CreateProviderMappingResult,
+  CreateProviderMappingErrorCode,
   RemoveProviderMappingResult,
   ValidateProviderMappingResult,
   MappingSource,
@@ -328,8 +327,6 @@ export async function createProviderMapping(
 
   // 6. Write mapping (upsert on unique key — handles SYNC-created rows)
   try {
-    const providerSeasonId = await adapter.getProviderSeasonId(tenantId);
-
     const row = await prisma.teamExternalMapping.upsert({
       where: {
         tenantId_provider_externalTeamId_externalSeasonId: {
@@ -430,7 +427,10 @@ export async function createProviderMapping(
 /**
  * Replaces an existing mapping for a TeamSeason with a new provider team.
  *
- * Atomically removes the old mapping and creates the new one within a transaction.
+ * Atomic: unlinking the old mapping and creating the new one are executed
+ * inside a single Prisma interactive transaction. If the new mapping fails
+ * validation the transaction rolls back and the old mapping is preserved.
+ *
  * Used when an administrator wants to correct a wrong mapping.
  */
 export async function replaceProviderMapping(
@@ -438,7 +438,7 @@ export async function replaceProviderMapping(
   existingMappingId: string,
   input: CreateProviderMappingInput,
 ): Promise<CreateProviderMappingResult> {
-  // 1. Verify existing mapping belongs to tenant
+  // 1. Verify existing mapping belongs to tenant (before entering transaction)
   const existing = await prisma.teamExternalMapping.findFirst({
     where: { id: existingMappingId, tenantId },
     select: { id: true, provider: true, teamSeasonId: true },
@@ -452,24 +452,153 @@ export async function replaceProviderMapping(
     };
   }
 
-  // 2. Remove teamSeasonId from old mapping (do not delete — preserve history)
-  await prisma.teamExternalMapping.update({
-    where: { id: existingMappingId },
-    data: { teamSeasonId: null },
-  });
-
-  // 3. Create new mapping (allows the new external team to be mapped)
-  const result = await createProviderMapping(input);
-
-  if (!result.ok) {
-    // Rollback: restore teamSeasonId on old mapping
-    await prisma.teamExternalMapping.update({
-      where: { id: existingMappingId },
-      data: { teamSeasonId: existing.teamSeasonId },
-    });
+  // 2. Run all service-layer validation before opening the DB transaction.
+  //    Validation calls are read-only and cheap; performing them outside the
+  //    transaction avoids holding a lock during external adapter calls
+  //    (e.g. getProviderSeasonId hits the DB or cache).
+  const validation = await validateProviderMapping(input);
+  if (!validation.valid) {
+    // Map known validation error messages to typed codes for callers
+    const firstErr = validation.errors[0] ?? "";
+    const code: CreateProviderMappingErrorCode =
+      firstErr.includes("bereits einer anderen") ? "EXTERNAL_TEAM_ALREADY_MAPPED"
+      : firstErr.includes("TeamSeason nicht gefunden") ? "TEAM_SEASON_NOT_FOUND"
+      : firstErr.includes("archiv") || firstErr.includes("Archiv") ? "TEAM_SEASON_ARCHIVED"
+      : firstErr.includes("Mandant") ? "TEAM_SEASON_TENANT_MISMATCH"
+      : firstErr.includes("Adapter") || firstErr.includes("Anbieter") ? "PROVIDER_NOT_FOUND"
+      : "UNKNOWN_ERROR";
+    return { ok: false, code, message: validation.errors.join("; ") };
   }
 
-  return result;
+  // Additional duplicate checks (adapter already validated above)
+  const adapter = getProviderAdapter(input.provider);
+  if (!adapter) {
+    return { ok: false, code: "PROVIDER_NOT_FOUND", message: `Kein Adapter für Anbieter "${input.provider}" registriert.` };
+  }
+
+  // Check external team not mapped elsewhere (excluding the mapping being replaced)
+  const externalAlreadyMapped = await prisma.teamExternalMapping.findFirst({
+    where: {
+      tenantId,
+      provider: input.provider,
+      externalTeamId: input.externalTeamId,
+      externalSeasonId: input.externalSeasonId,
+      teamSeasonId: { not: null },
+      id: { not: existingMappingId },
+    },
+    select: { id: true },
+  });
+  if (externalAlreadyMapped) {
+    return {
+      ok: false,
+      code: "EXTERNAL_TEAM_ALREADY_MAPPED",
+      message: "Dieses externe Team ist bereits einer anderen TeamSeason zugeordnet.",
+    };
+  }
+
+  // 3. Perform atomic replace in a transaction
+  try {
+    const row = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Unlink old mapping (preserve row for audit)
+      await tx.teamExternalMapping.update({
+        where: { id: existingMappingId },
+        data: { teamSeasonId: null },
+      });
+
+      // Upsert new mapping
+      return tx.teamExternalMapping.upsert({
+        where: {
+          tenantId_provider_externalTeamId_externalSeasonId: {
+            tenantId,
+            provider: input.provider,
+            externalTeamId: input.externalTeamId,
+            externalSeasonId: input.externalSeasonId,
+          },
+        },
+        create: {
+          tenantId,
+          teamId: (await tx.teamSeason.findUniqueOrThrow({ where: { id: input.teamSeasonId }, select: { teamId: true } })).teamId,
+          provider: input.provider,
+          externalTeamId: input.externalTeamId,
+          externalSeasonId: input.externalSeasonId,
+          teamSeasonId: input.teamSeasonId,
+          mappingSource: "MANUAL" satisfies MappingSource,
+          confidenceLevel: (input.confidenceLevel ?? null) as string | null,
+          mappingCompetitionId: input.competitionId ?? null,
+          lastSyncedAt: new Date(),
+        },
+        update: {
+          teamSeasonId: input.teamSeasonId,
+          mappingSource: "MANUAL" satisfies MappingSource,
+          confidenceLevel: (input.confidenceLevel ?? null) as string | null,
+          mappingCompetitionId: input.competitionId ?? null,
+          lastSyncedAt: new Date(),
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          teamId: true,
+          team: { select: { name: true } },
+          teamSeasonId: true,
+          teamSeason: { select: { displayName: true } },
+          provider: true,
+          externalTeamId: true,
+          externalSeasonId: true,
+          providerTeamName: true,
+          providerLeagueId: true,
+          providerLeagueName: true,
+          providerOrganisationId: true,
+          providerIsActive: true,
+          mappingSource: true,
+          confidenceLevel: true,
+          mappingCompetitionId: true,
+          mappingCompetition: { select: { officialName: true } },
+          lastSyncedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    });
+
+    const dto: ProviderMappingDto = {
+      id: row.id,
+      tenantId: row.tenantId,
+      teamId: row.teamId,
+      teamName: row.team.name,
+      teamSeasonId: row.teamSeasonId,
+      teamSeasonDisplayName: row.teamSeason?.displayName ?? null,
+      provider: row.provider,
+      externalTeamId: row.externalTeamId,
+      externalSeasonId: row.externalSeasonId,
+      providerTeamName: row.providerTeamName,
+      providerLeagueId: row.providerLeagueId,
+      providerLeagueName: row.providerLeagueName,
+      providerOrganisationId: row.providerOrganisationId,
+      providerIsActive: row.providerIsActive,
+      mappingSource: row.mappingSource as MappingSource,
+      confidenceLevel: (row.confidenceLevel ?? null) as ConfidenceLevel | null,
+      mappingCompetitionId: row.mappingCompetitionId,
+      mappingCompetitionName: row.mappingCompetition?.officialName ?? null,
+      lastSyncedAt: row.lastSyncedAt.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+
+    return { ok: true, mapping: dto };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("Unique constraint")) {
+      return {
+        ok: false,
+        code: "EXTERNAL_TEAM_ALREADY_MAPPED",
+        message: "Dieses externe Team ist bereits einer anderen TeamSeason zugeordnet.",
+      };
+    }
+    return {
+      ok: false,
+      code: "UNKNOWN_ERROR",
+      message: err instanceof Error ? err.message : "Unbekannter Fehler.",
+    };
+  }
 }
 
 // ── Remove mapping ─────────────────────────────────────────────────────────────

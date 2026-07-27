@@ -226,6 +226,20 @@ describe("B. POST /api/provider-mapping", () => {
       expect.objectContaining({ tenantId: TENANT_ID }),
     );
   });
+
+  it("strips invalid confidenceLevel (not HIGH|MEDIUM|LOW) before passing to service", async () => {
+    await POST(makePostRequest({ ...VALID_BODY, confidenceLevel: "SUPERGOOD" }));
+    expect(mocks.createProviderMapping).toHaveBeenCalledWith(
+      expect.objectContaining({ confidenceLevel: undefined }),
+    );
+  });
+
+  it("passes valid confidenceLevel HIGH to service", async () => {
+    await POST(makePostRequest({ ...VALID_BODY, confidenceLevel: "HIGH" }));
+    expect(mocks.createProviderMapping).toHaveBeenCalledWith(
+      expect.objectContaining({ confidenceLevel: "HIGH" }),
+    );
+  });
 });
 
 // ── C. Tenant isolation ────────────────────────────────────────────────────────

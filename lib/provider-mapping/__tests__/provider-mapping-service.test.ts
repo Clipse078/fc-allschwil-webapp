@@ -21,7 +21,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    teamSeason: { findFirst: vi.fn() },
+    teamSeason: { findFirst: vi.fn(), findUniqueOrThrow: vi.fn() },
     competition: { findFirst: vi.fn() },
     teamExternalMapping: {
       count: vi.fn(),
@@ -30,6 +30,7 @@ vi.mock("@/lib/db/prisma", () => ({
       upsert: vi.fn(),
       update: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -45,6 +46,7 @@ import {
   createProviderMapping,
   removeProviderMapping,
   validateProviderMapping,
+  replaceProviderMapping,
 } from "../provider-mapping-service";
 import type { CreateProviderMappingInput } from "../types";
 
@@ -127,11 +129,6 @@ describe("A. createProviderMapping — happy path", () => {
       expect(result.mapping.externalTeamId).toBe(100);
       expect(result.mapping.mappingSource).toBe("MANUAL");
     }
-  });
-
-  it("calls the adapter's getProviderSeasonId", async () => {
-    await createProviderMapping(baseInput);
-    expect(mockAdapter.getProviderSeasonId).toHaveBeenCalledWith(TENANT_A);
   });
 
   it("passes confidenceLevel when provided", async () => {
@@ -332,5 +329,67 @@ describe("G. validateProviderMapping", () => {
     const result = await validateProviderMapping(baseInput);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.toLowerCase().includes("archiv"))).toBe(true);
+  });
+});
+
+// ── H. replaceProviderMapping — corrective (TEAM-PROVIDER-01-V) ───────────────
+
+describe("H. replaceProviderMapping — atomic transaction", () => {
+  const existingMappingId = "mapping-existing";
+
+  beforeEach(() => {
+    // Mock existing mapping lookup
+    vi.mocked(prisma.teamExternalMapping.findFirst)
+      .mockResolvedValueOnce({ id: existingMappingId, provider: "SFV", teamSeasonId: TEAM_SEASON_ID } as never)
+      // No other mapping for this external team
+      .mockResolvedValueOnce(null as never);
+
+    // validateProviderMapping needs teamSeason + no archived competition
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(mockTeamSeason as never);
+
+    // $transaction mock: execute the callback with a minimal tx client
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => {
+      const txClient = {
+        teamExternalMapping: {
+          update: vi.fn().mockResolvedValue({}),
+          upsert: vi.fn().mockResolvedValue(mockMappingRow),
+        },
+        teamSeason: {
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ teamId: TEAM_ID }),
+        },
+      };
+      return cb(txClient);
+    });
+  });
+
+  it("returns ok: true on successful replace", async () => {
+    const result = await replaceProviderMapping(TENANT_A, existingMappingId, baseInput);
+    expect(result.ok).toBe(true);
+  });
+
+  it("uses $transaction (not separate updates)", async () => {
+    await replaceProviderMapping(TENANT_A, existingMappingId, baseInput);
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+  });
+
+  it("returns TEAM_SEASON_NOT_FOUND when existing mapping not found", async () => {
+    // Override: no existing mapping for this specific test
+    vi.mocked(prisma.teamExternalMapping.findFirst).mockReset().mockResolvedValue(null as never);
+    const result = await replaceProviderMapping(TENANT_A, "non-existent", baseInput);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("TEAM_SEASON_NOT_FOUND");
+  });
+
+  it("returns EXTERNAL_TEAM_ALREADY_MAPPED when external team is mapped elsewhere", async () => {
+    // Override: first returns existing mapping, second returns a conflict
+    vi.mocked(prisma.teamExternalMapping.findFirst)
+      .mockReset()
+      .mockResolvedValueOnce({ id: existingMappingId, provider: "SFV", teamSeasonId: TEAM_SEASON_ID } as never)
+      .mockResolvedValueOnce({ id: "other-mapping" } as never);
+
+    const result = await replaceProviderMapping(TENANT_A, existingMappingId, baseInput);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("EXTERNAL_TEAM_ALREADY_MAPPED");
   });
 });

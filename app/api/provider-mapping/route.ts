@@ -31,6 +31,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { listProviderMappings } from "@/lib/provider-mapping/provider-mapping-queries";
 import { createProviderMapping } from "@/lib/provider-mapping/provider-mapping-service";
 import { ensureSfvAdapterRegistered } from "@/lib/integrations/sfv/register-adapter";
+import { parseConfidenceLevel } from "@/lib/provider-mapping/validators";
 import type { MappingFilterParams } from "@/lib/provider-mapping/provider-mapping-queries";
 import type { CreateProviderMappingInput } from "@/lib/provider-mapping/types";
 
@@ -107,9 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     externalTeamId: body.externalTeamId as number,
     externalSeasonId: body.externalSeasonId as number,
     competitionId: typeof body.competitionId === "string" ? body.competitionId : undefined,
-    confidenceLevel: typeof body.confidenceLevel === "string"
-      ? (body.confidenceLevel as CreateProviderMappingInput["confidenceLevel"])
-      : undefined,
+    confidenceLevel: parseConfidenceLevel(body.confidenceLevel),
   };
 
   const result = await createProviderMapping(input);
