@@ -1,6 +1,6 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
@@ -184,9 +184,12 @@ export default async function TeamDetailPage({ params }: Props) {
                         ? [
                             {
                               label: "Wettkampf",
-                              value: "Kein Wettkampf zugeordnet",
-                              icon: <Trophy className="h-3.5 w-3.5" />,
-                              emptyText: "Kein Wettkampf zugeordnet",
+                              value: (
+                                <span className="inline-flex items-center gap-1 text-amber-600">
+                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                  Kein Wettkampf zugeordnet
+                                </span>
+                              ),
                             },
                           ]
                         : []),

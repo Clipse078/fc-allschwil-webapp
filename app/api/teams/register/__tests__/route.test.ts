@@ -51,6 +51,7 @@ const VALID_BODY = {
   seasonId: "season-01",
   orgUnitIds: ["org-unit-01"],
   team: { name: "Frauen 1" },
+  participationType: "TRAINING",
   websiteVisible: true,
   infoboardVisible: true,
 };
@@ -162,6 +163,50 @@ describe("POST /api/teams/register — input validation", () => {
     const res = await POST(makeRequest(body));
     expect(res.status).toBe(400);
   });
+
+  it("returns 400 when participationType is invalid", async () => {
+    const body = { ...VALID_BODY, participationType: "INVALID_TYPE" };
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts valid participationType COMPETITION", async () => {
+    const body = { ...VALID_BODY, participationType: "COMPETITION" };
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
+  });
+
+  it("accepts valid participationType TRAINING", async () => {
+    const body = { ...VALID_BODY, participationType: "TRAINING" };
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
+  });
+
+  it("accepts valid participationType DEVELOPMENT", async () => {
+    const body = { ...VALID_BODY, participationType: "DEVELOPMENT" };
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
+  });
+
+  it("accepts valid participationType RECREATIONAL", async () => {
+    const body = { ...VALID_BODY, participationType: "RECREATIONAL" };
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
+  });
+
+  it("accepts valid participationType OTHER", async () => {
+    const body = { ...VALID_BODY, participationType: "OTHER" };
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 400 when participationType is absent (not defaulted silently)", async () => {
+    const body = { ...VALID_BODY };
+    // participationType omitted — should fail with 400 (not silently default)
+    delete (body as Record<string, unknown>).participationType;
+    const res = await POST(makeRequest(body));
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── Domain errors ──────────────────────────────────────────────────────────────
@@ -254,6 +299,61 @@ describe("POST /api/teams/register — domain errors", () => {
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(400);
   });
+
+  it("returns 404 for COMPETITION_NOT_FOUND", async () => {
+    mocks.registerTeamSeason.mockResolvedValue({
+      ok: false,
+      code: "COMPETITION_NOT_FOUND",
+      message: "Wettkampf nicht gefunden.",
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 for COMPETITION_TENANT_MISMATCH", async () => {
+    mocks.registerTeamSeason.mockResolvedValue({
+      ok: false,
+      code: "COMPETITION_TENANT_MISMATCH",
+      message: "Der Wettkampf gehört nicht zum aktiven Mandanten.",
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 for COMPETITION_ARCHIVED", async () => {
+    mocks.registerTeamSeason.mockResolvedValue({
+      ok: false,
+      code: "COMPETITION_ARCHIVED",
+      message: "Archivierte Wettkämpfe können nicht zugeordnet werden.",
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for COMPETITION_REQUIRED", async () => {
+    mocks.registerTeamSeason.mockResolvedValue({
+      ok: false,
+      code: "COMPETITION_REQUIRED",
+      message: "Wettkampfteams müssen einem Wettkampf zugeordnet werden.",
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for COMPETITION_NOT_ALLOWED", async () => {
+    mocks.registerTeamSeason.mockResolvedValue({
+      ok: false,
+      code: "COMPETITION_NOT_ALLOWED",
+      message: "Eine Wettkampfzuordnung ist nur für Wettkampfteams zulässig.",
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── Successful registration ────────────────────────────────────────────────────
@@ -312,6 +412,7 @@ describe("POST /api/teams/register — success", () => {
       seasonId: VALID_BODY.seasonId,
       orgUnitIds: VALID_BODY.orgUnitIds,
       team: VALID_BODY.team,
+      participationType: VALID_BODY.participationType,
     };
 
     const res = await POST(makeRequest(body));

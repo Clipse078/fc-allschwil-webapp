@@ -117,9 +117,16 @@ export async function POST(request: NextRequest) {
   const rawParticipationType =
     typeof b.participationType === "string" ? b.participationType.trim() : "";
   const validParticipationTypes = Object.values(ParticipationType) as string[];
-  const participationType: ParticipationType = validParticipationTypes.includes(rawParticipationType)
-    ? (rawParticipationType as ParticipationType)
-    : ParticipationType.TRAINING;
+
+  if (!validParticipationTypes.includes(rawParticipationType)) {
+    return NextResponse.json(
+      {
+        error: `Ungültiger Teilnahmetyp '${rawParticipationType}'. Gültige Werte: ${validParticipationTypes.join(", ")}.`,
+      },
+      { status: 400 },
+    );
+  }
+  const participationType = rawParticipationType as ParticipationType;
 
   const competitionId =
     typeof b.competitionId === "string" ? b.competitionId.trim() || null : null;
@@ -194,15 +201,23 @@ export async function POST(request: NextRequest) {
       "TEAM_NOT_FOUND",
       "COMPETITION_NOT_FOUND",
     ];
+    const validationCodes: string[] = [
+      "COMPETITION_NOT_ALLOWED",
+      "COMPETITION_ARCHIVED",
+      "INVALID_PARTICIPATION_TYPE",
+    ];
 
     const status = conflictCodes.includes(registrationResult.code)
       ? 409
       : notFoundCodes.includes(registrationResult.code)
         ? 404
         : registrationResult.code === "TEAM_TENANT_MISMATCH" ||
-            registrationResult.code === "ORG_UNIT_TENANT_MISMATCH"
+            registrationResult.code === "ORG_UNIT_TENANT_MISMATCH" ||
+            registrationResult.code === "COMPETITION_TENANT_MISMATCH"
           ? 403
-          : 400;
+          : validationCodes.includes(registrationResult.code)
+            ? 400
+            : 400;
 
     return NextResponse.json(
       { error: registrationResult.message, code: registrationResult.code },

@@ -421,6 +421,145 @@ describe("TEAM-CREATE-02 — provider competition (SFV)", () => {
   });
 });
 
+// ── Archived competition rejection ────────────────────────────────────────────
+
+describe("TEAM-CREATE-02 — archived competition rejection", () => {
+  it("rejects an archived competition (COMPETITION_ARCHIVED)", async () => {
+    // findFirst returns competition but it is archived
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
+      id: COMPETITION_ID,
+      tenantId: TENANT_A,
+      isArchived: true,
+    } as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      participationType: ParticipationType.COMPETITION,
+      competitionId: COMPETITION_ID,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("COMPETITION_ARCHIVED");
+    }
+  });
+
+  it("COMPETITION_ARCHIVED message is in German", async () => {
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
+      id: COMPETITION_ID,
+      tenantId: TENANT_A,
+      isArchived: true,
+    } as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      participationType: ParticipationType.COMPETITION,
+      competitionId: COMPETITION_ID,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toMatch(/[Aa]rchiv/);
+    }
+  });
+
+  it("accepts a non-archived competition (isArchived=false)", async () => {
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
+      id: COMPETITION_ID,
+      tenantId: TENANT_A,
+      isArchived: false,
+    } as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      participationType: ParticipationType.COMPETITION,
+      competitionId: COMPETITION_ID,
+    });
+
+    expect(result.ok).toBe(true);
+  });
+});
+
+// ── Non-COMPETITION types cannot have competitionId ───────────────────────────
+
+describe("TEAM-CREATE-02 — non-COMPETITION types reject competitionId", () => {
+  it("rejects TRAINING type with a competitionId (COMPETITION_NOT_ALLOWED)", async () => {
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
+      id: COMPETITION_ID,
+      tenantId: TENANT_A,
+      isArchived: false,
+    } as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      participationType: ParticipationType.TRAINING,
+      competitionId: COMPETITION_ID,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("COMPETITION_NOT_ALLOWED");
+    }
+  });
+
+  it("rejects DEVELOPMENT type with a competitionId", async () => {
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
+      id: COMPETITION_ID,
+      tenantId: TENANT_A,
+      isArchived: false,
+    } as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      participationType: ParticipationType.DEVELOPMENT,
+      competitionId: COMPETITION_ID,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("COMPETITION_NOT_ALLOWED");
+    }
+  });
+
+  it("rejects RECREATIONAL type with a competitionId", async () => {
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
+      id: COMPETITION_ID,
+      tenantId: TENANT_A,
+      isArchived: false,
+    } as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      participationType: ParticipationType.RECREATIONAL,
+      competitionId: COMPETITION_ID,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("COMPETITION_NOT_ALLOWED");
+    }
+  });
+
+  it("COMPETITION_NOT_ALLOWED message is in German", async () => {
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
+      id: COMPETITION_ID,
+      tenantId: TENANT_A,
+      isArchived: false,
+    } as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      participationType: ParticipationType.TRAINING,
+      competitionId: COMPETITION_ID,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toMatch(/Wettkampf/);
+    }
+  });
+});
+
 // ── Tenant isolation ──────────────────────────────────────────────────────────
 
 describe("TEAM-CREATE-02 — tenant isolation", () => {

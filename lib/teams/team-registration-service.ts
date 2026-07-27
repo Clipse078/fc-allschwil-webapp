@@ -131,8 +131,10 @@ export type RegisterTeamErrorCode =
   | "SLUG_CONFLICT"
   | "FEDERATION_MAPPING_CONFLICT"
   | "INVALID_PARTICIPATION_TYPE"
+  | "COMPETITION_NOT_ALLOWED"
   | "COMPETITION_REQUIRED"
   | "COMPETITION_NOT_FOUND"
+  | "COMPETITION_ARCHIVED"
   | "COMPETITION_TENANT_MISMATCH"
   | "UNKNOWN_ERROR";
 
@@ -245,13 +247,32 @@ export async function registerTeamSeason(
   }
 
   // 3b. Pre-validate Competition (if provided or required)
+  //
+  // Rules:
+  //   - competitionId may only be provided when participationType = COMPETITION.
+  //     Other participation types must not have a competition assignment.
+  //   - When competitionId is provided: must belong to tenant, must not be archived.
+  //   - When participationType = COMPETITION and no competitionId:
+  //       if non-archived competitions exist → COMPETITION_REQUIRED
+  //       if none exist               → allow (empty-state bypass, user returns later)
   const competitionId = input.competitionId?.trim() || null;
 
+  if (competitionId && input.participationType !== ParticipationType.COMPETITION) {
+    // Server-side guard: non-COMPETITION types must not receive a competition.
+    // The wizard clears this client-side, but the API must enforce independently.
+    return {
+      ok: false,
+      code: "COMPETITION_NOT_ALLOWED",
+      message:
+        "Eine Wettkampfzuordnung ist nur für Wettkampfteams zulässig.",
+    };
+  }
+
   if (competitionId) {
-    // Competition provided — verify it exists and belongs to this tenant
+    // Competition provided — verify it exists, belongs to this tenant, and is not archived.
     const competition = await prisma.competition.findFirst({
       where: { id: competitionId, tenantId: input.tenantId },
-      select: { id: true, tenantId: true },
+      select: { id: true, tenantId: true, isArchived: true },
     });
 
     if (!competition) {
@@ -275,10 +296,21 @@ export async function registerTeamSeason(
         message: "Der Wettkampf gehört nicht zum aktiven Mandanten.",
       };
     }
+
+    // Archived competitions cannot be assigned to new TeamSeason registrations.
+    if (competition.isArchived) {
+      return {
+        ok: false,
+        code: "COMPETITION_ARCHIVED",
+        message:
+          "Archivierte Wettkämpfe können nicht zugeordnet werden. Bitte wähle einen aktiven Wettkampf.",
+      };
+    }
   } else if (input.participationType === ParticipationType.COMPETITION) {
     // COMPETITION type without a competition: check if competitions exist for
     // this tenant. If none exist, registration is not blocked (empty state).
     // If competitions exist, the caller must provide one.
+    // NOTE: This check is server-side — the client cannot fake an empty list.
     const competitionCount = await prisma.competition.count({
       where: { tenantId: input.tenantId, isArchived: false },
     });
