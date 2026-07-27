@@ -71,7 +71,15 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
     availableSeasons.find((season) => season.key === selectedSeasonKey) ?? null;
 
   const teams = await getTeamsListData(selectedSeasonKey);
+  type TeamRow = (typeof teams)[number];
 
+  // ── Derived metrics ─────────────────────────────────────────────────────────
+  const activeTeams = teams.filter((t: TeamRow) => t.isActive).length;
+  const teamsInSeason = teams.filter((t: TeamRow) => t.activeSeason !== null).length;
+  const websiteVisible = teams.filter((t: TeamRow) => t.websiteVisible).length;
+  const infoboardVisible = teams.filter((t: TeamRow) => t.infoboardVisible).length;
+
+  // ── Category breakdown ──────────────────────────────────────────────────────
   const categoryMap = new Map<string, number>();
   for (const team of teams) {
     categoryMap.set(team.category, (categoryMap.get(team.category) ?? 0) + 1);
@@ -84,26 +92,36 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
     dotClass: CATEGORY_DISPLAY[key]?.dotClass ?? "bg-slate-400",
   }));
 
-  const activeTeams = teams.filter((t) => t.isActive).length;
-
   return (
     <PageShell fullWidth>
       <ListPagePattern
         eyebrow="Teams"
-        title="Teams pro Saison"
-        description="Saisongeführte Teamverwaltung. Die gewählte Saison ist führend; darunter werden alle Teams nach Kategorie gelistet."
+        title="Teams"
+        description={
+          selectedSeason
+            ? `Saisongeführte Teamverwaltung · ${selectedSeason.name}`
+            : "Saisongeführte Teamverwaltung"
+        }
+        headerBadge={
+          teams.length > 0 ? (
+            <span className="sce-count-badge" aria-label={`${teams.length} Teams`}>
+              {teams.length}
+            </span>
+          ) : undefined
+        }
         breadcrumbs={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Teams" },
         ]}
         headerActions={
           <Link href="/dashboard/teams/new" className="fca-button-primary">
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" aria-hidden="true" />
             Neues Team
           </Link>
         }
         stats={
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* Season selector — primary context */}
             <SeasonContextSelector
               title="Aktive Saison"
               description="Teams werden innerhalb der gewählten Saison nach Kategorie geführt."
@@ -111,17 +129,22 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
               selectedSeasonKey={selectedSeasonKey}
               basePath="/dashboard/teams"
             />
+
+            {/* Operational summary — only when teams exist */}
             {teams.length > 0 && (
               <TeamsCategorySummary
                 categories={categoryStats}
                 totalTeams={teams.length}
                 activeTeams={activeTeams}
+                teamsInSeason={teamsInSeason}
+                websiteVisible={websiteVisible}
+                infoboardVisible={infoboardVisible}
               />
             )}
           </div>
         }
         isEmpty={teams.length === 0}
-        emptyIcon={<Users className="h-10 w-10" />}
+        emptyIcon={<Users className="h-10 w-10" aria-hidden="true" />}
         emptyHeading="Keine Teams vorhanden"
         emptyDescription={
           selectedSeason?.name
@@ -130,6 +153,7 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
         }
         emptyAction={
           <Link href="/dashboard/teams/new" className="fca-button-primary">
+            <Plus className="h-4 w-4" aria-hidden="true" />
             Erstes Team anlegen
           </Link>
         }
