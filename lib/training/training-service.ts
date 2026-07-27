@@ -74,6 +74,23 @@ function toDto(row: TrainingSeriesRow): TrainingSeriesDto {
 }
 
 /**
+ * Validates an IANA timezone identifier using the Intl API.
+ *
+ * Uses Intl.DateTimeFormat to attempt construction with the given timezone.
+ * Invalid identifiers throw a RangeError, which we catch and convert to a
+ * typed validation error.
+ */
+function validateTimezone(timezone: string): void {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    throw new TrainingSeriesValidationError(
+      `timezone must be a valid IANA timezone identifier, got: "${timezone}"`,
+    );
+  }
+}
+
+/**
  * Validates time-of-day strings ("HH:mm") and their relative order.
  *
  * Converts to minutes-since-midnight for comparison, which handles the full
@@ -120,6 +137,14 @@ function validateCreateInput(input: CreateTrainingSeriesInput): void {
     throw new TrainingSeriesValidationError("at least one weekday is required for recurrence");
   }
   validateTimes(input.startsAt, input.endsAt);
+  if (input.timezone !== undefined && input.timezone.trim()) {
+    validateTimezone(input.timezone.trim());
+  }
+  if (input.validFrom != null && input.validUntil != null) {
+    if (input.validFrom >= input.validUntil) {
+      throw new TrainingSeriesValidationError("validFrom must be before validUntil");
+    }
+  }
 }
 
 /** Validates the update input (only validates fields that are present). */
@@ -147,6 +172,14 @@ function validateUpdateInput(input: UpdateTrainingSeriesInput): void {
           `endsAt must be a valid time string "HH:mm", got: "${input.endsAt}"`,
         );
       }
+    }
+  }
+  if (input.timezone !== undefined) {
+    validateTimezone(input.timezone);
+  }
+  if (input.validFrom != null && input.validUntil != null) {
+    if (input.validFrom >= input.validUntil) {
+      throw new TrainingSeriesValidationError("validFrom must be before validUntil");
     }
   }
 }

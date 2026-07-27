@@ -156,7 +156,9 @@ describe("A. createTrainingSeries", () => {
     });
 
     const call = vi.mocked(prisma.trainingSeries.create).mock.calls[0][0];
-    expect(call.data.recurrenceDays.create).toHaveLength(2);
+    const recurrenceDays = call.data.recurrenceDays;
+    expect(recurrenceDays).toBeDefined();
+    expect((recurrenceDays as { create: unknown[] }).create).toHaveLength(2);
   });
 
   it("supports multiple weekdays", async () => {
@@ -299,6 +301,66 @@ describe("A. createTrainingSeries", () => {
     ).rejects.toThrow(TrainingSeriesArchivedTeamError);
   });
 
+  it("throws TrainingSeriesValidationError for invalid IANA timezone", async () => {
+    await expect(
+      createTrainingSeries(TENANT_A, {
+        teamSeasonId: TEAM_SEASON_ID,
+        title: "E1 Training",
+        startsAt: "19:00",
+        endsAt: "21:00",
+        weekdays: ["TUESDAY"],
+        timezone: "Not/A/Timezone",
+      }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
+  it("accepts a valid IANA timezone", async () => {
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(activeTeamSeason as never);
+    vi.mocked(prisma.trainingSeries.create).mockResolvedValue({
+      ...baseRow,
+      timezone: "Europe/Zurich",
+    } as never);
+
+    const result = await createTrainingSeries(TENANT_A, {
+      teamSeasonId: TEAM_SEASON_ID,
+      title: "E1 Tuesday Training",
+      startsAt: "19:00",
+      endsAt: "21:00",
+      weekdays: ["TUESDAY"],
+      timezone: "Europe/Zurich",
+    });
+
+    expect(result.timezone).toBe("Europe/Zurich");
+  });
+
+  it("throws TrainingSeriesValidationError when validFrom is after validUntil", async () => {
+    await expect(
+      createTrainingSeries(TENANT_A, {
+        teamSeasonId: TEAM_SEASON_ID,
+        title: "E1 Training",
+        startsAt: "19:00",
+        endsAt: "21:00",
+        weekdays: ["TUESDAY"],
+        validFrom: new Date("2027-01-01"),
+        validUntil: new Date("2026-01-01"),
+      }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
+  it("throws TrainingSeriesValidationError when validFrom equals validUntil", async () => {
+    await expect(
+      createTrainingSeries(TENANT_A, {
+        teamSeasonId: TEAM_SEASON_ID,
+        title: "E1 Training",
+        startsAt: "19:00",
+        endsAt: "21:00",
+        weekdays: ["TUESDAY"],
+        validFrom: new Date("2026-08-01"),
+        validUntil: new Date("2026-08-01"),
+      }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
   it("throws TrainingSeriesConflictError on duplicate title within TeamSeason", async () => {
     vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(activeTeamSeason as never);
     vi.mocked(prisma.trainingSeries.create).mockRejectedValue(
@@ -405,6 +467,21 @@ describe("B. updateTrainingSeries", () => {
       updateTrainingSeries(TENANT_A, SERIES_ID, {
         startsAt: "21:00",
         endsAt: "19:00",
+      }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
+  it("throws TrainingSeriesValidationError for invalid timezone on update", async () => {
+    await expect(
+      updateTrainingSeries(TENANT_A, SERIES_ID, { timezone: "Mars/Olympus_Mons" }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
+  it("throws TrainingSeriesValidationError when updated validFrom is after validUntil", async () => {
+    await expect(
+      updateTrainingSeries(TENANT_A, SERIES_ID, {
+        validFrom: new Date("2027-01-01"),
+        validUntil: new Date("2026-01-01"),
       }),
     ).rejects.toThrow(TrainingSeriesValidationError);
   });
