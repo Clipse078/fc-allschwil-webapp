@@ -3,7 +3,6 @@ import {
   Archive,
   Dumbbell,
   Layers,
-  Plus,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";

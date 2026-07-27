@@ -215,7 +215,6 @@ describe("getVisibleNavSections permission filtering", () => {
 
   it("Saisons child under Planung is absent even with full permissions", () => {
     const sections = getVisibleNavSections(allPermissions);
-    const flat = flatItems(sections);
     const planungSection = sections
       .flatMap((s) => s.items)
       .find((i) => i.key === "planung");
