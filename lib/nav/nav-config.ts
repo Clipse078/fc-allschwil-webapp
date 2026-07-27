@@ -102,6 +102,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.TEAMS_VIEW, PERMISSIONS.TEAMS_MANAGE],
           },
           {
+            key: "provider-mapping",
+            label: "Anbieter-Mapping",
+            href: "/dashboard/teams/provider-mapping",
+            permissionKeys: [PERMISSIONS.TEAMS_MANAGE],
+          },
+          {
             key: "competitions",
             label: "Wettkämpfe",
             href: "/dashboard/competitions",

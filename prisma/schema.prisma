@@ -762,6 +762,8 @@ model Competition {
 
   tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   teamSeasonCompetitions TeamSeasonCompetition[]
+  /// Back-relation for TeamExternalMapping.mappingCompetitionId (TEAM-PROVIDER-01).
+  teamExternalMappings   TeamExternalMapping[]   @relation("TeamExternalMappingCompetition")
 
   /// Prevents duplicate provider competitions per tenant per season.
   @@unique([tenantId, provider, externalCompetitionId, externalSeasonId])
@@ -933,9 +935,25 @@ model TeamExternalMapping {
   /// resolution is ambiguous (multiple matching TeamSeasons).
   teamSeasonId         String?
 
+  // ── TEAM-PROVIDER-01: canonical provider mapping workflow ─────────────────
+  /// How this mapping was created.
+  /// "SYNC" = created automatically by provider sync.
+  /// "MANUAL" = created explicitly by an administrator through the mapping workflow.
+  mappingSource        String   @default("SYNC")
+  /// Suggestion-engine confidence level at the time of creation or last suggestion.
+  /// "HIGH" | "MEDIUM" | "LOW" — null for SYNC-created rows and for confirmed
+  /// manual mappings where confidence is not applicable.
+  confidenceLevel      String?
+  /// Competition ID used as context when this mapping was created.
+  /// Assists traceability — Competition does NOT own the provider mapping.
+  mappingCompetitionId String?
+
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   teamSeason TeamSeason? @relation(fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  /// The Competition used as mapping context (TEAM-PROVIDER-01). Does NOT mean
+  /// Competition owns the mapping — it is informational context only.
+  mappingCompetition Competition? @relation("TeamExternalMappingCompetition", fields: [mappingCompetitionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   /// Prevents duplicate mappings for the same external team/season/provider/tenant.
   @@unique([tenantId, provider, externalTeamId, externalSeasonId])
@@ -943,6 +961,11 @@ model TeamExternalMapping {
   @@index([teamId])
   @@index([teamSeasonId])
   @@index([providerIsActive])
+  @@index([mappingSource])
+  @@index([mappingCompetitionId])
+  // TEAM-PROVIDER-01-V: partial unique index (teamSeasonId, provider) WHERE teamSeasonId IS NOT NULL
+  // enforced via raw migration; Prisma schema documents the intent here.
+  // One TeamSeason may have at most one active mapping per provider.
 }
 
 model TeamSeason {
