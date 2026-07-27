@@ -29,6 +29,7 @@ import {
   registerTeamSeason,
   type RegisterTeamInput,
 } from "@/lib/teams/team-registration-service";
+import { ParticipationType } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.TEAMS_MANAGE);
@@ -111,6 +112,18 @@ export async function POST(request: NextRequest) {
   const websiteVisible = b.websiteVisible !== false;
   const infoboardVisible = b.infoboardVisible !== false;
 
+  // ── Participation type (TEAM-CREATE-02) ───────────────────────────────────
+
+  const rawParticipationType =
+    typeof b.participationType === "string" ? b.participationType.trim() : "";
+  const validParticipationTypes = Object.values(ParticipationType) as string[];
+  const participationType: ParticipationType = validParticipationTypes.includes(rawParticipationType)
+    ? (rawParticipationType as ParticipationType)
+    : ParticipationType.TRAINING;
+
+  const competitionId =
+    typeof b.competitionId === "string" ? b.competitionId.trim() || null : null;
+
   // ── Federation mapping (optional) ──────────────────────────────────────────
 
   let federationMapping: RegisterTeamInput["federationMapping"] = null;
@@ -160,6 +173,8 @@ export async function POST(request: NextRequest) {
       ageGroup: teamAgeGroup,
       sortOrder: teamSortOrder,
     },
+    participationType,
+    competitionId,
     federationMapping,
     websiteVisible,
     infoboardVisible,
@@ -177,6 +192,7 @@ export async function POST(request: NextRequest) {
       "SEASON_NOT_FOUND",
       "ORG_UNIT_NOT_FOUND",
       "TEAM_NOT_FOUND",
+      "COMPETITION_NOT_FOUND",
     ];
 
     const status = conflictCodes.includes(registrationResult.code)
@@ -205,18 +221,20 @@ export async function POST(request: NextRequest) {
       ? registrationResult.teamId
       : registrationResult.teamSeasonId,
     action: "CREATE",
-    afterJson: {
-      teamId: registrationResult.teamId,
-      teamSeasonId: registrationResult.teamSeasonId,
-      slug: registrationResult.slug,
-      createdTeamIdentity: registrationResult.createdTeamIdentity,
-      seasonId,
-      orgUnitIds,
-      websiteVisible,
-      infoboardVisible,
-      hasFederationMapping: federationMapping !== null,
-      tenantId: tenant.id,
-    },
+      afterJson: {
+        teamId: registrationResult.teamId,
+        teamSeasonId: registrationResult.teamSeasonId,
+        slug: registrationResult.slug,
+        createdTeamIdentity: registrationResult.createdTeamIdentity,
+        seasonId,
+        orgUnitIds,
+        participationType,
+        competitionId,
+        websiteVisible,
+        infoboardVisible,
+        hasFederationMapping: federationMapping !== null,
+        tenantId: tenant.id,
+      },
   });
 
   return NextResponse.json(

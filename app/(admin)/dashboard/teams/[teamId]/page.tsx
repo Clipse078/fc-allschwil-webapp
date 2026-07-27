@@ -1,6 +1,6 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Users } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
@@ -23,6 +23,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   FRAUEN: "Frauen",
   SENIOREN: "Senioren",
   TRAININGSGRUPPE: "Trainingsgruppe",
+};
+
+const PARTICIPATION_TYPE_LABELS: Record<string, string> = {
+  COMPETITION: "Wettkampfteam",
+  TRAINING: "Trainingsgruppe",
+  DEVELOPMENT: "Entwicklungsteam",
+  RECREATIONAL: "Freizeitteam",
+  OTHER: "Sonstiges",
 };
 
 type Props = {
@@ -133,6 +141,55 @@ export default async function TeamDetailPage({ params }: Props) {
                   items={[
                     { label: "Anzeigename", value: activeSeason.displayName },
                     { label: "Saison", value: activeSeason.season.name },
+                  ]}
+                  columns={1}
+                />
+              </SectionCard>
+            ) : null}
+
+            {activeSeason ? (
+              <SectionCard title="Teilnahme">
+                <PropertyGrid
+                  items={[
+                    {
+                      label: "Teilnahmetyp",
+                      value:
+                        PARTICIPATION_TYPE_LABELS[
+                          activeSeason.participationType
+                        ] ?? activeSeason.participationType,
+                      icon: <Trophy className="h-3.5 w-3.5" />,
+                    },
+                    ...(activeSeason.competitions[0]
+                      ? [
+                          {
+                            label: "Wettkampf",
+                            value:
+                              activeSeason.competitions[0].competition
+                                .shortName ??
+                              activeSeason.competitions[0].competition
+                                .officialName,
+                            icon: <Trophy className="h-3.5 w-3.5" />,
+                          },
+                          {
+                            label: "Anbieter",
+                            value:
+                              activeSeason.competitions[0].competition
+                                .provider === "MANUAL"
+                                ? "Manuell"
+                                : activeSeason.competitions[0].competition
+                                    .provider,
+                          },
+                        ]
+                      : activeSeason.participationType === "COMPETITION"
+                        ? [
+                            {
+                              label: "Wettkampf",
+                              value: "Kein Wettkampf zugeordnet",
+                              icon: <Trophy className="h-3.5 w-3.5" />,
+                              emptyText: "Kein Wettkampf zugeordnet",
+                            },
+                          ]
+                        : []),
                   ]}
                   columns={1}
                 />

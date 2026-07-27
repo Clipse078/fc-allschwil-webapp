@@ -12,6 +12,11 @@
  *   6. Optional TeamExternalMapping is created/claimed (guarded against races).
  *   7. All mandatory writes are atomic within a single Prisma transaction.
  *
+ * TEAM-CREATE-02: Extends registration with:
+ *   - participationType (required) — how the TeamSeason participates this season.
+ *   - competitionId (optional) — required when participationType = COMPETITION.
+ *   - TeamSeasonCompetition is created atomically when competitionId is provided.
+ *
  * Canonical TeamSeason write:
  *   This service uses writeTeamSeasonInTx() from team-season-service.ts as the
  *   single canonical implementation of the TeamSeason + TeamSeasonOrgUnit write.
@@ -20,9 +25,10 @@
  * Transaction safety:
  *   All mandatory writes (Team optional, TeamSeason, TeamSeasonOrgUnit) are
  *   wrapped in a single Prisma $transaction. The optional TeamExternalMapping
- *   is included in the same transaction to ensure atomicity. The pre-transaction
- *   validation checks are fail-fast gates; authoritative checks run inside the
- *   transaction to guard against TOCTOU race conditions.
+ *   and TeamSeasonCompetition are included in the same transaction to ensure
+ *   atomicity. The pre-transaction validation checks are fail-fast gates;
+ *   authoritative checks run inside the transaction to guard against TOCTOU
+ *   race conditions.
  *
  * Tenant isolation:
  *   tenantId always originates from the session (never from the request body).
@@ -31,7 +37,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma, OrgUnitStatus } from "@prisma/client";
-import { TeamSeasonStatus } from "@prisma/client";
+import { TeamSeasonStatus, ParticipationType } from "@prisma/client";
 import {
   normalizeTeamName,
   normalizeTeamSlug,
@@ -74,6 +80,18 @@ export type RegisterTeamInput = {
     sortOrder?: number | null;
   };
   /**
+   * How the TeamSeason participates in this season (TEAM-CREATE-02).
+   * Required. Defaults to TRAINING when not explicitly set by the caller.
+   */
+  participationType: ParticipationType;
+  /**
+   * Competition to assign to this TeamSeason (TEAM-CREATE-02).
+   * Required when participationType = COMPETITION and competitions exist.
+   * Must belong to tenantId.
+   * When provided, a TeamSeasonCompetition row is created (isPrimary=true).
+   */
+  competitionId?: string | null;
+  /**
    * Optional federation mapping for the newly created TeamSeason.
    * When provided, a TeamExternalMapping row is claimed/created.
    */
@@ -112,6 +130,10 @@ export type RegisterTeamErrorCode =
   | "TEAM_SEASON_ALREADY_EXISTS"
   | "SLUG_CONFLICT"
   | "FEDERATION_MAPPING_CONFLICT"
+  | "INVALID_PARTICIPATION_TYPE"
+  | "COMPETITION_REQUIRED"
+  | "COMPETITION_NOT_FOUND"
+  | "COMPETITION_TENANT_MISMATCH"
   | "UNKNOWN_ERROR";
 
 const ACTIVE_ORG_UNIT_STATUSES: OrgUnitStatus[] = ["ACTIVE"];
@@ -152,6 +174,16 @@ export async function registerTeamSeason(
       ok: false,
       code: "TEAM_NAME_REQUIRED",
       message: "Teamname ist erforderlich.",
+    };
+  }
+
+  // 1a. Validate participation type
+  const validParticipationTypes = Object.values(ParticipationType) as string[];
+  if (!validParticipationTypes.includes(input.participationType)) {
+    return {
+      ok: false,
+      code: "INVALID_PARTICIPATION_TYPE",
+      message: "Ungültiger Teilnahmetyp.",
     };
   }
 
@@ -210,6 +242,56 @@ export async function registerTeamSeason(
         message: `Organisationseinheit '${orgUnit.name}' ist nicht aktiv. Archivierte Einheiten können nicht zugewiesen werden.`,
       };
     }
+  }
+
+  // 3b. Pre-validate Competition (if provided or required)
+  const competitionId = input.competitionId?.trim() || null;
+
+  if (competitionId) {
+    // Competition provided — verify it exists and belongs to this tenant
+    const competition = await prisma.competition.findFirst({
+      where: { id: competitionId, tenantId: input.tenantId },
+      select: { id: true, tenantId: true },
+    });
+
+    if (!competition) {
+      // Try to find it without tenant scope to distinguish not-found from mismatch
+      const anyCompetition = await prisma.competition.findUnique({
+        where: { id: competitionId },
+        select: { id: true, tenantId: true },
+      });
+
+      if (!anyCompetition) {
+        return {
+          ok: false,
+          code: "COMPETITION_NOT_FOUND",
+          message: "Wettkampf nicht gefunden.",
+        };
+      }
+
+      return {
+        ok: false,
+        code: "COMPETITION_TENANT_MISMATCH",
+        message: "Der Wettkampf gehört nicht zum aktiven Mandanten.",
+      };
+    }
+  } else if (input.participationType === ParticipationType.COMPETITION) {
+    // COMPETITION type without a competition: check if competitions exist for
+    // this tenant. If none exist, registration is not blocked (empty state).
+    // If competitions exist, the caller must provide one.
+    const competitionCount = await prisma.competition.count({
+      where: { tenantId: input.tenantId, isArchived: false },
+    });
+
+    if (competitionCount > 0) {
+      return {
+        ok: false,
+        code: "COMPETITION_REQUIRED",
+        message:
+          "Wettkampfteams müssen einem Wettkampf zugeordnet werden. Bitte wähle einen Wettkampf aus.",
+      };
+    }
+    // competitionCount === 0: allow registration without competition
   }
 
   // 4. Pre-validate existing Team (if reuse requested)
@@ -318,11 +400,24 @@ export async function registerTeamSeason(
           displayName,
           shortName,
           status: TeamSeasonStatus.ACTIVE,
+          participationType: input.participationType,
           websiteVisible: input.websiteVisible,
           infoboardVisible: input.infoboardVisible,
         });
 
-        // 5c. Claim optional federation mapping inside transaction
+        // 5c. Create TeamSeasonCompetition if a competition was provided
+        if (competitionId) {
+          await tx.teamSeasonCompetition.create({
+            data: {
+              teamSeasonId,
+              competitionId,
+              isPrimary: true,
+              displayOrder: 1,
+            },
+          });
+        }
+
+        // 5d. Claim optional federation mapping inside transaction
         //     Authoritative conflict check happens here (not only pre-tx) to
         //     guard against TOCTOU: another request may claim the mapping between
         //     our pre-validation and this transaction.

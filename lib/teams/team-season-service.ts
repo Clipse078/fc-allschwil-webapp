@@ -32,7 +32,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import { TeamSeasonStatus } from "@prisma/client";
+import { TeamSeasonStatus, ParticipationType } from "@prisma/client";
 import type { Prisma, OrgUnitStatus } from "@prisma/client";
 import {
   buildTeamSeasonDisplayName,
@@ -265,6 +265,8 @@ export type WriteTeamSeasonInTxInput = {
   displayName: string;
   shortName: string | null;
   status: TeamSeasonStatus;
+  /** How the TeamSeason participates this season (TEAM-CREATE-02). Defaults to TRAINING. */
+  participationType?: ParticipationType;
   websiteVisible: boolean;
   infoboardVisible: boolean;
 };
@@ -301,6 +303,7 @@ export async function writeTeamSeasonInTx(
       displayName: input.displayName,
       shortName: input.shortName,
       status: input.status,
+      participationType: input.participationType ?? ParticipationType.TRAINING,
       websiteVisible: input.websiteVisible,
       infoboardVisible: input.infoboardVisible,
     },
