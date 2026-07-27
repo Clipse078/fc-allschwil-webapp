@@ -98,9 +98,21 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
   });
 }
 
-export async function getTeamDetailData(teamId: string) {
-  const team = await prisma.team.findUnique({
-    where: { id: teamId },
+/**
+ * Returns full detail data for a single Team, scoped to the given tenantId.
+ *
+ * tenantId is required for tenant isolation: a teamId from a foreign tenant
+ * returns null (treated as notFound by the caller). Nullable legacy Team rows
+ * that pre-date tenant isolation are only visible when tenantId is undefined,
+ * which should not happen from authenticated server components.
+ */
+export async function getTeamDetailData(teamId: string, tenantId?: string | null) {
+  const where = tenantId
+    ? { id: teamId, tenantId }
+    : { id: teamId };
+
+  const team = await prisma.team.findFirst({
+    where,
     select: {
       id: true,
       name: true,
@@ -183,3 +195,6 @@ export async function getTeamDetailData(teamId: string) {
     })),
   };
 }
+
+// Export type alias so callers can use it without importing Prisma directly.
+export type TeamDetailData = NonNullable<Awaited<ReturnType<typeof getTeamDetailData>>>;
