@@ -57,6 +57,7 @@ export default async function ProviderMappingPage({ searchParams }: PageProps) {
   };
 
   const mappings = await listProviderMappings(tenantId, filters);
+
   const canManage = session.user.permissionKeys?.includes(PERMISSIONS.TEAMS_MANAGE);
 
   const mappedCount = mappings.filter((m) => m.teamSeasonId !== null).length;

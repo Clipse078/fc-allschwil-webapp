@@ -49,10 +49,15 @@ export default async function TeamDetailPage({ params }: Props) {
   const { teamId } = await params;
 
   const tenant = await getTenantFromSession(session.user?.tenantId);
+  if (!tenant) {
+    notFound();
+  }
+  const tenantId = tenant.id;
+
   const [team, availableSeasons, availableOrgUnits] = await Promise.all([
-    getTeamDetailData(teamId),
+    getTeamDetailData(tenantId, teamId),
     getSeasonOptionsData(),
-    getOrgUnits(tenant?.id),
+    getOrgUnits(tenantId),
   ]);
 
   if (!team) {
