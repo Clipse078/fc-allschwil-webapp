@@ -212,8 +212,6 @@ export const NAV_SECTIONS: NavSection[] = [
           PERMISSIONS.TRAININGS_MANAGE,
           PERMISSIONS.EVENTS_VIEW,
           PERMISSIONS.EVENTS_MANAGE,
-          PERMISSIONS.FACILITIES_VIEW,
-          PERMISSIONS.FACILITIES_MANAGE,
         ],
         children: [
           {
@@ -227,12 +225,6 @@ export const NAV_SECTIONS: NavSection[] = [
             label: "Veranstaltungen",
             href: "/dashboard/events",
             permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
-          },
-          {
-            key: "anlagen",
-            label: "Anlagen",
-            href: "/dashboard/admin/facilities",
-            permissionKeys: [PERMISSIONS.FACILITIES_VIEW, PERMISSIONS.FACILITIES_MANAGE],
           },
         ],
       },

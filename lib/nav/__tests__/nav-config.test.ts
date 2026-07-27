@@ -41,7 +41,7 @@ function findItemByKey(
 // ── Static structure tests ────────────────────────────────────────────────────
 
 describe("NAV_SECTIONS static structure", () => {
-  it("Planung section contains exactly Trainingsplaner, Veranstaltungen, Anlagen", () => {
+  it("Planung section contains exactly Trainingsplaner and Veranstaltungen", () => {
     const betrieb = findSection("Betrieb");
     expect(betrieb).toBeDefined();
 
@@ -49,7 +49,14 @@ describe("NAV_SECTIONS static structure", () => {
     expect(planung).toBeDefined();
 
     const childKeys = planung!.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingsplaner", "veranstaltungen", "anlagen"]);
+    expect(childKeys).toEqual(["trainingsplaner", "veranstaltungen"]);
+  });
+
+  it("Anlagen does not appear under Planung", () => {
+    const betrieb = findSection("Betrieb");
+    const planung = betrieb!.items.find((i) => i.key === "planung");
+    const childKeys = planung!.children?.map((c) => c.key) ?? [];
+    expect(childKeys).not.toContain("anlagen");
   });
 
   it("Planung has no Saisons child", () => {
@@ -91,11 +98,12 @@ describe("NAV_SECTIONS static structure", () => {
     expect(veranstaltungen?.href).toBe("/dashboard/events");
   });
 
-  it("Anlagen points to /dashboard/admin/facilities", () => {
-    const betrieb = findSection("Betrieb");
-    const planung = betrieb!.items.find((i) => i.key === "planung");
-    const anlagen = planung!.children?.find((c) => c.key === "anlagen");
-    expect(anlagen?.href).toBe("/dashboard/admin/facilities");
+  it("Anlagen & Ressourcen appears under Administration pointing to /dashboard/admin/facilities", () => {
+    const system = findSection("System");
+    const admin = system!.items.find((i) => i.key === "administration");
+    const facilities = admin!.children?.find((c) => c.key === "admin-facilities");
+    expect(facilities?.href).toBe("/dashboard/admin/facilities");
+    expect(facilities?.label).toBe("Anlagen & Ressourcen");
   });
 
   it("Saisons appears under Administration as admin-seasons", () => {
@@ -164,23 +172,27 @@ describe("getVisibleNavSections permission filtering", () => {
     expect(item).not.toBeNull();
   });
 
-  it("facilities-view user sees Anlagen", () => {
+  it("facilities-view user sees Anlagen & Ressourcen under Administration", () => {
     const sections = getVisibleNavSections([PERMISSIONS.FACILITIES_VIEW]);
-    const item = findItemByKey(sections, "anlagen");
+    const item = findItemByKey(sections, "admin-facilities");
     expect(item).not.toBeNull();
   });
 
-  it("user without training/events/facilities permissions does not see Planung section items", () => {
+  it("facilities-view user does not see Anlagen under Planung", () => {
+    const sections = getVisibleNavSections([PERMISSIONS.FACILITIES_VIEW]);
+    const item = findItemByKey(sections, "anlagen");
+    expect(item).toBeNull();
+  });
+
+  it("user without training/events permissions does not see Planung section items", () => {
     const noSectionPermissions: typeof allPermissions = [
       PERMISSIONS.USERS_MANAGE,
     ];
     const sections = getVisibleNavSections(noSectionPermissions);
     const trainingsplaner = findItemByKey(sections, "trainingsplaner");
     const veranstaltungen = findItemByKey(sections, "veranstaltungen");
-    const anlagen = findItemByKey(sections, "anlagen");
     expect(trainingsplaner).toBeNull();
     expect(veranstaltungen).toBeNull();
-    expect(anlagen).toBeNull();
   });
 
   it("Planung section is hidden entirely when user has no relevant permissions", () => {
@@ -223,6 +235,22 @@ describe("getVisibleNavSections permission filtering", () => {
 // ── Route deduplication ───────────────────────────────────────────────────────
 
 describe("route deduplication", () => {
+  it("facilities route /dashboard/admin/facilities appears only under Administration, not under Planung", () => {
+    const betrieb = findSection("Betrieb");
+    const planung = betrieb!.items.find((i) => i.key === "planung");
+    const planungFacilities = planung!.children?.filter(
+      (c) => c.href === "/dashboard/admin/facilities",
+    ) ?? [];
+    expect(planungFacilities).toHaveLength(0);
+
+    const system = findSection("System");
+    const admin = system!.items.find((i) => i.key === "administration");
+    const adminFacilities = admin!.children?.filter(
+      (c) => c.href === "/dashboard/admin/facilities",
+    ) ?? [];
+    expect(adminFacilities).toHaveLength(1);
+  });
+
   it("there is no Wochenplanung entry in any section", () => {
     const sections = getVisibleNavSections(Object.values(PERMISSIONS));
     const flat = flatItems(sections);
