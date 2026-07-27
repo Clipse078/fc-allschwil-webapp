@@ -8,6 +8,7 @@
  *   - orgUnits: eligible (active, tenant-scoped) org units
  *   - existingTeams: existing active teams in the tenant (for "reuse" flow)
  *   - unmappedFederationTeams: unmapped TeamExternalMapping rows (for Verband step)
+ *   - eligibleCompetitions: non-archived competitions for the tenant (for Competition step)
  *
  * Requires: teams.manage permission
  */
@@ -22,6 +23,7 @@ import {
   getExistingTeamsForTenant,
   getUnmappedFederationTeams,
 } from "@/lib/teams/team-registration-service";
+import { getEligibleCompetitions } from "@/lib/competitions/queries";
 
 export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.TEAMS_MANAGE);
@@ -38,12 +40,13 @@ export async function GET() {
     );
   }
 
-  const [seasons, orgUnits, existingTeams, unmappedFederationTeams] =
+  const [seasons, orgUnits, existingTeams, unmappedFederationTeams, eligibleCompetitions] =
     await Promise.all([
       getRegistrationEligibleSeasons(),
       getEligibleOrgUnitsForTeamSeason(tenant.id),
       getExistingTeamsForTenant(tenant.id),
       getUnmappedFederationTeams(tenant.id),
+      getEligibleCompetitions(tenant.id),
     ]);
 
   return NextResponse.json({
@@ -51,5 +54,6 @@ export async function GET() {
     orgUnits,
     existingTeams,
     unmappedFederationTeams,
+    eligibleCompetitions,
   });
 }

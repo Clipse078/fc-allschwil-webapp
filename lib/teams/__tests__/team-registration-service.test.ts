@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { ParticipationType } from "@prisma/client";
 import type { RegisterTeamInput } from "../team-registration-service";
 
 // ── Mock Prisma ────────────────────────────────────────────────────────────────
@@ -23,6 +24,11 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     season: { findUnique: vi.fn() },
     orgUnit: { findMany: vi.fn() },
+    competition: {
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      count: vi.fn(),
+    },
     team: {
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -32,6 +38,7 @@ vi.mock("@/lib/db/prisma", () => ({
       create: vi.fn(),
     },
     teamSeasonOrgUnit: { createMany: vi.fn() },
+    teamSeasonCompetition: { create: vi.fn() },
     teamExternalMapping: {
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -59,6 +66,8 @@ const baseInput: RegisterTeamInput = {
   seasonId: SEASON_ID,
   orgUnitIds: [ORG_UNIT_ID_1],
   team: { name: "Frauen 1" },
+  // TEAM-CREATE-02: participationType is now required
+  participationType: ParticipationType.TRAINING,
   websiteVisible: true,
   infoboardVisible: true,
 };
@@ -90,6 +99,11 @@ beforeEach(() => {
     null as never,
   );
 
+  // TEAM-CREATE-02: competition mocks (no competitions by default)
+  vi.mocked(prisma.competition.findFirst).mockResolvedValue(null as never);
+  vi.mocked(prisma.competition.findUnique).mockResolvedValue(null as never);
+  vi.mocked(prisma.competition.count).mockResolvedValue(0 as never);
+
   // Default transaction: simulate full flow
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
@@ -104,6 +118,9 @@ beforeEach(() => {
       },
       teamSeasonOrgUnit: {
         createMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      teamSeasonCompetition: {
+        create: vi.fn().mockResolvedValue({ id: "tsc-01" }),
       },
       teamExternalMapping: {
         findUnique: vi.fn().mockResolvedValue(null),
@@ -196,6 +213,9 @@ describe("registerTeamSeason — existing Team reuse", () => {
         },
         teamSeasonOrgUnit: {
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        teamSeasonCompetition: {
+          create: vi.fn().mockResolvedValue({ id: "tsc-01" }),
         },
         teamExternalMapping: {
           findUnique: vi.fn().mockResolvedValue(null),
@@ -371,6 +391,7 @@ describe("registerTeamSeason — duplicate TeamSeason", () => {
           create: vi.fn(),
         },
         teamSeasonOrgUnit: { createMany: vi.fn() },
+        teamSeasonCompetition: { create: vi.fn() },
         teamExternalMapping: {
           findUnique: vi.fn().mockResolvedValue(null),
           update: vi.fn(),
@@ -401,6 +422,7 @@ describe("registerTeamSeason — duplicate TeamSeason", () => {
         },
         teamSeason: { findUnique: vi.fn(), create: vi.fn() },
         teamSeasonOrgUnit: { createMany: vi.fn() },
+        teamSeasonCompetition: { create: vi.fn() },
         teamExternalMapping: {
           findUnique: vi.fn().mockResolvedValue(null),
           update: vi.fn(),
@@ -462,6 +484,9 @@ describe("registerTeamSeason — federation mapping", () => {
         teamSeasonOrgUnit: {
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
+        teamSeasonCompetition: {
+          create: vi.fn().mockResolvedValue({ id: "tsc-01" }),
+        },
         teamExternalMapping: {
           findUnique: vi.fn().mockResolvedValue({
             id: "existing-unclaimed-mapping",
@@ -503,6 +528,9 @@ describe("registerTeamSeason — federation mapping", () => {
         },
         teamSeasonOrgUnit: {
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        teamSeasonCompetition: {
+          create: vi.fn().mockResolvedValue({ id: "tsc-01" }),
         },
         teamExternalMapping: {
           findUnique: vi.fn().mockResolvedValue({
@@ -563,6 +591,9 @@ describe("registerTeamSeason — OrgUnit ordering", () => {
             capturedOrgUnitData = args.data;
             return Promise.resolve({ count: args.data.length });
           }),
+        },
+        teamSeasonCompetition: {
+          create: vi.fn().mockResolvedValue({ id: "tsc-01" }),
         },
         teamExternalMapping: {
           findUnique: vi.fn().mockResolvedValue(null),

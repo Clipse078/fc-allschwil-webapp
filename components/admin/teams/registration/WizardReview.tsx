@@ -9,15 +9,43 @@ import {
   Globe,
   Monitor,
   ChevronRight,
+  Trophy,
+  Dumbbell,
+  MoreHorizontal,
+  Smile,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import type { WizardFormData, EligibleSeason, EligibleOrgUnit } from "./types";
+import type {
+  WizardFormData,
+  EligibleSeason,
+  EligibleOrgUnit,
+  EligibleCompetition,
+  ParticipationType,
+} from "./types";
+import {
+  PARTICIPATION_TYPES,
+  STEP_SEASON_ORG,
+  STEP_TEAM,
+  STEP_FEDERATION,
+  STEP_PARTICIPATION,
+  STEP_COMPETITION,
+  STEP_PUBLICATION,
+} from "./types";
 
 type Props = {
   form: WizardFormData;
   seasons: EligibleSeason[];
   orgUnits: EligibleOrgUnit[];
+  competitions: EligibleCompetition[];
   onGoToStep: (step: number) => void;
+};
+
+const PARTICIPATION_ICONS: Record<ParticipationType, React.ReactNode> = {
+  COMPETITION: <Trophy className="h-3.5 w-3.5" />,
+  TRAINING: <Dumbbell className="h-3.5 w-3.5" />,
+  DEVELOPMENT: <Star className="h-3.5 w-3.5" />,
+  RECREATIONAL: <Smile className="h-3.5 w-3.5" />,
+  OTHER: <MoreHorizontal className="h-3.5 w-3.5" />,
 };
 
 /**
@@ -25,11 +53,14 @@ type Props = {
  *
  * Shows a summary of all entered values. Each section has an "Bearbeiten"
  * link that navigates back to the corresponding step.
+ *
+ * Updated in TEAM-CREATE-02 to include Participation and Competition sections.
  */
 export default function WizardReview({
   form,
   seasons,
   orgUnits,
+  competitions,
   onGoToStep,
 }: Props) {
   const selectedSeason = seasons.find((s) => s.id === form.seasonId) ?? null;
@@ -39,20 +70,28 @@ export default function WizardReview({
 
   const hasMapping = form.federationExternalTeamId !== null;
 
+  const participationType = PARTICIPATION_TYPES.find(
+    (p) => p.value === form.participationType,
+  );
+
+  const selectedCompetition =
+    form.competitionId
+      ? (competitions.find((c) => c.id === form.competitionId) ?? null)
+      : null;
+
   return (
     <div className="space-y-4">
+      {/* Saison und Organisation */}
       <ReviewSection
         title="Saison und Organisation"
-        onEdit={() => onGoToStep(0)}
+        onEdit={() => onGoToStep(STEP_SEASON_ORG)}
       >
-        {/* Season */}
         <ReviewRow
           icon={<Calendar className="h-3.5 w-3.5" />}
           label="Saison"
           value={selectedSeason?.name ?? "—"}
         />
 
-        {/* OrgUnits */}
         <ReviewRow
           icon={<Building2 className="h-3.5 w-3.5" />}
           label="Organisationseinheiten"
@@ -83,7 +122,8 @@ export default function WizardReview({
         />
       </ReviewSection>
 
-      <ReviewSection title="Team" onEdit={() => onGoToStep(1)}>
+      {/* Team */}
+      <ReviewSection title="Team" onEdit={() => onGoToStep(STEP_TEAM)}>
         <ReviewRow label="Teamname" value={form.teamName || "—"} />
         {form.teamShortName && (
           <ReviewRow label="Kurzname" value={form.teamShortName} />
@@ -114,13 +154,17 @@ export default function WizardReview({
         )}
       </ReviewSection>
 
-      <ReviewSection title="Verband" onEdit={() => onGoToStep(2)}>
+      {/* Verband */}
+      <ReviewSection title="Verband" onEdit={() => onGoToStep(STEP_FEDERATION)}>
         {hasMapping ? (
           <>
             <ReviewRow
               icon={<Link2 className="h-3.5 w-3.5" />}
               label="Verbandsteam"
-              value={form.federationProviderTeamName ?? `ID ${form.federationExternalTeamId}`}
+              value={
+                form.federationProviderTeamName ??
+                `ID ${form.federationExternalTeamId}`
+              }
             />
             {form.federationProviderLeagueName && (
               <ReviewRow
@@ -146,7 +190,82 @@ export default function WizardReview({
         )}
       </ReviewSection>
 
-      <ReviewSection title="Veröffentlichung" onEdit={() => onGoToStep(3)}>
+      {/* Teilnahme */}
+      <ReviewSection
+        title="Teilnahme"
+        onEdit={() => onGoToStep(STEP_PARTICIPATION)}
+      >
+        <ReviewRow
+          icon={
+            participationType
+              ? PARTICIPATION_ICONS[participationType.value]
+              : undefined
+          }
+          label="Teilnahmetyp"
+          value={participationType?.label ?? form.participationType}
+        />
+        {participationType && (
+          <ReviewRow
+            label="Beschreibung"
+            value={
+              <span className="text-[var(--text-2)]">
+                {participationType.description}
+              </span>
+            }
+          />
+        )}
+      </ReviewSection>
+
+      {/* Wettkampf — only shown for COMPETITION type */}
+      {form.participationType === "COMPETITION" && (
+        <ReviewSection
+          title="Wettkampf"
+          onEdit={() => onGoToStep(STEP_COMPETITION)}
+        >
+          {selectedCompetition ? (
+            <>
+              <ReviewRow
+                icon={<Trophy className="h-3.5 w-3.5" />}
+                label="Wettkampf"
+                value={
+                  selectedCompetition.shortName ??
+                  selectedCompetition.officialName
+                }
+              />
+              {selectedCompetition.groupName && (
+                <ReviewRow
+                  label="Gruppe"
+                  value={selectedCompetition.groupName}
+                />
+              )}
+              <ReviewRow
+                label="Anbieter"
+                value={
+                  selectedCompetition.provider === "MANUAL"
+                    ? "Manuell"
+                    : selectedCompetition.provider
+                }
+              />
+            </>
+          ) : (
+            <ReviewRow
+              icon={<Trophy className="h-3.5 w-3.5 text-[var(--text-3)]" />}
+              label="Wettkampf"
+              value={
+                <span className="text-amber-600">
+                  Kein Wettkampf ausgewählt — wird später ergänzt
+                </span>
+              }
+            />
+          )}
+        </ReviewSection>
+      )}
+
+      {/* Veröffentlichung */}
+      <ReviewSection
+        title="Veröffentlichung"
+        onEdit={() => onGoToStep(STEP_PUBLICATION)}
+      >
         <ReviewRow
           icon={<Globe className="h-3.5 w-3.5" />}
           label="Website"
@@ -199,10 +318,10 @@ function ReviewSection({
 }) {
   return (
     <section
-      className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
+      className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
       aria-label={title}
     >
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-3">
         <h4 className="text-sm font-semibold text-[var(--foreground)]">
           {title}
         </h4>
@@ -236,7 +355,10 @@ function ReviewRow({
   return (
     <div className="flex items-start gap-3 py-3">
       {icon && (
-        <span className="mt-0.5 shrink-0 text-[var(--text-3)]" aria-hidden="true">
+        <span
+          className="mt-0.5 shrink-0 text-[var(--text-3)]"
+          aria-hidden="true"
+        >
           {icon}
         </span>
       )}

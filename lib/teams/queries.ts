@@ -132,6 +132,7 @@ export async function getTeamDetailData(teamId: string) {
           displayName: true,
           shortName: true,
           status: true,
+          participationType: true,
           websiteVisible: true,
           infoboardVisible: true,
           season: {
@@ -142,6 +143,23 @@ export async function getTeamDetailData(teamId: string) {
               startDate: true,
               endDate: true,
               isActive: true,
+            },
+          },
+          competitions: {
+            where: { isPrimary: true },
+            take: 1,
+            select: {
+              isPrimary: true,
+              competition: {
+                select: {
+                  id: true,
+                  officialName: true,
+                  shortName: true,
+                  provider: true,
+                  competitionType: true,
+                  isArchived: true,
+                },
+              },
             },
           },
         },

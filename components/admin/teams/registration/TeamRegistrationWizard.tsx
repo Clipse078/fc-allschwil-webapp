@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowRight, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -12,17 +12,27 @@ import WizardStepIndicator from "./WizardStepIndicator";
 import StepSeasonAndOrgUnit from "./StepSeasonAndOrgUnit";
 import StepTeamIdentity from "./StepTeamIdentity";
 import StepFederation from "./StepFederation";
+import StepParticipation from "./StepParticipation";
+import StepCompetition from "./StepCompetition";
 import StepPublication from "./StepPublication";
 import WizardReview from "./WizardReview";
 
 import {
   INITIAL_FORM_DATA,
-  WIZARD_STEPS,
+  WIZARD_STEP_DEFS,
+  STEP_SEASON_ORG,
+  STEP_TEAM,
+  STEP_FEDERATION,
+  STEP_PARTICIPATION,
+  STEP_COMPETITION,
+  STEP_PUBLICATION,
   type EligibleOrgUnit,
   type EligibleSeason,
+  type EligibleCompetition,
   type ExistingTeam,
   type UnmappedFederationTeam,
   type WizardFormData,
+  type ParticipationType,
 } from "./types";
 import { normalizeTeamSlug } from "@/lib/teams/team-season-rules";
 
@@ -35,6 +45,7 @@ type EligibleData = {
   orgUnits: EligibleOrgUnit[];
   existingTeams: ExistingTeam[];
   unmappedFederationTeams: UnmappedFederationTeam[];
+  eligibleCompetitions: EligibleCompetition[];
 };
 
 // ---------------------------------------------------------------------------
@@ -44,20 +55,33 @@ type EligibleData = {
 function validateStep(
   step: number,
   form: WizardFormData,
+  competitions: EligibleCompetition[],
 ): Partial<Record<string, string>> {
   const errors: Partial<Record<string, string>> = {};
 
-  if (step === 0) {
+  if (step === STEP_SEASON_ORG) {
     if (!form.seasonId) errors.seasonId = "Wähle eine Saison aus.";
     if (form.orgUnitIds.length === 0)
       errors.orgUnitIds = "Wähle mindestens eine Organisationseinheit aus.";
   }
 
-  if (step === 1) {
+  if (step === STEP_TEAM) {
     if (!form.teamName.trim())
       errors.teamName = "Teamname ist erforderlich.";
     if (!form.teamSlug.trim())
       errors.teamSlug = "URL-Pfad ist erforderlich.";
+  }
+
+  if (step === STEP_COMPETITION) {
+    // Competition is required for COMPETITION type when competitions exist
+    if (
+      form.participationType === "COMPETITION" &&
+      !form.competitionId &&
+      competitions.length > 0
+    ) {
+      errors.competitionId =
+        "Bitte wähle einen Wettkampf für das Wettkampfteam aus.";
+    }
   }
 
   return errors;
@@ -67,15 +91,13 @@ function validateStep(
 // Wizard
 // ---------------------------------------------------------------------------
 
-const STEP_COUNT = WIZARD_STEPS.length;
-
 export default function TeamRegistrationWizard() {
   const router = useRouter();
   const { toast } = useToast();
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [form, setForm] = useState<WizardFormData>(INITIAL_FORM_DATA);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState<number>(0);
   const [showReview, setShowReview] = useState(false);
 
   // ── Validation state ───────────────────────────────────────────────────────
@@ -96,6 +118,37 @@ export default function TeamRegistrationWizard() {
 
   // ── Focus management ──────────────────────────────────────────────────────
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  // ── Effective (visible) steps — Competition step is conditional ───────────
+  const effectiveSteps = useMemo(
+    () =>
+      WIZARD_STEP_DEFS.filter((s) => {
+        if (s.index === STEP_COMPETITION) {
+          return form.participationType === "COMPETITION";
+        }
+        return true;
+      }),
+    [form.participationType],
+  );
+
+  // Resolve next/prev step indices considering conditional steps
+  const nextStepIndex = useCallback(
+    (current: number): number | null => {
+      const indices = effectiveSteps.map((s) => s.index);
+      const pos = indices.indexOf(current);
+      return pos >= 0 && pos < indices.length - 1 ? indices[pos + 1] : null;
+    },
+    [effectiveSteps],
+  );
+
+  const prevStepIndex = useCallback(
+    (current: number): number | null => {
+      const indices = effectiveSteps.map((s) => s.index);
+      const pos = indices.indexOf(current);
+      return pos > 0 ? indices[pos - 1] : null;
+    },
+    [effectiveSteps],
+  );
 
   // ── Load eligible data on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -151,9 +204,6 @@ export default function TeamRegistrationWizard() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Preselect season effect ─────────────────────────────────────────────────
-  // (handled above)
 
   // ── Focus on step change ────────────────────────────────────────────────────
   useEffect(() => {
@@ -229,14 +279,22 @@ export default function TeamRegistrationWizard() {
     setHasEdited(true);
   }
 
-  // ── Team name → slug sync ──────────────────────────────────────────────────
-  useEffect(() => {
-    // This is handled inside StepTeamIdentity
-  }, []);
+  // ── Participation type change — clear competition when not COMPETITION ─────
+  function handleParticipationTypeChange(value: ParticipationType) {
+    setForm((prev) => ({
+      ...prev,
+      participationType: value,
+      // Clear competition selection when switching away from COMPETITION type
+      competitionId: value === "COMPETITION" ? prev.competitionId : null,
+    }));
+    setHasEdited(true);
+    setStepErrors({});
+  }
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   function handleNext() {
-    const errors = validateStep(currentStep, form);
+    const competitions = eligibleData?.eligibleCompetitions ?? [];
+    const errors = validateStep(currentStep, form, competitions);
     if (Object.keys(errors).length > 0) {
       setStepErrors(errors);
       return;
@@ -244,11 +302,11 @@ export default function TeamRegistrationWizard() {
 
     setStepErrors({});
 
-    if (currentStep < STEP_COUNT - 1) {
-      const nextStep = currentStep + 1;
-      setCurrentStep(nextStep);
+    const next = nextStepIndex(currentStep);
+    if (next !== null) {
+      setCurrentStep(next);
     } else {
-      // Move to review
+      // Last visible step — move to review
       setShowReview(true);
     }
   }
@@ -258,8 +316,9 @@ export default function TeamRegistrationWizard() {
       setShowReview(false);
       return;
     }
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+    const prev = prevStepIndex(currentStep);
+    if (prev !== null) {
+      setCurrentStep(prev);
     }
   }
 
@@ -302,8 +361,12 @@ export default function TeamRegistrationWizard() {
           ageGroup: form.teamAgeGroup || undefined,
           sortOrder: form.teamSortOrder,
         },
+        participationType: form.participationType,
+        competitionId: form.competitionId ?? undefined,
         federationMapping:
-          form.federationProvider && form.federationExternalTeamId !== null && form.federationExternalSeasonId !== null
+          form.federationProvider &&
+          form.federationExternalTeamId !== null &&
+          form.federationExternalSeasonId !== null
             ? {
                 provider: form.federationProvider,
                 externalTeamId: form.federationExternalTeamId,
@@ -345,17 +408,29 @@ export default function TeamRegistrationWizard() {
   }
 
   // ── Step meta ──────────────────────────────────────────────────────────────
-  const currentStepMeta = WIZARD_STEPS[currentStep];
+  const visibleStepPosition = effectiveSteps.findIndex(
+    (s) => s.index === currentStep,
+  );
+  const isFirstStep = currentStep === STEP_SEASON_ORG;
+  const isLastVisibleStep =
+    visibleStepPosition === effectiveSteps.length - 1;
 
   const stepDescriptions: Record<number, string> = {
-    0: "Lege fest, für welche Saison das Team registriert wird und welchen Organisationseinheiten es zugeordnet ist.",
-    1: "Erfasse die Identität des Teams. Weitere Angaben wie Spieler, Trainer und Trainings werden nach der Registrierung ergänzt.",
-    2: "Verbinde das Team optional mit einem Team aus dem angebundenen Verband. Die Verbindung kann auch später eingerichtet werden.",
-    3: "Lege fest, wo das Team nach der Registrierung sichtbar sein soll.",
+    [STEP_SEASON_ORG]:
+      "Lege fest, für welche Saison das Team registriert wird und welchen Organisationseinheiten es zugeordnet ist.",
+    [STEP_TEAM]:
+      "Erfasse die Identität des Teams. Weitere Angaben wie Spieler, Trainer und Trainings werden nach der Registrierung ergänzt.",
+    [STEP_FEDERATION]:
+      "Verbinde das Team optional mit einem Team aus dem angebundenen Verband. Die Verbindung kann auch später eingerichtet werden.",
+    [STEP_PARTICIPATION]:
+      "Lege fest, wie das Team in dieser Saison teilnimmt — als Wettkampfteam, Trainingsgruppe oder auf andere Weise.",
+    [STEP_COMPETITION]:
+      "Weise dem Wettkampfteam einen Wettkampf zu. Die Auswahl kann nach der Registrierung geändert werden.",
+    [STEP_PUBLICATION]:
+      "Lege fest, wo das Team nach der Registrierung sichtbar sein soll.",
   };
 
-  const isFirstStep = currentStep === 0;
-  const isLastStepBeforeReview = currentStep === STEP_COUNT - 1;
+  const currentStepDef = WIZARD_STEP_DEFS[currentStep];
 
   // ── Data loading / error guard ────────────────────────────────────────────
   if (dataError) {
@@ -379,6 +454,8 @@ export default function TeamRegistrationWizard() {
       </div>
     );
   }
+
+  const competitions = eligibleData?.eligibleCompetitions ?? [];
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -406,9 +483,13 @@ export default function TeamRegistrationWizard() {
       {/* Step indicator */}
       <div className="mt-4 mb-8">
         <WizardStepIndicator
-          steps={WIZARD_STEPS.map((s) => ({ ...s }))}
-          currentStep={showReview ? STEP_COUNT : currentStep}
-          completedUpTo={showReview ? STEP_COUNT - 1 : currentStep - 1}
+          steps={effectiveSteps.map((s) => ({ ...s }))}
+          currentStep={
+            showReview ? effectiveSteps.length : visibleStepPosition
+          }
+          completedUpTo={
+            showReview ? effectiveSteps.length - 1 : visibleStepPosition - 1
+          }
         />
       </div>
 
@@ -424,9 +505,7 @@ export default function TeamRegistrationWizard() {
           )}
           aria-live="polite"
         >
-          {showReview
-            ? "Zusammenfassung"
-            : currentStepMeta?.label}
+          {showReview ? "Zusammenfassung" : currentStepDef?.label}
         </h2>
 
         {/* Step content */}
@@ -435,9 +514,10 @@ export default function TeamRegistrationWizard() {
             form={form}
             seasons={eligibleData?.seasons ?? []}
             orgUnits={eligibleData?.orgUnits ?? []}
+            competitions={competitions}
             onGoToStep={handleGoToStep}
           />
-        ) : currentStep === 0 ? (
+        ) : currentStep === STEP_SEASON_ORG ? (
           <StepSeasonAndOrgUnit
             seasons={eligibleData?.seasons ?? []}
             orgUnits={eligibleData?.orgUnits ?? []}
@@ -448,22 +528,36 @@ export default function TeamRegistrationWizard() {
             onPrimaryChange={handlePrimaryChange}
             loading={dataLoading}
           />
-        ) : currentStep === 1 ? (
+        ) : currentStep === STEP_TEAM ? (
           <StepTeamIdentity
             form={form}
             existingTeams={eligibleData?.existingTeams ?? []}
             onFieldChange={handleFieldChange}
             validationErrors={stepErrors}
           />
-        ) : currentStep === 2 ? (
+        ) : currentStep === STEP_FEDERATION ? (
           <StepFederation
-            unmappedFederationTeams={eligibleData?.unmappedFederationTeams ?? []}
+            unmappedFederationTeams={
+              eligibleData?.unmappedFederationTeams ?? []
+            }
             form={form}
             onSelectFederationTeam={handleSelectFederationTeam}
             loading={dataLoading}
             providerUnavailable={!dataLoading && !!dataError}
           />
-        ) : currentStep === 3 ? (
+        ) : currentStep === STEP_PARTICIPATION ? (
+          <StepParticipation
+            participationType={form.participationType}
+            onParticipationTypeChange={handleParticipationTypeChange}
+          />
+        ) : currentStep === STEP_COMPETITION ? (
+          <StepCompetition
+            competitions={competitions}
+            selectedCompetitionId={form.competitionId}
+            onSelectCompetition={(id) => handleFieldChange("competitionId", id)}
+            loading={dataLoading}
+          />
+        ) : currentStep === STEP_PUBLICATION ? (
           <StepPublication
             websiteVisible={form.websiteVisible}
             infoboardVisible={form.infoboardVisible}
@@ -546,13 +640,13 @@ export default function TeamRegistrationWizard() {
               type="button"
               variant="primary"
               iconRight={
-                isLastStepBeforeReview ? undefined : (
+                isLastVisibleStep ? undefined : (
                   <ArrowRight className="h-4 w-4" />
                 )
               }
               onClick={handleNext}
             >
-              {isLastStepBeforeReview ? "Prüfen" : "Weiter"}
+              {isLastVisibleStep ? "Prüfen" : "Weiter"}
             </Button>
           )}
         </div>

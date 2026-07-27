@@ -278,6 +278,31 @@ enum TeamSeasonStatus {
   ARCHIVED
 }
 
+// ---------------------------------------------------------------------------
+// ParticipationType — canonical classification of how a TeamSeason participates
+// in a given season.
+//
+// TEAM-CREATE-02: Introduced to replace ad-hoc category-based classification
+// for new business logic. Decoupled from the legacy TeamCategory field and
+// from any provider-specific concepts.
+//
+// Values:
+//   COMPETITION   — Team participates in a formal competition (league, cup, etc.)
+//   TRAINING      — Training group; no competitive participation.
+//   DEVELOPMENT   — Youth / development group; structured but non-competitive.
+//   RECREATIONAL  — Recreational / leisure group (e.g. Walking Football).
+//   OTHER         — Catch-all for future or atypical participation forms.
+//
+// Localisation: labels are defined in the UI layer (German).
+// ---------------------------------------------------------------------------
+enum ParticipationType {
+  COMPETITION
+  TRAINING
+  DEVELOPMENT
+  RECREATIONAL
+  OTHER
+}
+
 enum PlayerSquadStatus {
   ACTIVE
   INACTIVE
@@ -921,18 +946,22 @@ model TeamExternalMapping {
 }
 
 model TeamSeason {
-  id                        String           @id @default(cuid())
+  id                        String            @id @default(cuid())
   teamId                    String
   seasonId                  String
   displayName               String
   shortName                 String?
-  status                    TeamSeasonStatus @default(ACTIVE)
-  websiteVisible            Boolean          @default(true)
-  infoboardVisible          Boolean          @default(true)
-  squadWebsiteVisible       Boolean          @default(true)
-  trainerTeamWebsiteVisible Boolean          @default(true)
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
+  status                    TeamSeasonStatus  @default(ACTIVE)
+  /// How this TeamSeason participates in the season (TEAM-CREATE-02).
+  /// COMPETITION teams require at least one TeamSeasonCompetition entry.
+  /// All other types can operate without a competition assignment.
+  participationType         ParticipationType @default(TRAINING)
+  websiteVisible            Boolean           @default(true)
+  infoboardVisible          Boolean           @default(true)
+  squadWebsiteVisible       Boolean           @default(true)
+  trainerTeamWebsiteVisible Boolean           @default(true)
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
 
   team               Team                @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   season             Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -948,6 +977,7 @@ model TeamSeason {
   @@unique([teamId, seasonId])
   @@index([seasonId])
   @@index([status])
+  @@index([participationType])
   @@index([squadWebsiteVisible])
   @@index([trainerTeamWebsiteVisible])
 }

@@ -29,6 +29,7 @@ import {
   registerTeamSeason,
   type RegisterTeamInput,
 } from "@/lib/teams/team-registration-service";
+import { ParticipationType } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.TEAMS_MANAGE);
@@ -111,6 +112,25 @@ export async function POST(request: NextRequest) {
   const websiteVisible = b.websiteVisible !== false;
   const infoboardVisible = b.infoboardVisible !== false;
 
+  // ── Participation type (TEAM-CREATE-02) ───────────────────────────────────
+
+  const rawParticipationType =
+    typeof b.participationType === "string" ? b.participationType.trim() : "";
+  const validParticipationTypes = Object.values(ParticipationType) as string[];
+
+  if (!validParticipationTypes.includes(rawParticipationType)) {
+    return NextResponse.json(
+      {
+        error: `Ungültiger Teilnahmetyp '${rawParticipationType}'. Gültige Werte: ${validParticipationTypes.join(", ")}.`,
+      },
+      { status: 400 },
+    );
+  }
+  const participationType = rawParticipationType as ParticipationType;
+
+  const competitionId =
+    typeof b.competitionId === "string" ? b.competitionId.trim() || null : null;
+
   // ── Federation mapping (optional) ──────────────────────────────────────────
 
   let federationMapping: RegisterTeamInput["federationMapping"] = null;
@@ -160,6 +180,8 @@ export async function POST(request: NextRequest) {
       ageGroup: teamAgeGroup,
       sortOrder: teamSortOrder,
     },
+    participationType,
+    competitionId,
     federationMapping,
     websiteVisible,
     infoboardVisible,
@@ -177,6 +199,12 @@ export async function POST(request: NextRequest) {
       "SEASON_NOT_FOUND",
       "ORG_UNIT_NOT_FOUND",
       "TEAM_NOT_FOUND",
+      "COMPETITION_NOT_FOUND",
+    ];
+    const validationCodes: string[] = [
+      "COMPETITION_NOT_ALLOWED",
+      "COMPETITION_ARCHIVED",
+      "INVALID_PARTICIPATION_TYPE",
     ];
 
     const status = conflictCodes.includes(registrationResult.code)
@@ -184,9 +212,12 @@ export async function POST(request: NextRequest) {
       : notFoundCodes.includes(registrationResult.code)
         ? 404
         : registrationResult.code === "TEAM_TENANT_MISMATCH" ||
-            registrationResult.code === "ORG_UNIT_TENANT_MISMATCH"
+            registrationResult.code === "ORG_UNIT_TENANT_MISMATCH" ||
+            registrationResult.code === "COMPETITION_TENANT_MISMATCH"
           ? 403
-          : 400;
+          : validationCodes.includes(registrationResult.code)
+            ? 400
+            : 400;
 
     return NextResponse.json(
       { error: registrationResult.message, code: registrationResult.code },
@@ -205,18 +236,20 @@ export async function POST(request: NextRequest) {
       ? registrationResult.teamId
       : registrationResult.teamSeasonId,
     action: "CREATE",
-    afterJson: {
-      teamId: registrationResult.teamId,
-      teamSeasonId: registrationResult.teamSeasonId,
-      slug: registrationResult.slug,
-      createdTeamIdentity: registrationResult.createdTeamIdentity,
-      seasonId,
-      orgUnitIds,
-      websiteVisible,
-      infoboardVisible,
-      hasFederationMapping: federationMapping !== null,
-      tenantId: tenant.id,
-    },
+      afterJson: {
+        teamId: registrationResult.teamId,
+        teamSeasonId: registrationResult.teamSeasonId,
+        slug: registrationResult.slug,
+        createdTeamIdentity: registrationResult.createdTeamIdentity,
+        seasonId,
+        orgUnitIds,
+        participationType,
+        competitionId,
+        websiteVisible,
+        infoboardVisible,
+        hasFederationMapping: federationMapping !== null,
+        tenantId: tenant.id,
+      },
   });
 
   return NextResponse.json(
