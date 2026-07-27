@@ -22,6 +22,7 @@
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts",
     "sync-workspace-permissions": "tsx scripts/sync-workspace-permissions.ts",
     "sync-training-permissions": "tsx scripts/sync-training-permissions.ts",
+    "check-user-permissions": "tsx scripts/check-user-permissions.ts",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
