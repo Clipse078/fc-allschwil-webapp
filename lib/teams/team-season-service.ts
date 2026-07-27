@@ -231,9 +231,11 @@ export async function createCanonicalTeamSeason(
         select: { id: true },
       });
 
-      // Create TeamSeasonOrgUnit rows; first OrgUnit is primary
+      // Create TeamSeasonOrgUnit rows; first OrgUnit is primary.
+      // IDs are omitted so Prisma uses @default(cuid()) — prevents ID collisions
+      // that would arise from synchronous Date.now() inside map() when creating
+      // multiple OrgUnit assignments for the same TeamSeason.
       const orgUnitData = uniqueOrgUnitIds.map((orgUnitId, index) => ({
-        id: `${teamSeason.id}-${orgUnitId}`.slice(0, 25) + Date.now().toString(36),
         tenantId: input.tenantId,
         teamSeasonId: teamSeason.id,
         orgUnitId,
