@@ -43,6 +43,7 @@ enum PermissionModule {
   SEASONS
   TEAMS
   COMPETITIONS
+  TRAININGS
   PEOPLE
   EVENTS
   FIXTURES
@@ -502,6 +503,8 @@ model Tenant {
   teamSeasonOrgUnits     TeamSeasonOrgUnit[]
   // COMPETITION-01: canonical competition entities
   competitions           Competition[]
+  // TRAINING-CORE-01: canonical recurring training series
+  trainingSeries         TrainingSeries[]
 
   @@index([status])
   @@index([name])
@@ -996,6 +999,8 @@ model TeamSeason {
   externalMappings   TeamExternalMapping[]
   // COMPETITION-01: optional competitions for this TeamSeason
   competitions       TeamSeasonCompetition[]
+  // TRAINING-CORE-01: canonical recurring training series for this TeamSeason
+  trainingSeries     TrainingSeries[]
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -2778,4 +2783,132 @@ model OpponentExternalMapping {
   @@unique([tenantId, provider, externalTeamId, externalSeasonId])
   @@index([tenantId, provider])
   @@index([opponentId])
+}
+
+// =============================================================================
+// TRAINING-CORE-01: Canonical Training Foundation
+//
+// Introduces TrainingSeries — the canonical recurring training identity used
+// by every SportClubEvo training-related module.
+//
+// Architecture:
+//   Organisation → Team → TeamSeason → TrainingSeries
+//
+// Canonical principles:
+//   - One TrainingSeries = one recurring training identity (e.g. "E1 Tuesday Training").
+//   - A TrainingSeries is NEVER duplicated for different weekplans / pitches / rooms.
+//   - Alternative weekplans configure the same TrainingSeries.
+//   - Every TrainingSeries belongs to exactly one TeamSeason (never directly to Team).
+//   - No resource allocation, no weekplans, no publishing at this layer.
+//
+// Future consumers:
+//   Training Planner, Website Weekplanner, Team Pages, Infoboards,
+//   Resource Planning, Calendar, Mobile App.
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// TrainingSeriesStatus — lifecycle status of a TrainingSeries.
+//
+// ACTIVE   — Series is live and generates occurrences.
+// INACTIVE — Series is paused; no occurrences generated. Can be reactivated.
+// ARCHIVED — Series is closed. archivedAt is set. Restore sets it back to INACTIVE.
+// ---------------------------------------------------------------------------
+enum TrainingSeriesStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+// ---------------------------------------------------------------------------
+// Weekday — ISO-aligned weekday enum for training recurrence rules.
+// ---------------------------------------------------------------------------
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+// ---------------------------------------------------------------------------
+// TrainingSeries — canonical recurring training identity.
+//
+// Represents a single, stable recurring training slot for a TeamSeason.
+// Examples: "E1 Tuesday Training", "FF17 Thursday Training".
+//
+// Architecture invariants:
+//   - tenantId always comes from a trusted session context.
+//   - Belongs to exactly one TeamSeason (TeamSeason owns it via teamSeasonId).
+//   - title is unique per TeamSeason: prevents accidental duplication.
+//   - Soft-archive: archivedAt is set on archive; no hard delete.
+//   - startsAt / endsAt are time-of-day strings ("HH:mm") in the given timezone.
+//   - validFrom / validUntil define the calendar span of the series.
+//   - Recurrence is represented by TrainingSeriesRecurrenceDay rows.
+//
+// Security invariants:
+//   - All queries scope by tenantId (via team.tenantId join).
+//   - Tenant A cannot read or modify Tenant B's training series.
+// ---------------------------------------------------------------------------
+model TrainingSeries {
+  id           String               @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId     String
+  /// Owning TeamSeason. One series belongs to exactly one TeamSeason.
+  teamSeasonId String
+  /// Human-readable training identity. Unique within a TeamSeason.
+  title        String
+  description  String?
+  /// Lifecycle status of this series.
+  status       TrainingSeriesStatus @default(ACTIVE)
+  /// Time-of-day the training starts ("HH:mm"), interpreted in `timezone`.
+  startsAt     String
+  /// Time-of-day the training ends ("HH:mm"), interpreted in `timezone`.
+  endsAt       String
+  /// IANA timezone identifier (e.g. "Europe/Zurich"). Defaults to UTC.
+  timezone     String               @default("UTC")
+  /// Optional calendar start of this series. Null means no lower bound.
+  validFrom    DateTime?
+  /// Optional calendar end of this series. Null means no upper bound.
+  validUntil   DateTime?
+  /// Set when the series is archived. Null when not archived.
+  archivedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason     TeamSeason                   @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  recurrenceDays TrainingSeriesRecurrenceDay[]
+
+  /// Prevents duplicate training identities within the same TeamSeason.
+  @@unique([teamSeasonId, title])
+  @@index([tenantId])
+  @@index([teamSeasonId])
+  @@index([tenantId, status])
+  @@index([teamSeasonId, status])
+}
+
+// ---------------------------------------------------------------------------
+// TrainingSeriesRecurrenceDay — weekly recurrence days for a TrainingSeries.
+//
+// A TrainingSeries may recur on one or more weekdays per week.
+// Each row represents one active weekday in the series' recurrence pattern.
+//
+// Architecture invariants:
+//   - Duplicate (trainingSeriesId, weekday) is prevented at DB level.
+//   - Cascade-delete with the parent TrainingSeries.
+//   - Extensible: future recurrence types (bi-weekly, monthly) would add
+//     new fields or sibling models without changing this table.
+// ---------------------------------------------------------------------------
+model TrainingSeriesRecurrenceDay {
+  id               String         @id @default(cuid())
+  trainingSeriesId String
+  weekday          Weekday
+  createdAt        DateTime       @default(now())
+
+  trainingSeries TrainingSeries @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([trainingSeriesId, weekday])
+  @@index([trainingSeriesId])
 }
