@@ -20,6 +20,10 @@
  *   - Manual team without mappings (no competitions)
  *   - Provider-synchronized team with competitions
  *   - Optional relations are handled (no orgUnit, no teamSeasons, etc.)
+ *
+ * Verification corrections (STAGE-OPS-01-V):
+ *   - Signature is now (tenantId: string, teamId: string) — tenantId required
+ *   - Backward-compat (optional tenantId) tests removed; tenant scope is mandatory
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -120,48 +124,40 @@ describe("STAGE-OPS-01 — getTeamDetailData tenant isolation (Issue 3 regressio
     const teamRow = makeTeamRow({ tenantId: TENANT_A });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result).not.toBeNull();
     expect(result?.id).toBe(TEAM_ID_A);
   });
 
   it("returns null for a foreign-tenant team ID (tenant isolation)", async () => {
-    // When tenantId is provided, Prisma should scope by it.
-    // Mocking findFirst to return null simulates the DB rejecting the query.
+    // When tenantId is provided, Prisma scopes by it.
+    // Mocking findFirst to return null simulates the DB rejecting the cross-tenant query.
     mockPrisma.team.findFirst.mockResolvedValue(null);
 
-    const result = await getTeamDetailData(TEAM_ID_B, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_B);
     expect(result).toBeNull();
   });
 
-  it("includes tenantId in the where clause when tenantId is provided", async () => {
+  it("always includes both tenantId and teamId in the where clause", async () => {
     mockPrisma.team.findFirst.mockResolvedValue(null);
-    await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    await getTeamDetailData(TENANT_A, TEAM_ID_A);
 
     const callArgs = mockPrisma.team.findFirst.mock.calls[0][0];
     expect(callArgs.where).toMatchObject({ id: TEAM_ID_A, tenantId: TENANT_A });
   });
 
-  it("omits tenantId from where clause when tenantId is undefined (backward compat)", async () => {
+  it("tenant B query uses TENANT_B not TENANT_A in the where clause", async () => {
     mockPrisma.team.findFirst.mockResolvedValue(null);
-    await getTeamDetailData(TEAM_ID_A, undefined);
+    await getTeamDetailData(TENANT_B, TEAM_ID_A);
 
     const callArgs = mockPrisma.team.findFirst.mock.calls[0][0];
-    expect(callArgs.where).toEqual({ id: TEAM_ID_A });
-    expect(callArgs.where.tenantId).toBeUndefined();
-  });
-
-  it("omits tenantId from where clause when tenantId is null (backward compat)", async () => {
-    mockPrisma.team.findFirst.mockResolvedValue(null);
-    await getTeamDetailData(TEAM_ID_A, null);
-
-    const callArgs = mockPrisma.team.findFirst.mock.calls[0][0];
-    expect(callArgs.where).toEqual({ id: TEAM_ID_A });
+    expect(callArgs.where.tenantId).toBe(TENANT_B);
+    expect(callArgs.where.tenantId).not.toBe(TENANT_A);
   });
 
   it("returns null for a missing team ID", async () => {
     mockPrisma.team.findFirst.mockResolvedValue(null);
-    const result = await getTeamDetailData("nonexistent", TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, "nonexistent");
     expect(result).toBeNull();
   });
 });
@@ -175,7 +171,7 @@ describe("STAGE-OPS-01 — getTeamDetailData data handling (Issue 3 regression)"
     const teamRow = makeTeamRow({ teamSeasons: [] });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result).not.toBeNull();
     expect(result?.teamSeasons).toEqual([]);
   });
@@ -184,7 +180,7 @@ describe("STAGE-OPS-01 — getTeamDetailData data handling (Issue 3 regression)"
     const teamRow = makeTeamRow({ orgUnit: null });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.orgUnit).toBeNull();
   });
 
@@ -193,7 +189,7 @@ describe("STAGE-OPS-01 — getTeamDetailData data handling (Issue 3 regression)"
     const teamRow = makeTeamRow({ teamSeasons: [teamSeasonNoCompetitions] });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.teamSeasons[0].competitions).toEqual([]);
   });
 
@@ -202,7 +198,7 @@ describe("STAGE-OPS-01 — getTeamDetailData data handling (Issue 3 regression)"
     const teamRow = makeTeamRow({ teamSeasons: [teamSeasonWithComp] });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.teamSeasons[0].competitions).toHaveLength(1);
     expect(result?.teamSeasons[0].competitions[0].competition.provider).toBe("SFV");
   });
@@ -212,7 +208,7 @@ describe("STAGE-OPS-01 — getTeamDetailData data handling (Issue 3 regression)"
     const teamRow = makeTeamRow({ teamSeasons: [teamSeasonWithDates] });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     const season = result?.teamSeasons[0].season;
     expect(typeof season?.startDate).toBe("string");
     expect(typeof season?.endDate).toBe("string");
@@ -223,7 +219,7 @@ describe("STAGE-OPS-01 — getTeamDetailData data handling (Issue 3 regression)"
     const teamRow = makeTeamRow({ isActive: false });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.isActive).toBe(false);
   });
 
@@ -235,7 +231,7 @@ describe("STAGE-OPS-01 — getTeamDetailData data handling (Issue 3 regression)"
     const teamRow = makeTeamRow({ teamSeasons: [trainingTeamSeason] });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
-    const result = await getTeamDetailData(TEAM_ID_A, TENANT_A);
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.teamSeasons[0].participationType).toBe("TRAINING");
   });
 });

@@ -5,7 +5,7 @@ import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getTeamDetailData, type TeamDetailData } from "@/lib/teams/queries";
+import { getTeamDetailData } from "@/lib/teams/queries";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getTenantFromSession } from "@/lib/tenants/queries";
@@ -49,26 +49,17 @@ export default async function TeamDetailPage({ params }: Props) {
   const { teamId } = await params;
 
   const tenant = await getTenantFromSession(session.user?.tenantId);
-  const tenantId = tenant?.id;
-
-  let teamResult: TeamDetailData | null = null;
-  let availableSeasons: Awaited<ReturnType<typeof getSeasonOptionsData>> = [];
-  let availableOrgUnits: Awaited<ReturnType<typeof getOrgUnits>> = [];
-
-  try {
-    [teamResult, availableSeasons, availableOrgUnits] = await Promise.all([
-      // Pass tenantId to scope the query to the active tenant (tenant isolation).
-      getTeamDetailData(teamId, tenantId),
-      getSeasonOptionsData(),
-      getOrgUnits(tenantId),
-    ]);
-  } catch (err) {
-    // Log for server diagnostics; surface a clean not-found rather than crashing.
-    console.error("[team-detail] data fetch failed for teamId=%s:", teamId, err instanceof Error ? err.message : String(err));
+  if (!tenant) {
     notFound();
   }
+  const tenantId = tenant.id;
 
-  const team = teamResult;
+  const [team, availableSeasons, availableOrgUnits] = await Promise.all([
+    getTeamDetailData(tenantId, teamId),
+    getSeasonOptionsData(),
+    getOrgUnits(tenantId),
+  ]);
+
   if (!team) {
     notFound();
   }
