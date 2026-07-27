@@ -205,7 +205,13 @@ export default function ProviderMappingTable({ mappings, canManage = false }: Pr
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-2">
                       <Link
-                        href={`/dashboard/teams/provider-mapping/${m.teamSeasonId ?? "unmapped"}?mappingId=${m.id}`}
+                        href={
+                          m.teamSeasonId
+                            // MAPPED: go to the TeamSeason-based mapping page, focus this mapping.
+                            ? `/dashboard/teams/provider-mapping/${m.teamSeasonId}?mappingId=${m.id}`
+                            // UNMAPPED: go to the mapping assignment page for this specific row.
+                            : `/dashboard/teams/provider-mapping/mapping/${m.id}`
+                        }
                         className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
                         title="Zuordnung bearbeiten"
                       >

@@ -243,6 +243,59 @@ export async function getMappedTeamSeasonIds(
   return ids;
 }
 
+// ── Eligible TeamSeasons for mapping assignment ────────────────────────────────
+
+export type EligibleTeamSeason = {
+  id: string;
+  displayName: string;
+  shortName: string | null;
+  status: string;
+  teamName: string;
+  seasonName: string;
+  seasonKey: string;
+};
+
+/**
+ * Returns all active (non-archived) TeamSeasons for the given tenant,
+ * ordered by season (newest first) then team name.
+ *
+ * Used to populate the TeamSeason selector when assigning an unmapped
+ * provider team (TeamExternalMapping) to a canonical TeamSeason.
+ * Only tenant-scoped results are returned.
+ */
+export async function getEligibleTeamSeasonsForMapping(
+  tenantId: string,
+): Promise<EligibleTeamSeason[]> {
+  const rows = await prisma.teamSeason.findMany({
+    where: {
+      status: { not: "ARCHIVED" },
+      team: { tenantId },
+    },
+    select: {
+      id: true,
+      displayName: true,
+      shortName: true,
+      status: true,
+      team: { select: { name: true } },
+      season: { select: { name: true, key: true, startDate: true } },
+    },
+    orderBy: [
+      { season: { startDate: "desc" } },
+      { team: { name: "asc" } },
+    ],
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    displayName: r.displayName,
+    shortName: r.shortName,
+    status: r.status,
+    teamName: r.team.name,
+    seasonName: r.season.name,
+    seasonKey: r.season.key,
+  }));
+}
+
 /**
  * Gets all external team IDs that are already mapped to a TeamSeason for this provider.
  * Used to identify unmapped provider teams.
