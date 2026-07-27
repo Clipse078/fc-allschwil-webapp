@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Dumbbell,
   FileText,
   Flag,
   FolderClosed,
@@ -25,6 +26,7 @@ import {
   Layers,
   LayoutDashboard,
   LayoutTemplate,
+  MapPin,
   Menu,
   Monitor,
   Newspaper,
@@ -92,6 +94,10 @@ function getNavIcon(label: string) {
     case "Wiederverwendbare Inhalte":   return BookCheck;
     case "Einstellungen":               return Settings2;
     // Planung children
+    case "Trainingsplaner":             return Dumbbell;
+    case "Veranstaltungen":             return CalendarDays;
+    case "Anlagen":                     return MapPin;
+    // Legacy Planung labels (kept for any remaining references)
     case "Saisons":                     return CalendarRange;
     case "Saisonplanung":               return ClipboardList;
     case "Events":                      return CalendarDays;
