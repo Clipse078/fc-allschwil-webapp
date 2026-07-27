@@ -947,6 +947,29 @@ describe("J. upsertTrainingPlanAssignment", () => {
     ).rejects.toThrow(TrainingPlanAssignmentSeasonMismatchError);
   });
 
+  it("rejects invalid IANA timezone override", async () => {
+    await expect(
+      upsertTrainingPlanAssignment(TENANT_A, {
+        trainingPlanId: PLAN_ID,
+        trainingSeriesId: SERIES_ID,
+        timezoneOverride: "Not/A/Timezone",
+      }),
+    ).rejects.toThrow(TrainingPlanAssignmentInvalidTimeError);
+  });
+
+  it("accepts a valid IANA timezone override", async () => {
+    vi.mocked(prisma.trainingPlanAssignment.create).mockResolvedValue({
+      ...baseAssignmentRow,
+      timezoneOverride: "America/New_York",
+    } as never);
+    const result = await upsertTrainingPlanAssignment(TENANT_A, {
+      trainingPlanId: PLAN_ID,
+      trainingSeriesId: SERIES_ID,
+      timezoneOverride: "America/New_York",
+    });
+    expect(result.timezoneOverride).toBe("America/New_York");
+  });
+
   it("supports NOT_SCHEDULED assignment status", async () => {
     vi.mocked(prisma.trainingPlanAssignment.create).mockResolvedValue({
       ...baseAssignmentRow,

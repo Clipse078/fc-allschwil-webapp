@@ -68,14 +68,15 @@ function isValidTime(time: string): boolean {
 }
 
 /**
- * Validates a time override pair. If only one override is provided, the
- * effective range is formed by combining the override with the canonical value.
- * We validate in the context of both provided overrides only to prevent the
- * assignment itself from creating an invalid range within its own overrides.
+ * Validates a time override pair and optional timezone override.
+ * If only one time override is provided, the effective range is formed by
+ * combining the override with the canonical value. We validate in the context
+ * of both provided overrides only to prevent an invalid range within overrides.
  */
 function validateTimeOverrides(
   startTimeOverride: string | null | undefined,
   endTimeOverride: string | null | undefined,
+  timezoneOverride?: string | null,
 ): void {
   if (startTimeOverride != null && !isValidTime(startTimeOverride)) {
     throw new TrainingPlanAssignmentInvalidTimeError(
@@ -95,6 +96,25 @@ function validateTimeOverrides(
         `startTimeOverride (${startTimeOverride}) must be before endTimeOverride (${endTimeOverride})`,
       );
     }
+  }
+  if (timezoneOverride != null) {
+    validateTimezoneOverride(timezoneOverride);
+  }
+}
+
+/**
+ * Validates an IANA timezone identifier.
+ *
+ * Uses Intl.DateTimeFormat to attempt construction with the given timezone.
+ * Invalid identifiers throw a RangeError which is converted to a typed error.
+ */
+function validateTimezoneOverride(timezone: string): void {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    throw new TrainingPlanAssignmentInvalidTimeError(
+      `timezoneOverride must be a valid IANA timezone identifier, got: "${timezone}"`,
+    );
   }
 }
 
@@ -689,7 +709,7 @@ export async function upsertTrainingPlanAssignment(
     throw new TrainingPlanAssignmentSeasonMismatchError();
   }
 
-  validateTimeOverrides(startTimeOverride, endTimeOverride);
+  validateTimeOverrides(startTimeOverride, endTimeOverride, timezoneOverride);
 
   // Validate combined effective range when one override is partial
   const effectiveStart = startTimeOverride ?? series.startsAt;
