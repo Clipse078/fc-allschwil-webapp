@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { createFacilityResource } from "@/lib/facilities/queries";
+import {
+  createFacilityResource,
+  getFacilityResourcesForFacility,
+  getFacilityById,
+} from "@/lib/facilities/queries";
 import type { FacilityResourceType } from "@prisma/client";
 
 const ALLOWED_TYPES: FacilityResourceType[] = [
@@ -12,6 +16,30 @@ const ALLOWED_TYPES: FacilityResourceType[] = [
 ];
 
 type Params = { params: Promise<{ facilityId: string }> };
+
+export async function GET(_request: NextRequest, { params }: Params) {
+  const auth = await requireApiAnyPermission([
+    PERMISSIONS.FACILITIES_VIEW,
+    PERMISSIONS.FACILITIES_MANAGE,
+  ]);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const tenantId = auth.session.user?.tenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
+  }
+
+  const { facilityId } = await params;
+
+  const resources = await getFacilityResourcesForFacility(facilityId, tenantId);
+  if (resources === null) {
+    return NextResponse.json({ error: "Facility not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ resources });
+}
 
 export async function POST(request: NextRequest, { params }: Params) {
   const auth = await requireApiAnyPermission([PERMISSIONS.FACILITIES_MANAGE]);
@@ -25,6 +53,15 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const { facilityId } = await params;
+
+  // Verify the facility exists and belongs to this tenant before creating a resource.
+  // Without this check, a crafted request could attach a resource to another tenant's
+  // facility, causing the resource to disappear from this tenant's list.
+  const facility = await getFacilityById(facilityId, tenantId);
+  if (!facility) {
+    return NextResponse.json({ error: "Facility not found" }, { status: 404 });
+  }
+
   const body = await request.json().catch(() => null);
 
   if (!body || typeof body.name !== "string" || !body.name.trim()) {
