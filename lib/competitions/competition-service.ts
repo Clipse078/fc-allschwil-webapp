@@ -157,6 +157,7 @@ export async function updateCompetition(
   const row = await prisma.competition.update({
     where: { id: competitionId },
     data: {
+      ...(input.officialName !== undefined ? { officialName: input.officialName.trim() } : {}),
       ...(input.shortName !== undefined ? { shortName: input.shortName?.trim() ?? null } : {}),
       ...(input.groupName !== undefined ? { groupName: input.groupName?.trim() ?? null } : {}),
       ...(input.competitionType !== undefined ? { competitionType: input.competitionType } : {}),

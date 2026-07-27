@@ -3,16 +3,19 @@
 /**
  * CompetitionsTable
  *
- * Server-rendered table listing canonical Competition records.
- * Supports search, provider/season filtering, and shows assigned team count.
+ * Client-side table listing canonical Competition records.
+ * Supports inline archive / restore actions.
  *
  * German UI as required.
  */
 
-import { Trophy, Archive } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Trophy, Archive, RotateCcw, Edit2 } from "lucide-react";
 import type { CompetitionListItem } from "@/lib/competitions/dto";
 import { SectionCard } from "@/components/ui/page";
 import { Badge } from "@/components/ui/Badge";
+import CompetitionEditDialog from "./CompetitionEditDialog";
 
 // ── Label helpers ─────────────────────────────────────────────────────────────
 
@@ -42,14 +45,51 @@ function formatDate(iso: string | null | undefined): string {
 
 type Props = {
   competitions: CompetitionListItem[];
+  canManage?: boolean;
 };
 
-export default function CompetitionsTable({ competitions }: Props) {
+export default function CompetitionsTable({ competitions, canManage = false }: Props) {
+  const router = useRouter();
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<CompetitionListItem | null>(null);
+
+  async function handleArchive(id: string) {
+    setActionLoading(id);
+    try {
+      await fetch(`/api/competitions/${id}`, { method: "DELETE" });
+      router.refresh();
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRestore(id: string) {
+    setActionLoading(id);
+    try {
+      await fetch(`/api/competitions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isArchived: false }),
+      });
+      router.refresh();
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   if (competitions.length === 0) {
     return null;
   }
 
   return (
+    <>
+    {editTarget && (
+      <CompetitionEditDialog
+        competition={editTarget}
+        open={true}
+        onClose={() => setEditTarget(null)}
+      />
+    )}
     <SectionCard noPadding>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -76,6 +116,11 @@ export default function CompetitionsTable({ competitions }: Props) {
               <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
+              {canManage && (
+                <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider">
+                  Aktionen
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
@@ -161,11 +206,49 @@ export default function CompetitionsTable({ competitions }: Props) {
                     </div>
                   )}
                 </td>
+
+                {/* Aktionen */}
+                {canManage && (
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        title="Bearbeiten"
+                        onClick={() => setEditTarget(competition)}
+                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                      {competition.isArchived ? (
+                        <button
+                          type="button"
+                          title="Wiederherstellen"
+                          disabled={actionLoading === competition.id}
+                          onClick={() => handleRestore(competition.id)}
+                          className="rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors disabled:opacity-40"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          title="Archivieren"
+                          disabled={actionLoading === competition.id}
+                          onClick={() => handleArchive(competition.id)}
+                          className="rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-colors disabled:opacity-40"
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </SectionCard>
+    </>
   );
 }

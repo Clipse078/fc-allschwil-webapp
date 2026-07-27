@@ -103,6 +103,10 @@ export function validateCreateCompetitionInput(input: CreateCompetitionInput): v
  * Throws CompetitionValidationError on the first invalid field.
  */
 export function validateUpdateCompetitionInput(input: UpdateCompetitionInput): void {
+  if (input.officialName !== undefined) {
+    assertNonEmpty(input.officialName, "officialName");
+    assertMaxLength(input.officialName, "officialName", MAX_NAME_LENGTH);
+  }
   assertMaxLength(input.shortName, "shortName", MAX_SHORT_NAME_LENGTH);
   assertMaxLength(input.groupName, "groupName", MAX_GROUP_NAME_LENGTH);
   assertMaxLength(input.ageCategory, "ageCategory", MAX_AGE_CATEGORY_LENGTH);

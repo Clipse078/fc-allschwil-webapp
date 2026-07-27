@@ -86,10 +86,12 @@ export type CreateCompetitionInput = {
 /**
  * Input for updating a Competition.
  * Partial: only supplied fields are updated.
- * Provider-owned fields (officialName, externalIds) may be updated manually
- * when provider is "MANUAL".
+ * officialName is only updatable for provider = "MANUAL" competitions;
+ * for provider-synced competitions it is managed by the sync service.
  */
 export type UpdateCompetitionInput = {
+  /** For MANUAL competitions only: update the display name. */
+  officialName?: string;
   shortName?: string;
   groupName?: string;
   competitionType?: CompetitionType;

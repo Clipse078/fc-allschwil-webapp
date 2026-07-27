@@ -135,20 +135,58 @@ export async function listCompetitions(
 /**
  * Returns competitions eligible for team registration in a given provider season.
  *
- * Returns only non-archived competitions for the specified externalSeasonId.
- * Used by the team registration flow (TEAM-CREATE-02) and season selectors.
+ * When externalSeasonId is provided, returns:
+ *   - All non-archived competitions matching that specific season (provider-synced).
+ *   - All non-archived manual competitions (externalSeasonId = null), which are
+ *     season-agnostic and always eligible.
  *
  * When externalSeasonId is not provided, returns all non-archived competitions
- * for the tenant.
+ * for the tenant (both manual and provider-synced across all seasons).
+ *
+ * This ensures tenants without any provider integration see their manually created
+ * competitions regardless of whether a season filter is applied.
  */
 export async function getEligibleCompetitions(
   tenantId: string,
   externalSeasonId?: number,
 ): Promise<CompetitionListItem[]> {
-  return listCompetitions(tenantId, {
-    externalSeasonId,
-    includeArchived: false,
+  if (externalSeasonId === undefined) {
+    return listCompetitions(tenantId, { includeArchived: false });
+  }
+
+  const rows = await prisma.competition.findMany({
+    where: {
+      tenantId,
+      isArchived: false,
+      OR: [
+        { externalSeasonId },
+        { externalSeasonId: null },
+      ],
+    },
+    orderBy: [{ isArchived: "asc" }, { officialName: "asc" }],
+    include: {
+      _count: {
+        select: { teamSeasonCompetitions: true },
+      },
+    },
   });
+
+  return rows.map((row) => ({
+    id: row.id,
+    tenantId: row.tenantId,
+    provider: row.provider,
+    externalCompetitionId: row.externalCompetitionId,
+    externalSeasonId: row.externalSeasonId,
+    officialName: row.officialName,
+    shortName: row.shortName,
+    groupName: row.groupName,
+    competitionType: row.competitionType as CompetitionListItem["competitionType"],
+    gender: row.gender as CompetitionListItem["gender"],
+    ageCategory: row.ageCategory,
+    isArchived: row.isArchived,
+    lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+    assignedTeamCount: row._count.teamSeasonCompetitions,
+  }));
 }
 
 /**

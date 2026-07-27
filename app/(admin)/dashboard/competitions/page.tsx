@@ -3,9 +3,10 @@
  *
  * Admin overview of canonical Competition records.
  * Shows all competitions for the active tenant, with search, provider filter,
- * and archived toggle. Also provides SFV sync trigger.
+ * and archived toggle. Provides SFV sync trigger and manual creation for all
+ * tenants — no provider required.
  *
- * German UI. Responsive. Server Component with client-side search.
+ * German UI. Responsive. Server Component with client-side interactions.
  */
 
 import { Trophy } from "lucide-react";
@@ -18,6 +19,7 @@ import { ListPagePattern } from "@/components/ui/patterns";
 import CompetitionsTable from "@/components/admin/competitions/CompetitionsTable";
 import CompetitionsSyncButton from "@/components/admin/competitions/CompetitionsSyncButton";
 import CompetitionsSearchBar from "@/components/admin/competitions/CompetitionsSearchBar";
+import CompetitionsCreateButton from "@/components/admin/competitions/CompetitionsCreateButton";
 import type { CompetitionFilterParams } from "@/lib/competitions/dto";
 
 type CompetitionsPageProps = {
@@ -101,11 +103,14 @@ export default async function CompetitionsPage({ searchParams }: CompetitionsPag
           </div>
         }
         toolbar={
-          <CompetitionsSearchBar
-            initialSearch={params.search ?? ""}
-            initialProvider={params.provider ?? ""}
-            initialIncludeArchived={params.includeArchived === "true"}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <CompetitionsSearchBar
+              initialSearch={params.search ?? ""}
+              initialProvider={params.provider ?? ""}
+              initialIncludeArchived={params.includeArchived === "true"}
+            />
+            {canManage && <CompetitionsCreateButton />}
+          </div>
         }
         isEmpty={competitions.length === 0}
         emptyIcon={<Trophy className="h-10 w-10" />}
@@ -113,10 +118,10 @@ export default async function CompetitionsPage({ searchParams }: CompetitionsPag
         emptyDescription={
           filters.search
             ? `Keine Wettkämpfe für „${filters.search}" gefunden.`
-            : "Noch keine Wettkämpfe importiert oder erfasst. Starten Sie eine SFV-Synchronisation."
+            : "Noch keine Wettkämpfe vorhanden. Erstellen Sie manuell einen Wettkampf oder starten Sie eine SFV-Synchronisation."
         }
       >
-        <CompetitionsTable competitions={competitions} />
+        <CompetitionsTable competitions={competitions} canManage={canManage} />
       </ListPagePattern>
     </PageShell>
   );

@@ -190,14 +190,27 @@ describe("C. getEligibleCompetitions", () => {
     expect(call.where.isArchived).toBe(false);
   });
 
-  it("filters by externalSeasonId when provided", async () => {
+  it("includes both season-specific and manual (null-season) competitions when seasonId provided", async () => {
     vi.mocked(prisma.competition.findMany).mockResolvedValue([] as never);
 
     await getEligibleCompetitions(TENANT_A, 2027);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const call = (vi.mocked(prisma.competition.findMany).mock.calls[0] as any)[0];
-    expect(call.where.externalSeasonId).toBe(2027);
+    expect(call.where.OR).toBeDefined();
+    expect(call.where.OR).toContainEqual({ externalSeasonId: 2027 });
+    expect(call.where.OR).toContainEqual({ externalSeasonId: null });
+  });
+
+  it("does not filter by externalSeasonId when seasonId is undefined", async () => {
+    vi.mocked(prisma.competition.findMany).mockResolvedValue([baseRow] as never);
+
+    await getEligibleCompetitions(TENANT_A, undefined);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const call = (vi.mocked(prisma.competition.findMany).mock.calls[0] as any)[0];
+    expect(call.where.OR).toBeUndefined();
+    expect(call.where.externalSeasonId).toBeUndefined();
   });
 
   it("returns all non-archived when no seasonId provided", async () => {

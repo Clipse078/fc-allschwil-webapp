@@ -179,6 +179,28 @@ describe("B. updateCompetition", () => {
       }),
     ).rejects.toThrow(CompetitionValidationError);
   });
+
+  it("allows updating officialName for MANUAL competitions", async () => {
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue({ id: COMPETITION_ID } as never);
+    vi.mocked(prisma.competition.update).mockResolvedValue({
+      ...baseRow,
+      officialName: "Regionalcup 2027",
+    } as never);
+
+    const result = await updateCompetition(TENANT_ID, COMPETITION_ID, {
+      officialName: "Regionalcup 2027",
+    });
+
+    expect(result.officialName).toBe("Regionalcup 2027");
+    const updateCall = vi.mocked(prisma.competition.update).mock.calls[0][0];
+    expect(updateCall.data.officialName).toBe("Regionalcup 2027");
+  });
+
+  it("throws CompetitionValidationError when officialName is empty string on update", async () => {
+    await expect(
+      updateCompetition(TENANT_ID, COMPETITION_ID, { officialName: "   " }),
+    ).rejects.toThrow(CompetitionValidationError);
+  });
 });
 
 // ── C. archiveCompetition / unarchiveCompetition ─────────────────────────────
