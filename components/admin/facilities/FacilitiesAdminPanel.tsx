@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Pencil,
@@ -117,9 +118,11 @@ function InlineEditForm({
 function CreateFacilityForm({
   onCreated,
   onCancel,
+  onRefresh,
 }: {
   onCreated: (facility: FacilityRow) => void;
   onCancel: () => void;
+  onRefresh: () => void;
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<FacilityType>("PITCH");
@@ -143,6 +146,7 @@ function CreateFacilityForm({
       }
       const data = await res.json();
       onCreated({ ...data.facility, resources: [] });
+      onRefresh();
     });
   }
 
@@ -189,8 +193,9 @@ function CreateFacilityForm({
         </button>
         <button
           type="button"
+          disabled={pending}
           onClick={onCancel}
-          className="fca-button-secondary"
+          className="fca-button-secondary disabled:opacity-50"
         >
           Abbrechen
         </button>
@@ -205,10 +210,12 @@ function CreateResourceForm({
   facilityId,
   onCreated,
   onCancel,
+  onRefresh,
 }: {
   facilityId: string;
   onCreated: (resource: ResourceRow) => void;
   onCancel: () => void;
+  onRefresh: () => void;
 }) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -233,6 +240,7 @@ function CreateResourceForm({
       }
       const data = await res.json();
       onCreated(data.resource);
+      onRefresh();
     });
   }
 
@@ -288,8 +296,9 @@ function CreateResourceForm({
         </button>
         <button
           type="button"
+          disabled={pending}
           onClick={onCancel}
-          className="fca-button-secondary"
+          className="fca-button-secondary disabled:opacity-50"
         >
           Abbrechen
         </button>
@@ -305,11 +314,13 @@ function ResourceItem({
   resource,
   canManage,
   onUpdate,
+  onRefresh,
 }: {
   facilityId: string;
   resource: ResourceRow;
   canManage: boolean;
   onUpdate: (updated: ResourceRow) => void;
+  onRefresh: () => void;
 }) {
   const [editingName, setEditingName] = useState(false);
   const [, startTransition] = useTransition();
@@ -324,6 +335,7 @@ function ResourceItem({
     });
     if (res.ok) {
       onUpdate({ ...resource, ...data } as ResourceRow);
+      onRefresh();
     }
   }
 
@@ -399,10 +411,12 @@ function FacilityCard({
   facility,
   canManage,
   onUpdate,
+  onRefresh,
 }: {
   facility: FacilityRow;
   canManage: boolean;
   onUpdate: (updated: FacilityRow) => void;
+  onRefresh: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [editingName, setEditingName] = useState(false);
@@ -419,6 +433,7 @@ function FacilityCard({
     });
     if (res.ok) {
       onUpdate({ ...facility, ...data } as FacilityRow);
+      onRefresh();
     }
   }
 
@@ -524,6 +539,7 @@ function FacilityCard({
                   resource={resource}
                   canManage={canManage}
                   onUpdate={updateResource}
+                  onRefresh={onRefresh}
                 />
               ))
             )}
@@ -538,6 +554,7 @@ function FacilityCard({
                   setAddingResource(false);
                 }}
                 onCancel={() => setAddingResource(false)}
+                onRefresh={onRefresh}
               />
             ) : (
               <button
@@ -561,11 +578,22 @@ export default function FacilitiesAdminPanel({
   initialFacilities,
   canManage,
 }: Props) {
+  const router = useRouter();
   const [facilities, setFacilities] = useState<FacilityRow[]>(initialFacilities);
   const [showCreate, setShowCreate] = useState(false);
 
+  // Sync local state when the server re-renders with fresh data (after router.refresh()).
+  // This ensures the list reflects the latest server state after any mutation.
+  useEffect(() => {
+    setFacilities(initialFacilities);
+  }, [initialFacilities]);
+
   function updateFacility(updated: FacilityRow) {
     setFacilities((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+  }
+
+  function handleRefresh() {
+    router.refresh();
   }
 
   return (
@@ -579,6 +607,7 @@ export default function FacilitiesAdminPanel({
               setShowCreate(false);
             }}
             onCancel={() => setShowCreate(false)}
+            onRefresh={handleRefresh}
           />
         ) : (
           <button
@@ -610,6 +639,7 @@ export default function FacilitiesAdminPanel({
               facility={facility}
               canManage={canManage}
               onUpdate={updateFacility}
+              onRefresh={handleRefresh}
             />
           ))}
         </div>

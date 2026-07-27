@@ -37,6 +37,30 @@ export async function getFacilityById(id: string, tenantId: string) {
 }
 
 /**
+ * List active (non-archived) resources for a specific facility.
+ *
+ * Requires both facilityId AND tenantId so the query is always tenant-scoped.
+ * Returns null when the facility itself does not exist or belongs to a different tenant.
+ */
+export async function getFacilityResourcesForFacility(
+  facilityId: string,
+  tenantId: string,
+): Promise<FacilityResourceRow[] | null> {
+  const facility = await prisma.facility.findFirst({
+    where: { id: facilityId, tenantId },
+    include: {
+      resources: {
+        where: { status: { not: "ARCHIVED" } },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      },
+    },
+  });
+
+  if (!facility) return null;
+  return facility.resources;
+}
+
+/**
  * Look up a FacilityResource by allocation code for the given tenant.
  * Used by the canonical display helper to resolve tenant-configured labels.
  */
