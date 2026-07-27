@@ -56,7 +56,41 @@ export default async function ProviderMappingPage({ searchParams }: PageProps) {
     seasonId: params.seasonId ?? undefined,
   };
 
-  const mappings = await listProviderMappings(tenantId, filters);
+  let mappings;
+  try {
+    mappings = await listProviderMappings(tenantId, filters);
+  } catch (err) {
+    // Log to server for diagnostics; show graceful setup-required state in UI.
+    console.error("[provider-mapping] listProviderMappings failed:", err instanceof Error ? err.message : String(err));
+    return (
+      <PageShell fullWidth>
+        <ListPagePattern
+          eyebrow="Teams · Anbieter-Mapping"
+          title="Anbieter-Zuordnungen"
+          description="Anbieter-Mapping ist noch nicht bereit."
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Teams", href: "/dashboard/teams" },
+            { label: "Anbieter-Zuordnungen", href: "/dashboard/teams/provider-mapping" },
+          ]}
+          isEmpty
+          emptyState={
+            <div className="text-center py-16 text-gray-500">
+              <Link2 className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium text-gray-600">Anbieter-Integration noch nicht konfiguriert</p>
+              <p className="text-sm mt-1">
+                Stellen Sie sicher, dass alle Datenbankmigrationen angewendet wurden und
+                ein Anbieter (z. B. SFV) konfiguriert ist.
+              </p>
+            </div>
+          }
+        >
+          {null}
+        </ListPagePattern>
+      </PageShell>
+    );
+  }
+
   const canManage = session.user.permissionKeys?.includes(PERMISSIONS.TEAMS_MANAGE);
 
   const mappedCount = mappings.filter((m) => m.teamSeasonId !== null).length;
