@@ -77,6 +77,8 @@ export const NAV_SECTIONS: NavSection[] = [
           PERMISSIONS.ORG_MANAGE,
           PERMISSIONS.TEAMS_VIEW,
           PERMISSIONS.TEAMS_MANAGE,
+          PERMISSIONS.COMPETITIONS_VIEW,
+          PERMISSIONS.COMPETITIONS_MANAGE,
           PERMISSIONS.PEOPLE_VIEW,
           PERMISSIONS.PEOPLE_MANAGE,
         ],
@@ -98,6 +100,12 @@ export const NAV_SECTIONS: NavSection[] = [
             label: "Teams",
             href: "/dashboard/teams",
             permissionKeys: [PERMISSIONS.TEAMS_VIEW, PERMISSIONS.TEAMS_MANAGE],
+          },
+          {
+            key: "competitions",
+            label: "Wettkämpfe",
+            href: "/dashboard/competitions",
+            permissionKeys: [PERMISSIONS.COMPETITIONS_VIEW, PERMISSIONS.COMPETITIONS_MANAGE],
           },
           {
             key: "personen",
@@ -376,6 +384,14 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     href: "/dashboard/teams",
     permissionKeys: [PERMISSIONS.TEAMS_VIEW, PERMISSIONS.TEAMS_MANAGE],
     carrySeason: true,
+  },
+  {
+    key: "competitions",
+    label: "Wettkämpfe",
+    description: "Ligen, Cups und Turnierserie — Wettkampfmetadaten verwalten und synchronisieren.",
+    href: "/dashboard/competitions",
+    permissionKeys: [PERMISSIONS.COMPETITIONS_VIEW, PERMISSIONS.COMPETITIONS_MANAGE],
+    carrySeason: false,
   },
   {
     key: "events",

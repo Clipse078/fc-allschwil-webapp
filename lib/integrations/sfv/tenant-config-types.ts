@@ -60,6 +60,8 @@ export type TenantSfvConfig = {
   lastScheduleSyncAt: Date | null;
   /** Most recent fully successful match-detail sync completion time. */
   lastMatchDetailSyncAt: Date | null;
+  /** Most recent fully successful competition sync completion time. */
+  lastCompetitionSyncAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

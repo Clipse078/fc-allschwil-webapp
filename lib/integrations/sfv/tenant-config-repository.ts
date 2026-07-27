@@ -31,6 +31,7 @@ const sfvConfigSelect = {
   lastTeamSyncAt: true,
   lastScheduleSyncAt: true,
   lastMatchDetailSyncAt: true,
+  lastCompetitionSyncAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -133,5 +134,18 @@ export async function markMatchDetailSyncSuccessful(
   await prisma.tenantSfvConfig.update({
     where: { tenantId },
     data: { lastMatchDetailSyncAt: finishedAt },
+  });
+}
+
+/**
+ * Records completion of the most recent fully successful competition synchronization.
+ */
+export async function markCompetitionSyncSuccessful(
+  tenantId: string,
+  finishedAt: Date,
+): Promise<void> {
+  await prisma.tenantSfvConfig.update({
+    where: { tenantId },
+    data: { lastCompetitionSyncAt: finishedAt },
   });
 }
