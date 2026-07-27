@@ -341,6 +341,10 @@ enum EventStatus {
   CANCELLED
   POSTPONED
   ARCHIVED
+  /// Match was abandoned mid-game (e.g. crowd trouble, weather). Result stands at abandonment point or is voided.
+  ABANDONED
+  /// Match result decided by administrative forfeiture (e.g. ineligible player, no-show). Canonical score applies.
+  FORFEITED
 }
 
 enum EventImportRunStatus {
