@@ -61,6 +61,19 @@ enum PermissionModule {
   ORG
   FACILITIES
   WORKSPACE
+  ROLES
+}
+
+// RPERM-02: Distinguishes platform-wide roles/permissions from tenant-scoped ones.
+enum RoleScope {
+  PLATFORM
+  TENANT
+}
+
+// RPERM-02: Distinguishes platform-wide permissions from tenant-scoped ones.
+enum PermissionScope {
+  PLATFORM
+  TENANT
 }
 
 // ---------------------------------------------------------------------------
@@ -511,6 +524,12 @@ model Tenant {
   // TRAINING-ALLOCATIONS-01: canonical facility resource allocations
   trainingAllocations      TrainingAllocation[]
 
+  // RPERM-02
+  tenantMemberships TenantMembership[]
+  roles             Role[]
+  userRoles         UserRole[]
+  auditLogs         AuditLog[]
+
   @@index([status])
   @@index([name])
 }
@@ -533,6 +552,7 @@ model User {
   tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   userRoles                  UserRole[]
+  tenantMemberships          TenantMembership[]
   auditLogs                  AuditLog[]           @relation("AuditActor")
   assignedRegistrations      Registration[]       @relation("RegistrationAssignedUser")
   orgUnitMemberships         OrgUnitMembership[]
@@ -599,14 +619,25 @@ model Registration {
 }
 
 model Role {
-  id                              String   @id @default(cuid())
-  key                             String   @unique
+  id                              String    @id @default(cuid())
+  key                             String    @unique
   name                            String
   description                     String?
-  canAccessVereinsleitung         Boolean  @default(false)
-  canAttendVereinsleitungMeetings Boolean  @default(false)
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  canAccessVereinsleitung         Boolean   @default(false)
+  canAttendVereinsleitungMeetings Boolean   @default(false)
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+
+  // RPERM-02: tenant-aware role foundation
+  scope      RoleScope @default(PLATFORM)
+  tenantId   String?
+  isSystem   Boolean   @default(false)
+  isArchived Boolean   @default(false)
+  // isTemplate: marks canonical template roles that are never directly assignable.
+  // Used by club_admin seed record which serves as template only until RPERM-04.
+  isTemplate Boolean   @default(false)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   userRoles                 UserRole[]
   rolePermissions           RolePermission[]
@@ -616,6 +647,9 @@ model Role {
   @@index([name])
   @@index([canAccessVereinsleitung])
   @@index([canAttendVereinsleitungMeetings])
+  @@index([scope])
+  @@index([tenantId])
+  @@index([isSystem])
 }
 
 model Permission {
@@ -626,6 +660,10 @@ model Permission {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
+  // RPERM-02: permission scope metadata
+  scope            PermissionScope @default(TENANT)
+  grantableByAdmin Boolean         @default(true)
+
   rolePermissions RolePermission[]
 }
 
@@ -635,11 +673,16 @@ model UserRole {
   roleId    String
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  // RPERM-02: optional tenant scope for future tenant-aware role assignments
+  tenantId String?
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  role   Role    @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([userId, roleId])
   @@index([roleId])
+  @@index([tenantId])
 }
 
 model RolePermission {
@@ -653,6 +696,28 @@ model RolePermission {
 
   @@unique([roleId, permissionId])
   @@index([permissionId])
+}
+
+// RPERM-02: Canonical tenant membership record.
+// One row per (tenantId, userId) pair — the authoritative source of
+// whether a user belongs to a tenant.
+// User.tenantId is intentionally preserved until the RPERM-04 migration.
+model TenantMembership {
+  id       String @id @default(cuid())
+  tenantId String
+  userId   String
+
+  isActive Boolean  @default(true)
+  joinedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, isActive])
 }
 
 model RoleWorkflowRule {
@@ -1248,11 +1313,16 @@ model AuditLog {
   metadataJson Json?
   createdAt    DateTime @default(now())
 
-  actorUser User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  // RPERM-02: tenant scope for audit log filtering
+  tenantId String?
+
+  actorUser User?   @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   @@index([moduleKey])
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([tenantId, createdAt])
 }
 
 // ---------------------------------------------------------------------------
