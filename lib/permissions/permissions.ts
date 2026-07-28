@@ -1,6 +1,9 @@
 export const PERMISSIONS = {
+  USERS_VIEW: "users.view",
   USERS_MANAGE: "users.manage",
   USERS_IMPERSONATE: "users.impersonate",
+  USERS_INVITE: "users.invite",
+  USERS_MANAGE_MEMBERSHIPS: "users.manage_memberships",
 
   SEASONS_VIEW: "seasons.view",
   SEASONS_MANAGE: "seasons.manage",
@@ -63,6 +66,11 @@ export const PERMISSIONS = {
 
   TRAININGS_VIEW: "trainings.view",
   TRAININGS_MANAGE: "trainings.manage",
+
+  // RPERM-02: role management permissions — defined here, not yet used in guards
+  ROLES_VIEW: "roles.view",
+  ROLES_MANAGE: "roles.manage",
+  ROLES_ASSIGN: "roles.assign",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

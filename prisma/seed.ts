@@ -5,7 +5,9 @@ import {
   FacilityResourceType,
   FacilityType,
   PermissionModule,
+  PermissionScope,
   PrismaClient,
+  RoleScope,
   TenantStatus,
 } from "@prisma/client";
 import { Pool } from "pg";
@@ -61,76 +63,79 @@ async function main() {
     },
   });
 
+  // RPERM-02: permissions now carry scope and grantableByAdmin metadata.
+  // Platform-only permissions (users.manage, users.impersonate, tenants.view,
+  // tenants.manage) are scope=PLATFORM, grantableByAdmin=false.
+  // All other permissions are scope=TENANT, grantableByAdmin=true.
   const permissions = [
-    { key: "users.manage", name: "Manage users", module: PermissionModule.USERS },
-    { key: "users.impersonate", name: "Impersonate users", module: PermissionModule.USERS },
+    // ── PLATFORM-scoped permissions (not grantable by club admins) ─────────
+    { key: "users.manage", name: "Manage users", module: PermissionModule.USERS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
+    { key: "users.impersonate", name: "Impersonate users", module: PermissionModule.USERS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
+    { key: "tenants.view", name: "View tenants", module: PermissionModule.TENANTS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
+    { key: "tenants.manage", name: "Manage tenants", module: PermissionModule.TENANTS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
 
-    { key: "seasons.view", name: "View seasons", module: PermissionModule.SEASONS },
-    { key: "seasons.manage", name: "Manage seasons", module: PermissionModule.SEASONS },
+    // ── RPERM-02: new user-management keys ────────────────────────────────
+    { key: "users.view", name: "View users", module: PermissionModule.USERS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "users.invite", name: "Invite users", module: PermissionModule.USERS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "users.manage_memberships", name: "Manage user memberships", module: PermissionModule.USERS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "teams.view", name: "View teams", module: PermissionModule.TEAMS },
-    { key: "teams.manage", name: "Manage teams", module: PermissionModule.TEAMS },
+    // ── RPERM-02: new role management keys ───────────────────────────────
+    { key: "roles.view", name: "View roles", module: PermissionModule.ROLES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "roles.manage", name: "Manage roles", module: PermissionModule.ROLES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "roles.assign", name: "Assign roles", module: PermissionModule.ROLES, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "people.view", name: "View people", module: PermissionModule.PEOPLE },
-    { key: "people.manage", name: "Manage people", module: PermissionModule.PEOPLE },
+    // ── TENANT-scoped permissions ─────────────────────────────────────────
+    { key: "seasons.view", name: "View seasons", module: PermissionModule.SEASONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "seasons.manage", name: "Manage seasons", module: PermissionModule.SEASONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "events.view", name: "View events", module: PermissionModule.EVENTS },
-    { key: "events.manage", name: "Manage events", module: PermissionModule.EVENTS },
-    { key: "events.import", name: "Import events", module: PermissionModule.EVENTS },
-    { key: "events.publish_website", name: "Publish events to website", module: PermissionModule.EVENTS },
-    { key: "events.publish_infoboard", name: "Publish events to infoboard", module: PermissionModule.EVENTS },
+    { key: "teams.view", name: "View teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "teams.manage", name: "Manage teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "fixtures.view", name: "View fixtures", module: PermissionModule.FIXTURES },
-    { key: "fixtures.create", name: "Create fixtures", module: PermissionModule.FIXTURES },
-    { key: "fixtures.edit_all", name: "Edit all fixtures", module: PermissionModule.FIXTURES },
-    {
-      key: "fixtures.submit_for_publication",
-      name: "Submit fixtures for publication",
-      module: PermissionModule.FIXTURES,
-    },
-    {
-      key: "fixtures.publish_website",
-      name: "Publish fixtures to website",
-      module: PermissionModule.FIXTURES,
-    },
-    {
-      key: "fixtures.publish_infoboard",
-      name: "Publish fixtures to infoboard",
-      module: PermissionModule.FIXTURES,
-    },
+    { key: "people.view", name: "View people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.manage", name: "Manage people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "wochenplan.manage", name: "Manage Wochenplan", module: PermissionModule.WOCHENPLAN },
-    { key: "news.manage", name: "Manage news", module: PermissionModule.NEWS },
-    { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE },
-    { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD },
-    { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS },
+    { key: "events.view", name: "View events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "events.manage", name: "Manage events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "events.import", name: "Import events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "events.publish_website", name: "Publish events to website", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "events.publish_infoboard", name: "Publish events to infoboard", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "targets.view", name: "View targets", module: PermissionModule.TARGETS },
-    { key: "targets.manage", name: "Manage targets", module: PermissionModule.TARGETS },
+    { key: "fixtures.view", name: "View fixtures", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "fixtures.create", name: "Create fixtures", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "fixtures.edit_all", name: "Edit all fixtures", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "fixtures.submit_for_publication", name: "Submit fixtures for publication", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "fixtures.publish_website", name: "Publish fixtures to website", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "fixtures.publish_infoboard", name: "Publish fixtures to infoboard", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "meetings.view", name: "View meetings", module: PermissionModule.MEETINGS },
-    { key: "meetings.manage", name: "Manage meetings", module: PermissionModule.MEETINGS },
+    { key: "wochenplan.manage", name: "Manage Wochenplan", module: PermissionModule.WOCHENPLAN, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "news.manage", name: "Manage news", module: PermissionModule.NEWS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "initiatives.view", name: "View initiatives", module: PermissionModule.INITIATIVES },
-    { key: "initiatives.manage", name: "Manage initiatives", module: PermissionModule.INITIATIVES },
+    { key: "targets.view", name: "View targets", module: PermissionModule.TARGETS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "targets.manage", name: "Manage targets", module: PermissionModule.TARGETS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "templates.view", name: "View templates", module: PermissionModule.TEMPLATES },
-    { key: "templates.manage", name: "Manage templates", module: PermissionModule.TEMPLATES },
+    { key: "meetings.view", name: "View meetings", module: PermissionModule.MEETINGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "meetings.manage", name: "Manage meetings", module: PermissionModule.MEETINGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "registrations.view", name: "View registrations", module: PermissionModule.REGISTRATIONS },
-    { key: "registrations.edit", name: "Edit registrations", module: PermissionModule.REGISTRATIONS },
+    { key: "initiatives.view", name: "View initiatives", module: PermissionModule.INITIATIVES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "initiatives.manage", name: "Manage initiatives", module: PermissionModule.INITIATIVES, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "tenants.view", name: "View tenants", module: PermissionModule.TENANTS },
-    { key: "tenants.manage", name: "Manage tenants", module: PermissionModule.TENANTS },
+    { key: "templates.view", name: "View templates", module: PermissionModule.TEMPLATES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "templates.manage", name: "Manage templates", module: PermissionModule.TEMPLATES, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "org.view", name: "View organisations", module: PermissionModule.ORG },
-    { key: "org.manage", name: "Manage organisations", module: PermissionModule.ORG },
+    { key: "registrations.view", name: "View registrations", module: PermissionModule.REGISTRATIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "registrations.edit", name: "Edit registrations", module: PermissionModule.REGISTRATIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "facilities.view", name: "View facilities & resources", module: PermissionModule.FACILITIES },
-    { key: "facilities.manage", name: "Manage facilities & resources", module: PermissionModule.FACILITIES },
+    { key: "org.view", name: "View organisations", module: PermissionModule.ORG, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "org.manage", name: "Manage organisations", module: PermissionModule.ORG, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
-    { key: "trainings.view", name: "View training allocations", module: PermissionModule.TRAININGS },
-    { key: "trainings.manage", name: "Manage training allocations", module: PermissionModule.TRAININGS },
+    { key: "facilities.view", name: "View facilities & resources", module: PermissionModule.FACILITIES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "facilities.manage", name: "Manage facilities & resources", module: PermissionModule.FACILITIES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+
+    { key: "trainings.view", name: "View training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "trainings.manage", name: "Manage training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
   ] as const;
 
   for (const permission of permissions) {
@@ -139,26 +144,49 @@ async function main() {
       update: {
         name: permission.name,
         module: permission.module,
+        scope: permission.scope,
+        grantableByAdmin: permission.grantableByAdmin,
       },
       create: {
         key: permission.key,
         name: permission.name,
         module: permission.module,
+        scope: permission.scope,
+        grantableByAdmin: permission.grantableByAdmin,
       },
     });
   }
 
+  // RPERM-02: role definitions now carry scope/isSystem/isTemplate metadata.
+  // super_admin: platform-scoped system role — never reassigned or deleted.
+  // club_admin: platform-scoped template-only role — never directly assignable.
+  //   Actual per-tenant club_admin roles are created in RPERM-04.
   const roleDefinitions = [
     {
       key: "super_admin",
       name: "Super Admin",
       description: "Full platform access",
+      scope: RoleScope.PLATFORM,
+      isSystem: true,
+      isTemplate: false,
       permissionKeys: permissions.map((permission) => permission.key),
+    },
+    {
+      key: "club_admin",
+      name: "Club Admin",
+      description: "Template for tenant club administrator role — not directly assignable",
+      scope: RoleScope.PLATFORM,
+      isSystem: true,
+      isTemplate: true,
+      permissionKeys: [] as string[],
     },
     {
       key: "match_coordinator",
       name: "Match Coordinator",
       description: "Operational fixture owner",
+      scope: RoleScope.PLATFORM,
+      isSystem: false,
+      isTemplate: false,
       permissionKeys: [
         "seasons.view",
         "teams.view",
@@ -184,6 +212,9 @@ async function main() {
       key: "website_publisher",
       name: "Website Publisher",
       description: "Publishes public-facing content",
+      scope: RoleScope.PLATFORM,
+      isSystem: false,
+      isTemplate: false,
       permissionKeys: [
         "seasons.view",
         "events.view",
@@ -199,6 +230,9 @@ async function main() {
       key: "trainer",
       name: "Trainer",
       description: "Basic operational access",
+      scope: RoleScope.PLATFORM,
+      isSystem: false,
+      isTemplate: false,
       permissionKeys: [
         "seasons.view",
         "teams.view",
@@ -221,6 +255,9 @@ async function main() {
       key: "viewer",
       name: "Viewer",
       description: "Read-only access",
+      scope: RoleScope.PLATFORM,
+      isSystem: false,
+      isTemplate: false,
       permissionKeys: [
         "seasons.view",
         "teams.view",
@@ -238,11 +275,17 @@ async function main() {
       update: {
         name: roleDefinition.name,
         description: roleDefinition.description,
+        scope: roleDefinition.scope,
+        isSystem: roleDefinition.isSystem,
+        isTemplate: roleDefinition.isTemplate,
       },
       create: {
         key: roleDefinition.key,
         name: roleDefinition.name,
         description: roleDefinition.description,
+        scope: roleDefinition.scope,
+        isSystem: roleDefinition.isSystem,
+        isTemplate: roleDefinition.isTemplate,
       },
     });
 
