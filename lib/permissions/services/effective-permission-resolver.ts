@@ -22,6 +22,8 @@
  *   4. The role includes the requested permission.
  *
  * Tenant roles NEVER satisfy a platform permission check.
+ * A role with scope = PLATFORM but tenantId ≠ null is inconsistent data
+ * and must not act as a platform role.
  *
  * ── Tenant Permissions ───────────────────────────────────────────────────────
  * Granted only when ALL of the following hold:
@@ -29,8 +31,12 @@
  *   2. The permission has scope = TENANT in the database.
  *   3. The user has an active TenantMembership for that exact tenant.
  *   4. The user has a UserRole scoped to that exact tenant (UserRole.tenantId = tenantId).
- *   5. The assigned role has scope = TENANT and isArchived = false.
+ *   5. The assigned role has scope = TENANT, tenantId = requested tenantId, and isArchived = false.
  *   6. The role includes the requested permission.
+ *
+ * Role ownership is enforced: a TENANT role whose tenantId does not match
+ * the requested tenant must not grant permissions in that tenant, even when
+ * UserRole.tenantId matches. This guards against inconsistent data.
  *
  * Platform roles do NOT implicitly satisfy tenant operational permission checks.
  * A role membership from Tenant A does NOT authorize access in Tenant B.
@@ -135,6 +141,7 @@ export interface EffectivePermissionsResult {
  *   • userId = <userId>
  *   • UserRole.tenantId IS NULL   (platform assignment, not tenant-specific)
  *   • role.scope = PLATFORM
+ *   • role.tenantId IS NULL       (platform roles must not be tenant-owned)
  *   • role.isArchived = false
  *   • permission.scope = PLATFORM
  */
@@ -148,6 +155,7 @@ async function resolvePlatformPermissions(
       tenantId: null,
       role: {
         scope: "PLATFORM",
+        tenantId: null,
         isArchived: false,
       },
     },
@@ -194,8 +202,13 @@ async function resolvePlatformPermissions(
  * Filters applied at database level:
  *   • TenantMembership.tenantId = tenantId AND userId = userId AND isActive = true
  *   • UserRole.userId = userId AND UserRole.tenantId = tenantId
- *   • role.scope = TENANT AND role.isArchived = false
+ *   • role.scope = TENANT AND role.tenantId = tenantId AND role.isArchived = false
  *   • permission.scope = TENANT
+ *
+ * Role ownership enforcement: role.tenantId = tenantId ensures a role that
+ * belongs to Tenant B cannot be used to authorize access in Tenant A, even
+ * when UserRole.tenantId is set correctly. This closes the inconsistent-data
+ * attack vector without requiring schema-level constraints.
  */
 async function resolveTenantPermissions(
   prisma: PrismaClient,
@@ -213,12 +226,15 @@ async function resolveTenantPermissions(
   }
 
   // Step 2: resolve role permissions for this tenant.
+  // role.tenantId = tenantId ensures the role is actually owned by this tenant,
+  // not just referenced via a cross-tenant UserRole assignment.
   const userRoles = await prisma.userRole.findMany({
     where: {
       userId,
       tenantId,
       role: {
         scope: "TENANT",
+        tenantId,
         isArchived: false,
       },
     },
