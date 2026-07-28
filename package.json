@@ -23,6 +23,8 @@
     "sync-workspace-permissions": "tsx scripts/sync-workspace-permissions.ts",
     "sync-training-permissions": "tsx scripts/sync-training-permissions.ts",
     "check-user-permissions": "tsx scripts/check-user-permissions.ts",
+    "rperm-03a:inventory": "tsx scripts/rperm-03a-authorization-clean-start.ts --inventory",
+    "rperm-03a:dry-run": "tsx scripts/rperm-03a-authorization-clean-start.ts --dry-run",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {

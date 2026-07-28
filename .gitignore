@@ -60,3 +60,6 @@ next-env.d.ts
 # SQLite dev database (should never be committed)
 prisma/dev.db
 prisma/dev.db-journal
+
+# RPERM-03A: temporary authorization inventory backups — never commit
+.tmp/
