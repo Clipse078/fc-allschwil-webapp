@@ -10,18 +10,24 @@
  *   - trainings.view  (PermissionModule.TRAININGS)
  *   - trainings.manage (PermissionModule.TRAININGS)
  *
- * Role assignment policy (matches canonical seed.ts):
- *   super_admin → trainings.view + trainings.manage   (platform admin: full access)
- *   trainer     → trainings.view only                 (view own schedule; no management)
+ * Automatic bootstrap policy (STAGE-OPS-03B):
+ *   super_admin → trainings.view + trainings.manage   (only automatic recipient)
  *
- * trainings.manage for operational planners (e.g. "Trainingsplanung" role):
- *   Not seeded automatically. A super_admin creates the role in /dashboard/roles and
- *   assigns trainings.view + trainings.manage + any other required permissions, then
- *   assigns the role to the relevant users. Roles are platform-global; all tenants
- *   share the same role system.
+ * No canonical club-admin role currently exists in this repository.
+ * Automatic bootstrap therefore remains limited to super_admin until the
+ * future Roles & Permissions module introduces club-admin support.
+ *
+ * Trainers and all other operational users receive training permissions only
+ * through explicit assignment via a custom role created by a super_admin in
+ * /dashboard/roles. No automatic grants to trainer or any other role.
+ *
+ * Cleanup (STAGE-OPS-03B): this script removes the previously-bootstrapped
+ * trainer → trainings.view and trainer → trainings.manage RolePermission rows
+ * to correct the over-permissive assignments introduced by STAGE-OPS-03 and
+ * STAGE-OPS-03A. Permissions obtained through other custom roles are not touched.
  *
  * All writes use upsert — safe to re-run any number of times.
- * No destructive deletes, no permission downgrades, no broad grants.
+ * No destructive deletes beyond the explicit trainer revocation above.
  * No FC Allschwil tenant ID hardcoded — permissions are global (not tenant-scoped).
  */
 
@@ -52,29 +58,31 @@ export const TRAINING_PERMISSION_DEFS = [
 ] as const;
 
 /**
- * Per-role permission assignment policy.
+ * Per-role automatic bootstrap assignment policy.
  *
- * Each entry defines exactly which training permissions a canonical seeded role
- * receives. Roles not listed here are not touched by the reconciliation.
- *
- * Policy decisions:
- *   super_admin: receives ALL training permissions — platform admin has full access.
- *   trainer:     receives trainings.view ONLY — ordinary trainers may see their
- *                training schedule but must not administer training plans. A
- *                dedicated role (e.g. "Trainingsplanung") created by a super_admin
- *                grants trainings.manage to operational planners without promoting
- *                them to full platform admins.
+ * Only roles listed here receive training permissions during reconciliation.
+ * No canonical club-admin role exists yet; super_admin is the sole automatic
+ * recipient until the Roles & Permissions module adds club-admin support.
  */
 export const TRAINING_ROLE_ASSIGNMENTS = [
   {
     roleKey: "super_admin",
     permissionKeys: ["trainings.view", "trainings.manage"] as const,
   },
-  {
-    roleKey: "trainer",
-    permissionKeys: ["trainings.view"] as const,
-    // trainings.manage deliberately excluded — see policy note above.
-  },
+  // No entry for trainer or any operational role:
+  // trainer receives training permissions only via explicit custom-role assignment.
+] as const;
+
+/**
+ * Role-permission pairs to revoke during reconciliation.
+ *
+ * Removes the over-permissive assignments bootstrapped by STAGE-OPS-03/03A.
+ * Only the exact trainer assignments are targeted; custom-role grants are
+ * untouched (the revocation matches by roleKey + permissionKey, not by role ID).
+ */
+export const TRAINING_PERMISSION_REVOCATIONS = [
+  { roleKey: "trainer", permissionKey: "trainings.view" },
+  { roleKey: "trainer", permissionKey: "trainings.manage" },
 ] as const;
 
 // ── Result types ───────────────────────────────────────────────────────────────
@@ -90,9 +98,16 @@ export type RolePermissionSyncOutcome =
   | { action: "role_not_found"; roleKey: string; permissionKey: string }
   | { action: "permission_not_in_db"; roleKey: string; permissionKey: string };
 
+export type RolePermissionRevocationOutcome =
+  | { action: "revoked"; roleKey: string; permissionKey: string }
+  | { action: "not_present"; roleKey: string; permissionKey: string }
+  | { action: "role_not_found"; roleKey: string; permissionKey: string }
+  | { action: "permission_not_in_db"; roleKey: string; permissionKey: string };
+
 export type ReconciliationResult = {
   permissions: PermissionSyncOutcome[];
   rolePermissions: RolePermissionSyncOutcome[];
+  revocations: RolePermissionRevocationOutcome[];
 };
 
 // ── Reconciliation ─────────────────────────────────────────────────────────────
@@ -103,6 +118,10 @@ export type ReconciliationResult = {
  * Idempotent: safe to call multiple times without side effects.
  * Does NOT commit any changes when dryRun is true.
  *
+ * Step 1: Ensure Permission rows exist (trainings.view, trainings.manage).
+ * Step 2: Grant permissions to roles per TRAINING_ROLE_ASSIGNMENTS.
+ * Step 3: Revoke obsolete trainer bootstrap grants per TRAINING_PERMISSION_REVOCATIONS.
+ *
  * @param prisma - Prisma client to use for all DB operations
  * @param dryRun - When true, checks state but makes no writes
  */
@@ -112,8 +131,9 @@ export async function reconcileTrainingPermissions(
 ): Promise<ReconciliationResult> {
   const permissionOutcomes: PermissionSyncOutcome[] = [];
   const rolePermissionOutcomes: RolePermissionSyncOutcome[] = [];
+  const revocationOutcomes: RolePermissionRevocationOutcome[] = [];
 
-  // 1. Ensure Permission rows exist
+  // ── Step 1: Ensure Permission rows exist ─────────────────────────────────────
   for (const def of TRAINING_PERMISSION_DEFS) {
     const existing = await prisma.permission.findUnique({
       where: { key: def.key },
@@ -136,7 +156,7 @@ export async function reconcileTrainingPermissions(
     }
   }
 
-  // 2. Assign permissions to roles according to TRAINING_ROLE_ASSIGNMENTS policy
+  // ── Step 2: Grant permissions to bootstrap roles ──────────────────────────────
   for (const assignment of TRAINING_ROLE_ASSIGNMENTS) {
     const { roleKey, permissionKeys } = assignment;
 
@@ -167,10 +187,7 @@ export async function reconcileTrainingPermissions(
 
       const existing = await prisma.rolePermission.findUnique({
         where: {
-          roleId_permissionId: {
-            roleId: role.id,
-            permissionId: permission.id,
-          },
+          roleId_permissionId: { roleId: role.id, permissionId: permission.id },
         },
         select: { roleId: true },
       });
@@ -184,20 +201,58 @@ export async function reconcileTrainingPermissions(
       if (!dryRun) {
         await prisma.rolePermission.upsert({
           where: {
-            roleId_permissionId: {
-              roleId: role.id,
-              permissionId: permission.id,
-            },
+            roleId_permissionId: { roleId: role.id, permissionId: permission.id },
           },
           update: {},
-          create: {
-            roleId: role.id,
-            permissionId: permission.id,
-          },
+          create: { roleId: role.id, permissionId: permission.id },
         });
       }
     }
   }
 
-  return { permissions: permissionOutcomes, rolePermissions: rolePermissionOutcomes };
+  // ── Step 3: Revoke obsolete trainer bootstrap grants ─────────────────────────
+  for (const { roleKey, permissionKey } of TRAINING_PERMISSION_REVOCATIONS) {
+    const role = await prisma.role.findUnique({
+      where: { key: roleKey },
+      select: { id: true },
+    });
+
+    if (!role) {
+      revocationOutcomes.push({ action: "role_not_found", roleKey, permissionKey });
+      continue;
+    }
+
+    const permission = await prisma.permission.findUnique({
+      where: { key: permissionKey },
+      select: { id: true },
+    });
+
+    if (!permission) {
+      revocationOutcomes.push({ action: "permission_not_in_db", roleKey, permissionKey });
+      continue;
+    }
+
+    const existing = await prisma.rolePermission.findUnique({
+      where: {
+        roleId_permissionId: { roleId: role.id, permissionId: permission.id },
+      },
+      select: { roleId: true },
+    });
+
+    if (!existing) {
+      revocationOutcomes.push({ action: "not_present", roleKey, permissionKey });
+    } else {
+      revocationOutcomes.push({ action: "revoked", roleKey, permissionKey });
+    }
+
+    if (!dryRun && existing) {
+      await prisma.rolePermission.delete({
+        where: {
+          roleId_permissionId: { roleId: role.id, permissionId: permission.id },
+        },
+      });
+    }
+  }
+
+  return { permissions: permissionOutcomes, rolePermissions: rolePermissionOutcomes, revocations: revocationOutcomes };
 }
