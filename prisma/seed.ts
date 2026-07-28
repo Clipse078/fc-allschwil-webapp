@@ -208,11 +208,13 @@ async function main() {
         "fixtures.view",
         "fixtures.create",
         "fixtures.submit_for_publication",
-        "trainings.view",
-        // trainings.manage deliberately excluded: ordinary trainers view their
-        // training schedule but do not administer training plans. A dedicated
-        // planning role (e.g. "Trainingsplanung") created by a super_admin in
-        // /dashboard/roles grants trainings.manage to operational planners.
+        // trainings.view and trainings.manage deliberately excluded.
+        // STAGE-OPS-03B policy: automatic training-permission bootstrap is
+        // limited to super_admin only. No canonical club-admin role exists yet.
+        // Trainers and all other operational users receive training permissions
+        // only through explicit assignment via a custom role created in
+        // /dashboard/roles by a super_admin. The future Roles & Permissions
+        // module is the canonical place for club admins to manage this.
       ],
     },
     {
