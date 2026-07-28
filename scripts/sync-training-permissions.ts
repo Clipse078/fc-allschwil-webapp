@@ -11,9 +11,15 @@
  *   - trainings.view   (TRAININGS — View training allocations)
  *   - trainings.manage (TRAININGS — Manage training allocations)
  *
- * Role assignments (matches canonical seed.ts):
- *   - super_admin → both
- *   - trainer     → both
+ * Automatic bootstrap (STAGE-OPS-03B policy):
+ *   - super_admin → trainings.view + trainings.manage   (only automatic recipient)
+ *
+ * No canonical club-admin role exists; super_admin is the sole automatic bootstrap
+ * recipient. Trainers and other operational users receive training permissions only
+ * through explicit custom-role assignment via /dashboard/roles.
+ *
+ * Cleanup: removes previously-bootstrapped trainer → trainings.view and
+ * trainer → trainings.manage assignments (STAGE-OPS-03 / STAGE-OPS-03A regression).
  *
  * Root cause this script fixes (STAGE-OPS-01, Issue 1):
  *   Migration 20260727400000_training_core_01_canonical_foundation adds the
@@ -98,14 +104,30 @@ async function main() {
   }
 
   // ── Report role assignments ─────────────────────────────────────────────────
-  console.log("\n── Role assignments ────────────────────────────────────────────");
+  console.log("\n── Role assignments (bootstrap) ────────────────────────────────");
   for (const outcome of result.rolePermissions) {
     if (outcome.action === "role_not_found") {
       console.log(`  ?  Role not found: ${outcome.roleKey} — skipping (run \`npm run db:seed\` first)`);
+    } else if (outcome.action === "permission_not_in_db") {
+      console.log(`  ?  Permission not in DB yet: ${outcome.permissionKey} for ${outcome.roleKey} — will be assigned in apply mode`);
     } else if (outcome.action === "assigned") {
       console.log(`  +  ${outcome.roleKey} → ${outcome.permissionKey} — would assign`);
     } else {
       console.log(`  ✓  ${outcome.roleKey} → ${outcome.permissionKey} — already assigned`);
+    }
+  }
+
+  // ── Report revocations ──────────────────────────────────────────────────────
+  console.log("\n── Revocations (cleanup obsolete bootstrap grants) ─────────────");
+  for (const outcome of result.revocations) {
+    if (outcome.action === "revoked") {
+      console.log(`  -  ${outcome.roleKey} → ${outcome.permissionKey} — would revoke`);
+    } else if (outcome.action === "not_present") {
+      console.log(`  ✓  ${outcome.roleKey} → ${outcome.permissionKey} — already absent`);
+    } else if (outcome.action === "role_not_found") {
+      console.log(`  ?  Role not found: ${outcome.roleKey} — skipping`);
+    } else {
+      console.log(`  ?  Permission not in DB: ${outcome.permissionKey} — skipping`);
     }
   }
 
