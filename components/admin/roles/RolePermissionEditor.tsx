@@ -11,6 +11,7 @@ const MODULE_LABELS: Record<string, string> = {
   USERS: "Benutzer",
   SEASONS: "Saisons",
   TEAMS: "Teams",
+  COMPETITIONS: "Wettbewerbe",
   PEOPLE: "Personen",
   EVENTS: "Events",
   FIXTURES: "Spiele",
@@ -26,6 +27,9 @@ const MODULE_LABELS: Record<string, string> = {
   REGISTRATIONS: "Registrierungen",
   TENANTS: "Tenants",
   ORG: "Organisation",
+  FACILITIES: "Anlagen",
+  TRAININGS: "Trainingsplanung",
+  WORKSPACE: "Workspace",
 };
 
 type Props = {

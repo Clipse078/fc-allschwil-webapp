@@ -10,9 +10,15 @@
  *   - trainings.view  (PermissionModule.TRAININGS)
  *   - trainings.manage (PermissionModule.TRAININGS)
  *
- * Role assignments (matches canonical seed.ts):
- *   - super_admin → both
- *   - trainer     → both
+ * Role assignment policy (matches canonical seed.ts):
+ *   super_admin → trainings.view + trainings.manage   (platform admin: full access)
+ *   trainer     → trainings.view only                 (view own schedule; no management)
+ *
+ * trainings.manage for operational planners (e.g. "Trainingsplanung" role):
+ *   Not seeded automatically. A super_admin creates the role in /dashboard/roles and
+ *   assigns trainings.view + trainings.manage + any other required permissions, then
+ *   assigns the role to the relevant users. Roles are platform-global; all tenants
+ *   share the same role system.
  *
  * All writes use upsert — safe to re-run any number of times.
  * No destructive deletes, no permission downgrades, no broad grants.
@@ -45,7 +51,31 @@ export const TRAINING_PERMISSION_DEFS = [
   },
 ] as const;
 
-export const TRAINING_PERMISSION_ROLE_KEYS = ["super_admin", "trainer"] as const;
+/**
+ * Per-role permission assignment policy.
+ *
+ * Each entry defines exactly which training permissions a canonical seeded role
+ * receives. Roles not listed here are not touched by the reconciliation.
+ *
+ * Policy decisions:
+ *   super_admin: receives ALL training permissions — platform admin has full access.
+ *   trainer:     receives trainings.view ONLY — ordinary trainers may see their
+ *                training schedule but must not administer training plans. A
+ *                dedicated role (e.g. "Trainingsplanung") created by a super_admin
+ *                grants trainings.manage to operational planners without promoting
+ *                them to full platform admins.
+ */
+export const TRAINING_ROLE_ASSIGNMENTS = [
+  {
+    roleKey: "super_admin",
+    permissionKeys: ["trainings.view", "trainings.manage"] as const,
+  },
+  {
+    roleKey: "trainer",
+    permissionKeys: ["trainings.view"] as const,
+    // trainings.manage deliberately excluded — see policy note above.
+  },
+] as const;
 
 // ── Result types ───────────────────────────────────────────────────────────────
 
@@ -57,7 +87,8 @@ export type PermissionSyncOutcome =
 export type RolePermissionSyncOutcome =
   | { action: "assigned"; roleKey: string; permissionKey: string }
   | { action: "already_assigned"; roleKey: string; permissionKey: string }
-  | { action: "role_not_found"; roleKey: string; permissionKey: string };
+  | { action: "role_not_found"; roleKey: string; permissionKey: string }
+  | { action: "permission_not_in_db"; roleKey: string; permissionKey: string };
 
 export type ReconciliationResult = {
   permissions: PermissionSyncOutcome[];
@@ -105,37 +136,32 @@ export async function reconcileTrainingPermissions(
     }
   }
 
-  // 2. Assign permissions to roles
-  for (const roleKey of TRAINING_PERMISSION_ROLE_KEYS) {
+  // 2. Assign permissions to roles according to TRAINING_ROLE_ASSIGNMENTS policy
+  for (const assignment of TRAINING_ROLE_ASSIGNMENTS) {
+    const { roleKey, permissionKeys } = assignment;
+
     const role = await prisma.role.findUnique({
       where: { key: roleKey },
       select: { id: true },
     });
 
     if (!role) {
-      for (const def of TRAINING_PERMISSION_DEFS) {
-        rolePermissionOutcomes.push({
-          action: "role_not_found",
-          roleKey,
-          permissionKey: def.key,
-        });
+      for (const permissionKey of permissionKeys) {
+        rolePermissionOutcomes.push({ action: "role_not_found", roleKey, permissionKey });
       }
       continue;
     }
 
-    for (const def of TRAINING_PERMISSION_DEFS) {
+    for (const permissionKey of permissionKeys) {
       const permission = await prisma.permission.findUnique({
-        where: { key: def.key },
+        where: { key: permissionKey },
         select: { id: true },
       });
 
       if (!permission) {
-        // Should not happen if the permission upsert above ran without dryRun
-        rolePermissionOutcomes.push({
-          action: "role_not_found",
-          roleKey,
-          permissionKey: def.key,
-        });
+        // Permission row does not exist yet — only possible in dry-run mode
+        // (apply mode upserts all permission rows in step 1 above).
+        rolePermissionOutcomes.push({ action: "permission_not_in_db", roleKey, permissionKey });
         continue;
       }
 
@@ -150,17 +176,9 @@ export async function reconcileTrainingPermissions(
       });
 
       if (existing) {
-        rolePermissionOutcomes.push({
-          action: "already_assigned",
-          roleKey,
-          permissionKey: def.key,
-        });
+        rolePermissionOutcomes.push({ action: "already_assigned", roleKey, permissionKey });
       } else {
-        rolePermissionOutcomes.push({
-          action: "assigned",
-          roleKey,
-          permissionKey: def.key,
-        });
+        rolePermissionOutcomes.push({ action: "assigned", roleKey, permissionKey });
       }
 
       if (!dryRun) {

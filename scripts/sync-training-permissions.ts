@@ -102,6 +102,8 @@ async function main() {
   for (const outcome of result.rolePermissions) {
     if (outcome.action === "role_not_found") {
       console.log(`  ?  Role not found: ${outcome.roleKey} — skipping (run \`npm run db:seed\` first)`);
+    } else if (outcome.action === "permission_not_in_db") {
+      console.log(`  ?  Permission not in DB yet: ${outcome.permissionKey} for ${outcome.roleKey} — will be assigned in apply mode`);
     } else if (outcome.action === "assigned") {
       console.log(`  +  ${outcome.roleKey} → ${outcome.permissionKey} — would assign`);
     } else {

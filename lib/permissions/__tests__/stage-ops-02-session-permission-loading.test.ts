@@ -1,5 +1,6 @@
 /**
- * STAGE-OPS-02 — Tests for session permission loading and training permission chain.
+ * STAGE-OPS-02 / STAGE-OPS-03A — Tests for session permission loading and
+ * training permission chain.
  *
  * Verifies the complete authorization chain:
  *   Permission → RolePermission → Role → UserRole → session.permissionKeys
@@ -7,7 +8,8 @@
  * Covers:
  *   A. super_admin role key is the canonical key used by bootstrap-admin.ts
  *   B. super_admin receives both training permissions via the reconciliation
- *   C. trainer receives both training permissions per seed.ts
+ *   C. trainer receives trainings.view but NOT trainings.manage per policy
+ *      (STAGE-OPS-03A: trainings.manage removed from trainer)
  *   D. Other roles (viewer, website_publisher, match_coordinator) do NOT receive them
  *   E. hasAnyPermission correctly evaluates training permission checks
  *   F. Navigation visibility is consistent with route guard permissions
@@ -17,7 +19,7 @@
 import { describe, it, expect } from "vitest";
 import { PERMISSIONS, type PermissionKey } from "@/lib/permissions/permissions";
 import { getVisibleNavSections } from "@/lib/nav/nav-config";
-import { TRAINING_PERMISSION_DEFS, TRAINING_PERMISSION_ROLE_KEYS } from "@/lib/permissions/training-permission-reconciliation";
+import { TRAINING_PERMISSION_DEFS, TRAINING_ROLE_ASSIGNMENTS } from "@/lib/permissions/training-permission-reconciliation";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -45,7 +47,7 @@ function buildEffectivePermissions(
   ).sort();
 }
 
-// ── Role definitions matching seed.ts ─────────────────────────────────────────
+// ── Role definitions matching seed.ts (STAGE-OPS-03A: trainer no longer has trainings.manage) ──
 
 const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: Object.values(PERMISSIONS), // all permissions
@@ -59,7 +61,7 @@ const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
     "fixtures.create",
     "fixtures.submit_for_publication",
     "trainings.view",
-    "trainings.manage",
+    // trainings.manage deliberately excluded per STAGE-OPS-03A policy
   ],
   viewer: [
     "seasons.view",
@@ -105,23 +107,28 @@ const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
 
 describe("STAGE-OPS-02 — Canonical role keys for training permissions", () => {
   it("reconciliation script targets super_admin role key", () => {
-    expect(TRAINING_PERMISSION_ROLE_KEYS).toContain("super_admin");
+    const roleKeys = TRAINING_ROLE_ASSIGNMENTS.map((a) => a.roleKey);
+    expect(roleKeys).toContain("super_admin");
   });
 
   it("reconciliation script targets trainer role key", () => {
-    expect(TRAINING_PERMISSION_ROLE_KEYS).toContain("trainer");
+    const roleKeys = TRAINING_ROLE_ASSIGNMENTS.map((a) => a.roleKey);
+    expect(roleKeys).toContain("trainer");
   });
 
   it("reconciliation script does NOT target viewer role", () => {
-    expect(TRAINING_PERMISSION_ROLE_KEYS).not.toContain("viewer");
+    const roleKeys = TRAINING_ROLE_ASSIGNMENTS.map((a) => a.roleKey);
+    expect(roleKeys).not.toContain("viewer");
   });
 
   it("reconciliation script does NOT target website_publisher role", () => {
-    expect(TRAINING_PERMISSION_ROLE_KEYS).not.toContain("website_publisher");
+    const roleKeys = TRAINING_ROLE_ASSIGNMENTS.map((a) => a.roleKey);
+    expect(roleKeys).not.toContain("website_publisher");
   });
 
   it("reconciliation script does NOT target match_coordinator role", () => {
-    expect(TRAINING_PERMISSION_ROLE_KEYS).not.toContain("match_coordinator");
+    const roleKeys = TRAINING_ROLE_ASSIGNMENTS.map((a) => a.roleKey);
+    expect(roleKeys).not.toContain("match_coordinator");
   });
 
   it("training permission keys match exactly trainings.view and trainings.manage", () => {
@@ -132,7 +139,7 @@ describe("STAGE-OPS-02 — Canonical role keys for training permissions", () => 
   });
 });
 
-describe("STAGE-OPS-02 — Effective permissions per role (seed.ts model)", () => {
+describe("STAGE-OPS-02/03A — Effective permissions per role (seed.ts model)", () => {
   it("super_admin has trainings.view", () => {
     const perms = buildEffectivePermissions(SEED_ROLE_PERMISSIONS, ["super_admin"]);
     expect(perms).toContain("trainings.view");
@@ -148,9 +155,9 @@ describe("STAGE-OPS-02 — Effective permissions per role (seed.ts model)", () =
     expect(perms).toContain("trainings.view");
   });
 
-  it("trainer has trainings.manage", () => {
+  it("trainer does NOT have trainings.manage (STAGE-OPS-03A policy)", () => {
     const perms = buildEffectivePermissions(SEED_ROLE_PERMISSIONS, ["trainer"]);
-    expect(perms).toContain("trainings.manage");
+    expect(perms).not.toContain("trainings.manage");
   });
 
   it("viewer does NOT have trainings.view", () => {
@@ -185,7 +192,7 @@ describe("STAGE-OPS-02 — Navigation visibility matches route guard", () => {
     expect(item?.href).toBe("/dashboard/training");
   });
 
-  it("trainer session (with training perms) sees Trainingsplaner", () => {
+  it("trainer session (with trainings.view) sees Trainingsplaner", () => {
     const trainerPerms = buildEffectivePermissions(SEED_ROLE_PERMISSIONS, ["trainer"]);
     const sections = getVisibleNavSections(trainerPerms as PermissionKey[]);
     const item = findNavItem(sections, "trainingsplaner");

@@ -209,7 +209,10 @@ async function main() {
         "fixtures.create",
         "fixtures.submit_for_publication",
         "trainings.view",
-        "trainings.manage",
+        // trainings.manage deliberately excluded: ordinary trainers view their
+        // training schedule but do not administer training plans. A dedicated
+        // planning role (e.g. "Trainingsplanung") created by a super_admin in
+        // /dashboard/roles grants trainings.manage to operational planners.
       ],
     },
     {
