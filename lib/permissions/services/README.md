@@ -49,10 +49,12 @@ const { platform, tenant } = await resolver.getEffectivePermissions({ userId, te
 Granted only when ALL hold:
 1. Permission `scope = PLATFORM` in the database.
 2. User has a `UserRole` with `tenantId = NULL` (platform-level assignment).
-3. Assigned role has `scope = PLATFORM` and `isArchived = false`.
+3. Assigned role has `scope = PLATFORM`, `tenantId = NULL`, and `isArchived = false`.
 4. Role includes the requested permission.
 
 **Tenant roles never satisfy a platform permission check.**
+**A role with `scope = PLATFORM` but `tenantId ≠ null` (inconsistent data) is also excluded.**
+Both `UserRole.tenantId = null` and `role.tenantId = null` are required.
 
 ### Tenant Permission Check (tenantId provided)
 
@@ -61,8 +63,12 @@ Granted only when ALL hold:
 2. Permission `scope = TENANT` in the database.
 3. User has an active `TenantMembership` (`isActive = true`) for that exact tenant.
 4. User has a `UserRole` scoped to that exact tenant (`UserRole.tenantId = tenantId`).
-5. Assigned role has `scope = TENANT` and `isArchived = false`.
+5. Assigned role has `scope = TENANT`, `tenantId = tenantId`, and `isArchived = false`.
 6. Role includes the requested permission.
+
+**Role ownership is enforced:** a role owned by Tenant B cannot authorize access in Tenant A,
+even if `UserRole.tenantId = Tenant A`. The filter `role.tenantId = tenantId` is applied at DB
+query level, closing the inconsistent-data attack vector without requiring schema constraints.
 
 **A role membership from Tenant A does NOT authorize access in Tenant B.**
 **Platform roles do NOT implicitly grant tenant operational permissions.**
@@ -107,16 +113,26 @@ the tests to document the new intentional behavior.
 
 ## Query Strategy
 
-- **Platform check**: one `userRole.findMany` with filters for `tenantId: null`,
-  `role.scope = PLATFORM`, `role.isArchived = false`, including nested
-  `rolePermissions → permission`.
+- **Platform check** (`hasPermission` / `hasAnyPermission` / `hasAllPermissions`, no tenantId):
+  1 `userRole.findMany` with filters `UserRole.tenantId = null`, `role.scope = PLATFORM`,
+  `role.tenantId = null`, `role.isArchived = false`, nested `rolePermissions → permission`.
 
-- **Tenant check**: one `tenantMembership.findUnique` to validate membership,
-  then one `userRole.findMany` with filters for `tenantId`, `role.scope = TENANT`,
-  `role.isArchived = false`, including nested `rolePermissions → permission`.
+- **Tenant check** (`hasPermission` / `hasAnyPermission` / `hasAllPermissions`, tenantId provided):
+  1 `tenantMembership.findUnique` (membership gate), then 1 `userRole.findMany` with filters
+  `UserRole.tenantId = tenantId`, `role.scope = TENANT`, `role.tenantId = tenantId`,
+  `role.isArchived = false`, nested `rolePermissions → permission`.
+  **Max 2 DB queries per call.**
+
+- **Combined effective listing** (`getEffectivePermissions`, tenantId provided):
+  1 platform `userRole.findMany` + 1 `tenantMembership.findUnique` + 1 tenant `userRole.findMany`.
+  **Max 3 DB queries per call.** (This is intentional — platform and tenant grants are resolved
+  independently and returned as separate structured collections.)
+
+- **Combined effective listing** (`getEffectivePermissions`, no tenantId):
+  1 platform `userRole.findMany`. **1 DB query.**
 
 Deduplication uses `Set<string>` internally. Returned arrays are sorted for
-stable output.
+stable output. No N+1 queries, no full role-table scans, no cross-tenant data loaded.
 
 ## No Automatic Operational Role Assignment
 

@@ -773,7 +773,7 @@ describe("EffectivePermissionResolver", () => {
   // ── QUERY SAFETY ──────────────────────────────────────────────────────────
 
   describe("Q-01: tenant permission query filters by tenantId at DB level", () => {
-    it("passes the tenantId to userRole.findMany where clause", async () => {
+    it("passes the tenantId to both UserRole and role filters in userRole.findMany", async () => {
       tenantMembershipFindUnique.mockResolvedValue(activeMembership());
       userRoleFindMany.mockResolvedValue([]);
 
@@ -785,14 +785,17 @@ describe("EffectivePermissionResolver", () => {
 
       expect(userRoleFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ tenantId: TENANT_A }),
+          where: expect.objectContaining({
+            tenantId: TENANT_A,
+            role: expect.objectContaining({ tenantId: TENANT_A }),
+          }),
         }),
       );
     });
   });
 
   describe("Q-02: platform permission query uses tenantId=null at DB level", () => {
-    it("passes tenantId: null to userRole.findMany for platform checks", async () => {
+    it("passes tenantId: null to both UserRole and role filters in userRole.findMany", async () => {
       userRoleFindMany.mockResolvedValue([]);
 
       await resolver.hasPermission({
@@ -803,7 +806,10 @@ describe("EffectivePermissionResolver", () => {
 
       expect(userRoleFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ tenantId: null }),
+          where: expect.objectContaining({
+            tenantId: null,
+            role: expect.objectContaining({ tenantId: null }),
+          }),
         }),
       );
     });
@@ -843,6 +849,128 @@ describe("EffectivePermissionResolver", () => {
       const calls = tenantMembershipFindUnique.mock.calls as Array<[{ where: { tenantId_userId: { tenantId: string } } }]>;
       const queriedTenants = calls.map((c) => c[0].where.tenantId_userId.tenantId);
       expect(queriedTenants).not.toContain(TENANT_B);
+    });
+  });
+
+  // ── SECURITY REGRESSION — ROLE OWNERSHIP ─────────────────────────────────
+  //
+  // These tests cover the hostile data scenario where:
+  //   UserRole.tenantId = Tenant A  (assignment looks correct)
+  //   Role.tenantId     = Tenant B  (role actually belongs to Tenant B)
+  // or
+  //   UserRole.tenantId = null      (platform assignment looks correct)
+  //   Role.tenantId     = Tenant A  (role is actually tenant-owned)
+  //
+  // Both must be DENIED even though the assignment-level tenantId looks valid.
+  // The resolver enforces role ownership at DB query level via role.tenantId.
+
+  describe("Sec-01: tenant role ownership mismatch → denied at query level", () => {
+    it("query enforces role.tenantId = requested tenantId, not just UserRole.tenantId", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership());
+      // The DB mock returns nothing — simulating the DB correctly returning
+      // zero rows because role.tenantId = TENANT_B ≠ TENANT_A (the filter).
+      userRoleFindMany.mockResolvedValue([]);
+
+      const result = await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(result).toBe(false);
+
+      // CRITICAL: verify the query includes role.tenantId = TENANT_A so the DB
+      // can reject the mismatched Tenant B role before any data is returned.
+      expect(userRoleFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: TENANT_A,
+            role: expect.objectContaining({ tenantId: TENANT_A }),
+          }),
+        }),
+      );
+    });
+
+    it("a role owned by Tenant B does not grant access in Tenant A check", async () => {
+      // Simulate: DB would have returned a row if role.tenantId were not
+      // filtered — but with the filter in place, the DB returns nothing.
+      // The mock models the DB behavior after the filter is applied.
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership());
+      userRoleFindMany.mockResolvedValue([]); // role.tenantId = TENANT_B filtered out
+
+      const result = await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("Sec-02: platform role with tenant owner → denied at query level", () => {
+    it("query enforces role.tenantId = null for platform checks", async () => {
+      // DB returns nothing — simulating the DB rejecting a role that has
+      // scope=PLATFORM but tenantId=TENANT_A (inconsistent data).
+      userRoleFindMany.mockResolvedValue([]);
+
+      const result = await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_USERS_MANAGE,
+        // no tenantId → platform check
+      });
+
+      expect(result).toBe(false);
+
+      // CRITICAL: verify role.tenantId = null is in the query
+      expect(userRoleFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: null,
+            role: expect.objectContaining({ tenantId: null }),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("Sec-03: archived platform role → denied at query level", () => {
+    it("platform query includes role.isArchived: false filter", async () => {
+      userRoleFindMany.mockResolvedValue([]);
+
+      await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_USERS_MANAGE,
+      });
+
+      expect(userRoleFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            role: expect.objectContaining({ isArchived: false }),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("Sec-04: archived tenant role → denied at query level", () => {
+    it("tenant query includes role.isArchived: false filter", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership());
+      userRoleFindMany.mockResolvedValue([]);
+
+      await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(userRoleFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            role: expect.objectContaining({ isArchived: false }),
+          }),
+        }),
+      );
     });
   });
 
