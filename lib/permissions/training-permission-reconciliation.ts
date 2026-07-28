@@ -19,21 +19,29 @@
  * No FC Allschwil tenant ID hardcoded — permissions are global (not tenant-scoped).
  */
 
-import { PermissionModule } from "@prisma/client";
-import type { PrismaClient } from "@prisma/client";
+import type { PermissionModule, PrismaClient } from "@prisma/client";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
+
+// Use the string literal "TRAININGS" rather than PermissionModule.TRAININGS (the
+// runtime enum object from the generated client) to guard against the case where
+// the Prisma client was generated before migration
+// 20260727400000_training_core_01_canonical_foundation was applied. In that
+// stale-client scenario PermissionModule.TRAININGS is undefined, which Prisma
+// rejects with "Argument `module` is missing." Using the canonical string value
+// directly makes the reconciliation robust regardless of client generation time.
+const TRAINING_MODULE = "TRAININGS" as PermissionModule;
 
 export const TRAINING_PERMISSION_DEFS = [
   {
     key: "trainings.view",
     name: "View training allocations",
-    module: PermissionModule.TRAININGS,
+    module: TRAINING_MODULE,
   },
   {
     key: "trainings.manage",
     name: "Manage training allocations",
-    module: PermissionModule.TRAININGS,
+    module: TRAINING_MODULE,
   },
 ] as const;
 

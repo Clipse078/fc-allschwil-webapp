@@ -284,3 +284,179 @@ describe("reconcileTrainingPermissions — coverage and safety", () => {
     });
   });
 });
+
+// ── STAGE-OPS-03: Missing module regression ──────────────────────────────────────
+// These tests directly cover the production blocker where PermissionModule.TRAININGS
+// was undefined (stale Prisma client), causing "Argument `module` is missing."
+
+describe("STAGE-OPS-03 regression — module field is never undefined or null", () => {
+  it("TRAINING_PERMISSION_DEFS: module is a non-empty string for every entry", () => {
+    for (const def of TRAINING_PERMISSION_DEFS) {
+      expect(def.module).toBeDefined();
+      expect(def.module).not.toBeNull();
+      expect(typeof def.module).toBe("string");
+      expect((def.module as string).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("module value is exactly 'TRAININGS' (canonical DB enum value)", () => {
+    for (const def of TRAINING_PERMISSION_DEFS) {
+      expect(def.module).toBe("TRAININGS");
+    }
+  });
+
+  it("upsert create block includes module when permission is missing", async () => {
+    const permUpsert = vi.fn().mockResolvedValue({});
+    const prisma = makeMockPrisma({
+      permissionFindUnique: vi.fn().mockResolvedValue(null),
+      permissionUpsert: permUpsert,
+      roleFindUnique: vi.fn().mockResolvedValue(null),
+    });
+
+    await reconcileTrainingPermissions(prisma, false);
+
+    expect(permUpsert).toHaveBeenCalledTimes(2);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const call of permUpsert.mock.calls as any[][]) {
+      const createArg = (call[0] as { create: Record<string, unknown> }).create;
+      expect(createArg.module).toBeDefined();
+      expect(createArg.module).toBe("TRAININGS");
+    }
+  });
+
+  it("upsert update block includes module when permission already exists", async () => {
+    const permUpsert = vi.fn().mockResolvedValue({});
+    const prisma = makeMockPrisma({
+      permissionFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        return Promise.resolve({ id: "perm-existing", name: "View training allocations", module: "TRAININGS" });
+      }),
+      permissionUpsert: permUpsert,
+      roleFindUnique: vi.fn().mockResolvedValue(null),
+    });
+
+    await reconcileTrainingPermissions(prisma, false);
+
+    expect(permUpsert).toHaveBeenCalledTimes(2);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const call of permUpsert.mock.calls as any[][]) {
+      const updateArg = (call[0] as { update: Record<string, unknown> }).update;
+      expect(updateArg.module).toBeDefined();
+      expect(updateArg.module).toBe("TRAININGS");
+    }
+  });
+
+  it("required Prisma fields — upsert create includes key, name, module", async () => {
+    const permUpsert = vi.fn().mockResolvedValue({});
+    const prisma = makeMockPrisma({
+      permissionFindUnique: vi.fn().mockResolvedValue(null),
+      permissionUpsert: permUpsert,
+      roleFindUnique: vi.fn().mockResolvedValue(null),
+    });
+
+    await reconcileTrainingPermissions(prisma, false);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const call of permUpsert.mock.calls as any[][]) {
+      const createArg = (call[0] as { create: Record<string, unknown> }).create;
+      expect(createArg).toHaveProperty("key");
+      expect(createArg).toHaveProperty("name");
+      expect(createArg).toHaveProperty("module");
+      expect(createArg.module).not.toBeUndefined();
+    }
+  });
+
+  it("dry run: module is still defined even in dry-run mode (no writes executed)", async () => {
+    // The module value must be correct even when dryRun=true prevents writes.
+    for (const def of TRAINING_PERMISSION_DEFS) {
+      expect(def.module).toBe("TRAININGS");
+      expect(def.module).toBeDefined();
+    }
+  });
+
+  it("apply mode: reconcileTrainingPermissions does NOT throw with valid module values", async () => {
+    const permUpsert = vi.fn().mockResolvedValue({});
+    const roleFindUnique = vi.fn().mockResolvedValue(SUPER_ADMIN_ROLE);
+    const rolePermFindUnique = vi.fn().mockResolvedValue(null);
+    const rolePermUpsert = vi.fn().mockResolvedValue({});
+
+    const prisma = makeMockPrisma({
+      permissionFindUnique: vi.fn().mockResolvedValue(null),
+      permissionUpsert: permUpsert,
+      roleFindUnique,
+      rolePermissionFindUnique: rolePermFindUnique,
+      rolePermissionUpsert: rolePermUpsert,
+    });
+
+    await expect(reconcileTrainingPermissions(prisma, false)).resolves.not.toThrow();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const call of permUpsert.mock.calls as any[][]) {
+      const createArg = (call[0] as { create: Record<string, unknown> }).create;
+      expect(createArg.module).not.toBeUndefined();
+    }
+  });
+
+  it("idempotency — second execution does not create new permissions", async () => {
+    const permUpsert = vi.fn().mockResolvedValue({});
+    const roleFindUnique = vi.fn().mockResolvedValue(SUPER_ADMIN_ROLE);
+    const rolePermFindUnique = vi.fn().mockResolvedValue({ roleId: "exists" });
+
+    const prisma = makeMockPrisma({
+      permissionFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        const map: Record<string, { id: string; name: string; module: string }> = {
+          "trainings.view": { id: "perm-view", name: "View training allocations", module: "TRAININGS" },
+          "trainings.manage": { id: "perm-manage", name: "Manage training allocations", module: "TRAININGS" },
+        };
+        return Promise.resolve(map[where.key] ?? null);
+      }),
+      permissionUpsert: permUpsert,
+      roleFindUnique,
+      rolePermissionFindUnique: rolePermFindUnique,
+    });
+
+    const result = await reconcileTrainingPermissions(prisma, false);
+
+    expect(result.permissions.every((p) => p.action === "already_exists")).toBe(true);
+    expect(result.rolePermissions.every((r) => r.action === "already_assigned")).toBe(true);
+  });
+
+  it("missing role assignment: reports 'assigned' when permission exists but RolePermission missing", async () => {
+    const rolePermUpsert = vi.fn().mockResolvedValue({});
+
+    const prisma = makeMockPrisma({
+      permissionFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        if (where.key === "trainings.view") return Promise.resolve(PERM_VIEW);
+        if (where.key === "trainings.manage") return Promise.resolve(PERM_MANAGE);
+        return Promise.resolve(null);
+      }),
+      roleFindUnique: vi.fn().mockResolvedValue(SUPER_ADMIN_ROLE),
+      rolePermissionFindUnique: vi.fn().mockResolvedValue(null),
+      rolePermissionUpsert: rolePermUpsert,
+    });
+
+    const result = await reconcileTrainingPermissions(prisma, false);
+
+    const assigned = result.rolePermissions.filter((r) => r.action === "assigned");
+    expect(assigned.length).toBeGreaterThan(0);
+    expect(rolePermUpsert).toHaveBeenCalled();
+  });
+
+  it("existing role assignment: reports 'already_assigned' and does not duplicate", async () => {
+    const rolePermUpsert = vi.fn().mockResolvedValue({});
+
+    const prisma = makeMockPrisma({
+      permissionFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        if (where.key === "trainings.view") return Promise.resolve(PERM_VIEW);
+        if (where.key === "trainings.manage") return Promise.resolve(PERM_MANAGE);
+        return Promise.resolve(null);
+      }),
+      roleFindUnique: vi.fn().mockResolvedValue(SUPER_ADMIN_ROLE),
+      rolePermissionFindUnique: vi.fn().mockResolvedValue({ roleId: "super-admin-role" }),
+      rolePermissionUpsert: rolePermUpsert,
+    });
+
+    const result = await reconcileTrainingPermissions(prisma, false);
+
+    const alreadyAssigned = result.rolePermissions.filter((r) => r.action === "already_assigned");
+    expect(alreadyAssigned.length).toBeGreaterThan(0);
+  });
+});
