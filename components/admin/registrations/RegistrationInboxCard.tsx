@@ -10,6 +10,11 @@ import {
   MessageSquare,
   ClipboardList,
   Globe,
+  Smartphone,
+  PenLine,
+  FileSpreadsheet,
+  Code2,
+  HelpCircle,
   Users,
   Shield,
   Flag,
@@ -25,8 +30,22 @@ import {
   TARGET_GROUP_COLORS,
 } from "@/lib/registrations/classification";
 import { getUrgencyInfo, getInitials } from "@/lib/inbox/types";
-import { WEBSITE_SOURCE } from "@/lib/registrations/constants";
-import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
+import { formatDateShort, formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
+import {
+  getRegistrationSourceInfo,
+  type RegistrationSourceKey,
+} from "@/lib/registrations/source";
+
+// Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
+// only, ingestion is untouched (see lib/registrations/source.ts).
+const SOURCE_ICON: Record<RegistrationSourceKey, ComponentType<{ className?: string }>> = {
+  WEBSITE: Globe,
+  MOBILE_APP: Smartphone,
+  MANUAL: PenLine,
+  CSV_IMPORT: FileSpreadsheet,
+  API: Code2,
+  OTHER: HelpCircle,
+};
 
 // ── Type visual config (icons replace emojis) ─────────────────────────────────
 
@@ -183,12 +202,18 @@ export default function RegistrationInboxCard({
     : false;
   const genderLabel = getGenderLabel(gender, isAdult);
 
-  const isWebsiteSource = registration.source === WEBSITE_SOURCE;
+  // Goal 6 (REGISTRATION-01E): presentation-only source label — ingestion
+  // still always writes "WEBSITE" today (see lib/registrations/source.ts).
+  const sourceInfo = getRegistrationSourceInfo(registration.source);
+  const SourceIcon = sourceInfo ? SOURCE_ICON[sourceInfo.key] : null;
   const isPossibleDuplicate =
     registration.payloadJson &&
     typeof registration.payloadJson === "object" &&
     !Array.isArray(registration.payloadJson) &&
     (registration.payloadJson as Record<string, unknown>).possibleDuplicate === true;
+  // Goal 2 (REGISTRATION-01E): show enough to identify the original at a
+  // glance, without redesigning duplicate detection itself.
+  const duplicateReference = registration.duplicateReference;
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -244,15 +269,18 @@ export default function RegistrationInboxCard({
             >
               {statusLabel}
             </span>
-            {isWebsiteSource && (
+            {sourceInfo && (
               <span className="inline-flex items-center gap-1 h-5 rounded-full border border-indigo-200 bg-indigo-50 px-2 text-[0.65rem] font-semibold text-indigo-700">
-                <Globe className="h-3 w-3" aria-hidden />
-                Website
+                {SourceIcon ? <SourceIcon className="h-3 w-3" aria-hidden /> : null}
+                {sourceInfo.label}
               </span>
             )}
           </div>
 
-          {/* Row 2: classification metadata — Jahrgang · Geschlecht · Suggested group */}
+          {/* Row 2: classification metadata — Jahrgang · Geschlecht · Suggested group.
+              Goal 1 (REGISTRATION-01E): the suggested-group chip always renders
+              (falling back to "Nicht zugeordnet" for UNKNOWN) so this row is
+              never left visually empty when birth year/gender weren't submitted. */}
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {registration.birthYear ? (
               <span className="text-[0.72rem] text-[var(--text-2)] font-medium">
@@ -265,23 +293,21 @@ export default function RegistrationInboxCard({
                 <span className="text-[0.72rem] text-[var(--text-2)]">{genderLabel}</span>
               </>
             ) : null}
-            {classification.targetGroupKey !== "UNKNOWN" && (
-              <>
-                <span className="text-[var(--border-strong)] text-[0.65rem]">·</span>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 text-[0.65rem] font-semibold",
-                    groupColors.text,
-                  )}
-                >
-                  <span
-                    className={cn("h-1.5 w-1.5 rounded-full flex-shrink-0", groupColors.dot)}
-                    aria-hidden
-                  />
-                  {classification.targetGroupLabel}
-                </span>
-              </>
+            {(registration.birthYear || genderLabel) && (
+              <span className="text-[var(--border-strong)] text-[0.65rem]">·</span>
             )}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-[0.65rem] font-semibold",
+                groupColors.text,
+              )}
+            >
+              <span
+                className={cn("h-1.5 w-1.5 rounded-full flex-shrink-0", groupColors.dot)}
+                aria-hidden
+              />
+              {classification.targetGroupLabel}
+            </span>
           </div>
 
           {/* Row 3: ownership (always visible) */}
@@ -303,7 +329,12 @@ export default function RegistrationInboxCard({
           {isPossibleDuplicate && (
             <div className="mt-1.5 flex items-center gap-1 text-[0.65rem] font-medium text-amber-600">
               <AlertTriangle className="h-3 w-3 flex-shrink-0" aria-hidden />
-              Mögliches Duplikat
+              <span>Mögliches Duplikat</span>
+              {duplicateReference ? (
+                <span className="text-amber-500">
+                  · Original {formatDateShort(duplicateReference.submittedAt, { locale, timezone })}
+                </span>
+              ) : null}
             </div>
           )}
 

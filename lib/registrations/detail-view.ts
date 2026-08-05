@@ -27,6 +27,15 @@
  *   - Any `rawData` keys that are not explicitly mapped anywhere else are
  *     surfaced verbatim under "Notes from website" (`additionalRawData`) so
  *     that no submitted data is ever silently hidden from operators.
+ *
+ * REGISTRATION-01E additions (presentation-only, no schema/API change):
+ *   - `technical.websiteVersion` — looked up defensively in `rawData`, same
+ *     pattern as nationality/remarks above.
+ *   - `duplicate` — a read-only projection of the existing
+ *     `possibleDuplicate` / `possibleDuplicateOf` payload keys written by
+ *     the unchanged duplicate-detection logic in public-submission.ts.
+ *   - `formatCompactAddressLines()` — groups the five address fields into
+ *     display lines without changing the underlying fields.
  */
 
 export type RegistrationRawShape = {
@@ -96,6 +105,19 @@ export type RegistrationDetailFields = {
     locale: string | null;
     submittedAt: string;
     internalId: string;
+    /** Website build/version tag, when the source submitted one via rawData. */
+    websiteVersion: string | null;
+  };
+  /**
+   * REGISTRATION-01E — Goal 2: soft duplicate flag as written by the
+   * (unchanged) duplicate-detection logic in public-submission.ts. This is a
+   * read-only projection of `payloadJson.possibleDuplicate` /
+   * `possibleDuplicateOf` — it does not alter duplicate detection itself.
+   */
+  duplicate: {
+    isPossibleDuplicate: boolean;
+    /** ID of the earlier registration this one may duplicate, if resolvable. */
+    referenceId: string | null;
   };
 };
 
@@ -196,6 +218,9 @@ const MAPPED_RAWDATA_KEYS = new Set([
   "remarks",
   "bemerkungen",
   "anmerkungen",
+  "websiteVersion",
+  "siteVersion",
+  "webVersion",
 ]);
 
 // ── Main extraction function ──────────────────────────────────────────────
@@ -302,6 +327,18 @@ export function getRegistrationDetailFields(
 
   // ── Technical ───────────────────────────────────────────────────────────
   const locale = pickString(payload, ["locale"]);
+  const websiteVersion = pickString(rawData, ["websiteVersion", "siteVersion", "webVersion"]);
+
+  // ── Duplicate flag (Goal 2) ─────────────────────────────────────────────
+  // Written by the unchanged duplicate-detection logic in
+  // public-submission.ts as top-level payloadJson keys.
+  const isPossibleDuplicate = payload.possibleDuplicate === true;
+  const duplicateReferenceId =
+    isPossibleDuplicate &&
+    typeof payload.possibleDuplicateOf === "string" &&
+    payload.possibleDuplicateOf.trim()
+      ? payload.possibleDuplicateOf.trim()
+      : null;
 
   return {
     player: {
@@ -331,6 +368,39 @@ export function getRegistrationDetailFields(
       locale,
       submittedAt: registration.submittedAt,
       internalId: registration.id,
+      websiteVersion,
+    },
+    duplicate: {
+      isPossibleDuplicate,
+      referenceId: duplicateReferenceId,
     },
   };
+}
+
+// ── Compact address formatting (Goal 3) ────────────────────────────────────
+
+/**
+ * Collapses the five address fields into up to three display lines:
+ *   1. "Strasse Hausnummer"
+ *   2. "PLZ Ort"
+ *   3. "Land"
+ *
+ * Underlying fields are never merged or mutated — this only controls how
+ * they are grouped for display. Returns an empty array when nothing was
+ * submitted; callers render the "Nicht angegeben" fallback in that case.
+ */
+export function formatCompactAddressLines(
+  address: RegistrationDetailFields["address"],
+): string[] {
+  const lines: string[] = [];
+
+  const streetLine = [address.street, address.houseNumber].filter(Boolean).join(" ");
+  if (streetLine) lines.push(streetLine);
+
+  const cityLine = [address.postalCode, address.city].filter(Boolean).join(" ");
+  if (cityLine) lines.push(cityLine);
+
+  if (address.country) lines.push(address.country);
+
+  return lines;
 }
