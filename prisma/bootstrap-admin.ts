@@ -93,6 +93,20 @@ async function main() {
     );
   }
 
+  // RPERM-04: the tenant-scoped club_admin role materialized by `npm run db:seed`.
+  // The platform admin also needs real tenant operational access — a
+  // TenantMembership + a tenant-scoped UserRole — rather than inheriting
+  // tenant permissions merely by holding the PLATFORM super_admin role.
+  const tenantClubAdminRole = await prisma.role.findUnique({
+    where: { key: `club_admin__${tenant.key}` },
+  });
+
+  if (!tenantClubAdminRole) {
+    throw new Error(
+      "Tenant club_admin role not found. Run `npm run db:seed` first to materialize it."
+    );
+  }
+
   const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
   // NOTE: passwordHash is intentionally absent from the `update` block.
@@ -128,6 +142,33 @@ async function main() {
     create: {
       userId: adminUser.id,
       roleId: superAdminRole.id,
+    },
+  });
+
+  // RPERM-04: TenantMembership is the canonical source of tenant context —
+  // no runtime code should ever derive it from User.tenantId again.
+  await prisma.tenantMembership.upsert({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: adminUser.id } },
+    update: { isActive: true },
+    create: {
+      tenantId: tenant.id,
+      userId: adminUser.id,
+      isActive: true,
+    },
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: adminUser.id,
+        roleId: tenantClubAdminRole.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: adminUser.id,
+      roleId: tenantClubAdminRole.id,
+      tenantId: tenant.id,
     },
   });
 
