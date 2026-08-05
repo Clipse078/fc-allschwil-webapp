@@ -18,6 +18,12 @@ import {
   ClipboardList,
   Lightbulb,
   Globe,
+  Smartphone,
+  PenLine,
+  FileSpreadsheet,
+  Code2,
+  HelpCircle,
+  Building2,
   Shield,
   Flag,
   CalendarDays,
@@ -35,11 +41,22 @@ import {
   getGenderLabel,
   TARGET_GROUP_COLORS,
 } from "@/lib/registrations/classification";
-import { formatDate, formatDateTime, formatDateShort, formatTime } from "@/lib/tenant-runtime/formatters";
+import {
+  formatDate,
+  formatDateTime,
+  formatDateShort,
+  formatDateTimeCompact,
+} from "@/lib/tenant-runtime/formatters";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import { getInitials } from "@/lib/inbox/types";
-import { WEBSITE_SOURCE } from "@/lib/registrations/constants";
-import { getRegistrationDetailFields } from "@/lib/registrations/detail-view";
+import {
+  formatCompactAddressLines,
+  getRegistrationDetailFields,
+} from "@/lib/registrations/detail-view";
+import {
+  getRegistrationSourceInfo,
+  type RegistrationSourceKey,
+} from "@/lib/registrations/source";
 
 const NOT_PROVIDED = "Nicht angegeben";
 
@@ -157,7 +174,53 @@ const STATUS_BADGE: Record<RegistrationStatus, string> = {
   ARCHIVED: "border-slate-200 bg-slate-50 text-slate-400",
 };
 
+const STATUS_DOT: Record<RegistrationStatus, string> = {
+  NEW: "bg-blue-500",
+  REVIEWING: "bg-amber-500",
+  CONTACTED: "bg-violet-500",
+  ACCEPTED: "bg-emerald-500",
+  REJECTED: "bg-red-500",
+  ARCHIVED: "bg-slate-400",
+};
+
+// Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
+// only, ingestion is untouched (see lib/registrations/source.ts).
+const SOURCE_ICON: Record<RegistrationSourceKey, ComponentType<{ className?: string }>> = {
+  WEBSITE: Globe,
+  MOBILE_APP: Smartphone,
+  MANUAL: PenLine,
+  CSV_IMPORT: FileSpreadsheet,
+  API: Code2,
+  OTHER: HelpCircle,
+};
+
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+/**
+ * Goal 4 (REGISTRATION-01E): one compact "at a glance" item in the
+ * registration summary strip (what / where / when / status / suggested
+ * allocation) shown right below the header, before the scrollable body.
+ */
+function SummaryItem({
+  icon: Icon,
+  dotClassName,
+  children,
+}: {
+  icon?: ComponentType<{ className?: string }>;
+  dotClassName?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-[var(--text-2)]">
+      {dotClassName ? (
+        <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", dotClassName)} aria-hidden />
+      ) : Icon ? (
+        <Icon className="h-3.5 w-3.5 flex-shrink-0 text-[var(--muted)]" aria-hidden />
+      ) : null}
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
 
 function SectionLabel({ icon: Icon, children }: { icon?: ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
@@ -275,57 +338,16 @@ function getContactName(payloadJson: unknown): string | null {
     : null;
 }
 
-type WebsitePayload = {
-  parentOrGuardian?: {
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    phone?: string;
-  };
-  consent?: {
-    privacyAccepted?: boolean;
-    communicationAccepted?: boolean;
-    photoConsent?: boolean;
-  };
-  football?: {
-    currentClub?: string;
-    previousClub?: string;
-    desiredTeam?: string;
-    position?: string;
-    preferredTrainingDay?: string;
-  };
-  event?: { eventId?: string; eventName?: string };
-  sponsor?: { companyName?: string; contactPerson?: string; website?: string };
-  address?: { street?: string; postalCode?: string; city?: string; country?: string };
-  possibleDuplicate?: boolean;
-  possibleDuplicateOf?: string;
-};
-
-function getWebsitePayload(payloadJson: unknown): WebsitePayload | null {
-  if (!payloadJson || typeof payloadJson !== "object" || Array.isArray(payloadJson))
-    return null;
-  return payloadJson as WebsitePayload;
-}
-
 // ── Classification section ────────────────────────────────────────────────────
 
 function ClassificationSection({
-  registration,
+  classification,
+  genderLabel,
 }: {
-  registration: RegistrationListItem;
+  classification: ReturnType<typeof classifyRegistration>;
+  genderLabel: string | null;
 }) {
-  const gender = extractGenderFromPayload(registration.payloadJson);
-  const classification = classifyRegistration(
-    registration.birthYear,
-    gender,
-    registration.type,
-  );
   const colors = TARGET_GROUP_COLORS[classification.colorToken];
-
-  const isAdult = registration.birthYear
-    ? new Date().getFullYear() - registration.birthYear >= 18
-    : false;
-  const genderLabel = getGenderLabel(gender, isAdult);
 
   return (
     <div className="px-5 pt-5 pb-4 border-b border-[var(--border)]">
@@ -357,7 +379,12 @@ function ClassificationSection({
             </span>
             <span className={cn("font-medium", colors.text)}>
               {classification.reasoning}
-              {genderLabel ? ` · ${genderLabel}` : ""}
+              {/* Bugfix while touching this section (REGISTRATION-01E): avoid
+                  duplicating the gender label when it's already part of the
+                  reasoning string (e.g. "Jahrgang 2015 · Mädchen"). */}
+              {genderLabel && !classification.reasoning.includes(genderLabel)
+                ? ` · ${genderLabel}`
+                : ""}
             </span>
           </div>
 
@@ -465,9 +492,11 @@ export default function RegistrationDetailDrawer({
   const contactName = getContactName(registration.payloadJson);
   const detailHref = `/tenant/${tenantSlug}/cockpit/registrations/${registration.id}`;
 
-  const isWebsiteSource = registration.source === WEBSITE_SOURCE;
-  const websitePayload = isWebsiteSource ? getWebsitePayload(registration.payloadJson) : null;
-  const isPossibleDuplicate = websitePayload?.possibleDuplicate === true;
+  // Goal 6 (REGISTRATION-01E): presentation-only source label — ingestion
+  // still always writes "WEBSITE" today (see lib/registrations/source.ts).
+  const sourceInfo = getRegistrationSourceInfo(registration.source);
+  const isWebsiteSource = sourceInfo?.key === "WEBSITE";
+  const SourceIcon = sourceInfo ? SOURCE_ICON[sourceInfo.key] : null;
 
   // Goal 3/4 (REGISTRATION-01D): normalized read-model covering every field
   // collected across the pipeline (website → API → DB → payloadJson).
@@ -477,6 +506,13 @@ export default function RegistrationDetailDrawer({
     ? new Date().getFullYear() - registration.birthYear >= 18
     : false;
   const genderDisplayLabel = getGenderLabel(genderCode, isAdultForGender) ?? fields.player.gender;
+
+  // Goal 4/2 (REGISTRATION-01E): classification computed once and reused by
+  // both the summary strip and the detailed "Vorgeschlagene Zuordnung"
+  // section; duplicate reference resolved server-side in queries.ts.
+  const classification = classifyRegistration(registration.birthYear, genderCode, registration.type);
+  const addressLines = formatCompactAddressLines(fields.address);
+  const duplicateReference = registration.duplicateReference;
 
   return (
     <>
@@ -539,14 +575,14 @@ export default function RegistrationDetailDrawer({
                 >
                   {STATUS_LABELS[registration.status]}
                 </span>
-                {isWebsiteSource && (
+                {sourceInfo && (
                   <span className="inline-flex items-center gap-1.5 h-6 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-[0.7rem] font-semibold text-indigo-700">
-                    <Globe className="h-3.5 w-3.5" aria-hidden />
-                    Website
+                    {SourceIcon ? <SourceIcon className="h-3.5 w-3.5" aria-hidden /> : null}
+                    {sourceInfo.label}
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-xs text-[var(--muted)]">
+              <p className="mt-1 text-xs text-[var(--muted)] break-all">
                 {registration.email}
               </p>
             </div>
@@ -571,24 +607,19 @@ export default function RegistrationDetailDrawer({
             </div>
           </div>
 
-          {/* Goal 2 (REGISTRATION-01D): exact registration timestamp, always
-              visible in the header — never requires scrolling to Systemdaten. */}
-          <div className="px-6 pb-4">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5">
-              <Calendar className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
-              <span className="text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
-                Registriert
-              </span>
-              <span className="text-xs font-semibold text-[var(--foreground)] tabular-nums">
-                {formatDateShort(registration.submittedAt, cfg)}
-              </span>
-              <span className="text-[var(--border-strong)]" aria-hidden>
-                ·
-              </span>
-              <span className="text-xs font-semibold text-[var(--foreground)] tabular-nums">
-                {formatTime(registration.submittedAt, cfg)}
-              </span>
-            </span>
+          {/* Goal 4 (REGISTRATION-01E): compact registration summary — what /
+              where / when / status / suggested allocation — all answered in
+              one glance, right below the header, before any scrolling. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-6 pb-4">
+            <SummaryItem icon={TypeIcon}>{typeConfig.label}</SummaryItem>
+            {sourceInfo && <SummaryItem icon={SourceIcon ?? Globe}>{sourceInfo.label}</SummaryItem>}
+            <SummaryItem icon={Calendar}>
+              {formatDateTimeCompact(registration.submittedAt, cfg)}
+            </SummaryItem>
+            <SummaryItem dotClassName={STATUS_DOT[registration.status]}>
+              {STATUS_LABELS[registration.status]}
+            </SummaryItem>
+            <SummaryItem icon={Lightbulb}>{classification.targetGroupLabel}</SummaryItem>
           </div>
         </div>
 
@@ -596,39 +627,58 @@ export default function RegistrationDetailDrawer({
         <div className="flex-1 overflow-y-auto">
 
           {/* Classification / routing suggestion */}
-          <ClassificationSection registration={registration} />
+          <ClassificationSection classification={classification} genderLabel={genderDisplayLabel} />
 
-          {/* Website source banner + possible duplicate warning */}
-          {isWebsiteSource && (
+          {/* Source banner + possible duplicate warning (Goal 2 & 6) */}
+          {(sourceInfo || fields.duplicate.isPossibleDuplicate) && (
             <div className="px-6 pt-4 pb-4 border-b border-[var(--border)] bg-indigo-50/50">
-              <div className="flex items-start gap-2.5">
-                <Globe className="h-4 w-4 text-indigo-600 flex-shrink-0 mt-0.5" aria-hidden />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[0.78rem] font-semibold text-indigo-800">
-                    Website-Anmeldung
-                  </p>
-                  <p className="text-[0.72rem] text-indigo-600 mt-0.5">
-                    Eingegangen über das öffentliche Kontaktformular (FC Allschwil Website)
-                  </p>
+              {sourceInfo && (
+                <div className="flex items-start gap-2.5">
+                  {SourceIcon ? (
+                    <SourceIcon className="h-4 w-4 text-indigo-600 flex-shrink-0 mt-0.5" aria-hidden />
+                  ) : null}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[0.78rem] font-semibold text-indigo-800">
+                      {isWebsiteSource ? "Website-Anmeldung" : `${sourceInfo.label}-Anmeldung`}
+                    </p>
+                    {isWebsiteSource && (
+                      <p className="text-[0.72rem] text-indigo-600 mt-0.5">
+                        Eingegangen über das öffentliche Kontaktformular (FC Allschwil Website)
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {isPossibleDuplicate && (
-                <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+              )}
+              {fields.duplicate.isPossibleDuplicate && (
+                <div className={cn("flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5", sourceInfo && "mt-3")}>
                   <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[0.75rem] font-semibold text-amber-800">
                       Mögliches Duplikat erkannt
                     </p>
-                    <p className="text-[0.7rem] text-amber-700 mt-0.5">
-                      Eine ähnliche Anmeldung mit dieser E-Mail-Adresse wurde bereits innerhalb
-                      der letzten 24 Stunden eingereicht. Bitte prüfe, ob es sich um eine
-                      Doppeleinsendung handelt.
-                      {websitePayload?.possibleDuplicateOf && (
-                        <span className="block mt-1 font-mono text-[0.65rem] text-amber-600">
-                          Referenz-ID: {websitePayload.possibleDuplicateOf}
-                        </span>
-                      )}
-                    </p>
+                    {duplicateReference ? (
+                      <p className="text-[0.7rem] text-amber-700 mt-0.5">
+                        Anmeldung vom{" "}
+                        <span className="font-semibold tabular-nums">
+                          {formatDateShort(duplicateReference.submittedAt, cfg)}
+                        </span>{" "}
+                        · Status: <span className="font-semibold">{STATUS_LABELS[duplicateReference.status]}</span>
+                      </p>
+                    ) : (
+                      <p className="text-[0.7rem] text-amber-700 mt-0.5">
+                        Eine ähnliche Anmeldung mit dieser E-Mail-Adresse wurde bereits eingereicht.
+                        Bitte prüfe, ob es sich um eine Doppeleinsendung handelt.
+                      </p>
+                    )}
+                    {fields.duplicate.referenceId && (
+                      <a
+                        href={`/tenant/${tenantSlug}/cockpit/registrations/${fields.duplicate.referenceId}`}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[0.7rem] font-semibold text-amber-800 hover:underline"
+                      >
+                        Bestehende Anmeldung öffnen
+                        <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden />
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
@@ -769,16 +819,21 @@ export default function RegistrationDetailDrawer({
             </div>
           </div>
 
-          {/* Adresse (Address) — Goal 1/4: postcode & city must become visible */}
+          {/* Adresse (Address) — Goal 3 (REGISTRATION-01E): compact block
+              instead of five separate rows. Underlying fields are unchanged. */}
           <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
             <SectionLabel icon={MapPin}>Adresse</SectionLabel>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <LabeledField label="Strasse" value={fields.address.street} />
-              <LabeledField label="Hausnummer" value={fields.address.houseNumber} />
-              <LabeledField label="Postleitzahl" value={fields.address.postalCode} />
-              <LabeledField label="Ort" value={fields.address.city} />
-              <LabeledField label="Land" value={fields.address.country} />
-            </div>
+            {addressLines.length > 0 ? (
+              <address className="not-italic text-sm leading-relaxed text-[var(--foreground)] break-words">
+                {addressLines.map((line, i) => (
+                  <span key={i} className="block">
+                    {line}
+                  </span>
+                ))}
+              </address>
+            ) : (
+              <span className="sce-data-value-empty text-sm">{NOT_PROVIDED}</span>
+            )}
           </div>
 
           {/* Kontakt (Contact) */}
@@ -788,7 +843,7 @@ export default function RegistrationDetailDrawer({
               <DataRow label="E-Mail">
                 <a
                   href={`mailto:${fields.contact.email}`}
-                  className="sce-link-primary flex items-center gap-1.5 text-sm"
+                  className="sce-link-primary flex items-center gap-1.5 text-sm break-all"
                 >
                   <Mail className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
                   {fields.contact.email}
@@ -820,7 +875,7 @@ export default function RegistrationDetailDrawer({
                 <DataRow label="E-Mail">
                   <a
                     href={`mailto:${fields.parent.email}`}
-                    className="sce-link-primary flex items-center gap-1.5 text-sm"
+                    className="sce-link-primary flex items-center gap-1.5 text-sm break-all"
                   >
                     <Mail className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
                     {fields.parent.email}
@@ -879,7 +934,7 @@ export default function RegistrationDetailDrawer({
                     {fields.additional.additionalRawData.map((entry) => (
                       <div key={entry.key} className="flex items-start gap-2 text-sm">
                         <FileText className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-[var(--muted)]" aria-hidden />
-                        <span className="text-[var(--text-2)]">
+                        <span className="min-w-0 break-words text-[var(--text-2)]">
                           <span className="font-medium">{entry.label}:</span> {entry.value}
                         </span>
                       </div>
@@ -920,10 +975,18 @@ export default function RegistrationDetailDrawer({
             </div>
           </div>
 
-          {/* Systemdaten (System Information) */}
+          {/* Systemdaten (System Information) — Goal 5 (REGISTRATION-01E):
+              admin-relevant fields only (ID, timestamps, source, tenant,
+              duplicate reference). Never expose raw internal implementation
+              details. */}
           <div className="px-6 pt-5 pb-8">
             <SectionLabel icon={Hash}>Systemdaten</SectionLabel>
             <div className="grid gap-4 sm:grid-cols-2">
+              <DataRow label="Registrierungs-ID">
+                <code className="font-mono text-[0.7rem] text-[var(--muted)]">
+                  {fields.technical.internalId}
+                </code>
+              </DataRow>
               <DataRow label="Eingegangen">
                 <span className="sce-data-value flex items-center gap-1.5 text-sm">
                   <Calendar className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
@@ -931,13 +994,28 @@ export default function RegistrationDetailDrawer({
                 </span>
               </DataRow>
               <LabeledField label="Zuletzt geändert" value={formatDate(registration.updatedAt, cfg)} />
-              <LabeledField label="Quelle" value={fields.technical.source} />
-              <LabeledField label="Sprache" value={fields.technical.locale} />
-              <DataRow label="Interne Registrierungs-ID">
-                <code className="font-mono text-[0.7rem] text-[var(--muted)]">
-                  {fields.technical.internalId}
-                </code>
+              <LabeledField label="Quelle" value={sourceInfo?.label ?? null} />
+              {fields.technical.websiteVersion && (
+                <LabeledField label="Website-Version" value={fields.technical.websiteVersion} mono />
+              )}
+              <DataRow label="Mandant">
+                <span className="sce-data-value flex items-center gap-1.5 text-sm">
+                  <Building2 className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
+                  {registration.tenant.name}
+                </span>
               </DataRow>
+              {fields.duplicate.referenceId && (
+                <DataRow label="Duplikat-Referenz">
+                  <a
+                    href={`/tenant/${tenantSlug}/cockpit/registrations/${fields.duplicate.referenceId}`}
+                    className="sce-link-primary flex items-center gap-1.5 text-sm"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                    <code className="font-mono text-[0.7rem]">{fields.duplicate.referenceId}</code>
+                  </a>
+                </DataRow>
+              )}
+              <LabeledField label="Sprache" value={fields.technical.locale} />
             </div>
           </div>
         </div>
