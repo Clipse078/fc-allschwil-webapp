@@ -26,6 +26,7 @@ import {
 } from "@/lib/registrations/classification";
 import { getUrgencyInfo, getInitials } from "@/lib/inbox/types";
 import { WEBSITE_SOURCE } from "@/lib/registrations/constants";
+import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
 
 // ── Type visual config (icons replace emojis) ─────────────────────────────────
 
@@ -146,12 +147,18 @@ type Props = {
   registration: RegistrationListItem;
   onClick: () => void;
   isSelected?: boolean;
+  /** Tenant locale (e.g. "de-CH"). Falls back to "de-CH" when absent. */
+  locale?: string;
+  /** Tenant timezone (e.g. "Europe/Zurich"). Falls back to "Europe/Zurich" when absent. */
+  timezone?: string;
 };
 
 export default function RegistrationInboxCard({
   registration,
   onClick,
   isSelected = false,
+  locale = "de-CH",
+  timezone = "Europe/Zurich",
 }: Props) {
   const initials = getInitials(registration.firstName, registration.lastName);
   const typeConfig = TYPE_CONFIG[registration.type] ?? TYPE_CONFIG.OTHER;
@@ -159,6 +166,9 @@ export default function RegistrationInboxCard({
   const statusBadgeClass = STATUS_BADGE[registration.status] ?? STATUS_BADGE.NEW;
   const statusLabel = STATUS_LABEL[registration.status] ?? registration.status;
   const urgency = getUrgencyInfo(registration.submittedAt);
+  // Goal 1 (REGISTRATION-01D): the exact timestamp must never disappear,
+  // even alongside the relative-time label above.
+  const exactTimestamp = formatDateTimeCompact(registration.submittedAt, { locale, timezone });
 
   const gender = extractGenderFromPayload(registration.payloadJson);
   const classification = classifyRegistration(
@@ -313,8 +323,8 @@ export default function RegistrationInboxCard({
           </div>
         </div>
 
-        {/* Right meta: urgency dot + age label */}
-        <div className="flex-shrink-0 flex flex-col items-end gap-1 pt-0.5">
+        {/* Right meta: urgency dot + relative label + exact timestamp (Goal 1) */}
+        <div className="flex-shrink-0 flex flex-col items-end gap-0.5 pt-0.5">
           <div className="flex items-center gap-1.5">
             <span
               className={cn(
@@ -333,6 +343,10 @@ export default function RegistrationInboxCard({
               {urgency.label}
             </span>
           </div>
+          {/* Exact timestamp — never hidden, always shown alongside the relative label */}
+          <span className="text-[0.65rem] text-[var(--muted)]/80 whitespace-nowrap tabular-nums">
+            {exactTimestamp}
+          </span>
         </div>
       </div>
     </div>

@@ -24,6 +24,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Baby,
+  MapPin,
+  FileText,
 } from "lucide-react";
 import { RegistrationStatus } from "@prisma/client";
 import { cn } from "@/lib/cn";
@@ -33,10 +35,13 @@ import {
   getGenderLabel,
   TARGET_GROUP_COLORS,
 } from "@/lib/registrations/classification";
-import { formatDate, formatDateTime } from "@/lib/tenant-runtime/formatters";
+import { formatDate, formatDateTime, formatDateShort, formatTime } from "@/lib/tenant-runtime/formatters";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import { getInitials } from "@/lib/inbox/types";
 import { WEBSITE_SOURCE } from "@/lib/registrations/constants";
+import { getRegistrationDetailFields } from "@/lib/registrations/detail-view";
+
+const NOT_PROVIDED = "Nicht angegeben";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -168,6 +173,78 @@ function DataRow({ label, children }: { label: string; children: React.ReactNode
     <div className="sce-data-field">
       <span className="sce-data-label">{label}</span>
       <div className="mt-0.5">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Goal 6 (REGISTRATION-01D): a label is never hidden because its value is
+ * empty — it always renders, falling back to "Nicht angegeben" so admins
+ * can tell "not collected" apart from a rendering bug.
+ */
+function FieldValue({ value, mono = false }: { value: string | null | undefined; mono?: boolean }) {
+  if (!value) {
+    return <span className="sce-data-value-empty text-sm">{NOT_PROVIDED}</span>;
+  }
+  return (
+    <span className={cn("sce-data-value text-sm", mono && "font-mono text-[0.72rem] text-[var(--muted)]")}>
+      {value}
+    </span>
+  );
+}
+
+/** Label + FieldValue in one line, for compact grids. */
+function LabeledField({ label, value, mono }: { label: string; value: string | null | undefined; mono?: boolean }) {
+  return (
+    <DataRow label={label}>
+      <FieldValue value={value} mono={mono} />
+    </DataRow>
+  );
+}
+
+/**
+ * Tri-state consent row: true → accepted styling, false → declined styling,
+ * null/undefined (never submitted/collected) → neutral "Nicht angegeben".
+ * Goal 6: the label always renders regardless of state.
+ */
+function ConsentRow({
+  label,
+  value,
+  trueLabel,
+  falseLabel,
+  unknownLabel,
+}: {
+  label: string;
+  value: boolean | null;
+  trueLabel: string;
+  falseLabel: string;
+  unknownLabel: string;
+}) {
+  const state = value === true ? "true" : value === false ? "false" : "unknown";
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={cn(
+          "h-4 w-4 flex-shrink-0 rounded-full flex items-center justify-center text-[0.6rem]",
+          state === "true" && "bg-emerald-100 text-emerald-700",
+          state === "false" && "bg-red-100 text-red-700",
+          state === "unknown" && "bg-slate-100 text-slate-400",
+        )}
+        aria-hidden
+      >
+        {state === "true" ? "✓" : state === "false" ? "✗" : "—"}
+      </span>
+      <span className="text-sm text-[var(--text-2)]">{label}</span>
+      <span
+        className={cn(
+          "text-[0.65rem] font-semibold",
+          state === "true" && "text-emerald-600",
+          state === "false" && "text-red-600",
+          state === "unknown" && "italic text-[var(--muted)]",
+        )}
+      >
+        {state === "true" ? trueLabel : state === "false" ? falseLabel : unknownLabel}
+      </span>
     </div>
   );
 }
@@ -392,6 +469,15 @@ export default function RegistrationDetailDrawer({
   const websitePayload = isWebsiteSource ? getWebsitePayload(registration.payloadJson) : null;
   const isPossibleDuplicate = websitePayload?.possibleDuplicate === true;
 
+  // Goal 3/4 (REGISTRATION-01D): normalized read-model covering every field
+  // collected across the pipeline (website → API → DB → payloadJson).
+  const fields = getRegistrationDetailFields(registration);
+  const genderCode = extractGenderFromPayload(registration.payloadJson);
+  const isAdultForGender = registration.birthYear
+    ? new Date().getFullYear() - registration.birthYear >= 18
+    : false;
+  const genderDisplayLabel = getGenderLabel(genderCode, isAdultForGender) ?? fields.player.gender;
+
   return (
     <>
       {/* Backdrop — subtle on desktop, dark on mobile */}
@@ -424,63 +510,85 @@ export default function RegistrationDetailDrawer({
         style={{ transitionDuration: "220ms" }}
       >
         {/* ── Header ───────────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 flex items-start gap-4 px-6 py-5 border-b border-[var(--border)] bg-[var(--surface)]">
-          {/* Applicant avatar */}
-          <div className="flex-shrink-0 h-11 w-11 rounded-full border-2 border-[color-mix(in_srgb,var(--tenant-primary)_20%,white)] bg-[color-mix(in_srgb,var(--tenant-primary)_10%,white)] flex items-center justify-center text-sm font-bold uppercase text-[var(--tenant-primary)]">
-            {initials}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-semibold text-[var(--foreground)]">
-                {registration.firstName} {registration.lastName}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 h-6 rounded-full border px-2.5 text-[0.7rem] font-semibold",
-                  typeConfig.colorClass,
-                )}
-              >
-                <TypeIcon className="h-3.5 w-3.5" aria-hidden />
-                <span>{typeConfig.label}</span>
-              </span>
-              <span
-                className={cn(
-                  "inline-flex h-6 items-center rounded-full border px-2.5 text-[0.7rem] font-semibold",
-                  STATUS_BADGE[registration.status],
-                )}
-              >
-                {STATUS_LABELS[registration.status]}
-              </span>
-              {isWebsiteSource && (
-                <span className="inline-flex items-center gap-1.5 h-6 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-[0.7rem] font-semibold text-indigo-700">
-                  <Globe className="h-3.5 w-3.5" aria-hidden />
-                  Website
-                </span>
-              )}
+        <div className="flex-shrink-0 border-b border-[var(--border)] bg-[var(--surface)]">
+          <div className="flex items-start gap-4 px-6 py-5">
+            {/* Applicant avatar */}
+            <div className="flex-shrink-0 h-11 w-11 rounded-full border-2 border-[color-mix(in_srgb,var(--tenant-primary)_20%,white)] bg-[color-mix(in_srgb,var(--tenant-primary)_10%,white)] flex items-center justify-center text-sm font-bold uppercase text-[var(--tenant-primary)]">
+              {initials}
             </div>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              {registration.email}
-            </p>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-base font-semibold text-[var(--foreground)]">
+                  {registration.firstName} {registration.lastName}
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 h-6 rounded-full border px-2.5 text-[0.7rem] font-semibold",
+                    typeConfig.colorClass,
+                  )}
+                >
+                  <TypeIcon className="h-3.5 w-3.5" aria-hidden />
+                  <span>{typeConfig.label}</span>
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex h-6 items-center rounded-full border px-2.5 text-[0.7rem] font-semibold",
+                    STATUS_BADGE[registration.status],
+                  )}
+                >
+                  {STATUS_LABELS[registration.status]}
+                </span>
+                {isWebsiteSource && (
+                  <span className="inline-flex items-center gap-1.5 h-6 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-[0.7rem] font-semibold text-indigo-700">
+                    <Globe className="h-3.5 w-3.5" aria-hidden />
+                    Website
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {registration.email}
+              </p>
+            </div>
+
+            <div className="flex-shrink-0 flex items-center gap-1">
+              <a
+                href={detailHref}
+                className="sce-icon-button"
+                title="Vollansicht öffnen"
+                tabIndex={0}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+              <button
+                type="button"
+                onClick={onClose}
+                className="sce-icon-button"
+                aria-label="Schließen"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex-shrink-0 flex items-center gap-1">
-            <a
-              href={detailHref}
-              className="sce-icon-button"
-              title="Vollansicht öffnen"
-              tabIndex={0}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </a>
-            <button
-              type="button"
-              onClick={onClose}
-              className="sce-icon-button"
-              aria-label="Schließen"
-            >
-              <X className="h-4 w-4" />
-            </button>
+          {/* Goal 2 (REGISTRATION-01D): exact registration timestamp, always
+              visible in the header — never requires scrolling to Systemdaten. */}
+          <div className="px-6 pb-4">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5">
+              <Calendar className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
+              <span className="text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+                Registriert
+              </span>
+              <span className="text-xs font-semibold text-[var(--foreground)] tabular-nums">
+                {formatDateShort(registration.submittedAt, cfg)}
+              </span>
+              <span className="text-[var(--border-strong)]" aria-hidden>
+                ·
+              </span>
+              <span className="text-xs font-semibold text-[var(--foreground)] tabular-nums">
+                {formatTime(registration.submittedAt, cfg)}
+              </span>
+            </span>
           </div>
         </div>
 
@@ -527,9 +635,9 @@ export default function RegistrationDetailDrawer({
             </div>
           )}
 
-          {/* Status + workflow */}
+          {/* Registrierung (Registration) — workflow status, assignment, routing */}
           <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
-            <SectionLabel icon={UserCheck}>Bearbeitung</SectionLabel>
+            <SectionLabel icon={UserCheck}>Registrierung</SectionLabel>
 
             {updateError && (
               <div className="mb-4 rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-2 text-[0.75rem] text-rose-700">
@@ -642,205 +750,177 @@ export default function RegistrationDetailDrawer({
             )}
           </div>
 
-          {/* Stammdaten / contact */}
+          {/* Spieler (Player) */}
           <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
-            <SectionLabel icon={User}>Stammdaten</SectionLabel>
+            <SectionLabel icon={User}>Spieler</SectionLabel>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LabeledField label="Vorname" value={fields.player.firstName} />
+              <LabeledField label="Nachname" value={fields.player.lastName} />
+              <LabeledField label="Geschlecht" value={genderDisplayLabel} />
+              <LabeledField
+                label="Geburtsdatum"
+                value={fields.player.birthDate ? formatDate(fields.player.birthDate, cfg) : null}
+              />
+              <LabeledField
+                label="Jahrgang"
+                value={fields.player.birthYear ? String(fields.player.birthYear) : null}
+              />
+              <LabeledField label="Nationalität" value={fields.player.nationality} />
+            </div>
+          </div>
 
+          {/* Adresse (Address) — Goal 1/4: postcode & city must become visible */}
+          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+            <SectionLabel icon={MapPin}>Adresse</SectionLabel>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LabeledField label="Strasse" value={fields.address.street} />
+              <LabeledField label="Hausnummer" value={fields.address.houseNumber} />
+              <LabeledField label="Postleitzahl" value={fields.address.postalCode} />
+              <LabeledField label="Ort" value={fields.address.city} />
+              <LabeledField label="Land" value={fields.address.country} />
+            </div>
+          </div>
+
+          {/* Kontakt (Contact) */}
+          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+            <SectionLabel icon={Mail}>Kontakt</SectionLabel>
             <div className="grid gap-4 sm:grid-cols-2">
               <DataRow label="E-Mail">
                 <a
-                  href={`mailto:${registration.email}`}
+                  href={`mailto:${fields.contact.email}`}
                   className="sce-link-primary flex items-center gap-1.5 text-sm"
                 >
                   <Mail className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-                  {registration.email}
+                  {fields.contact.email}
                 </a>
               </DataRow>
-
-              {registration.phone ? (
+              {fields.contact.phone ? (
                 <DataRow label="Telefon">
                   <a
-                    href={`tel:${registration.phone}`}
+                    href={`tel:${fields.contact.phone}`}
                     className="sce-link-primary flex items-center gap-1.5 text-sm"
                   >
                     <Phone className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-                    {registration.phone}
+                    {fields.contact.phone}
                   </a>
                 </DataRow>
-              ) : null}
-
-              {registration.birthYear ? (
-                <DataRow label="Jahrgang">
-                  <span className="sce-data-value text-sm">
-                    {registration.birthYear}
-                  </span>
-                </DataRow>
-              ) : null}
-
-              {contactName ? (
-                <DataRow label="Kontaktperson">
-                  <span className="sce-data-value text-sm">{contactName}</span>
-                </DataRow>
-              ) : null}
-
-              {registration.source ? (
-                <DataRow label="Quelle">
-                  <span className="sce-data-value text-sm">
-                    {registration.source}
-                  </span>
-                </DataRow>
-              ) : null}
+              ) : (
+                <LabeledField label="Telefon" value={null} />
+              )}
+              {contactName ? <LabeledField label="Kontaktperson" value={contactName} /> : null}
             </div>
           </div>
 
-          {/* Message */}
+          {/* Erziehungsberechtigte/r (Parent / Guardian) */}
           <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
-            <SectionLabel icon={MessageSquare}>Nachricht</SectionLabel>
-            {registration.message ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-2)]">
-                {registration.message}
-              </p>
-            ) : (
-              <p className="text-sm italic text-[var(--muted)]">
-                Keine Nachricht hinterlegt.
-              </p>
-            )}
+            <SectionLabel icon={Baby}>Erziehungsberechtigte/r</SectionLabel>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LabeledField label="Name" value={fields.parent?.name ?? null} />
+              {fields.parent?.email ? (
+                <DataRow label="E-Mail">
+                  <a
+                    href={`mailto:${fields.parent.email}`}
+                    className="sce-link-primary flex items-center gap-1.5 text-sm"
+                  >
+                    <Mail className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                    {fields.parent.email}
+                  </a>
+                </DataRow>
+              ) : (
+                <LabeledField label="E-Mail" value={null} />
+              )}
+              {fields.parent?.phone ? (
+                <DataRow label="Telefon">
+                  <a
+                    href={`tel:${fields.parent.phone}`}
+                    className="sce-link-primary flex items-center gap-1.5 text-sm"
+                  >
+                    <Phone className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                    {fields.parent.phone}
+                  </a>
+                </DataRow>
+              ) : (
+                <LabeledField label="Telefon" value={null} />
+              )}
+            </div>
           </div>
 
-          {/* Parent / guardian — website submissions only */}
-          {websitePayload?.parentOrGuardian &&
-            (websitePayload.parentOrGuardian.firstName ||
-              websitePayload.parentOrGuardian.lastName ||
-              websitePayload.parentOrGuardian.email ||
-              websitePayload.parentOrGuardian.phone) && (
-              <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
-                <SectionLabel icon={Baby}>Erziehungsberechtigte/r</SectionLabel>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {(websitePayload.parentOrGuardian.firstName ||
-                    websitePayload.parentOrGuardian.lastName) && (
-                    <DataRow label="Name">
-                      <span className="sce-data-value text-sm">
-                        {[
-                          websitePayload.parentOrGuardian.firstName,
-                          websitePayload.parentOrGuardian.lastName,
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      </span>
-                    </DataRow>
-                  )}
-                  {websitePayload.parentOrGuardian.email && (
-                    <DataRow label="E-Mail">
-                      <a
-                        href={`mailto:${websitePayload.parentOrGuardian.email}`}
-                        className="sce-link-primary flex items-center gap-1.5 text-sm"
-                      >
-                        <Mail className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-                        {websitePayload.parentOrGuardian.email}
-                      </a>
-                    </DataRow>
-                  )}
-                  {websitePayload.parentOrGuardian.phone && (
-                    <DataRow label="Telefon">
-                      <a
-                        href={`tel:${websitePayload.parentOrGuardian.phone}`}
-                        className="sce-link-primary flex items-center gap-1.5 text-sm"
-                      >
-                        <Phone className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-                        {websitePayload.parentOrGuardian.phone}
-                      </a>
-                    </DataRow>
-                  )}
-                </div>
-              </div>
-            )}
-
-          {/* Consent — website submissions only */}
-          {websitePayload?.consent && (
-            <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
-              <SectionLabel icon={CheckCircle}>Einwilligungen</SectionLabel>
-              <div className="grid gap-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "h-4 w-4 flex-shrink-0 rounded-full flex items-center justify-center text-[0.6rem]",
-                      websitePayload.consent.privacyAccepted
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-red-100 text-red-700",
-                    )}
-                    aria-hidden
-                  >
-                    {websitePayload.consent.privacyAccepted ? "✓" : "✗"}
-                  </span>
-                  <span className="text-sm text-[var(--text-2)]">Datenschutzerklärung</span>
-                  <span
-                    className={cn(
-                      "text-[0.65rem] font-semibold",
-                      websitePayload.consent.privacyAccepted
-                        ? "text-emerald-600"
-                        : "text-red-600",
-                    )}
-                  >
-                    {websitePayload.consent.privacyAccepted ? "Akzeptiert" : "Nicht akzeptiert"}
-                  </span>
-                </div>
-                {websitePayload.consent.communicationAccepted !== undefined && (
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "h-4 w-4 flex-shrink-0 rounded-full flex items-center justify-center text-[0.6rem]",
-                        websitePayload.consent.communicationAccepted
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-500",
-                      )}
-                      aria-hidden
-                    >
-                      {websitePayload.consent.communicationAccepted ? "✓" : "—"}
-                    </span>
-                    <span className="text-sm text-[var(--text-2)]">Kommunikation / Newsletter</span>
-                    <span
-                      className={cn(
-                        "text-[0.65rem] font-semibold",
-                        websitePayload.consent.communicationAccepted
-                          ? "text-emerald-600"
-                          : "text-slate-500",
-                      )}
-                    >
-                      {websitePayload.consent.communicationAccepted ? "Ja" : "Nein"}
-                    </span>
-                  </div>
-                )}
-                {websitePayload.consent.photoConsent !== undefined && (
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "h-4 w-4 flex-shrink-0 rounded-full flex items-center justify-center text-[0.6rem]",
-                        websitePayload.consent.photoConsent
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-500",
-                      )}
-                      aria-hidden
-                    >
-                      {websitePayload.consent.photoConsent ? "✓" : "—"}
-                    </span>
-                    <span className="text-sm text-[var(--text-2)]">Fotofreigabe</span>
-                    <span
-                      className={cn(
-                        "text-[0.65rem] font-semibold",
-                        websitePayload.consent.photoConsent
-                          ? "text-emerald-600"
-                          : "text-slate-500",
-                      )}
-                    >
-                      {websitePayload.consent.photoConsent ? "Ja" : "Nein"}
-                    </span>
-                  </div>
-                )}
-              </div>
+          {/* Fussball (Football) */}
+          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+            <SectionLabel icon={Volleyball}>Fussball</SectionLabel>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LabeledField label="Gewünschtes Team" value={fields.football?.requestedTeam ?? null} />
+              <LabeledField label="Gewünschte Altersgruppe" value={fields.football?.requestedAgeGroup ?? null} />
+              <LabeledField label="Bevorzugtes Training" value={fields.football?.preferredTraining ?? null} />
+              <LabeledField label="Spielerfahrung" value={fields.football?.playingExperience ?? null} />
+              <LabeledField label="Aktueller Verein" value={fields.football?.currentClub ?? null} />
+              <LabeledField label="Ehemaliger Verein" value={fields.football?.previousClub ?? null} />
+              <LabeledField label="Position" value={fields.football?.position ?? null} />
             </div>
-          )}
+          </div>
 
-          {/* System metadata */}
+          {/* Zusätzliche Angaben (Additional Information) */}
+          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+            <SectionLabel icon={MessageSquare}>Zusätzliche Angaben</SectionLabel>
+            <div className="grid gap-4">
+              <DataRow label="Nachricht">
+                {fields.additional.message ? (
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-2)]">
+                    {fields.additional.message}
+                  </p>
+                ) : (
+                  <FieldValue value={null} />
+                )}
+              </DataRow>
+              <LabeledField label="Bemerkungen" value={fields.additional.remarks} />
+              <DataRow label="Notizen von der Website">
+                {fields.additional.additionalRawData.length > 0 ? (
+                  <div className="grid gap-2">
+                    {fields.additional.additionalRawData.map((entry) => (
+                      <div key={entry.key} className="flex items-start gap-2 text-sm">
+                        <FileText className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-[var(--muted)]" aria-hidden />
+                        <span className="text-[var(--text-2)]">
+                          <span className="font-medium">{entry.label}:</span> {entry.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <FieldValue value={null} />
+                )}
+              </DataRow>
+            </div>
+          </div>
+
+          {/* Einwilligungen (Consents) */}
+          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+            <SectionLabel icon={CheckCircle}>Einwilligungen</SectionLabel>
+            <div className="grid gap-2">
+              <ConsentRow
+                label="Datenschutzerklärung"
+                value={fields.consents.privacyAccepted}
+                trueLabel="Akzeptiert"
+                falseLabel="Nicht akzeptiert"
+                unknownLabel={NOT_PROVIDED}
+              />
+              <ConsentRow
+                label="Marketing-Einwilligung"
+                value={fields.consents.marketingConsent}
+                trueLabel="Ja"
+                falseLabel="Nein"
+                unknownLabel={NOT_PROVIDED}
+              />
+              <ConsentRow
+                label="Fotofreigabe"
+                value={fields.consents.photoConsent}
+                trueLabel="Ja"
+                falseLabel="Nein"
+                unknownLabel={NOT_PROVIDED}
+              />
+            </div>
+          </div>
+
+          {/* Systemdaten (System Information) */}
           <div className="px-6 pt-5 pb-8">
             <SectionLabel icon={Hash}>Systemdaten</SectionLabel>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -850,14 +930,12 @@ export default function RegistrationDetailDrawer({
                   {formatDateTime(registration.submittedAt, cfg)}
                 </span>
               </DataRow>
-              <DataRow label="Zuletzt geändert">
-                <span className="sce-data-value text-sm">
-                  {formatDate(registration.updatedAt, cfg)}
-                </span>
-              </DataRow>
-              <DataRow label="ID">
+              <LabeledField label="Zuletzt geändert" value={formatDate(registration.updatedAt, cfg)} />
+              <LabeledField label="Quelle" value={fields.technical.source} />
+              <LabeledField label="Sprache" value={fields.technical.locale} />
+              <DataRow label="Interne Registrierungs-ID">
                 <code className="font-mono text-[0.7rem] text-[var(--muted)]">
-                  {registration.id}
+                  {fields.technical.internalId}
                 </code>
               </DataRow>
             </div>

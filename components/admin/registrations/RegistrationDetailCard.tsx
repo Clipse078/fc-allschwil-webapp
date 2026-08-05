@@ -5,8 +5,11 @@ import { useState } from "react";
 import { RegistrationStatus } from "@prisma/client";
 import {
   ArrowLeft,
+  Baby,
   Calendar,
+  CheckCircle,
   Clock,
+  FileText,
   Hash,
   Mail,
   MapPin,
@@ -15,10 +18,22 @@ import {
   User,
   UserCheck,
   Users,
+  Volleyball,
 } from "lucide-react";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationDetail } from "@/lib/registrations/queries";
-import { formatDate, formatDateTime } from "@/lib/tenant-runtime/formatters";
+import {
+  formatDate,
+  formatDateShort,
+  formatTime,
+} from "@/lib/tenant-runtime/formatters";
+import {
+  extractGenderFromPayload,
+  getGenderLabel,
+} from "@/lib/registrations/classification";
+import { getRegistrationDetailFields } from "@/lib/registrations/detail-view";
+
+const NOT_PROVIDED = "Nicht angegeben";
 
 type AssignableUser = {
   id: string;
@@ -144,8 +159,59 @@ function DataField({
           </span>
         )
       ) : (
-        <span className="sce-data-value-empty">—</span>
+        // Goal 6 (REGISTRATION-01D): never a bare dash — always distinguish
+        // "not collected" from a rendering bug.
+        <span className="sce-data-value-empty">{NOT_PROVIDED}</span>
       )}
+    </div>
+  );
+}
+
+/**
+ * Tri-state consent row: true → accepted styling, false → declined styling,
+ * null/undefined (never submitted/collected) → neutral "Nicht angegeben".
+ */
+function ConsentField({
+  label,
+  value,
+  trueLabel,
+  falseLabel,
+}: {
+  label: string;
+  value: boolean | null;
+  trueLabel: string;
+  falseLabel: string;
+}) {
+  const state = value === true ? "true" : value === false ? "false" : "unknown";
+  return (
+    <div className="sce-data-field">
+      <span className="sce-data-label">{label}</span>
+      <span className="flex items-center gap-1.5">
+        <span
+          className={
+            "inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[0.6rem] " +
+            (state === "true"
+              ? "bg-emerald-100 text-emerald-700"
+              : state === "false"
+                ? "bg-red-100 text-red-700"
+                : "bg-slate-100 text-slate-400")
+          }
+          aria-hidden
+        >
+          {state === "true" ? "✓" : state === "false" ? "✗" : "—"}
+        </span>
+        <span
+          className={
+            state === "unknown"
+              ? "sce-data-value-empty"
+              : state === "true"
+                ? "text-sm font-medium text-emerald-700"
+                : "text-sm font-medium text-red-700"
+          }
+        >
+          {state === "true" ? trueLabel : state === "false" ? falseLabel : NOT_PROVIDED}
+        </span>
+      </span>
     </div>
   );
 }
@@ -170,6 +236,15 @@ export default function RegistrationDetailCard({
   const initials = getInitials(registration.firstName, registration.lastName);
   const typeLabel = TYPE_LABELS[registration.type] ?? registration.type;
   const backHref = `/tenant/${tenantSlug}/cockpit/registrations`;
+
+  // Goal 3/4 (REGISTRATION-01D): normalized read-model covering every field
+  // collected across the pipeline (website → API → DB → payloadJson).
+  const fields = getRegistrationDetailFields(registration);
+  const genderCode = extractGenderFromPayload(registration.payloadJson);
+  const isAdultForGender = registration.birthYear
+    ? new Date().getFullYear() - registration.birthYear >= 18
+    : false;
+  const genderDisplayLabel = getGenderLabel(genderCode, isAdultForGender) ?? fields.player.gender;
 
   async function patchRegistration(patch: Record<string, unknown>) {
     setIsUpdating(true);
@@ -279,12 +354,20 @@ export default function RegistrationDetailCard({
             <Mail className="h-4 w-4 text-white/60" />
             <span>{registration.email}</span>
           </div>
+          {/* Goal 2 (REGISTRATION-01D): "Registriert" — date + time immediately
+              visible in the hero, never requires scrolling to Systemdaten. */}
           <div className="flex items-center gap-2 text-sm text-white/80">
             <Clock className="h-4 w-4 text-white/60" />
             <span>
-              Eingegangen:{" "}
-              <span className="font-semibold text-white">
-                {formatDateTime(registration.submittedAt, cfg)}
+              Registriert:{" "}
+              <span className="font-semibold text-white tabular-nums">
+                {formatDateShort(registration.submittedAt, cfg)}
+              </span>{" "}
+              <span className="text-white/50" aria-hidden>
+                ·
+              </span>{" "}
+              <span className="font-semibold text-white tabular-nums">
+                {formatTime(registration.submittedAt, cfg)}
               </span>
             </span>
           </div>
@@ -306,38 +389,29 @@ export default function RegistrationDetailCard({
       <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
         {/* Main column */}
         <div className="space-y-5">
-          {/* Kontaktdaten */}
+          {/* Spieler (Player) */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-[var(--muted)]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Kontaktdaten
+                  Spieler
                 </p>
               </div>
             </div>
             <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
+              <DataField label="Vorname" value={fields.player.firstName} />
+              <DataField label="Nachname" value={fields.player.lastName} />
+              <DataField label="Geschlecht" value={genderDisplayLabel} />
               <DataField
-                label="E-Mail"
-                value={registration.email}
-                icon={<Mail className="h-3.5 w-3.5" />}
-                href={`mailto:${registration.email}`}
-              />
-              <DataField
-                label="Telefon"
-                value={registration.phone}
-                icon={<Phone className="h-3.5 w-3.5" />}
-                href={registration.phone ? `tel:${registration.phone}` : undefined}
+                label="Geburtsdatum"
+                value={fields.player.birthDate ? formatDate(fields.player.birthDate, cfg) : null}
               />
               <DataField
                 label="Jahrgang"
-                value={
-                  registration.birthYear
-                    ? String(registration.birthYear)
-                    : null
-                }
+                value={fields.player.birthYear ? String(fields.player.birthYear) : null}
               />
-              <DataField label="Kontaktperson" value={contactName} />
+              <DataField label="Nationalität" value={fields.player.nationality} />
               {routingSuggestion ? (
                 <div className="sce-data-field">
                   <span className="sce-data-label">Routing-Vorschlag</span>
@@ -349,30 +423,174 @@ export default function RegistrationDetailCard({
               ) : (
                 <DataField label="Routing-Vorschlag" value={null} />
               )}
-              <DataField label="Quelle" value={registration.source} />
             </div>
           </div>
 
-          {/* Nachricht */}
+          {/* Adresse (Address) — Goal 1/4: postcode & city must become visible */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Adresse
+                </p>
+              </div>
+            </div>
+            <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
+              <DataField label="Strasse" value={fields.address.street} />
+              <DataField label="Hausnummer" value={fields.address.houseNumber} />
+              <DataField label="Postleitzahl" value={fields.address.postalCode} />
+              <DataField label="Ort" value={fields.address.city} />
+              <DataField label="Land" value={fields.address.country} />
+            </div>
+          </div>
+
+          {/* Kontakt (Contact) */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Kontakt
+                </p>
+              </div>
+            </div>
+            <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
+              <DataField
+                label="E-Mail"
+                value={fields.contact.email}
+                icon={<Mail className="h-3.5 w-3.5" />}
+                href={`mailto:${fields.contact.email}`}
+              />
+              <DataField
+                label="Telefon"
+                value={fields.contact.phone}
+                icon={<Phone className="h-3.5 w-3.5" />}
+                href={fields.contact.phone ? `tel:${fields.contact.phone}` : undefined}
+              />
+              <DataField label="Kontaktperson" value={contactName} />
+            </div>
+          </div>
+
+          {/* Erziehungsberechtigte/r (Parent / Guardian) */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <Baby className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Erziehungsberechtigte/r
+                </p>
+              </div>
+            </div>
+            <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
+              <DataField label="Name" value={fields.parent?.name ?? null} />
+              <DataField
+                label="E-Mail"
+                value={fields.parent?.email ?? null}
+                icon={fields.parent?.email ? <Mail className="h-3.5 w-3.5" /> : undefined}
+                href={fields.parent?.email ? `mailto:${fields.parent.email}` : undefined}
+              />
+              <DataField
+                label="Telefon"
+                value={fields.parent?.phone ?? null}
+                icon={fields.parent?.phone ? <Phone className="h-3.5 w-3.5" /> : undefined}
+                href={fields.parent?.phone ? `tel:${fields.parent.phone}` : undefined}
+              />
+            </div>
+          </div>
+
+          {/* Fussball (Football) */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <Volleyball className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Fussball
+                </p>
+              </div>
+            </div>
+            <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
+              <DataField label="Gewünschtes Team" value={fields.football?.requestedTeam ?? null} />
+              <DataField label="Gewünschte Altersgruppe" value={fields.football?.requestedAgeGroup ?? null} />
+              <DataField label="Bevorzugtes Training" value={fields.football?.preferredTraining ?? null} />
+              <DataField label="Spielerfahrung" value={fields.football?.playingExperience ?? null} />
+              <DataField label="Aktueller Verein" value={fields.football?.currentClub ?? null} />
+              <DataField label="Ehemaliger Verein" value={fields.football?.previousClub ?? null} />
+              <DataField label="Position" value={fields.football?.position ?? null} />
+            </div>
+          </div>
+
+          {/* Zusätzliche Angaben (Additional Information) */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-[var(--muted)]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Nachricht
+                  Zusätzliche Angaben
                 </p>
               </div>
             </div>
-            <div className="sce-detail-section-body">
-              {registration.message ? (
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-2)]">
-                  {registration.message}
+            <div className="sce-detail-section-body space-y-4">
+              <div className="sce-data-field">
+                <span className="sce-data-label">Nachricht</span>
+                {fields.additional.message ? (
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-2)]">
+                    {fields.additional.message}
+                  </p>
+                ) : (
+                  <span className="sce-data-value-empty">{NOT_PROVIDED}</span>
+                )}
+              </div>
+              <DataField label="Bemerkungen" value={fields.additional.remarks} />
+              <div className="sce-data-field">
+                <span className="sce-data-label">Notizen von der Website</span>
+                {fields.additional.additionalRawData.length > 0 ? (
+                  <div className="mt-1 grid gap-2">
+                    {fields.additional.additionalRawData.map((entry) => (
+                      <div key={entry.key} className="flex items-start gap-2 text-sm">
+                        <FileText className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-[var(--muted)]" />
+                        <span className="text-[var(--text-2)]">
+                          <span className="font-medium">{entry.label}:</span> {entry.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="sce-data-value-empty">{NOT_PROVIDED}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Einwilligungen (Consents) */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Einwilligungen
                 </p>
-              ) : (
-                <p className="text-sm italic text-[var(--muted)]">
-                  Keine Nachricht hinterlegt.
-                </p>
-              )}
+              </div>
+            </div>
+            <div className="sce-detail-section-body grid gap-4 sm:grid-cols-2">
+              <ConsentField
+                label="Datenschutzerklärung"
+                value={fields.consents.privacyAccepted}
+                trueLabel="Akzeptiert"
+                falseLabel="Nicht akzeptiert"
+              />
+              <ConsentField
+                label="Marketing-Einwilligung"
+                value={fields.consents.marketingConsent}
+                trueLabel="Ja"
+                falseLabel="Nein"
+              />
+              <ConsentField
+                label="Fotofreigabe"
+                value={fields.consents.photoConsent}
+                trueLabel="Ja"
+                falseLabel="Nein"
+              />
             </div>
           </div>
         </div>
@@ -511,11 +729,17 @@ export default function RegistrationDetailCard({
               </div>
             </div>
             <div className="sce-detail-section-body space-y-4">
+              {/* Goal 2/4 (REGISTRATION-01D): exact registration timestamp —
+                  date and time, always visible, never just relative time. */}
               <div className="sce-data-field">
-                <span className="sce-data-label">Eingegangen</span>
-                <span className="sce-data-value flex items-center gap-1.5">
+                <span className="sce-data-label">Registriert</span>
+                <span className="sce-data-value flex items-center gap-1.5 tabular-nums">
                   <Calendar className="h-3.5 w-3.5 text-[var(--muted)]" />
-                  {formatDate(registration.submittedAt, cfg)}
+                  {formatDateShort(registration.submittedAt, cfg)}
+                  <span className="text-[var(--border-strong)]" aria-hidden>
+                    ·
+                  </span>
+                  {formatTime(registration.submittedAt, cfg)}
                 </span>
               </div>
               <div className="sce-data-field">
@@ -530,10 +754,12 @@ export default function RegistrationDetailCard({
                   {formatDate(registration.updatedAt, cfg)}
                 </span>
               </div>
+              <DataField label="Quelle" value={fields.technical.source} />
+              <DataField label="Sprache" value={fields.technical.locale} />
               <div className="sce-data-field">
-                <span className="sce-data-label">ID</span>
+                <span className="sce-data-label">Interne Registrierungs-ID</span>
                 <code className="font-mono text-[0.72rem] text-[var(--muted)]">
-                  {registration.id}
+                  {fields.technical.internalId}
                 </code>
               </div>
             </div>

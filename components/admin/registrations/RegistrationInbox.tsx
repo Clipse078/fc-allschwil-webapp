@@ -97,6 +97,8 @@ function InboxGroup({
   selectedId,
   onSelect,
   defaultOpen = true,
+  locale,
+  timezone,
 }: {
   label: string;
   dotClass: string;
@@ -104,6 +106,8 @@ function InboxGroup({
   selectedId: string | null;
   onSelect: (r: RegistrationListItem) => void;
   defaultOpen?: boolean;
+  locale: string;
+  timezone: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -138,6 +142,8 @@ function InboxGroup({
               registration={reg}
               isSelected={selectedId === reg.id}
               onClick={() => onSelect(reg)}
+              locale={locale}
+              timezone={timezone}
             />
           ))}
         </div>
@@ -437,6 +443,8 @@ export default function RegistrationInbox({
               selectedId={selectedRegistration?.id ?? null}
               onSelect={setSelectedRegistration}
               defaultOpen={idx === 0 || group.items.length > 0}
+              locale={locale}
+              timezone={timezone}
             />
           ))
         )}
