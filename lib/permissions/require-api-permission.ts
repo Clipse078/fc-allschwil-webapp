@@ -1,8 +1,17 @@
 ﻿import { auth } from "@/auth";
-import { hasPermission } from "@/lib/permissions/has-permission";
+import { prisma } from "@/lib/db/prisma";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import type { PermissionKey } from "@/lib/permissions/permissions";
 
-export async function requireApiPermission(permissionKey: PermissionKey) {
+/**
+ * RPERM-04 — Authoritative API permission gate.
+ *
+ * See requirePermission() (lib/permissions/require-permission.ts) for the
+ * full resolution model. `tenantId` defaults to the session's
+ * `activeTenantId`; pass an explicit value only to check a permission in a
+ * tenant other than the caller's active one.
+ */
+export async function requireApiPermission(permissionKey: PermissionKey, tenantId?: string) {
   const session = await auth();
 
   if (!session?.user) {
@@ -14,7 +23,17 @@ export async function requireApiPermission(permissionKey: PermissionKey) {
     };
   }
 
-  if (!hasPermission(session, permissionKey)) {
+  const effectiveTenantId = tenantId ?? session.user.activeTenantId ?? undefined;
+
+  const resolver = createEffectivePermissionResolver(prisma);
+  const { platform, tenant } = await resolver.getEffectivePermissions({
+    userId: session.user.id,
+    tenantId: effectiveTenantId,
+  });
+
+  const allowed = platform.includes(permissionKey) || tenant.includes(permissionKey);
+
+  if (!allowed) {
     return {
       ok: false as const,
       status: 403,

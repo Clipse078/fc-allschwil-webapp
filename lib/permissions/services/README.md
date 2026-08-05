@@ -140,15 +140,34 @@ The resolver answers authorization questions only. It never assigns roles or
 permissions automatically. Operational roles (Trainer, Website Publisher, etc.)
 must be assigned explicitly by authorized administrators.
 
-## Deferred Work (RPERM-04 and later)
+## RPERM-04 — Tenant Context Integration
 
-The following are intentionally NOT part of RPERM-03:
+RPERM-04 made this resolver the canonical authorization boundary. See
+`lib/tenants/README.md` for the full slice writeup. In short:
+
+- `requirePermission` / `requireAnyPermission` / `requireApiPermission` /
+  `requireApiAnyPermission` (`lib/permissions/require-*.ts`) now call
+  `getEffectivePermissions({ userId, tenantId })` live on every check —
+  `tenantId` defaults to `session.user.activeTenantId`, itself derived
+  exclusively from active `TenantMembership` rows (never `User.tenantId`).
+- The session-cached `permissionKeys` array (used by `hasPermission` /
+  `hasAnyPermission` for non-authoritative UI decisions) is now built the
+  same way at sign-in, closing the "Platform Super Admin inherits every
+  tenant permission" bug described below.
+- `Create User` / `Assign Role` (`app/api/users/create`,
+  `app/api/users/[userId]/roles`) always provision `TenantMembership` +
+  tenant-scoped `UserRole` rows for TENANT-scoped role assignments.
+
+## Deferred Work (post-RPERM-04)
+
+The following remain intentionally out of scope:
 
 - Roles & Permissions management UI
-- Tenant custom-role CRUD via `/dashboard/roles`
-- Broad API route migration to this resolver
-- Platform override / super-admin impersonation into tenant contexts
+- Tenant custom-role CRUD via `/dashboard/roles` (tenant `club_admin` roles
+  are currently materialized by `prisma/seed.ts`, one per tenant)
+- Multi-tenant switching UI (the data model — `availableTenants` — already
+  supports it; see `lib/tenants/README.md`)
 - Permission caching infrastructure (request-scoped or distributed)
 - Organization-unit / team / target-group permission inheritance
 - Audit log integration for permission resolutions
-- Matchcenter and Workspace permission migration
+- Full removal of the legacy `User.tenantId` column
