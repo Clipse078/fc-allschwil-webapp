@@ -15,7 +15,14 @@ export function extractGenderFromPayload(payloadJson: unknown): GenderCode {
     return null;
 
   const p = payloadJson as Record<string, unknown>;
-  const raw = (p.gender ?? p.geschlecht ?? p.sex ?? "") as string;
+  // Website submissions (lib/website/integration-contract.ts) nest gender
+  // under `person.gender`. Legacy / manual entries may store it top-level.
+  // REGISTRATION-01D: check both so classification and display never miss
+  // gender that was actually collected and persisted.
+  const person = (p.person && typeof p.person === "object" && !Array.isArray(p.person)
+    ? (p.person as Record<string, unknown>)
+    : null);
+  const raw = (person?.gender ?? p.gender ?? p.geschlecht ?? p.sex ?? "") as string;
 
   if (typeof raw !== "string" || !raw) return null;
 

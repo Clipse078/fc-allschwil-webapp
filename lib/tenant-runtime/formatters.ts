@@ -42,6 +42,7 @@
  *   formatDate(date, cfg, opts?)     "03. Juni 2026"
  *   formatDateShort(date, cfg)       "03.06.2026"
  *   formatDateTime(date, cfg)        "3. Juni 2026 um 12:30"
+ *   formatDateTimeCompact(date, cfg) "03.06.2026 · 12:30"
  *   formatTime(date, cfg)            "10:00"
  *   formatTodayDate(cfg)             "Mittwoch, 03. Juni 2026"
  *   formatCurrency(amount, cfg)      "CHF 1'234.50"
@@ -142,6 +143,16 @@ export function formatDateTime(date: Date | string, cfg: TenantFormatConfig): st
   } catch {
     return toDate(date).toISOString();
   }
+}
+
+/**
+ * Compact date + time: "03.06.2026 · 12:30"
+ *
+ * REGISTRATION-01D: used wherever an exact, never-hidden timestamp must be
+ * shown alongside a relative-time label (e.g. "Heute", "Vor 4 Tagen").
+ */
+export function formatDateTimeCompact(date: Date | string, cfg: TenantFormatConfig): string {
+  return `${formatDateShort(date, cfg)} · ${formatTime(date, cfg)}`;
 }
 
 /**
