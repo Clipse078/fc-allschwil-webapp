@@ -3,6 +3,10 @@ import { prisma } from "@/lib/db/prisma";
 import { auth, unstable_update } from "@/auth";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import {
+  resolveSessionPermissionKeys,
+  resolveTenantMembershipContext,
+} from "@/lib/auth/session-context";
 
 type RouteContext = {
   params: Promise<{
@@ -36,17 +40,7 @@ export async function POST(_: NextRequest, context: RouteContext) {
     where: { id: userId },
     include: {
       userRoles: {
-        include: {
-          role: {
-            include: {
-              rolePermissions: {
-                include: {
-                  permission: true,
-                },
-              },
-            },
-          },
-        },
+        select: { role: { select: { key: true } } },
       },
     },
   });
@@ -59,12 +53,16 @@ export async function POST(_: NextRequest, context: RouteContext) {
   }
 
   const roleKeys = Array.from(new Set(targetUser.userRoles.map((userRole) => userRole.role.key)));
-  const permissionKeys = Array.from(
-    new Set(
-      targetUser.userRoles.flatMap((userRole) =>
-        userRole.role.rolePermissions.map((rolePermission) => rolePermission.permission.key)
-      )
-    )
+
+  // RPERM-04: the impersonated session must be built through the exact same
+  // tenant-resolution model as a real login — TenantMembership-derived tenant
+  // context and resolver-derived permission keys, never a flatten of every
+  // role's permissions regardless of scope/tenant ownership.
+  const tenantContext = await resolveTenantMembershipContext(prisma, targetUser.id);
+  const permissionKeys = await resolveSessionPermissionKeys(
+    prisma,
+    targetUser.id,
+    tenantContext.activeTenantId,
   );
 
   const actorName =
@@ -83,6 +81,9 @@ export async function POST(_: NextRequest, context: RouteContext) {
       actorEmail: session.user.actorEmail ?? session.user.email,
       actorName: session.user.actorName ?? actorName,
       effectiveUserId: targetUser.id,
+      activeTenantId: tenantContext.activeTenantId,
+      activeMembershipId: tenantContext.activeMembershipId,
+      availableTenants: tenantContext.availableTenants,
     },
   });
 
