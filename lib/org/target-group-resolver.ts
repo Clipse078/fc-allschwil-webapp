@@ -292,16 +292,28 @@ async function resolveRoleKeys(keys: string[], ctx: ResolutionCtx): Promise<Memb
           lastName: true,
           email: true,
           isActive: true,
-          tenantId: true,
         },
       },
     },
   });
 
+  // RPERM-04: tenant membership is the canonical source of a user's tenant
+  // scope — never the legacy User.tenantId column. When ctx.tenantId is set,
+  // restrict results to users holding an active TenantMembership for it.
+  let allowedUserIds: Set<string> | null = null;
+  if (ctx.tenantId) {
+    const candidateUserIds = Array.from(new Set(userRoles.map((ur) => ur.user.id)));
+    const memberships = await prisma.tenantMembership.findMany({
+      where: { tenantId: ctx.tenantId, userId: { in: candidateUserIds }, isActive: true },
+      select: { userId: true },
+    });
+    allowedUserIds = new Set(memberships.map((m) => m.userId));
+  }
+
   const results: MemberEntry[] = [];
   for (const ur of userRoles) {
     if (!ur.user.isActive) continue;
-    if (ctx.tenantId && ur.user.tenantId && ur.user.tenantId !== ctx.tenantId) continue;
+    if (allowedUserIds && !allowedUserIds.has(ur.user.id)) continue;
     results.push({
       _key: `user:${ur.user.id}`,
       userId: ur.user.id,
