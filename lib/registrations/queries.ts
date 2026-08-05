@@ -64,6 +64,67 @@ function serializeRegistration(registration: RegistrationRecord) {
   };
 }
 
+// ── Duplicate reference enrichment (REGISTRATION-01E, Goal 2) ──────────────
+//
+// Duplicate DETECTION is unchanged (see public-submission.ts). This only
+// reads the existing `possibleDuplicate` / `possibleDuplicateOf` payload
+// keys and resolves the referenced registration's basic display info
+// (name/status/submittedAt) so the UI can show "Registration from … ·
+// Status: …" and a direct link, instead of a bare internal ID.
+
+type DuplicateReferenceSummary = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  status: RegistrationStatus;
+  submittedAt: string;
+};
+
+function extractDuplicateReferenceId(payloadJson: unknown): string | null {
+  if (!payloadJson || typeof payloadJson !== "object" || Array.isArray(payloadJson)) {
+    return null;
+  }
+  const p = payloadJson as Record<string, unknown>;
+  if (p.possibleDuplicate !== true) return null;
+  return typeof p.possibleDuplicateOf === "string" && p.possibleDuplicateOf.trim()
+    ? p.possibleDuplicateOf.trim()
+    : null;
+}
+
+async function attachDuplicateReferences<T extends { payloadJson: unknown }>(
+  tenantId: string,
+  registrations: T[],
+): Promise<(T & { duplicateReference: DuplicateReferenceSummary | null })[]> {
+  const referenceIds = Array.from(
+    new Set(
+      registrations
+        .map((r) => extractDuplicateReferenceId(r.payloadJson))
+        .filter((id): id is string => !!id),
+    ),
+  );
+
+  if (referenceIds.length === 0) {
+    return registrations.map((r) => ({ ...r, duplicateReference: null }));
+  }
+
+  const references = await prisma.registration.findMany({
+    where: { id: { in: referenceIds }, tenantId },
+    select: { id: true, firstName: true, lastName: true, status: true, submittedAt: true },
+  });
+
+  const referenceMap = new Map<string, DuplicateReferenceSummary>(
+    references.map((r) => [r.id, { ...r, submittedAt: r.submittedAt.toISOString() }]),
+  );
+
+  return registrations.map((r) => {
+    const refId = extractDuplicateReferenceId(r.payloadJson);
+    return {
+      ...r,
+      duplicateReference: refId ? (referenceMap.get(refId) ?? null) : null,
+    };
+  });
+}
+
 export async function listRegistrationsForTenant(tenantSlug: string) {
   const tenant = await requireTenant(tenantSlug);
 
@@ -75,7 +136,8 @@ export async function listRegistrationsForTenant(tenantSlug: string) {
     select: registrationSelect,
   });
 
-  return registrations.map(serializeRegistration);
+  const serialized = registrations.map(serializeRegistration);
+  return attachDuplicateReferences(tenant.id, serialized);
 }
 
 export async function getRegistrationForTenant(
@@ -92,7 +154,12 @@ export async function getRegistrationForTenant(
     select: registrationSelect,
   });
 
-  return registration ? serializeRegistration(registration) : null;
+  if (!registration) return null;
+
+  const [enriched] = await attachDuplicateReferences(tenant.id, [
+    serializeRegistration(registration),
+  ]);
+  return enriched;
 }
 
 export async function updateRegistrationStatusForTenant(
@@ -155,9 +222,14 @@ export async function updateRegistrationStatusForTenant(
     select: registrationSelect,
   });
 
+  const [serializedBefore, serializedUpdated] = await attachDuplicateReferences(tenant.id, [
+    serializeRegistration(existing),
+    serializeRegistration(updated),
+  ]);
+
   return {
-    before: serializeRegistration(existing),
-    registration: serializeRegistration(updated),
+    before: serializedBefore,
+    registration: serializedUpdated,
   };
 }
 

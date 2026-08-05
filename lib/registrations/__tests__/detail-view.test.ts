@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getRegistrationDetailFields, type RegistrationRawShape } from "@/lib/registrations/detail-view";
+import {
+  formatCompactAddressLines,
+  getRegistrationDetailFields,
+  type RegistrationDetailFields,
+  type RegistrationRawShape,
+} from "@/lib/registrations/detail-view";
 
 function baseRegistration(overrides: Partial<RegistrationRawShape> = {}): RegistrationRawShape {
   return {
@@ -196,5 +201,91 @@ describe("getRegistrationDetailFields", () => {
     expect(() => getRegistrationDetailFields(asString)).not.toThrow();
     expect(getRegistrationDetailFields(asArray).address.city).toBeNull();
     expect(getRegistrationDetailFields(asString).football).toBeNull();
+  });
+
+  // ── REGISTRATION-01E — Goal 2: duplicate flag projection ──────────────────
+
+  it("exposes no duplicate flag when the registration was never flagged", () => {
+    const registration = baseRegistration({
+      payloadJson: { person: { firstName: "Jonas" }, consent: { privacyAccepted: true } },
+    });
+    const fields = getRegistrationDetailFields(registration);
+    expect(fields.duplicate).toEqual({ isPossibleDuplicate: false, referenceId: null });
+  });
+
+  it("projects possibleDuplicate/possibleDuplicateOf without altering duplicate detection", () => {
+    const registration = baseRegistration({
+      payloadJson: {
+        person: { firstName: "Jonas" },
+        consent: { privacyAccepted: true },
+        possibleDuplicate: true,
+        possibleDuplicateOf: "reg_earlier",
+      },
+    });
+    const fields = getRegistrationDetailFields(registration);
+    expect(fields.duplicate).toEqual({ isPossibleDuplicate: true, referenceId: "reg_earlier" });
+  });
+
+  it("never reports a duplicate reference when the flag itself is falsy, even if a stray ID is present", () => {
+    const registration = baseRegistration({
+      payloadJson: {
+        possibleDuplicate: false,
+        possibleDuplicateOf: "reg_earlier",
+      },
+    });
+    const fields = getRegistrationDetailFields(registration);
+    expect(fields.duplicate).toEqual({ isPossibleDuplicate: false, referenceId: null });
+  });
+
+  // ── REGISTRATION-01E — Goal 5: website version (rawData lookup) ───────────
+
+  it("surfaces websiteVersion from rawData when present, and omits it from 'notes' (no double-reporting)", () => {
+    const registration = baseRegistration({
+      payloadJson: {
+        person: { firstName: "Jonas" },
+        consent: { privacyAccepted: true },
+        rawData: { websiteVersion: "2.4.1" },
+      },
+    });
+    const fields = getRegistrationDetailFields(registration);
+    expect(fields.technical.websiteVersion).toBe("2.4.1");
+    expect(fields.additional.additionalRawData).toEqual([]);
+  });
+
+  it("is null when no website version was ever submitted (most registrations, incl. legacy)", () => {
+    const registration = baseRegistration({ payloadJson: null });
+    const fields = getRegistrationDetailFields(registration);
+    expect(fields.technical.websiteVersion).toBeNull();
+  });
+});
+
+// ── REGISTRATION-01E — Goal 3: compact address formatting ────────────────────
+
+describe("formatCompactAddressLines", () => {
+  function address(
+    overrides: Partial<RegistrationDetailFields["address"]> = {},
+  ): RegistrationDetailFields["address"] {
+    return { street: null, houseNumber: null, postalCode: null, city: null, country: null, ...overrides };
+  }
+
+  it("collapses a full address into three lines", () => {
+    const lines = formatCompactAddressLines(
+      address({ street: "Baselstrasse", houseNumber: "12A", postalCode: "4123", city: "Allschwil", country: "CH" }),
+    );
+    expect(lines).toEqual(["Baselstrasse 12A", "4123 Allschwil", "CH"]);
+  });
+
+  it("omits a line entirely when none of its fields were submitted (no empty lines)", () => {
+    const lines = formatCompactAddressLines(address({ street: "Baselstrasse", country: "CH" }));
+    expect(lines).toEqual(["Baselstrasse", "CH"]);
+  });
+
+  it("returns an empty array when nothing was submitted — caller renders the 'Nicht angegeben' fallback", () => {
+    expect(formatCompactAddressLines(address())).toEqual([]);
+  });
+
+  it("still renders a line when only one half of a pair is present", () => {
+    expect(formatCompactAddressLines(address({ postalCode: "4123" }))).toEqual(["4123"]);
+    expect(formatCompactAddressLines(address({ houseNumber: "12A" }))).toEqual(["12A"]);
   });
 });
