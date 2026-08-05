@@ -146,7 +146,10 @@ enum RegistrationType {
 enum RegistrationStatus {
   NEW
   REVIEWING
+  // REGISTRATION-01F — Goal 8: workflow-actionable statuses.
+  ASSIGNED
   CONTACTED
+  WAITING
   ACCEPTED
   REJECTED
   ARCHIVED
@@ -555,6 +558,7 @@ model User {
   tenantMemberships          TenantMembership[]
   auditLogs                  AuditLog[]           @relation("AuditActor")
   assignedRegistrations      Registration[]       @relation("RegistrationAssignedUser")
+  duplicateIgnoredRegistrations Registration[]    @relation("RegistrationDuplicateIgnoredBy")
   orgUnitMemberships         OrgUnitMembership[]
   reviewedHomepageSections   HomepageSection[]    @relation("HomepageSectionReviewer")
   approvedHomepageSections   HomepageSection[]    @relation("HomepageSectionApprovedBy")
@@ -601,14 +605,37 @@ model Registration {
   assignedToUserId String?
   targetGroupId    String?
 
+  // REGISTRATION-01F — Goal 2/3: canonical link from a registration to the
+  // Person record it represents (existing match OR the Person created from
+  // this registration via the "Create Person" workflow action).
+  personId String?
+
+  // REGISTRATION-01F — Goal 7: "Ignore duplicate" workflow action. The
+  // existing possibleDuplicate/possibleDuplicateOf payloadJson flags (see
+  // public-submission.ts) are unchanged; this only records that a
+  // coordinator explicitly acknowledged and dismissed the warning.
+  duplicateIgnoredAt   DateTime?
+  duplicateIgnoredById String?
+
+  // REGISTRATION-01F — Goal 6/8: timestamps for quick-action / timeline
+  // derivation ("Contacted", "Archived") without re-deriving them from
+  // AuditLog on every read.
+  contactedAt DateTime?
+  archivedAt  DateTime?
+
   submittedAt DateTime @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  assignedToUser User?        @relation("RegistrationAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  targetGroup    TargetGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assignedToUser   User?        @relation("RegistrationAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  targetGroup      TargetGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  person           Person?      @relation("RegistrationPerson", fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  duplicateIgnoredBy User?      @relation("RegistrationDuplicateIgnoredBy", fields: [duplicateIgnoredById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  // Back-relation for Person.createdRegistrationId — the Person record(s)
+  // that were created from this registration (see Goal 3).
+  createdPersons   Person[]     @relation("PersonCreatedFromRegistration")
 
   @@index([tenantId, status])
   @@index([tenantId, type])
@@ -616,6 +643,8 @@ model Registration {
   @@index([assignedToUserId])
   @@index([targetGroupId])
   @@index([tenantId, source])
+  @@index([personId])
+  @@index([duplicateIgnoredById])
 }
 
 model Role {
@@ -900,17 +929,54 @@ model Person {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // REGISTRATION-01F — Goal 3: fields copied verbatim from a registration
+  // when a Person is created through the "Create Person" workflow action.
+  // These are plain, non-derived data — never invented, never guessed.
+  street      String?
+  houseNumber String?
+  postalCode  String?
+  city        String?
+  country     String?
+
+  guardianFirstName String?
+  guardianLastName  String?
+  guardianEmail     String?
+  guardianPhone     String?
+
+  /// Football-specific fields copied from the registration's `football`
+  /// payload where relevant (requestedTeam, requestedAgeGroup,
+  /// preferredTraining, playingExperience, currentClub, previousClub,
+  /// position). Null for persons not created from a football registration.
+  footballJson Json?
+
+  /// True when this Person was created via the registration "Create
+  /// Person" workflow action, as opposed to manual entry elsewhere in
+  /// People admin. Never set automatically outside that explicit action.
+  createdFromRegistration Boolean @default(false)
+  /// The specific registration whose "Create Person" action produced this
+  /// Person record (Goal 3). Distinct from any Registration.personId link,
+  /// which may later point elsewhere (e.g. a subsequent registration is
+  /// manually linked to this same, already-existing Person).
+  createdRegistrationId   String?
+
+  createdRegistration Registration? @relation("PersonCreatedFromRegistration", fields: [createdRegistrationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
   playerSquadMembers   PlayerSquadMember[]
   trainerTeamMembers   TrainerTeamMember[]
   orgUnitMemberships   OrgUnitMembership[]
   authoredNewsArticles NewsArticle[]       @relation("NewsArticleAuthorPerson")
   authoredWebsitePages WebsitePage[]       @relation("WebsitePageAuthorPerson")
+  // Registrations currently linked to this Person (Goal 2/3 — may include
+  // registrations linked via manual "existing person" match, not only the
+  // one that created this Person; see createdRegistrationId above).
+  linkedRegistrations  Registration[]      @relation("RegistrationPerson")
 
   @@index([lastName, firstName])
   @@index([email])
   @@index([isActive])
   @@index([isPlayer])
   @@index([isTrainer])
+  @@index([createdRegistrationId])
 }
 
 model Team {

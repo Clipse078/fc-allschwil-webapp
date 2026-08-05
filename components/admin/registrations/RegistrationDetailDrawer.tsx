@@ -27,13 +27,11 @@ import {
   Shield,
   Flag,
   CalendarDays,
-  AlertTriangle,
   CheckCircle,
   Baby,
   MapPin,
   FileText,
 } from "lucide-react";
-import { RegistrationStatus } from "@prisma/client";
 import { cn } from "@/lib/cn";
 import {
   classifyRegistration,
@@ -44,7 +42,6 @@ import {
 import {
   formatDate,
   formatDateTime,
-  formatDateShort,
   formatDateTimeCompact,
 } from "@/lib/tenant-runtime/formatters";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
@@ -57,23 +54,22 @@ import {
   getRegistrationSourceInfo,
   type RegistrationSourceKey,
 } from "@/lib/registrations/source";
+import {
+  STATUS_ORDER,
+  STATUS_LABELS as SHARED_STATUS_LABELS,
+  STATUS_BADGE_CLASS,
+  STATUS_DOT_CLASS,
+} from "@/lib/registrations/status";
+import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
 
 const NOT_PROVIDED = "Nicht angegeben";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type AssignableUser = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-};
-
-export type TargetGroupOption = {
-  id: string;
-  name: string;
-  key: string;
-};
+// Re-exported for backward compatibility — RegistrationInbox.tsx and other
+// call sites import these from here. Source of truth is workflow-types.ts.
+export type { AssignableUser, TargetGroupOption };
 
 type Props = {
   registration: RegistrationListItem | null;
@@ -154,34 +150,13 @@ const TYPE_CONFIG: Record<string, TypeCfg> = {
   },
 };
 
-const STATUS_OPTIONS = Object.values(RegistrationStatus);
-
-const STATUS_LABELS: Record<RegistrationStatus, string> = {
-  NEW: "Neu",
-  REVIEWING: "In Prüfung",
-  CONTACTED: "Kontaktiert",
-  ACCEPTED: "Angenommen",
-  REJECTED: "Abgelehnt",
-  ARCHIVED: "Archiviert",
-};
-
-const STATUS_BADGE: Record<RegistrationStatus, string> = {
-  NEW: "border-blue-200 bg-blue-50 text-blue-700",
-  REVIEWING: "border-amber-200 bg-amber-50 text-amber-700",
-  CONTACTED: "border-violet-200 bg-violet-50 text-violet-700",
-  ACCEPTED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  REJECTED: "border-red-200 bg-red-50 text-red-700",
-  ARCHIVED: "border-slate-200 bg-slate-50 text-slate-400",
-};
-
-const STATUS_DOT: Record<RegistrationStatus, string> = {
-  NEW: "bg-blue-500",
-  REVIEWING: "bg-amber-500",
-  CONTACTED: "bg-violet-500",
-  ACCEPTED: "bg-emerald-500",
-  REJECTED: "bg-red-500",
-  ARCHIVED: "bg-slate-400",
-};
+// REGISTRATION-01F — Goal 8: status metadata now lives in one shared module
+// (lib/registrations/status.ts) so New/In Review/Assigned/Contacted/
+// Waiting/Accepted/Rejected/Archived only needs to be edited once.
+const STATUS_OPTIONS = STATUS_ORDER;
+const STATUS_LABELS = SHARED_STATUS_LABELS;
+const STATUS_BADGE = STATUS_BADGE_CLASS;
+const STATUS_DOT = STATUS_DOT_CLASS;
 
 // Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
 // only, ingestion is untouched (see lib/registrations/source.ts).
@@ -309,23 +284,6 @@ function ConsentRow({
         {state === "true" ? trueLabel : state === "false" ? falseLabel : unknownLabel}
       </span>
     </div>
-  );
-}
-
-function OwnerAvatar({ firstName, lastName }: { firstName: string; lastName: string }) {
-  const initials = getInitials(firstName, lastName);
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--tenant-primary)_14%,white)] text-[0.6rem] font-bold uppercase text-[var(--tenant-primary)]"
-        aria-hidden
-      >
-        {initials}
-      </span>
-      <span className="text-sm font-medium text-[var(--foreground)]">
-        {firstName} {lastName}
-      </span>
-    </span>
   );
 }
 
@@ -512,7 +470,6 @@ export default function RegistrationDetailDrawer({
   // section; duplicate reference resolved server-side in queries.ts.
   const classification = classifyRegistration(registration.birthYear, genderCode, registration.type);
   const addressLines = formatCompactAddressLines(fields.address);
-  const duplicateReference = registration.duplicateReference;
 
   return (
     <>
@@ -629,59 +586,26 @@ export default function RegistrationDetailDrawer({
           {/* Classification / routing suggestion */}
           <ClassificationSection classification={classification} genderLabel={genderDisplayLabel} />
 
-          {/* Source banner + possible duplicate warning (Goal 2 & 6) */}
-          {(sourceInfo || fields.duplicate.isPossibleDuplicate) && (
+          {/* Source banner (Goal 6, REGISTRATION-01E) — the duplicate
+              warning now lives in the workflow panel below, with actions
+              (Goal 7, REGISTRATION-01F). */}
+          {sourceInfo && (
             <div className="px-6 pt-4 pb-4 border-b border-[var(--border)] bg-indigo-50/50">
-              {sourceInfo && (
-                <div className="flex items-start gap-2.5">
-                  {SourceIcon ? (
-                    <SourceIcon className="h-4 w-4 text-indigo-600 flex-shrink-0 mt-0.5" aria-hidden />
-                  ) : null}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[0.78rem] font-semibold text-indigo-800">
-                      {isWebsiteSource ? "Website-Anmeldung" : `${sourceInfo.label}-Anmeldung`}
+              <div className="flex items-start gap-2.5">
+                {SourceIcon ? (
+                  <SourceIcon className="h-4 w-4 text-indigo-600 flex-shrink-0 mt-0.5" aria-hidden />
+                ) : null}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[0.78rem] font-semibold text-indigo-800">
+                    {isWebsiteSource ? "Website-Anmeldung" : `${sourceInfo.label}-Anmeldung`}
+                  </p>
+                  {isWebsiteSource && (
+                    <p className="text-[0.72rem] text-indigo-600 mt-0.5">
+                      Eingegangen über das öffentliche Kontaktformular (FC Allschwil Website)
                     </p>
-                    {isWebsiteSource && (
-                      <p className="text-[0.72rem] text-indigo-600 mt-0.5">
-                        Eingegangen über das öffentliche Kontaktformular (FC Allschwil Website)
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
-              )}
-              {fields.duplicate.isPossibleDuplicate && (
-                <div className={cn("flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5", sourceInfo && "mt-3")}>
-                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[0.75rem] font-semibold text-amber-800">
-                      Mögliches Duplikat erkannt
-                    </p>
-                    {duplicateReference ? (
-                      <p className="text-[0.7rem] text-amber-700 mt-0.5">
-                        Anmeldung vom{" "}
-                        <span className="font-semibold tabular-nums">
-                          {formatDateShort(duplicateReference.submittedAt, cfg)}
-                        </span>{" "}
-                        · Status: <span className="font-semibold">{STATUS_LABELS[duplicateReference.status]}</span>
-                      </p>
-                    ) : (
-                      <p className="text-[0.7rem] text-amber-700 mt-0.5">
-                        Eine ähnliche Anmeldung mit dieser E-Mail-Adresse wurde bereits eingereicht.
-                        Bitte prüfe, ob es sich um eine Doppeleinsendung handelt.
-                      </p>
-                    )}
-                    {fields.duplicate.referenceId && (
-                      <a
-                        href={`/tenant/${tenantSlug}/cockpit/registrations/${fields.duplicate.referenceId}`}
-                        className="mt-1.5 inline-flex items-center gap-1 text-[0.7rem] font-semibold text-amber-800 hover:underline"
-                      >
-                        Bestehende Anmeldung öffnen
-                        <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -695,109 +619,56 @@ export default function RegistrationDetailDrawer({
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Status */}
-              <div>
-                <p className="sce-data-label mb-1.5">Status</p>
-                {canEdit ? (
-                  <select
-                    value={registration.status}
-                    disabled={isUpdating}
-                    onChange={(e) =>
-                      patchRegistration({ status: e.target.value })
-                    }
-                    className="fca-select text-xs"
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABELS[s]}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <span
-                    className={cn(
-                      "inline-flex h-6 items-center rounded-full border px-2.5 text-[0.7rem] font-semibold",
-                      STATUS_BADGE[registration.status],
-                    )}
-                  >
-                    {STATUS_LABELS[registration.status]}
-                  </span>
-                )}
-              </div>
-
-              {/* Assignee */}
-              <div>
-                <p className="sce-data-label mb-1.5">Zugewiesen an</p>
-                {canEdit && assignableUsers.length > 0 ? (
-                  <select
-                    value={registration.assignedToUserId ?? ""}
-                    disabled={isUpdating}
-                    onChange={(e) =>
-                      patchRegistration({
-                        assignedToUserId: e.target.value || null,
-                      })
-                    }
-                    className="fca-select text-xs"
-                  >
-                    <option value="">— Nicht zugewiesen —</option>
-                    {assignableUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.firstName} {u.lastName}
-                      </option>
-                    ))}
-                  </select>
-                ) : registration.assignedToUser ? (
-                  <OwnerAvatar
-                    firstName={registration.assignedToUser.firstName}
-                    lastName={registration.assignedToUser.lastName}
-                  />
-                ) : (
-                  <span className="sce-data-value-empty text-sm">
-                    Nicht zugewiesen
-                  </span>
-                )}
-              </div>
-
-              {/* Target group */}
-              {(canEdit && targetGroups.length > 0) ||
-              registration.targetGroup ? (
-                <div className="sm:col-span-2">
-                  <p className="sce-data-label mb-1.5 flex items-center gap-1">
-                    <Users className="h-3 w-3" aria-hidden />
-                    Zielgruppe
-                  </p>
-                  {canEdit && targetGroups.length > 0 ? (
-                    <select
-                      value={registration.targetGroupId ?? ""}
-                      disabled={isUpdating}
-                      onChange={(e) =>
-                        patchRegistration({
-                          targetGroupId: e.target.value || null,
-                        })
-                      }
-                      className="fca-select text-xs"
-                    >
-                      <option value="">— Keine Zielgruppe —</option>
-                      {targetGroups.map((tg) => (
-                        <option key={tg.id} value={tg.id}>
-                          {tg.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : registration.targetGroup ? (
-                    <span className="sce-data-value flex items-center gap-1.5 text-sm">
-                      <Users className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
-                      {registration.targetGroup.name}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
+            <div>
+              <p className="sce-data-label mb-1.5">Status</p>
+              {canEdit ? (
+                <select
+                  value={registration.status}
+                  disabled={isUpdating}
+                  onChange={(e) =>
+                    patchRegistration({ status: e.target.value })
+                  }
+                  className="fca-select text-xs"
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_LABELS[s]}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span
+                  className={cn(
+                    "inline-flex h-6 items-center rounded-full border px-2.5 text-[0.7rem] font-semibold",
+                    STATUS_BADGE[registration.status],
+                  )}
+                >
+                  {STATUS_LABELS[registration.status]}
+                </span>
+              )}
             </div>
 
             {isUpdating && (
               <p className="mt-3 text-xs text-[var(--muted)]">Wird gespeichert…</p>
             )}
+          </div>
+
+          {/* REGISTRATION-01F: team recommendation actions, person lookup/
+              creation, assignment workflow, duplicate workflow, timeline. */}
+          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
+            <RegistrationWorkflowPanel
+              registration={registration}
+              tenantSlug={tenantSlug}
+              canEdit={canEdit}
+              locale={locale}
+              timezone={timezone}
+              assignableUsers={assignableUsers}
+              targetGroups={targetGroups}
+              onUpdate={(updated) => {
+                setRegistration(updated);
+                onUpdate(updated);
+              }}
+            />
           </div>
 
           {/* Spieler (Player) */}

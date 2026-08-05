@@ -12,15 +12,22 @@ import {
   MessageSquare,
   ClipboardList,
   ListFilter,
+  UserCheck2,
+  AlertTriangle,
+  UserRoundSearch,
+  Link2,
+  Clock3,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import type { InboxTypeOption } from "@/lib/inbox/types";
+import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import { STATUS_GROUPS, type StatusGroupKey } from "@/lib/registrations/status";
+import { classifyRegistration, extractGenderFromPayload } from "@/lib/registrations/classification";
+import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import RegistrationInboxCard from "./RegistrationInboxCard";
-import RegistrationDetailDrawer, {
-  type AssignableUser,
-  type TargetGroupOption,
-} from "./RegistrationDetailDrawer";
+import RegistrationDetailDrawer from "./RegistrationDetailDrawer";
 
 // ── Type filter options (icons replace emojis) ────────────────────────────────
 
@@ -34,59 +41,33 @@ const TYPE_FILTER_OPTIONS: InboxTypeOption[] = [
   { value: "OTHER", label: "Andere", Icon: ClipboardList },
 ];
 
-// ── Status group config ───────────────────────────────────────────────────────
+// ── Derived helpers (REGISTRATION-01F — Goals 9/10) ─────────────────────────
 
-type StatusGroupKey = "ALL" | "NEW" | "REVIEWING" | "CONTACTED" | "DONE";
+function isActiveDuplicate(r: RegistrationListItem): boolean {
+  const p = r.payloadJson;
+  const flagged =
+    !!p && typeof p === "object" && !Array.isArray(p) && (p as Record<string, unknown>).possibleDuplicate === true;
+  return flagged && !r.duplicateIgnoredAt;
+}
 
-const STATUS_GROUPS: {
-  key: StatusGroupKey;
-  label: string;
-  statuses: string[];
-  pillClass: string;
-  pillActiveClass: string;
-  dotClass: string;
-}[] = [
-  {
-    key: "NEW",
-    label: "Neu",
-    statuses: ["NEW"],
-    pillClass:
-      "border-blue-200 bg-white text-blue-700 hover:bg-blue-50",
-    pillActiveClass:
-      "border-blue-400 bg-blue-600 text-white shadow-sm",
-    dotClass: "bg-blue-500",
-  },
-  {
-    key: "REVIEWING",
-    label: "Bearbeitung",
-    statuses: ["REVIEWING"],
-    pillClass:
-      "border-amber-200 bg-white text-amber-700 hover:bg-amber-50",
-    pillActiveClass:
-      "border-amber-500 bg-amber-500 text-white shadow-sm",
-    dotClass: "bg-amber-500",
-  },
-  {
-    key: "CONTACTED",
-    label: "Kontaktiert",
-    statuses: ["CONTACTED"],
-    pillClass:
-      "border-violet-200 bg-white text-violet-700 hover:bg-violet-50",
-    pillActiveClass:
-      "border-violet-500 bg-violet-600 text-white shadow-sm",
-    dotClass: "bg-violet-500",
-  },
-  {
-    key: "DONE",
-    label: "Abgeschlossen",
-    statuses: ["ACCEPTED", "REJECTED", "ARCHIVED"],
-    pillClass:
-      "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50",
-    pillActiveClass:
-      "border-emerald-600 bg-emerald-600 text-white shadow-sm",
-    dotClass: "bg-emerald-500",
-  },
-];
+function needsPerson(r: RegistrationListItem): boolean {
+  return !r.personId;
+}
+
+function isCompletedToday(r: RegistrationListItem): boolean {
+  if (!(["ACCEPTED", "REJECTED", "ARCHIVED"] as string[]).includes(r.status)) return false;
+  const updated = new Date(r.updatedAt);
+  const now = new Date();
+  return (
+    updated.getFullYear() === now.getFullYear() &&
+    updated.getMonth() === now.getMonth() &&
+    updated.getDate() === now.getDate()
+  );
+}
+
+function needsAssignment(r: RegistrationListItem): boolean {
+  return !r.assignedToUserId && r.status !== "ARCHIVED";
+}
 
 // ── Group section sub-component ───────────────────────────────────────────────
 
@@ -203,6 +184,73 @@ function TypeFilterButton({
   );
 }
 
+// ── Goal 10: dashboard metrics ────────────────────────────────────────────────
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: typeof AlertTriangle;
+  label: string;
+  value: number;
+  tone: "blue" | "amber" | "violet" | "red" | "orange" | "emerald";
+}) {
+  const toneClass: Record<typeof tone, string> = {
+    blue: "text-[var(--blue)]",
+    amber: "text-amber-600",
+    violet: "text-violet-600",
+    red: "text-red-600",
+    orange: "text-orange-600",
+    emerald: "text-emerald-600",
+  };
+  return (
+    <div className="sce-kpi-card">
+      <p className="sce-data-label flex items-center gap-1.5">
+        <Icon className="h-3 w-3" aria-hidden />
+        {label}
+      </p>
+      <p
+        className={cn("mt-1.5 text-2xl font-bold", toneClass[tone])}
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// ── Goal 9: toggle filter chip ───────────────────────────────────────────────
+
+function ToggleFilterChip({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: typeof AlertTriangle;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[0.72rem] font-medium transition-all",
+        active
+          ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-white"
+          : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+      )}
+    >
+      <Icon className="h-3 w-3" aria-hidden />
+      {label}
+    </button>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 type Props = {
@@ -213,7 +261,11 @@ type Props = {
   timezone?: string;
   assignableUsers?: AssignableUser[];
   targetGroups?: TargetGroupOption[];
+  /** REGISTRATION-01F — Goal 9: drives the "Assigned to me" filter. */
+  currentUserId?: string | null;
 };
+
+type ToggleFilterKey = "ASSIGNED_TO_ME" | "HAS_DUPLICATE" | "NEEDS_PERSON" | "ALREADY_LINKED";
 
 export default function RegistrationInbox({
   tenantSlug,
@@ -223,30 +275,70 @@ export default function RegistrationInbox({
   timezone = "Europe/Zurich",
   assignableUsers = [],
   targetGroups = [],
+  currentUserId = null,
 }: Props) {
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [selectedRegistration, setSelectedRegistration] =
     useState<RegistrationListItem | null>(null);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusGroupKey>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusGroupKey | "ALL">("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [toggleFilters, setToggleFilters] = useState<Set<ToggleFilterKey>>(new Set());
+  const [ageGroupFilter, setAgeGroupFilter] = useState("ALL");
+  const [recommendedTeamFilter, setRecommendedTeamFilter] = useState("ALL");
 
-  // ── Counts for pills ──────────────────────────────────────────────────────
+  // ── Classification cache (Goal 9: Age group / Recommended team filters) ───
 
-  const counts = useMemo(() => {
+  const classified = useMemo(() => {
+    const map = new Map<string, { ageGroup: string | null; team: string }>();
+    for (const r of registrations) {
+      const gender = extractGenderFromPayload(r.payloadJson);
+      const classification = classifyRegistration(r.birthYear, gender, r.type);
+      map.set(r.id, {
+        ageGroup: getRoutingSuggestion(r.birthYear),
+        team: classification.targetGroupLabel,
+      });
+    }
+    return map;
+  }, [registrations]);
+
+  const ageGroupOptions = useMemo(
+    () =>
+      Array.from(new Set(Array.from(classified.values()).map((c) => c.ageGroup).filter((v): v is string => !!v))).sort(),
+    [classified],
+  );
+  const recommendedTeamOptions = useMemo(
+    () => Array.from(new Set(Array.from(classified.values()).map((c) => c.team))).sort(),
+    [classified],
+  );
+
+  // ── Goal 10: dashboard metrics ─────────────────────────────────────────────
+
+  const metrics = useMemo(() => {
+    return {
+      new: registrations.filter((r) => r.status === "NEW").length,
+      needsAssignment: registrations.filter(needsAssignment).length,
+      needsPerson: registrations.filter(needsPerson).length,
+      duplicates: registrations.filter(isActiveDuplicate).length,
+      waiting: registrations.filter((r) => r.status === "WAITING").length,
+      completedToday: registrations.filter(isCompletedToday).length,
+    };
+  }, [registrations]);
+
+  // ── Counts for status pills ────────────────────────────────────────────────
+
+  const statusCounts = useMemo(() => {
     const result: Record<StatusGroupKey, number> = {
       ALL: registrations.length,
       NEW: 0,
       REVIEWING: 0,
       CONTACTED: 0,
+      WAITING: 0,
       DONE: 0,
     };
     for (const r of registrations) {
-      if (r.status === "NEW") result.NEW++;
-      else if (r.status === "REVIEWING") result.REVIEWING++;
-      else if (r.status === "CONTACTED") result.CONTACTED++;
-      else if (["ACCEPTED", "REJECTED", "ARCHIVED"].includes(r.status))
-        result.DONE++;
+      const group = STATUS_GROUPS.find((g) => (g.statuses as string[]).includes(r.status));
+      if (group) result[group.key]++;
     }
     return result;
   }, [registrations]);
@@ -258,9 +350,18 @@ export default function RegistrationInbox({
     return registrations.filter((r) => {
       if (statusFilter !== "ALL") {
         const group = STATUS_GROUPS.find((g) => g.key === statusFilter);
-        if (group && !group.statuses.includes(r.status)) return false;
+        if (group && !(group.statuses as string[]).includes(r.status)) return false;
       }
       if (typeFilter !== "ALL" && r.type !== typeFilter) return false;
+
+      if (toggleFilters.has("ASSIGNED_TO_ME") && r.assignedToUserId !== currentUserId) return false;
+      if (toggleFilters.has("HAS_DUPLICATE") && !isActiveDuplicate(r)) return false;
+      if (toggleFilters.has("NEEDS_PERSON") && !needsPerson(r)) return false;
+      if (toggleFilters.has("ALREADY_LINKED") && !r.personId) return false;
+
+      if (ageGroupFilter !== "ALL" && classified.get(r.id)?.ageGroup !== ageGroupFilter) return false;
+      if (recommendedTeamFilter !== "ALL" && classified.get(r.id)?.team !== recommendedTeamFilter) return false;
+
       if (q) {
         const searchable = [
           `${r.firstName} ${r.lastName}`,
@@ -276,14 +377,14 @@ export default function RegistrationInbox({
       }
       return true;
     });
-  }, [registrations, statusFilter, typeFilter, query]);
+  }, [registrations, statusFilter, typeFilter, toggleFilters, ageGroupFilter, recommendedTeamFilter, classified, currentUserId, query]);
 
   // ── Group the filtered results ─────────────────────────────────────────────
 
   const grouped = useMemo(() => {
     return STATUS_GROUPS.map((group) => ({
       ...group,
-      items: filtered.filter((r) => group.statuses.includes(r.status)),
+      items: filtered.filter((r) => (group.statuses as string[]).includes(r.status)),
     }));
   }, [filtered]);
 
@@ -307,9 +408,25 @@ export default function RegistrationInbox({
     [],
   );
 
-  const openCount = counts.NEW;
+  const toggleFilter = useCallback((key: ToggleFilterKey) => {
+    setToggleFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const openCount = statusCounts.NEW;
   const hasResults = filtered.length > 0;
-  const hasActiveFilter = !!(query.trim() || statusFilter !== "ALL" || typeFilter !== "ALL");
+  const hasActiveFilter = !!(
+    query.trim() ||
+    statusFilter !== "ALL" ||
+    typeFilter !== "ALL" ||
+    toggleFilters.size > 0 ||
+    ageGroupFilter !== "ALL" ||
+    recommendedTeamFilter !== "ALL"
+  );
 
   return (
     <div className="flex flex-col gap-0">
@@ -335,10 +452,20 @@ export default function RegistrationInbox({
         </div>
       </div>
 
+      {/* ── Goal 10: dashboard metrics ───────────────────────────────────── */}
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <MetricCard icon={Inbox} label="Neu" value={metrics.new} tone="blue" />
+        <MetricCard icon={UserCheck2} label="Braucht Zuweisung" value={metrics.needsAssignment} tone="amber" />
+        <MetricCard icon={UserRoundSearch} label="Braucht Person" value={metrics.needsPerson} tone="violet" />
+        <MetricCard icon={AlertTriangle} label="Duplikate" value={metrics.duplicates} tone="red" />
+        <MetricCard icon={Clock3} label="Wartend" value={metrics.waiting} tone="orange" />
+        <MetricCard icon={Link2} label="Heute abgeschlossen" value={metrics.completedToday} tone="emerald" />
+      </div>
+
       {/* ── Status filter pills ───────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {STATUS_GROUPS.map((group) => {
-          const count = counts[group.key];
+          const count = statusCounts[group.key];
           const isActive = statusFilter === group.key;
           return (
             <button
@@ -371,6 +498,64 @@ export default function RegistrationInbox({
             </button>
           );
         })}
+      </div>
+
+      {/* ── Goal 9: workflow filter chips ────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <ToggleFilterChip
+          icon={UserCheck2}
+          label="Mir zugewiesen"
+          active={toggleFilters.has("ASSIGNED_TO_ME")}
+          onClick={() => toggleFilter("ASSIGNED_TO_ME")}
+        />
+        <ToggleFilterChip
+          icon={AlertTriangle}
+          label="Hat Duplikat"
+          active={toggleFilters.has("HAS_DUPLICATE")}
+          onClick={() => toggleFilter("HAS_DUPLICATE")}
+        />
+        <ToggleFilterChip
+          icon={UserRoundSearch}
+          label="Braucht Person"
+          active={toggleFilters.has("NEEDS_PERSON")}
+          onClick={() => toggleFilter("NEEDS_PERSON")}
+        />
+        <ToggleFilterChip
+          icon={Link2}
+          label="Bereits verknüpft"
+          active={toggleFilters.has("ALREADY_LINKED")}
+          onClick={() => toggleFilter("ALREADY_LINKED")}
+        />
+
+        {ageGroupOptions.length > 0 && (
+          <select
+            value={ageGroupFilter}
+            onChange={(e) => setAgeGroupFilter(e.target.value)}
+            className="fca-select h-7 text-[0.72rem]"
+          >
+            <option value="ALL">Altersgruppe: Alle</option>
+            {ageGroupOptions.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {recommendedTeamOptions.length > 0 && (
+          <select
+            value={recommendedTeamFilter}
+            onChange={(e) => setRecommendedTeamFilter(e.target.value)}
+            className="fca-select h-7 text-[0.72rem]"
+          >
+            <option value="ALL">Empfohlenes Team: Alle</option>
+            {recommendedTeamOptions.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* ── Search + type filter row ──────────────────────────────────────── */}

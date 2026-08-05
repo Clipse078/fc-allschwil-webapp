@@ -20,6 +20,7 @@ import {
   Flag,
   CalendarDays,
   AlertTriangle,
+  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
@@ -35,6 +36,10 @@ import {
   getRegistrationSourceInfo,
   type RegistrationSourceKey,
 } from "@/lib/registrations/source";
+import {
+  STATUS_LABELS as SHARED_STATUS_LABELS,
+  STATUS_BADGE_CLASS as SHARED_STATUS_BADGE_CLASS,
+} from "@/lib/registrations/status";
 
 // Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
 // only, ingestion is untouched (see lib/registrations/source.ts).
@@ -114,23 +119,9 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
   },
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  NEW: "border-blue-200 bg-blue-50 text-blue-700",
-  REVIEWING: "border-amber-200 bg-amber-50 text-amber-700",
-  CONTACTED: "border-violet-200 bg-violet-50 text-violet-700",
-  ACCEPTED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  REJECTED: "border-red-200 bg-red-50 text-red-700",
-  ARCHIVED: "border-slate-200 bg-slate-50 text-slate-400",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  NEW: "Neu",
-  REVIEWING: "In Prüfung",
-  CONTACTED: "Kontaktiert",
-  ACCEPTED: "Angenommen",
-  REJECTED: "Abgelehnt",
-  ARCHIVED: "Archiviert",
-};
+// REGISTRATION-01F — Goal 8: status metadata now lives in one shared module.
+const STATUS_BADGE = SHARED_STATUS_BADGE_CLASS;
+const STATUS_LABEL = SHARED_STATUS_LABELS;
 
 const URGENCY_DOT: Record<string, string> = {
   ok: "bg-emerald-400",
@@ -323,6 +314,18 @@ export default function RegistrationInboxCard({
                 Nicht zugewiesen
               </span>
             )}
+            {/* Goal 2/9 (REGISTRATION-01F): person-match state at a glance. */}
+            {registration.personMatch?.status === "LINKED" ? (
+              <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium text-emerald-600">
+                <UserRound className="h-3 w-3" aria-hidden />
+                Person verknüpft
+              </span>
+            ) : registration.personMatch?.status === "CONFIRMED" || registration.personMatch?.status === "POSSIBLE" ? (
+              <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium text-amber-600">
+                <UserRound className="h-3 w-3" aria-hidden />
+                Möglicher Treffer
+              </span>
+            ) : null}
           </div>
 
           {/* Possible duplicate warning */}
