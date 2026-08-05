@@ -16,6 +16,17 @@ type Context = {
   }>;
 };
 
+// REGISTRATION-01F — Goal 1/12: explicit workflow-action tags. These are
+// purely an audit/timeline label — they never change what fields the PATCH
+// itself may write. Sent alongside the actual field changes so an action
+// like "No recommendation" (which may leave every field unchanged) still
+// produces a visible, attributable timeline/audit entry (Goal 5/12).
+const WORKFLOW_ACTIONS = new Set([
+  "ASSIGN_RECOMMENDED_TEAM",
+  "ASSIGN_ELSEWHERE",
+  "NO_RECOMMENDATION",
+]);
+
 function actorUserId(session: Awaited<ReturnType<typeof requireApiAnyPermission>>["session"]) {
   return session?.user?.effectiveUserId ?? session?.user?.id ?? null;
 }
@@ -72,6 +83,8 @@ export async function PATCH(request: NextRequest, context: Context) {
       status?: RegistrationStatus;
       assignedToUserId?: string | null;
       targetGroupId?: string | null;
+      personId?: string | null;
+      duplicateIgnored?: boolean;
     } = {};
 
     if ("status" in body) {
@@ -103,17 +116,50 @@ export async function PATCH(request: NextRequest, context: Context) {
       data.targetGroupId = val;
     }
 
-    if (Object.keys(data).length === 0) {
+    // REGISTRATION-01F — Goal 2/3: link/unlink an existing (or newly
+    // created) Person. Never invents a Person — see person-creation.ts for
+    // the only path that creates one.
+    if ("personId" in body) {
+      const val = body.personId;
+      if (val !== null && typeof val !== "string") {
+        return NextResponse.json(
+          { error: "personId muss ein String oder null sein." },
+          { status: 400 }
+        );
+      }
+      data.personId = val;
+    }
+
+    // REGISTRATION-01F — Goal 7: "Ignore duplicate" workflow action.
+    if ("duplicateIgnored" in body) {
+      if (body.duplicateIgnored !== true) {
+        return NextResponse.json(
+          { error: "duplicateIgnored unterstuetzt nur den Wert true." },
+          { status: 400 }
+        );
+      }
+      data.duplicateIgnored = true;
+    }
+
+    const workflowAction =
+      typeof body.workflowAction === "string" && WORKFLOW_ACTIONS.has(body.workflowAction)
+        ? (body.workflowAction as string)
+        : null;
+
+    if (Object.keys(data).length === 0 && !workflowAction) {
       return NextResponse.json(
         { error: "Keine unterstuetzte Aenderung uebergeben." },
         { status: 400 }
       );
     }
 
+    const actorId = actorUserId(access.session);
+
     const result = await updateRegistrationStatusForTenant(
       tenantSlug,
       registrationId,
-      data
+      data,
+      actorId,
     );
 
     if (!result) {
@@ -121,7 +167,6 @@ export async function PATCH(request: NextRequest, context: Context) {
     }
 
     const { before, registration } = result;
-    const actorId = actorUserId(access.session);
 
     if (before.status !== registration.status) {
       void logAction({
@@ -155,9 +200,46 @@ export async function PATCH(request: NextRequest, context: Context) {
         moduleKey: "registrations",
         entityType: "Registration",
         entityId: registration.id,
-        action: "TARGET_GROUP_CHANGE",
+        action: workflowAction ?? "TARGET_GROUP_CHANGE",
         beforeJson: { targetGroupId: before.targetGroupId },
+        afterJson: { targetGroupId: registration.targetGroupId, targetGroupName: registration.targetGroup?.name ?? null },
+        metadataJson: { tenantSlug },
+      });
+    } else if (workflowAction === "NO_RECOMMENDATION") {
+      // No field necessarily changed (target group was already empty) —
+      // still record the explicit decision (Goal 1/12).
+      void logAction({
+        actorUserId: actorId,
+        moduleKey: "registrations",
+        entityType: "Registration",
+        entityId: registration.id,
+        action: "NO_RECOMMENDATION",
         afterJson: { targetGroupId: registration.targetGroupId },
+        metadataJson: { tenantSlug },
+      });
+    }
+
+    if (before.personId !== registration.personId) {
+      void logAction({
+        actorUserId: actorId,
+        moduleKey: "registrations",
+        entityType: "Registration",
+        entityId: registration.id,
+        action: registration.personId ? "PERSON_LINKED" : "PERSON_UNLINKED",
+        beforeJson: { personId: before.personId },
+        afterJson: { personId: registration.personId },
+        metadataJson: { tenantSlug },
+      });
+    }
+
+    if (!before.duplicateIgnoredAt && registration.duplicateIgnoredAt) {
+      void logAction({
+        actorUserId: actorId,
+        moduleKey: "registrations",
+        entityType: "Registration",
+        entityId: registration.id,
+        action: "DUPLICATE_IGNORED",
+        afterJson: { duplicateIgnoredAt: registration.duplicateIgnoredAt, duplicateIgnoredById: actorId },
         metadataJson: { tenantSlug },
       });
     }

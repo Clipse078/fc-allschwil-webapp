@@ -1,6 +1,7 @@
 import { Prisma, RegistrationStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireTenant } from "@/lib/tenants/require-tenant";
+import { attachPersonMatchSummaries } from "@/lib/registrations/person-match";
 
 const registrationSelect = {
   id: true,
@@ -17,6 +18,11 @@ const registrationSelect = {
   source: true,
   assignedToUserId: true,
   targetGroupId: true,
+  personId: true,
+  duplicateIgnoredAt: true,
+  duplicateIgnoredById: true,
+  contactedAt: true,
+  archivedAt: true,
   submittedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -42,6 +48,23 @@ const registrationSelect = {
       name: true,
     },
   },
+  person: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      displayName: true,
+      email: true,
+      phone: true,
+    },
+  },
+  duplicateIgnoredBy: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+    },
+  },
 } satisfies Prisma.RegistrationSelect;
 
 type RegistrationRecord = Prisma.RegistrationGetPayload<{
@@ -52,6 +75,10 @@ type UpdateRegistrationInput = {
   status?: RegistrationStatus;
   assignedToUserId?: string | null;
   targetGroupId?: string | null;
+  /** REGISTRATION-01F — Goal 2/3: link (or unlink) an existing/newly-created Person. */
+  personId?: string | null;
+  /** REGISTRATION-01F — Goal 7: dismiss the duplicate warning explicitly. */
+  duplicateIgnored?: boolean;
 };
 
 function serializeRegistration(registration: RegistrationRecord) {
@@ -61,6 +88,9 @@ function serializeRegistration(registration: RegistrationRecord) {
     submittedAt: registration.submittedAt.toISOString(),
     createdAt: registration.createdAt.toISOString(),
     updatedAt: registration.updatedAt.toISOString(),
+    duplicateIgnoredAt: registration.duplicateIgnoredAt?.toISOString() ?? null,
+    contactedAt: registration.contactedAt?.toISOString() ?? null,
+    archivedAt: registration.archivedAt?.toISOString() ?? null,
   };
 }
 
@@ -125,6 +155,25 @@ async function attachDuplicateReferences<T extends { payloadJson: unknown }>(
   });
 }
 
+// ── Person match enrichment (REGISTRATION-01F, Goal 2) ─────────────────────
+//
+// Wraps attachPersonMatchSummaries so both list + detail reads get the same
+// "NONE / POSSIBLE / CONFIRMED / LINKED" projection used to drive the
+// "Needs person" / "Already linked" filters (Goal 9) and the Person
+// section of the detail view.
+
+async function attachPersonMatches<
+  T extends {
+    personId: string | null;
+    email: string;
+    phone: string | null;
+    firstName: string;
+    lastName: string;
+  },
+>(registrations: T[]) {
+  return attachPersonMatchSummaries(registrations);
+}
+
 export async function listRegistrationsForTenant(tenantSlug: string) {
   const tenant = await requireTenant(tenantSlug);
 
@@ -137,7 +186,8 @@ export async function listRegistrationsForTenant(tenantSlug: string) {
   });
 
   const serialized = registrations.map(serializeRegistration);
-  return attachDuplicateReferences(tenant.id, serialized);
+  const withDuplicates = await attachDuplicateReferences(tenant.id, serialized);
+  return attachPersonMatches(withDuplicates);
 }
 
 export async function getRegistrationForTenant(
@@ -159,13 +209,15 @@ export async function getRegistrationForTenant(
   const [enriched] = await attachDuplicateReferences(tenant.id, [
     serializeRegistration(registration),
   ]);
-  return enriched;
+  const [withPersonMatch] = await attachPersonMatches([enriched]);
+  return withPersonMatch;
 }
 
 export async function updateRegistrationStatusForTenant(
   tenantSlug: string,
   registrationId: string,
-  input: UpdateRegistrationInput
+  input: UpdateRegistrationInput,
+  actorUserId: string | null = null,
 ) {
   const tenant = await requireTenant(tenantSlug);
 
@@ -206,6 +258,28 @@ export async function updateRegistrationStatusForTenant(
     }
   }
 
+  if (input.personId) {
+    // Person is a global entity (no tenantId column today) — existence only.
+    const person = await prisma.person.findUnique({
+      where: { id: input.personId },
+      select: { id: true },
+    });
+    if (!person) {
+      throw new Error("Person not found.");
+    }
+  }
+
+  // REGISTRATION-01F — Goal 6/8: quick actions ("Mark Contacted" / "Archive")
+  // PATCH {status: "CONTACTED" | "ARCHIVED"} through the same endpoint as
+  // the status dropdown; stamp the dedicated timestamp whenever that
+  // specific status is (re-)reached so the timeline / KPIs have exact times.
+  const contactedAt = input.status === "CONTACTED" ? new Date() : undefined;
+  const archivedAt = input.status === "ARCHIVED" ? new Date() : undefined;
+
+  const duplicateIgnoreData = input.duplicateIgnored
+    ? { duplicateIgnoredAt: new Date(), duplicateIgnoredById: actorUserId }
+    : {};
+
   const updated = await prisma.registration.update({
     where: {
       id: existing.id,
@@ -218,6 +292,10 @@ export async function updateRegistrationStatusForTenant(
           : input.assignedToUserId,
       targetGroupId:
         input.targetGroupId === undefined ? undefined : input.targetGroupId,
+      personId: input.personId === undefined ? undefined : input.personId,
+      contactedAt,
+      archivedAt,
+      ...duplicateIgnoreData,
     },
     select: registrationSelect,
   });
@@ -226,10 +304,14 @@ export async function updateRegistrationStatusForTenant(
     serializeRegistration(existing),
     serializeRegistration(updated),
   ]);
+  const [withMatchBefore, withMatchUpdated] = await attachPersonMatches([
+    serializedBefore,
+    serializedUpdated,
+  ]);
 
   return {
-    before: serializedBefore,
-    registration: serializedUpdated,
+    before: withMatchBefore,
+    registration: withMatchUpdated,
   };
 }
 
