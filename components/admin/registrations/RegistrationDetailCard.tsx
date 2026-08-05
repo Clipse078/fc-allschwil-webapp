@@ -4,22 +4,33 @@ import Link from "next/link";
 import { useState } from "react";
 import { RegistrationStatus } from "@prisma/client";
 import {
+  AlertTriangle,
   ArrowLeft,
   Baby,
+  Building2,
   Calendar,
   CheckCircle,
   Clock,
+  Code2,
+  ExternalLink,
+  FileSpreadsheet,
   FileText,
+  Globe,
   Hash,
+  HelpCircle,
   Mail,
   MapPin,
   MessageSquare,
+  PenLine,
   Phone,
+  Smartphone,
   User,
   UserCheck,
   Users,
   Volleyball,
 } from "lucide-react";
+import type { ComponentType } from "react";
+import { cn } from "@/lib/cn";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationDetail } from "@/lib/registrations/queries";
 import {
@@ -31,7 +42,25 @@ import {
   extractGenderFromPayload,
   getGenderLabel,
 } from "@/lib/registrations/classification";
-import { getRegistrationDetailFields } from "@/lib/registrations/detail-view";
+import {
+  formatCompactAddressLines,
+  getRegistrationDetailFields,
+} from "@/lib/registrations/detail-view";
+import {
+  getRegistrationSourceInfo,
+  type RegistrationSourceKey,
+} from "@/lib/registrations/source";
+
+// Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
+// only, ingestion is untouched (see lib/registrations/source.ts).
+const SOURCE_ICON: Record<RegistrationSourceKey, ComponentType<{ className?: string }>> = {
+  WEBSITE: Globe,
+  MOBILE_APP: Smartphone,
+  MANUAL: PenLine,
+  CSV_IMPORT: FileSpreadsheet,
+  API: Code2,
+  OTHER: HelpCircle,
+};
 
 const NOT_PROVIDED = "Nicht angegeben";
 
@@ -130,11 +159,14 @@ function DataField({
   value,
   icon,
   href,
+  breakAll = false,
 }: {
   label: string;
   value: string | null | undefined;
   icon?: React.ReactNode;
   href?: string;
+  /** Goal 7 (REGISTRATION-01E): prevent long unbroken strings (emails, URLs). */
+  breakAll?: boolean;
 }) {
   return (
     <div className="sce-data-field">
@@ -143,7 +175,10 @@ function DataField({
         href ? (
           <a
             href={href}
-            className="sce-data-value flex items-center gap-1.5 text-[var(--blue)] hover:underline"
+            className={cn(
+              "sce-data-value flex items-center gap-1.5 text-[var(--blue)] hover:underline",
+              breakAll && "break-all",
+            )}
           >
             {icon ? (
               <span className="text-[var(--muted)]">{icon}</span>
@@ -151,7 +186,12 @@ function DataField({
             {value}
           </a>
         ) : (
-          <span className="sce-data-value flex items-center gap-1.5">
+          <span
+            className={cn(
+              "sce-data-value flex items-center gap-1.5",
+              breakAll && "break-all",
+            )}
+          >
             {icon ? (
               <span className="text-[var(--muted)]">{icon}</span>
             ) : null}
@@ -245,6 +285,13 @@ export default function RegistrationDetailCard({
     ? new Date().getFullYear() - registration.birthYear >= 18
     : false;
   const genderDisplayLabel = getGenderLabel(genderCode, isAdultForGender) ?? fields.player.gender;
+
+  // Goal 6 (REGISTRATION-01E): presentation-only source label — ingestion
+  // still always writes "WEBSITE" today (see lib/registrations/source.ts).
+  const sourceInfo = getRegistrationSourceInfo(registration.source);
+  const SourceIcon = sourceInfo ? SOURCE_ICON[sourceInfo.key] : null;
+  const addressLines = formatCompactAddressLines(fields.address);
+  const duplicateReference = registration.duplicateReference;
 
   async function patchRegistration(patch: Record<string, unknown>) {
     setIsUpdating(true);
@@ -350,9 +397,9 @@ export default function RegistrationDetailCard({
 
         {/* Quick-info strip */}
         <div className="relative z-10 mt-6 flex flex-wrap gap-6 border-t border-white/15 pt-4">
-          <div className="flex items-center gap-2 text-sm text-white/80">
-            <Mail className="h-4 w-4 text-white/60" />
-            <span>{registration.email}</span>
+          <div className="flex min-w-0 items-center gap-2 text-sm text-white/80">
+            <Mail className="h-4 w-4 flex-shrink-0 text-white/60" />
+            <span className="break-all">{registration.email}</span>
           </div>
           {/* Goal 2 (REGISTRATION-01D): "Registriert" — date + time immediately
               visible in the hero, never requires scrolling to Systemdaten. */}
@@ -382,8 +429,50 @@ export default function RegistrationDetailCard({
               </span>
             </div>
           ) : null}
+          {/* Goal 6 (REGISTRATION-01E): presentation-only source label. */}
+          {sourceInfo && (
+            <div className="flex items-center gap-2 text-sm text-white/80">
+              {SourceIcon ? <SourceIcon className="h-4 w-4 text-white/60" /> : null}
+              <span>
+                Quelle: <span className="font-semibold text-white">{sourceInfo.label}</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Mögliches Duplikat (Goal 2, REGISTRATION-01E) */}
+      {fields.duplicate.isPossibleDuplicate && (
+        <div className="flex items-start gap-2.5 rounded-[var(--radius-xl)] border border-amber-200 bg-amber-50 px-4 py-3.5">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-amber-800">Mögliches Duplikat erkannt</p>
+            {duplicateReference ? (
+              <p className="mt-0.5 text-xs text-amber-700">
+                Anmeldung vom{" "}
+                <span className="font-semibold tabular-nums">
+                  {formatDateShort(duplicateReference.submittedAt, cfg)}
+                </span>{" "}
+                · Status: <span className="font-semibold">{STATUS_LABELS[duplicateReference.status]}</span>
+              </p>
+            ) : (
+              <p className="mt-0.5 text-xs text-amber-700">
+                Eine ähnliche Anmeldung mit dieser E-Mail-Adresse wurde bereits eingereicht.
+                Bitte prüfe, ob es sich um eine Doppeleinsendung handelt.
+              </p>
+            )}
+            {fields.duplicate.referenceId && (
+              <Link
+                href={`/tenant/${tenantSlug}/cockpit/registrations/${fields.duplicate.referenceId}`}
+                className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:underline"
+              >
+                Bestehende Anmeldung öffnen
+                <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden />
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Content grid ──────────────────────────────────────────────────── */}
       <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
@@ -426,7 +515,8 @@ export default function RegistrationDetailCard({
             </div>
           </div>
 
-          {/* Adresse (Address) — Goal 1/4: postcode & city must become visible */}
+          {/* Adresse (Address) — Goal 3 (REGISTRATION-01E): compact block
+              instead of five separate rows. Underlying fields are unchanged. */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
@@ -436,12 +526,18 @@ export default function RegistrationDetailCard({
                 </p>
               </div>
             </div>
-            <div className="sce-detail-section-body grid gap-5 sm:grid-cols-2">
-              <DataField label="Strasse" value={fields.address.street} />
-              <DataField label="Hausnummer" value={fields.address.houseNumber} />
-              <DataField label="Postleitzahl" value={fields.address.postalCode} />
-              <DataField label="Ort" value={fields.address.city} />
-              <DataField label="Land" value={fields.address.country} />
+            <div className="sce-detail-section-body">
+              {addressLines.length > 0 ? (
+                <address className="not-italic text-sm leading-relaxed text-[var(--foreground)] break-words">
+                  {addressLines.map((line, i) => (
+                    <span key={i} className="block">
+                      {line}
+                    </span>
+                  ))}
+                </address>
+              ) : (
+                <span className="sce-data-value-empty">{NOT_PROVIDED}</span>
+              )}
             </div>
           </div>
 
@@ -461,6 +557,7 @@ export default function RegistrationDetailCard({
                 value={fields.contact.email}
                 icon={<Mail className="h-3.5 w-3.5" />}
                 href={`mailto:${fields.contact.email}`}
+                breakAll
               />
               <DataField
                 label="Telefon"
@@ -489,6 +586,7 @@ export default function RegistrationDetailCard({
                 value={fields.parent?.email ?? null}
                 icon={fields.parent?.email ? <Mail className="h-3.5 w-3.5" /> : undefined}
                 href={fields.parent?.email ? `mailto:${fields.parent.email}` : undefined}
+                breakAll
               />
               <DataField
                 label="Telefon"
@@ -549,7 +647,7 @@ export default function RegistrationDetailCard({
                     {fields.additional.additionalRawData.map((entry) => (
                       <div key={entry.key} className="flex items-start gap-2 text-sm">
                         <FileText className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-[var(--muted)]" />
-                        <span className="text-[var(--text-2)]">
+                        <span className="min-w-0 break-words text-[var(--text-2)]">
                           <span className="font-medium">{entry.label}:</span> {entry.value}
                         </span>
                       </div>
@@ -718,7 +816,9 @@ export default function RegistrationDetailCard({
             </div>
           </div>
 
-          {/* Systemdaten */}
+          {/* Systemdaten — Goal 5 (REGISTRATION-01E): admin-relevant fields
+              only (ID, timestamps, source, tenant, duplicate reference).
+              Never expose raw internal implementation details. */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
@@ -729,10 +829,16 @@ export default function RegistrationDetailCard({
               </div>
             </div>
             <div className="sce-detail-section-body space-y-4">
+              <div className="sce-data-field">
+                <span className="sce-data-label">Registrierungs-ID</span>
+                <code className="font-mono text-[0.72rem] text-[var(--muted)]">
+                  {fields.technical.internalId}
+                </code>
+              </div>
               {/* Goal 2/4 (REGISTRATION-01D): exact registration timestamp —
                   date and time, always visible, never just relative time. */}
               <div className="sce-data-field">
-                <span className="sce-data-label">Registriert</span>
+                <span className="sce-data-label">Eingegangen</span>
                 <span className="sce-data-value flex items-center gap-1.5 tabular-nums">
                   <Calendar className="h-3.5 w-3.5 text-[var(--muted)]" />
                   {formatDateShort(registration.submittedAt, cfg)}
@@ -743,25 +849,38 @@ export default function RegistrationDetailCard({
                 </span>
               </div>
               <div className="sce-data-field">
-                <span className="sce-data-label">Erstellt</span>
-                <span className="sce-data-value">
-                  {formatDate(registration.createdAt, cfg)}
-                </span>
-              </div>
-              <div className="sce-data-field">
                 <span className="sce-data-label">Zuletzt geändert</span>
                 <span className="sce-data-value">
                   {formatDate(registration.updatedAt, cfg)}
                 </span>
               </div>
-              <DataField label="Quelle" value={fields.technical.source} />
-              <DataField label="Sprache" value={fields.technical.locale} />
+              <DataField label="Quelle" value={sourceInfo?.label ?? null} />
+              {fields.technical.websiteVersion && (
+                <DataField
+                  label="Website-Version"
+                  value={fields.technical.websiteVersion}
+                />
+              )}
               <div className="sce-data-field">
-                <span className="sce-data-label">Interne Registrierungs-ID</span>
-                <code className="font-mono text-[0.72rem] text-[var(--muted)]">
-                  {fields.technical.internalId}
-                </code>
+                <span className="sce-data-label">Mandant</span>
+                <span className="sce-data-value flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-[var(--muted)]" />
+                  {registration.tenant.name}
+                </span>
               </div>
+              {fields.duplicate.referenceId && (
+                <div className="sce-data-field">
+                  <span className="sce-data-label">Duplikat-Referenz</span>
+                  <Link
+                    href={`/tenant/${tenantSlug}/cockpit/registrations/${fields.duplicate.referenceId}`}
+                    className="sce-data-value flex items-center gap-1.5 text-[var(--blue)] hover:underline"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                    <code className="font-mono text-[0.72rem]">{fields.duplicate.referenceId}</code>
+                  </Link>
+                </div>
+              )}
+              <DataField label="Sprache" value={fields.technical.locale} />
             </div>
           </div>
         </div>
