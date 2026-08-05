@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   ]);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const actorTenantId = access.session?.user?.tenantId ?? null;
+  const actorTenantId = access.session?.user?.activeTenantId ?? null;
 
   const { eventId } = await params;
   const body = await req.json().catch(() => ({}));

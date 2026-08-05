@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const { id, itemId } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
 
@@ -55,7 +55,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const { id, itemId } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
 

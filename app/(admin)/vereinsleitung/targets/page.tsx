@@ -34,7 +34,7 @@ export default async function TargetsPage({ searchParams }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const params = (await searchParams) ?? {};
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
   const targets = await getTargets(actor);
 
   return (

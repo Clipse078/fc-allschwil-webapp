@@ -39,7 +39,7 @@ export default async function WebsiteCmsOverviewPage() {
     PERMISSIONS.WEBSITE_MANAGE,
   ]);
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
   const stats = await getCmsOverviewStats(tenantId);

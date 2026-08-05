@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { auth } from "@/auth";
 import { getOrgUnitById } from "@/lib/org/queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
 import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { canAccessOrgUnit, canManageOrgUnit } from "@/lib/visibility/org-unit-access";
@@ -28,7 +28,8 @@ import { PropertyGrid } from "@/components/ui/PropertyGrid";
 import { MetadataCard } from "@/components/ui/MetadataCard";
 import { TimelinePlaceholder } from "@/components/ui/TimelinePlaceholder";
 
-// Slice 11.2b: tenant resolved from session-carried tenantId.
+// RPERM-04: tenant resolved via the single tenant-context helper (session.activeTenantId,
+// derived from TenantMembership — never the legacy User.tenantId column).
 // Slice 11.5: sibling sort controls and parent breadcrumb added.
 // Slice 12.3: archive button added to danger zone in sidebar.
 // Phase 2 (org-based permissions): access now granted to ORG_VIEW/ORG_MANAGE holders
@@ -81,7 +82,7 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   const { id } = await params;
 
   // Phase 2: build actor context to check org-unit membership in addition to permissions.
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
 
   // Access check: global ORG_VIEW/ORG_MANAGE permission OR active member of this specific unit.
   // canAccessOrgUnit() is narrow: belonging to unit X never grants access to unit Y.
@@ -91,7 +92,7 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
 
   const [unit, tenant, roles, seasons] = await Promise.all([
     getOrgUnitById(id),
-    getTenantFromSession(session.user?.tenantId),
+    getActiveTenant(),
     prisma.role.findMany({
       orderBy: { name: "asc" },
       select: { id: true, key: true, name: true },

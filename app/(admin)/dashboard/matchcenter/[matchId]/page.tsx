@@ -6,7 +6,7 @@ import {
 } from "@/lib/matchcenter/query-service";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
-import { getTenantContextFromSession } from "@/lib/tenants/context";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import MatchcenterDetail from "@/components/admin/matchcenter/MatchcenterDetail";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { ToastProvider } from "@/components/ui/ToastProvider";
@@ -25,17 +25,13 @@ export default async function MatchcenterDetailPage({
     PERMISSIONS.EVENTS_MANAGE,
   ]);
 
-  const tenantId = session.user?.tenantId;
-
-  if (!tenantId) {
-    notFound();
-  }
-
-  const tenantContext = await getTenantContextFromSession(tenantId);
+  const tenantContext = await getActiveTenant();
 
   if (!tenantContext) {
     notFound();
   }
+
+  const tenantId = tenantContext.id;
 
   const { matchId } = await params;
 

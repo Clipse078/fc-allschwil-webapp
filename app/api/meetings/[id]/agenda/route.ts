@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "read" });
   if (!guard.ok) return guard.response;
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
 

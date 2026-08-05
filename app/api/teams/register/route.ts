@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
   if (!tenant) {
     return NextResponse.json(
       { error: "Mandant nicht gefunden. Bitte melde dich erneut an." },

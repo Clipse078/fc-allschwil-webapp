@@ -70,7 +70,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // ── 2. Resolve tenantId from session — never from request ─────────────────
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
 
   if (!tenantId) {
     return NextResponse.json(

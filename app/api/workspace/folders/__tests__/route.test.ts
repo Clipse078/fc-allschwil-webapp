@@ -80,7 +80,7 @@ function mockAuthorizedSession(
           overrides.userId === undefined
             ? ACTOR_USER_ID
             : overrides.userId,
-        tenantId:
+        activeTenantId:
           overrides.tenantId === undefined
             ? SESSION_TENANT_ID
             : overrides.tenantId,

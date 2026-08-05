@@ -103,7 +103,7 @@ export async function createRootWorkspaceFolderAction(
     };
   }
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   const userId = session.user?.id;
 
   if (!tenantId || !userId) {
@@ -199,7 +199,7 @@ export async function createChildWorkspaceFolderAction(
     };
   }
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   const userId = session.user?.id;
 
   if (!tenantId || !userId) {
@@ -321,7 +321,7 @@ export async function renameWorkspaceFolderAction(
     };
   }
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   const userId = session.user?.id;
 
   if (!tenantId || !userId) {
@@ -450,7 +450,7 @@ export async function archiveWorkspaceFolderAction(
     };
   }
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   const userId = session.user?.id;
 
   if (!tenantId || !userId) {
@@ -556,7 +556,7 @@ export async function restoreWorkspaceFolderAction(
     };
   }
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   const userId = session.user?.id;
 
   if (!tenantId || !userId) {
@@ -745,7 +745,7 @@ export async function moveWorkspaceFolderAction(
     };
   }
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   const userId = session.user?.id;
 
   if (!tenantId || !userId) {

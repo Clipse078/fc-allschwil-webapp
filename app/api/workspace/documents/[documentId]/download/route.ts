@@ -36,7 +36,7 @@ export async function GET(
     );
   }
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
 
   if (!sessionTenantId) {
     return NextResponse.json(

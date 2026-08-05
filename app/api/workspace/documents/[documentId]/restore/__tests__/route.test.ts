@@ -78,7 +78,7 @@ function configureAuthorizedSession(
     session: {
       user: {
         id: userId,
-        tenantId,
+        activeTenantId: tenantId,
       },
     },
   });

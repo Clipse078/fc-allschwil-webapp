@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams): Promise<N
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
   }
@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
   }
@@ -97,7 +97,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
   }

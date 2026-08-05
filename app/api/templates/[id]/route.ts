@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const guard = await requireTemplateAccess({ actor, id, access: "read" });
   if (!guard.ok) return guard.response;
 
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const guard = await requireTemplateAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
 
@@ -69,7 +69,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const check = await requireSession();
   if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status });
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const guard = await requireTemplateAccess({ actor, id, access: "delete" });
   if (!guard.ok) return guard.response;
 

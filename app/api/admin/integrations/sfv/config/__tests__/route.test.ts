@@ -75,7 +75,7 @@ const AUTHENTICATED_ADMIN = {
     user: {
       id: "user-1",
       email: "admin@test.invalid",
-      tenantId: TENANT_ID,
+      activeTenantId: TENANT_ID,
     },
   },
 };
@@ -88,7 +88,7 @@ const AUTHENTICATED_ADMIN_NO_TENANT = {
     user: {
       id: "user-2",
       email: "admin2@test.invalid",
-      tenantId: null,
+      activeTenantId: null,
     },
   },
 };

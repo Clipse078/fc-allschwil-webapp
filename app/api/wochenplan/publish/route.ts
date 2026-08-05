@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   ]);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const actorTenantId = access.session?.user?.tenantId ?? null;
+  const actorTenantId = access.session?.user?.activeTenantId ?? null;
   const actorUserId = access.session?.user?.id ?? null;
 
   const body = await req.json().catch(() => ({}));

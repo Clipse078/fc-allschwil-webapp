@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id, metricId } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
 
   // Target access guard — also confirms Target exists
   const guard = await requireTargetAccess({ actor, id, access: "write" });

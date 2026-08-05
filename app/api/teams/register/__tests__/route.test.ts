@@ -70,7 +70,7 @@ function makeSessionOk(overrides: Record<string, unknown> = {}) {
     status: 200,
     error: null,
     session: {
-      user: { id: "user-01", tenantId: "tenant-a", ...overrides },
+      user: { id: "user-01", activeTenantId: "tenant-a", ...overrides },
     },
   };
 }

@@ -48,7 +48,7 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
 
   const { id } = await params;
   const qp = (await searchParams) ?? {};
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
   const target = await getTargetById(id, actor);
 
   if (!target) notFound();

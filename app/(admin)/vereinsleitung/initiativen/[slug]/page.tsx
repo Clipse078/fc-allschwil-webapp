@@ -52,7 +52,7 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { slug } = await params;
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
 
   // 404-masking: getInitiativeBySlug returns null if actor cannot see the record.
   // The "not in DB" fallback card renders identically — no 403 leakage.

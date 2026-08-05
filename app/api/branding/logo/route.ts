@@ -2,7 +2,7 @@
  * POST /api/branding/logo
  *
  * Self-service logo upload for the authenticated user's own tenant.
- * Resolves the tenant from session.user.tenantId — no URL-supplied slug.
+ * Resolves the tenant from session.user.activeTenantId — no URL-supplied slug.
  *
  * Permission: USERS_MANAGE (club-admin level)
  * Isolation:  tenantKey derived from session, never from user-supplied body.
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }

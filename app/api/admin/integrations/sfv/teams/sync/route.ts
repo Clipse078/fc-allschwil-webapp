@@ -51,7 +51,7 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json(
       { error: "Kein Mandanten-Kontext in der Sitzung." },

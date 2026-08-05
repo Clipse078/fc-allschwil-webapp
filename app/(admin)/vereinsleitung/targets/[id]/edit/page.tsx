@@ -20,7 +20,7 @@ export default async function EditTargetPage({ params }: PageProps) {
   if (!session?.user) redirect("/login");
 
   const { id } = await params;
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
 
   // Fetch target and link options in parallel — all respect VisibilityScope
   const [target, availableMeetings, availableInitiatives] = await Promise.all([

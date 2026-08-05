@@ -119,7 +119,7 @@ export default async function WorkspacePage({
     PERMISSIONS.WORKSPACE_MANAGE,
   ]);
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
   const params = (await searchParams) ?? {};

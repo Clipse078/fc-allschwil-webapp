@@ -2,15 +2,16 @@ import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits } from "@/lib/org/queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import OrgUnitForm from "@/components/admin/org/OrgUnitForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
-// Slice 11.2b: tenant resolved from session-carried tenantId.
+// RPERM-04: tenant resolved via the single tenant-context helper (session.activeTenantId,
+// derived from TenantMembership — never the legacy User.tenantId column).
 
 export default async function NewOrgUnitPage() {
-  const session = await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
-  const tenant = await getTenantFromSession(session.user?.tenantId);
+  await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
+  const tenant = await getActiveTenant();
   if (!tenant) notFound();
   const parentOptions = await getOrgUnits(tenant.id);
 

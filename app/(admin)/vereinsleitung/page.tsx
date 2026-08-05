@@ -67,7 +67,7 @@ export default async function VereinsleitungPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
 
   const [targets, meetings, initiatives, kpis, governance] = await Promise.all([
     getTargets(actor),

@@ -11,17 +11,16 @@ import {
   Users,
 } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
-import { auth } from "@/auth";
 import { KpiCard } from "@/components/admin/dashboard/KpiCard";
 import AdminOnboardingProgress from "@/components/admin/admin/AdminOnboardingProgress";
 
 type SeasonOption = Awaited<ReturnType<typeof getSeasonOptionsData>>[number];
 
-async function getAdminOverviewData(tenantId?: string | null) {
+async function getAdminOverviewData() {
   const [tenant, seasonOptions, counts] = await Promise.all([
-    getTenantFromSession(tenantId),
+    getActiveTenant(),
     getSeasonOptionsData(),
     Promise.all([
       prisma.orgUnit.count({ where: { status: { not: "ARCHIVED" } } }),
@@ -136,8 +135,7 @@ function QuickLinkItem({
 }
 
 export default async function AdminPage() {
-  const session = await auth();
-  const data = await getAdminOverviewData(session?.user?.tenantId);
+  const data = await getAdminOverviewData();
 
   const onboardingSteps = [
     {

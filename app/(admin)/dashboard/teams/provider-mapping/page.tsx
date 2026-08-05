@@ -14,7 +14,7 @@ import { Link2, Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { listProviderMappings } from "@/lib/provider-mapping/provider-mapping-queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
 import ProviderMappingTable from "@/components/admin/teams/provider-mapping/ProviderMappingTable";
@@ -37,7 +37,7 @@ export default async function ProviderMappingPage({ searchParams }: PageProps) {
     PERMISSIONS.TEAMS_MANAGE,
   ]);
 
-  const tenant = await getTenantFromSession(session.user.tenantId);
+  const tenant = await getActiveTenant();
   const tenantId = tenant?.id;
 
   if (!tenantId) {

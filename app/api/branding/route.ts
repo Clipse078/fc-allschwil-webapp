@@ -3,7 +3,7 @@
  *
  * Unlike /api/tenants/[tenantSlug]/route.ts (which requires TENANTS_MANAGE and
  * accepts a URL-supplied slug), this route resolves the tenant exclusively from
- * session.user.tenantId — club admins can manage their own branding without
+ * session.user.activeTenantId — club admins can manage their own branding without
  * needing super-admin permissions.
  *
  * GET  → returns current { logoUrl, primaryColor, secondaryColor, tenantKey, tenantName }
@@ -25,7 +25,7 @@ export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }
@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }

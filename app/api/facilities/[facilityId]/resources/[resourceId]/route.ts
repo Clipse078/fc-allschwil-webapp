@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const tenantId = auth.session.user?.tenantId;
+  const tenantId = auth.session.user?.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
   }

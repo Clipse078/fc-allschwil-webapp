@@ -402,7 +402,7 @@ export class EffectivePermissionResolver {
  * const allowed = await resolver.hasPermission({
  *   userId: session.user.id,
  *   permission: "trainings.view",
- *   tenantId: session.user.tenantId,
+ *   tenantId: session.user.activeTenantId,
  * });
  * ```
  */

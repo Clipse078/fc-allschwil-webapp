@@ -118,7 +118,7 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     // Validate orgUnitId against active tenant if explicitly set to a non-null value.
     if (orgUnitId !== undefined && orgUnitId !== null) {
-      const tenant = await getTenantFromSession(access.session.user?.tenantId);
+      const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
       const orgUnit = await prisma.orgUnit.findUnique({
         where: { id: orgUnitId },
         select: { id: true, tenantId: true },

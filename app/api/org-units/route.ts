@@ -16,7 +16,7 @@ export async function GET() {
   const access = await requireApiAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const orgUnits = await getOrgUnits(tenant.id);
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const body = await req.json().catch(() => ({}));

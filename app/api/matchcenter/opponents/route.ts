@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
 
   if (!tenantId) {
     return NextResponse.json(

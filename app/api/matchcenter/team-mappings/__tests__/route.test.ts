@@ -69,7 +69,7 @@ describe("POST /api/matchcenter/team-mappings", () => {
       session: {
         user: {
           id: "user-1",
-          tenantId: "tenant-1",
+          activeTenantId: "tenant-1",
         },
       },
     });
@@ -135,7 +135,7 @@ describe("POST /api/matchcenter/team-mappings", () => {
       session: {
         user: {
           id: "user-1",
-          tenantId: null,
+          activeTenantId: null,
         },
       },
     });

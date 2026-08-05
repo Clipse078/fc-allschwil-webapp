@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
-import { getTenantContextFromSession } from "@/lib/tenants/context";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { formatTime } from "@/lib/tenant-runtime/formatters";
 import {
   DashboardHero,
@@ -215,13 +215,10 @@ function EventItem({ day, month, title, location, time }: EventItemProps) {
 
 export default async function DashboardPage({ searchParams: _sp }: DashboardPageProps) {
   const session = await auth();
-  const tenantId = session?.user?.tenantId ?? null;
   const firstName = session?.user?.firstName ?? "Admin";
 
-  const [dash, ctx] = await Promise.all([
-    getDashboardData(tenantId),
-    getTenantContextFromSession(tenantId),
-  ]);
+  const ctx = await getActiveTenant();
+  const dash = await getDashboardData(ctx?.id ?? null);
 
   const fmtCfg = { locale: ctx?.locale ?? "de-CH", timezone: ctx?.timezone ?? undefined };
 

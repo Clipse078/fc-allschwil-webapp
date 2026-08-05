@@ -1,7 +1,7 @@
 /**
  * /api/website-settings — Self-service website settings API for the authenticated user's own tenant.
  *
- * Resolves tenant exclusively from session.user.tenantId — club admins can manage
+ * Resolves tenant exclusively from session.user.activeTenantId — club admins can manage
  * their own website settings without needing super-admin (TENANTS_MANAGE) permissions.
  *
  * GET  → returns current { approvedDataOnly }
@@ -21,7 +21,7 @@ export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.WEBSITE_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }
@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.WEBSITE_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }

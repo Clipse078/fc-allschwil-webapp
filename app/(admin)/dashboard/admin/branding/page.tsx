@@ -1,19 +1,17 @@
 import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getTenantContextFromSession } from "@/lib/tenants/context";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import BrandingSettingsForm from "@/components/admin/branding/BrandingSettingsForm";
 
 // Branding management for the authenticated user's own tenant.
-// Tenant resolved from session.user.tenantId — no URL slug required.
+// Tenant resolved through the single tenant-context helper (RPERM-04) — no URL slug required.
 // Permission: USERS_MANAGE (club admin level) — no TENANTS_MANAGE needed.
 
 export default async function BrandingPage() {
-  const session = await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
-  const tenantId = session.user?.tenantId;
-  if (!tenantId) notFound();
-  const ctx = await getTenantContextFromSession(tenantId);
+  await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
+  const ctx = await getActiveTenant();
   if (!ctx) notFound();
 
   return (
