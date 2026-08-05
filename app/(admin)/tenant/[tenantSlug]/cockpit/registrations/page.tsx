@@ -44,6 +44,8 @@ export default async function TenantRegistrationsPage({ params }: Props) {
     ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
+  // REGISTRATION-01F — Goal 9: "Assigned to me" filter needs the viewer's own user id.
+  const currentUserId = session.user?.effectiveUserId ?? session.user?.id ?? null;
 
   return (
     <PageShell fullWidth>
@@ -55,6 +57,7 @@ export default async function TenantRegistrationsPage({ params }: Props) {
         timezone={ctx?.timezone ?? undefined}
         assignableUsers={assignableUsers}
         targetGroups={targetGroups}
+        currentUserId={currentUserId}
       />
     </PageShell>
   );

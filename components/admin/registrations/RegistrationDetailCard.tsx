@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { RegistrationStatus } from "@prisma/client";
 import {
-  AlertTriangle,
   ArrowLeft,
   Baby,
   Building2,
@@ -25,7 +24,6 @@ import {
   Phone,
   Smartphone,
   User,
-  UserCheck,
   Users,
   Volleyball,
 } from "lucide-react";
@@ -50,6 +48,14 @@ import {
   getRegistrationSourceInfo,
   type RegistrationSourceKey,
 } from "@/lib/registrations/source";
+import {
+  STATUS_ORDER,
+  STATUS_LABELS as SHARED_STATUS_LABELS,
+  STATUS_HERO_CLASS as SHARED_STATUS_HERO_CLASS,
+  STATUS_BADGE_CLASS as SHARED_STATUS_BADGE_CLASS,
+} from "@/lib/registrations/status";
+import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
 
 // Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
 // only, ingestion is untouched (see lib/registrations/source.ts).
@@ -63,19 +69,6 @@ const SOURCE_ICON: Record<RegistrationSourceKey, ComponentType<{ className?: str
 };
 
 const NOT_PROVIDED = "Nicht angegeben";
-
-type AssignableUser = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-};
-
-type TargetGroupOption = {
-  id: string;
-  name: string;
-  key: string;
-};
 
 type RegistrationDetailCardProps = {
   tenantSlug: string;
@@ -106,34 +99,12 @@ const TYPE_LABELS: Record<string, string> = {
   VERANSTALTUNGSANMELDUNG: "Veranstaltungsanmeldung",
 };
 
-const STATUS_LABELS: Record<RegistrationStatus, string> = {
-  NEW: "Neu",
-  REVIEWING: "In Prüfung",
-  CONTACTED: "Kontaktiert",
-  ACCEPTED: "Angenommen",
-  REJECTED: "Abgelehnt",
-  ARCHIVED: "Archiviert",
-};
-
-const STATUS_HERO_CLASS: Record<RegistrationStatus, string> = {
-  NEW: "border-blue-300/60 bg-blue-500/20 text-blue-200",
-  REVIEWING: "border-amber-300/60 bg-amber-500/20 text-amber-200",
-  CONTACTED: "border-violet-300/60 bg-violet-500/20 text-violet-200",
-  ACCEPTED: "border-emerald-300/60 bg-emerald-500/20 text-emerald-200",
-  REJECTED: "border-red-300/60 bg-red-500/20 text-red-200",
-  ARCHIVED: "border-white/20 bg-white/10 text-white/50",
-};
-
-const STATUS_BADGE_CLASS: Record<RegistrationStatus, string> = {
-  NEW: "border-blue-200 bg-blue-50 text-blue-700",
-  REVIEWING: "border-amber-200 bg-amber-50 text-amber-700",
-  CONTACTED: "border-violet-200 bg-violet-50 text-violet-700",
-  ACCEPTED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  REJECTED: "border-red-200 bg-red-50 text-red-700",
-  ARCHIVED: "border-slate-200 bg-slate-50 text-slate-400",
-};
-
-const STATUS_OPTIONS = Object.values(RegistrationStatus);
+// REGISTRATION-01F — Goal 8: status metadata now lives in one shared module
+// (lib/registrations/status.ts).
+const STATUS_LABELS = SHARED_STATUS_LABELS;
+const STATUS_HERO_CLASS = SHARED_STATUS_HERO_CLASS;
+const STATUS_BADGE_CLASS = SHARED_STATUS_BADGE_CLASS;
+const STATUS_OPTIONS = STATUS_ORDER;
 
 
 function getInitials(firstName: string, lastName: string) {
@@ -291,7 +262,6 @@ export default function RegistrationDetailCard({
   const sourceInfo = getRegistrationSourceInfo(registration.source);
   const SourceIcon = sourceInfo ? SOURCE_ICON[sourceInfo.key] : null;
   const addressLines = formatCompactAddressLines(fields.address);
-  const duplicateReference = registration.duplicateReference;
 
   async function patchRegistration(patch: Record<string, unknown>) {
     setIsUpdating(true);
@@ -328,14 +298,6 @@ export default function RegistrationDetailCard({
 
   function updateStatus(status: RegistrationStatus) {
     return patchRegistration({ status });
-  }
-
-  function updateAssignee(assignedToUserId: string | null) {
-    return patchRegistration({ assignedToUserId });
-  }
-
-  function updateTargetGroup(targetGroupId: string | null) {
-    return patchRegistration({ targetGroupId });
   }
 
   return (
@@ -441,43 +403,23 @@ export default function RegistrationDetailCard({
         </div>
       </div>
 
-      {/* Mögliches Duplikat (Goal 2, REGISTRATION-01E) */}
-      {fields.duplicate.isPossibleDuplicate && (
-        <div className="flex items-start gap-2.5 rounded-[var(--radius-xl)] border border-amber-200 bg-amber-50 px-4 py-3.5">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-amber-800">Mögliches Duplikat erkannt</p>
-            {duplicateReference ? (
-              <p className="mt-0.5 text-xs text-amber-700">
-                Anmeldung vom{" "}
-                <span className="font-semibold tabular-nums">
-                  {formatDateShort(duplicateReference.submittedAt, cfg)}
-                </span>{" "}
-                · Status: <span className="font-semibold">{STATUS_LABELS[duplicateReference.status]}</span>
-              </p>
-            ) : (
-              <p className="mt-0.5 text-xs text-amber-700">
-                Eine ähnliche Anmeldung mit dieser E-Mail-Adresse wurde bereits eingereicht.
-                Bitte prüfe, ob es sich um eine Doppeleinsendung handelt.
-              </p>
-            )}
-            {fields.duplicate.referenceId && (
-              <Link
-                href={`/tenant/${tenantSlug}/cockpit/registrations/${fields.duplicate.referenceId}`}
-                className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:underline"
-              >
-                Bestehende Anmeldung öffnen
-                <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden />
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ── Content grid ──────────────────────────────────────────────────── */}
       <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
         {/* Main column */}
         <div className="space-y-5">
+          {/* REGISTRATION-01F: team recommendation actions, person lookup/
+              creation, assignment workflow, duplicate workflow, timeline. */}
+          <RegistrationWorkflowPanel
+            registration={registration}
+            tenantSlug={tenantSlug}
+            canEdit={canEdit}
+            locale={locale}
+            timezone={timezone}
+            assignableUsers={assignableUsers}
+            targetGroups={targetGroups}
+            onUpdate={setRegistration}
+          />
+
           {/* Spieler (Player) */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
@@ -740,71 +682,6 @@ export default function RegistrationDetailCard({
                   >
                     {STATUS_LABELS[registration.status]}
                   </span>
-                )}
-              </div>
-
-              {/* Assignee */}
-              <div className="sce-data-field">
-                <span className="sce-data-label flex items-center gap-1.5">
-                  <UserCheck className="h-3 w-3" />
-                  Zugewiesen an
-                </span>
-                {canEdit && assignableUsers.length > 0 ? (
-                  <select
-                    value={registration.assignedToUserId ?? ""}
-                    disabled={isUpdating}
-                    onChange={(e) =>
-                      updateAssignee(e.target.value || null)
-                    }
-                    className="fca-select mt-1"
-                  >
-                    <option value="">— Nicht zugewiesen —</option>
-                    {assignableUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.firstName} {u.lastName}
-                      </option>
-                    ))}
-                  </select>
-                ) : registration.assignedToUser ? (
-                  <span className="sce-data-value flex items-center gap-1.5">
-                    <UserCheck className="h-3.5 w-3.5 text-[var(--muted)]" />
-                    {registration.assignedToUser.firstName}{" "}
-                    {registration.assignedToUser.lastName}
-                  </span>
-                ) : (
-                  <span className="sce-data-value-empty">Nicht zugewiesen</span>
-                )}
-              </div>
-
-              {/* Target group */}
-              <div className="sce-data-field">
-                <span className="sce-data-label flex items-center gap-1.5">
-                  <Users className="h-3 w-3" />
-                  Zielgruppe
-                </span>
-                {canEdit && targetGroups.length > 0 ? (
-                  <select
-                    value={registration.targetGroupId ?? ""}
-                    disabled={isUpdating}
-                    onChange={(e) =>
-                      updateTargetGroup(e.target.value || null)
-                    }
-                    className="fca-select mt-1"
-                  >
-                    <option value="">— Nicht zugewiesen —</option>
-                    {targetGroups.map((tg) => (
-                      <option key={tg.id} value={tg.id}>
-                        {tg.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : registration.targetGroup ? (
-                  <span className="sce-data-value flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-[var(--muted)]" />
-                    {registration.targetGroup.name}
-                  </span>
-                ) : (
-                  <span className="sce-data-value-empty">Keine Zielgruppe</span>
                 )}
               </div>
 

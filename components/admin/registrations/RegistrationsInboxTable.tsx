@@ -8,6 +8,11 @@ import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import { formatDateShort } from "@/lib/tenant-runtime/formatters";
 import { EmptyState } from "@/components/ui/page";
+import {
+  STATUS_ORDER,
+  STATUS_LABELS as SHARED_STATUS_LABELS,
+  STATUS_BADGE_CLASS as SHARED_STATUS_BADGE_CLASS,
+} from "@/lib/registrations/status";
 
 type RegistrationsInboxTableProps = {
   tenantSlug: string;
@@ -32,23 +37,9 @@ const TYPE_LABELS: Record<string, string> = {
   VERANSTALTUNGSANMELDUNG: "Veranstaltungsanmeldung",
 };
 
-const STATUS_LABELS: Record<RegistrationStatus, string> = {
-  NEW: "Neu",
-  REVIEWING: "In Prüfung",
-  CONTACTED: "Kontaktiert",
-  ACCEPTED: "Angenommen",
-  REJECTED: "Abgelehnt",
-  ARCHIVED: "Archiviert",
-};
-
-const STATUS_BADGE_CLASS: Record<RegistrationStatus, string> = {
-  NEW: "border-blue-200 bg-blue-50 text-blue-700",
-  REVIEWING: "border-amber-200 bg-amber-50 text-amber-700",
-  CONTACTED: "border-violet-200 bg-violet-50 text-violet-700",
-  ACCEPTED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  REJECTED: "border-red-200 bg-red-50 text-red-700",
-  ARCHIVED: "border-slate-200 bg-slate-50 text-slate-400",
-};
+// REGISTRATION-01F — Goal 8: status metadata now lives in one shared module.
+const STATUS_LABELS = SHARED_STATUS_LABELS;
+const STATUS_BADGE_CLASS = SHARED_STATUS_BADGE_CLASS;
 
 const TYPE_BADGE_CLASS: Record<string, string> = {
   PROBETRAINING: "border-blue-200 bg-blue-50 text-blue-700",
@@ -59,7 +50,7 @@ const TYPE_BADGE_CLASS: Record<string, string> = {
   OTHER: "border-slate-200 bg-slate-50 text-slate-400",
 };
 
-const STATUS_OPTIONS = Object.values(RegistrationStatus);
+const STATUS_OPTIONS = STATUS_ORDER;
 
 
 function getInitials(firstName: string, lastName: string) {
