@@ -30,7 +30,7 @@ All features expose their data through API routes before UI is built on top. The
 Every database query that accesses tenant-scoped data must include a `tenantId` filter. Tenant identity is derived from the session — it is never taken from a client-supplied request parameter without server-side validation.
 
 **In practice:**
-- All Prisma queries for tenant-scoped models include `where: { tenantId: session.user.tenantId }`.
+- All Prisma queries for tenant-scoped models include `where: { tenantId: session.user.activeTenantId }` (RPERM-04: derived from `TenantMembership`, resolved through `lib/tenants/active-tenant.ts` in Server Components — never the legacy `User.tenantId` column).
 - Public API routes derive `tenantId` from `tenantSlug` resolved against the database — never from a raw query parameter alone.
 - Cross-tenant queries (platform admin only) are explicitly identified, documented, and access-controlled.
 - Tenant isolation is tested as part of go-live readiness (see `02-go-live-checklist.md`).

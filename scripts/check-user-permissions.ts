@@ -33,6 +33,7 @@ loadEnvConfig(process.cwd());
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 
 // ── Arg parsing ────────────────────────────────────────────────────────────────
 
@@ -87,69 +88,57 @@ async function main() {
     process.exit(1);
   }
 
+  // RPERM-04: TenantMembership is the canonical source of tenant scope — a
+  // user is resolved as belonging to this tenant only via an active
+  // TenantMembership row, never via the legacy User.tenantId column.
+  const membershipWhere = { tenantMemberships: { some: { tenantId: tenant.id, isActive: true } } };
+
   // Resolve user (without exposing sensitive fields)
   const user = args.userId
     ? await prisma.user.findFirst({
-        where: { id: args.userId, tenantId: tenant.id },
+        where: { id: args.userId, ...membershipWhere },
         select: {
           id: true,
-          tenantId: true,
           isActive: true,
-          userRoles: {
-            select: {
-              role: {
-                select: {
-                  key: true,
-                  name: true,
-                  rolePermissions: {
-                    select: { permission: { select: { key: true } } }
-                  }
-                }
-              }
-            }
-          }
-        }
+          userRoles: { select: { role: { select: { key: true } } } },
+        },
       })
     : await prisma.user.findFirst({
-        where: { email: args.email!, tenantId: tenant.id },
+        where: { email: args.email!, ...membershipWhere },
         select: {
           id: true,
-          tenantId: true,
           isActive: true,
-          userRoles: {
-            select: {
-              role: {
-                select: {
-                  key: true,
-                  name: true,
-                  rolePermissions: {
-                    select: { permission: { select: { key: true } } }
-                  }
-                }
-              }
-            }
-          }
-        }
+          userRoles: { select: { role: { select: { key: true } } } },
+        },
       });
 
   if (!user) {
     const identifier = args.email ?? args.userId;
-    console.error(`[check-user-permissions] ERROR: User not found (${identifier}) in tenant ${tenant.key}`);
+    console.error(`[check-user-permissions] ERROR: User not found (${identifier}) with an active TenantMembership in tenant ${tenant.key}`);
     process.exit(1);
   }
 
   const roleKeys = user.userRoles.map(ur => ur.role.key).sort();
-  const permissionKeys = Array.from(
-    new Set(user.userRoles.flatMap(ur => ur.role.rolePermissions.map(rp => rp.permission.key)))
-  ).sort();
+
+  // RPERM-04: effective permissions computed via the canonical
+  // EffectivePermissionResolver (platform ∪ tenant), never a blind flatten of
+  // every role a user happens to hold regardless of scope/tenant ownership.
+  const resolver = createEffectivePermissionResolver(prisma);
+  const { platform, tenant: tenantPermissions } = await resolver.getEffectivePermissions({
+    userId: user.id,
+    tenantId: tenant.id,
+  });
+  const permissionKeys = Array.from(new Set([...platform, ...tenantPermissions])).sort();
 
   console.log("\n[check-user-permissions] Result\n");
   console.log(`  Tenant          : ${tenant.name} (${tenant.key})`);
   console.log(`  User ID         : ${user.id.slice(0, 8)}... [REDACTED]`);
   console.log(`  Is Active       : ${user.isActive}`);
-  console.log(`  Tenant Match    : ${user.tenantId === tenant.id}`);
+  console.log(`  Tenant Membership Active : true`);
   console.log(`\n  Assigned Roles  : ${roleKeys.length === 0 ? "(none)" : roleKeys.join(", ")}`);
-  console.log(`\n  Total Permissions : ${permissionKeys.length}`);
+  console.log(`\n  Platform Permissions : ${platform.length}`);
+  console.log(`  Tenant Permissions   : ${tenantPermissions.length}`);
+  console.log(`  Total Permissions    : ${permissionKeys.length}`);
   console.log(`  trainings.view    : ${permissionKeys.includes("trainings.view") ? "✓ PRESENT" : "✗ MISSING"}`);
   console.log(`  trainings.manage  : ${permissionKeys.includes("trainings.manage") ? "✓ PRESENT" : "✗ MISSING"}`);
 

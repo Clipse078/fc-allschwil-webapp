@@ -258,7 +258,7 @@ Returns the block-based layout of a published page for unauthenticated public co
 
 | Layer | Isolation method |
 |-------|-----------------|
-| Admin API | `tenantId` from `access.session.user.tenantId` only |
+| Admin API | `tenantId` from `access.session.user.activeTenantId` only |
 | Page ownership | `getPageForTenant(tenantId, pageId)` verifies ownership |
 | Section ownership | All queries filter by `{ tenantId, pageId }` |
 | Public API | Tenant from URL path via `resolveTenantFromParams()` |

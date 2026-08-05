@@ -46,7 +46,7 @@ SportClubEvo is designed to serve many sports clubs (tenants) from a single plat
 
 ### Decision
 
-Every feature is built multi-tenant from its first commit. All database queries that access tenant-scoped data must include a `tenantId` filter. No tenant's data may be accessible to another tenant. Tenant identity is carried in the session (`session.user.tenantId`) and must be validated server-side on every request.
+Every feature is built multi-tenant from its first commit. All database queries that access tenant-scoped data must include a `tenantId` filter. No tenant's data may be accessible to another tenant. Tenant identity is carried in the session (`session.user.activeTenantId`, derived exclusively from active `TenantMembership` rows — see RPERM-04) and must be validated server-side on every request. Dashboard pages obtain it through the single helper `requireTenantContext()` / `getActiveTenant()` (`lib/tenants/active-tenant.ts`) rather than reading the session field directly.
 
 ### Consequences
 
