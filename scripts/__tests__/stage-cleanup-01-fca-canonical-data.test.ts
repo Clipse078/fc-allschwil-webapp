@@ -234,7 +234,8 @@ describe("HELPER FUNCTIONS", () => {
         "website_publisher",
         "trainer",
         "viewer",
-        "club_admin_fc_allschwil",
+        // RPERM-05-C1: canonical key, no longer the divergent legacy key.
+        "club_admin__fc-allschwil",
       ])
     );
   });

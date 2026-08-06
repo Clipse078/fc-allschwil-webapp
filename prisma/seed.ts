@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { Pool } from "pg";
 import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -25,13 +26,6 @@ const pool = new Pool({
 
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
-
-const CLUB_ADMIN_TEMPLATE_KEY = "club_admin";
-
-/** RPERM-04: derives the per-tenant materialized club_admin role key from the tenant's key. */
-function tenantClubAdminRoleKey(tenantKey: string): string {
-  return `${CLUB_ADMIN_TEMPLATE_KEY}__${tenantKey}`;
-}
 
 async function main() {
   await prisma.tenant.upsert({
@@ -351,7 +345,7 @@ async function main() {
       .map((permission) => permission.key);
 
     const tenantClubAdminRole = await prisma.role.upsert({
-      where: { key: tenantClubAdminRoleKey(fcaTenantForRoles.key) },
+      where: { key: getTenantClubAdminRoleKey(fcaTenantForRoles.key) },
       update: {
         name: "Club Admin",
         description: "Full operational access within this club",
@@ -362,7 +356,7 @@ async function main() {
         isArchived: false,
       },
       create: {
-        key: tenantClubAdminRoleKey(fcaTenantForRoles.key),
+        key: getTenantClubAdminRoleKey(fcaTenantForRoles.key),
         name: "Club Admin",
         description: "Full operational access within this club",
         scope: RoleScope.TENANT,

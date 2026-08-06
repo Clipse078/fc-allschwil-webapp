@@ -29,6 +29,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -98,7 +99,7 @@ async function main() {
   // TenantMembership + a tenant-scoped UserRole — rather than inheriting
   // tenant permissions merely by holding the PLATFORM super_admin role.
   const tenantClubAdminRole = await prisma.role.findUnique({
-    where: { key: `club_admin__${tenant.key}` },
+    where: { key: getTenantClubAdminRoleKey(tenant.key) },
   });
 
   if (!tenantClubAdminRole) {
