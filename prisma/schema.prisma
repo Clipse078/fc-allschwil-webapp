@@ -526,6 +526,8 @@ model Tenant {
   trainingPlanAssignments  TrainingPlanAssignment[]
   // TRAINING-ALLOCATIONS-01: canonical facility resource allocations
   trainingAllocations      TrainingAllocation[]
+  // TRAININGCENTER-02: canonical generated training sessions
+  trainingSessions         TrainingSession[]
 
   // RPERM-02
   tenantMemberships TenantMembership[]
@@ -1138,6 +1140,8 @@ model TeamSeason {
   competitions       TeamSeasonCompetition[]
   // TRAINING-CORE-01: canonical recurring training series for this TeamSeason
   trainingSeries     TrainingSeries[]
+  // TRAININGCENTER-02: canonical generated training sessions for this TeamSeason
+  trainingSessions   TrainingSession[]
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -3034,6 +3038,8 @@ model TrainingSeries {
   recurrenceDays  TrainingSeriesRecurrenceDay[]
   planAssignments TrainingPlanAssignment[]
   allocations     TrainingAllocation[]
+  // TRAININGCENTER-02: canonical generated occurrences of this series
+  sessions        TrainingSession[]
 
   @@index([tenantId])
   @@index([teamSeasonId])
@@ -3290,4 +3296,142 @@ model TrainingAllocation {
   @@index([trainingSeriesId])
   @@index([facilityResourceId])
   @@index([tenantId, trainingSeriesId])
+}
+
+// =============================================================================
+// TRAININGCENTER-02: Canonical Training Session Engine (Foundation)
+//
+// Introduces TrainingSession — the canonical, dated occurrence generated
+// from a recurring TrainingSeries. This is the single row that every
+// downstream consumer (Weekplanner, Dayplanner, Website, Infoboard,
+// Attendance, Weather, Communication) reads from. None of those consumers
+// generate their own occurrences — they all resolve against this table.
+//
+// Architecture:
+//   TrainingSeries → TrainingSession (generated) → many consumers
+//
+// Canonical principle — "one generated session, many consumers":
+//   - Each (trainingSeriesId, date) pair produces exactly one TrainingSession
+//     row, enforced by @@unique([trainingSeriesId, date]).
+//   - Generation (lib/training/session-generation-service.ts) is idempotent:
+//     re-running it for the same series/window never creates duplicates and
+//     only touches rows whose derived schedule actually changed.
+//   - Consumers never write their own copies of a session; they either read
+//     TrainingSession directly or (in the future) attach override/annotation
+//     rows that point back at a TrainingSession by id.
+//
+// Future compatibility (explicitly NOT implemented in this PR):
+//   - `status` already models CANCELLED / POSTPONED / MOVED so those lifecycle
+//     states can be introduced later without a breaking schema change.
+//     Generation today only ever writes/reads SCHEDULED occurrences.
+//   - Holidays / skipped dates / one-off exceptions: future exception rows
+//     (e.g. a `TrainingSeriesException` table keyed by trainingSeriesId+date)
+//     can be consulted by the generator to skip or move a date without any
+//     change to this model.
+//   - Weekplanner overrides (pitch, resource, dressing room, trainer, time,
+//     cancellation) belong in a future `TrainingSessionWeekplanOverride`
+//     model that references `TrainingSession.id` + a Weekplan id. Multiple
+//     weekplans (Standard/Bad Weather/Winter/Summer) each attach their own
+//     override rows to the SAME TrainingSession — the session itself is never
+//     duplicated per plan.
+//   - Attendance, weather snapshots, and notes are future models that hang
+//     off `TrainingSession.id` via a foreign key; none of them require
+//     changes to this table.
+//
+// Denormalisation:
+//   - `teamSeasonId` is copied from the parent TrainingSeries at generation
+//     time so every consumer can filter by team/season without an extra join.
+//     TrainingSeries.teamSeasonId is not mutable via the service layer today,
+//     so this copy cannot drift.
+//   - `weekday`, `timezone`, `startAt`, `endAt` are the resolved, generated
+//     values for this specific date. They are recomputed (and only updated
+//     when they actually change) on every regeneration run, so they always
+//     reflect the series' current recurrence configuration.
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// TrainingSessionStatus — lifecycle status of a generated TrainingSession.
+//
+// SCHEDULED  — Normal, generated occurrence. The only status the generator
+//              writes today.
+// CANCELLED  — Reserved for future exception handling (holidays, ad-hoc
+//              cancellations). Not set by any code in this PR.
+// POSTPONED  — Reserved for future exception handling (session pushed to a
+//              later date without changing its canonical identity). Not set
+//              by any code in this PR.
+// MOVED      — Reserved for future exception handling (session moved to a
+//              different date/time/resource while keeping its identity). Not
+//              set by any code in this PR.
+// ---------------------------------------------------------------------------
+enum TrainingSessionStatus {
+  SCHEDULED
+  CANCELLED
+  POSTPONED
+  MOVED
+}
+
+// ---------------------------------------------------------------------------
+// TrainingSession — canonical generated occurrence of a TrainingSeries.
+//
+// One row per (trainingSeriesId, date). Represents a single, concrete
+// training happening on a specific calendar date, with a resolved start/end
+// instant derived from the series' recurrence rule at generation time.
+//
+// Architecture invariants:
+//   - tenantId always comes from a trusted session context (copied from the
+//     parent TrainingSeries at generation time — never accepted as input).
+//   - Belongs to exactly one TrainingSeries (the canonical source) and,
+//     transitively, exactly one TeamSeason (denormalised as teamSeasonId).
+//   - `date` is the calendar date of the occurrence, stored at UTC midnight
+//     (same convention as Season.startDate/endDate) — it is a date key, not
+//     a zoned instant.
+//   - `startAt` / `endAt` are the resolved UTC instants for this occurrence,
+//     computed from the series' "HH:mm" time-of-day + `timezone` for `date`.
+//     They correctly account for DST transitions in the given timezone.
+//   - `timezone` is a per-occurrence snapshot of the series' timezone at
+//     generation time, so historical sessions remain accurate even if a
+//     series' timezone is changed later.
+//   - Never duplicated: @@unique([trainingSeriesId, date]) is the sole
+//     source of truth for occurrence identity and backs idempotent
+//     generation.
+//
+// Security invariants:
+//   - All queries must scope by tenantId.
+//   - Tenant A cannot read or modify Tenant B's training sessions.
+// ---------------------------------------------------------------------------
+model TrainingSession {
+  id               String                @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId         String
+  /// The canonical TrainingSeries this occurrence was generated from.
+  trainingSeriesId String
+  /// Denormalised from TrainingSeries.teamSeasonId for join-free filtering.
+  teamSeasonId     String
+  /// Calendar date of this occurrence, stored at UTC midnight (date key).
+  date             DateTime
+  /// Weekday of `date`, denormalised for display/filtering without recompute.
+  weekday          Weekday
+  /// Resolved UTC instant the session starts (derived from series startsAt + timezone).
+  startAt          DateTime
+  /// Resolved UTC instant the session ends (derived from series endsAt + timezone).
+  endAt            DateTime
+  /// IANA timezone snapshot used to resolve startAt/endAt for this occurrence.
+  timezone         String
+  /// Lifecycle status. Generation only ever writes/updates SCHEDULED rows.
+  status           TrainingSessionStatus @default(SCHEDULED)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSeries TrainingSeries @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason     TeamSeason     @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Canonical rule: one generated session per series per date. Never duplicated.
+  @@unique([trainingSeriesId, date])
+  @@index([tenantId])
+  @@index([trainingSeriesId])
+  @@index([teamSeasonId])
+  @@index([tenantId, date])
+  @@index([teamSeasonId, date])
+  @@index([tenantId, status])
 }
