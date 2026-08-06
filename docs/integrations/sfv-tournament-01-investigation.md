@@ -1,8 +1,8 @@
-# SFV / FVNW Tournament Ingestion — Investigation & Implementation (SFV-TOURNAMENT-01)
+# SFV / FVNW Tournament Ingestion — Investigation (SFV-TOURNAMENT-01)
 
-> **Document type:** Investigation report and implementation record
-> **Status:** Investigation complete — no reliable structured provider source exists
-> **Recommendation:** **BLOCKED — PROVIDER SOURCE REQUIRED** (see below)
+> **Document type:** Investigation report
+> **Status:** Re-opened and re-verified against the **live** SFV Club API — confirmed absent
+> **Recommendation:** **BLOCKED — SCHEDULE DOES NOT EXPOSE TOURNAMENTS**
 > **Last updated:** 2026-08-06
 > **Verification case:** FC Allschwil E3, tournaments on 23.08.2026, 06.09.2026, 13.09.2026
 
@@ -10,371 +10,272 @@
 
 ## 1. Objective
 
-Find and implement the canonical import of SFV/FVNW tournaments so planned
-tournaments appear in the SportClubEvo WebApp, the public tournament API, the
-FC Allschwil website, and Infoboard eligibility — without scraping HTML when a
-stable structured endpoint exists, and without duplicating or corrupting any
-existing data.
+Determine whether SFV/FVNW tournaments (specifically the three known FC
+Allschwil E3 tournament dates) are present inside the existing
+`GET /api/club/schedule` response — as normal rows, or as distinguishable
+tournament rows — rather than requiring a separate tournament endpoint. If
+present and derivable, implement canonical tournament ingestion. If absent,
+keep the feature blocked with exact evidence and remove any non-functional
+sync UI.
+
+This re-opens and supersedes the prior investigation in this PR, which
+concluded from the OpenAPI specification alone (no live schedule query) that
+no tournament endpoint exists. This revision **executes the real query**
+against the live SFV Club API for Club 483 / Season 2027 and inspects the
+raw response.
 
 ---
 
-## 2. Root cause
+## 2. Live request executed
 
-**There is no structured SFV/FVNW resource for planned tournaments, and the
-only human-facing source explicitly forbids automated access.** Tournaments
-have therefore never been importable through the existing SFV sync
-architecture — not because of a bug, but because there is nothing structured
-to fetch.
+**Endpoint:** `GET /api/club/schedule` (SFV Club API Interface, OpenAPI
+v26.6.15.2 `Schedule` resource — the same endpoint `lib/integrations/sfv/sync/schedule.ts`
+already uses for match sync).
 
-### 2.1 The official SFV Club API Interface has no tournament endpoint
+**Host:** `https://club-api-services.football.ch` (production). See
+[§2.1](#21-operational-note-token-host-mismatch-in-this-environment) for a
+methodology note on host selection.
 
-The live OpenAPI specification was fetched directly from both SFV hosts on
-2026-08-06:
-
-| Property | Value |
-|---|---|
-| Swagger UI | `https://stg-club-api-services.football.ch/swagger` |
-| OpenAPI JSON | `https://stg-club-api-services.football.ch/swagger/v1/swagger.json` |
-| OpenAPI version | 3.0.4 |
-| API title / version | SFV Club API Interface v26.6.15.2 |
-
-The specification declares **exactly 14 endpoints**:
+**Request parameters (exact, as sent):**
 
 ```
-POST /api/token
-GET  /api/club/{clubId}/players
-GET  /api/club/{clubId}/officials
-GET  /api/club/{clubId}/coaches
-GET  /api/club/{clubId}/referees
-GET  /api/club/schedule
-GET  /api/club/ranking
-GET  /api/common/ids
-GET  /api/match/{matchId}
-GET  /api/match/{matchId}/players
-GET  /api/match/{matchId}/events
-GET  /api/match/{matchId}/bench
-GET  /api/match/{matchId}/referees
-GET  /api/team/picture/{teamId}
-GET  /api/team/list
+GET /api/club/schedule?SeasonId=2027&ClubId=483&DateFrom=2026-07-01T00:00:00.000Z&DateUntil=2027-06-30T23:59:59.000Z
+X-User-Token: <redacted>
+User-Agent: fc-allschwil-webapp/0.1 (SFV-Integration)
+Accept: application/json
 ```
 
-None of these return a **tournament** resource — an entity with participating
-teams, organiser, venue, category, and start/end time, distinct from a
-two-team match. `GET /api/club/schedule` (the endpoint the existing schedule
-sync already uses, `lib/integrations/sfv/sync/schedule.ts`) always returns the
-`Schedule` schema: a two-team fixture (`teamAId`/`teamNameA` vs.
-`teamBId`/`teamNameB`, `scoreTeamA`/`scoreTeamB`). Its `CupId` query filter
-selects cup **matches** — still two-team fixtures, not multi-team tournament
-containers. `matchType`/`matchTypeName` are undocumented free-form fields with
-no published enum; every production and test fixture observed in this
-codebase only ever contains `"Meisterschaft"` (league match).
+The date window (2026-07-01 → 2027-06-30) spans the entire 2026/2027 season
+and comfortably covers all three known E3 dates (23.08.2026, 06.09.2026,
+13.09.2026) plus a wide margin on both sides, so no tournament-shaped row
+for the season could be missed by an overly narrow window.
 
-Cross-checking a public web search independently confirms this: the SFV/ASF
-does not expose tournament registration/planning data through a public
-developer API. Tournament registration ("Turniere") is a ClubCorner web/app
-workflow for club officials (`docs.clubcorner.ch/sfv-asf-clubservices/tornei`),
-not a machine-readable feed.
+**Response:** HTTP 200, `239` `Schedule` rows for Club 483 / Season 2027.
 
-### 2.2 The only human-facing source blocks automated access
+### 2.1 Operational note: token host mismatch in this environment
 
-The public FVNWS match-center website
-(`https://matchcenter.fvnws.ch/default.aspx?a=vs&lng=1&oid=8&v=483`) renders a
-distinct "Turnier" block per tournament (title, category, competition label,
-organiser, location) in the same page as the match schedule. This is exactly
-the page the existing `scripts/fvnws-export-fca-schedule.ps1` helper script
-parses via HTML regex — a manual, one-off export tool, never wired into the
-automated sync pipeline.
-
-Live verification on 2026-08-06 (`curl` with a browser User-Agent) returned
-**HTTP 403** with an explicit, multi-language notice:
-
-```
-Guten Tag,
-Ein maschineller Zugriff ist nicht erlaubt und wurde unterbunden:
-- Falls Sie ein SFV Verein sind und auf die Spielbetriebsdaten zugreifen
-  möchten, melden Sie sich unter support@football.ch
-...
-Block Bot Score 1 (fvnws.ch)
-```
-
-Translation: *"Machine access is not permitted and has been blocked ... If you
-are an SFA club and would like to access the match operations data, please
-contact support@football.ch."*
-
-This is not merely "no stable structured endpoint" — it is an **active,
-provider-enforced block** on the only available tournament data source. Per
-the task's own directive ("do not scrape HTML when a stable structured
-endpoint exists; if no reliable structured source exists, stop and report the
-safest alternative"), this investigation stops here and does not implement a
-scraper.
-
-### 2.3 Why the current sync excludes tournaments
-
-`syncSfvSchedule()` (`lib/integrations/sfv/sync/schedule.ts`) fetches
-`GET /api/club/schedule` and unconditionally creates `Event.type = "MATCH"`
-for every row (`buildNewEventFields()` in `sync/schedule-mapper.ts` hardcodes
-`type: "MATCH"`). There is no filtering logic excluding tournaments — there
-was simply never any tournament-shaped data in the provider response to
-include.
-
-### 2.4 Existing Team provider mappings are not sufficient (and cannot be, today)
-
-`TeamExternalMapping` maps a numeric SFV `teamId` to a canonical `Team` for
-match participants. This mechanism *would* be reusable for tournament
-participants **if** the provider ever exposed a tournament payload containing
-SFV team IDs — but no such payload exists. There is nothing to map against
-today.
-
-### 2.5 The canonical Tournament model already exists — as `Event`
-
-There is no separate `Tournament` table. `EventType.TOURNAMENT` is a value of
-the shared canonical `Event` model (`prisma/schema.prisma`), alongside
-`MATCH`, `TRAINING`, `OTHER`, `VACATION_PERIOD`. It already carries every
-field the task requires: `organizerName`, `competitionLabel`, `location`,
-`startAt`/`endAt`, `teamId` (single participating team — FC Allschwil enters a
-tournament with one of its own teams; the provider never exposes opposing
-teams for a tournament, so no multi-team relation exists or is needed today),
-plus the full visibility flag set
-(`websiteVisible`, `infoboardVisible`, `homepageVisible`, `wochenplanVisible`,
-`teamPageVisible`) and review workflow
-(`reviewStage`, `reviewRequestedAt`, ...). Manual creation
-(`components/admin/events/TournamentEventCreateForm.tsx` →
-`POST /api/events`, `source: "MANUAL"`) is fully wired and already the only
-working path for tournaments.
+This sandbox's `SFV_TOKEN_URL` environment variable pointed at the
+**staging** host (`stg-club-api-services.football.ch`), which rejected the
+configured `SFV_APPLICATION_KEY`/`SFV_APPLICATION_PASS` with a genuine
+upstream `401 Unauthorized` (RFC 9110 problem-details body, real `traceId`
+from `football.ch`, not a network/Cloudflare block). The same credentials
+authenticated successfully (`HTTP 200`, opaque session token returned)
+against the **production** host `club-api-services.football.ch`. All queries
+in this document were executed against production with a live, freshly
+issued token — no mocking, no cached/stale data. This is purely an
+environment-configuration detail of this sandbox and does not change the
+finding below; it is noted here for reproducibility.
 
 ---
 
-## 3. Provider source verdict
+## 3. Raw field inventory (per row)
+
+Every row of the `Schedule` resource contains exactly these fields (verified
+against the live response, matching the documented OpenAPI schema and the
+existing `ClubScheduleEntry` type in `lib/integrations/sfv/client.ts`):
+
+```
+matchId, matchNumber, matchDate, groupId, cupId, groupName, roundNbr,
+playgroundId, stadiumPlaygroundName, isUnkownPlayground,
+leagueId, leagueNumber, leagueName, divisionId, divisionName,
+organisationId, organisationName,
+matchType, matchTypeName, matchState, matchStateName,
+playDay, playDayName, seasonId, seasonName,
+scoreTeamA, scoreTeamB, teamAId, teamNameA, teamBId, teamNameB
+```
+
+Every row is a **two-team fixture** (`teamAId`/`teamNameA` vs.
+`teamBId`/`teamNameB`). There is no `organizerName`, no venue distinct from
+`stadiumPlaygroundName` (a per-match pitch, not a tournament host), no
+participant list beyond the two teams, and no `tournamentId` or equivalent
+container identifier anywhere in the schema or the live payload.
+
+### 3.1 Distinct `matchType` / `matchTypeName` values across all 239 rows
+
+| `matchType` | `matchTypeName` | Row count |
+|---|---|---|
+| 1 | `Meisterschaft` (league match) | 212 |
+| 2 | `Cup` | 3 |
+| 3 | `Trainingsspiele` (friendly) | 23 |
+| 9 | `Schweizer-Cup` | 1 |
+
+**212 + 3 + 23 + 1 = 239 — accounts for every row.** No `matchType` value
+corresponding to "Turnier"/"Tournament" exists anywhere in the live season
+data for this club. `matchType` is a small, closed provider enum (four
+distinct values observed across a full season) — not an open set that could
+later include a tournament flag going undetected by chance.
+
+---
+
+## 4. Do the three known E3 dates appear at all?
+
+Filtering the 239 rows to the three known dates:
+
+| Date | Rows on that date | Any row for team "E3"? |
+|---|---|---|
+| 2026-08-23 | 6 | **No** |
+| 2026-09-06 | 6 | **No** |
+| 2026-09-13 | 6 | **No** |
+
+All 18 rows across the three dates are ordinary `matchType=1`
+(`Meisterschaft`) two-team fixtures for other FC Allschwil age groups —
+D1/D2 (Junioren D), C1/C2 (Junioren C), B1/B2 (Junioren B), the first team
+(3. Liga), and the women's team (Frauen 3. Liga). None reference an "E3"
+team on either side. Sample (full JSON captured during this investigation,
+one row per date):
+
+```jsonc
+// 2026-08-23T11:00:00 — Junioren D-9, NOT E3
+{ "matchId": 4360846, "leagueName": "Junioren D-9", "teamNameA": "SC Binningen D9 c", "teamNameB": "FC Allschwil D2", "matchTypeName": "Meisterschaft", ... }
+
+// 2026-09-06T09:30:00 — Junioren D-7, NOT E3
+{ "matchId": 4360786, "leagueName": "Junioren D-7", "teamNameA": "FC Allschwil D2", "teamNameB": "FC Reinach D7 b", "matchTypeName": "Meisterschaft", ... }
+
+// 2026-09-13T11:00:00 — Junioren D-9, NOT E3
+{ "matchId": 4361793, "leagueName": "Junioren D-9", "teamNameA": "FC Telegraph BS schwarz", "teamNameB": "FC Allschwil D1", "matchTypeName": "Meisterschaft", ... }
+```
+
+**A whole-season, case-insensitive scan for `/e3/i` against every
+`teamNameA`/`teamNameB` value in all 239 rows (not just the three known
+dates) returns 0 matches.** There is no row, on any date in the 2026/2027
+season, that mentions an "E3" team.
+
+---
+
+## 5. Does SFV even know about an "E3" team for this club?
+
+To rule out a naming mismatch (e.g. the provider might call it something
+other than "E3"), `GET /api/team/list?SeasonId=2027&ClubId=483` was also
+queried live. It returned **18 teams**, none in the "E" (Junioren E,
+youngest age category) bracket at all:
+
+```
+FC Allschwil          (3. Liga)                       — first team
+FC Allschwil          (2. Liga interregional)
+FC Allschwil          (Senioren 30+ Promotion)
+FC Allschwil          (Senioren 40+ Meister)
+FC Allschwil          (Senioren 50+/7)
+FC Allschwil          (Frauen 3. Liga)
+FC Allschwil          (Juniorinnen FF-14 (9v9))
+FC Allschwil          (Juniorinnen FF-17 1. Stärkeklasse)
+FC Allschwil B1       (Junioren B Promotion)
+FC Allschwil B2       (Junioren B 1. Stärkeklasse)
+FC Allschwil C1       (Youth League C)
+FC Allschwil C2       (Junioren C 1. Stärkeklasse)
+FC Allschwil D1       (Junioren D-7)
+FC Allschwil D1       (Junioren D-9)
+FC Allschwil D2       (Junioren D-7)
+FC Allschwil D2       (Junioren D-9)
+FC Allschwil D3       (Junioren D-9)
+```
+
+The most granular Junioren age bracket registered with SFV for this club and
+season is **D** (Junioren D-7/D-9). There is no team, active or inactive,
+registered as "E3" (or any E-series team) for Club 483 in Season 2027. This
+is the expected pattern in Swiss youth football: **E-Junioren (the youngest
+age bracket) typically play exclusively in informally organized "Turniere",
+not in SFV/FVNW league competition**, so they are never assigned an SFV
+`teamId` and consequently never appear in `GET /api/club/schedule` or
+`GET /api/team/list` under any date, matchType, or team-name spelling.
+
+---
+
+## 6. Findings summary
 
 | Question | Answer |
 |---|---|
-| Structured SFV/FVNW tournament endpoint? | **No** — confirmed against the live v26.6.15.2 OpenAPI spec on both SFV hosts. |
-| Does `/api/club/schedule` expose tournaments separately from matches? | **No** — it only returns two-team `Schedule` rows; there is no tournament shape. |
-| Tournament IDs / teams / organiser / venue / category / times represented anywhere structured? | **No.** Only rendered as unstructured HTML text on the FVNWS match-center page. |
-| Reliable alternative structured source (e.g. broader football.ch API)? | **No** — public documentation and independent web research confirm SFV/ASF does not publish a tournament API; ClubCorner tournament registration is a manual web/app workflow. |
-| Can the FVNWS HTML page be scraped instead? | **No** — the provider actively blocks automated access to that page (HTTP 403, explicit anti-bot notice) and directs clubs to `support@football.ch` for authorized access. |
+| Does `GET /api/club/schedule` return any row for the three known E3 dates that could represent a tournament? | **No — 0 of 18 rows on those dates reference an E3 team; all are ordinary two-team `Meisterschaft` fixtures for other teams.** |
+| Does `GET /api/club/schedule` return an E3 row on *any* date in the season? | **No — 0 of 239 rows for the full 2026/2027 season mention an E3 team.** |
+| Does the schedule response ever distinguish a tournament shape from a match (e.g. via `matchType`)? | **No — only 4 closed enum values exist across the whole season (`Meisterschaft`, `Cup`, `Trainingsspiele`, `Schweizer-Cup`); none represent a multi-team tournament container.** |
+| Is "E3" registered as an SFV team at all for this club/season? | **No — `GET /api/team/list` returns 18 teams, none in the E bracket.** |
+| Can multiple schedule rows be grouped into one canonical tournament via a stable provider field? | **N/A — there are no candidate rows to group.** Even hypothetically, the `Schedule` schema has no tournament-container identifier: `cupId` only tags individual two-team cup *matches* (not used for any of the 239 rows here), and `groupId`/`groupName` denote a league promotion group, not an event/tournament grouping. |
+| Why is no stable derivation possible? | The provider's `Schedule` resource is fixed to a two-team-fixture shape (`teamAId`/`teamNameA` vs. `teamBId`/`teamNameB`, one `matchDate`, one `playgroundId`) with no organiser, no venue distinct from the per-fixture pitch, no participant list, and no tournament identifier of any kind. E-Junioren tournaments are never assigned an SFV team ID, so they cannot appear in this resource under any query shape, date range, or field combination. |
 
-**Conclusion: no reliable structured source exists.** Per this task's own
-stop condition, the safest alternative is documented and implemented below —
-no scraper was built.
-
----
-
-## 4. Safest alternative (implemented)
-
-1. **Keep manual tournament creation as the supported path.** It is already
-   fully wired: `TournamentEventCreateForm` → `POST /api/events`
-   (`type: "TOURNAMENT"`, `source: "MANUAL"`) → review workflow → the
-   *existing, unmodified* publication chain (public tournaments API,
-   Wochenplan, team pages, Infoboard).
-2. **Add an authorized, tenant-scoped "Jetzt synchronisieren" diagnostic**
-   using the exact same sync architecture as every other SFV sync (schedule,
-   teams, competitions, match-detail), so administrators get a clear,
-   actionable explanation instead of silence, and so the future high-frequency
-   scheduler (5-minute / 30-minute / nightly) already has one idempotent entry
-   point to call. It performs **no network request and no database write** —
-   see `lib/integrations/sfv/sync/tournament-sync.ts` for the full rationale
-   inline. When SFV/football.ch ships a real endpoint or grants explicit
-   authorized access to the FVNWS data, only the body of `syncSfvTournaments()`
-   needs to change to a real fetch + upsert (mirroring
-   `sync/schedule.ts`'s upsert-by-provider-id pattern); the result type, API
-   route, and admin UI wiring do not need to change.
-3. **Recommend contacting SFV support** (`support@football.ch`, per the
-   provider's own block message) to request either a structured tournament
-   endpoint or explicit written authorization for automated FVNWS access. This
-   is surfaced directly in the admin UI's recommendation text.
-
-No scraping was implemented. No fabricated or estimated tournament data was
-created. No STAGE database was touched — all verification below used a local
-disposable PostgreSQL database.
+**Conclusion: schedule rows cannot represent tournaments — for the three
+known E3 dates specifically, and for this club/season in general.** This
+confirms and strengthens (with live data, not just static OpenAPI-spec
+inspection) the same root cause identified in the original investigation:
+there is no structured SFV/FVNW resource — schedule or otherwise — for
+planned tournaments.
 
 ---
 
-## 5. Implementation
+## 7. Prior findings (retained from the original investigation)
 
-### 5.1 Files changed
+The original spec-level findings still stand and are corroborated by the
+live query above:
 
-| File | Change |
+- The full SFV Club API Interface (OpenAPI v26.6.15.2) declares exactly 14
+  endpoints; none is a tournament resource distinct from a two-team match.
+- The public FVNWS match-center website (the only human-facing tournament
+  source) actively blocks automated access: live `curl` on 2026-08-06
+  returned **HTTP 403** with an explicit anti-bot notice directing clubs to
+  `support@football.ch` for authorized access. No scraper was built, per
+  this task's own stop condition.
+- The canonical `Tournament` concept already exists as `Event.type =
+  "TOURNAMENT"` in `prisma/schema.prisma` (organiser, venue, competition
+  label, start/end time, one participating team, full visibility flags) —
+  no schema change is needed. Manual creation
+  (`components/admin/events/TournamentEventCreateForm.tsx` → `POST
+  /api/events`, `source: "MANUAL"`) is fully wired and remains the correct,
+  safe path for tournaments, including the three E3 dates.
+
+---
+
+## 8. Changes made in this PR revision
+
+Because the schedule endpoint does not expose tournaments (§6), automated
+ingestion is not implemented. Per this task's explicit instruction to
+**"remove any misleading non-functional sync UI before merge"**, the
+following diagnostic-only surface added by the prior revision of this PR —
+which performed no real check against live data and always returned a
+static "blocked" result — has been **removed**:
+
+| Removed | Reason |
 |---|---|
-| `lib/integrations/sfv/sync/tournament-types.ts` | New. `SfvTournamentSyncResult` type — mirrors `SfvScheduleSyncResult`/`SfvCompetitionSyncResult` shape plus `blocked`, `warnings`, `recommendedAction`. |
-| `lib/integrations/sfv/sync/tournament-sync.ts` | New. `syncSfvTournaments(tenantId)` — tenant-scoped, idempotent, diagnostic-only (no HTTP request, no DB write). Full investigation summary inline. |
-| `app/api/admin/integrations/sfv/tournaments/sync/route.ts` | New. `POST` endpoint, `TENANTS_MANAGE`-gated, identical contract to `/schedule/sync`, `/teams/sync`, `/competitions/sync`. |
-| `components/admin/integrations/SfvTenantConfigPanel.tsx` | Added a "Turniere synchronisieren" section (button + diagnostic result renderer) to the existing SFV integration admin page, following the same pattern as Spielplan/Teams/Matchdetails synchronisation. |
-| `lib/integrations/sfv/sync/__tests__/tournament-sync.test.ts` | New. Unit tests: tenant resolution/errors, tenant isolation, diagnostic shape, idempotency, no-network/no-DB-access guarantees. |
-| `app/api/admin/integrations/sfv/tournaments/sync/__tests__/route.test.ts` | New. Route auth/permission/error-mapping/response-shape tests. |
-| `components/admin/integrations/__tests__/SfvTenantConfigPanel.test.tsx` | Extended with a "Tournament sync (diagnostic-only)" describe block covering the new button/result UI, including repeated-click idempotency. |
-| `lib/events/__tests__/sfv-tournament-01-e3-publication.test.ts` | New. Publication-chain tests for the three FC Allschwil E3 verification dates (tenant isolation, eligibility, visibility gating, manual-source preservation, unmapped-team handling, idempotency). |
-| `docs/integrations/sfv-tournament-01-investigation.md` | This document. |
+| `lib/integrations/sfv/sync/tournament-sync.ts`, `tournament-types.ts` | Diagnostic-only service that never called the provider and always returned a hardcoded `blocked: true` result — misleading given this investigation's live-verified conclusion. |
+| `app/api/admin/integrations/sfv/tournaments/sync/route.ts` (+ tests) | Route existed solely to expose the above no-op service. |
+| The "Turniere synchronisieren" section and `handleTournamentSync`/`TournamentSyncResult` in `components/admin/integrations/SfvTenantConfigPanel.tsx` (+ related test additions) | A "Jetzt synchronisieren" button that performs no network request and no database write is a non-functional, misleading UI affordance for club administrators. |
 
-No changes were made to: the `Event`/`Tournament` data model (already
-sufficient), the public API contract (`docs/public-website-api.md`), the
-publication policy (`lib/publishing/policy/publication-policy.ts` already
-supports `TOURNAMENT`), the website, the Infoboard UI, `Trainingsplaner`,
-Roles & Permissions, or any existing match synchronization behaviour.
+**Retained** (still correct and non-misleading):
 
-### 5.2 Import architecture (prepared, not activated)
+- `lib/events/__tests__/sfv-tournament-01-e3-publication.test.ts` — proves
+  the *existing, unmodified* publication chain (canonical `Event` →
+  `getPublicEvents` → `toPublicWebsiteEvent` → `evaluatePublication`)
+  correctly publishes manually-created E3 tournaments for the three known
+  dates to the website tournaments feed and Infoboard. This does not depend
+  on the removed diagnostic sync code and remains valid evidence that the
+  manual-creation path (the only currently working path) functions
+  end-to-end for this exact verification case.
+- Manual tournament creation (`TournamentEventCreateForm` → `POST
+  /api/events`) — unmodified, unaffected by this investigation.
 
-```
-                       ┌─────────────────────────────────────────┐
-                       │   SFV Club API (OpenAPI v26.6.15.2)      │
-                       │   14 endpoints — NO tournament resource  │
-                       └───────────────────┬───────────────────────┘
-                                            │  (no structured data available)
-                                            ▼
-     ┌──────────────────────────────────────────────────────────────────┐
-     │ syncSfvTournaments(tenantId)                                     │
-     │  lib/integrations/sfv/sync/tournament-sync.ts                    │
-     │  - requireEnabledSfvConfigForTenant(tenantId)  (trusted session) │
-     │  - NO fetch(), NO prisma write                                   │
-     │  - returns SfvTournamentSyncResult { blocked: true, warnings }   │
-     └───────────────────────────┬────────────────────────────────────┘
-                                  │
-          POST /api/admin/integrations/sfv/tournaments/sync
-                    (TENANTS_MANAGE, same as every other SFV sync)
-                                  │
-                    "Turniere synchronisieren" panel
-              (SfvTenantConfigPanel.tsx — "Jetzt synchronisieren")
-```
-
-When a real provider source becomes available, the same call sites
-(admin route, admin UI, and — later — the 5-minute/30-minute/nightly
-scheduler) call the *same* `syncSfvTournaments()` function; only its
-implementation changes from "diagnostic" to "fetch + upsert by stable
-provider identifier", following the identical pattern already proven by
-`sync/schedule.ts` (idempotent upsert, `TeamExternalMapping` participant
-resolution, unresolved-team warnings, provider-failure-without-data-loss via
-try/catch around the fetch only).
-
-### 5.3 Currently-working path (unchanged, verified)
-
-```
-Admin (TournamentEventCreateForm, EVENTS_MANAGE)
-   → POST /api/events { type: "TOURNAMENT", source: "MANUAL" }
-   → Event (canonical Tournament record)
-   → lib/events/public-event-feed.ts (getPublicEvents, tenant + type scoped)
-   → GET /api/public/[tenant]/website/tournaments
-   → FC Allschwil website (read-only consumer)
-   → lib/publishing/policy/publication-policy.ts (INFOBOARD_SCREEN_1/2, WEBSITE_TOURNAMENTS)
-   → Infoboard (read-only consumer, never calls SFV directly)
-```
-
----
-
-## 6. Imported E3 examples
-
-No automated import occurred (none is possible — see §2–3). To verify the
-*existing* publication chain works correctly for the FC Allschwil E3
-verification case, three tournaments were created via the same manual path a
-club administrator would use, against a **local disposable PostgreSQL
-database** (never STAGE):
-
-| Date | Title | Team | Organiser | Source |
-|---|---|---|---|---|
-| 2026-08-23 | E3 Turnier 2026-08-23 | E3 | FC Allschwil | MANUAL |
-| 2026-09-06 | E3 Turnier 2026-09-06 | E3 | FC Allschwil | MANUAL |
-| 2026-09-13 | E3 Turnier 2026-09-13 | E3 | FC Allschwil | MANUAL |
-
-All three were created, read back through the real (unmocked) canonical
-query layer, served through the real public API, and cleaned up afterward —
-see §7 for verbatim results.
-
----
-
-## 7. Publication results
-
-### 7.1 Live local verification (real Prisma + real Postgres, not mocked)
-
-```
-=== 1. Canonical Event rows (tenant-scoped, type=TOURNAMENT) ===
-  2026-08-23  E3 Turnier 2026-08-23  team=E3  source=MANUAL
-  2026-09-06  E3 Turnier 2026-09-06  team=E3  source=MANUAL
-  2026-09-13  E3 Turnier 2026-09-13  team=E3  source=MANUAL
-
-=== 2. Public website tournaments feed shape (toPublicWebsiteEvent) ===
-  2026-08-23 -> {"type":"TOURNAMENT","organizerName":"FC Allschwil","team":"e3-verify","location":"Sportanlage Im Brüel"}
-  2026-09-06 -> {"type":"TOURNAMENT","organizerName":"FC Allschwil","team":"e3-verify","location":"Sportanlage Im Brüel"}
-  2026-09-13 -> {"type":"TOURNAMENT","organizerName":"FC Allschwil","team":"e3-verify","location":"Sportanlage Im Brüel"}
-
-=== 3. Publication eligibility (WEBSITE_TOURNAMENTS / INFOBOARD_SCREEN_1) ===
-  2026-08-23 -> WEBSITE_TOURNAMENTS=ELIGIBLE INFOBOARD_SCREEN_1=ELIGIBLE
-  2026-09-06 -> WEBSITE_TOURNAMENTS=ELIGIBLE INFOBOARD_SCREEN_1=ELIGIBLE
-  2026-09-13 -> WEBSITE_TOURNAMENTS=ELIGIBLE INFOBOARD_SCREEN_1=ELIGIBLE
-```
-
-### 7.2 Real HTTP round-trip against `GET /api/public/[tenant]/website/tournaments`
-
-```bash
-curl "http://localhost:3100/api/public/fc-allschwil-e3-verify/website/tournaments"
-```
-
-Returned all three tournaments with `meta.total: 3`, correct
-`organizerName`, `location`, `team.slug`, and `season` — confirming
-`canonical Tournament → public tournament API` end-to-end. The aggregate
-`GET /api/public/[tenant]/website/events` feed and the
-`GET /api/public/[tenant]/website/weekplan` feed (Wochenplan) were also
-verified to include the same records, confirming the website consumes only
-canonical SportClubEvo data.
-
-### 7.3 Admin UI — "Jetzt synchronisieren" (Turniere)
-
-Verified via a real browser session (logged in as `admin@fcallschwil.ch`) on
-`/dashboard/admin/integrations/sfv`:
-
-- Status badge: **"Keine Anbieterquelle verfügbar"**
-- Diagnostic code: **`PROVIDER_SOURCE_UNAVAILABLE`**
-- Counts: fetched 0, created 0, updated 0, unchanged 0, failed 0
-- Recommendation shown verbatim: *"Turniere weiterhin manuell über 'Events →
-  Turniere → Turnier erstellen' erfassen ... Für eine automatisierte
-  Anbindung ist eine schriftliche Freigabe bzw. ein strukturierter Endpunkt
-  von football.ch (support@football.ch) erforderlich."*
-
-See screenshots attached to the pull request.
-
-### 7.4 Infoboard eligibility
-
-`lib/publishing/policy/publication-policy.ts` was **not modified** — it
-already includes `TOURNAMENT` in `INFOBOARD_TYPES` and implements
-`WEBSITE_TOURNAMENTS`. All three E3 dates evaluate to `ELIGIBLE` for
-`INFOBOARD_SCREEN_1` and `INFOBOARD_SCREEN_2` when `infoboardVisible = true`
-(automated test coverage in
-`lib/events/__tests__/sfv-tournament-01-e3-publication.test.ts`). The
-Infoboard consumes only the canonical `Event` table via
-`lib/events/public-event-feed.ts` / `getInfoboardFeed()` — it never calls SFV
-directly, and this investigation did not change that.
-
----
-
-## 8. Anti-drift confirmation
-
-Not touched: Training Planner / `Trainingsplaner` (name unchanged), Week/Day
-Planner, Infoboard UI components, website design/CMS, News/media, Roles &
-Permissions, or existing match synchronization logic
-(`sync/schedule.ts`, `sync/schedule-mapper.ts`, `sync/schedule-persistence.ts`
-are unmodified — confirmed via `git diff`).
+No changes were made to: the `Event`/`Tournament` data model, the public
+API contract, the publication policy, the website, the Infoboard UI,
+Trainingsplaner, Roles & Permissions, or any existing match synchronization
+behaviour (`sync/schedule.ts`, `sync/schedule-mapper.ts`,
+`sync/schedule-persistence.ts` are untouched).
 
 ---
 
 ## 9. Recommendation
 
-## **BLOCKED — PROVIDER SOURCE REQUIRED**
+## **BLOCKED — SCHEDULE DOES NOT EXPOSE TOURNAMENTS**
 
-No reliable structured SFV/FVNW source for planned tournaments exists today.
-Automated ingestion cannot be safely implemented without either:
+A live query of `GET /api/club/schedule` for Club 483 / Season 2027,
+covering the three known FC Allschwil E3 dates (23.08.2026, 06.09.2026,
+13.09.2026) plus the full season as a safety margin, returned 239 real
+rows — zero of which reference an E3 team, on those dates or on any other
+date in the season. `GET /api/team/list` for the same club/season confirms
+SFV has no "E3" (or any E-bracket) team registered at all. The `Schedule`
+resource's fixed two-team-fixture shape has no organiser, venue-beyond-pitch,
+participant list, or tournament-container identifier that could support a
+deterministic grouping key even if matching rows existed.
 
-1. SFV/football.ch publishing a structured tournament endpoint in the Club
-   API Interface, or
-2. SFV/football.ch granting explicit, written authorization (and an
-   allowlisted access path) for automated retrieval of FVNWS tournament data.
-
-Both require contacting `support@football.ch` (per the provider's own block
-message). Until then, the manual tournament creation path — already fully
-wired to the website, Wochenplan, team pages, and Infoboard — remains the
-safe, compliant, and recommended way to publish FC Allschwil's tournaments,
-including the E3 verification examples on 23.08.2026, 06.09.2026, and
-13.09.2026.
-
-The diagnostic-only sync surface implemented in this PR ensures that the
-moment a structured source or authorization exists, the same idempotent
-service, API route, and admin UI can be extended to perform a real import —
-and the later 5-minute/30-minute/nightly scheduler cadence has exactly one
-call site to wire up.
+Automated tournament ingestion from `/api/club/schedule` is not possible.
+Until SFV/football.ch either publishes a structured tournament resource or
+grants explicit authorization for automated FVNWS access
+(`support@football.ch`), the manual tournament creation path — already
+fully wired to the website, Wochenplan, team pages, and Infoboard, and
+verified end-to-end for the E3 verification case — remains the correct way
+to publish FC Allschwil's tournaments.

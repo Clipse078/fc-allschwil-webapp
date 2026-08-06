@@ -4,9 +4,11 @@
  * SFV-TOURNAMENT-01 — Publication chain verification for the FC Allschwil E3
  * tournament examples (23.08.2026, 06.09.2026, 13.09.2026).
  *
- * Investigation finding: no reliable structured SFV/FVNW source exists for
- * planned tournaments (see lib/integrations/sfv/sync/tournament-sync.ts).
- * The safe, currently-working path is manual tournament creation
+ * Investigation finding: a live query of GET /api/club/schedule for Club 483
+ * / Season 2027 (see docs/integrations/sfv-tournament-01-investigation.md)
+ * returns zero rows referencing an E3 team on any date in the season — the
+ * schedule endpoint does not expose tournaments. The safe, currently-working
+ * path is manual tournament creation
  * (Event.type = "TOURNAMENT", Event.source = "MANUAL") via
  * `components/admin/events/TournamentEventCreateForm.tsx` → `POST /api/events`.
  *

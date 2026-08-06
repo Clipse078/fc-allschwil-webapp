@@ -36,7 +36,6 @@ import type { SfvAdminDiagnostics, SfvDiagnosticIssue } from "@/lib/integrations
 import type { SfvTeamSyncResult } from "@/lib/integrations/sfv/sync/types";
 import type { SfvScheduleSyncResult } from "@/lib/integrations/sfv/sync/schedule-types";
 import type { SfvDetailSyncResult } from "@/lib/integrations/sfv/sync/detail-types";
-import type { SfvTournamentSyncResult } from "@/lib/integrations/sfv/sync/tournament-types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,12 +70,6 @@ type DetailSyncState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; data: SfvDetailSyncResult }
-  | { status: "error"; message: string };
-
-type TournamentSyncState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; data: SfvTournamentSyncResult }
   | { status: "error"; message: string };
 
 type SfvTenantConfigPanelProps = {
@@ -472,85 +465,6 @@ function DetailSyncResult({ data }: { data: SfvDetailSyncResult }) {
   );
 }
 
-// ── Sub-component: Tournament Sync Result ────────────────────────────────────
-
-/**
- * Renders the diagnostic-only tournament sync result. Unlike the other sync
- * results, `blocked: true` is an expected outcome (no reliable structured
- * SFV/FVNW tournament source exists today) — it is rendered as an
- * informational warning, not as a failure.
- */
-function TournamentSyncResult({ data }: { data: SfvTournamentSyncResult }) {
-  const rows: { label: string; value: number | string }[] = [
-    { label: "Abgerufen", value: data.fetched },
-    { label: "Neu erstellt", value: data.created },
-    { label: "Aktualisiert", value: data.updated },
-    { label: "Unverändert", value: data.unchanged },
-    { label: "Fehler", value: data.failed },
-    { label: "Dauer", value: `${data.durationMs} ms` },
-  ];
-
-  return (
-    <div className="space-y-4" data-testid="tournament-sync-result">
-      <div className="flex flex-wrap items-center gap-3">
-        <StatusIndicator
-          variant={data.blocked ? "warning" : "success"}
-          label={data.blocked ? "Keine Anbieterquelle verfügbar" : "Erfolgreich abgeschlossen"}
-          data-testid="tournament-sync-status"
-        />
-        <span className="text-xs text-[var(--muted)]">
-          Saison {data.seasonId} · Club {data.clubId}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-        {rows.map(({ label, value }) => (
-          <div
-            key={label}
-            className="flex justify-between gap-2 border-b border-[var(--border)] py-1.5"
-          >
-            <span className="text-[var(--text-2)]">{label}</span>
-            <span className="font-semibold text-[var(--foreground)]">{value}</span>
-          </div>
-        ))}
-      </div>
-
-      {data.warnings.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Diagnose ({data.warnings.length})
-          </p>
-          <ul className="space-y-1.5" data-testid="tournament-sync-warnings">
-            {data.warnings.map((warning, idx) => (
-              <li
-                key={`${warning.code}-${idx}`}
-                className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
-              >
-                <StatusIndicator variant="warning" size="sm" className="mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">
-                    {warning.code}
-                  </p>
-                  <p className="mt-0.5 text-sm text-[var(--foreground)]">{warning.message}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
-        <p className="text-[0.68rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
-          Empfehlung
-        </p>
-        <p className="mt-0.5 text-sm text-[var(--foreground)]" data-testid="tournament-sync-recommendation">
-          {data.recommendedAction}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigPanelProps) {
@@ -564,7 +478,6 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
   const [teamSync, setTeamSync] = useState<TeamSyncState>({ status: "idle" });
   const [scheduleSync, setScheduleSync] = useState<ScheduleSyncState>({ status: "idle" });
   const [detailSync, setDetailSync] = useState<DetailSyncState>({ status: "idle" });
-  const [tournamentSync, setTournamentSync] = useState<TournamentSyncState>({ status: "idle" });
 
   // ── Field change handlers ──────────────────────────────────────────────────
 
@@ -821,52 +734,6 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
       }
     } catch {
       setDetailSync({
-        status: "error",
-        message: "Netzwerkfehler. Bitte Seite neu laden.",
-      });
-    }
-  }, []);
-
-  // ── Tournament synchronization (diagnostic-only, see tournament-sync.ts) ──
-
-  const handleTournamentSync = useCallback(async () => {
-    setTournamentSync({ status: "loading" });
-    try {
-      const res = await fetch("/api/admin/integrations/sfv/tournaments/sync", {
-        method: "POST",
-      });
-
-      const data = await res.json().catch(() => ({})) as {
-        result?: SfvTournamentSyncResult;
-        error?: string;
-      };
-
-      if (res.status === 404) {
-        setTournamentSync({
-          status: "error",
-          message: "Keine SFV-Konfiguration gefunden. Bitte zuerst speichern.",
-        });
-        return;
-      }
-      if (res.status === 409) {
-        setTournamentSync({
-          status: "error",
-          message: "SFV-Integration ist deaktiviert.",
-        });
-        return;
-      }
-
-      if (!res.ok || !data.result) {
-        setTournamentSync({
-          status: "error",
-          message: data.error ?? "Unbekannter Fehler bei der Turnier-Synchronisierung.",
-        });
-        return;
-      }
-
-      setTournamentSync({ status: "success", data: data.result });
-    } catch {
-      setTournamentSync({
         status: "error",
         message: "Netzwerkfehler. Bitte Seite neu laden.",
       });
@@ -1217,54 +1084,6 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
 
           {teamSync.status === "success" && (
             <TeamSyncResult data={teamSync.data} />
-          )}
-        </div>
-      </SectionCard>
-
-      {/* ── Turniere synchronisieren ──────────────────────────────────────── */}
-      <SectionCard
-        title="Turniere synchronisieren"
-        description="Prüft, ob SFV/FVNWS geplante Turniere (z.B. Jugendturniere) über eine strukturierte Schnittstelle bereitstellt. Aktueller Stand: Die SFV Club API bietet keinen Turnier-Endpunkt, und automatisierter Zugriff auf die FVNWS-Webseite wird vom Anbieter blockiert. Turniere bitte weiterhin manuell unter Events → Turniere erfassen — dies wird auf Website, Wochenplan und Infoboard ausgespielt."
-      >
-        <div className="space-y-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleTournamentSync}
-            loading={tournamentSync.status === "loading"}
-            disabled={tournamentSync.status === "loading" || !isConfigured}
-            data-testid="btn-tournament-sync"
-          >
-            {tournamentSync.status === "loading"
-              ? "Prüfung läuft…"
-              : "Jetzt synchronisieren"}
-          </Button>
-
-          {!isConfigured && tournamentSync.status === "idle" && (
-            <p className="text-xs text-[var(--muted)]">
-              Konfigurieren und aktivieren Sie die Integration, um die Turnier-Synchronisierung zu prüfen.
-            </p>
-          )}
-
-          {tournamentSync.status === "loading" && (
-            <p className="text-sm text-[var(--text-2)]" data-testid="tournament-sync-loading">
-              Anbieterquelle wird geprüft…
-            </p>
-          )}
-
-          {tournamentSync.status === "error" && (
-            <div
-              className="rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-4 py-3"
-              data-testid="tournament-sync-error"
-            >
-              <p className="text-sm font-medium text-[var(--sce-danger)]">
-                {tournamentSync.message}
-              </p>
-            </div>
-          )}
-
-          {tournamentSync.status === "success" && (
-            <TournamentSyncResult data={tournamentSync.data} />
           )}
         </div>
       </SectionCard>
