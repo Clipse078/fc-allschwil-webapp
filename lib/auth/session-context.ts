@@ -37,13 +37,23 @@ export type SessionTenantContext = {
 };
 
 /**
- * Resolves a user's tenant context from active TenantMembership rows only.
+ * Resolves a user's tenant context from active TenantMembership rows whose
+ * related Tenant is also operationally ACTIVE only.
+ *
+ * RPERM-04-C1: a membership being `isActive: true` is necessary but not
+ * sufficient — a membership linked to an ARCHIVED or INACTIVE tenant must
+ * never surface as an `activeTenantId`, `activeMembershipId`, or an entry in
+ * `availableTenants`. This filter is applied at the database level
+ * (`tenant: { status: "ACTIVE" }`) so archived/inactive tenants are excluded
+ * before any selection logic runs — an archived tenant simply does not
+ * exist from this function's point of view.
  *
  * Selection rule for `activeTenantId`: the membership with the earliest
  * `joinedAt` is chosen as the default active tenant. This is a deterministic,
  * stable placeholder for true tenant-switching (not yet built — see
  * `availableTenants`, which already lists every tenant the user could switch
- * into). Users with zero active memberships (e.g. platform-only admins) get
+ * into). Users with zero eligible memberships (e.g. platform-only admins, or
+ * users whose only membership is in an archived/inactive tenant) get
  * `activeTenantId: null` and an empty `availableTenants` list.
  */
 export async function resolveTenantMembershipContext(
@@ -55,7 +65,7 @@ export async function resolveTenantMembershipContext(
   }
 
   const memberships = await prisma.tenantMembership.findMany({
-    where: { userId, isActive: true },
+    where: { userId, isActive: true, tenant: { status: "ACTIVE" } },
     orderBy: { joinedAt: "asc" },
     select: {
       id: true,

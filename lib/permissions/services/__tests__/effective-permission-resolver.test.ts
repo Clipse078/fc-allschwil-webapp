@@ -32,6 +32,13 @@
  *   V-02  Archived role → denied
  *   V-03  Missing TenantMembership → denied (no row in DB)
  *
+ * TENANT OPERATIONAL STATUS (RPERM-04-C1)
+ *   TS-01 Active membership + ACTIVE tenant → granted
+ *   TS-02 Active membership + ARCHIVED tenant → denied
+ *   TS-03 Active membership + INACTIVE tenant → denied
+ *   TS-04 Inactive membership + ACTIVE tenant → denied (membership gate still applies)
+ *   TS-05 Archived-tenant denial short-circuits before the UserRole query
+ *
  * AGGREGATE METHODS
  *   A-01  hasAnyPermission: true when at least one permission granted
  *   A-02  hasAnyPermission: false when none granted
@@ -104,14 +111,18 @@ function makeUserRoleRow(opts: {
   };
 }
 
-/** Active tenant membership fixture. */
-function activeMembership() {
-  return { isActive: true };
+/**
+ * Active tenant membership fixture, linked to an operationally ACTIVE
+ * tenant by default (RPERM-04-C1: the resolver now selects the related
+ * Tenant.status alongside TenantMembership.isActive).
+ */
+function activeMembership(tenantStatus: "ACTIVE" | "INACTIVE" | "ARCHIVED" = "ACTIVE") {
+  return { isActive: true, tenant: { status: tenantStatus } };
 }
 
 /** Inactive tenant membership fixture. */
-function inactiveMembership() {
-  return { isActive: false };
+function inactiveMembership(tenantStatus: "ACTIVE" | "INACTIVE" | "ARCHIVED" = "ACTIVE") {
+  return { isActive: false, tenant: { status: tenantStatus } };
 }
 
 // ---------------------------------------------------------------------------
@@ -556,6 +567,126 @@ describe("EffectivePermissionResolver", () => {
       });
 
       expect(result).toBe(false);
+    });
+  });
+
+  // ── TENANT OPERATIONAL STATUS (RPERM-04-C1) ──────────────────────────────
+  //
+  // An active TenantMembership is necessary but not sufficient: the related
+  // Tenant must also be operationally ACTIVE. An archived or inactive tenant
+  // must not grant any tenant permission even to a user with a fully valid,
+  // active membership and role — this is the fix for "archived tenant
+  // remains accessible" (Finding 1).
+
+  describe("TS-01: active membership + ACTIVE tenant → granted", () => {
+    it("returns true when the related tenant is operationally ACTIVE", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership("ACTIVE"));
+      userRoleFindMany.mockResolvedValue([
+        makeUserRoleRow({
+          roleScope: "TENANT",
+          permissions: [{ key: PERM_TEAMS_VIEW, scope: "TENANT" }],
+        }),
+      ]);
+
+      const result = await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("TS-02: active membership + ARCHIVED tenant → denied", () => {
+    it("returns false even though the membership itself is active and the role grants the permission", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership("ARCHIVED"));
+      userRoleFindMany.mockResolvedValue([
+        makeUserRoleRow({
+          roleScope: "TENANT",
+          permissions: [{ key: PERM_TEAMS_VIEW, scope: "TENANT" }],
+        }),
+      ]);
+
+      const result = await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("getEffectivePermissions returns an empty tenant bucket for an archived tenant", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership("ARCHIVED"));
+      userRoleFindMany.mockResolvedValue([
+        makeUserRoleRow({
+          roleScope: "TENANT",
+          permissions: [{ key: PERM_TEAMS_VIEW, scope: "TENANT" }],
+        }),
+      ]);
+
+      const result = await resolver.getEffectivePermissions({
+        userId: USER_A,
+        tenantId: TENANT_A,
+      });
+
+      expect(result.tenant).toHaveLength(0);
+    });
+  });
+
+  describe("TS-03: active membership + INACTIVE tenant → denied", () => {
+    it("returns false when the related tenant status is INACTIVE (not just ARCHIVED)", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership("INACTIVE"));
+      userRoleFindMany.mockResolvedValue([
+        makeUserRoleRow({
+          roleScope: "TENANT",
+          permissions: [{ key: PERM_TEAMS_VIEW, scope: "TENANT" }],
+        }),
+      ]);
+
+      const result = await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("TS-04: inactive membership + ACTIVE tenant → denied", () => {
+    it("the membership gate still applies independently of tenant status", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(inactiveMembership("ACTIVE"));
+      userRoleFindMany.mockResolvedValue([
+        makeUserRoleRow({
+          roleScope: "TENANT",
+          permissions: [{ key: PERM_TEAMS_VIEW, scope: "TENANT" }],
+        }),
+      ]);
+
+      const result = await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("TS-05: archived tenant denial short-circuits before the UserRole query", () => {
+    it("does not query UserRole once the tenant is found to be non-ACTIVE", async () => {
+      tenantMembershipFindUnique.mockResolvedValue(activeMembership("ARCHIVED"));
+      userRoleFindMany.mockResolvedValue([]);
+
+      await resolver.hasPermission({
+        userId: USER_A,
+        permission: PERM_TEAMS_VIEW,
+        tenantId: TENANT_A,
+      });
+
+      expect(userRoleFindMany).not.toHaveBeenCalled();
     });
   });
 
