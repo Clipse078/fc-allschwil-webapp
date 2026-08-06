@@ -286,7 +286,9 @@ describe("A. generateTrainingSessions", () => {
 
     await generateTrainingSessions(TENANT_A, SERIES_ID, WINDOW);
 
-    const findManyCall = vi.mocked(prisma.trainingSession.findMany).mock.calls[0][0];
+    const findManyCall = vi.mocked(prisma.trainingSession.findMany).mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(findManyCall.where).toMatchObject({
       tenantId: TENANT_A,
       trainingSeriesId: SERIES_ID,
@@ -302,12 +304,11 @@ describe("B. generateTrainingSessionsForTenant", () => {
       { id: "series-a" },
       { id: "series-b" },
     ] as never);
-    vi.mocked(prisma.trainingSeries.findFirst).mockImplementation(
-      async (args) =>
-        makeSeriesRow({
-          id: (args as { where: { id: string } }).where.id,
-        }) as never,
-    );
+    // One resolved value per findFirst call, in the same order
+    // generateTrainingSessionsForTenant iterates activeSeries (series-a, then series-b).
+    vi.mocked(prisma.trainingSeries.findFirst)
+      .mockResolvedValueOnce(makeSeriesRow({ id: "series-a" }) as never)
+      .mockResolvedValueOnce(makeSeriesRow({ id: "series-b" }) as never);
     vi.mocked(prisma.trainingSession.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.trainingSession.createMany).mockResolvedValue({ count: 5 } as never);
 
@@ -317,7 +318,9 @@ describe("B. generateTrainingSessionsForTenant", () => {
     expect(results).toHaveLength(2);
     expect(results.map((r) => r.trainingSeriesId).sort()).toEqual(["series-a", "series-b"]);
 
-    const findManyCall = vi.mocked(prisma.trainingSeries.findMany).mock.calls[0][0];
+    const findManyCall = vi.mocked(prisma.trainingSeries.findMany).mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(findManyCall.where).toMatchObject({ tenantId: TENANT_A, status: "ACTIVE" });
   });
 
@@ -326,10 +329,11 @@ describe("B. generateTrainingSessionsForTenant", () => {
       { id: "series-ok" },
       { id: "series-missing" },
     ] as never);
-    vi.mocked(prisma.trainingSeries.findFirst).mockImplementation(async (args) => {
-      const id = (args as { where: { id: string } }).where.id;
-      return id === "series-ok" ? (makeSeriesRow({ id }) as never) : null;
-    });
+    // One resolved value per findFirst call, in the same order
+    // generateTrainingSessionsForTenant iterates activeSeries (series-ok, then series-missing).
+    vi.mocked(prisma.trainingSeries.findFirst)
+      .mockResolvedValueOnce(makeSeriesRow({ id: "series-ok" }) as never)
+      .mockResolvedValueOnce(null);
     vi.mocked(prisma.trainingSession.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.trainingSession.createMany).mockResolvedValue({ count: 5 } as never);
 
@@ -399,7 +403,9 @@ describe("C. listTrainingSessions / getTrainingSession", () => {
       dateTo: new Date("2026-08-31T00:00:00.000Z"),
     });
 
-    const call = vi.mocked(prisma.trainingSession.findMany).mock.calls[0][0];
+    const call = vi.mocked(prisma.trainingSession.findMany).mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(call.where).toMatchObject({
       tenantId: TENANT_A,
       teamSeasonId: TEAM_SEASON_ID,
