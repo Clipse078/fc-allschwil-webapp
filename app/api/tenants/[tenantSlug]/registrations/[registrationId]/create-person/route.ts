@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { requireApiTenantContextForSlug } from "@/lib/tenants/active-tenant";
 import { getRegistrationForTenant } from "@/lib/registrations/queries";
 import { createPersonFromRegistration } from "@/lib/registrations/person-creation";
 
@@ -28,13 +29,25 @@ type Context = {
  * confirmation before retrying.
  */
 export async function POST(request: NextRequest, context: Context) {
-  const access = await requireApiAnyPermission([PERMISSIONS.REGISTRATIONS_EDIT]);
+  const { tenantSlug, registrationId } = await context.params;
+
+  // RPERM-04-C1: resolve + validate the tenant named in the URL FIRST — never
+  // authorize this route against session.user.activeTenantId.
+  const tenantResult = await requireApiTenantContextForSlug(tenantSlug);
+  if (!tenantResult.ok) {
+    return NextResponse.json({ error: tenantResult.error }, { status: tenantResult.status });
+  }
+
+  // Permission is evaluated against the EXACT tenant resolved from the URL.
+  const access = await requireApiAnyPermission(
+    [PERMISSIONS.REGISTRATIONS_EDIT],
+    tenantResult.tenantId,
+  );
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   try {
-    const { tenantSlug, registrationId } = await context.params;
     const body = await request.json().catch(() => ({} as Record<string, unknown>));
     const confirm = body && typeof body === "object" && (body as Record<string, unknown>).confirm === true;
 

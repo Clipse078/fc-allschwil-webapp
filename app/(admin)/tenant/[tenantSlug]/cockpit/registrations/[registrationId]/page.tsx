@@ -4,8 +4,7 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getRegistrationForTenant } from "@/lib/registrations/queries";
-import { getCurrentTenantContext } from "@/lib/tenants/context";
-import { requireTenant } from "@/lib/tenants/require-tenant";
+import { requireTenantContextForSlug } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
 
 type Props = {
@@ -16,19 +15,24 @@ type Props = {
 };
 
 export default async function TenantRegistrationDetailPage({ params }: Props) {
-  const session = await requireAnyPermission([
-    PERMISSIONS.REGISTRATIONS_VIEW,
-    PERMISSIONS.REGISTRATIONS_EDIT,
-  ]);
   const { tenantSlug, registrationId } = await params;
 
-  // Resolve tenant first so we can scope all subsequent queries to this tenant.
-  const tenant = await requireTenant(tenantSlug);
-  const tenantId = tenant.id;
+  // RPERM-04-C1: resolve + validate the tenant named in the URL FIRST — never
+  // authorize this route against session.user.activeTenantId. Redirects to
+  // /dashboard before any registration data is fetched if the tenant does
+  // not exist, is not ACTIVE, or the user has no active membership in it.
+  const tenantContext = await requireTenantContextForSlug(tenantSlug);
+  const tenantId = tenantContext.id;
 
-  const [registration, ctx, users, targetGroups] = await Promise.all([
+  // Permission is evaluated against the EXACT tenant resolved from the URL,
+  // not the caller's own default tenant.
+  const session = await requireAnyPermission(
+    [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+    tenantId,
+  );
+
+  const [registration, users, targetGroups] = await Promise.all([
     getRegistrationForTenant(tenantSlug, registrationId),
-    getCurrentTenantContext(tenantSlug),
     // Tenant-scoped: only users belonging to this tenant are assignable.
     prisma.user.findMany({
       where: { isActive: true, tenantId },
@@ -57,8 +61,8 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
       tenantSlug={tenantSlug}
       initialRegistration={registration}
       canEdit={canEdit}
-      locale={ctx?.locale ?? undefined}
-      timezone={ctx?.timezone ?? undefined}
+      locale={tenantContext.locale ?? undefined}
+      timezone={tenantContext.timezone ?? undefined}
       assignableUsers={users}
       targetGroups={targetGroups}
     />
