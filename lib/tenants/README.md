@@ -145,7 +145,74 @@ earliest-joined active membership (a stable, deterministic default); a
 future slice can add an explicit "switch active tenant" action without any
 further model changes.
 
-## What is intentionally deferred
+## RPERM-04-C1 — Archived tenant & route tenant isolation corrections
+
+Two corrections were made to the model above after independent security
+verification of RPERM-04:
+
+### 1. Archived/inactive tenants no longer grant access
+
+An active `TenantMembership` was previously sufficient to establish tenant
+context and pass tenant permission checks — the related `Tenant.status` was
+never checked. A membership linked to an `ARCHIVED` or `INACTIVE` tenant
+could still produce `activeTenantId`, tenant permissions, and page/API
+access.
+
+Fixed at the two canonical choke points, so the fix applies everywhere
+consistently (session resolution, available tenant lists, default active
+tenant, explicit tenant ID, tenant-slug resolution, permission
+authorization, impersonation, and stop-impersonation all funnel through
+these):
+
+- `resolveTenantMembershipContext()` (`lib/auth/session-context.ts`) now
+  filters `tenant: { status: "ACTIVE" }` at the DB level — an
+  archived/inactive tenant's membership row is excluded before any
+  selection logic runs.
+- `EffectivePermissionResolver`'s `resolveTenantPermissions()`
+  (`lib/permissions/services/effective-permission-resolver.ts`) now also
+  requires `membership.tenant.status === "ACTIVE"`, in addition to
+  `membership.isActive`. Since `requirePermission`/`requireAnyPermission`/
+  `requireApiPermission`/`requireApiAnyPermission` all evaluate live against
+  this resolver on every request (never a JWT-cached value), archiving a
+  tenant takes effect immediately for every protected page and API — even
+  for a session whose JWT still carries the old `activeTenantId`. Only the
+  session's cached *display* fields (`permissionKeys`, etc.) remain stale
+  until next sign-in/refresh; they are never used as the authorization
+  boundary.
+
+### 2. Tenant-slug routes authorize against the route tenant, not the session tenant
+
+Routes identified by a URL `tenantSlug` param (`/tenant/[tenantSlug]/...`,
+`/api/tenants/[tenantSlug]/...`) must authorize against the tenant named by
+the slug — never `session.user.activeTenantId`. Registrations previously
+called `requireAnyPermission()`/`requireApiAnyPermission()` without an
+explicit `tenantId`, so the permission check silently defaulted to the
+caller's own active tenant while the actual data query used the
+slug-resolved tenant — allowing a user authorized in Tenant A to read/write
+Tenant B's registrations merely by editing the URL.
+
+Fixed with a canonical resolver pair in `lib/tenants/active-tenant.ts`:
+
+```ts
+// Server Component / page — redirects to /dashboard if invalid
+const tenantContext = await requireTenantContextForSlug(tenantSlug);
+const session = await requireAnyPermission([...], tenantContext.id);
+
+// API route — returns a discriminated result, never redirects
+const tenantResult = await requireApiTenantContextForSlug(tenantSlug);
+if (!tenantResult.ok) return NextResponse.json({ error: tenantResult.error }, { status: tenantResult.status });
+const access = await requireApiAnyPermission([...], tenantResult.tenantId);
+```
+
+`requireTenantContextForSlug()`/`requireApiTenantContextForSlug()` return a
+tenant only when it exists, is operationally `ACTIVE`, and the caller has an
+active `TenantMembership` in that *exact* tenant — resolved fresh from the
+database on every call. All Registration pages/routes were migrated to this
+pattern; the audit found no other authenticated tenant-slug route with the
+same defect (see `app/api/tenants/[tenantSlug]/route.ts` and `logo/route.ts`,
+which are `PLATFORM`-scoped and therefore unaffected).
+
+
 
 - Tenant custom-role CRUD UI (`/dashboard/roles` remains platform-only)
 - A tenant-switcher UI
