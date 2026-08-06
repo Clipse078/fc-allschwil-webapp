@@ -238,3 +238,25 @@ export class TrainingAllocationArchivedFacilityError extends Error {
     this.name = "TrainingAllocationArchivedFacilityError";
   }
 }
+
+// =============================================================================
+// TRAININGCENTER-02 errors — Canonical Training Session Engine
+// =============================================================================
+
+/** The requested TrainingSession was not found (or belongs to another tenant). */
+export class TrainingSessionNotFoundError extends Error {
+  readonly code = "TRAINING_SESSION_NOT_FOUND" as const;
+  constructor(sessionId: string) {
+    super(`TrainingSession not found: ${sessionId}`);
+    this.name = "TrainingSessionNotFoundError";
+  }
+}
+
+/** The generation window is invalid (not valid dates, or `from` after `to`). */
+export class TrainingSessionGenerationWindowError extends Error {
+  readonly code = "TRAINING_SESSION_GENERATION_WINDOW_INVALID" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "TrainingSessionGenerationWindowError";
+  }
+}

@@ -220,3 +220,75 @@ export interface ListTrainingAllocationsFilter {
   trainingSeriesId?: string;
   facilityResourceId?: string;
 }
+
+// =============================================================================
+// TRAININGCENTER-02: Canonical Training Session Engine types
+//
+// TrainingSession is the canonical, dated occurrence generated from a
+// recurring TrainingSeries. It is the stable public contract every
+// downstream consumer (Weekplanner, Dayplanner, Website, Infoboard,
+// Attendance, Weather, Communication) reads from.
+// =============================================================================
+
+/**
+ * Lifecycle status of a generated TrainingSession.
+ *
+ * CANCELLED / POSTPONED / MOVED are reserved for future exception handling
+ * (holidays, skipped dates, ad-hoc changes). The generator introduced in
+ * this PR only ever writes/updates SCHEDULED rows.
+ */
+export type TrainingSessionStatus = "SCHEDULED" | "CANCELLED" | "POSTPONED" | "MOVED";
+
+/** Public shape for a canonical generated training session. */
+export interface TrainingSessionDto {
+  id: string;
+  tenantId: string;
+  trainingSeriesId: string;
+  /** Denormalised from the parent TrainingSeries for convenience. */
+  trainingSeriesTitle: string;
+  /** Denormalised from the parent TrainingSeries for join-free filtering. */
+  teamSeasonId: string;
+  /** Calendar date of this occurrence, "YYYY-MM-DD". */
+  date: string;
+  weekday: Weekday;
+  /** ISO-8601 UTC instant the session starts. */
+  startAt: string;
+  /** ISO-8601 UTC instant the session ends. */
+  endAt: string;
+  /** IANA timezone snapshot used to resolve startAt/endAt for this occurrence. */
+  timezone: string;
+  status: TrainingSessionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Input to generateTrainingSessions(): bounds the generation window. */
+export interface GenerateTrainingSessionsInput {
+  /** Inclusive lower bound of the generation window (calendar date). */
+  from: Date;
+  /** Inclusive upper bound of the generation window (calendar date). */
+  to: Date;
+}
+
+/** Result of a single generateTrainingSessions() run. Always accurate, never estimated. */
+export interface GenerateTrainingSessionsResult {
+  trainingSeriesId: string;
+  /** Total occurrences the recurrence rule produced within the requested window. */
+  occurrencesInWindow: number;
+  /** Newly-created TrainingSession rows. */
+  created: number;
+  /** Existing rows whose derived schedule (weekday/startAt/endAt/timezone) changed. */
+  updated: number;
+  /** Existing rows that already matched the derived schedule exactly (no write issued). */
+  unchanged: number;
+}
+
+export interface ListTrainingSessionsFilter {
+  trainingSeriesId?: string;
+  teamSeasonId?: string;
+  status?: TrainingSessionStatus;
+  /** Inclusive lower bound (calendar date). */
+  dateFrom?: Date;
+  /** Inclusive upper bound (calendar date). */
+  dateTo?: Date;
+}
