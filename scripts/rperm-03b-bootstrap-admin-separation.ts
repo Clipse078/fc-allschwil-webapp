@@ -107,6 +107,10 @@ export const TENANT_PERMISSION_KEYS: readonly string[] = [
   "facilities.manage",
   "trainings.view",
   "trainings.manage",
+  // RPERM-05: Workspace/Documents — see prisma/seed.ts for the same fix applied
+  // to the canonical seed-driven tenant club_admin role.
+  "workspace.view",
+  "workspace.manage",
 ];
 
 // ---------------------------------------------------------------------------

@@ -143,6 +143,18 @@ async function main() {
 
     { key: "trainings.view", name: "View training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "trainings.manage", name: "Manage training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+
+    // ── RPERM-05: Workspace/Documents permissions ─────────────────────────
+    // Previously only created out-of-band by scripts/sync-workspace-permissions.ts
+    // (and only ever assigned to super_admin there). Adding them to the
+    // canonical seed list closes the gap that prevented every tenant
+    // club_admin role from ever receiving Documents access: the tenant
+    // club_admin permission set below (`tenantPermissionKeys`) is derived by
+    // filtering this exact array to scope=TENANT, so these two keys now flow
+    // through the same, already-accepted "club_admin owns every TENANT
+    // permission" seeding policy — no new automatic-assignment policy.
+    { key: "workspace.view", name: "View workspace", module: PermissionModule.WORKSPACE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "workspace.manage", name: "Manage workspace", module: PermissionModule.WORKSPACE, scope: PermissionScope.TENANT, grantableByAdmin: true },
   ] as const;
 
   for (const permission of permissions) {
