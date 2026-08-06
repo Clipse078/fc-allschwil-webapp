@@ -1,8 +1,16 @@
 "use client";
 
+/**
+ * NewsArticleMediaGallery — "Weitere Medien" (additional media) editor.
+ *
+ * Uses the exact same media selection experience as the Hero Image picker
+ * (MediaPickerDialog → SharedMediaPicker), opened in multi-selection mode.
+ * Newly selected assets are appended to the article's additional media.
+ */
+
 import { useState } from "react";
 import { ChevronUp, ChevronDown, X, ImageIcon, Film } from "lucide-react";
-import MediaLibraryGrid from "@/components/admin/media/MediaLibraryGrid";
+import MediaPickerDialog from "@/components/admin/media/MediaPickerDialog";
 import MediaUploadButton from "@/components/admin/media/MediaUploadButton";
 import type { MediaAssetListItem } from "@/lib/media/types";
 import type { NewsArticleMediaItem } from "@/lib/news/admin-queries";
@@ -21,7 +29,7 @@ export default function NewsArticleMediaGallery({
   items,
   onItemsChange,
 }: NewsArticleMediaGalleryProps) {
-  const [showLibrary, setShowLibrary] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +52,46 @@ export default function NewsArticleMediaGallery({
       onItemsChange([...items, data.item]);
     } finally {
       setActionPending(null);
+    }
+  }
+
+  /**
+   * Adds every newly picked asset (skipping ones already attached) to the
+   * article. Each asset still goes through the existing single-add API
+   * (unchanged), but results are batched into a single onItemsChange call
+   * so multi-select from the picker doesn't clobber itself across awaits.
+   */
+  async function handleAddMultiple(assets: MediaAssetListItem[]) {
+    if (!articleId) return;
+    const newAssets = assets.filter((a) => !existingIds.includes(a.id));
+    if (newAssets.length === 0) {
+      setPickerOpen(false);
+      return;
+    }
+
+    setError(null);
+    setActionPending("add-multiple");
+    try {
+      const addedItems: NewsArticleMediaItem[] = [];
+      for (const asset of newAssets) {
+        const res = await fetch(`/api/news/${articleId}/media`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mediaAssetId: asset.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data?.error ?? "Fehler beim Hinzufügen.");
+          continue;
+        }
+        addedItems.push(data.item);
+      }
+      if (addedItems.length > 0) {
+        onItemsChange([...items, ...addedItems]);
+      }
+    } finally {
+      setActionPending(null);
+      setPickerOpen(false);
     }
   }
 
@@ -191,10 +239,10 @@ export default function NewsArticleMediaGallery({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => setShowLibrary((v) => !v)}
+          onClick={() => setPickerOpen(true)}
           className="fca-button-secondary text-xs"
         >
-          {showLibrary ? "Bibliothek schliessen" : "Aus Bibliothek wählen"}
+          Aus Mediathek auswählen
         </button>
         <MediaUploadButton
           onUploaded={handleAdd}
@@ -203,20 +251,13 @@ export default function NewsArticleMediaGallery({
         />
       </div>
 
-      {/* Inline library */}
-      {showLibrary && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] p-4">
-          <MediaLibraryGrid
-            selectable
-            onSelect={(asset) => {
-              if (!existingIds.includes(asset.id)) {
-                handleAdd(asset);
-              }
-              setShowLibrary(false);
-            }}
-          />
-        </div>
-      )}
+      <MediaPickerDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectionMode="multiple"
+        onSelect={handleAddMultiple}
+        title="Weitere Medien auswählen"
+      />
     </div>
   );
 }
