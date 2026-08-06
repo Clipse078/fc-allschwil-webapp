@@ -18,6 +18,7 @@ function getPageMeta(pathname: string): PageMeta {
   if (pathname.startsWith("/dashboard/planner/week")) return { eyebrow: "Planner", title: "Wochenplanner" };
   if (pathname.startsWith("/dashboard/planner/day")) return { eyebrow: "Planner", title: "Tagesplanner" };
   if (pathname.startsWith("/dashboard/planner")) return { eyebrow: "Planner", title: "Saisonplanner" };
+  if (pathname.startsWith("/dashboard/training")) return { eyebrow: "Planung", title: "TrainingCenter" };
   if (pathname.startsWith("/dashboard/seasons")) return { eyebrow: "Saisons", title: "Saisonplanung" };
   if (pathname.startsWith("/dashboard/teams")) return { eyebrow: "Teams", title: "Teams" };
   if (pathname.startsWith("/dashboard/events")) return { eyebrow: "Events", title: "Events" };

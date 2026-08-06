@@ -94,10 +94,11 @@ function getNavIcon(label: string) {
     case "Wiederverwendbare Inhalte":   return BookCheck;
     case "Einstellungen":               return Settings2;
     // Planung children
-    case "Trainingsplaner":             return Dumbbell;
+    case "TrainingCenter":              return Dumbbell;
     case "Veranstaltungen":             return CalendarDays;
     case "Anlagen":                     return MapPin;
     // Legacy Planung labels (kept for any remaining references)
+    case "Trainingsplaner":             return Dumbbell;
     case "Saisons":                     return CalendarRange;
     case "Saisonplanung":               return ClipboardList;
     case "Events":                      return CalendarDays;

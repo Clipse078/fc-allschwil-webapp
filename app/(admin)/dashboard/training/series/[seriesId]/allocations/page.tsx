@@ -64,7 +64,7 @@ export default async function TrainingAllocationsPage({ params }: Props) {
   return (
     <div className="space-y-6">
       <AdminSectionHeader
-        eyebrow="Training"
+        eyebrow="TrainingCenter"
         title={`Ressourcen: ${series.title}`}
         description="Weisen Sie dieser Trainingsserie eine oder mehrere Anlagen-Ressourcen zu. Die Zuweisung gilt für alle Trainings dieser Serie und dient als einzige Quelle für Wochenplanung, Infoboard und Ressourcennutzung."
       />

@@ -41,7 +41,7 @@ function findItemByKey(
 // ── Static structure tests ────────────────────────────────────────────────────
 
 describe("NAV_SECTIONS static structure", () => {
-  it("Planung section contains exactly Trainingsplaner and Veranstaltungen", () => {
+  it("Planung section contains exactly TrainingCenter and Veranstaltungen", () => {
     const betrieb = findSection("Betrieb");
     expect(betrieb).toBeDefined();
 
@@ -49,7 +49,7 @@ describe("NAV_SECTIONS static structure", () => {
     expect(planung).toBeDefined();
 
     const childKeys = planung!.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingsplaner", "veranstaltungen"]);
+    expect(childKeys).toEqual(["trainingcenter", "veranstaltungen"]);
   });
 
   it("Anlagen does not appear under Planung", () => {
@@ -80,13 +80,13 @@ describe("NAV_SECTIONS static structure", () => {
     expect(childLabels).not.toContain("Feld & Ressourcen");
   });
 
-  it("Trainingsplaner points to /dashboard/training", () => {
+  it("TrainingCenter points to /dashboard/training", () => {
     const betrieb = findSection("Betrieb");
     const planung = betrieb!.items.find((i) => i.key === "planung");
-    const trainingsplaner = planung!.children?.find(
-      (c) => c.key === "trainingsplaner",
+    const trainingcenter = planung!.children?.find(
+      (c) => c.key === "trainingcenter",
     );
-    expect(trainingsplaner?.href).toBe("/dashboard/training");
+    expect(trainingcenter?.href).toBe("/dashboard/training");
   });
 
   it("Veranstaltungen points to /dashboard/events", () => {
@@ -160,9 +160,9 @@ describe("getVisibleNavSections permission filtering", () => {
     expect(saisonplanung).toBeUndefined();
   });
 
-  it("training-view user sees Trainingsplaner", () => {
+  it("training-view user sees TrainingCenter", () => {
     const sections = getVisibleNavSections([PERMISSIONS.TRAININGS_VIEW]);
-    const item = findItemByKey(sections, "trainingsplaner");
+    const item = findItemByKey(sections, "trainingcenter");
     expect(item).not.toBeNull();
   });
 
@@ -189,9 +189,9 @@ describe("getVisibleNavSections permission filtering", () => {
       PERMISSIONS.USERS_MANAGE,
     ];
     const sections = getVisibleNavSections(noSectionPermissions);
-    const trainingsplaner = findItemByKey(sections, "trainingsplaner");
+    const trainingcenter = findItemByKey(sections, "trainingcenter");
     const veranstaltungen = findItemByKey(sections, "veranstaltungen");
-    expect(trainingsplaner).toBeNull();
+    expect(trainingcenter).toBeNull();
     expect(veranstaltungen).toBeNull();
   });
 
@@ -223,10 +223,10 @@ describe("getVisibleNavSections permission filtering", () => {
     expect(planungChildKeys).not.toContain("saisons");
   });
 
-  it("allocation route /dashboard/training/series/:id/allocations prefix is reachable via Trainingsplaner", () => {
-    // Confirm the trainingsplaner entry exists so the allocations route is discoverable
+  it("allocation route /dashboard/training/series/:id/allocations prefix is reachable via TrainingCenter", () => {
+    // Confirm the trainingcenter entry exists so the allocations route is discoverable
     const sections = getVisibleNavSections([PERMISSIONS.TRAININGS_VIEW]);
-    const item = findItemByKey(sections, "trainingsplaner");
+    const item = findItemByKey(sections, "trainingcenter");
     expect(item?.href).toBe("/dashboard/training");
   });
 });

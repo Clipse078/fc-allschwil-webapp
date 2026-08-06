@@ -28,7 +28,7 @@
  *   However, the seed is NOT automatically re-run after a migration deploy.
  *   Any STAGE database seeded before this migration will be missing the
  *   trainings.view and trainings.manage Permission rows — and their
- *   RolePermission assignments — causing the Trainingsplaner navigation entry
+ *   RolePermission assignments — causing the TrainingCenter navigation entry
  *   to be invisible for all users including super_admin.
  *
  * Defaults to DRY RUN — shows what would change without touching the database.
