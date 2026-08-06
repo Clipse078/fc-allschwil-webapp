@@ -107,6 +107,7 @@ function getNavIcon(label: string) {
     case "Anlagen & Ressourcen":        return Building2;
     case "Benutzer":                    return Users;
     case "Rollen":                      return ShieldCheck;
+    case "Rollen & Berechtigungen":     return ShieldCheck;
     case "Berechtigungen":              return KeyRound;
     case "Tenants":                     return Globe;
     // Legacy / fallback (keep so any remaining references resolve cleanly)

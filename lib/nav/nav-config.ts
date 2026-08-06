@@ -294,6 +294,11 @@ export const NAV_SECTIONS: NavSection[] = [
           PERMISSIONS.FACILITIES_MANAGE,
           PERMISSIONS.TENANTS_VIEW,
           PERMISSIONS.TENANTS_MANAGE,
+          // RPERM-05: tenant Club Admins reach the Administration section
+          // through the tenant Roles & Permissions module below — they hold
+          // none of the PLATFORM keys above.
+          PERMISSIONS.ROLES_VIEW,
+          PERMISSIONS.ROLES_MANAGE,
         ],
         children: [
           {
@@ -313,6 +318,18 @@ export const NAV_SECTIONS: NavSection[] = [
             label: "Rollen",
             href: "/dashboard/roles",
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+          {
+            // RPERM-05: tenant-facing Roles & Permissions module. Gated by
+            // TENANT-scope roles.view/roles.manage only — a platform Super
+            // Admin without a tenant membership never satisfies these, so
+            // this entry stays hidden for a platform-only session, matching
+            // "does not automatically see tenant role management without a
+            // tenant membership/context".
+            key: "admin-tenant-roles",
+            label: "Rollen & Berechtigungen",
+            href: "/dashboard/administration/roles",
+            permissionKeys: [PERMISSIONS.ROLES_VIEW, PERMISSIONS.ROLES_MANAGE],
           },
           {
             key: "admin-seasons",
