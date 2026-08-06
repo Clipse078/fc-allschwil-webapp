@@ -215,8 +215,8 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
         children: [
           {
-            key: "trainingsplaner",
-            label: "Trainingsplaner",
+            key: "trainingcenter",
+            label: "TrainingCenter",
             href: "/dashboard/training",
             permissionKeys: [PERMISSIONS.TRAININGS_VIEW, PERMISSIONS.TRAININGS_MANAGE],
           },

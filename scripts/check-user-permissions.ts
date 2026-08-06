@@ -145,7 +145,7 @@ async function main() {
   if (!permissionKeys.includes("trainings.view") || !permissionKeys.includes("trainings.manage")) {
     console.log("\n  ACTION REQUIRED: Run sync-training-permissions.ts to add missing training permissions.");
   } else {
-    console.log("\n  Training permissions OK. If Trainingsplaner is still missing, the user");
+    console.log("\n  Training permissions OK. If TrainingCenter is still missing, the user");
     console.log("  must log out and log back in to refresh their session JWT.");
   }
 

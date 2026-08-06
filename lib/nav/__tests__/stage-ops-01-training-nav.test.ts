@@ -1,5 +1,5 @@
 /**
- * STAGE-OPS-01 — Regression tests for Issue 1: Trainingsplaner missing from nav.
+ * STAGE-OPS-01 — Regression tests for Issue 1: TrainingCenter missing from nav.
  *
  * Root cause: trainings.view and trainings.manage Permission rows were not
  * seeded into the STAGE database after migration
@@ -35,43 +35,43 @@ function findNavItem(
 // ── STAGE-OPS-01 Issue 1 Regression ──────────────────────────────────────────
 
 describe("STAGE-OPS-01 — Training Planner navigation regression", () => {
-  it("user with TRAININGS_VIEW sees Trainingsplaner under Planung", () => {
+  it("user with TRAININGS_VIEW sees TrainingCenter under Planung", () => {
     const sections = getVisibleNavSections([PERMISSIONS.TRAININGS_VIEW]);
-    const item = findNavItem(sections, "trainingsplaner");
+    const item = findNavItem(sections, "trainingcenter");
     expect(item).not.toBeNull();
     expect(item?.href).toBe("/dashboard/training");
   });
 
-  it("user with TRAININGS_MANAGE sees Trainingsplaner under Planung", () => {
+  it("user with TRAININGS_MANAGE sees TrainingCenter under Planung", () => {
     const sections = getVisibleNavSections([PERMISSIONS.TRAININGS_MANAGE]);
-    const item = findNavItem(sections, "trainingsplaner");
+    const item = findNavItem(sections, "trainingcenter");
     expect(item).not.toBeNull();
     expect(item?.href).toBe("/dashboard/training");
   });
 
-  it("user with both TRAININGS_VIEW and TRAININGS_MANAGE sees Trainingsplaner", () => {
+  it("user with both TRAININGS_VIEW and TRAININGS_MANAGE sees TrainingCenter", () => {
     const sections = getVisibleNavSections([
       PERMISSIONS.TRAININGS_VIEW,
       PERMISSIONS.TRAININGS_MANAGE,
     ]);
-    const item = findNavItem(sections, "trainingsplaner");
+    const item = findNavItem(sections, "trainingcenter");
     expect(item).not.toBeNull();
   });
 
-  it("user with only EVENTS_VIEW sees Veranstaltungen but NOT Trainingsplaner", () => {
+  it("user with only EVENTS_VIEW sees Veranstaltungen but NOT TrainingCenter", () => {
     const sections = getVisibleNavSections([PERMISSIONS.EVENTS_VIEW]);
-    const trainingsplaner = findNavItem(sections, "trainingsplaner");
+    const trainingcenter = findNavItem(sections, "trainingcenter");
     const veranstaltungen = findNavItem(sections, "veranstaltungen");
     // Reproduces the observed STAGE bug: Planung is visible (via events) but
-    // Trainingsplaner child is absent because training permissions are not in the session.
-    expect(trainingsplaner).toBeNull();
+    // TrainingCenter child is absent because training permissions are not in the session.
+    expect(trainingcenter).toBeNull();
     expect(veranstaltungen).not.toBeNull();
   });
 
-  it("user with only EVENTS_MANAGE sees Planung parent but not Trainingsplaner child", () => {
+  it("user with only EVENTS_MANAGE sees Planung parent but not TrainingCenter child", () => {
     const sections = getVisibleNavSections([PERMISSIONS.EVENTS_MANAGE]);
-    const trainingsplaner = findNavItem(sections, "trainingsplaner");
-    expect(trainingsplaner).toBeNull();
+    const trainingcenter = findNavItem(sections, "trainingcenter");
+    expect(trainingcenter).toBeNull();
     // Planung parent should still show (has EVENTS_MANAGE in its permissionKeys)
     const planungItem = sections
       .flatMap((s) => s.items)
@@ -93,52 +93,52 @@ describe("STAGE-OPS-01 — Training Planner navigation regression", () => {
       .flatMap((s) => s.items)
       .find((i) => i.key === "planung");
     expect(planungItem).toBeUndefined();
-    const trainingsplaner = findNavItem(sections, "trainingsplaner");
-    expect(trainingsplaner).toBeNull();
+    const trainingcenter = findNavItem(sections, "trainingcenter");
+    expect(trainingcenter).toBeNull();
   });
 
-  it("FC Admin (super_admin) should see Trainingsplaner once training permissions are seeded", () => {
+  it("FC Admin (super_admin) should see TrainingCenter once training permissions are seeded", () => {
     // super_admin has all permissions. This test validates the expected
     // session state after scripts/sync-training-permissions.ts is applied.
     const allPermissions = Object.values(PERMISSIONS);
     const sections = getVisibleNavSections(allPermissions);
-    const item = findNavItem(sections, "trainingsplaner");
+    const item = findNavItem(sections, "trainingcenter");
     expect(item).not.toBeNull();
     expect(item?.href).toBe("/dashboard/training");
   });
 
-  it("Trainingsplaner and Veranstaltungen are both visible for a user with all planning permissions", () => {
+  it("TrainingCenter and Veranstaltungen are both visible for a user with all planning permissions", () => {
     const sections = getVisibleNavSections([
       PERMISSIONS.TRAININGS_VIEW,
       PERMISSIONS.TRAININGS_MANAGE,
       PERMISSIONS.EVENTS_VIEW,
       PERMISSIONS.EVENTS_MANAGE,
     ]);
-    const trainingsplaner = findNavItem(sections, "trainingsplaner");
+    const trainingcenter = findNavItem(sections, "trainingcenter");
     const veranstaltungen = findNavItem(sections, "veranstaltungen");
-    expect(trainingsplaner).not.toBeNull();
+    expect(trainingcenter).not.toBeNull();
     expect(veranstaltungen).not.toBeNull();
   });
 
-  it("Planung section contains exactly trainingsplaner and veranstaltungen children (no extras)", () => {
+  it("Planung section contains exactly trainingcenter and veranstaltungen children (no extras)", () => {
     const sections = getVisibleNavSections(Object.values(PERMISSIONS));
     const planungItem = sections
       .flatMap((s) => s.items)
       .find((i) => i.key === "planung");
     const childKeys = planungItem?.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingsplaner", "veranstaltungen"]);
+    expect(childKeys).toEqual(["trainingcenter", "veranstaltungen"]);
   });
 
-  it("Trainingsplaner route and direct-route /dashboard/training require the same permissions", () => {
-    // Trainingsplaner in nav uses TRAININGS_VIEW | TRAININGS_MANAGE.
+  it("TrainingCenter route and direct-route /dashboard/training require the same permissions", () => {
+    // TrainingCenter in nav uses TRAININGS_VIEW | TRAININGS_MANAGE.
     // Direct route /dashboard/training requires the same (documented in page.tsx).
     // This test guards that the nav and route-level auth are aligned.
     const withView = getVisibleNavSections([PERMISSIONS.TRAININGS_VIEW]);
     const withManage = getVisibleNavSections([PERMISSIONS.TRAININGS_MANAGE]);
     const withNeither = getVisibleNavSections([PERMISSIONS.EVENTS_VIEW]);
 
-    expect(findNavItem(withView, "trainingsplaner")).not.toBeNull();
-    expect(findNavItem(withManage, "trainingsplaner")).not.toBeNull();
-    expect(findNavItem(withNeither, "trainingsplaner")).toBeNull();
+    expect(findNavItem(withView, "trainingcenter")).not.toBeNull();
+    expect(findNavItem(withManage, "trainingcenter")).not.toBeNull();
+    expect(findNavItem(withNeither, "trainingcenter")).toBeNull();
   });
 });

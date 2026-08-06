@@ -183,26 +183,26 @@ describe("STAGE-OPS-02/03B — Effective permissions per role (seed.ts model)", 
 });
 
 describe("STAGE-OPS-02 — Navigation visibility matches route guard", () => {
-  it("super_admin session (all perms) sees Trainingsplaner in sidebar", () => {
+  it("super_admin session (all perms) sees TrainingCenter in sidebar", () => {
     const allPerms = Object.values(PERMISSIONS);
     const sections = getVisibleNavSections(allPerms);
-    const item = findNavItem(sections, "trainingsplaner");
+    const item = findNavItem(sections, "trainingcenter");
     expect(item).not.toBeNull();
     expect(item?.href).toBe("/dashboard/training");
   });
 
-  it("trainer session (no training perms) does NOT see Trainingsplaner (STAGE-OPS-03B)", () => {
+  it("trainer session (no training perms) does NOT see TrainingCenter (STAGE-OPS-03B)", () => {
     const trainerPerms = buildEffectivePermissions(SEED_ROLE_PERMISSIONS, ["trainer"]);
     const sections = getVisibleNavSections(trainerPerms as PermissionKey[]);
-    const item = findNavItem(sections, "trainingsplaner");
+    const item = findNavItem(sections, "trainingcenter");
     // Trainer no longer has any training permission by default
     expect(item).toBeNull();
   });
 
-  it("viewer session (no training perms) does NOT see Trainingsplaner", () => {
+  it("viewer session (no training perms) does NOT see TrainingCenter", () => {
     const viewerPerms = buildEffectivePermissions(SEED_ROLE_PERMISSIONS, ["viewer"]);
     const sections = getVisibleNavSections(viewerPerms as PermissionKey[]);
-    const item = findNavItem(sections, "trainingsplaner");
+    const item = findNavItem(sections, "trainingcenter");
     expect(item).toBeNull();
   });
 
@@ -210,10 +210,10 @@ describe("STAGE-OPS-02 — Navigation visibility matches route guard", () => {
     // Both the nav entry and the route use [TRAININGS_VIEW, TRAININGS_MANAGE].
     // A user with only TRAININGS_VIEW should see nav AND access route.
     const viewOnly = getVisibleNavSections([PERMISSIONS.TRAININGS_VIEW]);
-    expect(findNavItem(viewOnly, "trainingsplaner")).not.toBeNull();
+    expect(findNavItem(viewOnly, "trainingcenter")).not.toBeNull();
 
     const manageOnly = getVisibleNavSections([PERMISSIONS.TRAININGS_MANAGE]);
-    expect(findNavItem(manageOnly, "trainingsplaner")).not.toBeNull();
+    expect(findNavItem(manageOnly, "trainingcenter")).not.toBeNull();
   });
 });
 

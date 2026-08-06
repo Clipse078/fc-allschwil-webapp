@@ -66,7 +66,7 @@ type Props = {
   searchParams?: Promise<TrainingSearchParams>;
 };
 
-export default async function TrainingPlannerPage({ searchParams }: Props) {
+export default async function TrainingCenterPage({ searchParams }: Props) {
   const session = await requireAnyPermission([
     PERMISSIONS.TRAININGS_VIEW,
     PERMISSIONS.TRAININGS_MANAGE,
@@ -93,25 +93,21 @@ export default async function TrainingPlannerPage({ searchParams }: Props) {
     <div className="space-y-6">
       <AdminSectionHeader
         eyebrow="Planung"
-        title="Trainingsplaner"
+        title="TrainingCenter"
         description="Übersicht aller Trainingsserien. Klicke auf Ressourcen zuweisen, um Anlagen-Ressourcen zu verwalten."
         actions={
-          canManage ? (
-            <div className="flex items-center gap-2">
-              {archivedSeries.length > 0 && (
-                <Link
-                  href={
-                    showArchived
-                      ? "/dashboard/training"
-                      : "/dashboard/training?archived=1"
-                  }
-                  className="fca-button-secondary inline-flex items-center gap-1.5 text-sm"
-                >
-                  <Archive className="h-3.5 w-3.5" />
-                  {showArchived ? "Archiv ausblenden" : "Archiv anzeigen"}
-                </Link>
-              )}
-            </div>
+          archivedSeries.length > 0 ? (
+            <Link
+              href={
+                showArchived
+                  ? "/dashboard/training"
+                  : "/dashboard/training?archived=1"
+              }
+              className="fca-button-secondary inline-flex items-center gap-1.5 text-sm"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              {showArchived ? "Archiv ausblenden" : "Archiv anzeigen"}
+            </Link>
           ) : null
         }
       />
