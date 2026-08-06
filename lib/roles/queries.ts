@@ -326,17 +326,38 @@ export type PermissionEditorData = {
  */
 export async function getPermissionEditorData(roleId: string): Promise<PermissionEditorData | null> {
   const [allPerms, role] = await Promise.all([
+    // RPERM-05-C1: scope=PLATFORM guard on the catalog itself — a TENANT
+    // permission (e.g. workspace.manage) must never even be listed as a
+    // selectable option here, since this editor only ever writes through
+    // setPlatformRolePermissions() (lib/roles/platform-mutations.ts), which
+    // only accepts scope=PLATFORM permissions. Tenant roles are edited via
+    // the tenant permission matrix (lib/roles/tenant-queries.ts /
+    // setTenantRolePermissions) instead.
     prisma.permission.findMany({
+      where: { scope: "PLATFORM" },
       orderBy: [{ module: "asc" }, { name: "asc" }],
       select: { id: true, key: true, name: true, module: true },
     }),
     // RPERM-05: scope=PLATFORM guard — this editor is the platform admin
     // surface only; tenant roles are edited via the tenant permission
     // matrix (lib/roles/tenant-queries.ts / setTenantRolePermissions).
+    //
+    // RPERM-05-C1: `rolePermissions` is ALSO filtered to scope=PLATFORM.
+    // Some seed-created PLATFORM roles (e.g. match_coordinator,
+    // website_publisher, trainer, viewer — prisma/seed.ts) already carry
+    // legacy TENANT-scoped RolePermission rows predating this fix. Without
+    // this filter, `assignedKeys` would include those invalid keys, the
+    // editor would render them as pre-checked, and clicking "Save" without
+    // changing anything would resubmit them — which
+    // setPlatformRolePermissions() now correctly rejects. Filtering here
+    // means the editor only ever reflects (and re-persists) valid
+    // PLATFORM permissions, self-healing the legacy rows away the next
+    // time an admin saves that role.
     prisma.role.findFirst({
       where: { id: roleId, scope: "PLATFORM" },
       select: {
         rolePermissions: {
+          where: { permission: { scope: "PLATFORM" } },
           select: { permission: { select: { key: true } } },
         },
       },

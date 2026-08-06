@@ -4,7 +4,9 @@
  * GET  → returns { permissionKeys: string[] } currently assigned to the role
  * PUT  → bulk-replace all RolePermission rows for this role
  *        body: { permissionKeys: string[] }
- *        Transaction: deleteMany + createMany for valid, active keys.
+ *        Delegates to setPlatformRolePermissions() (RPERM-05-C1), which
+ *        re-validates every key as scope=PLATFORM server-side and rejects
+ *        the whole batch (no partial persist) if any key is TENANT-scoped.
  *
  * Permission: USERS_MANAGE (role administration)
  *
@@ -13,13 +15,16 @@
  *   (not tenant-scoped in the current schema). This matches existing behavior.
  * - super_admin lockout guard: refuses to remove users.manage from the
  *   super_admin role if it is the last role possessing that permission.
- * - Unknown permissionKeys are silently ignored (no error for stale client state).
+ * - Unknown permissionKeys are silently ignored (no error for stale client
+ *   state) — but a *known* TENANT-scoped key is a hard, atomic rejection.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { setPlatformRolePermissions } from "@/lib/roles/platform-mutations";
+import { toRoleApiErrorResponse } from "@/lib/roles/errors";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -51,14 +56,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
 
-  // RPERM-05: PLATFORM-scope guard — a tenant-owned role can never be
-  // mutated through this platform-only endpoint.
-  const role = await prisma.role.findFirst({
-    where: { id, scope: "PLATFORM" },
-    select: { id: true, key: true },
-  });
-  if (!role) return NextResponse.json({ error: "Rolle nicht gefunden." }, { status: 404 });
-
   const body = await req.json().catch(() => ({}));
   const rawKeys: unknown = body.permissionKeys;
   if (!Array.isArray(rawKeys)) {
@@ -72,43 +69,11 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     .filter((k): k is string => typeof k === "string" && k.trim().length > 0)
     .map((k) => k.trim());
 
-  // Super-admin lockout guard: refuse to remove users.manage from super_admin
-  // if it would be the only role with that permission.
-  if (role.key === "super_admin" && !requestedKeys.includes(PERMISSIONS.USERS_MANAGE)) {
-    const otherRolesWithManage = await prisma.rolePermission.count({
-      where: {
-        permission: { key: PERMISSIONS.USERS_MANAGE },
-        role: { key: { not: "super_admin" } },
-      },
-    });
-    if (otherRolesWithManage === 0) {
-      return NextResponse.json(
-        {
-          error:
-            "users.manage kann nicht von super_admin entfernt werden — es wäre kein Benutzer mehr mit dieser Berechtigung vorhanden.",
-        },
-        { status: 409 },
-      );
-    }
+  try {
+    const result = await setPlatformRolePermissions({ roleId: id, permissionKeys: requestedKeys });
+    return NextResponse.json(result);
+  } catch (error) {
+    const { status, body: errorBody } = toRoleApiErrorResponse(error);
+    return NextResponse.json(errorBody, { status });
   }
-
-  // Resolve valid permission IDs for the requested keys.
-  const validPerms = await prisma.permission.findMany({
-    where: { key: { in: requestedKeys } },
-    select: { id: true, key: true },
-  });
-  const validPermIds = validPerms.map((p) => p.id);
-
-  // Bulk replace: delete all current assignments, create new ones.
-  await prisma.$transaction([
-    prisma.rolePermission.deleteMany({ where: { roleId: id } }),
-    prisma.rolePermission.createMany({
-      data: validPermIds.map((permissionId) => ({ roleId: id, permissionId })),
-      skipDuplicates: true,
-    }),
-  ]);
-
-  return NextResponse.json({
-    permissionKeys: validPerms.map((p) => p.key),
-  });
 }
