@@ -296,6 +296,38 @@ describe("A. generateTrainingSessions", () => {
   });
 });
 
+describe("A. generateTrainingSessions — TRAININGCENTER-03A per-weekday overrides", () => {
+  it("A12: recurrenceDays with their own startsAt/endsAt override the series-level fallback", async () => {
+    vi.mocked(prisma.trainingSeries.findFirst).mockResolvedValue(
+      makeSeriesRow({
+        recurrenceDays: [
+          { weekday: "MONDAY", startsAt: null, endsAt: null },
+          { weekday: "WEDNESDAY", startsAt: "16:00", endsAt: "17:00" },
+        ],
+      }) as never,
+    );
+    vi.mocked(prisma.trainingSession.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.trainingSession.createMany).mockResolvedValue({ count: 2 } as never);
+
+    await generateTrainingSessions(TENANT_A, SERIES_ID, {
+      from: new Date("2026-08-03T00:00:00.000Z"),
+      to: new Date("2026-08-05T00:00:00.000Z"),
+    });
+
+    const createCall = vi.mocked(prisma.trainingSession.createMany).mock.calls[0][0];
+    const rows = (createCall as { data: Array<Record<string, unknown>> }).data;
+
+    const monday = rows.find((r) => r.weekday === "MONDAY")!;
+    const wednesday = rows.find((r) => r.weekday === "WEDNESDAY")!;
+
+    // Monday has no override -> series-level 17:00 CEST = 15:00 UTC.
+    expect((monday.startAt as Date).toISOString()).toBe("2026-08-03T15:00:00.000Z");
+    // Wednesday overrides to 16:00 CEST = 14:00 UTC.
+    expect((wednesday.startAt as Date).toISOString()).toBe("2026-08-05T14:00:00.000Z");
+    expect((wednesday.endAt as Date).toISOString()).toBe("2026-08-05T15:00:00.000Z");
+  });
+});
+
 // ── B. generateTrainingSessionsForTenant ─────────────────────────────────────
 
 describe("B. generateTrainingSessionsForTenant", () => {

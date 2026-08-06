@@ -146,6 +146,17 @@ export async function generateTrainingSessions(
   const rangeFrom = toDateOnlyUtc(window.from);
   const rangeTo = toDateOnlyUtc(window.to);
 
+  // TRAININGCENTER-03A: each recurrence day may carry its own start/end time
+  // override (e.g. Monday 17:00–18:00, Wednesday 16:00–17:00). Days without
+  // an override fall back to the series-level startsAt/endsAt, handled by
+  // the recurrence engine itself.
+  const weekdayTimes: Partial<Record<Weekday, { startsAt: string; endsAt: string }>> = {};
+  for (const day of series.recurrenceDays) {
+    if (day.startsAt && day.endsAt) {
+      weekdayTimes[day.weekday as Weekday] = { startsAt: day.startsAt, endsAt: day.endsAt };
+    }
+  }
+
   const occurrences = generateTrainingSessionOccurrences(
     {
       validFrom: series.validFrom,
@@ -154,6 +165,7 @@ export async function generateTrainingSessions(
       timezone: series.timezone,
       startsAt: series.startsAt,
       endsAt: series.endsAt,
+      weekdayTimes,
     },
     { from: rangeFrom, to: rangeTo },
   );

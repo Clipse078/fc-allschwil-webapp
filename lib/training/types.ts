@@ -37,6 +37,21 @@ export type TrainingPlanAssignmentStatus = "SCHEDULED" | "NOT_SCHEDULED";
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
+/**
+ * TRAININGCENTER-03A: a single weekday's resolved (effective) schedule.
+ *
+ * "Resolved" means the per-weekday override when set, else the series-level
+ * startsAt/endsAt fallback — this is always the concrete time that
+ * generation will use for occurrences on this weekday.
+ */
+export interface WeekdayScheduleDto {
+  weekday: Weekday;
+  /** Resolved time-of-day string "HH:mm" interpreted in `timezone`. */
+  startsAt: string;
+  /** Resolved time-of-day string "HH:mm" interpreted in `timezone`. */
+  endsAt: string;
+}
+
 /** The resolved public shape returned by every service method. */
 export interface TrainingSeriesDto {
   id: string;
@@ -45,16 +60,20 @@ export interface TrainingSeriesDto {
   title: string;
   description: string | null;
   status: TrainingSeriesStatus;
-  /** Time-of-day string "HH:mm" interpreted in `timezone`. */
+  /** Time-of-day string "HH:mm" interpreted in `timezone`. Fallback default for weekdays without their own override. */
   startsAt: string;
-  /** Time-of-day string "HH:mm" interpreted in `timezone`. */
+  /** Time-of-day string "HH:mm" interpreted in `timezone`. Fallback default for weekdays without their own override. */
   endsAt: string;
   /** IANA timezone identifier, e.g. "Europe/Zurich". */
   timezone: string;
   weekdays: Weekday[];
+  /** TRAININGCENTER-03A: resolved per-weekday start/end times, ordered by weekday. */
+  weekdaySchedules: WeekdayScheduleDto[];
   validFrom: string | null;
   validUntil: string | null;
   archivedAt: string | null;
+  /** TRAININGCENTER-03A: number of canonical TrainingSession rows generated for this series. */
+  sessionCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -101,18 +120,35 @@ export interface TrainingPlanAssignmentDto {
 
 // ── Input shapes ──────────────────────────────────────────────────────────────
 
+/** TRAININGCENTER-03A: a per-weekday time override supplied to create/update. */
+export interface WeekdayTimeOverrideInput {
+  weekday: Weekday;
+  /** Time-of-day "HH:mm" this weekday starts. Must be before endsAt. */
+  startsAt: string;
+  /** Time-of-day "HH:mm" this weekday ends. */
+  endsAt: string;
+}
+
 export interface CreateTrainingSeriesInput {
   teamSeasonId: string;
   title: string;
   description?: string | null;
-  /** Time-of-day "HH:mm". Required. */
+  /** Time-of-day "HH:mm". Required. Fallback for any weekday without its own entry in `weekdayTimes`. */
   startsAt: string;
-  /** Time-of-day "HH:mm". Required. Must be after startsAt. */
+  /** Time-of-day "HH:mm". Required. Must be after startsAt. Fallback for any weekday without its own entry in `weekdayTimes`. */
   endsAt: string;
   /** IANA timezone. Defaults to "UTC" when omitted. */
   timezone?: string;
   /** Weekdays on which the series recurs. At least one required. */
   weekdays: Weekday[];
+  /**
+   * TRAININGCENTER-03A: optional per-weekday start/end time overrides — one
+   * recurring series may meet at different times on different weekdays
+   * (e.g. Monday 17:00–18:00, Wednesday 16:00–17:00). Every entry's weekday
+   * must also appear in `weekdays`. Weekdays present in `weekdays` but
+   * without an entry here fall back to `startsAt`/`endsAt`.
+   */
+  weekdayTimes?: WeekdayTimeOverrideInput[];
   validFrom?: Date | null;
   validUntil?: Date | null;
 }
@@ -124,6 +160,8 @@ export interface UpdateTrainingSeriesInput {
   endsAt?: string;
   timezone?: string;
   weekdays?: Weekday[];
+  /** TRAININGCENTER-03A: per-weekday time overrides. Only applied when `weekdays` is also provided (recurrence days are always fully replaced together). */
+  weekdayTimes?: WeekdayTimeOverrideInput[];
   validFrom?: Date | null;
   validUntil?: Date | null;
   status?: Exclude<TrainingSeriesStatus, "ARCHIVED">;

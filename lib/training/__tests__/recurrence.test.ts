@@ -395,6 +395,84 @@ describe("B. generateTrainingSessionOccurrences", () => {
   });
 });
 
+// ── C. weekdayTimes overrides (TRAININGCENTER-03A) ──────────────────────────
+
+describe("C. weekdayTimes per-weekday overrides", () => {
+  it("C1: the ticket example — Monday 17:00-18:00, Wednesday 16:00-17:00 on the same series", () => {
+    const series = makeSeries({
+      weekdays: ["MONDAY", "WEDNESDAY"],
+      startsAt: "17:00",
+      endsAt: "18:00",
+      validFrom: new Date("2026-08-03T00:00:00.000Z"), // Monday
+      validUntil: new Date("2026-08-05T00:00:00.000Z"), // Wednesday
+      weekdayTimes: {
+        WEDNESDAY: { startsAt: "16:00", endsAt: "17:00" },
+      },
+    });
+
+    const occurrences = generateTrainingSessionOccurrences(series, {
+      from: new Date("2026-08-01T00:00:00.000Z"),
+      to: new Date("2026-08-31T00:00:00.000Z"),
+    });
+
+    expect(occurrences).toHaveLength(2);
+    const monday = occurrences.find((o) => o.weekday === "MONDAY")!;
+    const wednesday = occurrences.find((o) => o.weekday === "WEDNESDAY")!;
+
+    // Monday has no override -> uses series-level startsAt/endsAt (17:00-18:00 CEST).
+    expect(monday.startAt.toISOString()).toBe("2026-08-03T15:00:00.000Z");
+    expect(monday.endAt.toISOString()).toBe("2026-08-03T16:00:00.000Z");
+
+    // Wednesday has an override -> uses 16:00-17:00 CEST instead.
+    expect(wednesday.startAt.toISOString()).toBe("2026-08-05T14:00:00.000Z");
+    expect(wednesday.endAt.toISOString()).toBe("2026-08-05T15:00:00.000Z");
+  });
+
+  it("C2: a weekday without an entry in weekdayTimes falls back to the series-level time", () => {
+    const series = makeSeries({
+      weekdays: ["MONDAY", "FRIDAY"],
+      startsAt: "19:00",
+      endsAt: "20:00",
+      validFrom: new Date("2026-08-03T00:00:00.000Z"),
+      validUntil: new Date("2026-08-07T00:00:00.000Z"),
+      weekdayTimes: {
+        MONDAY: { startsAt: "17:00", endsAt: "18:00" },
+        // FRIDAY intentionally has no override.
+      },
+    });
+
+    const occurrences = generateTrainingSessionOccurrences(series, {
+      from: new Date("2026-08-01T00:00:00.000Z"),
+      to: new Date("2026-08-31T00:00:00.000Z"),
+    });
+
+    const friday = occurrences.find((o) => o.weekday === "FRIDAY")!;
+    // No override for Friday -> falls back to the series-level 19:00 CEST = 17:00 UTC.
+    expect(friday.startAt.toISOString()).toBe("2026-08-07T17:00:00.000Z");
+  });
+
+  it("C3: an empty weekdayTimes object behaves identically to omitting it", () => {
+    const seriesWithEmpty = makeSeries({
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-03T00:00:00.000Z"),
+      validUntil: new Date("2026-08-03T00:00:00.000Z"),
+      weekdayTimes: {},
+    });
+    const seriesWithoutField = makeSeries({
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-03T00:00:00.000Z"),
+      validUntil: new Date("2026-08-03T00:00:00.000Z"),
+    });
+
+    const window = { from: new Date("2026-08-01T00:00:00.000Z"), to: new Date("2026-08-31T00:00:00.000Z") };
+    const a = generateTrainingSessionOccurrences(seriesWithEmpty, window);
+    const b = generateTrainingSessionOccurrences(seriesWithoutField, window);
+
+    expect(a[0].startAt.toISOString()).toBe(b[0].startAt.toISOString());
+    expect(a[0].endAt.toISOString()).toBe(b[0].endAt.toISOString());
+  });
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 describe("toDateOnlyUtc / dateKeyFromDate", () => {

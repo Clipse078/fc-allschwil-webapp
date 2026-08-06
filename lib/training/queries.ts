@@ -31,13 +31,20 @@ export type TrainingSeriesRow = {
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  recurrenceDays: { weekday: string }[];
+  /// TRAININGCENTER-03A: startsAt/endsAt are nullable per-weekday overrides —
+  /// null means "fall back to the parent TrainingSeries.startsAt/endsAt".
+  recurrenceDays: { weekday: string; startsAt: string | null; endsAt: string | null }[];
+  /// TRAININGCENTER-03A: count of canonical TrainingSession rows generated for this series.
+  _count?: { sessions: number };
 };
 
-const include = {
+export const trainingSeriesInclude = {
   recurrenceDays: {
-    select: { weekday: true },
+    select: { weekday: true, startsAt: true, endsAt: true },
     orderBy: { weekday: "asc" as const },
+  },
+  _count: {
+    select: { sessions: true },
   },
 } as const;
 
@@ -50,7 +57,7 @@ export async function findTrainingSeriesById(
 ): Promise<TrainingSeriesRow | null> {
   return prisma.trainingSeries.findFirst({
     where: { id: seriesId, tenantId },
-    include,
+    include: trainingSeriesInclude,
   }) as Promise<TrainingSeriesRow | null>;
 }
 
@@ -71,7 +78,7 @@ export async function findAllTrainingSeries(
       ...(teamSeasonId ? { teamSeasonId } : {}),
       ...(status ? { status } : !includeArchived ? { NOT: { status: "ARCHIVED" } } : {}),
     },
-    include,
+    include: trainingSeriesInclude,
     orderBy: [{ teamSeasonId: "asc" }, { title: "asc" }],
   }) as Promise<TrainingSeriesRow[]>;
 }
@@ -98,6 +105,68 @@ export async function findTeamSeasonForTenant(
       },
     },
   });
+}
+
+/**
+ * TRAININGCENTER-03A: Row shape for the "Team / TeamSeason" picker used by
+ * the TrainingSeries create/edit form.
+ *
+ * Only active TeamSeasons belonging to active teams are eligible — creating
+ * a TrainingSeries for an inactive team is rejected at the service layer
+ * (see TrainingSeriesArchivedTeamError), so the picker only ever offers
+ * choices that will actually succeed.
+ *
+ * trainers is the "Trainers where supported" display: the ACTIVE
+ * TrainerTeamMember roster already assigned to this TeamSeason. There is no
+ * per-TrainingSeries trainer assignment model yet — trainers are shown
+ * read-only, sourced from the canonical team-level roster.
+ */
+export type TeamSeasonPickerRow = {
+  id: string;
+  teamId: string;
+  teamName: string;
+  seasonName: string;
+  trainers: { id: string; name: string; roleLabel: string | null }[];
+};
+
+/** Returns every active TeamSeason (of an active Team) for a tenant, for use in pickers. */
+export async function findTeamSeasonsForTenant(
+  tenantId: string,
+): Promise<TeamSeasonPickerRow[]> {
+  const rows = await prisma.teamSeason.findMany({
+    where: {
+      status: "ACTIVE",
+      team: { tenantId, isActive: true },
+    },
+    select: {
+      id: true,
+      teamId: true,
+      team: { select: { name: true } },
+      season: { select: { name: true } },
+      trainerTeamMembers: {
+        where: { status: "ACTIVE" },
+        orderBy: { sortOrder: "asc" },
+        select: {
+          id: true,
+          roleLabel: true,
+          person: { select: { firstName: true, lastName: true, displayName: true } },
+        },
+      },
+    },
+    orderBy: [{ team: { name: "asc" } }, { season: { startDate: "desc" } }],
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    teamId: row.teamId,
+    teamName: row.team.name,
+    seasonName: row.season.name,
+    trainers: row.trainerTeamMembers.map((t) => ({
+      id: t.id,
+      name: t.person.displayName || `${t.person.firstName} ${t.person.lastName}`,
+      roleLabel: t.roleLabel,
+    })),
+  }));
 }
 
 // =============================================================================

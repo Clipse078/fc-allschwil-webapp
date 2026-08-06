@@ -35,6 +35,8 @@ import type {
   UpdateTrainingSeriesInput,
   ListTrainingSeriesFilter,
   Weekday,
+  WeekdayScheduleDto,
+  WeekdayTimeOverrideInput,
 } from "./types";
 import {
   TrainingSeriesNotFoundError,
@@ -47,10 +49,20 @@ import {
   findTrainingSeriesById,
   findAllTrainingSeries,
   findTeamSeasonForTenant,
+  trainingSeriesInclude as include,
   type TrainingSeriesRow,
 } from "./queries";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Resolves each recurrence day's effective (override ?? series fallback) schedule. */
+function resolveWeekdaySchedules(row: TrainingSeriesRow): WeekdayScheduleDto[] {
+  return row.recurrenceDays.map((d) => ({
+    weekday: d.weekday as Weekday,
+    startsAt: d.startsAt ?? row.startsAt,
+    endsAt: d.endsAt ?? row.endsAt,
+  }));
+}
 
 /** Converts a DB row to the public DTO shape. */
 function toDto(row: TrainingSeriesRow): TrainingSeriesDto {
@@ -65,12 +77,34 @@ function toDto(row: TrainingSeriesRow): TrainingSeriesDto {
     endsAt: row.endsAt,
     timezone: row.timezone,
     weekdays: row.recurrenceDays.map((d) => d.weekday as Weekday),
+    weekdaySchedules: resolveWeekdaySchedules(row),
     validFrom: row.validFrom?.toISOString() ?? null,
     validUntil: row.validUntil?.toISOString() ?? null,
     archivedAt: row.archivedAt?.toISOString() ?? null,
+    sessionCount: row._count?.sessions ?? 0,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/** Builds a weekday -> override lookup, validated against the known weekday set. */
+function buildWeekdayTimeLookup(
+  weekdayTimes: WeekdayTimeOverrideInput[] | undefined,
+  knownWeekdays: Set<Weekday>,
+): Map<Weekday, { startsAt: string; endsAt: string }> {
+  const lookup = new Map<Weekday, { startsAt: string; endsAt: string }>();
+  if (!weekdayTimes) return lookup;
+
+  for (const override of weekdayTimes) {
+    if (!knownWeekdays.has(override.weekday)) {
+      throw new TrainingSeriesValidationError(
+        `weekdayTimes contains weekday "${override.weekday}" which is not in weekdays`,
+      );
+    }
+    validateTimes(override.startsAt, override.endsAt);
+    lookup.set(override.weekday, { startsAt: override.startsAt, endsAt: override.endsAt });
+  }
+  return lookup;
 }
 
 /**
@@ -125,6 +159,20 @@ function validateTimes(startsAt: string, endsAt: string): void {
   }
 }
 
+/** Validates that weekdayTimes contains no duplicate weekday entries. */
+function validateNoDuplicateWeekdayTimes(weekdayTimes: WeekdayTimeOverrideInput[] | undefined): void {
+  if (!weekdayTimes) return;
+  const seen = new Set<Weekday>();
+  for (const override of weekdayTimes) {
+    if (seen.has(override.weekday)) {
+      throw new TrainingSeriesValidationError(
+        `weekdayTimes contains a duplicate entry for weekday "${override.weekday}"`,
+      );
+    }
+    seen.add(override.weekday);
+  }
+}
+
 /** Validates and normalises the create input. */
 function validateCreateInput(input: CreateTrainingSeriesInput): void {
   if (!input.title?.trim()) {
@@ -137,6 +185,7 @@ function validateCreateInput(input: CreateTrainingSeriesInput): void {
     throw new TrainingSeriesValidationError("at least one weekday is required for recurrence");
   }
   validateTimes(input.startsAt, input.endsAt);
+  validateNoDuplicateWeekdayTimes(input.weekdayTimes);
   if (input.timezone !== undefined && input.timezone.trim()) {
     validateTimezone(input.timezone.trim());
   }
@@ -155,6 +204,12 @@ function validateUpdateInput(input: UpdateTrainingSeriesInput): void {
   if (input.weekdays !== undefined && input.weekdays.length === 0) {
     throw new TrainingSeriesValidationError("weekdays must not be empty when provided");
   }
+  if (input.weekdayTimes !== undefined && input.weekdays === undefined) {
+    throw new TrainingSeriesValidationError(
+      "weekdayTimes can only be provided together with weekdays",
+    );
+  }
+  validateNoDuplicateWeekdayTimes(input.weekdayTimes);
   if (input.startsAt !== undefined || input.endsAt !== undefined) {
     if (input.startsAt !== undefined && input.endsAt !== undefined) {
       validateTimes(input.startsAt, input.endsAt);
@@ -223,6 +278,7 @@ export async function createTrainingSeries(
   await requireActiveTeamSeason(tenantId, input.teamSeasonId);
 
   const uniqueWeekdays = [...new Set(input.weekdays)];
+  const weekdayTimeLookup = buildWeekdayTimeLookup(input.weekdayTimes, new Set(uniqueWeekdays));
 
   try {
     const row = await prisma.trainingSeries.create({
@@ -239,15 +295,14 @@ export async function createTrainingSeries(
         validUntil: input.validUntil ?? null,
         archivedAt: null,
         recurrenceDays: {
-          create: uniqueWeekdays.map((weekday) => ({ weekday })),
+          create: uniqueWeekdays.map((weekday) => ({
+            weekday,
+            startsAt: weekdayTimeLookup.get(weekday)?.startsAt ?? null,
+            endsAt: weekdayTimeLookup.get(weekday)?.endsAt ?? null,
+          })),
         },
       },
-      include: {
-        recurrenceDays: {
-          select: { weekday: true },
-          orderBy: { weekday: "asc" },
-        },
-      },
+      include,
     });
 
     return toDto(row as TrainingSeriesRow);
@@ -286,6 +341,12 @@ export async function updateTrainingSeries(
     throw new TrainingSeriesNotFoundError(seriesId);
   }
 
+  const uniqueWeekdays = input.weekdays !== undefined ? [...new Set(input.weekdays)] : undefined;
+  const weekdayTimeLookup = buildWeekdayTimeLookup(
+    input.weekdayTimes,
+    new Set(uniqueWeekdays ?? []),
+  );
+
   try {
     const row = await prisma.trainingSeries.update({
       where: { id: seriesId },
@@ -300,21 +361,20 @@ export async function updateTrainingSeries(
         ...(input.validFrom !== undefined ? { validFrom: input.validFrom ?? null } : {}),
         ...(input.validUntil !== undefined ? { validUntil: input.validUntil ?? null } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.weekdays !== undefined
+        ...(uniqueWeekdays !== undefined
           ? {
               recurrenceDays: {
                 deleteMany: {},
-                create: [...new Set(input.weekdays)].map((weekday) => ({ weekday })),
+                create: uniqueWeekdays.map((weekday) => ({
+                  weekday,
+                  startsAt: weekdayTimeLookup.get(weekday)?.startsAt ?? null,
+                  endsAt: weekdayTimeLookup.get(weekday)?.endsAt ?? null,
+                })),
               },
             }
           : {}),
       },
-      include: {
-        recurrenceDays: {
-          select: { weekday: true },
-          orderBy: { weekday: "asc" },
-        },
-      },
+      include,
     });
 
     return toDto(row as TrainingSeriesRow);
@@ -357,12 +417,7 @@ export async function archiveTrainingSeries(
       status: "ARCHIVED",
       archivedAt: existing.archivedAt ?? new Date(),
     },
-    include: {
-      recurrenceDays: {
-        select: { weekday: true },
-        orderBy: { weekday: "asc" },
-      },
-    },
+    include,
   });
 
   return toDto(row as TrainingSeriesRow);
@@ -391,12 +446,7 @@ export async function restoreTrainingSeries(
       status: "INACTIVE",
       archivedAt: null,
     },
-    include: {
-      recurrenceDays: {
-        select: { weekday: true },
-        orderBy: { weekday: "asc" },
-      },
-    },
+    include,
   });
 
   return toDto(row as TrainingSeriesRow);
