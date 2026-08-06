@@ -186,6 +186,8 @@ export default async function RolesPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex flex-wrap gap-1.5">
+                          <AdminStatusPill label="Plattform" tone="default" />
+                          {role.isSystem && <AdminStatusPill label="Geschützt" tone="warning" />}
                           {role.userCount > 0 ? (
                             <AdminStatusPill label="Aktiv" tone="success" />
                           ) : (
@@ -267,6 +269,8 @@ export default async function RolesPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
+                    <AdminStatusPill label="Plattform" tone="default" />
+                    {role.isSystem && <AdminStatusPill label="Geschützt" tone="warning" />}
                     {role.userCount > 0 ? (
                       <AdminStatusPill label="Aktiv" tone="success" />
                     ) : (

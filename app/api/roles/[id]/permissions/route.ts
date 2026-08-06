@@ -27,9 +27,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
+  // RPERM-05: PLATFORM-scope guard — see /api/tenant/roles/[id]/permissions
+  // for the tenant equivalent of this endpoint.
   const { id } = await params;
-  const role = await prisma.role.findUnique({
-    where: { id },
+  const role = await prisma.role.findFirst({
+    where: { id, scope: "PLATFORM" },
     select: {
       rolePermissions: {
         select: { permission: { select: { key: true } } },
@@ -49,8 +51,10 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
 
-  const role = await prisma.role.findUnique({
-    where: { id },
+  // RPERM-05: PLATFORM-scope guard — a tenant-owned role can never be
+  // mutated through this platform-only endpoint.
+  const role = await prisma.role.findFirst({
+    where: { id, scope: "PLATFORM" },
     select: { id: true, key: true },
   });
   if (!role) return NextResponse.json({ error: "Rolle nicht gefunden." }, { status: 404 });
