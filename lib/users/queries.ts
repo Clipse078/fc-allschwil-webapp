@@ -49,6 +49,12 @@ export async function getUserDetailData(userId: string) {
               id: true,
               key: true,
               name: true,
+              // RPERM-05-C1: scope/tenant surfaced so callers (the user
+              // detail page) can split platform-editable roles from
+              // tenant roles, which are read-only summaries here — see
+              // getPlatformRolesListData() and app/api/users/[userId]/roles.
+              scope: true,
+              tenant: { select: { id: true, key: true, name: true } },
             },
           },
         },
@@ -58,13 +64,22 @@ export async function getUserDetailData(userId: string) {
 }
 
 /**
- * RPERM-04: excludes archived roles and template roles (e.g. the PLATFORM
- * club_admin template) — templates are never directly assignable; only their
- * per-tenant materialized roles (see prisma/seed.ts) are.
+ * RPERM-05-C1 (Finding 3): the platform user-role form
+ * (`components/admin/users/UserRolesForm.tsx`) may only ever offer
+ * PLATFORM-scoped roles — a tenant role must never even be a selectable
+ * option here, since `/api/users/[userId]/roles` now rejects tenant role
+ * ids server-side. Tenant role management lives exclusively in the
+ * RPERM-05 tenant administration module
+ * (`/dashboard/administration/roles`).
+ *
+ * RPERM-04: still excludes archived roles and template roles (e.g. the
+ * PLATFORM club_admin template) — templates are never directly
+ * assignable; only their per-tenant materialized roles (see
+ * prisma/seed.ts) are, and those are TENANT-scoped anyway.
  */
-export async function getRolesListData() {
+export async function getPlatformRolesListData() {
   return prisma.role.findMany({
-    where: { isArchived: false, isTemplate: false },
+    where: { scope: "PLATFORM", isArchived: false, isTemplate: false },
     orderBy: { name: "asc" },
     select: {
       id: true,

@@ -21,10 +21,15 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { logAction } from "@/lib/audit/log-action";
 import {
+  ArchivedRoleError,
   InvalidPermissionScopeError,
+  LastRequiredAdminError,
   ProtectedRoleError,
   RoleNotFoundError,
+  RoleUserNotFoundError,
+  ScopeMismatchError,
 } from "@/lib/roles/errors";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 
@@ -115,4 +120,138 @@ export async function setPlatformRolePermissions(
   ]);
 
   return { permissionKeys: permissions.map((p) => p.key) };
+}
+
+// ---------------------------------------------------------------------------
+// Platform user-role assignment (Finding 3 — the legacy /api/users/[userId]/roles endpoint)
+// ---------------------------------------------------------------------------
+
+export type SetPlatformUserRolesInput = {
+  userId: string;
+  roleIds: readonly string[];
+  actorUserId?: string;
+};
+
+export type SetPlatformUserRolesResult = {
+  roleIds: string[];
+};
+
+/**
+ * Bulk-replaces a user's PLATFORM-scoped role assignments only.
+ *
+ * Every safety property required by RPERM-05-C1 Finding 3:
+ *   - loads and accepts only `Role.scope === "PLATFORM"` role ids — a
+ *     TENANT role id anywhere in the request rejects the whole batch
+ *     (never silently dropped, never partially applied);
+ *   - never creates, updates, or reads a `TenantMembership` row;
+ *   - never touches a `UserRole` row where `tenantId IS NOT NULL` (or,
+ *     equivalently, whose `role.scope === "TENANT"`) — those rows are
+ *     managed exclusively by the RPERM-05 tenant-scoped assignment APIs
+ *     (`/api/tenant/roles/[id]/members`), which already enforce active
+ *     membership, tenant isolation, and last-active-Club-Admin
+ *     safeguards;
+ *   - blocks removing the last platform-wide holder of an `isSystem`
+ *     PLATFORM role (e.g. the last `super_admin`) — the platform
+ *     equivalent of the tenant module's `LastRequiredAdminError` guard in
+ *     `lib/roles/mutations.ts`;
+ *   - runs the actual UserRole delete/create inside `prisma.$transaction`;
+ *   - is idempotent — submitting the user's current platform role set is
+ *     a no-op success.
+ */
+export async function setPlatformUserRoles(
+  input: SetPlatformUserRolesInput,
+): Promise<SetPlatformUserRolesResult> {
+  const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } });
+  if (!user) throw new RoleUserNotFoundError();
+
+  const uniqueRequestedIds = Array.from(new Set(input.roleIds));
+
+  const foundRoles = uniqueRequestedIds.length
+    ? await prisma.role.findMany({
+        where: { id: { in: uniqueRequestedIds } },
+        select: { id: true, key: true, name: true, scope: true, isSystem: true, isArchived: true, isTemplate: true },
+      })
+    : [];
+
+  const notFoundIds = uniqueRequestedIds.filter((id) => !foundRoles.some((r) => r.id === id));
+  if (notFoundIds.length > 0) {
+    throw new RoleNotFoundError();
+  }
+
+  const tenantRoles = foundRoles.filter((r) => r.scope !== "PLATFORM");
+  if (tenantRoles.length > 0) {
+    throw new ScopeMismatchError(
+      `Diese Rolle(n) sind mandanten-spezifisch (TENANT) und können nicht über die Plattform-Benutzerverwaltung zugewiesen werden: ${tenantRoles
+        .map((r) => r.key)
+        .join(", ")}. Verwenden Sie die Mandanten-Rollenverwaltung.`,
+    );
+  }
+
+  const unassignableRoles = foundRoles.filter((r) => r.isArchived || r.isTemplate);
+  if (unassignableRoles.length > 0) {
+    throw new ArchivedRoleError(
+      `Diese Rolle(n) sind archiviert oder Vorlagen und können nicht zugewiesen werden: ${unassignableRoles
+        .map((r) => r.key)
+        .join(", ")}.`,
+    );
+  }
+
+  const requestedRoleIds = new Set(foundRoles.map((r) => r.id));
+
+  // Scope guard: only ever read/touch PLATFORM-scoped UserRole rows for
+  // this user — TENANT-scoped assignments (tenantId IS NOT NULL) are never
+  // part of this query and therefore can never be deleted or altered here.
+  const currentPlatformUserRoles = await prisma.userRole.findMany({
+    where: { userId: input.userId, role: { scope: "PLATFORM" } },
+    select: { id: true, roleId: true, role: { select: { key: true, isSystem: true } } },
+  });
+  const currentPlatformRoleIds = new Set(currentPlatformUserRoles.map((ur) => ur.roleId));
+
+  const toRemove = currentPlatformUserRoles.filter((ur) => !requestedRoleIds.has(ur.roleId));
+  const toAdd = foundRoles.filter((r) => !currentPlatformRoleIds.has(r.id));
+
+  // Last-required-admin safeguard, platform equivalent: never let a
+  // request remove the last platform-wide holder of an isSystem PLATFORM
+  // role (e.g. the last super_admin) — never weakens recovery access.
+  for (const ur of toRemove) {
+    if (!ur.role.isSystem) continue;
+    const otherHolders = await prisma.userRole.count({
+      where: { roleId: ur.roleId, userId: { not: input.userId } },
+    });
+    if (otherHolders === 0) {
+      throw new LastRequiredAdminError(
+        `"${ur.role.key}" kann diesem Benutzer nicht entzogen werden — er/sie ist der letzte Träger dieser systemkritischen Plattform-Rolle.`,
+      );
+    }
+  }
+
+  if (toRemove.length === 0 && toAdd.length === 0) {
+    // Idempotent no-op — nothing to change, no transaction needed.
+    return { roleIds: Array.from(requestedRoleIds) };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (toRemove.length > 0) {
+      await tx.userRole.deleteMany({ where: { id: { in: toRemove.map((ur) => ur.id) } } });
+    }
+    for (const role of toAdd) {
+      // tenantId is always null here — PLATFORM UserRole rows never carry a
+      // tenant id, and this function never creates a TenantMembership.
+      await tx.userRole.create({ data: { userId: input.userId, roleId: role.id, tenantId: null } });
+    }
+  });
+
+  if (input.actorUserId) {
+    await logAction({
+      actorUserId: input.actorUserId,
+      moduleKey: "users",
+      entityType: "UserRole",
+      entityId: input.userId,
+      action: "PLATFORM_ROLES_CHANGE",
+      beforeJson: { roleIds: Array.from(currentPlatformRoleIds) },
+      afterJson: { roleIds: Array.from(requestedRoleIds) },
+    });
+  }
+
+  return { roleIds: Array.from(requestedRoleIds) };
 }

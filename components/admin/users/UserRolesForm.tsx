@@ -70,7 +70,8 @@ export default function UserRolesForm({
   return (
     <div className="space-y-6">
       <p className="text-sm text-[var(--text-2)]">
-        Weise diesem Benutzer die passenden Rollen zu.
+        Weise diesem Benutzer die passenden Plattform-Rollen zu. Mandanten-Rollen
+        werden separat verwaltet.
       </p>
 
       {error ? (

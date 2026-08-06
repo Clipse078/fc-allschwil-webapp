@@ -5,13 +5,16 @@ import RoleManagementCard from "@/components/admin/users/RoleManagementCard";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getRolesListData, getUsersListData } from "@/lib/users/queries";
+import { getPlatformRolesListData, getUsersListData } from "@/lib/users/queries";
 
 export default async function UsersPage() {
   const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
   const currentUserId = session.user.effectiveUserId ?? session.user.id;
   const users = await getUsersListData();
-  const roles = await getRolesListData();
+  // RPERM-05-C1: this platform-only card mutates roles through
+  // /api/roles/[id] (PLATFORM-scope guarded) — only ever list PLATFORM
+  // roles here, never a tenant role a platform admin cannot actually save.
+  const roles = await getPlatformRolesListData();
 
   return (
     <div className="space-y-8">
