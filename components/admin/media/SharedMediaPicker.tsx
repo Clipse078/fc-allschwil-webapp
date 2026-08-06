@@ -3,11 +3,20 @@
 /**
  * SharedMediaPicker — Reusable DAM asset picker dialog.
  *
- * Use this instead of any module-specific picker. Supports:
+ * This is the single underlying picker dialog implementation for the whole
+ * app. Supports:
  * - Browse all assets with search + folder + type filters
  * - Single or multi-select
  * - Upload new assets from within the picker
+ * - Keyboard shortcuts (Escape closes the dialog)
  * - Returns normalized MediaAssetListItem
+ *
+ * Prefer using MediaPickerDialog (components/admin/media/MediaPickerDialog.tsx)
+ * for new module integrations — it wraps this component with a small,
+ * module-agnostic API (selectionMode / mediaTypes / onSelect) so every
+ * consumer shares the exact same browsing/search/upload experience without
+ * duplicating picker logic. This component remains the implementation both
+ * MediaPickerDialog and existing call sites render.
  *
  * Usage:
  *   <SharedMediaPicker
@@ -111,6 +120,20 @@ export default function SharedMediaPicker({
     load("", typeFilter, null);
     loadFolders();
   }, [open, load, typeFilter, loadFolders]);
+
+  // Keyboard shortcuts — shared by every consumer of this dialog (Hero Image,
+  // Weitere Medien, Homepage Builder, Page Builder, CMS layout, etc.).
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (!open) return;
