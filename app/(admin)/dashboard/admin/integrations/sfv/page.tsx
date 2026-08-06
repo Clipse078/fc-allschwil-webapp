@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 export default async function SfvIntegrationPage() {
   const session = await requireAnyPermission([PERMISSIONS.TENANTS_MANAGE]);
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
   let initialConfig: TenantSfvConfig | null = null;

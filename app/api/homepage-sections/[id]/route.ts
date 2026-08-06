@@ -30,7 +30,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session.user?.tenantId;
+  const tenantId = access.session.user?.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }

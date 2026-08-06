@@ -26,6 +26,13 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+const CLUB_ADMIN_TEMPLATE_KEY = "club_admin";
+
+/** RPERM-04: derives the per-tenant materialized club_admin role key from the tenant's key. */
+function tenantClubAdminRoleKey(tenantKey: string): string {
+  return `${CLUB_ADMIN_TEMPLATE_KEY}__${tenantKey}`;
+}
+
 async function main() {
   await prisma.tenant.upsert({
     where: { key: "fc-allschwil" },
@@ -308,6 +315,68 @@ async function main() {
         update: {},
         create: {
           roleId: role.id,
+          permissionId: permission.id,
+        },
+      });
+    }
+  }
+
+  // ── RPERM-04: materialize the tenant-scoped club_admin role ────────────────
+  // The PLATFORM club_admin role above is a template only (isTemplate: true,
+  // never directly assignable). Every tenant needs its own TENANT-scoped
+  // club_admin role, owning every TENANT-scoped permission, so that a tenant
+  // administrator's operational access comes from a real TenantMembership +
+  // tenant-scoped UserRole — never from inheriting a PLATFORM role's
+  // permissions. See lib/permissions/services/effective-permission-resolver.ts.
+  const fcaTenantForRoles = await prisma.tenant.findUnique({
+    where: { key: "fc-allschwil" },
+    select: { id: true, key: true },
+  });
+
+  if (fcaTenantForRoles) {
+    const tenantPermissionKeys = permissions
+      .filter((permission) => permission.scope === PermissionScope.TENANT)
+      .map((permission) => permission.key);
+
+    const tenantClubAdminRole = await prisma.role.upsert({
+      where: { key: tenantClubAdminRoleKey(fcaTenantForRoles.key) },
+      update: {
+        name: "Club Admin",
+        description: "Full operational access within this club",
+        scope: RoleScope.TENANT,
+        tenantId: fcaTenantForRoles.id,
+        isSystem: true,
+        isTemplate: false,
+        isArchived: false,
+      },
+      create: {
+        key: tenantClubAdminRoleKey(fcaTenantForRoles.key),
+        name: "Club Admin",
+        description: "Full operational access within this club",
+        scope: RoleScope.TENANT,
+        tenantId: fcaTenantForRoles.id,
+        isSystem: true,
+        isTemplate: false,
+      },
+    });
+
+    for (const permissionKey of tenantPermissionKeys) {
+      const permission = await prisma.permission.findUnique({ where: { key: permissionKey } });
+
+      if (!permission) {
+        throw new Error("Permission not found during tenant club_admin seeding: " + permissionKey);
+      }
+
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: tenantClubAdminRole.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: tenantClubAdminRole.id,
           permissionId: permission.id,
         },
       });

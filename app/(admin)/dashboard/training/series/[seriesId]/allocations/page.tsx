@@ -18,7 +18,7 @@ export default async function TrainingAllocationsPage({ params }: Props) {
     PERMISSIONS.TRAININGS_MANAGE,
   ]);
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
   const canManage = hasPermission(session, PERMISSIONS.TRAININGS_MANAGE);

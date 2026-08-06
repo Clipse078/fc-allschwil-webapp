@@ -29,7 +29,7 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session?.user?.tenantId;
+  const tenantId = access.session?.user?.activeTenantId;
   if (!tenantId) {
     return NextResponse.json(
       { error: "Kein Mandant in der Sitzung." },

@@ -12,7 +12,7 @@ export default async function VereinsleitungInitiativenPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
   const initiatives = await getInitiatives(actor);
 
   return (

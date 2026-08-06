@@ -4,7 +4,7 @@ import { Plus, RefreshCw, Volleyball } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
-import { getTenantContextFromSession } from "@/lib/tenants/context";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import {
   listMatchcenterMatches,
   type MatchcenterQueryDatabase,
@@ -13,22 +13,18 @@ import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
 
 export default async function MatchcenterPage() {
-  const session = await requireAnyPermission([
+  await requireAnyPermission([
     PERMISSIONS.EVENTS_VIEW,
     PERMISSIONS.EVENTS_MANAGE,
   ]);
 
-  const tenantId = session.user?.tenantId;
-
-  if (!tenantId) {
-    notFound();
-  }
-
-  const tenantContext = await getTenantContextFromSession(tenantId);
+  const tenantContext = await getActiveTenant();
 
   if (!tenantContext) {
     notFound();
   }
+
+  const tenantId = tenantContext.id;
 
   /*
    * Prisma's generic delegate return type cannot structurally satisfy the

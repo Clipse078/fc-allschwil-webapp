@@ -42,7 +42,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
 
   const guard = await requireTargetAccess({ actor, id, access: "stage" });
   if (!guard.ok) return guard.response;

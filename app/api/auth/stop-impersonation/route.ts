@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, unstable_update } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
+import {
+  resolveSessionPermissionKeys,
+  resolveTenantMembershipContext,
+} from "@/lib/auth/session-context";
 
 export async function POST(_: NextRequest) {
   const session = await auth();
@@ -16,17 +20,7 @@ export async function POST(_: NextRequest) {
     where: { id: session.user.actorUserId },
     include: {
       userRoles: {
-        include: {
-          role: {
-            include: {
-              rolePermissions: {
-                include: {
-                  permission: true,
-                },
-              },
-            },
-          },
-        },
+        select: { role: { select: { key: true } } },
       },
     },
   });
@@ -39,12 +33,14 @@ export async function POST(_: NextRequest) {
   }
 
   const roleKeys = Array.from(new Set(actorUser.userRoles.map((userRole) => userRole.role.key)));
-  const permissionKeys = Array.from(
-    new Set(
-      actorUser.userRoles.flatMap((userRole) =>
-        userRole.role.rolePermissions.map((rolePermission) => rolePermission.permission.key)
-      )
-    )
+
+  // RPERM-04: rebuild the restored session through the same tenant-resolution
+  // model used at login — see lib/auth/session-context.ts.
+  const tenantContext = await resolveTenantMembershipContext(prisma, actorUser.id);
+  const permissionKeys = await resolveSessionPermissionKeys(
+    prisma,
+    actorUser.id,
+    tenantContext.activeTenantId,
   );
 
   await unstable_update({
@@ -60,6 +56,9 @@ export async function POST(_: NextRequest) {
       actorEmail: undefined,
       actorName: undefined,
       effectiveUserId: actorUser.id,
+      activeTenantId: tenantContext.activeTenantId,
+      activeMembershipId: tenantContext.activeMembershipId,
+      availableTenants: tenantContext.availableTenants,
     },
   });
 

@@ -34,7 +34,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireAnyPermission: vi.fn(),
-  getTenantContextFromSession: vi.fn(),
+  getActiveTenant: vi.fn(),
   buildScreen1LivePayload: vi.fn(),
   notFound: vi.fn(),
   eventFindMany: vi.fn().mockResolvedValue([]),
@@ -45,8 +45,8 @@ vi.mock("@/lib/permissions/require-any-permission", () => ({
   requireAnyPermission: mocks.requireAnyPermission,
 }));
 
-vi.mock("@/lib/tenants/context", () => ({
-  getTenantContextFromSession: mocks.getTenantContextFromSession,
+vi.mock("@/lib/tenants/active-tenant", () => ({
+  getActiveTenant: mocks.getActiveTenant,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -73,7 +73,7 @@ vi.mock("next/navigation", () => ({
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const ACTIVE_SESSION = {
-  user: { tenantId: "tenant-fca", id: "user-1", name: "Admin" },
+  user: { activeTenantId: "tenant-fca", id: "user-1", name: "Admin" },
 };
 
 const ACTIVE_TENANT = {
@@ -143,7 +143,7 @@ describe("InfoboardAdminPage", () => {
     vi.resetModules();
     vi.clearAllMocks();
     mocks.requireAnyPermission.mockResolvedValue(ACTIVE_SESSION);
-    mocks.getTenantContextFromSession.mockResolvedValue(ACTIVE_TENANT);
+    mocks.getActiveTenant.mockResolvedValue(ACTIVE_TENANT);
     mocks.buildScreen1LivePayload.mockResolvedValue(EMPTY_PAYLOAD);
     mocks.notFound.mockImplementation(() => {
       throw new Error("notFound");
@@ -231,8 +231,9 @@ describe("InfoboardAdminPage", () => {
 
   it("uses authenticated tenant from session, not from query params", async () => {
     await renderPage({ date: "2026-07-25" });
-    // getTenantContextFromSession is called with the session tenantId
-    expect(mocks.getTenantContextFromSession).toHaveBeenCalledWith("tenant-fca");
+    // getActiveTenant() takes no arguments — it resolves the tenant exclusively
+    // from the session's activeTenantId, structurally preventing query-param override.
+    expect(mocks.getActiveTenant).toHaveBeenCalledWith();
     // buildScreen1LivePayload is called with the authenticated tenant
     expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -243,8 +244,8 @@ describe("InfoboardAdminPage", () => {
 
   it("query parameter cannot select a different tenant", async () => {
     await renderPage({ date: "2026-07-25", tenantId: "tenant-other" });
-    // Still uses the session tenant
-    expect(mocks.getTenantContextFromSession).toHaveBeenCalledWith("tenant-fca");
+    // Still uses the session tenant — getActiveTenant() accepts no arguments at all.
+    expect(mocks.getActiveTenant).toHaveBeenCalledWith();
     expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
       expect.objectContaining({
         tenant: expect.objectContaining({ id: "tenant-fca" }),
@@ -276,12 +277,12 @@ describe("InfoboardAdminPage", () => {
   });
 
   it("calls notFound when tenant is not found", async () => {
-    mocks.getTenantContextFromSession.mockResolvedValue(null);
+    mocks.getActiveTenant.mockResolvedValue(null);
     await expect(renderPage()).rejects.toThrow("notFound");
   });
 
   it("calls notFound when tenant timezone is missing", async () => {
-    mocks.getTenantContextFromSession.mockResolvedValue({
+    mocks.getActiveTenant.mockResolvedValue({
       ...ACTIVE_TENANT,
       timezone: null,
     });

@@ -15,7 +15,7 @@ import { ExternalLink, Palette } from "lucide-react";
 export default async function DesignSystemPage() {
   const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
   const [resolved, raw] = await Promise.all([

@@ -38,14 +38,33 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await hashPassword(password);
 
-    const user = await prisma.user.create({
-      data: {
-        firstName,
-        lastName,
-        email,
-        passwordHash,
-        isActive: true,
-      },
+    // RPERM-04: a new user is provisioned into the creating admin's active
+    // tenant via a TenantMembership row — never via the legacy User.tenantId
+    // column, which is no longer written for new users.
+    const activeTenantId = access.session.user.activeTenantId;
+
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          firstName,
+          lastName,
+          email,
+          passwordHash,
+          isActive: true,
+        },
+      });
+
+      if (activeTenantId) {
+        await tx.tenantMembership.create({
+          data: {
+            tenantId: activeTenantId,
+            userId: createdUser.id,
+            isActive: true,
+          },
+        });
+      }
+
+      return createdUser;
     });
 
     return NextResponse.json(

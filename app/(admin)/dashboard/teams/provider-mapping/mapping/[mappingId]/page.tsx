@@ -20,7 +20,7 @@ import { redirect, notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { getProviderMappingById, getEligibleTeamSeasonsForMapping } from "@/lib/provider-mapping/provider-mapping-queries";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
@@ -36,7 +36,7 @@ export default async function ProviderMappingAssignPage({ params }: PageProps) {
     PERMISSIONS.TEAMS_MANAGE,
   ]);
 
-  const tenant = await getTenantFromSession(session.user.tenantId);
+  const tenant = await getActiveTenant();
   if (!tenant) {
     notFound();
   }

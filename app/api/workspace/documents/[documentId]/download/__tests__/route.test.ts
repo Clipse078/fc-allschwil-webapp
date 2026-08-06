@@ -89,7 +89,7 @@ function mockAuthorizedSession(
     session: {
       user: {
         id: "user-1",
-        tenantId,
+        activeTenantId: tenantId,
       },
     },
   });

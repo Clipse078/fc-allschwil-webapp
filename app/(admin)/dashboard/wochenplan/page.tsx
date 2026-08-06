@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, CalendarDays, AlertCircle } from "lucide-rea
 import WochenplanBoard from "@/components/admin/wochenplan/WochenplanBoard";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { getActiveTenantId } from "@/lib/tenants/active-tenant";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import { getWeekWindow, getIsoWeekNumber, startOfIsoWeek } from "@/lib/planner/date-utils";
 import { getWochenplanPitchRowLabels } from "@/lib/facilities/queries";
@@ -14,8 +15,8 @@ type PageProps = {
 };
 
 export default async function WochenplanPage({ searchParams }: PageProps) {
-  const session = await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
-  const tenantId = session?.user?.tenantId ?? null;
+  await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
+  const tenantId = await getActiveTenantId();
 
   const { week } = await searchParams;
   const { weekId, start, end, previousWeekId, nextWeekId } = getWeekWindow(week);

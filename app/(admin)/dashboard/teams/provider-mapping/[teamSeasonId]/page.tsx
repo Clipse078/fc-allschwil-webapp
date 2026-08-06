@@ -16,7 +16,7 @@
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getMappingsForTeamSeason } from "@/lib/provider-mapping/provider-mapping-queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
@@ -34,7 +34,7 @@ export default async function ProviderMappingDetailPage({ params, searchParams }
     PERMISSIONS.TEAMS_MANAGE,
   ]);
 
-  const tenant = await getTenantFromSession(session.user.tenantId);
+  const tenant = await getActiveTenant();
   const tenantId = tenant?.id;
 
   if (!tenantId) {

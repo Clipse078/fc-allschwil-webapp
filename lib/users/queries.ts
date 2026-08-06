@@ -57,8 +57,14 @@ export async function getUserDetailData(userId: string) {
   });
 }
 
+/**
+ * RPERM-04: excludes archived roles and template roles (e.g. the PLATFORM
+ * club_admin template) — templates are never directly assignable; only their
+ * per-tenant materialized roles (see prisma/seed.ts) are.
+ */
 export async function getRolesListData() {
   return prisma.role.findMany({
+    where: { isArchived: false, isTemplate: false },
     orderBy: { name: "asc" },
     select: {
       id: true,

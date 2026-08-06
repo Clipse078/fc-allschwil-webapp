@@ -30,9 +30,13 @@
  *   1. A valid tenantId is supplied by the caller.
  *   2. The permission has scope = TENANT in the database.
  *   3. The user has an active TenantMembership for that exact tenant.
- *   4. The user has a UserRole scoped to that exact tenant (UserRole.tenantId = tenantId).
- *   5. The assigned role has scope = TENANT, tenantId = requested tenantId, and isArchived = false.
- *   6. The role includes the requested permission.
+ *   4. The related Tenant itself is operationally ACTIVE (RPERM-04-C1 — an
+ *      active membership linked to an ARCHIVED or INACTIVE tenant grants no
+ *      permissions; archival/deactivation must take effect immediately for
+ *      every live authorization check, not just at next sign-in).
+ *   5. The user has a UserRole scoped to that exact tenant (UserRole.tenantId = tenantId).
+ *   6. The assigned role has scope = TENANT, tenantId = requested tenantId, and isArchived = false.
+ *   7. The role includes the requested permission.
  *
  * Role ownership is enforced: a TENANT role whose tenantId does not match
  * the requested tenant must not grant permissions in that tenant, even when
@@ -209,19 +213,28 @@ async function resolvePlatformPermissions(
  * belongs to Tenant B cannot be used to authorize access in Tenant A, even
  * when UserRole.tenantId is set correctly. This closes the inconsistent-data
  * attack vector without requiring schema-level constraints.
+ *
+ * Tenant operational status (RPERM-04-C1): an active TenantMembership is
+ * necessary but not sufficient — the related Tenant must also be
+ * operationally ACTIVE (not ARCHIVED, not INACTIVE). This is evaluated live
+ * on every call (never cached), so archiving a tenant immediately revokes
+ * every tenant permission for every member, regardless of any JWT session
+ * that was issued before the archival.
  */
 async function resolveTenantPermissions(
   prisma: PrismaClient,
   userId: string,
   tenantId: string,
 ): Promise<Set<string>> {
-  // Step 1: verify active tenant membership.
+  // Step 1: verify active tenant membership AND that the tenant itself is
+  // operationally active. A membership row being `isActive: true` says
+  // nothing about the tenant's own status — both must hold.
   const membership = await prisma.tenantMembership.findUnique({
     where: { tenantId_userId: { tenantId, userId } },
-    select: { isActive: true },
+    select: { isActive: true, tenant: { select: { status: true } } },
   });
 
-  if (!membership?.isActive) {
+  if (!membership?.isActive || membership.tenant.status !== "ACTIVE") {
     return new Set<string>();
   }
 
@@ -402,7 +415,7 @@ export class EffectivePermissionResolver {
  * const allowed = await resolver.hasPermission({
  *   userId: session.user.id,
  *   permission: "trainings.view",
- *   tenantId: session.user.tenantId,
+ *   tenantId: session.user.activeTenantId,
  * });
  * ```
  */

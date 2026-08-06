@@ -19,7 +19,7 @@ export async function GET() {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   const meetings = await getMeetings(actor);
   return NextResponse.json({ meetings });
 }
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
   if (!actor.permissionKeys.includes("meetings.manage")) {
     return NextResponse.json({ error: "meetings.manage Berechtigung erforderlich." }, { status: 403 });
   }

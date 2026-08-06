@@ -5,18 +5,19 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnits, getArchivedOrgUnits } from "@/lib/org/queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import OrgUnitSearchableList from "@/components/admin/org/OrgUnitSearchableList";
 import { ListPagePattern } from "@/components/ui/patterns";
 
 // Org Builder Foundation v1: view=archived param switches to the archived units view.
-// Slice 11.2b: tenant resolved from session-carried tenantId.
+// RPERM-04: tenant resolved via the single tenant-context helper (session.activeTenantId,
+// derived from TenantMembership — never the legacy User.tenantId column).
 
 type PageProps = { searchParams: Promise<{ view?: string }> };
 
 export default async function OrgUnitsPage({ searchParams }: PageProps) {
   const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
-  const tenant = await getTenantFromSession(session.user?.tenantId);
+  const tenant = await getActiveTenant();
   if (!tenant) notFound();
 
   const { view } = await searchParams;

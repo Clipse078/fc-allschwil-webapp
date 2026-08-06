@@ -123,14 +123,19 @@ export async function getCurrentTenantContextById(
 /**
  * Session-aware TenantContext resolver — Branding Runtime Adoption.
  *
- * When tenantId is present (Slice 11.2b session users): resolves context by PK
- * via getCurrentTenantContextById() — no hard-coded key dependency.
+ * When tenantId is present: resolves context by PK via
+ * getCurrentTenantContextById() — no hard-coded key dependency.
  *
- * When tenantId is absent (legacy sessions / bootstrap paths): falls back to
- * getCurrentTenantContext() using the DEFAULT_TENANT_KEY — same behaviour as before.
+ * When tenantId is absent (bootstrap paths, platform-only admins with no
+ * active tenant membership): falls back to getCurrentTenantContext() using
+ * the DEFAULT_TENANT_KEY — same behaviour as before.
  *
- * Use this in layouts and server components that need the full context including
- * branding (logoUrl, primaryColor, secondaryColor) and locale/season config.
+ * RPERM-04: prefer lib/tenants/active-tenant.ts's getActiveTenant() /
+ * requireTenantContext() in dashboard pages — they call this function with
+ * session.user.activeTenantId (TenantMembership-derived) internally. Use
+ * this function directly only when you already have a tenantId from a
+ * source other than the current session (e.g. a platform-admin flow
+ * resolving a different tenant by slug).
  */
 export async function getTenantContextFromSession(
   tenantId: string | null | undefined,

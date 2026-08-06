@@ -4,19 +4,20 @@ import { ArrowLeft } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getOrgUnitById, getOrgUnits } from "@/lib/org/queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import OrgUnitForm from "@/components/admin/org/OrgUnitForm";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 
-// Slice 11.2b: tenant resolved from session-carried tenantId.
+// RPERM-04: tenant resolved via the single tenant-context helper (session.activeTenantId,
+// derived from TenantMembership — never the legacy User.tenantId column).
 
 type PageProps = { params: Promise<{ id: string }> };
 
 export default async function EditOrgUnitPage({ params }: PageProps) {
-  const session = await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
+  await requireAnyPermission([PERMISSIONS.ORG_MANAGE]);
 
   const { id } = await params;
-  const tenant = await getTenantFromSession(session.user?.tenantId);
+  const tenant = await getActiveTenant();
   if (!tenant) notFound();
 
   const [unit, parentOptions] = await Promise.all([

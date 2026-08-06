@@ -15,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const tenantId = auth.session.user?.tenantId;
+  const tenantId = auth.session.user?.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
   }
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const tenantId = auth.session.user?.tenantId;
+  const tenantId = auth.session.user?.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
   }

@@ -8,7 +8,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTeamDetailData } from "@/lib/teams/queries";
 import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { getOrgUnits } from "@/lib/org/queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { PageShell } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
 import { Badge, Card } from "@/components/ui";
@@ -48,7 +48,7 @@ export default async function TeamDetailPage({ params }: Props) {
   const canManage = hasPermission(session, PERMISSIONS.TEAMS_MANAGE);
   const { teamId } = await params;
 
-  const tenant = await getTenantFromSession(session.user?.tenantId);
+  const tenant = await getActiveTenant();
   if (!tenant) {
     notFound();
   }

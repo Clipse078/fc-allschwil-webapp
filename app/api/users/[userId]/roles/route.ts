@@ -67,29 +67,51 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         id: {
           in: roleIds,
         },
+        isArchived: false,
+        isTemplate: false,
       },
       select: {
         id: true,
+        scope: true,
+        tenantId: true,
       },
     });
 
     const validRoleIds = roles.map((role) => role.id);
 
-    await prisma.$transaction([
-      prisma.userRole.deleteMany({
-        where: { userId },
-      }),
-      ...(validRoleIds.length > 0
-        ? validRoleIds.map((roleId) =>
-            prisma.userRole.create({
-              data: {
-                userId,
-                roleId,
-              },
-            })
-          )
-        : []),
-    ]);
+    // RPERM-04: role assignment always creates a tenant-scoped UserRole (and
+    // an active TenantMembership) for TENANT-scoped roles. PLATFORM-scoped
+    // roles keep UserRole.tenantId = null. No more legacy paths — a user's
+    // tenant access is only ever granted through TenantMembership.
+    const tenantIdsNeedingMembership = Array.from(
+      new Set(
+        roles
+          .filter((role) => role.scope === "TENANT" && role.tenantId)
+          .map((role) => role.tenantId as string),
+      ),
+    );
+
+    await prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId } });
+
+      for (const role of roles) {
+        await tx.userRole.create({
+          data: {
+            userId,
+            roleId: role.id,
+            tenantId: role.scope === "TENANT" ? role.tenantId : null,
+          },
+        });
+      }
+
+      for (const tenantId of tenantIdsNeedingMembership) {
+        await tx.tenantMembership.upsert({
+          where: { tenantId_userId: { tenantId, userId } },
+          update: { isActive: true },
+          create: { tenantId, userId, isActive: true },
+        });
+      }
+    });
 
     return NextResponse.json({
       message: "Rollen erfolgreich gespeichert.",

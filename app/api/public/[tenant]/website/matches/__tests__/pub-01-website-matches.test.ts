@@ -60,7 +60,7 @@ vi.mock("@/lib/permissions/require-api-any-permission", () => ({
     ok: true,
     status: 200,
     error: null,
-    session: { user: { id: "user-1", tenantId: "tenant-fca" } },
+    session: { user: { id: "user-1", activeTenantId: "tenant-fca" } },
   }),
 }));
 

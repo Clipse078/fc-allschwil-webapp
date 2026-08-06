@@ -95,7 +95,7 @@ function toReviewItem(s: HomepageSectionAdminItem): ReviewQueueItem {
 
 export default async function ReviewQueuePage() {
   const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
   const [queue, recentlyApproved] = await Promise.all([

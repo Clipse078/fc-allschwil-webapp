@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id, membershipId } = await params;
@@ -139,7 +139,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.ORG_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
   if (!tenant) return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
 
   const { id, membershipId } = await params;

@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight, Clock, Users } from "lucide-react";
 import { auth } from "@/auth";
 import { getOrgUnitById, getOrgUnitMembershipHistory } from "@/lib/org/queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
 import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { canAccessOrgUnit } from "@/lib/visibility/org-unit-access";
@@ -22,14 +22,14 @@ export default async function OrgUnitMembershipHistoryPage({ params, searchParam
   const { seasonId, status } = await searchParams;
 
   // Phase 2: org-unit-aware access — same rule as the detail page.
-  const actor = await getActorContext(session.user, session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
   if (!canAccessOrgUnit(id, actor)) {
     redirect("/dashboard");
   }
 
   const [unit, tenant] = await Promise.all([
     getOrgUnitById(id),
-    getTenantFromSession(session.user?.tenantId),
+    getActiveTenant(),
   ]);
   if (!unit) notFound();
   if (unit.tenantId !== null && tenant && unit.tenantId !== tenant.id) notFound();

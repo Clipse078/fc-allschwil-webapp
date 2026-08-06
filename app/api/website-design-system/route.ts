@@ -8,7 +8,7 @@
  * DELETE → Resets design system to platform defaults.
  *
  * Permission: WEBSITE_MANAGE
- * Tenant isolation: resolved from session.user.tenantId — never from body.
+ * Tenant isolation: resolved from session.user.activeTenantId — never from body.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -27,7 +27,7 @@ export async function GET() {
   const access = await requireApiPermission(PERMISSIONS.WEBSITE_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }
@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.WEBSITE_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }
@@ -89,7 +89,7 @@ export async function DELETE() {
   const access = await requireApiPermission(PERMISSIONS.WEBSITE_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
-  const sessionTenantId = access.session.user?.tenantId;
+  const sessionTenantId = access.session.user?.activeTenantId;
   if (!sessionTenantId) {
     return NextResponse.json({ error: "Kein Mandant in der Sitzung." }, { status: 401 });
   }

@@ -94,7 +94,7 @@ describe("GET /api/matchcenter/opponents/[id]", () => {
       session: {
         user: {
           id: "user-1",
-          tenantId: "tenant-1",
+          activeTenantId: "tenant-1",
         },
       },
     });
@@ -125,7 +125,7 @@ describe("GET /api/matchcenter/opponents/[id]", () => {
       ok: false,
       status: 403,
       error: "Forbidden",
-      session: { user: { id: "user-1", tenantId: "tenant-1" } },
+      session: { user: { id: "user-1", activeTenantId: "tenant-1" } },
     });
 
     const response = await GET(
@@ -143,7 +143,7 @@ describe("GET /api/matchcenter/opponents/[id]", () => {
       ok: true,
       status: 200,
       error: null,
-      session: { user: { id: "user-1", tenantId: null } },
+      session: { user: { id: "user-1", activeTenantId: null } },
     });
 
     const response = await GET(

@@ -32,7 +32,7 @@ import { ExternalLink, Monitor, AlertCircle, Construction } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
-import { getTenantContextFromSession } from "@/lib/tenants/context";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { InfoboardDisplayCard } from "@/components/infoboard/admin/InfoboardDisplayCard";
 import { InfoboardPublicationSummary } from "@/components/infoboard/admin/InfoboardPublicationSummary";
@@ -152,15 +152,15 @@ export default async function InfoboardAdminPage({
 }: InfoboardAdminPageProps) {
   // ── Authentication ──────────────────────────────────────────────────────────
   // requireAnyPermission redirects unauthenticated users and checks permissions.
-  const session = await requireAnyPermission([
+  await requireAnyPermission([
     PERMISSIONS.INFOBOARD_MANAGE,
     PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
   ]);
 
   // ── Authenticated tenant resolution ─────────────────────────────────────────
-  // Tenant comes from the authenticated session — never from query parameters.
-  const tenantId = session.user?.tenantId;
-  const tenantContext = await getTenantContextFromSession(tenantId);
+  // Tenant comes through the single tenant-context helper (RPERM-04) — never
+  // from query parameters, and never from the legacy User.tenantId column.
+  const tenantContext = await getActiveTenant();
 
   if (!tenantContext) {
     notFound();

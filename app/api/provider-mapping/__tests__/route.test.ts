@@ -46,7 +46,7 @@ const TENANT_ID = "tenant-a";
 
 const SESSION = {
   user: {
-    tenantId: TENANT_ID,
+    activeTenantId: TENANT_ID,
     permissionKeys: ["teams.manage"],
   },
 };
@@ -121,7 +121,7 @@ describe("A. GET /api/provider-mapping", () => {
   it("returns 403 when tenantId is missing from session", async () => {
     mocks.requireApiPermission.mockResolvedValue({
       ok: true,
-      session: { user: { tenantId: undefined } },
+      session: { user: { activeTenantId: undefined } },
     });
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(403);

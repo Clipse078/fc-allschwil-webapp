@@ -232,6 +232,9 @@ async function main(): Promise<void> {
     // Joins users → tenants + counts roles.
     // passwordHash is fetched only for length/prefix check; value never printed.
 
+    // RPERM-04: tenant membership is checked via the canonical TenantMembership
+    // table (an active row for TARGET_TENANT_KEY), never via the legacy
+    // User.tenantId column, which is no longer written for new users.
     const { rows } = await client.query<{
       id: string;
       email: string;
@@ -244,6 +247,7 @@ async function main(): Promise<void> {
       tenant_key: string | null;
       tenant_name: string | null;
       tenant_status: string | null;
+      membership_active: boolean | null;
       role_count: string;
       role_keys: string;
     }>(
@@ -256,20 +260,22 @@ async function main(): Promise<void> {
         u."isActive"     AS is_active,
         u."passwordHash" AS password_hash,
         u."lastLoginAt"  AS last_login_at,
-        u."tenantId"     AS tenant_id,
+        t.id             AS tenant_id,
         t.key            AS tenant_key,
         t.name           AS tenant_name,
         t.status         AS tenant_status,
+        tm."isActive"    AS membership_active,
         COUNT(ur.id)::text                        AS role_count,
         COALESCE(STRING_AGG(r.key, ', '), '')     AS role_keys
       FROM "User" u
-      LEFT JOIN "Tenant"   t  ON t.id = u."tenantId"
-      LEFT JOIN "UserRole" ur ON ur."userId" = u.id
-      LEFT JOIN "Role"     r  ON r.id = ur."roleId"
+      LEFT JOIN "Tenant"           t  ON t.key = $2
+      LEFT JOIN "TenantMembership" tm ON tm."userId" = u.id AND tm."tenantId" = t.id
+      LEFT JOIN "UserRole"         ur ON ur."userId" = u.id
+      LEFT JOIN "Role"             r  ON r.id = ur."roleId"
       WHERE u.email = $1
-      GROUP BY u.id, t.id
+      GROUP BY u.id, t.id, tm."isActive"
       `,
-      [TARGET_EMAIL],
+      [TARGET_EMAIL, TARGET_TENANT_KEY],
     );
 
     const user = rows[0] ?? null;
@@ -324,21 +330,21 @@ async function main(): Promise<void> {
           : "passwordHash is empty/null — authentication will fail",
       });
 
-      // ── Check 5: tenant membership ─────────────────────────────────────────
+      // ── Check 5: tenant membership (RPERM-04: TenantMembership, not User.tenantId) ──
 
       if (!user.tenant_id) {
         results.push({
           id: "5",
           description: "Tenant membership",
           status: "FAIL",
-          detail: "user.tenantId = null — tenant context will not resolve",
+          detail: `Tenant "${TARGET_TENANT_KEY}" not found`,
         });
-      } else if (user.tenant_key !== TARGET_TENANT_KEY) {
+      } else if (!user.membership_active) {
         results.push({
           id: "5",
           description: "Tenant membership",
-          status: "WARN",
-          detail: `tenantId set but key = "${user.tenant_key}" — expected "${TARGET_TENANT_KEY}"`,
+          status: "FAIL",
+          detail: "No active TenantMembership row — tenant context will not resolve",
         });
       } else {
         const active = user.tenant_status === "ACTIVE";
@@ -347,8 +353,8 @@ async function main(): Promise<void> {
           description: "Tenant membership",
           status: active ? "PASS" : "WARN",
           detail: active
-            ? `${user.tenant_name} (key: ${user.tenant_key}) — ACTIVE`
-            : `${user.tenant_name} (key: ${user.tenant_key}) — status: ${user.tenant_status}`,
+            ? `${user.tenant_name} (key: ${user.tenant_key}) — ACTIVE membership`
+            : `${user.tenant_name} (key: ${user.tenant_key}) — tenant status: ${user.tenant_status}`,
         });
       }
 

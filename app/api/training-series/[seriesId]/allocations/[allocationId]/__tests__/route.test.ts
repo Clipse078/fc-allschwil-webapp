@@ -49,7 +49,7 @@ function makeAuthOk(tenantId = TENANT_A) {
     ok: true as const,
     status: 200,
     error: null,
-    session: { user: { id: "user-1", tenantId } },
+    session: { user: { id: "user-1", activeTenantId: tenantId } },
   };
 }
 
@@ -129,7 +129,7 @@ describe("GET /api/training-series/:seriesId/allocations/:allocationId", () => {
       ok: true,
       status: 200,
       error: null,
-      session: { user: { id: "u", tenantId: undefined } },
+      session: { user: { id: "u", activeTenantId: undefined } },
     });
     const res = await GET(makeGetReq(SERIES_ID, ALLOCATION_ID), makeParams(SERIES_ID, ALLOCATION_ID));
     expect(res.status).toBe(400);

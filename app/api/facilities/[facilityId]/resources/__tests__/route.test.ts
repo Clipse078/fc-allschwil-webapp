@@ -49,7 +49,7 @@ function makeAuthOk(tenantId = TENANT_A) {
     ok: true as const,
     status: 200,
     error: null,
-    session: { user: { id: "user-1", tenantId } },
+    session: { user: { id: "user-1", activeTenantId: tenantId } },
   };
 }
 
@@ -138,7 +138,7 @@ describe("GET /api/facilities/[facilityId]/resources", () => {
       ok: true,
       status: 200,
       error: null,
-      session: { user: { id: "user-1", tenantId: undefined } },
+      session: { user: { id: "user-1", activeTenantId: undefined } },
     });
 
     const res = await GET(
@@ -235,7 +235,7 @@ describe("POST /api/facilities/[facilityId]/resources", () => {
       ok: true,
       status: 200,
       error: null,
-      session: { user: { id: "user-1", tenantId: undefined } },
+      session: { user: { id: "user-1", activeTenantId: undefined } },
     });
 
     const res = await POST(

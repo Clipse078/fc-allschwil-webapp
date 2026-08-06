@@ -32,7 +32,7 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenant = await getTenantFromSession(access.session.user?.tenantId);
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
   if (!tenant) {
     return NextResponse.json(
       { error: "Mandant nicht gefunden." },

@@ -13,7 +13,7 @@ import { Trophy } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { listCompetitions } from "@/lib/competitions/queries";
-import { getTenantFromSession } from "@/lib/tenants/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { PageShell, SectionCard } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
 import CompetitionsTable from "@/components/admin/competitions/CompetitionsTable";
@@ -39,7 +39,7 @@ export default async function CompetitionsPage({ searchParams }: CompetitionsPag
     PERMISSIONS.COMPETITIONS_MANAGE,
   ]);
 
-  const tenant = await getTenantFromSession(session.user.tenantId);
+  const tenant = await getActiveTenant();
   const tenantId = tenant?.id;
 
   if (!tenantId) {

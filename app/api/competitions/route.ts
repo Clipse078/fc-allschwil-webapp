@@ -42,7 +42,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
   }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const tenantId = access.session.user.tenantId;
+  const tenantId = access.session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
   }

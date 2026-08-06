@@ -9,7 +9,7 @@ type PageProps = { params: Promise<{ id: string }> };
 export default async function EditReusableComponentPage({ params }: PageProps) {
   const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
 
-  const tenantId = session.user?.tenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
   const { id } = await params;

@@ -164,7 +164,7 @@ function revalidatePlannerPaths() {
 
 export async function createPlannerEntryAction(formData: FormData) {
   const session = await requirePlannerManagePermission();
-  const tenantId = session?.user?.tenantId ?? null;
+  const tenantId = session?.user?.activeTenantId ?? null;
   const data = await validatePlannerForm(formData, "create");
 
   await prisma.event.create({

@@ -2,10 +2,15 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPassword } from "@/lib/auth/password";
+import {
+  resolveSessionPermissionKeys,
+  resolveTenantMembershipContext,
+} from "@/lib/auth/session-context";
 
-// Slice 11.2b: tenantId added to carry tenant context through JWT/session.
-// Users without a tenantId (legacy / unbackfilled) fall back to getDefaultTenant()
-// in getTenantFromSession() — no breakage for existing sessions.
+// RPERM-04: tenant context now carried as activeTenantId / activeMembershipId /
+// availableTenants, derived exclusively from TenantMembership — never from the
+// legacy User.tenantId column. See lib/auth/session-context.ts for the single
+// resolution model shared by login and impersonation.
 type SessionUserShape = {
   id: string;
   email: string;
@@ -18,7 +23,9 @@ type SessionUserShape = {
   actorEmail?: string;
   actorName?: string;
   effectiveUserId?: string;
-  tenantId?: string | null;
+  activeTenantId: string | null;
+  activeMembershipId: string | null;
+  availableTenants: { id: string; key: string; name: string }[];
 };
 
 function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUserShape {
@@ -37,7 +44,10 @@ function normalizeSessionUserShape(value: Partial<SessionUserShape>): SessionUse
       typeof value.effectiveUserId === "string"
         ? value.effectiveUserId
         : String(value.id ?? ""),
-    tenantId: typeof value.tenantId === "string" ? value.tenantId : null,
+    activeTenantId: typeof value.activeTenantId === "string" ? value.activeTenantId : null,
+    activeMembershipId:
+      typeof value.activeMembershipId === "string" ? value.activeMembershipId : null,
+    availableTenants: Array.isArray(value.availableTenants) ? value.availableTenants : [],
   };
 }
 
@@ -67,21 +77,6 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         try {
           user = await prisma.user.findUnique({
             where: { email },
-            include: {
-              userRoles: {
-                include: {
-                  role: {
-                    include: {
-                      rolePermissions: {
-                        include: {
-                          permission: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
           });
         } catch (lookupErr) {
           console.error(
@@ -113,16 +108,21 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           data: { lastLoginAt: new Date() },
         });
 
-        const roleKeys = Array.from(new Set(user.userRoles.map((userRole) => userRole.role.key)));
-        const permissionKeys = Array.from(
-          new Set(
-            user.userRoles.flatMap((userRole) =>
-              userRole.role.rolePermissions.map(
-                (rolePermission) => rolePermission.permission.key
-              )
-            )
-          )
+        // RPERM-04: tenant context and effective permissions are resolved via
+        // the single canonical model (TenantMembership + EffectivePermissionResolver),
+        // not via User.tenantId or a naive flatten of every assigned role's permissions.
+        const tenantContext = await resolveTenantMembershipContext(prisma, user.id);
+        const permissionKeys = await resolveSessionPermissionKeys(
+          prisma,
+          user.id,
+          tenantContext.activeTenantId,
         );
+
+        const userRoles = await prisma.userRole.findMany({
+          where: { userId: user.id },
+          select: { role: { select: { key: true } } },
+        });
+        const roleKeys = Array.from(new Set(userRoles.map((ur) => ur.role.key)));
 
         const authUser: SessionUserShape = {
           id: user.id,
@@ -133,7 +133,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           permissionKeys,
           isImpersonating: false,
           effectiveUserId: user.id,
-          tenantId: user.tenantId ?? null,
+          activeTenantId: tenantContext.activeTenantId,
+          activeMembershipId: tenantContext.activeMembershipId,
+          availableTenants: tenantContext.availableTenants,
         };
 
         return authUser;
@@ -156,7 +158,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = authUser.actorEmail;
         token.actorName = authUser.actorName;
         token.effectiveUserId = authUser.effectiveUserId;
-        token.tenantId = authUser.tenantId;
+        token.activeTenantId = authUser.activeTenantId;
+        token.activeMembershipId = authUser.activeMembershipId;
+        token.availableTenants = authUser.availableTenants;
       }
 
       if (trigger === "update" && session?.user) {
@@ -175,7 +179,9 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.actorEmail = updatedUser.actorEmail;
         token.actorName = updatedUser.actorName;
         token.effectiveUserId = updatedUser.effectiveUserId;
-        token.tenantId = updatedUser.tenantId;
+        token.activeTenantId = updatedUser.activeTenantId;
+        token.activeMembershipId = updatedUser.activeMembershipId;
+        token.availableTenants = updatedUser.availableTenants;
       }
 
       return token;
@@ -201,8 +207,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           typeof token.effectiveUserId === "string"
             ? token.effectiveUserId
             : session.user.id;
-        session.user.tenantId =
-          typeof token.tenantId === "string" ? token.tenantId : null;
+        session.user.activeTenantId =
+          typeof token.activeTenantId === "string" ? token.activeTenantId : null;
+        session.user.activeMembershipId =
+          typeof token.activeMembershipId === "string" ? token.activeMembershipId : null;
+        session.user.availableTenants = Array.isArray(token.availableTenants)
+          ? token.availableTenants
+          : [];
       }
 
       return session;

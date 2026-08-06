@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
 
     // Validate orgUnitId against active tenant if provided.
     if (orgUnitId !== null) {
-      const tenant = await getTenantFromSession(access.session.user?.tenantId);
+      const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
       const orgUnit = await prisma.orgUnit.findUnique({
         where: { id: orgUnitId },
         select: { id: true, tenantId: true },
@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
 
     // TEAM-CORE-02: slug uniqueness is now tenant-scoped.
     // Use compound key lookup (tenantId + slug) instead of global slug findUnique.
-    const currentTenantForSlugCheck = await getTenantFromSession(access.session.user?.tenantId);
+    const currentTenantForSlugCheck = await getTenantFromSession(access.session.user?.activeTenantId);
     const existingTeamBySlug = currentTenantForSlugCheck
       ? await prisma.team.findUnique({
           where: {

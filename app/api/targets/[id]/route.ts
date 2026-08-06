@@ -23,7 +23,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
 
   const guard = await requireTargetAccess({ actor, id, access: "read" });
   if (!guard.ok) return guard.response;
@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
 
   const guard = await requireTargetAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
@@ -151,7 +151,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.tenantId ?? undefined);
+  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
 
   const guard = await requireTargetAccess({ actor, id, access: "delete" });
   if (!guard.ok) return guard.response;

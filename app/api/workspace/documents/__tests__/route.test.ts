@@ -103,7 +103,7 @@ function mockAuthorizedSession(
           overrides.userId === undefined
             ? ACTOR_USER_ID
             : overrides.userId,
-        tenantId:
+        activeTenantId:
           overrides.tenantId === undefined
             ? SESSION_TENANT_ID
             : overrides.tenantId,
@@ -539,7 +539,7 @@ describe("POST /api/workspace/documents", () => {
       session: {
         user: {
           id: ACTOR_USER_ID,
-          tenantId: SESSION_TENANT_ID,
+          activeTenantId: SESSION_TENANT_ID,
         },
       },
     });
