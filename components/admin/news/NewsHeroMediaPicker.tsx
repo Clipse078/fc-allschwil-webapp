@@ -1,8 +1,21 @@
 "use client";
 
+/**
+ * NewsHeroMediaPicker — Hero Image selector for News articles.
+ *
+ * Uses the exact same media selection experience as "Weitere Medien"
+ * (MediaPickerDialog → SharedMediaPicker) in single-selection mode. The
+ * only difference between the two entry points is the selection mode;
+ * search, filters, upload, pagination, previews and keyboard shortcuts are
+ * shared, unmodified code.
+ *
+ * Selecting an asset from the library immediately assigns it as the hero
+ * image — no separate "confirm" step.
+ */
+
 import { useState } from "react";
-import { ImageIcon, X } from "lucide-react";
-import MediaLibraryGrid from "@/components/admin/media/MediaLibraryGrid";
+import { ImageIcon, RotateCcw } from "lucide-react";
+import MediaPickerDialog from "@/components/admin/media/MediaPickerDialog";
 import MediaUploadButton from "@/components/admin/media/MediaUploadButton";
 import type { MediaAssetListItem } from "@/lib/media/types";
 
@@ -12,16 +25,17 @@ type NewsHeroMediaPickerProps = {
 };
 
 export default function NewsHeroMediaPicker({ value, onChange }: NewsHeroMediaPickerProps) {
-  const [showLibrary, setShowLibrary] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  function handleSelect(asset: MediaAssetListItem) {
+  function handleSelect(assets: MediaAssetListItem[]) {
+    const asset = assets[0];
+    if (!asset) return;
     onChange({ id: asset.id, url: asset.url, altText: asset.altText, filename: asset.filename });
-    setShowLibrary(false);
+    setPickerOpen(false);
   }
 
   function handleUploaded(asset: MediaAssetListItem) {
     onChange({ id: asset.id, url: asset.url, altText: asset.altText, filename: asset.filename });
-    setShowLibrary(false);
   }
 
   return (
@@ -38,11 +52,11 @@ export default function NewsHeroMediaPicker({ value, onChange }: NewsHeroMediaPi
             <p className="truncate text-[11px] text-white">{value.filename}</p>
             <button
               type="button"
-              onClick={() => onChange(null)}
+              onClick={() => setPickerOpen(true)}
               className="ml-2 rounded-full bg-white/20 p-1 text-white transition hover:bg-white/40"
-              title="Headerbild entfernen"
+              title="Headerbild ersetzen"
             >
-              <X className="h-3 w-3" />
+              <RotateCcw className="h-3 w-3" />
             </button>
           </div>
         </div>
@@ -59,10 +73,10 @@ export default function NewsHeroMediaPicker({ value, onChange }: NewsHeroMediaPi
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => setShowLibrary(!showLibrary)}
+          onClick={() => setPickerOpen(true)}
           className="fca-button-secondary text-xs"
         >
-          {showLibrary ? "Bibliothek schliessen" : "Aus Bibliothek wählen"}
+          Aus Mediathek auswählen
         </button>
         <MediaUploadButton
           onUploaded={handleUploaded}
@@ -75,17 +89,19 @@ export default function NewsHeroMediaPicker({ value, onChange }: NewsHeroMediaPi
             onClick={() => onChange(null)}
             className="fca-button-secondary text-xs text-rose-600"
           >
-            Entfernen
+            Headerbild entfernen
           </button>
         )}
       </div>
 
-      {/* Inline library picker */}
-      {showLibrary && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] p-4">
-          <MediaLibraryGrid onSelect={handleSelect} selectable />
-        </div>
-      )}
+      <MediaPickerDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selectionMode="single"
+        mediaTypes={["image"]}
+        onSelect={handleSelect}
+        title="Headerbild auswählen"
+      />
     </div>
   );
 }
