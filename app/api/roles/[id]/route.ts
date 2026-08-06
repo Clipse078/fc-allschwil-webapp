@@ -36,8 +36,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Name ist erforderlich." }, { status: 400 });
     }
 
-    const existingRole = await prisma.role.findUnique({
-      where: { id },
+    // RPERM-05: PLATFORM-scope guard — a tenant-owned role id can never be
+    // mutated through this platform-only endpoint. 404 (not 403) so this
+    // route cannot be used to probe whether a given id belongs to a tenant
+    // role.
+    const existingRole = await prisma.role.findFirst({
+      where: { id, scope: "PLATFORM" },
       select: { id: true },
     });
 

@@ -272,12 +272,15 @@ function nominalSuperAdminRole(): RoleSummary {
 function nominalTenantClubAdminRole(): RoleSummary {
   return {
     exists: true,
-    id: "role-club_admin_fc_allschwil-id",
+    id: "role-club-admin-fca-id",
     key: TENANT_CLUB_ADMIN_ROLE_KEY,
     name: "Club Admin",
     scope: RoleScope.TENANT,
     tenantId: "tenant-fc-allschwil-id",
-    isSystem: false,
+    // RPERM-05-C1: the canonical tenant Club Admin role is always
+    // isSystem=true (protected) — this was the actual bug: the legacy
+    // bootstrap script previously created it with isSystem=false.
+    isSystem: true,
     isTemplate: false,
     isArchived: false,
     permissionCount: TENANT_PERMISSION_KEYS.length,
@@ -736,6 +739,25 @@ describe("EXECUTE SAFETY", () => {
     const failures = gates.filter((g) => g.status === "FAIL");
     expect(failures).toHaveLength(0);
   });
+
+  it("ES-11 (RPERM-05-C1): TENANT_CLUB_ADMIN_IS_SYSTEM is informational (PASS), never a blocking FAIL, even when the role is isSystem=false", () => {
+    const inspect = {
+      ...nominalInspectResult(),
+      tenantClubAdminRole: { ...nominalTenantClubAdminRole(), isSystem: false },
+    };
+    const gates = evaluateSafetyGates({
+      inspect,
+      isExecute: false,
+      confirmValue: undefined,
+      platformPasswordAvailable: false,
+      clubAdminPasswordAvailable: false,
+      connectionString: "postgresql://user:pass@localhost/test",
+    });
+
+    const isSystemGate = gates.find((g) => g.gate === "TENANT_CLUB_ADMIN_IS_SYSTEM");
+    expect(isSystemGate?.status).toBe("PASS");
+    expect(isSystemGate?.detail).toContain("self-heal");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1007,8 +1029,8 @@ describe("CONSTANTS", () => {
     expect(LEGACY_EMAIL).toBe("admin@fcallschwil.ch");
   });
 
-  it("TENANT_CLUB_ADMIN_ROLE_KEY is club_admin_fc_allschwil", () => {
-    expect(TENANT_CLUB_ADMIN_ROLE_KEY).toBe("club_admin_fc_allschwil");
+  it("TENANT_CLUB_ADMIN_ROLE_KEY is club_admin__fc-allschwil (RPERM-05-C1 canonical key)", () => {
+    expect(TENANT_CLUB_ADMIN_ROLE_KEY).toBe("club_admin__fc-allschwil");
   });
 
   it("SUPER_ADMIN_ROLE_KEY is super_admin", () => {

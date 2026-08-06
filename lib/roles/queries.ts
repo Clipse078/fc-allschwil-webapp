@@ -2,6 +2,15 @@ import { prisma } from "@/lib/db/prisma";
 
 // Explicit interfaces ensure consumers have proper types regardless of
 // whether the Prisma client is generated in the local environment.
+//
+// RPERM-05: every query in this file is the PLATFORM administration surface
+// (`/dashboard/roles`, `/dashboard/permissions`) and is scoped to
+// `Role.scope === "PLATFORM"` — tenant-owned roles are managed exclusively
+// through `lib/roles/tenant-queries.ts` / `/dashboard/administration/roles`.
+// This keeps platform and tenant role management visibly and technically
+// separated: a platform Super Admin browsing this page can no longer see or
+// edit a tenant's custom roles just because USERS_MANAGE (a PLATFORM
+// permission) happens to be held.
 
 export type RoleListItem = {
   id: string;
@@ -10,6 +19,7 @@ export type RoleListItem = {
   description: string | null;
   canAccessVereinsleitung: boolean;
   canAttendVereinsleitungMeetings: boolean;
+  isSystem: boolean;
   createdAt: Date;
   updatedAt: Date;
   userCount: number;
@@ -47,6 +57,7 @@ export type RoleDetailItem = {
   description: string | null;
   canAccessVereinsleitung: boolean;
   canAttendVereinsleitungMeetings: boolean;
+  isSystem: boolean;
   createdAt: Date;
   updatedAt: Date;
   users: RoleUser[];
@@ -74,6 +85,7 @@ export type PermissionsData = {
 
 export async function getRolesWithCountsData(): Promise<RoleListItem[]> {
   const roles = await prisma.role.findMany({
+    where: { scope: "PLATFORM" },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -82,6 +94,7 @@ export async function getRolesWithCountsData(): Promise<RoleListItem[]> {
       description: true,
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
+      isSystem: true,
       createdAt: true,
       updatedAt: true,
       _count: {
@@ -119,6 +132,7 @@ export async function getRolesWithCountsData(): Promise<RoleListItem[]> {
       description: role.description,
       canAccessVereinsleitung: role.canAccessVereinsleitung,
       canAttendVereinsleitungMeetings: role.canAttendVereinsleitungMeetings,
+      isSystem: role.isSystem,
       createdAt: role.createdAt,
       updatedAt: role.updatedAt,
       userCount: role._count.userRoles,
@@ -129,8 +143,8 @@ export async function getRolesWithCountsData(): Promise<RoleListItem[]> {
 }
 
 export async function getRoleDetailData(roleId: string): Promise<RoleDetailItem | null> {
-  const role = await prisma.role.findUnique({
-    where: { id: roleId },
+  const role = await prisma.role.findFirst({
+    where: { id: roleId, scope: "PLATFORM" },
     select: {
       id: true,
       key: true,
@@ -138,6 +152,7 @@ export async function getRoleDetailData(roleId: string): Promise<RoleDetailItem 
       description: true,
       canAccessVereinsleitung: true,
       canAttendVereinsleitungMeetings: true,
+      isSystem: true,
       createdAt: true,
       updatedAt: true,
       userRoles: {
@@ -207,6 +222,7 @@ export async function getRoleDetailData(roleId: string): Promise<RoleDetailItem 
     description: role.description,
     canAccessVereinsleitung: role.canAccessVereinsleitung,
     canAttendVereinsleitungMeetings: role.canAttendVereinsleitungMeetings,
+    isSystem: role.isSystem,
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
     users: role.userRoles.map((ur): RoleUser => ({
@@ -236,6 +252,10 @@ export async function getPermissionsWithRoleMappingsData(): Promise<PermissionsD
       name: true,
       module: true,
       rolePermissions: {
+        // RPERM-05: only PLATFORM roles are shown here — tenant role
+        // mappings for the same permission key are visible in the tenant
+        // permission matrix (`/dashboard/administration/roles`) instead.
+        where: { role: { scope: "PLATFORM" } },
         select: {
           role: {
             select: {
@@ -306,14 +326,38 @@ export type PermissionEditorData = {
  */
 export async function getPermissionEditorData(roleId: string): Promise<PermissionEditorData | null> {
   const [allPerms, role] = await Promise.all([
+    // RPERM-05-C1: scope=PLATFORM guard on the catalog itself — a TENANT
+    // permission (e.g. workspace.manage) must never even be listed as a
+    // selectable option here, since this editor only ever writes through
+    // setPlatformRolePermissions() (lib/roles/platform-mutations.ts), which
+    // only accepts scope=PLATFORM permissions. Tenant roles are edited via
+    // the tenant permission matrix (lib/roles/tenant-queries.ts /
+    // setTenantRolePermissions) instead.
     prisma.permission.findMany({
+      where: { scope: "PLATFORM" },
       orderBy: [{ module: "asc" }, { name: "asc" }],
       select: { id: true, key: true, name: true, module: true },
     }),
-    prisma.role.findUnique({
-      where: { id: roleId },
+    // RPERM-05: scope=PLATFORM guard — this editor is the platform admin
+    // surface only; tenant roles are edited via the tenant permission
+    // matrix (lib/roles/tenant-queries.ts / setTenantRolePermissions).
+    //
+    // RPERM-05-C1: `rolePermissions` is ALSO filtered to scope=PLATFORM.
+    // Some seed-created PLATFORM roles (e.g. match_coordinator,
+    // website_publisher, trainer, viewer — prisma/seed.ts) already carry
+    // legacy TENANT-scoped RolePermission rows predating this fix. Without
+    // this filter, `assignedKeys` would include those invalid keys, the
+    // editor would render them as pre-checked, and clicking "Save" without
+    // changing anything would resubmit them — which
+    // setPlatformRolePermissions() now correctly rejects. Filtering here
+    // means the editor only ever reflects (and re-persists) valid
+    // PLATFORM permissions, self-healing the legacy rows away the next
+    // time an admin saves that role.
+    prisma.role.findFirst({
+      where: { id: roleId, scope: "PLATFORM" },
       select: {
         rolePermissions: {
+          where: { permission: { scope: "PLATFORM" } },
           select: { permission: { select: { key: true } } },
         },
       },

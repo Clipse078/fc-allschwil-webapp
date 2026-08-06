@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 import { Pool } from "pg";
 import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -25,13 +26,6 @@ const pool = new Pool({
 
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
-
-const CLUB_ADMIN_TEMPLATE_KEY = "club_admin";
-
-/** RPERM-04: derives the per-tenant materialized club_admin role key from the tenant's key. */
-function tenantClubAdminRoleKey(tenantKey: string): string {
-  return `${CLUB_ADMIN_TEMPLATE_KEY}__${tenantKey}`;
-}
 
 async function main() {
   await prisma.tenant.upsert({
@@ -143,6 +137,18 @@ async function main() {
 
     { key: "trainings.view", name: "View training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "trainings.manage", name: "Manage training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+
+    // ── RPERM-05: Workspace/Documents permissions ─────────────────────────
+    // Previously only created out-of-band by scripts/sync-workspace-permissions.ts
+    // (and only ever assigned to super_admin there). Adding them to the
+    // canonical seed list closes the gap that prevented every tenant
+    // club_admin role from ever receiving Documents access: the tenant
+    // club_admin permission set below (`tenantPermissionKeys`) is derived by
+    // filtering this exact array to scope=TENANT, so these two keys now flow
+    // through the same, already-accepted "club_admin owns every TENANT
+    // permission" seeding policy — no new automatic-assignment policy.
+    { key: "workspace.view", name: "View workspace", module: PermissionModule.WORKSPACE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "workspace.manage", name: "Manage workspace", module: PermissionModule.WORKSPACE, scope: PermissionScope.TENANT, grantableByAdmin: true },
   ] as const;
 
   for (const permission of permissions) {
@@ -339,7 +345,7 @@ async function main() {
       .map((permission) => permission.key);
 
     const tenantClubAdminRole = await prisma.role.upsert({
-      where: { key: tenantClubAdminRoleKey(fcaTenantForRoles.key) },
+      where: { key: getTenantClubAdminRoleKey(fcaTenantForRoles.key) },
       update: {
         name: "Club Admin",
         description: "Full operational access within this club",
@@ -350,7 +356,7 @@ async function main() {
         isArchived: false,
       },
       create: {
-        key: tenantClubAdminRoleKey(fcaTenantForRoles.key),
+        key: getTenantClubAdminRoleKey(fcaTenantForRoles.key),
         name: "Club Admin",
         description: "Full operational access within this club",
         scope: RoleScope.TENANT,

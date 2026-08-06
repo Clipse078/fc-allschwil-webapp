@@ -44,6 +44,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, RoleScope, PermissionScope } from "@prisma/client";
 import { Pool } from "pg";
 import { hashPassword } from "@/lib/auth/password";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -54,7 +55,11 @@ export const CLUB_ADMIN_EMAIL = "it@fcallschwil.ch";
 export const LEGACY_EMAIL = "admin@fcallschwil.ch";
 export const TENANT_KEY = "fc-allschwil";
 export const SUPER_ADMIN_ROLE_KEY = "super_admin";
-export const TENANT_CLUB_ADMIN_ROLE_KEY = "club_admin_fc_allschwil";
+// RPERM-05-C1: this MUST always be derived from the shared canonical helper
+// (also used by prisma/seed.ts, prisma/bootstrap-admin.ts, and the
+// consolidation tooling) — never a second, independently-constructed
+// string. See lib/roles/tenant-role-keys.ts for the rationale.
+export const TENANT_CLUB_ADMIN_ROLE_KEY = getTenantClubAdminRoleKey(TENANT_KEY);
 export const TENANT_CLUB_ADMIN_ROLE_NAME = "Club Admin";
 export const EXECUTE_CONFIRMATION = "SEPARATE-STAGE-PLATFORM-AND-TENANT-ADMINS";
 
@@ -107,6 +112,10 @@ export const TENANT_PERMISSION_KEYS: readonly string[] = [
   "facilities.manage",
   "trainings.view",
   "trainings.manage",
+  // RPERM-05: Workspace/Documents — see prisma/seed.ts for the same fix applied
+  // to the canonical seed-driven tenant club_admin role.
+  "workspace.view",
+  "workspace.manage",
 ];
 
 // ---------------------------------------------------------------------------
@@ -181,6 +190,7 @@ export type SafeGateName =
   | "SUPER_ADMIN_SCOPE_PLATFORM"
   | "SUPER_ADMIN_NOT_TEMPLATE"
   | "TENANT_CLUB_ADMIN_ROLE_SCOPE"
+  | "TENANT_CLUB_ADMIN_IS_SYSTEM"
   | "TENANT_CLUB_ADMIN_NO_PLATFORM_PERMS"
   | "PLATFORM_EMAIL_NOT_DUPLICATE"
   | "CLUB_ADMIN_EMAIL_NOT_DUPLICATE"
@@ -683,6 +693,22 @@ export function evaluateSafetyGates(params: {
       : "Club Admin role not yet created — will be created during execute",
   });
 
+  // Gate 6b: Tenant Club Admin role isSystem status is informational only
+  // (NOT a blocking gate) — RPERM-05-C1: the canonical tenant Club Admin
+  // role must always be isSystem=true, but a role found with isSystem=false
+  // reflects pre-RPERM-05-C1 drift that --execute self-heals automatically
+  // (see runExecute Step 3b) rather than something the operator must fix
+  // out-of-band first.
+  gates.push({
+    gate: "TENANT_CLUB_ADMIN_IS_SYSTEM",
+    status: "PASS",
+    detail: !tcaRoleExists
+      ? "Club Admin role not yet created — will be created with isSystem=true during execute"
+      : inspect.tenantClubAdminRole.isSystem === true
+      ? "Club Admin role isSystem=true"
+      : "Club Admin role isSystem=false (pre-RPERM-05-C1 drift) — --execute will self-heal this to true",
+  });
+
   // Gate 7: Tenant Club Admin role must have no PLATFORM permissions
   const platformPermCount = inspect.tenantClubAdminRole.platformPermissionCount ?? 0;
   gates.push({
@@ -867,6 +893,8 @@ export interface ExecuteResult {
   rolesCreated: string[];
   userRolesCreated: string[];
   rolePermissionsCreated: number;
+  /** RPERM-05-C1: true when a pre-existing canonical role's isSystem/isArchived drift was corrected. */
+  selfHealedIsSystem: boolean;
   postconditions: Array<{ check: string; passed: boolean; detail: string }>;
   error?: string;
 }
@@ -897,6 +925,7 @@ export async function runExecute(
     rolesCreated: [],
     userRolesCreated: [],
     rolePermissionsCreated: 0,
+    selfHealedIsSystem: false,
     postconditions: [],
   };
 
@@ -930,10 +959,14 @@ export async function runExecute(
       throw new Error("super_admin role is marked as template — cannot assign");
     }
 
-    // Step 3: Verify or create FC Allschwil tenant Club Admin role
+    // Step 3: Resolve (never re-generate) the canonical FC Allschwil tenant
+    // Club Admin role by the shared TENANT_CLUB_ADMIN_ROLE_KEY
+    // (getTenantClubAdminRoleKey(TENANT_KEY)) — this is the SAME key
+    // prisma/seed.ts materializes, so a fresh seed + this script always
+    // resolve to one row, never two divergent ones (RPERM-05-C1).
     let tenantClubAdminRole = await tx.role.findUnique({
       where: { key: TENANT_CLUB_ADMIN_ROLE_KEY },
-      select: { id: true, scope: true, tenantId: true, isArchived: true },
+      select: { id: true, scope: true, tenantId: true, isSystem: true, isArchived: true },
     });
 
     if (!tenantClubAdminRole) {
@@ -944,11 +977,11 @@ export async function runExecute(
           description: "FC Allschwil tenant-scoped Club Administrator",
           scope: RoleScope.TENANT,
           tenantId: tenant.id,
-          isSystem: false,
+          isSystem: true,
           isTemplate: false,
           isArchived: false,
         },
-        select: { id: true, scope: true, tenantId: true, isArchived: true },
+        select: { id: true, scope: true, tenantId: true, isSystem: true, isArchived: true },
       });
       result.rolesCreated.push(TENANT_CLUB_ADMIN_ROLE_KEY);
     } else {
@@ -961,6 +994,17 @@ export async function runExecute(
         throw new Error(
           `Tenant Club Admin role is scoped to a different tenant (expected ${tenant.id}, got ${tenantClubAdminRole.tenantId})`
         );
+      }
+      // Step 3b: self-heal isSystem/isArchived drift on the canonical role
+      // (e.g. a database bootstrapped before RPERM-05-C1) — never weakens
+      // protection, only strengthens it. Never touches name/description/key.
+      if (!tenantClubAdminRole.isSystem || tenantClubAdminRole.isArchived) {
+        tenantClubAdminRole = await tx.role.update({
+          where: { id: tenantClubAdminRole.id },
+          data: { isSystem: true, isArchived: false },
+          select: { id: true, scope: true, tenantId: true, isSystem: true, isArchived: true },
+        });
+        result.selfHealedIsSystem = true;
       }
     }
 
@@ -1286,7 +1330,7 @@ export async function runExecute(
     // Postcondition 10: Tenant Club Admin role scope is TENANT
     const tcaRoleFinal = await tx.role.findUnique({
       where: { key: TENANT_CLUB_ADMIN_ROLE_KEY },
-      select: { scope: true, tenantId: true },
+      select: { scope: true, tenantId: true, isSystem: true, isArchived: true },
     });
     result.postconditions.push({
       check: `${TENANT_CLUB_ADMIN_ROLE_KEY} scope=TENANT`,
@@ -1298,6 +1342,19 @@ export async function runExecute(
       check: `${TENANT_CLUB_ADMIN_ROLE_KEY} tenantId=FC Allschwil tenant ID`,
       passed: tcaRoleFinal?.tenantId === tenant.id,
       detail: `tenantId=${tcaRoleFinal?.tenantId ?? "null"} (expected=${tenant.id})`,
+    });
+
+    // Postcondition 10b (RPERM-05-C1): the canonical role is always protected.
+    result.postconditions.push({
+      check: `${TENANT_CLUB_ADMIN_ROLE_KEY} isSystem=true`,
+      passed: tcaRoleFinal?.isSystem === true,
+      detail: `isSystem=${tcaRoleFinal?.isSystem ?? "missing"}`,
+    });
+
+    result.postconditions.push({
+      check: `${TENANT_CLUB_ADMIN_ROLE_KEY} isArchived=false`,
+      passed: tcaRoleFinal?.isArchived === false,
+      detail: `isArchived=${tcaRoleFinal?.isArchived ?? "missing"}`,
     });
 
     // Postcondition 11: No PLATFORM permissions attached to Club Admin role
@@ -1415,6 +1472,7 @@ function printInspectResult(result: InspectResult, platformEmail: string, clubAd
   if (result.tenantClubAdminRole.exists) {
     console.log(`  Tenant role scope         : ${result.tenantClubAdminRole.scope}`);
     console.log(`  Tenant role tenantId      : ${result.tenantClubAdminRole.tenantId}`);
+    console.log(`  Tenant role isSystem      : ${result.tenantClubAdminRole.isSystem} (must be true — RPERM-05-C1)`);
     console.log(`  Tenant role permissions   : ${result.tenantClubAdminRole.permissionCount}`);
     console.log(`  Platform perms attached   : ${result.tenantClubAdminRole.platformPermissionCount} (must be 0)`);
   }
@@ -1667,6 +1725,7 @@ async function main(): Promise<void> {
       console.log(`  Roles created          : ${execResult.rolesCreated.join(", ") || "none"}`);
       console.log(`  UserRoles created      : ${execResult.userRolesCreated.join(", ") || "none"}`);
       console.log(`  RolePermissions created: ${execResult.rolePermissionsCreated}`);
+      console.log(`  Self-healed isSystem   : ${execResult.selfHealedIsSystem}`);
 
       console.log("\n── POSTCONDITIONS ───────────────────────────────────────");
       for (const pc of execResult.postconditions) {

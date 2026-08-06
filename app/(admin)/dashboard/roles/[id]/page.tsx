@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Building2,
   CheckCircle2,
-  KeyRound,
   Shield,
   Users,
   XCircle,
@@ -76,6 +75,8 @@ export default async function RoleDetailPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <AdminStatusPill label="Plattform" tone="default" />
+            {role.isSystem && <AdminStatusPill label="Geschützt" tone="warning" />}
             {role.users.length > 0 ? (
               <AdminStatusPill label="Aktiv" tone="success" />
             ) : (

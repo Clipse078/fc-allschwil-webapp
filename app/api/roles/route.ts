@@ -10,7 +10,10 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  // RPERM-05: PLATFORM-scope guard — tenant roles are managed exclusively
+  // through /api/tenant/roles.
   const roles = await prisma.role.findMany({
+    where: { scope: "PLATFORM" },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -74,6 +77,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name ist erforderlich." }, { status: 400 });
     }
 
+    // RPERM-05: scope is always forced to PLATFORM here — this endpoint
+    // never accepts a scope/tenantId from the request body. Tenant custom
+    // roles are created exclusively through POST /api/tenant/roles.
     const role = await prisma.role.create({
       data: {
         key,
@@ -81,6 +87,8 @@ export async function POST(request: NextRequest) {
         description,
         canAccessVereinsleitung,
         canAttendVereinsleitungMeetings,
+        scope: "PLATFORM",
+        isSystem: false,
       },
       select: {
         id: true,

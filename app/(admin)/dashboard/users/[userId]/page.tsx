@@ -18,7 +18,7 @@ import ImpersonateButton from "@/components/admin/users/ImpersonateButton";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getRolesListData, getUserDetailData } from "@/lib/users/queries";
+import { getPlatformRolesListData, getUserDetailData } from "@/lib/users/queries";
 
 type UserDetailPageProps = {
   params: Promise<{
@@ -62,8 +62,15 @@ export default async function UserDetailPage({
     notFound();
   }
 
-  const roles = await getRolesListData();
-  const initialRoleIds = user.userRoles.map((userRole) => userRole.role.id);
+  const roles = await getPlatformRolesListData();
+
+  // RPERM-05-C1 (Finding 3): the platform user-role form only ever manages
+  // PLATFORM-scoped roles — tenant roles are rendered as a read-only
+  // summary below, linking to the tenant administration module rather
+  // than being editable through this global form.
+  const platformUserRoles = user.userRoles.filter((userRole) => userRole.role.scope === "PLATFORM");
+  const tenantUserRoles = user.userRoles.filter((userRole) => userRole.role.scope === "TENANT");
+  const initialRoleIds = platformUserRoles.map((userRole) => userRole.role.id);
   const initials = getInitials(user.firstName, user.lastName);
   const displayName = `${user.firstName} ${user.lastName}`;
 
@@ -184,17 +191,17 @@ export default async function UserDetailPage({
             </div>
           </div>
 
-          {/* Roles & Access */}
+          {/* Platform Roles & Access */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-[var(--muted)]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Rollen & Zugriff
+                  Plattform-Rollen
                 </p>
-                {user.userRoles.length > 0 ? (
+                {platformUserRoles.length > 0 ? (
                   <span className="sce-count-badge">
-                    {user.userRoles.length}
+                    {platformUserRoles.length}
                   </span>
                 ) : null}
               </div>
@@ -205,6 +212,64 @@ export default async function UserDetailPage({
                 initialRoles={roles}
                 initialSelectedRoleIds={initialRoleIds}
               />
+            </div>
+          </div>
+
+          {/* Tenant Roles — read-only summary (RPERM-05-C1: managed exclusively
+              through the tenant administration module, never through this
+              global platform form). */}
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Mandanten-Rollen
+                </p>
+                {tenantUserRoles.length > 0 ? (
+                  <span className="sce-count-badge">
+                    {tenantUserRoles.length}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="sce-detail-section-body">
+              {tenantUserRoles.length === 0 ? (
+                <div className="fca-status-box fca-status-box-muted">
+                  Keine Mandanten-Rollen zugewiesen.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-[var(--text-2)]">
+                    Nur lesbar. Mandanten-Rollen werden ausschliesslich über die
+                    Mandanten-Rollenverwaltung des jeweiligen Mandanten geändert.
+                  </p>
+                  <div className="divide-y divide-[var(--border)]">
+                    {tenantUserRoles.map((userRole) => (
+                      <div
+                        key={userRole.role.id}
+                        className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-[var(--foreground)]">
+                            {userRole.role.name}
+                          </p>
+                          <p className="text-[0.75rem] text-[var(--muted)]">
+                            {userRole.role.tenant?.name ?? "Unbekannter Mandant"}
+                          </p>
+                        </div>
+                        {userRole.role.tenant ? (
+                          <Link
+                            href={`/dashboard/administration/roles/${userRole.role.id}`}
+                            className="text-[0.75rem] font-medium text-[var(--blue)] hover:underline"
+                          >
+                            Verwalten
+                          </Link>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

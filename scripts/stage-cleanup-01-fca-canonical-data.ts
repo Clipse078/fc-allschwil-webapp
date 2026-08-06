@@ -56,6 +56,7 @@ import { PrismaClient, RoleScope } from "@prisma/client";
 import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -68,7 +69,11 @@ export const CLUB_ADMIN_EMAIL = "it@fcallschwil.ch"; // FC Allschwil Club Admin
 export const CANONICAL_USER_EMAILS: readonly string[] = [PLATFORM_EMAIL, CLUB_ADMIN_EMAIL];
 
 export const SUPER_ADMIN_ROLE_KEY = "super_admin";
-export const TENANT_CLUB_ADMIN_ROLE_KEY = "club_admin_fc_allschwil";
+// RPERM-05-C1: derived from the shared canonical helper — see
+// lib/roles/tenant-role-keys.ts. Previously hardcoded to the divergent
+// legacy key `club_admin_fc_allschwil`, which no longer exists once
+// scripts/rperm-05c1-consolidate-club-admin-roles.ts has run.
+export const TENANT_CLUB_ADMIN_ROLE_KEY = getTenantClubAdminRoleKey(TENANT_KEY);
 
 // Canonical system roles, per prisma/seed.ts roleDefinitions plus the tenant-scoped
 // Club Admin role established by RPERM-03B. "No permission changes" — this script
