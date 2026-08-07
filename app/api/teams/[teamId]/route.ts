@@ -76,6 +76,25 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     const name = String(body.name ?? "").trim();
     const category = String(body.category ?? "").trim();
+
+    // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME.
+    // undefined = not present in body (keep existing), null/"" = clear, string = set.
+    // Never derived from string parsing of `name`.
+    const shortNameRaw = body.shortName;
+    const shortName: string | null | undefined =
+      shortNameRaw === undefined
+        ? undefined
+        : shortNameRaw === null || shortNameRaw === ""
+          ? null
+          : String(shortNameRaw).trim() || null;
+
+    const alternativeNameRaw = body.alternativeName;
+    const alternativeName: string | null | undefined =
+      alternativeNameRaw === undefined
+        ? undefined
+        : alternativeNameRaw === null || alternativeNameRaw === ""
+          ? null
+          : String(alternativeNameRaw).trim() || null;
     const genderGroup =
       body.genderGroup === null || body.genderGroup === undefined
         ? null
@@ -151,6 +170,8 @@ export async function PATCH(request: NextRequest, context: Context) {
         websiteVisible: Boolean(body.websiteVisible),
         infoboardVisible: Boolean(body.infoboardVisible),
         ...(orgUnitId !== undefined ? { orgUnitId } : {}),
+        ...(shortName !== undefined ? { shortName } : {}),
+        ...(alternativeName !== undefined ? { alternativeName } : {}),
       },
       include: {
         teamSeasons: {
@@ -179,6 +200,8 @@ export async function PATCH(request: NextRequest, context: Context) {
       afterJson: {
         id: updated.id,
         name: updated.name,
+        shortName: updated.shortName,
+        alternativeName: updated.alternativeName,
         slug: updated.slug,
         category: updated.category,
         genderGroup: updated.genderGroup,
