@@ -2867,6 +2867,12 @@ model TenantSfvConfig {
   lastMatchDetailSyncAt DateTime?
   /// Completion time of the most recent fully successful tenant-level competition synchronization.
   lastCompetitionSyncAt DateTime?
+  /// SFV-MATCH-SYNC-HOTFIX-01: set while an automatic (cron-triggered) schedule
+  /// sync is in progress for this tenant; null when idle. Used as an atomic,
+  /// TTL-based overlap guard — see claimSfvScheduleSyncLock() in
+  /// tenant-config-repository.ts. Never read/written by manual admin-triggered
+  /// syncs, which remain unaffected by this lock.
+  syncLockedAt          DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

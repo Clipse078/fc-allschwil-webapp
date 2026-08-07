@@ -32,6 +32,7 @@ const sfvConfigSelect = {
   lastScheduleSyncAt: true,
   lastMatchDetailSyncAt: true,
   lastCompetitionSyncAt: true,
+  syncLockedAt: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -147,5 +148,74 @@ export async function markCompetitionSyncSuccessful(
   await prisma.tenantSfvConfig.update({
     where: { tenantId },
     data: { lastCompetitionSyncAt: finishedAt },
+  });
+}
+
+// ── Automatic (cron) sync support — SFV-MATCH-SYNC-HOTFIX-01 ─────────────────
+
+/**
+ * Returns the tenantId of every tenant with an enabled SFV configuration.
+ *
+ * Used exclusively by the automatic (cron-triggered) sync orchestrator to
+ * discover which tenants require a scheduled sync run. Never used to bypass
+ * the enabled/disabled check — only enabled tenants are returned.
+ */
+export async function listEnabledSfvConfigTenantIds(): Promise<string[]> {
+  const rows = await prisma.tenantSfvConfig.findMany({
+    where: { enabled: true },
+    select: { tenantId: true },
+  });
+  return rows.map((row) => row.tenantId);
+}
+
+/**
+ * Atomically claims the automatic-sync lock for one tenant.
+ *
+ * Implemented as a single conditional UPDATE — safe under Postgres's default
+ * READ COMMITTED isolation: if two invocations race to claim the same
+ * tenant, only one UPDATE will match the WHERE clause (the other blocks on
+ * the row lock, then re-evaluates the WHERE clause against the just-committed
+ * row and finds syncLockedAt no longer satisfies the condition). No advisory
+ * locks or explicit transactions are required.
+ *
+ * The lock is considered free when `syncLockedAt` is null OR older than
+ * `staleAfterMs` (self-healing: a crashed/killed function run can never
+ * permanently wedge a tenant out of future automatic syncs).
+ *
+ * Returns true when the lock was claimed by this call (caller must run the
+ * sync and then call releaseSfvScheduleSyncLock() in a finally block).
+ * Returns false when another run currently holds a fresh lock — the caller
+ * must skip this tenant for this invocation.
+ */
+export async function claimSfvScheduleSyncLock(
+  tenantId: string,
+  now: Date,
+  staleAfterMs: number,
+): Promise<boolean> {
+  const staleThreshold = new Date(now.getTime() - staleAfterMs);
+
+  const result = await prisma.tenantSfvConfig.updateMany({
+    where: {
+      tenantId,
+      enabled: true,
+      OR: [{ syncLockedAt: null }, { syncLockedAt: { lt: staleThreshold } }],
+    },
+    data: { syncLockedAt: now },
+  });
+
+  return result.count === 1;
+}
+
+/**
+ * Releases the automatic-sync lock for one tenant.
+ *
+ * Must be called in a finally block after claimSfvScheduleSyncLock() returns
+ * true, regardless of whether the sync succeeded or failed, so a single
+ * tenant failure can never block that tenant's future automatic sync runs.
+ */
+export async function releaseSfvScheduleSyncLock(tenantId: string): Promise<void> {
+  await prisma.tenantSfvConfig.update({
+    where: { tenantId },
+    data: { syncLockedAt: null },
   });
 }
