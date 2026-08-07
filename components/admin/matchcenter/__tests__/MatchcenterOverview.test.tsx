@@ -4,7 +4,9 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
+import MatchcenterOverview, {
+  getOperationalWarnings,
+} from "@/components/admin/matchcenter/MatchcenterOverview";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
 
 function createMatch(
@@ -307,5 +309,206 @@ describe("MatchcenterOverview", () => {
     );
 
     expect(screen.getByText("Live")).toBeTruthy();
+  });
+});
+
+describe("TEAM-SFV-MAPPING-05: team-assignment warning semantics", () => {
+  // Reproduces live STAGE provider match 4344423 (Junioren B 1. Stärkeklasse):
+  // Home: FC Allschwil B2 (canonically mapped) — Away: VfR Kleinhüningen a
+  // (external opponent, intentionally not mapped to a canonical tenant Team).
+  const unmappedExternalOpponent = {
+    providerTeamId: 5544,
+    providerTeamName: "VfR Kleinhüningen a",
+    canonicalTeamId: null,
+    canonicalTeamName: null,
+    displayName: "VfR Kleinhüningen a",
+    resolution: "UNRESOLVED" as const,
+    isOwnTeam: false,
+  };
+
+  const resolvedFca = {
+    providerTeamId: 3311,
+    providerTeamName: "FC Allschwil B2",
+    canonicalTeamId: "team-fca-b2",
+    canonicalTeamName: "FC Allschwil B2",
+    displayName: "FC Allschwil B2",
+    resolution: "RESOLVED" as const,
+    isOwnTeam: true,
+  };
+
+  const unresolvedFca = {
+    providerTeamId: 3311,
+    providerTeamName: "FC Allschwil B2",
+    canonicalTeamId: null,
+    canonicalTeamName: null,
+    displayName: "FC Allschwil B2",
+    resolution: "UNRESOLVED" as const,
+    isOwnTeam: false,
+  };
+
+  const resolvedOpponent = {
+    providerTeamId: 5544,
+    providerTeamName: "VfR Kleinhüningen a",
+    canonicalTeamId: "team-opponent",
+    canonicalTeamName: "VfR Kleinhüningen a",
+    displayName: "VfR Kleinhüningen a",
+    resolution: "RESOLVED" as const,
+    isOwnTeam: false,
+  };
+
+  it("case 1 / match 4344423: FCA home resolved + external opponent unmapped -> no warning", () => {
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            id: "match-4344423",
+            title: "FC Allschwil B2 – VfR Kleinhüningen a",
+            competitionLabel: "Junioren B 1. Stärkeklasse",
+            homeAway: "HOME",
+            home: resolvedFca,
+            away: unmappedExternalOpponent,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("Team nicht zugeordnet")).toBeNull();
+    // The opponent's provider name remains visible without being canonicalized.
+    expect(screen.getByText("VfR Kleinhüningen a")).toBeTruthy();
+  });
+
+  it("case 2: FCA away side resolved + external opponent unmapped -> no warning", () => {
+    // Away matches render an informational "Auswärtsspiel" readiness badge
+    // instead of the warning list, so the underlying decision (used by any
+    // consumer of the warnings, e.g. detail-page parity) is asserted
+    // directly here rather than through the away-match UI branch.
+    const match = createMatch({
+      homeAway: "AWAY",
+      home: unmappedExternalOpponent,
+      away: resolvedFca,
+    });
+
+    expect(getOperationalWarnings(match)).not.toContain(
+      "Team nicht zugeordnet",
+    );
+  });
+
+  it("case 3: FCA home side unresolved -> warning shown even if opponent is mapped", () => {
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            homeAway: "HOME",
+            home: unresolvedFca,
+            away: resolvedOpponent,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Team nicht zugeordnet")).toBeTruthy();
+  });
+
+  it("case 4: FCA away side unresolved -> warning shown", () => {
+    const match = createMatch({
+      homeAway: "AWAY",
+      home: resolvedOpponent,
+      away: unresolvedFca,
+    });
+
+    expect(getOperationalWarnings(match)).toContain(
+      "Team nicht zugeordnet",
+    );
+  });
+
+  it("case 5: both canonical sides resolved -> no team-assignment warning", () => {
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            homeAway: "HOME",
+            home: resolvedFca,
+            away: resolvedOpponent,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("Team nicht zugeordnet")).toBeNull();
+  });
+
+  it("case 7: pitch/dressing-room warnings remain unaffected by an unmapped opponent", () => {
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            homeAway: "HOME",
+            home: resolvedFca,
+            away: unmappedExternalOpponent,
+            operational: {
+              pitchCode: null,
+              homeDressingRoomCode: null,
+              awayDressingRoomCode: null,
+              meetingTime: null,
+              remarks: null,
+            },
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("Team nicht zugeordnet")).toBeNull();
+    expect(screen.getByText("Spielfeld fehlt")).toBeTruthy();
+    expect(screen.getByText("Garderobe Heimteam fehlt")).toBeTruthy();
+    expect(screen.getByText("Garderobe Gastteam fehlt")).toBeTruthy();
+  });
+
+  it("readiness is 'ready' for a fully set-up home match even with an unmapped opponent", () => {
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            id: "match-4344423",
+            homeAway: "HOME",
+            home: resolvedFca,
+            away: unmappedExternalOpponent,
+          }),
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("matchcenter-readiness-match-4344423"),
+    ).toHaveTextContent("Bereit für Infoboard");
+  });
+
+  it("does not rely on team display names to decide the warning (identity-based only)", () => {
+    // Same shape as the unresolved-FCA case, but with unrelated/foreign
+    // display names — the outcome must be identical, proving the decision
+    // is based on isOwnTeam/homeAway/resolution, not on name matching.
+    render(
+      <MatchcenterOverview
+        matches={[
+          createMatch({
+            homeAway: "HOME",
+            home: {
+              ...unresolvedFca,
+              providerTeamName: "Zzz Unrelated Name FC",
+              displayName: "Zzz Unrelated Name FC",
+            },
+            away: {
+              ...resolvedOpponent,
+              providerTeamName: "FC Allschwil Lookalike",
+              canonicalTeamName: "FC Allschwil Lookalike",
+              displayName: "FC Allschwil Lookalike",
+            },
+          }),
+        ]}
+      />,
+    );
+
+    // Warning still fires because the home side (FCA, per homeAway) is
+    // unresolved — regardless of what either side is named.
+    expect(screen.getByText("Team nicht zugeordnet")).toBeTruthy();
   });
 });
