@@ -110,6 +110,13 @@ vi.mock("../sync/schedule-persistence", () => ({
   processScheduleEntry: (...args: unknown[]) => mockProcessScheduleEntry(...args),
 }));
 
+// ── Mock: schedule-team-sync (TEAM-SFV-MAPPING-02 healing) ───────────────────
+
+const mockHealMissingClubTeamMappings = vi.fn();
+vi.mock("../sync/schedule-team-sync", () => ({
+  healMissingClubTeamMappings: (...args: unknown[]) => mockHealMissingClubTeamMappings(...args),
+}));
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 const { syncSfvSchedule } = await import("../sync/schedule");
@@ -234,6 +241,15 @@ beforeEach(() => {
       clubName: "FC Testclub", teamLeagueId: 17131, teamLeagueName: "4. Liga",
       teamDivisionName: "Gruppe 1", teamOrganisationId: 8, isTeamActive: true, isHomeTeam: false },
   ]);
+  // Default: no missing mappings to heal (already fully synced — the common case)
+  mockHealMissingClubTeamMappings.mockResolvedValue({
+    candidates: 0,
+    created: 0,
+    relinked: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+  });
 });
 
 // ── 1-3: First synchronization ────────────────────────────────────────────────
@@ -664,6 +680,108 @@ describe("Opponent strategy and team resolution", () => {
       expect.any(Set), // clubOwnedSfvTeamIds
     );
     expect(result.unresolvedLocalTeamRefs).toBe(0);
+  });
+});
+
+// ── TEAM-SFV-MAPPING-02: schedule-sync team mapping healing ─────────────────
+//
+// The automatic (cron-triggered) sync only ever calls syncSfvSchedule, never
+// syncSfvTeams. These tests verify schedule sync opportunistically heals
+// missing current-season TeamExternalMapping rows for club-owned teams
+// referenced in the current batch, using the already-fetched club team list —
+// without requiring a separate manual "Sync Teams" action.
+
+describe("TEAM-SFV-MAPPING-02: schedule-sync team mapping healing", () => {
+  it("H1 — invokes healMissingClubTeamMappings with the referenced SFV teamIds and club-owned set", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([
+      makeScheduleEntry({ teamAId: 31927, teamBId: 44001 }),
+    ]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    await syncSfvSchedule(TENANT_A);
+
+    expect(mockHealMissingClubTeamMappings).toHaveBeenCalledOnce();
+    const [, referencedIds, clubOwnedIds] = mockHealMissingClubTeamMappings.mock.calls[0];
+    expect(referencedIds).toBeInstanceOf(Set);
+    expect([...(referencedIds as Set<number>)].sort()).toEqual([31927, 44001]);
+    expect(clubOwnedIds).toBeInstanceOf(Set);
+    expect((clubOwnedIds as Set<number>).has(31927)).toBe(true);
+  });
+
+  it("H2 — refreshes teamMappings and resolves the match when healing relinks a mapping", async () => {
+    // First load: nothing mapped yet for this season → would classify as unresolved_local
+    mockLoadTeamMappings
+      .mockResolvedValueOnce(new Map()) // initial load — season mapping missing
+      .mockResolvedValueOnce(new Map([[31927, "team-local-1"]])); // refreshed after healing
+
+    mockFetchClubSchedule.mockResolvedValueOnce([
+      makeScheduleEntry({ teamAId: 31927, teamBId: 44001 }),
+    ]);
+    // Healing found a cross-season canonical team and relinked it for this season
+    mockHealMissingClubTeamMappings.mockResolvedValueOnce({
+      candidates: 1,
+      created: 0,
+      relinked: 1,
+      updated: 0,
+      unchanged: 0,
+      failed: 0,
+    });
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    expect(mockLoadTeamMappings).toHaveBeenCalledTimes(2);
+    // processScheduleEntry must have received the REFRESHED map (with the healed entry)
+    const teamMappingsArg = mockProcessScheduleEntry.mock.calls[0][4] as Map<number, string>;
+    expect(teamMappingsArg.get(31927)).toBe("team-local-1");
+    expect(result.unresolvedLocalTeamRefs).toBe(0);
+  });
+
+  it("H3 — does not reload teamMappings when healing finds nothing to fix (already fully synced)", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ teamAId: 31927 })]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    await syncSfvSchedule(TENANT_A);
+
+    // Default mock resolves { created: 0, relinked: 0, ... } — no refresh needed
+    expect(mockLoadTeamMappings).toHaveBeenCalledTimes(1);
+  });
+
+  it("H4 — a healing failure never blocks match persistence (best-effort)", async () => {
+    mockHealMissingClubTeamMappings.mockRejectedValueOnce(new Error("boom"));
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    expect(result.created).toBe(1);
+    expect(result.failed).toBe(0);
+  });
+
+  it("H5 — healing is skipped entirely when the club team list fetch failed", async () => {
+    mockFetchTeamList.mockRejectedValueOnce(new Error("SFV team list unavailable"));
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    expect(mockHealMissingClubTeamMappings).not.toHaveBeenCalled();
+    expect(result.created).toBe(1);
   });
 });
 

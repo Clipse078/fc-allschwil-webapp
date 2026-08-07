@@ -63,6 +63,8 @@ import {
   resolveActiveSeason,
   processScheduleEntry,
 } from "./schedule-persistence";
+import { healMissingClubTeamMappings } from "./schedule-team-sync";
+import type { SfvTeamSyncContext } from "./types";
 import {
   logScheduleSyncStarted,
   logScheduleSyncCompleted,
@@ -184,11 +186,12 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
 
   // ── Load existing data ───────────────────────────────────────────────────
 
-  const [existingMappings, teamMappings, seasonId] = await Promise.all([
+  const [existingMappings, seasonId] = await Promise.all([
     loadExistingMatchMappings(tenantId, PROVIDER, context.seasonId),
-    loadTeamMappings(tenantId, PROVIDER, context.seasonId),
     resolveActiveSeason(tenantId),
   ]);
+
+  let teamMappings = await loadTeamMappings(tenantId, PROVIDER, context.seasonId);
 
   // ── Fetch club-owned team IDs for participant classification ─────────────
   //
@@ -203,8 +206,9 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
   // of unresolved vs external when the team list is unavailable.
 
   let clubOwnedSfvTeamIds: ReadonlySet<number>;
+  let clubTeamList: Awaited<ReturnType<typeof fetchTeamList>> | null = null;
   try {
-    const clubTeamList = await fetchTeamList({
+    clubTeamList = await fetchTeamList({
       SeasonId: context.seasonId,
       ClubId: context.clubId,
       ...(context.organisationId !== null
@@ -216,6 +220,51 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     // Team list fetch failed — fall back to TeamExternalMapping keys.
     // Metrics may be less precise in this fallback path.
     clubOwnedSfvTeamIds = new Set(teamMappings.keys());
+  }
+
+  // ── TEAM-SFV-MAPPING-02: heal missing current-season team mappings ───────
+  //
+  // The automatic (cron-triggered) sync never calls syncSfvTeams — only this
+  // schedule sync runs on a schedule. Without this step, a season transition
+  // (or a newly added club team) would leave every affected match's
+  // homeTeamId/awayTeamId permanently null — "Team nicht zugeordnet" in
+  // Matchcenter — until an admin manually re-runs "Sync Teams". Reuses the
+  // exact tested season-carryover logic from TEAM-SFV-MAPPING-01
+  // (team-persistence.ts) scoped to only the teams actually referenced by
+  // this batch. Best-effort: never blocks match persistence on failure.
+  if (clubTeamList !== null) {
+    try {
+      const referencedSfvTeamIds = new Set<number>();
+      for (const entry of providerEntries) {
+        referencedSfvTeamIds.add(entry.teamAId);
+        referencedSfvTeamIds.add(entry.teamBId);
+      }
+
+      const clubTeamDetailsById = new Map(clubTeamList.map((t) => [t.teamId, t]));
+      const teamSyncContext: SfvTeamSyncContext = {
+        tenantId,
+        clubId: context.clubId,
+        seasonId: context.seasonId,
+        organisationId: context.organisationId,
+        syncedAt: context.syncedAt,
+      };
+
+      const healingResult = await healMissingClubTeamMappings(
+        tenantId,
+        referencedSfvTeamIds,
+        clubOwnedSfvTeamIds,
+        clubTeamDetailsById,
+        teamSyncContext,
+      );
+
+      if (healingResult.created > 0 || healingResult.relinked > 0) {
+        // Refresh so this run's participant classification immediately sees
+        // any mapping just created/relinked — avoids waiting for a second run.
+        teamMappings = await loadTeamMappings(tenantId, PROVIDER, context.seasonId);
+      }
+    } catch {
+      // Best-effort: team-mapping healing must never block schedule sync.
+    }
   }
 
   // ── Process each schedule entry ──────────────────────────────────────────
