@@ -96,7 +96,28 @@ export interface ClubDirectoryMutationDatabase {
   externalTeamProviderMapping: {
     findFirst(args: object): Promise<ExternalTeamProviderMappingRow | null>;
     upsert(args: object): Promise<ExternalTeamProviderMappingRow>;
+    /**
+     * CLUB-DIRECTORY-02 concurrency fix — a plain (non-upsert) create used
+     * exclusively to atomically *claim* a provider identity inside
+     * `transaction()` below. Implementations MUST reject a duplicate
+     * (tenantId, provider, providerTeamId, providerSeasonId) by throwing
+     * `ClubDirectoryUniqueConstraintError` — never by silently updating the
+     * existing row (that is what `upsert` is for) — so a losing concurrent
+     * caller can detect the conflict and roll back its own transaction.
+     */
+    create(args: object): Promise<ExternalTeamProviderMappingRow>;
   };
+  /**
+   * CLUB-DIRECTORY-02 concurrency fix — runs `fn` against a transactional
+   * view of this database. Implementations MUST provide real atomicity
+   * (e.g. Prisma's interactive `$transaction`): if `fn` throws, every write
+   * performed through the transactional database passed to `fn` is rolled
+   * back as a single unit. Used by discovery-service.ts to make "create the
+   * canonical shell + claim the provider identity" all-or-nothing, so two
+   * concurrent discoveries of the same brand-new provider identity can never
+   * both leave behind a committed ExternalClub/ExternalTeam pair.
+   */
+  transaction<T>(fn: (tx: ClubDirectoryMutationDatabase) => Promise<T>): Promise<T>;
 }
 
 // ── Domain errors ───────────────────────────────────────────────────────────────
@@ -119,6 +140,24 @@ export class ClubDirectoryConflictError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ClubDirectoryConflictError";
+  }
+}
+
+/**
+ * CLUB-DIRECTORY-02 concurrency fix — thrown by
+ * `ClubDirectoryMutationDatabase.externalTeamProviderMapping.create()` when
+ * a row already exists for the same (tenantId, provider, providerTeamId,
+ * providerSeasonId). Distinct from `ClubDirectoryConflictError` (which
+ * signals a genuine identity conflict — the same provider id already
+ * pointing at a *different* canonical record chosen by a caller) — this
+ * error instead signals a benign concurrency race that the caller
+ * (discovery-service.ts) recovers from transparently by adopting whichever
+ * row won the race.
+ */
+export class ClubDirectoryUniqueConstraintError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClubDirectoryUniqueConstraintError";
   }
 }
 

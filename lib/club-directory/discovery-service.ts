@@ -37,11 +37,29 @@
  *   A tenant admin can always correct the auto-generated club/team names or
  *   re-parent a team to the correct club later — that tenant-managed edit is
  *   never overwritten by a subsequent sync (see mutation-service.ts).
+ *
+ * Concurrency (CLUB-DIRECTORY-02 fix):
+ *   Two overlapping discovery calls for the same brand-new
+ *   (tenantId, provider, providerTeamId, providerSeasonId) must never both
+ *   commit their own ExternalClub/ExternalTeam pair. The "create the shell"
+ *   branch below therefore creates the ExternalClub, ExternalTeam, AND a
+ *   placeholder ExternalTeamProviderMapping row that *claims* the identity —
+ *   all inside one `database.transaction()`. The mapping create is a plain
+ *   `create()` (never `upsert()`): if a concurrent caller already committed
+ *   the same identity first, this create hits the real unique constraint
+ *   and throws `ClubDirectoryUniqueConstraintError`, which rolls back the
+ *   ENTIRE transaction — the club and team included — leaving no orphan
+ *   behind. The losing caller then re-reads the now-guaranteed-visible
+ *   winning mapping and adopts its ExternalTeam instead of retrying its own
+ *   (already rolled back) shell. See lib/club-directory/__tests__/
+ *   discovery-service.test.ts and discovery-service-concurrency.integration.
+ *   test.ts for the sequential and genuinely-concurrent-Postgres proofs.
  */
 
 import {
   linkExternalTeamProvider,
   ClubDirectoryNotFoundError,
+  ClubDirectoryUniqueConstraintError,
   type ClubDirectoryMutationDatabase,
   type ExternalClubRow,
   type ExternalTeamRow,
@@ -105,6 +123,74 @@ export type DiscoverExternalTeamResult = {
 // ── Public service function ───────────────────────────────────────────────────
 
 /**
+ * Atomically creates the canonical ExternalClub + ExternalTeam shell and
+ * claims the (tenantId, provider, providerTeamId, providerSeasonId)
+ * identity in a single transaction.
+ *
+ * Returns the newly-created ExternalTeam id on success. Returns null when a
+ * concurrent caller won the race for this exact identity — the unique
+ * constraint on ExternalTeamProviderMapping caused this transaction's own
+ * mapping `create()` to fail, rolling back the club and team created
+ * earlier in the SAME transaction. Any other error propagates unchanged.
+ */
+async function createShellAndClaimIdentity(
+  database: ClubDirectoryMutationDatabase,
+  key: { tenantId: string; provider: string; providerTeamId: number; providerSeasonId: number },
+  fallbackName: string,
+): Promise<string | null> {
+  try {
+    const team = await database.transaction(async (tx) => {
+      const club = await tx.externalClub.create({
+        data: {
+          tenantId: key.tenantId,
+          name: fallbackName,
+          // Provider-discovered origin, informational only (never gates
+          // identity or behaviour) — mirrors ExternalClub.source semantics
+          // from CLUB-DIRECTORY-01.
+          source: key.provider,
+        },
+      });
+
+      const createdTeam = await tx.externalTeam.create({
+        data: {
+          tenantId: key.tenantId,
+          externalClubId: club.id,
+          name: fallbackName,
+          source: key.provider,
+        },
+      });
+
+      // Plain create() — never upsert() — is what makes this race-safe: a
+      // concurrent winner's already-committed row causes THIS create to hit
+      // the real unique constraint and throw, which rolls back the whole
+      // transaction (club + team included). Provider-owned fields
+      // (providerTeamName, providerLogoUrl, …) are intentionally NOT set
+      // here — linkExternalTeamProvider() (called unconditionally by the
+      // caller after this returns) is the single place that ever writes
+      // them, on every path (new, reused, or race-recovered) alike.
+      await tx.externalTeamProviderMapping.create({
+        data: {
+          tenantId: key.tenantId,
+          externalTeamId: createdTeam.id,
+          provider: key.provider,
+          providerTeamId: key.providerTeamId,
+          providerSeasonId: key.providerSeasonId,
+        },
+      });
+
+      return createdTeam;
+    });
+
+    return team.id;
+  } catch (err) {
+    if (err instanceof ClubDirectoryUniqueConstraintError) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/**
  * Resolves the canonical ExternalClub/ExternalTeam for a provider-reported
  * team, creating the minimal canonical shell only when no matching
  * ExternalTeamProviderMapping exists yet for this tenant/provider/team/season.
@@ -115,6 +201,11 @@ export type DiscoverExternalTeamResult = {
  * same canonical ExternalTeam and only refreshes provider-owned fields via
  * `linkExternalTeamProvider` (which itself never touches tenant-managed
  * fields once set).
+ *
+ * Concurrency-safe: two overlapping calls for the same brand-new identity
+ * can never both commit a club/team pair (see createShellAndClaimIdentity
+ * above) — the losing call transparently adopts the winner's canonical
+ * ExternalTeam instead of surfacing an error or leaving an orphan behind.
  */
 export async function discoverExternalTeamFromProvider(
   database: ClubDirectoryMutationDatabase,
@@ -125,13 +216,14 @@ export async function discoverExternalTeamFromProvider(
   const provider = requireIdentifier(input.provider, "provider").toUpperCase();
   const providerTeamId = requirePositiveInteger(input.providerTeamId, "providerTeamId");
   const providerSeasonId = input.providerSeasonId ?? 0;
-
-  const existingMapping = await database.externalTeamProviderMapping.findFirst({
-    where: { tenantId, provider, providerTeamId, providerSeasonId },
-  });
+  const mappingKey = { tenantId, provider, providerTeamId, providerSeasonId };
 
   let externalTeamId: string;
   let discovered = false;
+
+  const existingMapping = await database.externalTeamProviderMapping.findFirst({
+    where: mappingKey,
+  });
 
   if (existingMapping !== null) {
     externalTeamId = existingMapping.externalTeamId;
@@ -139,28 +231,27 @@ export async function discoverExternalTeamFromProvider(
     const fallbackName =
       normalizeOptionalString(input.providerTeamName) ?? `${provider} ${providerTeamId}`;
 
-    const club = await database.externalClub.create({
-      data: {
-        tenantId,
-        name: fallbackName,
-        // Provider-discovered origin, informational only (never gates
-        // identity or behaviour) — mirrors ExternalClub.source semantics
-        // from CLUB-DIRECTORY-01.
-        source: provider,
-      },
-    });
+    const createdTeamId = await createShellAndClaimIdentity(database, mappingKey, fallbackName);
 
-    const team = await database.externalTeam.create({
-      data: {
-        tenantId,
-        externalClubId: club.id,
-        name: fallbackName,
-        source: provider,
-      },
-    });
+    if (createdTeamId !== null) {
+      externalTeamId = createdTeamId;
+      discovered = true;
+    } else {
+      // Lost the race: a concurrent call already claimed this identity and
+      // (per Postgres's unique-index conflict semantics) its transaction is
+      // guaranteed to have already committed by the time our create() saw
+      // the conflict — so this re-read is guaranteed to find it.
+      const winningMapping = await database.externalTeamProviderMapping.findFirst({
+        where: mappingKey,
+      });
 
-    externalTeamId = team.id;
-    discovered = true;
+      if (winningMapping === null) {
+        // Defensive only — should be unreachable given the guarantee above.
+        throw new ClubDirectoryNotFoundError("ExternalTeamProviderMapping");
+      }
+
+      externalTeamId = winningMapping.externalTeamId;
+    }
   }
 
   const { team: updatedTeam } = await linkExternalTeamProvider(

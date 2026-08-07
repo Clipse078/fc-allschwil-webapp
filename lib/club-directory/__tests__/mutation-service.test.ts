@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   ClubDirectoryConflictError,
   ClubDirectoryNotFoundError,
+  ClubDirectoryUniqueConstraintError,
   ClubDirectoryValidationError,
   createExternalClub,
   createExternalTeam,
@@ -83,7 +84,7 @@ type MappingUpsertArgs = {
 };
 
 function createFakeDatabase(): ClubDirectoryMutationDatabase {
-  return {
+  const database: ClubDirectoryMutationDatabase = {
     externalClub: {
       findFirst: async (args: object) => {
         const { where } = args as FindFirstArgs;
@@ -207,8 +208,68 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
         teamMappings.push(created);
         return created;
       },
+      // CLUB-DIRECTORY-02 concurrency fix: plain create() — never upsert() —
+      // used exclusively inside transaction() to atomically claim a
+      // provider identity. Mirrors the real Postgres unique-constraint
+      // behaviour: a duplicate (tenantId, provider, providerTeamId,
+      // providerSeasonId) throws ClubDirectoryUniqueConstraintError instead
+      // of silently updating the existing row.
+      create: async (args: object) => {
+        const { data } = args as CreateArgs;
+        const key = data as {
+          tenantId: string;
+          provider: string;
+          providerTeamId: number;
+          providerSeasonId: number;
+        };
+        const existing = teamMappings.find(
+          (m) =>
+            m.tenantId === key.tenantId &&
+            m.provider === key.provider &&
+            m.providerTeamId === key.providerTeamId &&
+            m.providerSeasonId === key.providerSeasonId,
+        );
+        if (existing) {
+          throw new ClubDirectoryUniqueConstraintError(
+            "ExternalTeamProviderMapping already exists for this identity.",
+          );
+        }
+        const created: ExternalTeamProviderMappingRow = {
+          id: freshId("team-map"),
+          ...data,
+        } as ExternalTeamProviderMappingRow;
+        teamMappings.push(created);
+        return created;
+      },
+    },
+    // CLUB-DIRECTORY-02 concurrency fix: a fake but functionally faithful
+    // transaction — snapshots state before running `fn`, restores it if
+    // `fn` throws. `tx` is the same database instance (a fake doesn't need
+    // per-connection isolation), which is sufficient to exercise "an error
+    // inside the transaction rolls back every write performed within it".
+    transaction: async <T>(fn: (tx: ClubDirectoryMutationDatabase) => Promise<T>): Promise<T> => {
+      const snapshot = {
+        clubs: [...clubs],
+        teams: [...teams],
+        clubMappings: [...clubMappings],
+        teamMappings: [...teamMappings],
+      };
+      try {
+        return await fn(database);
+      } catch (err) {
+        clubs.length = 0;
+        clubs.push(...snapshot.clubs);
+        teams.length = 0;
+        teams.push(...snapshot.teams);
+        clubMappings.length = 0;
+        clubMappings.push(...snapshot.clubMappings);
+        teamMappings.length = 0;
+        teamMappings.push(...snapshot.teamMappings);
+        throw err;
+      }
     },
   };
+  return database;
 }
 
 let db: ClubDirectoryMutationDatabase;

@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { discoverExternalTeamFromProvider } from "../discovery-service";
-import type {
-  ClubDirectoryMutationDatabase,
-  ExternalClubProviderMappingRow,
-  ExternalClubRow,
-  ExternalTeamProviderMappingRow,
-  ExternalTeamRow,
+import {
+  ClubDirectoryUniqueConstraintError,
+  type ClubDirectoryMutationDatabase,
+  type ExternalClubProviderMappingRow,
+  type ExternalClubRow,
+  type ExternalTeamProviderMappingRow,
+  type ExternalTeamRow,
 } from "../mutation-service";
 
 // ── In-memory fake database ─────────────────────────────────────────────────────
@@ -54,7 +55,7 @@ type MappingUpsertArgs = {
 };
 
 function createFakeDatabase(): ClubDirectoryMutationDatabase {
-  return {
+  const database: ClubDirectoryMutationDatabase = {
     externalClub: {
       findFirst: async (args: object) => {
         const { where } = args as FindFirstArgs;
@@ -178,8 +179,68 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
         teamMappings.push(created);
         return created;
       },
+      // CLUB-DIRECTORY-02 concurrency fix: plain create() — never upsert() —
+      // used exclusively inside transaction() to atomically claim a
+      // provider identity. Mirrors the real Postgres unique-constraint
+      // behaviour: a duplicate (tenantId, provider, providerTeamId,
+      // providerSeasonId) throws ClubDirectoryUniqueConstraintError instead
+      // of silently updating the existing row.
+      create: async (args: object) => {
+        const { data } = args as CreateArgs;
+        const key = data as {
+          tenantId: string;
+          provider: string;
+          providerTeamId: number;
+          providerSeasonId: number;
+        };
+        const existing = teamMappings.find(
+          (m) =>
+            m.tenantId === key.tenantId &&
+            m.provider === key.provider &&
+            m.providerTeamId === key.providerTeamId &&
+            m.providerSeasonId === key.providerSeasonId,
+        );
+        if (existing) {
+          throw new ClubDirectoryUniqueConstraintError(
+            "ExternalTeamProviderMapping already exists for this identity.",
+          );
+        }
+        const created: FakeTeamMappingRow = {
+          id: freshId("team-map"),
+          ...data,
+        } as FakeTeamMappingRow;
+        teamMappings.push(created);
+        return created;
+      },
+    },
+    // CLUB-DIRECTORY-02 concurrency fix: a fake but functionally faithful
+    // transaction — snapshots state before running `fn`, restores it if
+    // `fn` throws. `tx` is the same database instance (a fake doesn't need
+    // per-connection isolation), which is sufficient to exercise "an error
+    // inside the transaction rolls back every write performed within it".
+    transaction: async <T>(fn: (tx: ClubDirectoryMutationDatabase) => Promise<T>): Promise<T> => {
+      const snapshot = {
+        clubs: [...clubs],
+        teams: [...teams],
+        clubMappings: [...clubMappings],
+        teamMappings: [...teamMappings],
+      };
+      try {
+        return await fn(database);
+      } catch (err) {
+        clubs.length = 0;
+        clubs.push(...snapshot.clubs);
+        teams.length = 0;
+        teams.push(...snapshot.teams);
+        clubMappings.length = 0;
+        clubMappings.push(...snapshot.clubMappings);
+        teamMappings.length = 0;
+        teamMappings.push(...snapshot.teamMappings);
+        throw err;
+      }
     },
   };
+  return database;
 }
 
 let db: ClubDirectoryMutationDatabase;
@@ -414,6 +475,158 @@ describe("discoverExternalTeamFromProvider — STRICT OWNERSHIP RULE", () => {
     });
 
     expect(first.club.logoUrl).toBe("https://provider.example.com/crest.gif");
+  });
+});
+
+describe("discoverExternalTeamFromProvider — concurrency (CLUB-DIRECTORY-02 fix)", () => {
+  it("rolls back its own shell and adopts the winner when a conflict appears mid-transaction", async () => {
+    // Simulates a concurrent writer whose transaction already committed the
+    // SAME provider identity by the time our own transaction starts (the
+    // real-Postgres guarantee: the loser's conflicting INSERT only ever
+    // raises once the winner is visible — see
+    // discovery-service-concurrency.integration.test.ts for the genuine
+    // two-connection proof). Patching `transaction()` itself (rather than
+    // an inner delegate) ensures the injected winner rows land BEFORE the
+    // snapshot this fake's transaction() takes, so rolling back our own
+    // (later, losing) writes never touches them — exactly mirroring how a
+    // real DB rollback can never undo another session's committed work.
+    const originalTransaction = db.transaction.bind(db);
+    let winnerTeamId: string | null = null;
+
+    db.transaction = (async (fn: (tx: ClubDirectoryMutationDatabase) => Promise<unknown>) => {
+      const winnerClub: ExternalClubRow = {
+        id: freshId("club"),
+        tenantId: "tenant-1",
+        name: "SV Muttenz B1",
+        shortName: null,
+        alternativeName: null,
+        website: null,
+        location: null,
+        logoUrl: null,
+        notes: null,
+        source: "SFV",
+        archivedAt: null,
+      };
+      clubs.push(winnerClub);
+
+      const winnerTeam: ExternalTeamRow = {
+        id: freshId("team"),
+        tenantId: "tenant-1",
+        externalClubId: winnerClub.id,
+        name: "SV Muttenz B1",
+        shortName: null,
+        alternativeName: null,
+        categoryLabel: null,
+        logoUrl: null,
+        source: "SFV",
+        archivedAt: null,
+      };
+      teams.push(winnerTeam);
+      winnerTeamId = winnerTeam.id;
+
+      teamMappings.push({
+        id: freshId("team-map"),
+        tenantId: "tenant-1",
+        externalTeamId: winnerTeam.id,
+        provider: "SFV",
+        providerTeamId: 51234,
+        providerSeasonId: 0,
+      });
+
+      return originalTransaction(fn);
+    }) as typeof db.transaction;
+
+    const result = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 51234,
+      providerTeamName: "SV Muttenz B1",
+    });
+
+    expect(result.discovered).toBe(false);
+    expect(result.team.id).toBe(winnerTeamId);
+    // Exactly one club/team/mapping survive — our own shell (created inside
+    // the now-rolled-back transaction) never persisted.
+    expect(clubs).toHaveLength(1);
+    expect(teams).toHaveLength(1);
+    expect(teamMappings).toHaveLength(1);
+  });
+
+  it("does not leave an orphan club behind when the mapping create conflicts", async () => {
+    const originalTransaction = db.transaction.bind(db);
+
+    db.transaction = (async (fn: (tx: ClubDirectoryMutationDatabase) => Promise<unknown>) => {
+      // A competing winner has already committed by the time our
+      // transaction starts.
+      const winnerClub: ExternalClubRow = {
+        id: freshId("club"),
+        tenantId: "tenant-1",
+        name: "Winner",
+        shortName: null,
+        alternativeName: null,
+        website: null,
+        location: null,
+        logoUrl: null,
+        notes: null,
+        source: "SFV",
+        archivedAt: null,
+      };
+      clubs.push(winnerClub);
+
+      const winnerTeam: ExternalTeamRow = {
+        id: freshId("team"),
+        tenantId: "tenant-1",
+        externalClubId: winnerClub.id,
+        name: "Winner",
+        shortName: null,
+        alternativeName: null,
+        categoryLabel: null,
+        logoUrl: null,
+        source: "SFV",
+        archivedAt: null,
+      };
+      teams.push(winnerTeam);
+      teamMappings.push({
+        id: freshId("team-map"),
+        tenantId: "tenant-1",
+        externalTeamId: winnerTeam.id,
+        provider: "SFV",
+        providerTeamId: 999999,
+        providerSeasonId: 0,
+      });
+
+      return originalTransaction(fn);
+    }) as typeof db.transaction;
+
+    await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 999999,
+      providerTeamName: "Race Team",
+    });
+
+    // Our own attempt (inside the now-rolled-back transaction) tried to
+    // create a club named "Race Team" — it must not survive.
+    expect(clubs.filter((c) => c.name === "Race Team")).toHaveLength(0);
+  });
+
+  it("propagates a genuine (non-conflict) transaction failure unchanged", async () => {
+    const boom = new Error("simulated connection failure");
+    db.externalTeam.create = async () => {
+      throw boom;
+    };
+
+    await expect(
+      discoverExternalTeamFromProvider(db, {
+        tenantId: "tenant-1",
+        provider: "SFV",
+        providerTeamId: 51234,
+        providerTeamName: "SV Muttenz B1",
+      }),
+    ).rejects.toThrow(boom);
+
+    // The failed transaction must not leave a dangling club behind either.
+    expect(clubs).toHaveLength(0);
   });
 });
 
