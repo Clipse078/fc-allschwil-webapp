@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Plus, RefreshCw, Volleyball } from "lucide-react";
+import { Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
@@ -9,10 +9,29 @@ import {
   listMatchcenterMatches,
   type MatchcenterQueryDatabase,
 } from "@/lib/matchcenter/query-service";
+import {
+  formatMonthLabel,
+  MATCHCENTER_DEFAULT_TIMEZONE,
+  resolveMatchcenterMonthWindow,
+} from "@/lib/matchcenter/month-range";
+import {
+  normalizeMatchcenterActionFilter,
+  normalizeMatchcenterTab,
+} from "@/lib/matchcenter/view-model";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
 
-export default async function MatchcenterPage() {
+type MatchcenterPageProps = {
+  searchParams?: Promise<{
+    tab?: string;
+    month?: string;
+    filter?: string;
+  }>;
+};
+
+export default async function MatchcenterPage({
+  searchParams,
+}: MatchcenterPageProps) {
   await requireAnyPermission([
     PERMISSIONS.EVENTS_VIEW,
     PERMISSIONS.EVENTS_MANAGE,
@@ -25,6 +44,16 @@ export default async function MatchcenterPage() {
   }
 
   const tenantId = tenantContext.id;
+  const timezone = tenantContext.timezone ?? MATCHCENTER_DEFAULT_TIMEZONE;
+  const locale = tenantContext.locale ?? "de-CH";
+
+  const params = (await searchParams) ?? {};
+  const tab = normalizeMatchcenterTab(params.tab);
+  const actionFilter = normalizeMatchcenterActionFilter(params.filter);
+  const resolvedMonth = resolveMatchcenterMonthWindow({
+    monthParam: params.month,
+    timeZone: timezone,
+  });
 
   /*
    * Prisma's generic delegate return type cannot structurally satisfy the
@@ -37,39 +66,31 @@ export default async function MatchcenterPage() {
   const matchcenterDatabase =
     prisma as unknown as MatchcenterQueryDatabase;
 
+  // Month-scoped server-side query (MATCHCENTER-UX-01 §13): avoids loading
+  // the full season — only the selected month's window is fetched, for
+  // both Spielplanung and Resultate (they share one month filter).
   const matches = await listMatchcenterMatches(
     matchcenterDatabase,
     {
       tenantId,
+      from: resolvedMonth.from,
+      to: resolvedMonth.to,
     },
   );
 
-  const synchronizedCount = matches.filter(
-    (match) =>
-      match.synchronization.eventLastSyncedAt !== null ||
-      match.synchronization.mappingLastSyncedAt !== null,
-  ).length;
-
-  const unresolvedCount = matches.filter(
-    (match) =>
-      match.home.resolution === "UNRESOLVED" ||
-      match.away.resolution === "UNRESOLVED",
-  ).length;
-
-  const incompleteCount = matches.filter(
-    (match) =>
-      !match.location?.trim() ||
-      !match.operational.pitchCode?.trim() ||
-      !match.operational.homeDressingRoomCode?.trim() ||
-      !match.operational.awayDressingRoomCode?.trim(),
-  ).length;
+  const monthWindow = {
+    param: resolvedMonth.param,
+    label: formatMonthLabel(resolvedMonth, locale, timezone),
+    previousParam: resolvedMonth.previousParam,
+    nextParam: resolvedMonth.nextParam,
+  };
 
   return (
     <div className="max-w-[1400px] space-y-8">
       <AdminSectionHeader
         eyebrow="Spielbetrieb"
         title="Matchcenter"
-        description="Zentrale Übersicht aller synchronisierten und manuell erfassten Matches."
+        description="Zentrale Spielplanung und operative Matchvorbereitung."
         actions={
           <Link
             href="/dashboard/events/matches/new"
@@ -81,86 +102,13 @@ export default async function MatchcenterPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Matches</p>
-          <p
-            className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-[var(--blue)]"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {matches.length}
-          </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">
-            Im aktuellen Zeitraum
-          </p>
-        </div>
-
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Synchronisiert</p>
-          <p
-            className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-emerald-600"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {synchronizedCount}
-          </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">
-            Externe oder aktualisierte Daten
-          </p>
-        </div>
-
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Nicht zugeordnet</p>
-          <p
-            className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-amber-600"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {unresolvedCount}
-          </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">
-            Mindestens ein Team offen
-          </p>
-        </div>
-
-        <div className="sce-kpi-card p-5">
-          <p className="sce-data-label">Operativ offen</p>
-          <p
-            className="mt-2 text-[2rem] font-bold leading-none tracking-tight text-rose-600"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {incompleteCount}
-          </p>
-          <p className="mt-1.5 text-[0.75rem] text-[var(--text-2)]">
-            Spielort, Feld oder Garderobe
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)]">
-            <RefreshCw className="h-4 w-4 text-[var(--muted)]" />
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-[var(--foreground)]">
-              Datenquelle
-            </p>
-            <p className="text-xs text-[var(--muted)]">
-              ClubCorner/SFV-Synchronisation und manuell erfasste Matches.
-            </p>
-          </div>
-        </div>
-
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
-          <Volleyball className="h-3.5 w-3.5" />
-          {tenantContext.name}
-        </span>
-      </div>
-
       <MatchcenterOverview
         matches={matches}
-        timezone={tenantContext.timezone ?? "Europe/Zurich"}
-        locale={tenantContext.locale ?? "de-CH"}
+        tab={tab}
+        actionFilter={actionFilter}
+        monthWindow={monthWindow}
+        timezone={timezone}
+        locale={locale}
       />
     </div>
   );

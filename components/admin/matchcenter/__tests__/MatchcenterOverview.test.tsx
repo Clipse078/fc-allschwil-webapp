@@ -2,12 +2,17 @@
  * @vitest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import MatchcenterOverview, {
-  getOperationalWarnings,
-} from "@/components/admin/matchcenter/MatchcenterOverview";
+import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
+
+const DEFAULT_MONTH_WINDOW = {
+  param: "2026-08",
+  label: "August 2026",
+  previousParam: "2026-07",
+  nextParam: "2026-09",
+};
 
 function createMatch(
   overrides: Partial<MatchcenterMatchSummary> = {},
@@ -83,432 +88,392 @@ function createMatch(
   };
 }
 
-describe("MatchcenterOverview", () => {
-  it("renders the empty state and create link", () => {
-    render(<MatchcenterOverview matches={[]} />);
+function renderOverview(
+  matches: MatchcenterMatchSummary[],
+  props: Partial<{
+    tab: "SPIELPLANUNG" | "RESULTATE";
+    actionFilter: "ALLE" | "OFFEN" | "ERLEDIGT";
+  }> = {},
+) {
+  return render(
+    <MatchcenterOverview
+      matches={matches}
+      tab={props.tab ?? "SPIELPLANUNG"}
+      actionFilter={props.actionFilter ?? "ALLE"}
+      monthWindow={DEFAULT_MONTH_WINDOW}
+    />,
+  );
+}
 
-    expect(
-      screen.getByText("Keine Matches vorhanden"),
-    ).toBeTruthy();
+describe("MatchcenterOverview — tabs, month nav, KPIs", () => {
+  it("renders the Spielplanung/Resultate tabs and the selected month label", () => {
+    renderOverview([createMatch()]);
 
-    const link = screen.getByRole("link", {
-      name: /Match erstellen/i,
+    expect(screen.getByTestId("matchcenter-tab-spielplanung")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByTestId("matchcenter-tab-resultate")).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(screen.getByTestId("matchcenter-month-label")).toHaveTextContent(
+      "August 2026",
+    );
+  });
+
+  it("month navigation links preserve the active tab and filter", () => {
+    renderOverview([createMatch()], { actionFilter: "OFFEN" });
+
+    expect(screen.getByTestId("matchcenter-month-previous")).toHaveAttribute(
+      "href",
+      "/dashboard/matchcenter?tab=spielplanung&month=2026-07&filter=offen",
+    );
+    expect(screen.getByTestId("matchcenter-month-next")).toHaveAttribute(
+      "href",
+      "/dashboard/matchcenter?tab=spielplanung&month=2026-09&filter=offen",
+    );
+  });
+
+  it("computes KPI cards from the full month population regardless of the active filter", () => {
+    const openMatch = createMatch({
+      id: "match-open",
+      operational: {
+        pitchCode: null,
+        homeDressingRoomCode: null,
+        awayDressingRoomCode: null,
+        meetingTime: null,
+        remarks: null,
+      },
+    });
+    const readyMatch = createMatch({ id: "match-ready" });
+    const completedMatch = createMatch({
+      id: "match-completed",
+      status: "COMPLETED",
+      scoreHome: 2,
+      scoreAway: 1,
     });
 
-    expect(link).toHaveAttribute(
-      "href",
-      "/dashboard/events/matches/new",
+    renderOverview([openMatch, readyMatch, completedMatch], {
+      actionFilter: "OFFEN",
+    });
+
+    expect(screen.getByTestId("matchcenter-kpi-anstehend")).toHaveTextContent(
+      "2",
+    );
+    expect(screen.getByTestId("matchcenter-kpi-offen")).toHaveTextContent("1");
+    expect(screen.getByTestId("matchcenter-kpi-bereit")).toHaveTextContent(
+      "1",
+    );
+    expect(screen.getByTestId("matchcenter-kpi-resultate")).toHaveTextContent(
+      "1",
+    );
+  });
+});
+
+describe("MatchcenterOverview — Spielplanung", () => {
+  it("renders the empty state and create link when nothing matches", () => {
+    renderOverview([]);
+
+    expect(screen.getByText("Keine Matches gefunden")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /Match erstellen/i }),
+    ).toHaveAttribute("href", "/dashboard/events/matches/new");
+  });
+
+  it("renders home and away team names", () => {
+    renderOverview([createMatch()]);
+
+    expect(screen.getByText("FC Allschwil E1")).toBeTruthy();
+    expect(screen.getByText("FC Basel E1")).toBeTruthy();
+  });
+
+  it("links each Spielplanung row to its detail page", () => {
+    renderOverview([createMatch()]);
+
+    const link = screen.getByRole("link", {
+      name: "Details zu FC Allschwil – Gegner anzeigen",
+    });
+    expect(link).toHaveAttribute("href", "/dashboard/matchcenter/match-1");
+  });
+
+  it("A. an upcoming SCHEDULED match never renders a score", () => {
+    renderOverview([
+      createMatch({ status: "SCHEDULED", scoreHome: 0, scoreAway: 0 }),
+    ]);
+
+    expect(screen.queryByText("0:0")).toBeNull();
+    expect(screen.queryByTestId("matchcenter-live-score-match-1")).toBeNull();
+  });
+
+  it("F. shows Bereit for a fully set-up future HOME match", () => {
+    renderOverview([createMatch()]);
+
+    expect(
+      within(screen.getByTestId("matchcenter-action-match-1")).getByText(
+        "Bereit",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("E. shows the open action count and compact chips for a future HOME match with missing setup", () => {
+    renderOverview([
+      createMatch({
+        operational: {
+          pitchCode: null,
+          homeDressingRoomCode: null,
+          awayDressingRoomCode: "G2",
+          meetingTime: null,
+          remarks: null,
+        },
+      }),
+    ]);
+
+    expect(screen.getByText("2 Aufgaben offen")).toBeTruthy();
+    expect(screen.getByText("Spielfeld")).toBeTruthy();
+    expect(screen.getByText("Heimkabine")).toBeTruthy();
+    expect(screen.queryByText("Gastkabine")).toBeNull();
+  });
+
+  it("G. shows a calm Auswärtsspiel state instead of manufactured facility warnings", () => {
+    renderOverview([
+      createMatch({
+        homeAway: "AWAY",
+        home: {
+          providerTeamId: 200,
+          providerTeamName: "FC Reinach E1",
+          canonicalTeamId: "team-home",
+          canonicalTeamName: "FC Reinach E1",
+          displayName: "FC Reinach E1",
+          resolution: "RESOLVED",
+          isOwnTeam: false,
+        },
+        away: {
+          providerTeamId: 100,
+          providerTeamName: "FC Allschwil E1",
+          canonicalTeamId: "team-away",
+          canonicalTeamName: "FC Allschwil E1",
+          displayName: "FC Allschwil E1",
+          resolution: "RESOLVED",
+          isOwnTeam: true,
+        },
+        operational: {
+          pitchCode: null,
+          homeDressingRoomCode: null,
+          awayDressingRoomCode: null,
+          meetingTime: null,
+          remarks: null,
+        },
+      }),
+    ]);
+
+    expect(screen.getAllByText("Auswärtsspiel").length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(screen.queryByText("Spielfeld")).toBeNull();
+    expect(screen.queryByText("Heimkabine")).toBeNull();
+    expect(screen.queryByText("Gastkabine")).toBeNull();
+  });
+
+  it("shows the team-assignment warning when the FCA side is genuinely unresolved", () => {
+    renderOverview([
+      createMatch({
+        home: {
+          providerTeamId: 100,
+          providerTeamName: "FC Allschwil E1",
+          canonicalTeamId: null,
+          canonicalTeamName: null,
+          displayName: "FC Allschwil E1",
+          resolution: "UNRESOLVED",
+          isOwnTeam: false,
+        },
+      }),
+    ]);
+
+    expect(screen.getByText("Team nicht zugeordnet")).toBeTruthy();
+  });
+
+  it("H. an unmapped external opponent never produces a team-assignment warning", () => {
+    renderOverview([
+      createMatch({
+        home: {
+          providerTeamId: 3311,
+          providerTeamName: "FC Allschwil B2",
+          canonicalTeamId: "team-fca-b2",
+          canonicalTeamName: "FC Allschwil B2",
+          displayName: "FC Allschwil B2",
+          resolution: "RESOLVED",
+          isOwnTeam: true,
+        },
+        away: {
+          providerTeamId: 5544,
+          providerTeamName: "VfR Kleinhüningen a",
+          canonicalTeamId: null,
+          canonicalTeamName: null,
+          displayName: "VfR Kleinhüningen a",
+          resolution: "UNRESOLVED",
+          isOwnTeam: false,
+        },
+      }),
+    ]);
+
+    expect(screen.queryByText("Team nicht zugeordnet")).toBeNull();
+    expect(
+      within(screen.getByTestId("matchcenter-action-match-1")).getByText(
+        "Bereit",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("renders live status with an inline live score", () => {
+    renderOverview([
+      createMatch({
+        status: "LIVE",
+        scoreHome: 1,
+        scoreAway: 0,
+      }),
+    ]);
+
+    expect(screen.getByText("Live")).toBeTruthy();
+    expect(screen.getByTestId("matchcenter-live-score-match-1")).toHaveTextContent(
+      "1:0",
     );
   });
 
-  it("renders home and away teams", () => {
-    render(
-      <MatchcenterOverview
-        matches={[createMatch()]}
-      />,
+  it("K. Offen filter link is active and shows only open matches", () => {
+    renderOverview(
+      [
+        createMatch({
+          id: "match-open",
+          operational: {
+            pitchCode: null,
+            homeDressingRoomCode: null,
+            awayDressingRoomCode: null,
+            meetingTime: null,
+            remarks: null,
+          },
+        }),
+        createMatch({ id: "match-ready" }),
+      ],
+      { actionFilter: "OFFEN" },
     );
 
+    expect(screen.getByTestId("matchcenter-filter-offen")).toHaveClass(
+      "border-[var(--sce-primary)]",
+    );
     expect(
-      screen.getByText("FC Allschwil E1"),
+      screen.getByTestId("matchcenter-spielplanung-row-match-open"),
     ).toBeTruthy();
-
     expect(
-      screen.getByText("FC Basel E1"),
-    ).toBeTruthy();
+      screen.queryByTestId("matchcenter-spielplanung-row-match-ready"),
+    ).toBeNull();
   });
 
-  it("links each match to its detail page", () => {
-    render(
-      <MatchcenterOverview
-        matches={[createMatch()]}
-      />,
+  it("a COMPLETED match never appears in Spielplanung, even with Alle selected", () => {
+    renderOverview(
+      [createMatch({ id: "match-completed", status: "COMPLETED" })],
+      { actionFilter: "ALLE" },
+    );
+
+    expect(screen.getByText("Keine Matches gefunden")).toBeTruthy();
+  });
+});
+
+describe("MatchcenterOverview — Resultate", () => {
+  it("B/C. renders the actual completed result, including a legitimate 0:0", () => {
+    renderOverview(
+      [
+        createMatch({
+          id: "match-draw",
+          status: "COMPLETED",
+          scoreHome: 0,
+          scoreAway: 0,
+        }),
+      ],
+      { tab: "RESULTATE" },
+    );
+
+    expect(screen.getByTestId("matchcenter-result-match-draw")).toHaveTextContent(
+      "0:0",
+    );
+  });
+
+  it("renders the mapped score when available", () => {
+    renderOverview(
+      [
+        createMatch({
+          id: "match-1",
+          status: "COMPLETED",
+          scoreHome: 3,
+          scoreAway: 1,
+        }),
+      ],
+      { tab: "RESULTATE" },
+    );
+
+    expect(screen.getByTestId("matchcenter-result-match-1")).toHaveTextContent(
+      "3:1",
+    );
+  });
+
+  it("falls back to resultLabel when mapped scores are absent", () => {
+    renderOverview(
+      [
+        createMatch({
+          id: "match-1",
+          status: "COMPLETED",
+          resultLabel: "2:2",
+        }),
+      ],
+      { tab: "RESULTATE" },
+    );
+
+    expect(screen.getByTestId("matchcenter-result-match-1")).toHaveTextContent(
+      "2:2",
+    );
+  });
+
+  it("does not show operational warnings in Resultate", () => {
+    renderOverview(
+      [
+        createMatch({
+          id: "match-1",
+          status: "COMPLETED",
+          scoreHome: 2,
+          scoreAway: 0,
+          operational: {
+            pitchCode: null,
+            homeDressingRoomCode: null,
+            awayDressingRoomCode: null,
+            meetingTime: null,
+            remarks: null,
+          },
+        }),
+      ],
+      { tab: "RESULTATE" },
+    );
+
+    expect(screen.queryByText("Spielfeld")).toBeNull();
+    expect(screen.queryByText("Aufgaben offen")).toBeNull();
+  });
+
+  it("renders an empty state when no matches were completed this month", () => {
+    renderOverview([createMatch({ status: "SCHEDULED" })], {
+      tab: "RESULTATE",
+    });
+
+    expect(screen.getByText("Keine Resultate vorhanden")).toBeTruthy();
+  });
+
+  it("links each Resultate row to its detail page", () => {
+    renderOverview(
+      [createMatch({ id: "match-1", status: "COMPLETED" })],
+      { tab: "RESULTATE" },
     );
 
     const link = screen.getByRole("link", {
       name: "Details zu FC Allschwil – Gegner anzeigen",
     });
-
-    expect(link).toHaveAttribute(
-      "href",
-      "/dashboard/matchcenter/match-1",
-    );
-  });
-  it("renders mapped score when available", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            status: "COMPLETED",
-            scoreHome: 3,
-            scoreAway: 1,
-          }),
-        ]}
-      />,
-    );
-
-    expect(
-      screen.getByTestId("matchcenter-result-match-1"),
-    ).toHaveTextContent("3:1");
-  });
-
-  it("falls back to resultLabel when mapped score is absent", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            status: "COMPLETED",
-            resultLabel: "2:2",
-          }),
-        ]}
-      />,
-    );
-
-    expect(
-      screen.getByTestId("matchcenter-result-match-1"),
-    ).toHaveTextContent("2:2");
-  });
-
-  it("shows Bereit für Infoboard for a fully set-up home match", () => {
-    render(
-      <MatchcenterOverview
-        matches={[createMatch()]}
-      />,
-    );
-
-    expect(
-      screen.getByText("Bereit für Infoboard"),
-    ).toBeTruthy();
-  });
-
-  it("shows Auswärtsspiel readiness for an away match", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            homeAway: "AWAY",
-            home: {
-              providerTeamId: 200,
-              providerTeamName: "FC Reinach E1",
-              canonicalTeamId: "team-home",
-              canonicalTeamName: "FC Reinach E1",
-              displayName: "FC Reinach E1",
-              resolution: "RESOLVED",
-              isOwnTeam: false,
-            },
-            away: {
-              providerTeamId: 100,
-              providerTeamName: "FC Allschwil E1",
-              canonicalTeamId: "team-away",
-              canonicalTeamName: "FC Allschwil E1",
-              displayName: "FC Allschwil E1",
-              resolution: "RESOLVED",
-              isOwnTeam: true,
-            },
-          }),
-        ]}
-      />,
-    );
-
-    // Both the homeaway badge and the readiness badge show "Auswärtsspiel"
-    expect(screen.getAllByText("Auswärtsspiel").length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText("Infoboard nicht freigegeben")).toBeNull();
-  });
-
-  it("shows missing operational data as warnings", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            visibility: {
-              websiteVisible: true,
-              infoboardVisible: false,
-              homepageVisible: false,
-              wochenplanVisible: true,
-              trainingsplanVisible: false,
-              teamPageVisible: true,
-            },
-            operational: {
-              pitchCode: null,
-              homeDressingRoomCode: null,
-              awayDressingRoomCode: null,
-              meetingTime: null,
-              remarks: null,
-            },
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.getByText("Spielfeld fehlt")).toBeTruthy();
-    expect(screen.getByText("Garderobe Heimteam fehlt")).toBeTruthy();
-    expect(screen.getByText("Garderobe Gastteam fehlt")).toBeTruthy();
-    expect(screen.getByText("Infoboard nicht freigegeben")).toBeTruthy();
-  });
-
-  it("shows unresolved team warnings", () => {
-    const base = createMatch();
-
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            // Both sides unresolved so readiness is "setup-required" and warnings show
-            home: {
-              ...base.home,
-              canonicalTeamId: null,
-              canonicalTeamName: null,
-              resolution: "UNRESOLVED",
-            },
-            away: {
-              ...base.away,
-              canonicalTeamId: null,
-              canonicalTeamName: null,
-              resolution: "UNRESOLVED",
-            },
-          }),
-        ]}
-      />,
-    );
-
-    expect(
-      screen.getByText("Team nicht zugeordnet"),
-    ).toBeTruthy();
-  });
-
-  it("does not show Infoboard warning for away matches", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            homeAway: "AWAY",
-            visibility: {
-              websiteVisible: true,
-              infoboardVisible: false,
-              homepageVisible: false,
-              wochenplanVisible: false,
-              trainingsplanVisible: false,
-              teamPageVisible: false,
-            },
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.queryByText("Infoboard nicht freigegeben")).toBeNull();
-  });
-
-  it("renders live status in German", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            status: "LIVE",
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.getByText("Live")).toBeTruthy();
-  });
-});
-
-describe("TEAM-SFV-MAPPING-05: team-assignment warning semantics", () => {
-  // Reproduces live STAGE provider match 4344423 (Junioren B 1. Stärkeklasse):
-  // Home: FC Allschwil B2 (canonically mapped) — Away: VfR Kleinhüningen a
-  // (external opponent, intentionally not mapped to a canonical tenant Team).
-  const unmappedExternalOpponent = {
-    providerTeamId: 5544,
-    providerTeamName: "VfR Kleinhüningen a",
-    canonicalTeamId: null,
-    canonicalTeamName: null,
-    displayName: "VfR Kleinhüningen a",
-    resolution: "UNRESOLVED" as const,
-    isOwnTeam: false,
-  };
-
-  const resolvedFca = {
-    providerTeamId: 3311,
-    providerTeamName: "FC Allschwil B2",
-    canonicalTeamId: "team-fca-b2",
-    canonicalTeamName: "FC Allschwil B2",
-    displayName: "FC Allschwil B2",
-    resolution: "RESOLVED" as const,
-    isOwnTeam: true,
-  };
-
-  const unresolvedFca = {
-    providerTeamId: 3311,
-    providerTeamName: "FC Allschwil B2",
-    canonicalTeamId: null,
-    canonicalTeamName: null,
-    displayName: "FC Allschwil B2",
-    resolution: "UNRESOLVED" as const,
-    isOwnTeam: false,
-  };
-
-  const resolvedOpponent = {
-    providerTeamId: 5544,
-    providerTeamName: "VfR Kleinhüningen a",
-    canonicalTeamId: "team-opponent",
-    canonicalTeamName: "VfR Kleinhüningen a",
-    displayName: "VfR Kleinhüningen a",
-    resolution: "RESOLVED" as const,
-    isOwnTeam: false,
-  };
-
-  it("case 1 / match 4344423: FCA home resolved + external opponent unmapped -> no warning", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            id: "match-4344423",
-            title: "FC Allschwil B2 – VfR Kleinhüningen a",
-            competitionLabel: "Junioren B 1. Stärkeklasse",
-            homeAway: "HOME",
-            home: resolvedFca,
-            away: unmappedExternalOpponent,
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.queryByText("Team nicht zugeordnet")).toBeNull();
-    // The opponent's provider name remains visible without being canonicalized.
-    expect(screen.getByText("VfR Kleinhüningen a")).toBeTruthy();
-  });
-
-  it("case 2: FCA away side resolved + external opponent unmapped -> no warning", () => {
-    // Away matches render an informational "Auswärtsspiel" readiness badge
-    // instead of the warning list, so the underlying decision (used by any
-    // consumer of the warnings, e.g. detail-page parity) is asserted
-    // directly here rather than through the away-match UI branch.
-    const match = createMatch({
-      homeAway: "AWAY",
-      home: unmappedExternalOpponent,
-      away: resolvedFca,
-    });
-
-    expect(getOperationalWarnings(match)).not.toContain(
-      "Team nicht zugeordnet",
-    );
-  });
-
-  it("case 3: FCA home side unresolved -> warning shown even if opponent is mapped", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            homeAway: "HOME",
-            home: unresolvedFca,
-            away: resolvedOpponent,
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.getByText("Team nicht zugeordnet")).toBeTruthy();
-  });
-
-  it("case 4: FCA away side unresolved -> warning shown", () => {
-    const match = createMatch({
-      homeAway: "AWAY",
-      home: resolvedOpponent,
-      away: unresolvedFca,
-    });
-
-    expect(getOperationalWarnings(match)).toContain(
-      "Team nicht zugeordnet",
-    );
-  });
-
-  it("case 5: both canonical sides resolved -> no team-assignment warning", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            homeAway: "HOME",
-            home: resolvedFca,
-            away: resolvedOpponent,
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.queryByText("Team nicht zugeordnet")).toBeNull();
-  });
-
-  it("case 7: pitch/dressing-room warnings remain unaffected by an unmapped opponent", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            homeAway: "HOME",
-            home: resolvedFca,
-            away: unmappedExternalOpponent,
-            operational: {
-              pitchCode: null,
-              homeDressingRoomCode: null,
-              awayDressingRoomCode: null,
-              meetingTime: null,
-              remarks: null,
-            },
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.queryByText("Team nicht zugeordnet")).toBeNull();
-    expect(screen.getByText("Spielfeld fehlt")).toBeTruthy();
-    expect(screen.getByText("Garderobe Heimteam fehlt")).toBeTruthy();
-    expect(screen.getByText("Garderobe Gastteam fehlt")).toBeTruthy();
-  });
-
-  it("readiness is 'ready' for a fully set-up home match even with an unmapped opponent", () => {
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            id: "match-4344423",
-            homeAway: "HOME",
-            home: resolvedFca,
-            away: unmappedExternalOpponent,
-          }),
-        ]}
-      />,
-    );
-
-    expect(
-      screen.getByTestId("matchcenter-readiness-match-4344423"),
-    ).toHaveTextContent("Bereit für Infoboard");
-  });
-
-  it("does not rely on team display names to decide the warning (identity-based only)", () => {
-    // Same shape as the unresolved-FCA case, but with unrelated/foreign
-    // display names — the outcome must be identical, proving the decision
-    // is based on isOwnTeam/homeAway/resolution, not on name matching.
-    render(
-      <MatchcenterOverview
-        matches={[
-          createMatch({
-            homeAway: "HOME",
-            home: {
-              ...unresolvedFca,
-              providerTeamName: "Zzz Unrelated Name FC",
-              displayName: "Zzz Unrelated Name FC",
-            },
-            away: {
-              ...resolvedOpponent,
-              providerTeamName: "FC Allschwil Lookalike",
-              canonicalTeamName: "FC Allschwil Lookalike",
-              displayName: "FC Allschwil Lookalike",
-            },
-          }),
-        ]}
-      />,
-    );
-
-    // Warning still fires because the home side (FCA, per homeAway) is
-    // unresolved — regardless of what either side is named.
-    expect(screen.getByText("Team nicht zugeordnet")).toBeTruthy();
+    expect(link).toHaveAttribute("href", "/dashboard/matchcenter/match-1");
   });
 });

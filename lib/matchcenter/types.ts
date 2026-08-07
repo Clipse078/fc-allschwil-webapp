@@ -5,6 +5,8 @@ export type MatchcenterTeamResolution =
 export interface MatchcenterTeamReference {
   id: string;
   name: string;
+  shortName?: string | null;
+  alternativeName?: string | null;
 }
 
 export interface MatchcenterSide {
@@ -12,6 +14,20 @@ export interface MatchcenterSide {
   providerTeamName: string | null;
   canonicalTeamId: string | null;
   canonicalTeamName: string | null;
+  /**
+   * TEAM-IDENTITY-01 canonical SHORT NAME (Team.shortName), when the side
+   * resolves to a canonical Team. Optional so existing fixtures/tests that
+   * predate TEAM-IDENTITY-01 compact naming keep compiling unchanged.
+   * Use lib/matchcenter/team-display.ts to resolve the compact display name
+   * rather than reading this field directly.
+   */
+  canonicalTeamShortName?: string | null;
+  /**
+   * TEAM-IDENTITY-01 canonical ALTERNATIVE NAME (Team.alternativeName).
+   * See canonicalTeamShortName above.
+   */
+  canonicalTeamAlternativeName?: string | null;
+  /** Long-form display name (TEAM-IDENTITY-01 long resolver). */
   displayName: string;
   resolution: MatchcenterTeamResolution;
   isOwnTeam: boolean;

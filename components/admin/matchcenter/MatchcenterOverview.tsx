@@ -1,375 +1,260 @@
 import Link from "next/link";
-import {
-  CalendarDays,
-  CheckCircle2,
-  CircleAlert,
-  Clock3,
-  MapPin,
-  Plus,
-  Radio,
-  ShieldAlert,
-  Volleyball,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Volleyball } from "lucide-react";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
-import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import {
+  buildMatchcenterViewModel,
+  type MatchcenterActionFilter,
+  type MatchcenterTab,
+} from "@/lib/matchcenter/view-model";
+import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/ui/page/EmptyState";
 import { SectionCard } from "@/components/ui/page/SectionCard";
+import MatchcenterSpielplanungRow from "./MatchcenterSpielplanungRow";
+import MatchcenterResultRow from "./MatchcenterResultRow";
+
+export type MatchcenterMonthWindowLike = {
+  param: string;
+  label: string;
+  previousParam: string;
+  nextParam: string;
+};
 
 type MatchcenterOverviewProps = {
   matches: MatchcenterMatchSummary[];
+  tab: MatchcenterTab;
+  actionFilter: MatchcenterActionFilter;
+  monthWindow: MatchcenterMonthWindowLike;
+  basePath?: string;
   timezone?: string;
   locale?: string;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: "Geplant",
-  LIVE: "Live",
-  COMPLETED: "Abgeschlossen",
-  POSTPONED: "Verschoben",
-  CANCELED: "Abgesagt",
-  CANCELLED: "Abgesagt",
-  DRAFT: "Entwurf",
-  ARCHIVED: "Archiviert",
-};
+const TABS: { key: MatchcenterTab; label: string }[] = [
+  { key: "SPIELPLANUNG", label: "Spielplanung" },
+  { key: "RESULTATE", label: "Resultate" },
+];
 
-const STATUS_VARIANTS: Record<string, BadgeVariant> = {
-  SCHEDULED: "info",
-  LIVE: "success",
-  COMPLETED: "default",
-  POSTPONED: "warning",
-  CANCELED: "danger",
-  CANCELLED: "danger",
-  DRAFT: "outline",
-  ARCHIVED: "outline",
-};
+const ACTION_FILTERS: { key: MatchcenterActionFilter; label: string }[] = [
+  { key: "ALLE", label: "Alle" },
+  { key: "OFFEN", label: "Offen" },
+  { key: "ERLEDIGT", label: "Erledigt" },
+];
 
-function formatMatchDate(
-  value: Date,
-  locale: string,
-  timezone: string,
+function buildHref(
+  basePath: string,
+  params: { tab: MatchcenterTab; month: string; actionFilter: MatchcenterActionFilter },
 ): string {
-  return new Intl.DateTimeFormat(locale, {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  }).format(value);
-}
-
-function getResult(match: MatchcenterMatchSummary): string | null {
-  if (match.scoreHome !== null && match.scoreAway !== null) {
-    return `${match.scoreHome}:${match.scoreAway}`;
+  const search = new URLSearchParams();
+  search.set("tab", params.tab.toLowerCase());
+  search.set("month", params.month);
+  if (params.tab === "SPIELPLANUNG") {
+    search.set("filter", params.actionFilter.toLowerCase());
   }
-
-  const resultLabel = match.resultLabel?.trim();
-
-  return resultLabel ? resultLabel : null;
-}
-
-type MatchReadiness =
-  | "ready"
-  | "setup-required"
-  | "away-match";
-
-export function getMatchReadiness(
-  match: MatchcenterMatchSummary,
-): MatchReadiness {
-  const homeAway = match.homeAway?.trim().toUpperCase() ?? null;
-
-  if (homeAway === "AWAY") {
-    return "away-match";
-  }
-
-  // Home matches only require the tenant-owned home (FC Allschwil) side to
-  // resolve to a canonical Team. The away side is an external opponent and
-  // is intentionally allowed to remain unmapped — see getOperationalWarnings.
-  const hasTeam = match.home.resolution === "RESOLVED";
-  const hasPitch = Boolean(match.operational.pitchCode?.trim());
-  const hasHomeDR = Boolean(match.operational.homeDressingRoomCode?.trim());
-  const hasAwayDR = Boolean(match.operational.awayDressingRoomCode?.trim());
-  const infoboardOn = match.visibility.infoboardVisible;
-
-  if (homeAway === "HOME" && hasTeam && hasPitch && hasHomeDR && hasAwayDR && infoboardOn) {
-    return "ready";
-  }
-
-  return "setup-required";
-}
-
-export function getOperationalWarnings(
-  match: MatchcenterMatchSummary,
-): string[] {
-  const warnings: string[] = [];
-  const homeAway = match.homeAway?.trim().toUpperCase() ?? null;
-  const isAway = homeAway === "AWAY";
-
-  // A match only requires the tenant-owned FC Allschwil side to resolve to a
-  // canonical Team. `homeAway` reflects FC Allschwil's own perspective on the
-  // fixture, so the FCA side is the home side for home matches and the away
-  // side for away matches. The opposite side is always the external
-  // opponent: it is intentionally allowed to stay unmapped
-  // (canonicalTeamId === null) and its resolution state must never trigger
-  // this warning on its own — see TEAM-SFV-MAPPING-05.
-  const ownSide = isAway ? match.away : match.home;
-  const ownSideUnresolved = ownSide.resolution === "UNRESOLVED";
-
-  if (ownSideUnresolved) {
-    warnings.push("Team nicht zugeordnet");
-  }
-
-  if (!match.operational.pitchCode?.trim()) {
-    warnings.push("Spielfeld fehlt");
-  }
-
-  if (!match.operational.homeDressingRoomCode?.trim()) {
-    warnings.push("Garderobe Heimteam fehlt");
-  }
-
-  if (!match.operational.awayDressingRoomCode?.trim()) {
-    warnings.push("Garderobe Gastteam fehlt");
-  }
-
-  // Only show infoboard warning for home matches
-  if (homeAway === "HOME" && !match.visibility.infoboardVisible) {
-    warnings.push("Infoboard nicht freigegeben");
-  }
-
-  return warnings;
+  return `${basePath}?${search.toString()}`;
 }
 
 export default function MatchcenterOverview({
   matches,
+  tab,
+  actionFilter,
+  monthWindow,
+  basePath = "/dashboard/matchcenter",
   timezone = "Europe/Zurich",
   locale = "de-CH",
 }: MatchcenterOverviewProps) {
-  if (matches.length === 0) {
-    return (
-      <SectionCard noPadding>
-        <EmptyState
-          icon={<Volleyball className="h-8 w-8" />}
-          heading="Keine Matches vorhanden"
-          description="Im aktuellen Matchcenter-Zeitraum wurden keine Spiele gefunden."
-          action={
-            <Link
-              href="/dashboard/events/matches/new"
-              className="fca-button-primary"
-            >
-              <Plus className="h-4 w-4" />
-              Match erstellen
-            </Link>
-          }
-        />
-      </SectionCard>
-    );
-  }
+  const viewModel = buildMatchcenterViewModel(matches, { actionFilter });
 
   return (
-    <SectionCard
-      title="Matches"
-      description="Chronologische Übersicht der vergangenen und kommenden Spiele."
-      noPadding
-    >
+    <div className="space-y-5">
+      {/* Spielplanung / Resultate ────────────────────────────────────────── */}
       <div
-        className="divide-y divide-[var(--border)]"
-        data-testid="matchcenter-list"
+        role="tablist"
+        aria-label="Matchcenter-Bereiche"
+        className="flex gap-1 border-b border-[var(--border)]"
       >
-        {matches.map((match) => {
-          const result = getResult(match);
-          const warnings = getOperationalWarnings(match);
-          const readiness = getMatchReadiness(match);
-          const statusLabel =
-            STATUS_LABELS[match.status] ?? match.status;
-          const statusVariant =
-            STATUS_VARIANTS[match.status] ?? "default";
-          const normalizedHomeAway =
-            match.homeAway?.trim().toUpperCase() ?? null;
-          const homeAwayLabel =
-            normalizedHomeAway === "HOME"
-              ? "Heimspiel"
-              : normalizedHomeAway === "AWAY"
-                ? "Auswärtsspiel"
-                : null;
-
+        {TABS.map((item) => {
+          const isActive = item.key === tab;
           return (
-            <article
-              key={match.id}
-              data-testid={`matchcenter-row-${match.id}`}
-              className="relative px-5 py-4 transition hover:bg-[var(--surface-2)]"
+            <Link
+              key={item.key}
+              href={buildHref(basePath, {
+                tab: item.key,
+                month: monthWindow.param,
+                actionFilter,
+              })}
+              role="tab"
+              aria-selected={isActive}
+              data-testid={`matchcenter-tab-${item.key.toLowerCase()}`}
+              className={cn(
+                "-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors",
+                isActive
+                  ? "border-[var(--sce-primary)] text-[var(--sce-primary)]"
+                  : "border-transparent text-[var(--text-2)] hover:text-[var(--foreground)]",
+              )}
             >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
-                    <Volleyball className="h-4 w-4 text-[var(--muted)]" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge
-                        variant={statusVariant}
-                        size="sm"
-                      >
-                        {match.status === "LIVE" ? (
-                          <Radio className="h-3 w-3" />
-                        ) : null}
-                        {statusLabel}
-                      </Badge>
-
-                      {homeAwayLabel ? (
-                        <Badge
-                          variant={
-                            normalizedHomeAway === "HOME"
-                              ? "success"
-                              : "default"
-                          }
-                          size="sm"
-                          data-testid={`matchcenter-homeaway-${match.id}`}
-                        >
-                          {homeAwayLabel}
-                        </Badge>
-                      ) : null}
-
-                      {match.competitionLabel ? (
-                        <span className="text-xs font-medium text-[var(--muted)]">
-                          {match.competitionLabel}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-2 grid gap-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center sm:gap-4">
-                      <p
-                        className={
-                          match.home.isOwnTeam
-                            ? "truncate text-sm font-semibold text-[var(--foreground)]"
-                            : "truncate text-sm text-[var(--foreground)]"
-                        }
-                      >
-                        {match.home.displayName}
-                      </p>
-
-                      <div className="flex items-center gap-2 sm:justify-center">
-                        {result ? (
-                          <span
-                            data-testid={`matchcenter-result-${match.id}`}
-                            className="rounded-lg bg-[var(--foreground)] px-3 py-1 text-sm font-bold tabular-nums text-white"
-                          >
-                            {result}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                            vs.
-                          </span>
-                        )}
-                      </div>
-
-                      <p
-                        className={
-                          match.away.isOwnTeam
-                            ? "truncate text-sm font-semibold text-[var(--foreground)] sm:text-right"
-                            : "truncate text-sm text-[var(--foreground)] sm:text-right"
-                        }
-                      >
-                        {match.away.displayName}
-                      </p>
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
-                      <span className="inline-flex items-center gap-1.5">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {formatMatchDate(
-                          match.startAt,
-                          locale,
-                          timezone,
-                        )}
-                      </span>
-
-                      {match.location ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {match.location}
-                        </span>
-                      ) : null}
-
-                      {match.operational.meetingTime ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock3 className="h-3.5 w-3.5" />
-                          Treffpunkt{" "}
-                          {new Intl.DateTimeFormat(locale, {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            timeZone: timezone,
-                          }).format(match.operational.meetingTime)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 flex-wrap items-center gap-2 lg:max-w-xs lg:justify-end">
-                  {/* Infoboard readiness badge */}
-                  {readiness === "ready" ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700"
-                      data-testid={`matchcenter-readiness-${match.id}`}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Bereit für Infoboard
-                    </span>
-                  ) : readiness === "away-match" ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]"
-                      data-testid={`matchcenter-readiness-${match.id}`}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Auswärtsspiel
-                    </span>
-                  ) : warnings.length === 0 ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Operativ vollständig
-                    </span>
-                  ) : (
-                    <>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
-                        <CircleAlert className="h-3.5 w-3.5" />
-                        Einrichtung erforderlich
-                      </span>
-
-                      <div
-                        className="flex flex-wrap gap-1.5"
-                        aria-label="Operative Hinweise"
-                      >
-                        {warnings.map((warning) => (
-                          <Badge
-                            key={warning}
-                            variant="warning"
-                            size="sm"
-                          >
-                            <ShieldAlert className="h-3 w-3" />
-                            {warning}
-                          </Badge>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <Link
-                  href={`/dashboard/matchcenter/${match.id}`}
-                  aria-label={`Details zu ${match.title} anzeigen`}
-                  className="absolute inset-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2"
-                >
-                  <span className="sr-only">
-                    Details zu {match.title} anzeigen
-                  </span>
-                </Link>
-              </div>
-            </article>
+              {item.label}
+            </Link>
           );
         })}
       </div>
-    </SectionCard>
+
+      {/* Month navigation ──────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5">
+        <Link
+          href={buildHref(basePath, {
+            tab,
+            month: monthWindow.previousParam,
+            actionFilter,
+          })}
+          aria-label="Vorheriger Monat"
+          data-testid="matchcenter-month-previous"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Link>
+
+        <span
+          className="text-sm font-semibold text-[var(--foreground)]"
+          data-testid="matchcenter-month-label"
+        >
+          {monthWindow.label}
+        </span>
+
+        <Link
+          href={buildHref(basePath, {
+            tab,
+            month: monthWindow.nextParam,
+            actionFilter,
+          })}
+          aria-label="Nächster Monat"
+          data-testid="matchcenter-month-next"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Link>
+      </div>
+
+      {/* Operational summary ───────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard label="Anstehend" value={viewModel.kpis.anstehend} tone="default" />
+        <SummaryCard label="Offen" value={viewModel.kpis.offen} tone="amber" />
+        <SummaryCard label="Bereit" value={viewModel.kpis.bereit} tone="emerald" />
+        <SummaryCard label="Resultate" value={viewModel.kpis.resultate} tone="default" />
+      </div>
+
+      {tab === "SPIELPLANUNG" ? (
+        <>
+          {/* Alle / Offen / Erledigt ─────────────────────────────────────── */}
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Aktionsfilter">
+            {ACTION_FILTERS.map((item) => {
+              const isActive = item.key === actionFilter;
+              return (
+                <Link
+                  key={item.key}
+                  href={buildHref(basePath, {
+                    tab,
+                    month: monthWindow.param,
+                    actionFilter: item.key,
+                  })}
+                  data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
+                    isActive
+                      ? "border-[var(--sce-primary)] bg-[var(--sce-primary-light)] text-[var(--sce-primary)]"
+                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {viewModel.spielplanung.length === 0 ? (
+            <SectionCard noPadding>
+              <EmptyState
+                icon={<Volleyball className="h-8 w-8" />}
+                heading="Keine Matches gefunden"
+                description="Für den ausgewählten Monat und Filter gibt es keine anstehenden Spiele."
+                action={
+                  <Link href="/dashboard/events/matches/new" className="fca-button-primary">
+                    <Plus className="h-4 w-4" />
+                    Match erstellen
+                  </Link>
+                }
+              />
+            </SectionCard>
+          ) : (
+            <SectionCard noPadding>
+              <div className="divide-y divide-[var(--border)]" data-testid="matchcenter-spielplanung-list">
+                {viewModel.spielplanung.map((row) => (
+                  <MatchcenterSpielplanungRow
+                    key={row.match.id}
+                    match={row.match}
+                    assessment={row.assessment}
+                    locale={locale}
+                    timezone={timezone}
+                  />
+                ))}
+              </div>
+            </SectionCard>
+          )}
+        </>
+      ) : (
+        <>
+          {viewModel.resultate.length === 0 ? (
+            <SectionCard noPadding>
+              <EmptyState
+                icon={<Volleyball className="h-8 w-8" />}
+                heading="Keine Resultate vorhanden"
+                description="Für den ausgewählten Monat wurden noch keine Spiele abgeschlossen."
+              />
+            </SectionCard>
+          ) : (
+            <SectionCard noPadding>
+              <div className="divide-y divide-[var(--border)]" data-testid="matchcenter-resultate-list">
+                {viewModel.resultate.map((match) => (
+                  <MatchcenterResultRow
+                    key={match.id}
+                    match={match}
+                    locale={locale}
+                    timezone={timezone}
+                  />
+                ))}
+              </div>
+            </SectionCard>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "default" | "amber" | "emerald";
+}) {
+  const toneClass =
+    tone === "amber"
+      ? "text-amber-600"
+      : tone === "emerald"
+        ? "text-emerald-600"
+        : "text-[var(--blue)]";
+
+  return (
+    <div className="sce-kpi-card p-4" data-testid={`matchcenter-kpi-${label.toLowerCase()}`}>
+      <p className="sce-data-label">{label}</p>
+      <p
+        className={cn("mt-1.5 text-[1.75rem] font-bold leading-none tracking-tight", toneClass)}
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
