@@ -66,12 +66,27 @@ export type RegisterTeamInput = {
    */
   existingTeamId?: string | null;
   team: {
-    /** Team name. Required. */
+    /** Team name. Required. Becomes the canonical Team.name (LONG NAME). */
     name: string;
     /** Optional slug. Auto-generated from name when absent. */
     slug?: string | null;
-    /** Optional short name. Defaults to name when absent. */
+    /**
+     * Optional short name, entered once at registration time.
+     * TEAM-IDENTITY-01: this value is persisted to BOTH the canonical
+     * Team.shortName (tenant-owned, set only here, never auto-derived) and —
+     * unchanged from prior behavior — the seasonal TeamSeason.shortName
+     * (falling back to a name-derived value when omitted). When absent,
+     * Team.shortName remains NULL (no guessed data).
+     */
     shortName?: string | null;
+    /**
+     * Optional canonical ALTERNATIVE NAME (Team.alternativeName).
+     * TEAM-IDENTITY-01: tenant-owned, set only at Team creation here, never
+     * auto-derived from `name` or `shortName`. Ignored when reusing an
+     * existing Team identity (existingTeamId set) — edit it later via the
+     * Team settings page instead.
+     */
+    alternativeName?: string | null;
     /** Optional gender group (free text). */
     genderGroup?: string | null;
     /** Optional age group / level (free text). */
@@ -398,9 +413,15 @@ export async function registerTeamSeason(
           }
 
           // Create new Team identity (legacy category as neutral compatibility default)
+          //
+          // TEAM-IDENTITY-01: Team.shortName / Team.alternativeName are set
+          // only from explicit input here — never auto-derived from `name`.
+          // Both remain NULL when omitted.
           const newTeam = await tx.team.create({
             data: {
               name: teamName,
+              shortName: input.team.shortName?.trim() || null,
+              alternativeName: input.team.alternativeName?.trim() || null,
               slug: teamSlug,
               tenantId: input.tenantId,
               category: DEFAULT_LEGACY_CATEGORY,

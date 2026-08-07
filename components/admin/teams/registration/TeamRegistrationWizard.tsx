@@ -357,6 +357,7 @@ export default function TeamRegistrationWizard() {
           name: form.teamName,
           slug: form.teamSlug || normalizeTeamSlug(form.teamName),
           shortName: form.teamShortName || undefined,
+          alternativeName: form.teamAlternativeName || undefined,
           genderGroup: form.teamGenderGroup || undefined,
           ageGroup: form.teamAgeGroup || undefined,
           sortOrder: form.teamSortOrder,

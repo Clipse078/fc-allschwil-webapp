@@ -124,9 +124,12 @@ export default function WizardReview({
 
       {/* Team */}
       <ReviewSection title="Team" onEdit={() => onGoToStep(STEP_TEAM)}>
-        <ReviewRow label="Teamname" value={form.teamName || "—"} />
+        <ReviewRow label="Langname" value={form.teamName || "—"} />
         {form.teamShortName && (
           <ReviewRow label="Kurzname" value={form.teamShortName} />
+        )}
+        {form.teamAlternativeName && (
+          <ReviewRow label="Alternativname" value={form.teamAlternativeName} />
         )}
         <ReviewRow
           label="URL-Pfad"

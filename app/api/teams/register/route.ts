@@ -97,6 +97,12 @@ export async function POST(request: NextRequest) {
     typeof teamObj.slug === "string" ? teamObj.slug.trim() || null : null;
   const teamShortName =
     typeof teamObj.shortName === "string" ? teamObj.shortName.trim() || null : null;
+  // TEAM-IDENTITY-01: Team.alternativeName — tenant-owned, optional. Set only
+  // at Team creation. Never derived from parsing `name`.
+  const teamAlternativeName =
+    typeof teamObj.alternativeName === "string"
+      ? teamObj.alternativeName.trim() || null
+      : null;
   const teamGenderGroup =
     typeof teamObj.genderGroup === "string" ? teamObj.genderGroup.trim() || null : null;
   const teamAgeGroup =
@@ -176,6 +182,7 @@ export async function POST(request: NextRequest) {
       name: teamName,
       slug: teamSlug,
       shortName: teamShortName,
+      alternativeName: teamAlternativeName,
       genderGroup: teamGenderGroup,
       ageGroup: teamAgeGroup,
       sortOrder: teamSortOrder,

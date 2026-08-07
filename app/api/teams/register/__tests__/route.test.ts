@@ -209,6 +209,39 @@ describe("POST /api/teams/register — input validation", () => {
   });
 });
 
+// ── TEAM-IDENTITY-01 — canonical Team.alternativeName pass-through ────────────
+
+describe("POST /api/teams/register — TEAM-IDENTITY-01 naming fields", () => {
+  it("passes team.alternativeName through to registerTeamSeason when provided", async () => {
+    const body = {
+      ...VALID_BODY,
+      team: { name: "Frauen 1", shortName: "F1", alternativeName: "1. Frauenmannschaft" },
+    };
+
+    await POST(makeRequest(body));
+
+    expect(mocks.registerTeamSeason).toHaveBeenCalledWith(
+      expect.objectContaining({
+        team: expect.objectContaining({
+          name: "Frauen 1",
+          shortName: "F1",
+          alternativeName: "1. Frauenmannschaft",
+        }),
+      }),
+    );
+  });
+
+  it("defaults team.alternativeName to null when omitted", async () => {
+    await POST(makeRequest(VALID_BODY));
+
+    expect(mocks.registerTeamSeason).toHaveBeenCalledWith(
+      expect.objectContaining({
+        team: expect.objectContaining({ alternativeName: null }),
+      }),
+    );
+  });
+});
+
 // ── Domain errors ──────────────────────────────────────────────────────────────
 
 describe("POST /api/teams/register — domain errors", () => {
