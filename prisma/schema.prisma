@@ -2816,6 +2816,15 @@ model MatchExternalMapping {
   homeTeamId             String?
   /// Canonical local Team for away side. Null when external opponent.
   awayTeamId             String?
+  /// CLUB-DIRECTORY-02: canonical ExternalClub-Directory ExternalTeam for the
+  /// home side, when that side is an external opponent (i.e. homeTeamId is
+  /// null). Resolved/created by the discovery flow in
+  /// lib/club-directory/discovery-service.ts during schedule sync — never a
+  /// second/parallel opponent representation. Null until discovery has run
+  /// for this side, or when the side is a club-owned team.
+  homeExternalTeamId     String?
+  /// See homeExternalTeamId — away-side equivalent.
+  awayExternalTeamId     String?
   /// Raw SFV matchState integer, preserved exactly as received. Never interpreted.
   providerMatchState     Int?
   /// Human-readable match state name from provider, for admin reference.
@@ -2850,10 +2859,13 @@ model MatchExternalMapping {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  homeTeam Team?  @relation("MatchHomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  awayTeam Team?  @relation("MatchAwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  event            Event         @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  homeTeam         Team?         @relation("MatchHomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  awayTeam         Team?         @relation("MatchAwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  /// CLUB-DIRECTORY-02: canonical Club Directory identity for external sides.
+  homeExternalTeam ExternalTeam? @relation("MatchHomeExternalTeam", fields: [homeExternalTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  awayExternalTeam ExternalTeam? @relation("MatchAwayExternalTeam", fields: [awayExternalTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   /// Prevents duplicate SFV match mappings within the same tenant.
   @@unique([tenantId, provider, externalMatchId])
@@ -2862,6 +2874,8 @@ model MatchExternalMapping {
   @@index([eventId])
   @@index([homeTeamId])
   @@index([awayTeamId])
+  @@index([homeExternalTeamId])
+  @@index([awayExternalTeamId])
 }
 
 model TenantSfvConfig {
@@ -3048,6 +3062,12 @@ model ExternalTeam {
   updatedAt DateTime @updatedAt
 
   providerMappings ExternalTeamProviderMapping[]
+
+  // CLUB-DIRECTORY-02: reverse relations for the canonical opponent identity
+  // consumed directly by Matchcenter (see MatchExternalMapping.homeExternalTeamId
+  // / awayExternalTeamId below) — never a second/parallel opponent model.
+  matchMappingsAsHome MatchExternalMapping[] @relation("MatchHomeExternalTeam")
+  matchMappingsAsAway MatchExternalMapping[] @relation("MatchAwayExternalTeam")
 
   @@index([tenantId])
   @@index([tenantId, archivedAt])
