@@ -130,3 +130,79 @@ describe("TeamsOverviewGrid — recognition (MINIMAL TEAMS UX)", () => {
     expect(screen.getByText("2027/28")).toBeTruthy();
   });
 });
+
+// ── TEAM-IDENTITY-01 — canonical naming contract ──────────────────────────────
+
+describe("TeamsOverviewGrid — TEAM-IDENTITY-01 canonical naming", () => {
+  it("uses the resolved displayName (long name) as the primary title", () => {
+    render(
+      <TeamsOverviewGrid
+        teams={[
+          makeTeam({
+            name: "Junioren B2",
+            displayName: "FC Allschwil Junioren B2",
+            compactName: "B2",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("FC Allschwil Junioren B2")).toBeTruthy();
+  });
+
+  it("shows the compact/short name as a secondary badge when it differs from the long name", () => {
+    render(
+      <TeamsOverviewGrid
+        teams={[
+          makeTeam({
+            name: "FC Allschwil Junioren B2",
+            displayName: "FC Allschwil Junioren B2",
+            compactName: "B2",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByTitle("Kurzname")).toHaveTextContent("B2");
+  });
+
+  it("does not duplicate the short name badge when it equals the long name", () => {
+    render(
+      <TeamsOverviewGrid
+        teams={[
+          makeTeam({
+            name: "Aktive",
+            displayName: "Aktive",
+            compactName: "Aktive",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByTitle("Kurzname")).toBeNull();
+  });
+
+  it("falls back to Team.name when no resolved displayName is supplied (back-compat)", () => {
+    render(
+      <TeamsOverviewGrid
+        teams={[
+          makeTeam({
+            name: "FC Allschwil C1",
+            displayName: undefined,
+            compactName: undefined,
+            activeSeason: null,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("FC Allschwil C1")).toBeTruthy();
+  });
+
+  it("does not prominently render an externalTeamId anywhere in the row", () => {
+    render(<TeamsOverviewGrid teams={[makeTeam()]} />);
+
+    expect(screen.queryByText(/externalTeamId/i)).toBeNull();
+    expect(screen.queryByText(/31927/)).toBeNull();
+  });
+});

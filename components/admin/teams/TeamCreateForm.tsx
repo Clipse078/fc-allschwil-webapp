@@ -46,6 +46,8 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
   const router = useRouter();
 
   const [name, setName] = useState("");
+  const [shortName, setShortName] = useState("");
+  const [alternativeName, setAlternativeName] = useState("");
   const [slug, setSlug] = useState("");
   const [category, setCategory] = useState("KINDERFUSSBALL");
   const [seasonId, setSeasonId] = useState("");
@@ -126,6 +128,8 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
         },
         body: JSON.stringify({
           name,
+          shortName: shortName || null,
+          alternativeName: alternativeName || null,
           slug: slug || generatedSlug,
           seasonId,
           category,
@@ -241,11 +245,11 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
 
         <FormSection
           title="Team-Details"
-          description="Name, Slug und Klassifizierung des Teams."
+          description="Langname, Kurzname, Alternativname, Slug und Klassifizierung des Teams. Kurzname und Alternativname sind optional und werden von einer allfälligen Verbandsanbindung (z. B. SFV) nie überschrieben."
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1.5">
-              <span className="fca-label">Teamname *</span>
+              <span className="fca-label">Langname *</span>
               <input
                 type="text"
                 value={name}
@@ -256,6 +260,7 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
                   }
                 }}
                 className="fca-input"
+                placeholder="z. B. FC Allschwil Junioren B2"
                 required
               />
             </label>
@@ -268,6 +273,28 @@ export default function TeamCreateForm({ availableOrgUnits }: Props) {
                 onChange={(event) => setSlug(slugify(event.target.value))}
                 className="fca-input font-mono text-xs"
                 required
+              />
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="fca-label">Kurzname</span>
+              <input
+                type="text"
+                value={shortName}
+                onChange={(event) => setShortName(event.target.value)}
+                className="fca-input"
+                placeholder="z. B. B2"
+              />
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="fca-label">Alternativname</span>
+              <input
+                type="text"
+                value={alternativeName}
+                onChange={(event) => setAlternativeName(event.target.value)}
+                className="fca-input"
+                placeholder="z. B. Junioren B2"
               />
             </label>
 

@@ -70,7 +70,9 @@ export default async function TeamDetailPage({ params }: Props) {
     team.teamSeasons[0] ??
     null;
 
-  const displayTitle = activeSeason?.displayName ?? team.name;
+  // TEAM-IDENTITY-01: canonical long-name fallback (lib/teams/team-naming.ts),
+  // already resolved by getTeamDetailData.
+  const displayTitle = team.displayName ?? team.name;
 
   return (
     <PageShell fullWidth>

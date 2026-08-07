@@ -69,9 +69,19 @@ type OrgUnitOption = {
   type: string;
 };
 
+type ProviderMappingInfo = {
+  provider: string;
+  teamName: string | null;
+  isActive: boolean;
+  lastSyncedAt: string;
+} | null;
+
 type Team = {
   id: string;
   name: string;
+  // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME.
+  shortName: string | null;
+  alternativeName: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -82,6 +92,8 @@ type Team = {
   infoboardVisible: boolean;
   orgUnitId: string | null;
   orgUnit: OrgUnitOption | null;
+  // TEAM-IDENTITY-01: read-only provider identity/name. Never edited here.
+  providerMapping?: ProviderMappingInfo;
   teamSeasons: TeamSeasonItem[];
 };
 
@@ -125,6 +137,8 @@ export default function TeamDetailCard({
   function handleTeamSaved(updatedTeamBase: {
     id: string;
     name: string;
+    shortName: string | null;
+    alternativeName: string | null;
     slug: string;
     category: string;
     genderGroup: string | null;
@@ -184,6 +198,8 @@ export default function TeamDetailCard({
         team={{
           id: team.id,
           name: team.name,
+          shortName: team.shortName,
+          alternativeName: team.alternativeName,
           slug: team.slug,
           category: team.category,
           genderGroup: team.genderGroup,
@@ -193,6 +209,7 @@ export default function TeamDetailCard({
           websiteVisible: team.websiteVisible,
           infoboardVisible: team.infoboardVisible,
           orgUnitId: team.orgUnitId,
+          providerMapping: team.providerMapping,
           teamSeasons: team.teamSeasons.map((entry) => ({
             id: entry.id,
             season: entry.season,

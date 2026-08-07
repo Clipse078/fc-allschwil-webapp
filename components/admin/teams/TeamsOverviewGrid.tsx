@@ -9,6 +9,13 @@ import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 type TeamItem = {
   id: string;
   name: string;
+  // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME, and the
+  // resolved canonical naming contract (lib/teams/team-naming.ts). Optional
+  // for backward compatibility with existing callers/tests.
+  shortName?: string | null;
+  alternativeName?: string | null;
+  displayName?: string | null;
+  compactName?: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -227,8 +234,13 @@ export default function TeamsOverviewGrid({
           <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
             {categoryTeams.map((team, idx) => {
               const isLast = idx === categoryTeams.length - 1;
+              // TEAM-IDENTITY-01: canonical long-name fallback — prefer the
+              // value already resolved by getTeamsListData; fall back inline
+              // for callers that don't yet supply it (e.g. older tests).
               const displayName =
-                team.activeSeason?.displayName ?? team.name;
+                team.displayName ?? team.activeSeason?.displayName ?? team.name;
+              const compactName =
+                team.compactName ?? team.shortName ?? null;
 
               return (
                 <Link
@@ -247,6 +259,14 @@ export default function TeamsOverviewGrid({
                       <span className="truncate text-sm font-semibold text-[var(--foreground)]">
                         {displayName}
                       </span>
+                      {/* TEAM-IDENTITY-01: compact short name as a secondary
+                          disambiguator, shown only when distinct from the
+                          long name already rendered above. */}
+                      {compactName && compactName !== displayName ? (
+                        <span className="fca-pill" title="Kurzname">
+                          {compactName}
+                        </span>
+                      ) : null}
                       {team.activeSeason?.seasonName ? (
                         <span className="fca-pill">
                           {team.activeSeason.seasonName}
