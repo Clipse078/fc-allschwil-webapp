@@ -62,7 +62,11 @@ export default function MatchcenterResultRow({
           >
             {homeName}
           </p>
-          <MatchTeamLogo label={homeName} emphasized={match.home.isOwnTeam} />
+          <MatchTeamLogo
+            label={homeName}
+            emphasized={match.home.isOwnTeam}
+            logoUrl={match.home.externalLogoUrl}
+          />
         </div>
 
         <div
@@ -73,7 +77,11 @@ export default function MatchcenterResultRow({
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
-          <MatchTeamLogo label={awayName} emphasized={match.away.isOwnTeam} />
+          <MatchTeamLogo
+            label={awayName}
+            emphasized={match.away.isOwnTeam}
+            logoUrl={match.away.externalLogoUrl}
+          />
           <p
             className={
               match.away.isOwnTeam

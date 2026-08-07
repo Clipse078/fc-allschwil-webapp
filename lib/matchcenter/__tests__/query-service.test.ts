@@ -208,6 +208,82 @@ describe("Matchcenter query service", () => {
     );
   });
 
+  it("prefers the canonical Club Directory ExternalTeam name/logo over the raw provider name for an external opponent", async () => {
+    const database = createDatabase({
+      list: [
+        createEvent({
+          matchExternalMapping: {
+            ...createEvent().matchExternalMapping,
+            awayTeam: null,
+            awayExternalTeam: {
+              id: "ext-team-1",
+              name: "SV Muttenz Erste Mannschaft",
+              shortName: "1M",
+              alternativeName: null,
+              logoUrl: null,
+              externalClub: { id: "ext-club-1", logoUrl: "https://cdn.example.com/crest.png" },
+            },
+          },
+        }),
+      ],
+    });
+
+    const result = await listMatchcenterMatches(database, {
+      tenantId: "tenant-1",
+      from: new Date("2026-08-01T00:00:00.000Z"),
+      to: new Date("2026-09-01T00:00:00.000Z"),
+    });
+
+    // Canonical ExternalTeam name wins over the raw providerTeamName ("Provider Away").
+    expect(result[0].away).toEqual(
+      expect.objectContaining({
+        canonicalTeamId: null, // never conflated with the tenant Team identity
+        canonicalExternalTeamId: "ext-team-1",
+        canonicalExternalClubId: "ext-club-1",
+        canonicalExternalTeamName: "SV Muttenz Erste Mannschaft",
+        canonicalExternalTeamShortName: "1M",
+        displayName: "SV Muttenz Erste Mannschaft",
+        // Team-level logo unset — falls back to the parent club's crest.
+        externalLogoUrl: "https://cdn.example.com/crest.png",
+        isOwnTeam: false,
+      }),
+    );
+  });
+
+  it("falls back to the raw provider name when no canonical ExternalTeam is linked yet", async () => {
+    const database = createDatabase({
+      list: [createEvent()], // fixture's away side has no homeExternalTeam/awayExternalTeam
+    });
+
+    const result = await listMatchcenterMatches(database, {
+      tenantId: "tenant-1",
+      from: new Date("2026-08-01T00:00:00.000Z"),
+      to: new Date("2026-09-01T00:00:00.000Z"),
+    });
+
+    expect(result[0].away).toEqual(
+      expect.objectContaining({
+        canonicalExternalTeamId: null,
+        canonicalExternalTeamName: null,
+        externalLogoUrl: null,
+        displayName: "Provider Away",
+      }),
+    );
+  });
+
+  it("never treats the resolved tenant own-team side as an external opponent", async () => {
+    const database = createDatabase({ list: [createEvent()] });
+
+    const result = await listMatchcenterMatches(database, {
+      tenantId: "tenant-1",
+      from: new Date("2026-08-01T00:00:00.000Z"),
+      to: new Date("2026-09-01T00:00:00.000Z"),
+    });
+
+    expect(result[0].home.isOwnTeam).toBe(true);
+    expect(result[0].home.canonicalExternalTeamId).toBeNull();
+  });
+
   it("handles a missing external mapping safely", async () => {
     const database = createDatabase({
       list: [

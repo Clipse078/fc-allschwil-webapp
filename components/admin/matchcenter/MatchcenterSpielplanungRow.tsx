@@ -114,7 +114,11 @@ export default function MatchcenterSpielplanungRow({
         </div>
 
         <div className="mt-2 flex min-w-0 items-center gap-2">
-          <MatchTeamLogo label={homeName} emphasized={match.home.isOwnTeam} />
+          <MatchTeamLogo
+            label={homeName}
+            emphasized={match.home.isOwnTeam}
+            logoUrl={match.home.externalLogoUrl}
+          />
           <p
             className={
               match.home.isOwnTeam
@@ -129,7 +133,11 @@ export default function MatchcenterSpielplanungRow({
             vs
           </span>
 
-          <MatchTeamLogo label={awayName} emphasized={match.away.isOwnTeam} />
+          <MatchTeamLogo
+            label={awayName}
+            emphasized={match.away.isOwnTeam}
+            logoUrl={match.away.externalLogoUrl}
+          />
           <p
             className={
               match.away.isOwnTeam

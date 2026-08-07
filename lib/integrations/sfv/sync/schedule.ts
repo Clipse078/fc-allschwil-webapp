@@ -49,6 +49,7 @@ import { requireEnabledSfvConfigForTenant } from "../tenant-config-service";
 import { markScheduleSyncSuccessful } from "../tenant-config-repository";
 import { fetchClubSchedule, fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
+import { createExternalOpponentResolver } from "./external-team-discovery";
 import type { SfvScheduleSyncContext, SfvScheduleSyncResult } from "./schedule-types";
 import type { SyncErrorEntry } from "./types";
 import {
@@ -311,6 +312,14 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     // Best-effort: stale-match reconciliation must never block schedule sync.
   }
 
+  // ── CLUB-DIRECTORY-02: external opponent discovery/resolution ────────────
+  //
+  // One resolver per sync run, memoized per SFV teamId, so an opponent
+  // appearing in several matches within the same run is only discovered
+  // once. Never throws — discovery failures must never block schedule sync
+  // (see createExternalOpponentResolver).
+  const resolveExternalTeamId = createExternalOpponentResolver(tenantId, context.syncedAt);
+
   // ── Process each schedule entry ──────────────────────────────────────────
 
   let created = 0;
@@ -332,6 +341,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
       existingMappings,
       teamMappings,
       clubOwnedSfvTeamIds,
+      resolveExternalTeamId,
     );
 
     unresolvedLocalTeamRefs += participantCounts.unresolvedLocalTeamRefs;

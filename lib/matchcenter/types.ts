@@ -31,6 +31,26 @@ export interface MatchcenterSide {
   displayName: string;
   resolution: MatchcenterTeamResolution;
   isOwnTeam: boolean;
+  /**
+   * CLUB-DIRECTORY-02 — canonical Club Directory identity for this side,
+   * when it resolves to a discovered/linked ExternalTeam (never set for the
+   * tenant's own side — that identity lives exclusively in
+   * canonicalTeamId/canonicalTeamName above). Reuses the canonical
+   * ExternalClub/ExternalTeam directory instead of introducing a second
+   * opponent representation; see lib/club-directory/discovery-service.ts.
+   */
+  canonicalExternalTeamId?: string | null;
+  canonicalExternalClubId?: string | null;
+  canonicalExternalTeamName?: string | null;
+  canonicalExternalTeamShortName?: string | null;
+  canonicalExternalTeamAlternativeName?: string | null;
+  /**
+   * Effective logo URL for the resolved ExternalTeam (team-level override,
+   * falling back to the parent ExternalClub's crest — see
+   * lib/club-directory/logo.ts resolveExternalTeamLogoUrl). Null when no
+   * canonical external identity is resolved yet, or no logo is set.
+   */
+  externalLogoUrl?: string | null;
 }
 
 export interface MatchcenterSource {

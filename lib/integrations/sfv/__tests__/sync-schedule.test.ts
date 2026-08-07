@@ -129,6 +129,17 @@ vi.mock("../sync/stale-match-reconciliation", () => ({
   applyRepairableEntries: (...args: unknown[]) => mockApplyRepairableEntries(...args),
 }));
 
+// ── Mock: external-team-discovery (CLUB-DIRECTORY-02) ────────────────────────
+//
+// No real database access from this orchestrator-level test file — discovery
+// is unit-tested independently in lib/club-directory/__tests__/discovery-service.test.ts.
+
+const mockCreateExternalOpponentResolver = vi.fn();
+vi.mock("../sync/external-team-discovery", () => ({
+  createExternalOpponentResolver: (...args: unknown[]) =>
+    mockCreateExternalOpponentResolver(...args),
+}));
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 const { syncSfvSchedule } = await import("../sync/schedule");
@@ -278,6 +289,9 @@ beforeEach(() => {
     entries: [],
   });
   mockApplyRepairableEntries.mockResolvedValue({ applied: [] });
+  // Default: discovery resolver factory returns a stub resolver (never
+  // exercises real discovery logic in this orchestrator-level test file).
+  mockCreateExternalOpponentResolver.mockReturnValue(async () => null);
 });
 
 // ── 1-3: First synchronization ────────────────────────────────────────────────
@@ -379,6 +393,7 @@ describe("Idempotency and identity", () => {
       expect.anything(),
       expect.anything(),
       expect.any(Set), // clubOwnedSfvTeamIds
+      expect.any(Function), // CLUB-DIRECTORY-02 external opponent resolver
     );
   });
 });
@@ -706,6 +721,7 @@ describe("Opponent strategy and team resolution", () => {
       expect.anything(),
       expect.objectContaining({ get: expect.any(Function) }),
       expect.any(Set), // clubOwnedSfvTeamIds
+      expect.any(Function), // CLUB-DIRECTORY-02 external opponent resolver
     );
     expect(result.unresolvedLocalTeamRefs).toBe(0);
   });
@@ -1102,6 +1118,7 @@ describe("Participant classification (Step 9)", () => {
       expect.anything(), expect.anything(), expect.anything(),
       expect.anything(), expect.anything(),
       expect.objectContaining({ has: expect.any(Function) }),
+      expect.any(Function), // CLUB-DIRECTORY-02 external opponent resolver
     );
     expect(result.unresolvedLocalTeamRefs).toBe(0);
   });

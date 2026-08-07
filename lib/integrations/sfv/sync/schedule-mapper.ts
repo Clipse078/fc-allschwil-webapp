@@ -228,6 +228,15 @@ export function buildMappingFields(
   context: SfvScheduleSyncContext,
   homeTeamId: string | null,
   awayTeamId: string | null,
+  /**
+   * CLUB-DIRECTORY-02: canonical Club Directory ExternalTeam id for the home
+   * side, when resolved/discovered by lib/club-directory/discovery-service.ts.
+   * Optional (defaults to null) so every pre-existing call site continues to
+   * compile and behave unchanged.
+   */
+  homeExternalTeamId: string | null = null,
+  /** See homeExternalTeamId — away-side equivalent. */
+  awayExternalTeamId: string | null = null,
 ): {
   provider: string;
   externalMatchId: number;
@@ -239,6 +248,8 @@ export function buildMappingFields(
   providerAwayTeamName: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
+  homeExternalTeamId: string | null;
+  awayExternalTeamId: string | null;
   providerMatchState: number | null;
   providerMatchStateName: string | null;
   scoreHome: number | null;
@@ -265,6 +276,8 @@ export function buildMappingFields(
     providerAwayTeamName: entry.teamNameB,
     homeTeamId,
     awayTeamId,
+    homeExternalTeamId,
+    awayExternalTeamId,
     providerMatchState: entry.matchState,
     providerMatchStateName: entry.matchStateName,
     // SFV returns 0 for unplayed matches; treat as null for clarity
@@ -300,6 +313,13 @@ type ExistingMappingSnapshot = {
   providerAwayTeamName: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
+  /**
+   * CLUB-DIRECTORY-02: optional so existing fixtures/tests that predate the
+   * canonical Club Directory link keep compiling and behaving unchanged
+   * (treated as null when absent — see detectChanges below).
+   */
+  homeExternalTeamId?: string | null;
+  awayExternalTeamId?: string | null;
 };
 
 type ExistingEventSnapshot = {
@@ -358,7 +378,9 @@ export function detectChanges(
     existingMapping.providerHomeTeamName !== incomingMapping.providerHomeTeamName ||
     existingMapping.providerAwayTeamName !== incomingMapping.providerAwayTeamName ||
     existingMapping.homeTeamId !== incomingMapping.homeTeamId ||
-    existingMapping.awayTeamId !== incomingMapping.awayTeamId;
+    existingMapping.awayTeamId !== incomingMapping.awayTeamId ||
+    (existingMapping.homeExternalTeamId ?? null) !== incomingMapping.homeExternalTeamId ||
+    (existingMapping.awayExternalTeamId ?? null) !== incomingMapping.awayExternalTeamId;
 
   const hasAnyChange =
     scoreChanged || kickoffChanged || statusChanged || teamIdChanged || homeAwayChanged || otherMappingChanged;
