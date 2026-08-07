@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import type { MatchcenterMatchDetail } from "@/lib/matchcenter/types";
+import { getMatchcenterResultLabel } from "@/lib/matchcenter/match-lifecycle";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { PageShell } from "@/components/ui/page/PageShell";
 import { SectionCard } from "@/components/ui/page/SectionCard";
@@ -94,17 +95,6 @@ function formatTime(
     minute: "2-digit",
     timeZone: timezone,
   }).format(value);
-}
-
-function getResult(match: MatchcenterMatchDetail): string | null {
-  if (
-    match.scoreHome !== null &&
-    match.scoreAway !== null
-  ) {
-    return `${match.scoreHome}:${match.scoreAway}`;
-  }
-
-  return match.resultLabel;
 }
 
 function valueOrFallback(
@@ -189,7 +179,7 @@ export default function MatchcenterDetail({
   const statusVariant =
     STATUS_VARIANTS[match.status] ?? "default";
 
-  const result = getResult(match);
+  const result = getMatchcenterResultLabel(match);
 
   const unresolvedSides = [
     match.home,

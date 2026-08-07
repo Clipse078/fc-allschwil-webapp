@@ -54,6 +54,8 @@ function createEvent(overrides: Record<string, unknown> = {}) {
     team: {
       id: "team-own",
       name: "FC Allschwil E1",
+      shortName: "E1",
+      alternativeName: "Junioren E1",
     },
     matchExternalMapping: {
       provider: "SFV",
@@ -84,6 +86,8 @@ function createEvent(overrides: Record<string, unknown> = {}) {
       homeTeam: {
         id: "team-own",
         name: "FC Allschwil E1",
+        shortName: "E1",
+        alternativeName: "Junioren E1",
       },
       awayTeam: null,
     },
@@ -351,5 +355,84 @@ describe("Matchcenter query service", () => {
     expect(
       event.matchExternalMapping.providerAwayTeamName,
     ).toBe(originalProviderName);
+  });
+
+  describe("TEAM-IDENTITY-01 canonical naming integration", () => {
+    it("M. selects Team.shortName and Team.alternativeName from the database and exposes them on the resolved side", async () => {
+      const database = createDatabase({ list: [createEvent()] });
+
+      const result = await listMatchcenterMatches(database, {
+        tenantId: "tenant-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      expect(result[0].home.canonicalTeamShortName).toBe("E1");
+      expect(result[0].home.canonicalTeamAlternativeName).toBe(
+        "Junioren E1",
+      );
+
+      expect(database.event.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            team: expect.objectContaining({
+              select: expect.objectContaining({
+                shortName: true,
+                alternativeName: true,
+              }),
+            }),
+            matchExternalMapping: expect.objectContaining({
+              include: expect.objectContaining({
+                homeTeam: expect.objectContaining({
+                  select: expect.objectContaining({
+                    shortName: true,
+                    alternativeName: true,
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }),
+      );
+    });
+
+    it("falls back to Team.alternativeName in the long resolver when Team.name is blank", async () => {
+      const database = createDatabase({
+        list: [
+          createEvent({
+            matchExternalMapping: {
+              ...createEvent().matchExternalMapping,
+              homeTeam: {
+                id: "team-own",
+                name: "   ",
+                shortName: null,
+                alternativeName: "Junioren E1",
+              },
+            },
+          }),
+        ],
+      });
+
+      const result = await listMatchcenterMatches(database, {
+        tenantId: "tenant-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      expect(result[0].home.displayName).toBe("Junioren E1");
+    });
+
+    it("does not overwrite the tenant-managed name with the provider name when both exist", async () => {
+      const database = createDatabase({ list: [createEvent()] });
+
+      const result = await listMatchcenterMatches(database, {
+        tenantId: "tenant-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      // homeTeam.name = "FC Allschwil E1", providerHomeTeamName = "Provider Home"
+      expect(result[0].home.displayName).toBe("FC Allschwil E1");
+    });
   });
 });

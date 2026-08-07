@@ -1,3 +1,4 @@
+import { resolveLongTeamName } from "@/lib/teams/team-naming";
 import type {
   MatchcenterDetailInput,
   MatchcenterListInput,
@@ -18,6 +19,8 @@ export const MATCHCENTER_MAX_WINDOW_DAYS = 366;
 interface MatchcenterTeamRecord {
   id: string;
   name: string;
+  shortName?: string | null;
+  alternativeName?: string | null;
 }
 
 interface MatchcenterMappingRecord {
@@ -104,6 +107,8 @@ const matchcenterRelations = {
     select: {
       id: true,
       name: true,
+      shortName: true,
+      alternativeName: true,
     },
   },
   matchExternalMapping: {
@@ -112,12 +117,16 @@ const matchcenterRelations = {
         select: {
           id: true,
           name: true,
+          shortName: true,
+          alternativeName: true,
         },
       },
       awayTeam: {
         select: {
           id: true,
           name: true,
+          shortName: true,
+          alternativeName: true,
         },
       },
     },
@@ -207,6 +216,8 @@ function toTeamReference(
   return {
     id: team.id,
     name: team.name,
+    shortName: team.shortName ?? null,
+    alternativeName: team.alternativeName ?? null,
   };
 }
 
@@ -217,20 +228,28 @@ function createSide(input: {
   fallbackName: string;
   isOwnTeam: boolean;
 }): MatchcenterSide {
-  const canonicalName = input.canonicalTeam?.name.trim() ?? "";
-  const providerName = input.providerTeamName?.trim() ?? "";
   const fallbackName = input.fallbackName.trim();
+
+  // TEAM-IDENTITY-01 long-name resolver: TeamSeason.displayName is not in
+  // scope here (no TeamSeason is loaded by this query), so the chain starts
+  // at Team.name. Falls back to the manually-derived fallbackName (e.g.
+  // event.title / opponentName) only when every naming source is absent —
+  // this preserves behaviour for matches with no external mapping at all.
+  const resolvedName = resolveLongTeamName({
+    teamName: input.canonicalTeam?.name ?? null,
+    teamAlternativeName: input.canonicalTeam?.alternativeName ?? null,
+    providerTeamName: input.providerTeamName,
+  });
 
   return {
     providerTeamId: input.providerTeamId,
     providerTeamName: input.providerTeamName,
     canonicalTeamId: input.canonicalTeam?.id ?? null,
     canonicalTeamName: input.canonicalTeam?.name ?? null,
-    displayName:
-      canonicalName ||
-      providerName ||
-      fallbackName ||
-      "Unknown team",
+    canonicalTeamShortName: input.canonicalTeam?.shortName ?? null,
+    canonicalTeamAlternativeName:
+      input.canonicalTeam?.alternativeName ?? null,
+    displayName: resolvedName || fallbackName || "Unknown team",
     resolution:
       input.canonicalTeam === null
         ? "UNRESOLVED"
