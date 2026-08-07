@@ -983,7 +983,21 @@ model Person {
 
 model Team {
   id               String       @id @default(cuid())
+  // ── TEAM-IDENTITY-01: canonical tenant-owned naming ───────────────────────
+  // Team.name is the canonical LONG NAME (e.g. "FC Allschwil Junioren B2").
+  // Kept as `name` for backward compatibility — NOT renamed to `longName`.
+  // Tenant-managed: set on Team creation (including first SFV import) and
+  // then owned exclusively by the tenant. Provider sync never overwrites it
+  // on subsequent syncs (see lib/integrations/sfv/sync/team-mapper.ts).
   name             String
+  /// SHORT NAME (e.g. "B2") — tenant-owned, optional. Used for compact
+  /// contexts. Never written by provider sync. Distinct from
+  /// TeamSeason.shortName, which is a seasonal presentation override.
+  shortName        String?
+  /// ALTERNATIVE NAME (e.g. "Junioren B2") — tenant-owned, optional.
+  /// Used as a naming fallback before providerTeamName. Never written by
+  /// provider sync. Never auto-derived from string parsing of other names.
+  alternativeName  String?
   // slug is unique per tenant (tenant-scoped) since TEAM-CORE-02.
   // Legacy global @unique dropped; replaced by @@unique([tenantId, slug]) below.
   // Queries must always scope by tenantId when resolving by slug.
