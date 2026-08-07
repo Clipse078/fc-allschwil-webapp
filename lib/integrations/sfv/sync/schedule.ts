@@ -66,11 +66,17 @@ import {
 import { healMissingClubTeamMappings } from "./schedule-team-sync";
 import type { SfvTeamSyncContext } from "./types";
 import {
+  loadStaleMatchCandidates,
+  buildStaleMatchReconciliationReport,
+  applyRepairableEntries,
+} from "./stale-match-reconciliation";
+import {
   logScheduleSyncStarted,
   logScheduleSyncCompleted,
   logScheduleSyncFailed,
   logMatchPersistenceFailed,
   logUnresolvedTeam,
+  logStaleMatchReconciliationApplied,
 } from "./schedule-logging";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -265,6 +271,44 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     } catch {
       // Best-effort: team-mapping healing must never block schedule sync.
     }
+  }
+
+  // ── TEAM-SFV-MAPPING-04: self-heal already-persisted stale matches ───────
+  //
+  // The healing above (and `processScheduleEntry` below) only ever touches
+  // matches inside THIS run's rolling fetch window (see schedule-window.ts).
+  // A MatchExternalMapping row whose match date has already scrolled outside
+  // that window is never re-fetched from the provider, so it is never passed
+  // to `processScheduleEntry` again — even after its TeamExternalMapping
+  // becomes available. Without this step, such a row's homeTeamId/awayTeamId
+  // stays null forever, regardless of how many times sync runs (this is the
+  // exact "Team nicht zugeordnet" defect TEAM-SFV-MAPPING-03 diagnosed on
+  // STAGE). This reconciles directly against the already-loaded (and, above,
+  // possibly just-refreshed) `teamMappings` — fully decoupled from the fetch
+  // window, so it needs no window expansion to self-heal. Deterministic,
+  // idempotent, tenant/provider/season-scoped, and never touches a non-null
+  // homeTeamId/awayTeamId or any Team/TeamExternalMapping row (see
+  // stale-match-reconciliation.ts). Best-effort: never blocks match
+  // persistence below on failure.
+  try {
+    const staleCandidates = await loadStaleMatchCandidates(tenantId, PROVIDER, context.seasonId);
+    const reconciliationReport = buildStaleMatchReconciliationReport(
+      tenantId,
+      PROVIDER,
+      context.seasonId,
+      staleCandidates,
+      teamMappings,
+    );
+
+    if (reconciliationReport.repairableRows > 0) {
+      const { applied } = await applyRepairableEntries(reconciliationReport.entries);
+      if (applied.length > 0) {
+        const rowsRepaired = new Set(applied.map((a) => a.mappingId)).size;
+        logStaleMatchReconciliationApplied(tenantId, context.seasonId, applied.length, rowsRepaired);
+      }
+    }
+  } catch {
+    // Best-effort: stale-match reconciliation must never block schedule sync.
   }
 
   // ── Process each schedule entry ──────────────────────────────────────────
