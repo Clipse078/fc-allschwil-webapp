@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Globe, Monitor, ChevronRight } from "lucide-react";
+import { Globe, Monitor, ChevronRight, Link2, Link2Off, PenLine } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 
@@ -23,6 +23,16 @@ type TeamItem = {
     displayName: string;
     shortName: string | null;
     status: string;
+  } | null;
+  competition: {
+    name: string;
+    shortName: string | null;
+  } | null;
+  providerMapping: {
+    provider: string;
+    isActive: boolean;
+    lastSyncedAt: string;
+    source: string;
   } | null;
 };
 
@@ -96,6 +106,54 @@ function VisibilityIndicator({
     >
       {icon}
       {label}
+    </span>
+  );
+}
+
+/**
+ * TEAM-SFV-MAPPING-01 — provider mapping / sync status indicator.
+ *
+ * Distinguishes three states so admins can immediately tell whether a row's
+ * data is currently being kept in sync by a provider, is manually managed,
+ * or has fallen out of sync (providerIsActive = false — the provider no
+ * longer reports this team, e.g. after a season/category change):
+ *   - "Manuell"            no provider mapping at all
+ *   - "<Provider> inaktiv" mapping exists but provider marked it inactive
+ *   - "<Provider>"         actively synced
+ */
+function ProviderMappingBadge({
+  providerMapping,
+}: {
+  providerMapping: TeamItem["providerMapping"];
+}) {
+  if (!providerMapping) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.69rem] font-semibold text-slate-500">
+        <PenLine className="h-3 w-3" />
+        Manuell
+      </span>
+    );
+  }
+
+  if (!providerMapping.isActive) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[0.69rem] font-semibold text-amber-700"
+        title={`Zuletzt synchronisiert: ${new Date(providerMapping.lastSyncedAt).toLocaleString("de-CH")}`}
+      >
+        <Link2Off className="h-3 w-3" />
+        {providerMapping.provider} inaktiv
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.69rem] font-semibold text-emerald-700"
+      title={`Zuletzt synchronisiert: ${new Date(providerMapping.lastSyncedAt).toLocaleString("de-CH")}`}
+    >
+      <Link2 className="h-3 w-3" />
+      {providerMapping.provider}
     </span>
   );
 }
@@ -204,14 +262,22 @@ export default function TeamsOverviewGrid({
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {/* TEAM-SFV-MAPPING-01: competition/league — key
+                        disambiguator when several rows share a generic name. */}
+                    {team.competition ? (
+                      <p className="mt-0.5 truncate text-xs font-medium text-[var(--text-2)]">
+                        {team.competition.name}
+                      </p>
+                    ) : null}
                   </div>
 
-                  {/* Status + visibility + chevron */}
+                  {/* Status + provider mapping + visibility + chevron */}
                   <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
                     <AdminStatusPill
                       label={team.isActive ? "Aktiv" : "Inaktiv"}
                       tone={team.isActive ? "success" : "muted"}
                     />
+                    <ProviderMappingBadge providerMapping={team.providerMapping} />
                     <VisibilityIndicator
                       label="Web"
                       active={team.websiteVisible}

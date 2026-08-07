@@ -37,9 +37,17 @@ import {
 
 /**
  * Result of processing a single TeamDetail against the database.
+ *
+ * "relinked" (TEAM-SFV-MAPPING-01): the SFV teamId already has a canonical
+ * Team from a prior season sync (e.g. the tenant's configured SFV season
+ * advanced from 2026 to 2027). Only a new TeamExternalMapping row was
+ * created for the new season — the existing canonical Team was reused.
+ * Distinguished from "created" so admins can see that no new physical team
+ * was introduced.
  */
 export type TeamPersistenceOutcome =
   | { status: "created" }
+  | { status: "relinked" }
   | { status: "updated" }
   | { status: "unchanged" }
   | { status: "failed"; code: string; message: string };
@@ -86,6 +94,47 @@ export async function loadExistingMappings(
   const map = new Map<number, ExistingMappingRow>();
   for (const row of rows) {
     map.set(row.externalTeamId, row);
+  }
+  return map;
+}
+
+/**
+ * Loads the most recently synced canonical teamId for every externalTeamId
+ * previously mapped for this tenant/provider in a season OTHER than the one
+ * currently being synced (TEAM-SFV-MAPPING-01 — season carryover).
+ *
+ * Root cause this addresses: `loadExistingMappings` above is scoped to a
+ * single `externalSeasonId`. Whenever a tenant's configured SFV season
+ * advances (e.g. 2026 → 2027), every previously-known team appears "new" to
+ * that season-scoped lookup even though the real-world team — identified by
+ * its stable SFV teamId — already has a canonical Team. Without this
+ * fallback, `createTeamWithMapping` would create a brand-new duplicate Team
+ * every season, which is the exact "many indistinguishable FC Allschwil
+ * rows" defect this slice fixes.
+ *
+ * SFV teamId is the sole authority for identity here — never team name,
+ * since provider names may differ slightly season to season (rename,
+ * league suffix change, etc.) without the underlying team changing.
+ *
+ * When multiple historical rows exist for the same externalTeamId (one per
+ * season previously synced), the most recently synced one wins.
+ */
+export async function loadCrossSeasonTeamIds(
+  tenantId: string,
+  provider: string,
+  currentSeasonId: number,
+): Promise<Map<number, string>> {
+  const rows = await prisma.teamExternalMapping.findMany({
+    where: { tenantId, provider, externalSeasonId: { not: currentSeasonId } },
+    orderBy: { lastSyncedAt: "desc" },
+    select: { externalTeamId: true, teamId: true },
+  });
+
+  const map = new Map<number, string>();
+  for (const row of rows) {
+    if (!map.has(row.externalTeamId)) {
+      map.set(row.externalTeamId, row.teamId);
+    }
   }
   return map;
 }
@@ -157,6 +206,59 @@ export async function createTeamWithMapping(
       status: "failed",
       code: "TEAM_CREATE_FAILED",
       message: `Failed to create team for SFV teamId ${detail.teamId}: ${message}`,
+    };
+  }
+}
+
+// ── Relink (season carryover) ─────────────────────────────────────────────────
+
+/**
+ * Links an SFV team to its EXISTING canonical Team for a new season by
+ * creating only a new TeamExternalMapping row — never a new Team.
+ *
+ * Called when `loadCrossSeasonTeamIds` found a canonical teamId for this
+ * externalTeamId from a prior season. Provider IDs are authoritative
+ * (TEAM-SFV-MAPPING-01): the same SFV teamId always resolves to the same
+ * canonical Team, regardless of season or provider name changes.
+ *
+ * Defensively re-verifies the Team still exists for this tenant before
+ * linking. If it does not (e.g. deleted outside the sync pipeline), falls
+ * back to creating a new Team rather than failing the whole sync — this
+ * mirrors the very first import path exactly.
+ */
+export async function linkExistingTeamToNewSeason(
+  teamId: string,
+  detail: TeamDetail,
+  context: SfvTeamSyncContext,
+): Promise<TeamPersistenceOutcome> {
+  const mappingFields = buildMappingFields(detail, context);
+
+  try {
+    const team = await prisma.team.findFirst({
+      where: { id: teamId, tenantId: context.tenantId },
+      select: { id: true },
+    });
+
+    if (!team) {
+      return createTeamWithMapping(detail, context);
+    }
+
+    await prisma.teamExternalMapping.create({
+      data: {
+        tenantId: context.tenantId,
+        teamId,
+        ...mappingFields,
+      },
+    });
+
+    return { status: "relinked" };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Unknown error linking team to new season.";
+    return {
+      status: "failed",
+      code: "TEAM_RELINK_FAILED",
+      message: `Failed to link SFV teamId ${detail.teamId} to its existing canonical team for season ${context.seasonId}: ${message}`,
     };
   }
 }
@@ -233,22 +335,34 @@ export async function markMappingsInactive(
 // ── High-level per-record processing ──────────────────────────────────────────
 
 /**
- * Processes a single TeamDetail: creates or updates as needed.
+ * Processes a single TeamDetail: creates, relinks, or updates as needed.
  *
- * Delegates to createTeamWithMapping or updateMappingFields based on whether
- * an existing mapping is found in the pre-loaded map.
+ * Resolution order:
+ *   1. A mapping already exists for THIS season → update or leave unchanged.
+ *   2. No mapping for this season, but a canonical Team already exists from
+ *      a PRIOR season (TEAM-SFV-MAPPING-01 season carryover) → relink
+ *      (new mapping row only, reusing the existing Team — never duplicated).
+ *   3. Otherwise → true first-time import (create Team + mapping).
  *
- * Returns the outcome (created / updated / unchanged / failed) for result
- * accumulation in the main sync loop.
+ * `crossSeasonTeamIds` defaults to an empty map for backward compatibility;
+ * callers should always pass the result of `loadCrossSeasonTeamIds`.
+ *
+ * Returns the outcome (created / relinked / updated / unchanged / failed)
+ * for result accumulation in the main sync loop.
  */
 export async function processTeamDetail(
   detail: TeamDetail,
   context: SfvTeamSyncContext,
   existingMappings: Map<number, ExistingMappingRow>,
+  crossSeasonTeamIds: Map<number, string> = new Map(),
 ): Promise<TeamPersistenceOutcome> {
   const existing = existingMappings.get(detail.teamId);
 
   if (existing === undefined) {
+    const priorTeamId = crossSeasonTeamIds.get(detail.teamId);
+    if (priorTeamId !== undefined) {
+      return linkExistingTeamToNewSeason(priorTeamId, detail, context);
+    }
     return createTeamWithMapping(detail, context);
   }
 

@@ -36,6 +36,7 @@ import { toSafePublicError } from "../errors";
 import type { SfvTeamSyncContext, SfvTeamSyncResult } from "./types";
 import {
   loadExistingMappings,
+  loadCrossSeasonTeamIds,
   processTeamDetail,
   markMappingsInactive,
 } from "./team-persistence";
@@ -102,6 +103,7 @@ export async function syncSfvTeams(tenantId: string): Promise<SfvTeamSyncResult>
     return buildResult(context, startedAt, finishedAt, {
       fetched: 0,
       created: 0,
+      relinked: 0,
       updated: 0,
       unchanged: 0,
       markedInactive: 0,
@@ -123,9 +125,19 @@ export async function syncSfvTeams(tenantId: string): Promise<SfvTeamSyncResult>
     context.seasonId,
   );
 
+  // TEAM-SFV-MAPPING-01: resolve season-carryover teams BEFORE deciding
+  // create vs. relink, so a tenant-season advance never spawns duplicate
+  // canonical Teams for SFV teamIds already known from a prior season.
+  const crossSeasonTeamIds = await loadCrossSeasonTeamIds(
+    tenantId,
+    PROVIDER,
+    context.seasonId,
+  );
+
   // ── Process each provider team ───────────────────────────────────────────
 
   let created = 0;
+  let relinked = 0;
   let updated = 0;
   let unchanged = 0;
   let failed = 0;
@@ -137,11 +149,19 @@ export async function syncSfvTeams(tenantId: string): Promise<SfvTeamSyncResult>
   for (const teamDetail of providerTeams) {
     presentExternalIds.add(teamDetail.teamId);
 
-    const outcome = await processTeamDetail(teamDetail, context, existingMappings);
+    const outcome = await processTeamDetail(
+      teamDetail,
+      context,
+      existingMappings,
+      crossSeasonTeamIds,
+    );
 
     switch (outcome.status) {
       case "created":
         created++;
+        break;
+      case "relinked":
+        relinked++;
         break;
       case "updated":
         updated++;
@@ -188,6 +208,7 @@ export async function syncSfvTeams(tenantId: string): Promise<SfvTeamSyncResult>
   const result = buildResult(context, startedAt, finishedAt, {
     fetched: providerTeams.length,
     created,
+    relinked,
     updated,
     unchanged,
     markedInactive,
@@ -208,7 +229,14 @@ export async function syncSfvTeams(tenantId: string): Promise<SfvTeamSyncResult>
 
 type CountFields = Pick<
   SfvTeamSyncResult,
-  "fetched" | "created" | "updated" | "unchanged" | "markedInactive" | "failed" | "errors"
+  | "fetched"
+  | "created"
+  | "relinked"
+  | "updated"
+  | "unchanged"
+  | "markedInactive"
+  | "failed"
+  | "errors"
 >;
 
 function buildResult(
