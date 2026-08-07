@@ -108,6 +108,13 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.TEAMS_MANAGE],
           },
           {
+            // CLUB-DIRECTORY-01: canonical external club/team directory.
+            key: "vereine",
+            label: "Vereine",
+            href: "/dashboard/vereine",
+            permissionKeys: [PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE],
+          },
+          {
             key: "competitions",
             label: "Wettkämpfe",
             href: "/dashboard/competitions",

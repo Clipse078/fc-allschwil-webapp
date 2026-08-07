@@ -46,7 +46,11 @@ import {
   mimeToLogoExtension,
   type AllowedLogoUploadMimeType,
 } from "@/lib/assets/validation";
-import { getTenantLogoKey } from "@/lib/assets/tenant-paths";
+import {
+  getExternalClubLogoKey,
+  getExternalTeamLogoKey,
+  getTenantLogoKey,
+} from "@/lib/assets/tenant-paths";
 
 // ── Vercel Blob URL detection ─────────────────────────────────────────────────
 
@@ -71,10 +75,11 @@ export type UploadLogoResult =
   | { ok: true; publicUrl: string }
   | { ok: false; error: string; status: number };
 
-// ── Main upload function ──────────────────────────────────────────────────────
+// ── Shared core upload logic ───────────────────────────────────────────────────
 
 /**
- * Validates and uploads a tenant logo to Vercel Blob.
+ * Validates and uploads an arbitrary logo/crest image to Vercel Blob at the
+ * given storage key.
  *
  * Validation performed here (server-side, not client-side):
  *   1. Declared MIME must be in ALLOWED_LOGO_UPLOAD_MIME_TYPES.
@@ -84,16 +89,12 @@ export type UploadLogoResult =
  * Returns { ok: false, status: 503 } when BLOB_READ_WRITE_TOKEN is absent —
  * no throw, so the caller can propagate a clean JSON error.
  *
- * On success returns the Vercel Blob public CDN URL.
- * The caller must persist this URL to Tenant.logoUrl and call
- * deleteOrphanedLogo() on the previous URL if it was a different blob key.
- *
- * @param tenantKey    Tenant's unique key (e.g. "fc-allschwil").
- * @param buffer       Raw file bytes.
- * @param declaredMime Browser-supplied Content-Type. Pre-validated by caller.
+ * This is the single upload core shared by uploadTenantLogo() and the
+ * CLUB-DIRECTORY-01 external club/team crest uploaders below — no duplicated
+ * validation or Vercel Blob call sites.
  */
-export async function uploadTenantLogo(
-  tenantKey: string,
+async function uploadLogoObject(
+  storageKey: string,
   buffer: Uint8Array,
   declaredMime: string,
 ): Promise<UploadLogoResult> {
@@ -143,26 +144,98 @@ export async function uploadTenantLogo(
     };
   }
 
-  // ── Build storage key ─────────────────────────────────────────────────────
-  const ext = mimeToLogoExtension(allowedMime);
-  if (!ext) {
-    return { ok: false, status: 400, error: "Keine Dateiendung für MIME-Typ ermittelt." };
-  }
-
-  const storageKey = getTenantLogoKey(tenantKey, ext);
-
   // ── Upload to Vercel Blob ─────────────────────────────────────────────────
   // @vercel/blob's put() accepts Buffer but not Uint8Array directly.
   const blob = await put(storageKey, Buffer.from(buffer), {
     access: "public",
     contentType: allowedMime,
     token,
-    // allowOverwrite: true — same tenant + same extension always overwrites the
-    // same key, so re-uploads of the same format never accumulate duplicates.
+    // allowOverwrite: true — same key always overwrites, so re-uploads of the
+    // same format never accumulate duplicates.
     allowOverwrite: true,
   });
 
   return { ok: true, publicUrl: blob.url };
+}
+
+// ── Main upload function ──────────────────────────────────────────────────────
+
+/**
+ * Validates and uploads a tenant logo to Vercel Blob.
+ *
+ * On success returns the Vercel Blob public CDN URL.
+ * The caller must persist this URL to Tenant.logoUrl and call
+ * deleteOrphanedLogo() on the previous URL if it was a different blob key.
+ *
+ * @param tenantKey    Tenant's unique key (e.g. "fc-allschwil").
+ * @param buffer       Raw file bytes.
+ * @param declaredMime Browser-supplied Content-Type. Pre-validated by caller.
+ */
+export async function uploadTenantLogo(
+  tenantKey: string,
+  buffer: Uint8Array,
+  declaredMime: string,
+): Promise<UploadLogoResult> {
+  const ext = mimeToLogoExtension(declaredMime);
+  if (!isAllowedLogoUploadMimeType(declaredMime) || !ext) {
+    return { ok: false, status: 400, error: `Nicht erlaubter MIME-Typ: ${declaredMime}.` };
+  }
+
+  return uploadLogoObject(getTenantLogoKey(tenantKey, ext), buffer, declaredMime);
+}
+
+// ── CLUB-DIRECTORY-01: external club/team crest upload ─────────────────────────
+//
+// Shares every validation rule and the Vercel Blob call path with
+// uploadTenantLogo() above via uploadLogoObject() — no separate logo-cache
+// implementation, per the CLUB-DIRECTORY-01 LOGOS requirement ("do not
+// implement a Matchcenter-specific logo cache").
+
+/**
+ * Uploads an ExternalClub crest. The caller persists the returned publicUrl
+ * to ExternalClub.logoUrl (tenant-managed once set) and is responsible for
+ * calling deleteOrphanedLogo() on the previous URL when re-uploading in a
+ * different format.
+ */
+export async function uploadExternalClubLogo(
+  tenantKey: string,
+  externalClubId: string,
+  buffer: Uint8Array,
+  declaredMime: string,
+): Promise<UploadLogoResult> {
+  const ext = mimeToLogoExtension(declaredMime);
+  if (!isAllowedLogoUploadMimeType(declaredMime) || !ext) {
+    return { ok: false, status: 400, error: `Nicht erlaubter MIME-Typ: ${declaredMime}.` };
+  }
+
+  return uploadLogoObject(
+    getExternalClubLogoKey(tenantKey, externalClubId, ext),
+    buffer,
+    declaredMime,
+  );
+}
+
+/**
+ * Uploads an ExternalTeam-level crest override. Team-level crests are the
+ * exception, not the default — most teams should rely on the parent
+ * ExternalClub's crest via lib/club-directory/logo.ts.
+ */
+export async function uploadExternalTeamLogo(
+  tenantKey: string,
+  externalTeamId: string,
+  buffer: Uint8Array,
+  declaredMime: string,
+): Promise<UploadLogoResult> {
+  const ext = mimeToLogoExtension(declaredMime);
+  if (!isAllowedLogoUploadMimeType(declaredMime) || !ext) {
+    return { ok: false, status: 400, error: `Nicht erlaubter MIME-Typ: ${declaredMime}.` };
+  }
+
+  return uploadLogoObject(
+    getExternalTeamLogoKey(tenantKey, externalTeamId, ext),
+    buffer,
+    declaredMime,
+  );
 }
 
 // ── Orphaned blob cleanup ─────────────────────────────────────────────────────

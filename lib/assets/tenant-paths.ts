@@ -36,3 +36,31 @@ export function getTenantLogoKey(tenantKey: string, ext: string): string {
   return `logos/${tenantKey}.${ext}`;
 }
 
+// ── CLUB-DIRECTORY-01: external club/team crest paths ─────────────────────────
+//
+// Same convention as tenant logos, tenant-scoped and keyed by the canonical
+// record id so a re-upload always overwrites the same key (no orphans by
+// construction). Club and team crests share the "clubs/" prefix because a
+// team crest is, in practice, almost always the parent club's crest (see
+// lib/club-directory/logo.ts) — keeping them in one namespace makes that
+// relationship visible in storage, not just in the database.
+//
+//   Club crest key:  clubs/{tenantKey}/{externalClubId}.{ext}
+//   Team crest key:  clubs/{tenantKey}/teams/{externalTeamId}.{ext}
+
+export function getExternalClubLogoKey(
+  tenantKey: string,
+  externalClubId: string,
+  ext: string,
+): string {
+  return `clubs/${tenantKey}/${externalClubId}.${ext}`;
+}
+
+export function getExternalTeamLogoKey(
+  tenantKey: string,
+  externalTeamId: string,
+  ext: string,
+): string {
+  return `clubs/${tenantKey}/teams/${externalTeamId}.${ext}`;
+}
+
