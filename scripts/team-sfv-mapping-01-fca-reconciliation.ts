@@ -74,6 +74,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -265,6 +266,35 @@ export function createPrismaClient(connectionString: string): { prisma: PrismaCl
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
   return { prisma, pool };
+}
+
+/**
+ * Determines whether this module was invoked directly as the CLI entrypoint
+ * (e.g. `npx tsx team-sfv-mapping-01-fca-reconciliation.ts --inventory`), as
+ * opposed to being imported by another module (e.g. the test suite).
+ *
+ * The previous check — `import.meta.url === new URL(process.argv[1], "file://").href`
+ * — silently failed on Windows/PowerShell: `new URL(path, base)` does not
+ * understand Windows path separators (`\`) or drive letters (`C:\...`), so
+ * the constructed URL never matched `import.meta.url` and `main()` was
+ * never invoked, even though `tsx` still exited 0 with no output.
+ *
+ * `pathToFileURL` is Node's purpose-built, platform-aware conversion for
+ * exactly this comparison. `platform` defaults to the real `process.platform`
+ * at call time but can be overridden, which makes both the Windows and the
+ * POSIX branch deterministically unit-testable from a single host.
+ */
+export function isCliEntrypoint(
+  argv1: string | undefined,
+  moduleUrl: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  if (!argv1) return false;
+  try {
+    return pathToFileURL(argv1, { windows: platform === "win32" }).href === moduleUrl;
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -574,7 +604,9 @@ async function main(): Promise<void> {
   }
 }
 
-if (import.meta.url === new URL(process.argv[1], "file://").href) {
+// Only run main() when invoked directly (not when imported by tests). See
+// `isCliEntrypoint` above for why this must not be a raw `new URL(...)` check.
+if (isCliEntrypoint(process.argv[1], import.meta.url)) {
   main().catch((err) => {
     console.error("[team-sfv-mapping-01] FATAL:", err instanceof Error ? err.message : String(err));
     process.exit(1);

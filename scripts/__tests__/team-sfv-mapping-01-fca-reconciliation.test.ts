@@ -23,6 +23,19 @@
  *   P-02  buildFixPlan produces a deactivate list excluding the survivor team
  *   P-03  buildFixPlan routes AMBIGUOUS groups to ambiguousGroups, not safeFixes
  *   P-04  buildFixPlan produces zero fixes when there are no split groups
+ *
+ *   E-01  POSIX: matching argv[1]/import.meta.url pair is detected as the CLI entrypoint
+ *   E-02  POSIX: a different file on argv[1] is NOT detected as the CLI entrypoint
+ *   E-03  Windows: matching drive-letter argv[1]/import.meta.url pair is detected
+ *         as the CLI entrypoint (this is the TEAM-SFV-MAPPING-01A regression case —
+ *         the old `new URL(argv[1], "file://")` check always returned false here)
+ *   E-04  Windows: a different drive-letter path on argv[1] is NOT detected as
+ *         the CLI entrypoint
+ *   E-05  Windows and POSIX paths for the same logical script never cross-match
+ *   E-06  A missing argv[1] (e.g. an unusual host/loader) is NOT the CLI entrypoint
+ *   E-07  A malformed argv[1] is handled gracefully (returns false, never throws)
+ *   E-08  Importing this module (as this very test file does) never invokes main() —
+ *         no DB/network/process.exit side effects occur merely from the import above
  */
 
 import { describe, it, expect } from "vitest";
@@ -30,6 +43,7 @@ import {
   hasDependentData,
   classifySplitIdentityGroups,
   buildFixPlan,
+  isCliEntrypoint,
   type MappingRow,
   type TeamRow,
   type TeamDependentCounts,
@@ -316,5 +330,86 @@ describe("buildFixPlan", () => {
 
     expect(plan.safeFixes).toHaveLength(0);
     expect(plan.ambiguousGroups).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCliEntrypoint (TEAM-SFV-MAPPING-01A — Windows CLI entrypoint regression)
+//
+// The buggy predecessor — `import.meta.url === new URL(process.argv[1], "file://").href`
+// — never matches on Windows because `new URL(path, base)` treats `\` as a
+// literal character (not a separator) and misparses the `C:` drive prefix as
+// URL scheme/port syntax. `isCliEntrypoint` accepts an explicit `platform`
+// so both branches are exercised deterministically regardless of the OS the
+// test suite actually runs on.
+// ---------------------------------------------------------------------------
+
+describe("isCliEntrypoint", () => {
+  it("E-01 — POSIX: matching argv[1]/import.meta.url pair is the CLI entrypoint", () => {
+    const moduleUrl = "file:///workspace/scripts/team-sfv-mapping-01-fca-reconciliation.ts";
+
+    expect(
+      isCliEntrypoint("/workspace/scripts/team-sfv-mapping-01-fca-reconciliation.ts", moduleUrl, "linux"),
+    ).toBe(true);
+  });
+
+  it("E-02 — POSIX: a different file on argv[1] is NOT the CLI entrypoint", () => {
+    const moduleUrl = "file:///workspace/scripts/team-sfv-mapping-01-fca-reconciliation.ts";
+
+    expect(isCliEntrypoint("/workspace/scripts/some-other-script.ts", moduleUrl, "linux")).toBe(false);
+  });
+
+  it("E-03 — Windows: matching drive-letter argv[1]/import.meta.url pair is the CLI entrypoint", () => {
+    const moduleUrl = "file:///C:/Users/dev/sportclubevo-webapp/scripts/team-sfv-mapping-01-fca-reconciliation.ts";
+
+    expect(
+      isCliEntrypoint(
+        "C:\\Users\\dev\\sportclubevo-webapp\\scripts\\team-sfv-mapping-01-fca-reconciliation.ts",
+        moduleUrl,
+        "win32",
+      ),
+    ).toBe(true);
+  });
+
+  it("E-04 — Windows: a different drive-letter path on argv[1] is NOT the CLI entrypoint", () => {
+    const moduleUrl = "file:///C:/Users/dev/sportclubevo-webapp/scripts/team-sfv-mapping-01-fca-reconciliation.ts";
+
+    expect(
+      isCliEntrypoint("C:\\Users\\dev\\sportclubevo-webapp\\scripts\\some-other-script.ts", moduleUrl, "win32"),
+    ).toBe(false);
+  });
+
+  it("E-05 — Windows and POSIX paths for the same logical script never cross-match", () => {
+    const posixModuleUrl = "file:///workspace/scripts/team-sfv-mapping-01-fca-reconciliation.ts";
+    const windowsArgv1 = "C:\\Users\\dev\\sportclubevo-webapp\\scripts\\team-sfv-mapping-01-fca-reconciliation.ts";
+
+    // Real-world case: entrypoint under test on a genuine Windows host.
+    expect(isCliEntrypoint(windowsArgv1, posixModuleUrl, "win32")).toBe(false);
+    // Defensive case: even if a caller mislabels the platform, paths that
+    // resolve to different File URLs must never be treated as a match.
+    expect(isCliEntrypoint(windowsArgv1, posixModuleUrl, "linux")).toBe(false);
+  });
+
+  it("E-06 — a missing argv[1] is NOT the CLI entrypoint", () => {
+    const moduleUrl = "file:///workspace/scripts/team-sfv-mapping-01-fca-reconciliation.ts";
+
+    expect(isCliEntrypoint(undefined, moduleUrl, "linux")).toBe(false);
+    expect(isCliEntrypoint(undefined, moduleUrl, "win32")).toBe(false);
+  });
+
+  it("E-07 — a malformed argv[1] is handled gracefully (returns false, never throws)", () => {
+    const moduleUrl = "file:///workspace/scripts/team-sfv-mapping-01-fca-reconciliation.ts";
+
+    expect(() => isCliEntrypoint("", moduleUrl, "linux")).not.toThrow();
+    expect(isCliEntrypoint("", moduleUrl, "linux")).toBe(false);
+  });
+
+  it("E-08 — importing this module never invokes main() (no side effects from the import above)", () => {
+    // If the entrypoint guard were broken such that importing this module
+    // executed main(), the process would attempt a DB connection / call
+    // process.exit before this test file's own tests ever ran. Reaching
+    // this assertion at all is itself proof that import-time execution is
+    // side-effect free; isCliEntrypoint just documents why.
+    expect(isCliEntrypoint(undefined, import.meta.url, "linux")).toBe(false);
   });
 });
