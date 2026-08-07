@@ -62,6 +62,13 @@ export type TenantSfvConfig = {
   lastMatchDetailSyncAt: Date | null;
   /** Most recent fully successful competition sync completion time. */
   lastCompetitionSyncAt: Date | null;
+  /**
+   * Set while an automatic (cron-triggered) schedule sync is in progress for
+   * this tenant; null when idle. TTL-based overlap guard — see
+   * claimSfvScheduleSyncLock() in tenant-config-repository.ts. Manual
+   * admin-triggered syncs never read or write this field.
+   */
+  syncLockedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

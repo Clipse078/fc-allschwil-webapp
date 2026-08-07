@@ -36,19 +36,29 @@ import type { TenantSfvConfig } from "../tenant-config-types";
 
 const mockFindUnique = vi.fn();
 const mockFindFirst = vi.fn();
+const mockFindMany = vi.fn();
+const mockUpdateMany = vi.fn();
+const mockUpdate = vi.fn();
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     tenantSfvConfig: {
       findUnique: mockFindUnique,
       findFirst: mockFindFirst,
+      findMany: mockFindMany,
+      updateMany: mockUpdateMany,
+      update: mockUpdate,
     },
   },
 }));
 
-const { findSfvConfigByTenantId, getEnabledSfvConfigByTenantId } = await import(
-  "../tenant-config-repository"
-);
+const {
+  findSfvConfigByTenantId,
+  getEnabledSfvConfigByTenantId,
+  listEnabledSfvConfigTenantIds,
+  claimSfvScheduleSyncLock,
+  releaseSfvScheduleSyncLock,
+} = await import("../tenant-config-repository");
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -66,6 +76,7 @@ function makeConfig(overrides: Partial<TenantSfvConfig> = {}): TenantSfvConfig {
     lastScheduleSyncAt: null,
     lastMatchDetailSyncAt: null,
     lastCompetitionSyncAt: null,
+    syncLockedAt: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
     updatedAt: new Date("2026-07-01T00:00:00.000Z"),
     ...overrides,
@@ -125,6 +136,7 @@ describe("findSfvConfigByTenantId", () => {
         "lastScheduleSyncAt",
         "lastMatchDetailSyncAt",
         "lastCompetitionSyncAt",
+        "syncLockedAt",
         "createdAt",
         "updatedAt",
       ].sort(),
@@ -206,6 +218,7 @@ describe("getEnabledSfvConfigByTenantId", () => {
         "lastScheduleSyncAt",
         "lastMatchDetailSyncAt",
         "lastCompetitionSyncAt",
+        "syncLockedAt",
         "createdAt",
         "updatedAt",
       ].sort(),
@@ -253,5 +266,119 @@ describe("Tenant isolation", () => {
     expect(callA.where["tenantId"]).toBe(tenantA);
     expect(callB.where["tenantId"]).toBe(tenantB);
     expect(callA.where["tenantId"]).not.toBe(tenantB);
+  });
+});
+
+// ── listEnabledSfvConfigTenantIds (SFV-MATCH-SYNC-HOTFIX-01) ─────────────────
+
+describe("listEnabledSfvConfigTenantIds", () => {
+  it("15 — filters by enabled=true only", async () => {
+    mockFindMany.mockResolvedValueOnce([{ tenantId: "tenant-A" }]);
+
+    await listEnabledSfvConfigTenantIds();
+
+    const args = mockFindMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(args.where).toEqual({ enabled: true });
+  });
+
+  it("16 — returns a flat array of tenantId strings", async () => {
+    mockFindMany.mockResolvedValueOnce([{ tenantId: "tenant-A" }, { tenantId: "tenant-B" }]);
+
+    const result = await listEnabledSfvConfigTenantIds();
+
+    expect(result).toEqual(["tenant-A", "tenant-B"]);
+  });
+
+  it("17 — returns an empty array when no tenants are enabled", async () => {
+    mockFindMany.mockResolvedValueOnce([]);
+
+    const result = await listEnabledSfvConfigTenantIds();
+
+    expect(result).toEqual([]);
+  });
+});
+
+// ── claimSfvScheduleSyncLock (SFV-MATCH-SYNC-HOTFIX-01) ──────────────────────
+
+describe("claimSfvScheduleSyncLock", () => {
+  const NOW = new Date("2026-08-07T10:00:00.000Z");
+  const STALE_AFTER_MS = 10 * 60 * 1000;
+
+  it("18 — returns true when exactly one row is updated (lock claimed)", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 });
+
+    const claimed = await claimSfvScheduleSyncLock(TENANT_ID, NOW, STALE_AFTER_MS);
+
+    expect(claimed).toBe(true);
+  });
+
+  it("19 — returns false when zero rows are updated (already locked)", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const claimed = await claimSfvScheduleSyncLock(TENANT_ID, NOW, STALE_AFTER_MS);
+
+    expect(claimed).toBe(false);
+  });
+
+  it("20 — where clause requires exact tenantId AND enabled=true", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 });
+
+    await claimSfvScheduleSyncLock(TENANT_ID, NOW, STALE_AFTER_MS);
+
+    const args = mockUpdateMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(args.where["tenantId"]).toBe(TENANT_ID);
+    expect(args.where["enabled"]).toBe(true);
+  });
+
+  it("21 — where clause allows a null lock OR a lock older than the stale threshold", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 });
+
+    await claimSfvScheduleSyncLock(TENANT_ID, NOW, STALE_AFTER_MS);
+
+    const args = mockUpdateMany.mock.calls[0][0] as {
+      where: { OR: Array<Record<string, unknown>> };
+    };
+    expect(args.where.OR).toEqual([
+      { syncLockedAt: null },
+      { syncLockedAt: { lt: new Date(NOW.getTime() - STALE_AFTER_MS) } },
+    ]);
+  });
+
+  it("22 — sets syncLockedAt to the provided 'now' timestamp", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 });
+
+    await claimSfvScheduleSyncLock(TENANT_ID, NOW, STALE_AFTER_MS);
+
+    const args = mockUpdateMany.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(args.data).toEqual({ syncLockedAt: NOW });
+  });
+
+  it("23 — forwards Prisma errors (does not swallow)", async () => {
+    mockUpdateMany.mockRejectedValueOnce(new Error("DB unavailable"));
+
+    await expect(
+      claimSfvScheduleSyncLock(TENANT_ID, NOW, STALE_AFTER_MS),
+    ).rejects.toThrow("DB unavailable");
+  });
+});
+
+// ── releaseSfvScheduleSyncLock (SFV-MATCH-SYNC-HOTFIX-01) ────────────────────
+
+describe("releaseSfvScheduleSyncLock", () => {
+  it("24 — sets syncLockedAt to null for the exact tenantId", async () => {
+    mockUpdate.mockResolvedValueOnce({});
+
+    await releaseSfvScheduleSyncLock(TENANT_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { tenantId: TENANT_ID },
+      data: { syncLockedAt: null },
+    });
+  });
+
+  it("25 — forwards Prisma errors (does not swallow)", async () => {
+    mockUpdate.mockRejectedValueOnce(new Error("DB unavailable"));
+
+    await expect(releaseSfvScheduleSyncLock(TENANT_ID)).rejects.toThrow("DB unavailable");
   });
 });
