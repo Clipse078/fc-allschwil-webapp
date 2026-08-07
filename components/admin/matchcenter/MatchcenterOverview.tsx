@@ -74,7 +74,7 @@ type MatchReadiness =
   | "setup-required"
   | "away-match";
 
-function getMatchReadiness(
+export function getMatchReadiness(
   match: MatchcenterMatchSummary,
 ): MatchReadiness {
   const homeAway = match.homeAway?.trim().toUpperCase() ?? null;
@@ -83,9 +83,10 @@ function getMatchReadiness(
     return "away-match";
   }
 
-  const hasTeam =
-    match.home.resolution === "RESOLVED" ||
-    match.away.resolution === "RESOLVED";
+  // Home matches only require the tenant-owned home (FC Allschwil) side to
+  // resolve to a canonical Team. The away side is an external opponent and
+  // is intentionally allowed to remain unmapped — see getOperationalWarnings.
+  const hasTeam = match.home.resolution === "RESOLVED";
   const hasPitch = Boolean(match.operational.pitchCode?.trim());
   const hasHomeDR = Boolean(match.operational.homeDressingRoomCode?.trim());
   const hasAwayDR = Boolean(match.operational.awayDressingRoomCode?.trim());
@@ -98,23 +99,24 @@ function getMatchReadiness(
   return "setup-required";
 }
 
-function getOperationalWarnings(
+export function getOperationalWarnings(
   match: MatchcenterMatchSummary,
 ): string[] {
   const warnings: string[] = [];
   const homeAway = match.homeAway?.trim().toUpperCase() ?? null;
   const isAway = homeAway === "AWAY";
 
-  // For away matches, only warn if the away side (FC Allschwil) is unresolved.
-  // For home matches, warn if either side is unresolved.
-  const fcaIsUnresolved = isAway
-    ? match.away.resolution === "UNRESOLVED"
-    : match.home.resolution === "UNRESOLVED";
-  const opponentIsUnresolved = !isAway
-    ? match.away.resolution === "UNRESOLVED"
-    : false;
+  // A match only requires the tenant-owned FC Allschwil side to resolve to a
+  // canonical Team. `homeAway` reflects FC Allschwil's own perspective on the
+  // fixture, so the FCA side is the home side for home matches and the away
+  // side for away matches. The opposite side is always the external
+  // opponent: it is intentionally allowed to stay unmapped
+  // (canonicalTeamId === null) and its resolution state must never trigger
+  // this warning on its own — see TEAM-SFV-MAPPING-05.
+  const ownSide = isAway ? match.away : match.home;
+  const ownSideUnresolved = ownSide.resolution === "UNRESOLVED";
 
-  if (fcaIsUnresolved || opponentIsUnresolved) {
+  if (ownSideUnresolved) {
     warnings.push("Team nicht zugeordnet");
   }
 
