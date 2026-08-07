@@ -9,8 +9,19 @@
  * (syncSfvSchedule via runAutomaticSfvScheduleSync — no second sync
  * implementation).
  *
- * Scheduling (see vercel.json "crons"): every 15 minutes.
+ * Scheduling (see vercel.json "crons"): SFV-MATCH-SYNC-HOTFIX-01C —
+ * daily at 01:00 UTC ("0 1 * * *"), Hobby-plan compatible (Vercel Hobby
+ * only permits daily-or-coarser cron; the original 15-minute schedule
+ * caused deployment to fail on Hobby and has been replaced).
  *
+ * 01:00 UTC is a fixed instant; Vercel Cron does not shift for DST, so the
+ * local Europe/Zurich execution time varies by season:
+ *   - CEST (summer, UTC+2): 01:00 UTC -> 03:00 Europe/Zurich.
+ *   - CET  (winter, UTC+1): 01:00 UTC -> 02:00 Europe/Zurich.
+ * Both fall within a low-traffic overnight window; no code change is
+ * required to account for this one-hour seasonal shift.
+ *
+
  * Authorization:
  *   - Requires `Authorization: Bearer ${CRON_SECRET}`. Vercel automatically
  *     attaches this header to scheduled invocations of routes configured in
