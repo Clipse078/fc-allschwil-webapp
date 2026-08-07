@@ -73,6 +73,37 @@ describe("resolveMatchcenterCompactSideName — TEAM-IDENTITY-01 compact resolve
     ).toBe("SV Muttenz a");
   });
 
+  it("CLUB-DIRECTORY-02: prefers the canonical ExternalTeam short name over the raw provider name", () => {
+    expect(
+      resolveMatchcenterCompactSideName(
+        side({
+          canonicalTeamId: null,
+          canonicalTeamName: null,
+          canonicalTeamShortName: null,
+          canonicalTeamAlternativeName: null,
+          resolution: "UNRESOLVED",
+          isOwnTeam: false,
+          canonicalExternalTeamId: "ext-team-1",
+          canonicalExternalTeamName: "SV Muttenz Erste Mannschaft",
+          canonicalExternalTeamShortName: "1M",
+          providerTeamName: "SV Muttenz a",
+          displayName: "SV Muttenz Erste Mannschaft",
+        }),
+      ),
+    ).toBe("1M");
+  });
+
+  it("CLUB-DIRECTORY-02: never lets the ExternalTeam identity override an own-team resolution", () => {
+    expect(
+      resolveMatchcenterCompactSideName(
+        side({
+          canonicalTeamShortName: "B2",
+          canonicalExternalTeamShortName: "SHOULD-NEVER-WIN",
+        }),
+      ),
+    ).toBe("B2");
+  });
+
   it("falls back to the long displayName when every naming source is absent", () => {
     expect(
       resolveMatchcenterCompactSideName(

@@ -24,10 +24,18 @@ import type { MatchcenterSide } from "./types";
 export function resolveMatchcenterCompactSideName(
   side: MatchcenterSide,
 ): string {
+  // CLUB-DIRECTORY-02: when this side has no canonical tenant Team, fall
+  // back to the canonical Club Directory ExternalTeam's tenant-managed
+  // name/shortName/alternativeName before the raw provider name — reusing
+  // the same tested naming contract, never a second naming scheme.
   const resolved = resolveCompactTeamName({
-    teamName: side.canonicalTeamName,
-    teamShortName: side.canonicalTeamShortName ?? null,
-    teamAlternativeName: side.canonicalTeamAlternativeName ?? null,
+    teamName: side.canonicalTeamName ?? side.canonicalExternalTeamName ?? null,
+    teamShortName:
+      side.canonicalTeamShortName ?? side.canonicalExternalTeamShortName ?? null,
+    teamAlternativeName:
+      side.canonicalTeamAlternativeName ??
+      side.canonicalExternalTeamAlternativeName ??
+      null,
     providerTeamName: side.providerTeamName,
   });
 

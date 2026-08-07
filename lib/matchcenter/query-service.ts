@@ -1,4 +1,5 @@
 import { resolveLongTeamName } from "@/lib/teams/team-naming";
+import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 import type {
   MatchcenterDetailInput,
   MatchcenterListInput,
@@ -21,6 +22,24 @@ interface MatchcenterTeamRecord {
   name: string;
   shortName?: string | null;
   alternativeName?: string | null;
+}
+
+/**
+ * CLUB-DIRECTORY-02 — canonical Club Directory ExternalTeam record, as
+ * consumed from MatchExternalMapping.homeExternalTeam / awayExternalTeam.
+ * Reuses the canonical ExternalClub/ExternalTeam directory (CLUB-DIRECTORY-01)
+ * rather than introducing a second opponent representation.
+ */
+interface MatchcenterExternalTeamRecord {
+  id: string;
+  name: string;
+  shortName: string | null;
+  alternativeName: string | null;
+  logoUrl: string | null;
+  externalClub: {
+    id: string;
+    logoUrl: string | null;
+  };
 }
 
 interface MatchcenterMappingRecord {
@@ -51,6 +70,9 @@ interface MatchcenterMappingRecord {
   detailSyncedAt: Date | null;
   homeTeam: MatchcenterTeamRecord | null;
   awayTeam: MatchcenterTeamRecord | null;
+  /** CLUB-DIRECTORY-02: canonical Club Directory identity for external sides. */
+  homeExternalTeam?: MatchcenterExternalTeamRecord | null;
+  awayExternalTeam?: MatchcenterExternalTeamRecord | null;
 }
 
 interface MatchcenterEventRecord {
@@ -127,6 +149,27 @@ const matchcenterRelations = {
           name: true,
           shortName: true,
           alternativeName: true,
+        },
+      },
+      // CLUB-DIRECTORY-02: canonical Club Directory identity for external sides.
+      homeExternalTeam: {
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          alternativeName: true,
+          logoUrl: true,
+          externalClub: { select: { id: true, logoUrl: true } },
+        },
+      },
+      awayExternalTeam: {
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          alternativeName: true,
+          logoUrl: true,
+          externalClub: { select: { id: true, logoUrl: true } },
         },
       },
     },
@@ -221,10 +264,48 @@ function toTeamReference(
   };
 }
 
+/**
+ * CLUB-DIRECTORY-02 — canonical Club Directory identity for one side, as
+ * consumed by createSide below. Structurally distinct from
+ * MatchcenterTeamReference (tenant Team) — never conflated with it.
+ */
+type MatchcenterExternalTeamReference = {
+  id: string;
+  clubId: string;
+  name: string;
+  shortName: string | null;
+  alternativeName: string | null;
+  logoUrl: string | null;
+};
+
+function toExternalTeamReference(
+  team: MatchcenterExternalTeamRecord | null | undefined,
+): MatchcenterExternalTeamReference | null {
+  if (team === null || team === undefined) {
+    return null;
+  }
+
+  return {
+    id: team.id,
+    clubId: team.externalClub.id,
+    name: team.name,
+    shortName: team.shortName,
+    alternativeName: team.alternativeName,
+    logoUrl: resolveExternalTeamLogoUrl(team, team.externalClub),
+  };
+}
+
 function createSide(input: {
   providerTeamId: number | null;
   providerTeamName: string | null;
   canonicalTeam: MatchcenterTeamReference | null;
+  /**
+   * CLUB-DIRECTORY-02: canonical Club Directory identity, when this side is
+   * an external opponent resolved/discovered via SFV sync (or manually
+   * linked). Never set alongside canonicalTeam — a side is either the
+   * tenant's own team or a Club Directory opponent, never both.
+   */
+  canonicalExternalTeam: MatchcenterExternalTeamReference | null;
   fallbackName: string;
   isOwnTeam: boolean;
 }): MatchcenterSide {
@@ -232,12 +313,20 @@ function createSide(input: {
 
   // TEAM-IDENTITY-01 long-name resolver: TeamSeason.displayName is not in
   // scope here (no TeamSeason is loaded by this query), so the chain starts
-  // at Team.name. Falls back to the manually-derived fallbackName (e.g.
-  // event.title / opponentName) only when every naming source is absent —
-  // this preserves behaviour for matches with no external mapping at all.
+  // at Team.name. When no tenant Team is resolved, the CLUB-DIRECTORY-02
+  // canonical ExternalTeam's tenant-managed name/alternativeName is used
+  // next — this is the "Matchcenter consumes canonical identity" wiring; it
+  // reuses the same tested naming contract, never a second naming scheme.
+  // Falls back to the manually-derived fallbackName (e.g. event.title /
+  // opponentName) only when every naming source is absent — this preserves
+  // behaviour for matches with no external mapping and no discovered
+  // ExternalTeam at all.
   const resolvedName = resolveLongTeamName({
-    teamName: input.canonicalTeam?.name ?? null,
-    teamAlternativeName: input.canonicalTeam?.alternativeName ?? null,
+    teamName: input.canonicalTeam?.name ?? input.canonicalExternalTeam?.name ?? null,
+    teamAlternativeName:
+      input.canonicalTeam?.alternativeName ??
+      input.canonicalExternalTeam?.alternativeName ??
+      null,
     providerTeamName: input.providerTeamName,
   });
 
@@ -249,6 +338,13 @@ function createSide(input: {
     canonicalTeamShortName: input.canonicalTeam?.shortName ?? null,
     canonicalTeamAlternativeName:
       input.canonicalTeam?.alternativeName ?? null,
+    canonicalExternalTeamId: input.canonicalExternalTeam?.id ?? null,
+    canonicalExternalClubId: input.canonicalExternalTeam?.clubId ?? null,
+    canonicalExternalTeamName: input.canonicalExternalTeam?.name ?? null,
+    canonicalExternalTeamShortName: input.canonicalExternalTeam?.shortName ?? null,
+    canonicalExternalTeamAlternativeName:
+      input.canonicalExternalTeam?.alternativeName ?? null,
+    externalLogoUrl: input.canonicalExternalTeam?.logoUrl ?? null,
     displayName: resolvedName || fallbackName || "Unknown team",
     resolution:
       input.canonicalTeam === null
@@ -267,12 +363,15 @@ function resolveSides(event: MatchcenterEventRecord): {
   if (mapping !== null) {
     const homeTeam = toTeamReference(mapping.homeTeam);
     const awayTeam = toTeamReference(mapping.awayTeam);
+    const homeExternalTeam = toExternalTeamReference(mapping.homeExternalTeam);
+    const awayExternalTeam = toExternalTeamReference(mapping.awayExternalTeam);
 
     return {
       home: createSide({
         providerTeamId: mapping.providerHomeTeamId,
         providerTeamName: mapping.providerHomeTeamName,
         canonicalTeam: homeTeam,
+        canonicalExternalTeam: homeExternalTeam,
         fallbackName:
           normalizeHomeAway(event.homeAway) === "AWAY"
             ? event.opponentName ?? "Home team"
@@ -283,6 +382,7 @@ function resolveSides(event: MatchcenterEventRecord): {
         providerTeamId: mapping.providerAwayTeamId,
         providerTeamName: mapping.providerAwayTeamName,
         canonicalTeam: awayTeam,
+        canonicalExternalTeam: awayExternalTeam,
         fallbackName:
           normalizeHomeAway(event.homeAway) === "HOME"
             ? event.opponentName ?? "Away team"
@@ -301,6 +401,7 @@ function resolveSides(event: MatchcenterEventRecord): {
       providerTeamId: null,
       providerTeamName: null,
       canonicalTeam: ownTeamIsAway ? null : eventTeam,
+      canonicalExternalTeam: null,
       fallbackName: ownTeamIsAway
         ? event.opponentName ?? "Home team"
         : event.team?.name ?? event.title,
@@ -310,6 +411,7 @@ function resolveSides(event: MatchcenterEventRecord): {
       providerTeamId: null,
       providerTeamName: null,
       canonicalTeam: ownTeamIsAway ? eventTeam : null,
+      canonicalExternalTeam: null,
       fallbackName: ownTeamIsAway
         ? event.team?.name ?? event.title
         : event.opponentName ?? "Away team",
