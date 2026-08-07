@@ -21,6 +21,9 @@ import { describe, it, expect } from "vitest";
 import {
   zonedTimeToUtc,
   generateTrainingSessionOccurrences,
+  matchesRecurrence,
+  computeOccurrenceForDate,
+  weekdayFromDate,
   toDateOnlyUtc,
   dateKeyFromDate,
   type TrainingSeriesRecurrenceInput,
@@ -470,6 +473,121 @@ describe("C. weekdayTimes per-weekday overrides", () => {
 
     expect(a[0].startAt.toISOString()).toBe(b[0].startAt.toISOString());
     expect(a[0].endAt.toISOString()).toBe(b[0].endAt.toISOString());
+  });
+});
+
+// ── D. matchesRecurrence / computeOccurrenceForDate (TRAININGCENTER-03A-FIX) ──
+
+describe("D. matchesRecurrence", () => {
+  it("D1: true for a date whose weekday is included and within [validFrom, validUntil]", () => {
+    const series = makeSeries({
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-01T00:00:00.000Z"),
+      validUntil: new Date("2026-12-31T00:00:00.000Z"),
+    });
+    expect(matchesRecurrence(new Date("2026-08-03T00:00:00.000Z"), series)).toBe(true);
+  });
+
+  it("D2: false when the weekday is not in the recurrence's weekday set", () => {
+    const series = makeSeries({ weekdays: ["MONDAY"] });
+    // 2026-08-05 is a Wednesday.
+    expect(matchesRecurrence(new Date("2026-08-05T00:00:00.000Z"), series)).toBe(false);
+  });
+
+  it("D3: false when the date is after validUntil (shortened validity)", () => {
+    const series = makeSeries({
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-01T00:00:00.000Z"),
+      validUntil: new Date("2026-08-17T00:00:00.000Z"),
+    });
+    // 2026-08-24 is a Monday, but after the shortened validUntil.
+    expect(matchesRecurrence(new Date("2026-08-24T00:00:00.000Z"), series)).toBe(false);
+  });
+
+  it("D4: false when the date is before validFrom (moved forward)", () => {
+    const series = makeSeries({
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-15T00:00:00.000Z"),
+      validUntil: null,
+    });
+    expect(matchesRecurrence(new Date("2026-08-03T00:00:00.000Z"), series)).toBe(false);
+  });
+
+  it("D5: validFrom/validUntil boundaries are inclusive", () => {
+    const series = makeSeries({
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-03T00:00:00.000Z"),
+      validUntil: new Date("2026-08-17T00:00:00.000Z"),
+    });
+    expect(matchesRecurrence(new Date("2026-08-03T00:00:00.000Z"), series)).toBe(true);
+    expect(matchesRecurrence(new Date("2026-08-17T00:00:00.000Z"), series)).toBe(true);
+  });
+
+  it("D6: unbounded validFrom/validUntil (null) never rejects on the date range", () => {
+    const series = makeSeries({ weekdays: ["MONDAY"], validFrom: null, validUntil: null });
+    expect(matchesRecurrence(new Date("2010-01-04T00:00:00.000Z"), series)).toBe(true);
+    expect(matchesRecurrence(new Date("2099-01-05T00:00:00.000Z"), series)).toBe(true);
+  });
+
+  it("D7: is independent of any generation window — window is not a parameter", () => {
+    // matchesRecurrence only takes (date, series); a date matching the
+    // recurrence rule is always reported as matching, regardless of what
+    // window a caller might separately be generating over.
+    const series = makeSeries({
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2020-01-01T00:00:00.000Z"),
+      validUntil: new Date("2030-12-31T00:00:00.000Z"),
+    });
+    expect(matchesRecurrence(new Date("2026-08-03T00:00:00.000Z"), series)).toBe(true);
+  });
+});
+
+describe("D. computeOccurrenceForDate", () => {
+  it("D8: returns null when the date does not match the recurrence", () => {
+    const series = makeSeries({ weekdays: ["MONDAY"] });
+    // 2026-08-05 is a Wednesday.
+    expect(computeOccurrenceForDate(new Date("2026-08-05T00:00:00.000Z"), series)).toBeNull();
+  });
+
+  it("D9: computes the resolved schedule for a matching date, honouring weekdayTimes overrides", () => {
+    const series = makeSeries({
+      weekdays: ["MONDAY", "WEDNESDAY"],
+      startsAt: "17:00",
+      endsAt: "18:00",
+      weekdayTimes: { WEDNESDAY: { startsAt: "16:00", endsAt: "17:00" } },
+    });
+
+    const monday = computeOccurrenceForDate(new Date("2026-08-03T00:00:00.000Z"), series)!;
+    const wednesday = computeOccurrenceForDate(new Date("2026-08-05T00:00:00.000Z"), series)!;
+
+    expect(monday.startAt.toISOString()).toBe("2026-08-03T15:00:00.000Z");
+    expect(wednesday.startAt.toISOString()).toBe("2026-08-05T14:00:00.000Z");
+    expect(wednesday.endAt.toISOString()).toBe("2026-08-05T15:00:00.000Z");
+  });
+
+  it("D10: matches the per-date result generateTrainingSessionOccurrences() would have produced", () => {
+    const series = makeSeries({
+      weekdays: ["TUESDAY", "THURSDAY"],
+      validFrom: new Date("2026-08-01T00:00:00.000Z"),
+      validUntil: new Date("2026-08-31T00:00:00.000Z"),
+    });
+    const window = { from: new Date("2026-08-01T00:00:00.000Z"), to: new Date("2026-08-31T00:00:00.000Z") };
+
+    const bulk = generateTrainingSessionOccurrences(series, window);
+    for (const occ of bulk) {
+      const single = computeOccurrenceForDate(occ.date, series);
+      expect(single).not.toBeNull();
+      expect(single!.startAt.toISOString()).toBe(occ.startAt.toISOString());
+      expect(single!.endAt.toISOString()).toBe(occ.endAt.toISOString());
+    }
+  });
+});
+
+describe("D. weekdayFromDate", () => {
+  it("D11: returns the correct Weekday for a range of known dates", () => {
+    expect(weekdayFromDate(new Date("2026-08-03T00:00:00.000Z"))).toBe("MONDAY"); // Monday
+    expect(weekdayFromDate(new Date("2026-08-05T00:00:00.000Z"))).toBe("WEDNESDAY");
+    expect(weekdayFromDate(new Date("2026-08-09T00:00:00.000Z"))).toBe("SUNDAY");
   });
 });
 

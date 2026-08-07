@@ -215,25 +215,22 @@ const sessionFullSelect = {
 } as const;
 
 /**
- * Returns every TrainingSession row for `trainingSeriesId` whose `date`
- * falls within [from, to] (both inclusive, UTC-midnight calendar dates).
+ * Returns every TrainingSession row ever generated for `trainingSeriesId`,
+ * regardless of date or the caller's current generation window.
  *
- * Used by the generation service to diff already-generated rows against
- * freshly computed occurrences — scoped by tenantId defensively even though
- * trainingSeriesId is already tenant-validated by the caller.
+ * TRAININGCENTER-03A-FIX: reconciliation must be able to detect and
+ * deactivate stale rows that fall outside the currently requested
+ * generation window (e.g. sessions after a shortened validUntil, or before
+ * a validFrom moved forward) — diffing only within the window would miss
+ * exactly the rows the fix needs to catch. Scoped by tenantId defensively
+ * even though trainingSeriesId is already tenant-validated by the caller.
  */
-export async function findTrainingSessionsForSeriesInWindow(
+export async function findAllTrainingSessionsForSeries(
   tenantId: string,
   trainingSeriesId: string,
-  from: Date,
-  to: Date,
 ): Promise<TrainingSessionScheduleRow[]> {
   return prisma.trainingSession.findMany({
-    where: {
-      tenantId,
-      trainingSeriesId,
-      date: { gte: from, lte: to },
-    },
+    where: { tenantId, trainingSeriesId },
     select: sessionScheduleSelect,
   }) as Promise<TrainingSessionScheduleRow[]>;
 }
@@ -280,7 +277,7 @@ export type TrainingSessionScheduleUpdate = {
 /**
  * Updates only the derived schedule fields of an existing TrainingSession.
  *
- * Deliberately never touches `status` — future exception/override handling
+ * Deliberately never touches `status` — exception/override handling
  * (CANCELLED, POSTPONED, MOVED) must survive regeneration runs.
  */
 export async function updateTrainingSessionSchedule(
@@ -290,6 +287,40 @@ export async function updateTrainingSessionSchedule(
   await prisma.trainingSession.update({
     where: { id: sessionId },
     data,
+  });
+}
+
+/**
+ * TRAININGCENTER-03A-FIX: marks a previously-SCHEDULED TrainingSession as
+ * RECURRENCE_REMOVED because its date no longer matches its series'
+ * recurrence rule.
+ *
+ * Callers must only invoke this for rows currently in status SCHEDULED —
+ * CANCELLED/POSTPONED/MOVED rows are genuine operational history and must
+ * never be overwritten by reconciliation.
+ */
+export async function deactivateTrainingSession(sessionId: string): Promise<void> {
+  await prisma.trainingSession.update({
+    where: { id: sessionId },
+    data: { status: "RECURRENCE_REMOVED" },
+  });
+}
+
+/**
+ * TRAININGCENTER-03A-FIX: reactivates a RECURRENCE_REMOVED TrainingSession
+ * back to SCHEDULED and re-syncs its derived schedule, because its date
+ * matches the series' recurrence rule again (e.g. a removed weekday was
+ * re-added). Reuses the existing row — the caller must resolve it via the
+ * (trainingSeriesId, date) unique row rather than creating a new one, so no
+ * duplicate is ever produced for the same occurrence.
+ */
+export async function reactivateTrainingSessionSchedule(
+  sessionId: string,
+  data: TrainingSessionScheduleUpdate,
+): Promise<void> {
+  await prisma.trainingSession.update({
+    where: { id: sessionId },
+    data: { ...data, status: "SCHEDULED" },
   });
 }
 
@@ -304,7 +335,17 @@ export async function findTrainingSessionById(
   }) as Promise<TrainingSessionRow | null>;
 }
 
-/** Returns TrainingSession rows for a tenant, with optional filters. Ordered by date, then startAt. */
+/**
+ * Returns TrainingSession rows for a tenant, with optional filters. Ordered
+ * by date, then startAt.
+ *
+ * TRAININGCENTER-03A-FIX: canonical reads exclude RECURRENCE_REMOVED rows
+ * by default (they are no longer part of the series' recurrence definition
+ * and must not leak into Weekplanner/Dayplanner/Website/Infoboard
+ * consumers). Pass `includeInactive: true` for historical/admin access.
+ * An explicit `status` filter is itself an opt-in and is never combined
+ * with the default exclusion.
+ */
 export async function findAllTrainingSessions(
   tenantId: string,
   opts: {
@@ -313,16 +354,22 @@ export async function findAllTrainingSessions(
     status?: TrainingSessionStatus;
     dateFrom?: Date;
     dateTo?: Date;
+    includeInactive?: boolean;
   } = {},
 ): Promise<TrainingSessionRow[]> {
-  const { trainingSeriesId, teamSeasonId, status, dateFrom, dateTo } = opts;
+  const { trainingSeriesId, teamSeasonId, status, dateFrom, dateTo, includeInactive = false } =
+    opts;
 
   return prisma.trainingSession.findMany({
     where: {
       tenantId,
       ...(trainingSeriesId ? { trainingSeriesId } : {}),
       ...(teamSeasonId ? { teamSeasonId } : {}),
-      ...(status ? { status } : {}),
+      ...(status
+        ? { status }
+        : !includeInactive
+          ? { NOT: { status: "RECURRENCE_REMOVED" } }
+          : {}),
       ...(dateFrom || dateTo
         ? {
             date: {

@@ -3381,6 +3381,16 @@ enum TrainingSessionStatus {
   CANCELLED
   POSTPONED
   MOVED
+  /// TRAININGCENTER-03A-FIX: this generated occurrence's date no longer
+  /// satisfies its TrainingSeries' recurrence rule (weekday removed,
+  /// validFrom/validUntil narrowed, ...). Distinct from CANCELLED, which
+  /// means "this actual scheduled training was cancelled" — RECURRENCE_REMOVED
+  /// means "this occurrence is no longer part of the series definition".
+  /// Reconciliation (see session-generation-service.ts) is the only writer
+  /// of this status; it never overwrites CANCELLED/POSTPONED/MOVED rows, and
+  /// it clears RECURRENCE_REMOVED back to SCHEDULED if the date matches the
+  /// recurrence again (e.g. a removed weekday is re-added).
+  RECURRENCE_REMOVED
 }
 
 // ---------------------------------------------------------------------------
@@ -3430,7 +3440,10 @@ model TrainingSession {
   endAt            DateTime
   /// IANA timezone snapshot used to resolve startAt/endAt for this occurrence.
   timezone         String
-  /// Lifecycle status. Generation only ever writes/updates SCHEDULED rows.
+  /// Lifecycle status. Generation writes SCHEDULED rows and reconciles
+  /// RECURRENCE_REMOVED <-> SCHEDULED transitions when the parent series'
+  /// recurrence rule changes; it never writes/overwrites CANCELLED,
+  /// POSTPONED, or MOVED (see session-generation-service.ts).
   status           TrainingSessionStatus @default(SCHEDULED)
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt

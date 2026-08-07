@@ -271,11 +271,25 @@ export interface ListTrainingAllocationsFilter {
 /**
  * Lifecycle status of a generated TrainingSession.
  *
- * CANCELLED / POSTPONED / MOVED are reserved for future exception handling
- * (holidays, skipped dates, ad-hoc changes). The generator introduced in
- * this PR only ever writes/updates SCHEDULED rows.
+ * SCHEDULED           — canonical, active occurrence. Default consumer-facing state.
+ * CANCELLED           — a genuine, manually-set operational status: "this actual
+ *                        scheduled training was cancelled". Never written or
+ *                        cleared by reconciliation.
+ * POSTPONED / MOVED    — reserved for future exception handling (ad-hoc changes).
+ *                        Same non-interference guarantee as CANCELLED.
+ * RECURRENCE_REMOVED  — reconciliation-owned: "this generated occurrence is no
+ *                        longer part of the TrainingSeries recurrence definition"
+ *                        (weekday removed, validFrom/validUntil narrowed, ...).
+ *                        Distinct from CANCELLED — see session-generation-service.ts.
+ *                        Excluded from listTrainingSessions() by default; opt in
+ *                        with `includeInactive: true` or an explicit `status` filter.
  */
-export type TrainingSessionStatus = "SCHEDULED" | "CANCELLED" | "POSTPONED" | "MOVED";
+export type TrainingSessionStatus =
+  | "SCHEDULED"
+  | "CANCELLED"
+  | "POSTPONED"
+  | "MOVED"
+  | "RECURRENCE_REMOVED";
 
 /** Public shape for a canonical generated training session. */
 export interface TrainingSessionDto {
@@ -319,6 +333,19 @@ export interface GenerateTrainingSessionsResult {
   updated: number;
   /** Existing rows that already matched the derived schedule exactly (no write issued). */
   unchanged: number;
+  /**
+   * TRAININGCENTER-03A-FIX: previously SCHEDULED rows transitioned to
+   * RECURRENCE_REMOVED because their date no longer matches the series'
+   * recurrence rule. Never applied to CANCELLED/POSTPONED/MOVED rows.
+   */
+  deactivated: number;
+  /**
+   * TRAININGCENTER-03A-FIX: previously RECURRENCE_REMOVED rows transitioned
+   * back to SCHEDULED because their date matches the recurrence rule again
+   * (e.g. a removed weekday was re-added). Reuses the existing row — never
+   * creates a duplicate for the same (trainingSeriesId, date).
+   */
+  reactivated: number;
 }
 
 export interface ListTrainingSessionsFilter {
@@ -329,4 +356,12 @@ export interface ListTrainingSessionsFilter {
   dateFrom?: Date;
   /** Inclusive upper bound (calendar date). */
   dateTo?: Date;
+  /**
+   * TRAININGCENTER-03A-FIX: canonical reads (Weekplanner, Dayplanner,
+   * Website, Infoboard) exclude RECURRENCE_REMOVED rows by default. Set to
+   * `true` for historical/admin access that needs to see them too. Has no
+   * effect when `status` is explicitly provided — an explicit status filter
+   * is itself an opt-in to that specific status.
+   */
+  includeInactive?: boolean;
 }

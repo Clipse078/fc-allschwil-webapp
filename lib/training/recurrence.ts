@@ -190,6 +190,66 @@ export interface GeneratedTrainingOccurrence {
   endAt: Date;
 }
 
+/** Returns the Weekday for a UTC calendar date (ignores any time-of-day component). */
+export function weekdayFromDate(date: Date): Weekday {
+  return JS_DAY_TO_WEEKDAY[toDateOnlyUtc(date).getUTCDay()];
+}
+
+/**
+ * Returns whether `date` is a live occurrence of `series` — i.e. its weekday
+ * is one of `series.weekdays` AND it falls within [validFrom, validUntil]
+ * (both inclusive, unbounded when null).
+ *
+ * Deliberately independent of any generation window: this is the single
+ * source of truth for "is this calendar date still part of the recurrence
+ * rule", used by the reconciliation logic in session-generation-service.ts
+ * to detect TrainingSession rows that have gone stale (weekday removed,
+ * validFrom moved forward, validUntil moved back) regardless of whether
+ * that row's date happens to lie inside the currently requested generation
+ * window.
+ */
+export function matchesRecurrence(
+  date: Date,
+  series: Pick<TrainingSeriesRecurrenceInput, "validFrom" | "validUntil" | "weekdays">,
+): boolean {
+  const ms = toDateOnlyUtc(date).getTime();
+  if (series.validFrom && ms < toDateOnlyUtc(series.validFrom).getTime()) return false;
+  if (series.validUntil && ms > toDateOnlyUtc(series.validUntil).getTime()) return false;
+  return series.weekdays.includes(weekdayFromDate(date));
+}
+
+/**
+ * Computes the single occurrence `series` produces on `date`, or `null` when
+ * `date` does not match the recurrence rule (see `matchesRecurrence`).
+ *
+ * Used by the reconciliation logic to (re)compute the resolved schedule for
+ * a specific date without generating a full window — e.g. when reactivating
+ * a previously RECURRENCE_REMOVED row whose weekday was re-added.
+ *
+ * @throws {RangeError} When `series.timezone` is not a valid IANA timezone identifier.
+ */
+export function computeOccurrenceForDate(
+  date: Date,
+  series: TrainingSeriesRecurrenceInput,
+): GeneratedTrainingOccurrence | null {
+  if (!matchesRecurrence(date, series)) return null;
+
+  const normalised = toDateOnlyUtc(date);
+  const weekday = weekdayFromDate(normalised);
+  const dateKey = dateKeyFromDate(normalised);
+  const override = series.weekdayTimes?.[weekday];
+  const startsAt = override?.startsAt ?? series.startsAt;
+  const endsAt = override?.endsAt ?? series.endsAt;
+
+  return {
+    dateKey,
+    date: normalised,
+    weekday,
+    startAt: zonedTimeToUtc(dateKey, startsAt, series.timezone),
+    endAt: zonedTimeToUtc(dateKey, endsAt, series.timezone),
+  };
+}
+
 /**
  * Generates every concrete occurrence of `series` that falls within
  * `window`, intersected with the series' own validFrom/validUntil bounds.
