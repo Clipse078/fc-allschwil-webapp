@@ -117,6 +117,18 @@ vi.mock("../sync/schedule-team-sync", () => ({
   healMissingClubTeamMappings: (...args: unknown[]) => mockHealMissingClubTeamMappings(...args),
 }));
 
+// ── Mock: stale-match-reconciliation (TEAM-SFV-MAPPING-04 self-heal) ─────────
+
+const mockLoadStaleMatchCandidates = vi.fn();
+const mockBuildStaleMatchReconciliationReport = vi.fn();
+const mockApplyRepairableEntries = vi.fn();
+vi.mock("../sync/stale-match-reconciliation", () => ({
+  loadStaleMatchCandidates: (...args: unknown[]) => mockLoadStaleMatchCandidates(...args),
+  buildStaleMatchReconciliationReport: (...args: unknown[]) =>
+    mockBuildStaleMatchReconciliationReport(...args),
+  applyRepairableEntries: (...args: unknown[]) => mockApplyRepairableEntries(...args),
+}));
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 const { syncSfvSchedule } = await import("../sync/schedule");
@@ -250,6 +262,22 @@ beforeEach(() => {
     unchanged: 0,
     failed: 0,
   });
+  // Default: no stale MatchExternalMapping rows to self-heal (TEAM-SFV-MAPPING-04)
+  mockLoadStaleMatchCandidates.mockResolvedValue([]);
+  mockBuildStaleMatchReconciliationReport.mockReturnValue({
+    tenantId: TENANT_A,
+    provider: "SFV",
+    seasonId: 0,
+    totalScanned: 0,
+    staleRowsFound: 0,
+    repairableRows: 0,
+    ambiguousRows: 0,
+    alreadyCorrectRows: 0,
+    affectedExternalTeamIds: [],
+    affectedMatchIds: [],
+    entries: [],
+  });
+  mockApplyRepairableEntries.mockResolvedValue({ applied: [] });
 });
 
 // ── 1-3: First synchronization ────────────────────────────────────────────────
@@ -782,6 +810,142 @@ describe("TEAM-SFV-MAPPING-02: schedule-sync team mapping healing", () => {
 
     expect(mockHealMissingClubTeamMappings).not.toHaveBeenCalled();
     expect(result.created).toBe(1);
+  });
+});
+
+// ── TEAM-SFV-MAPPING-04: stale-match self-heal runs in the same sync pass ────
+//
+// Test 14 from the TEAM-SFV-MAPPING-04 test plan: TEAM-SFV-MAPPING-02's
+// team-mapping healing and this run's normal window-scoped match persistence
+// (processScheduleEntry) coexist correctly with the new, window-independent
+// stale-match reconciliation step in a single syncSfvSchedule pass.
+
+describe("TEAM-SFV-MAPPING-04: stale-match reconciliation runs alongside healing + persistence", () => {
+  it("14 — reconciles already-persisted stale matches using the freshly-healed mapping, in the same pass as normal window persistence", async () => {
+    // Team mapping healing relinks 31927 for this season (TEAM-SFV-MAPPING-02).
+    mockLoadTeamMappings
+      .mockResolvedValueOnce(new Map()) // initial load — season mapping missing
+      .mockResolvedValueOnce(new Map([[31927, "team-local-1"]])); // refreshed after healing
+
+    mockHealMissingClubTeamMappings.mockResolvedValueOnce({
+      candidates: 1,
+      created: 0,
+      relinked: 1,
+      updated: 0,
+      unchanged: 0,
+      failed: 0,
+    });
+
+    // Today's window contains one NEW match (normal persistence path).
+    mockFetchClubSchedule.mockResolvedValueOnce([
+      makeScheduleEntry({ matchId: 500001, teamAId: 31927, teamBId: 44001 }),
+    ]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    // Separately, an already-persisted match from EARLIER in the season has
+    // scrolled outside today's fetch window (it is not part of
+    // mockFetchClubSchedule's result) but is still stale in the database —
+    // exactly the TEAM-SFV-MAPPING-03 finding. It references the SAME
+    // provider teamId (31927) that healing just relinked this run.
+    mockLoadStaleMatchCandidates.mockResolvedValueOnce([
+      {
+        id: "stale-mapping-1",
+        eventId: "stale-event-1",
+        externalMatchId: 400099,
+        externalSeasonId: 2027,
+        providerHomeTeamId: 31927,
+        providerAwayTeamId: 44002,
+        homeTeamId: null,
+        awayTeamId: null,
+      },
+    ]);
+    mockBuildStaleMatchReconciliationReport.mockImplementationOnce(
+      (tenantId: string, provider: string, seasonId: number) => ({
+        tenantId,
+        provider,
+        seasonId,
+        totalScanned: 1,
+        staleRowsFound: 1,
+        repairableRows: 1,
+        ambiguousRows: 0,
+        alreadyCorrectRows: 0,
+        affectedExternalTeamIds: [31927],
+        affectedMatchIds: [400099],
+        entries: [
+          {
+            mappingId: "stale-mapping-1",
+            eventId: "stale-event-1",
+            externalMatchId: 400099,
+            externalSeasonId: 2027,
+            home: { status: "repairable", side: "home", providerTeamId: 31927, canonicalTeamId: "team-local-1" },
+            away: { status: "unmapped", side: "away", providerTeamId: 44002 },
+            classification: "repairable",
+          },
+        ],
+      }),
+    );
+    mockApplyRepairableEntries.mockResolvedValueOnce({
+      applied: [
+        {
+          mappingId: "stale-mapping-1",
+          eventId: "stale-event-1",
+          externalMatchId: 400099,
+          side: "home",
+          providerTeamId: 31927,
+          previousTeamId: null,
+          newTeamId: "team-local-1",
+        },
+      ],
+    });
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    // 1. Normal window-scoped persistence still ran for today's fetched match.
+    expect(result.created).toBe(1);
+    expect(result.failed).toBe(0);
+
+    // 2. The stale-match reconciliation step used the REFRESHED (post-healing)
+    //    teamMappings — not the stale pre-healing map that lacked 31927.
+    expect(mockBuildStaleMatchReconciliationReport).toHaveBeenCalledOnce();
+    const teamMappingsArg = mockBuildStaleMatchReconciliationReport.mock.calls[0][4] as Map<number, string>;
+    expect(teamMappingsArg.get(31927)).toBe("team-local-1");
+
+    // 3. It only applied the repair for the out-of-window stale row —
+    //    completely independent of (and in addition to) today's normal
+    //    in-window persistence above.
+    expect(mockApplyRepairableEntries).toHaveBeenCalledOnce();
+    expect(mockLoadStaleMatchCandidates).toHaveBeenCalledWith(TENANT_A, "SFV", 2027);
+  });
+
+  it("does not call applyRepairableEntries when there is nothing repairable", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+    // Default beforeEach stubs already report repairableRows: 0.
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    expect(result.created).toBe(1);
+    expect(mockApplyRepairableEntries).not.toHaveBeenCalled();
+  });
+
+  it("a stale-match reconciliation failure never blocks match persistence (best-effort)", async () => {
+    mockLoadStaleMatchCandidates.mockRejectedValueOnce(new Error("boom"));
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry()]);
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    expect(result.created).toBe(1);
+    expect(result.failed).toBe(0);
   });
 });
 

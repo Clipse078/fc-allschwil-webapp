@@ -107,6 +107,29 @@ export function logMatchPersistenceFailed(
 }
 
 /**
+ * Emits a structured log entry when the best-effort stale-match
+ * reconciliation step (TEAM-SFV-MAPPING-04) repairs one or more already-
+ * persisted MatchExternalMapping rows whose homeTeamId/awayTeamId had gone
+ * stale outside the rolling schedule-fetch window. Only counts and the
+ * season are logged — never team names or raw provider payloads.
+ */
+export function logStaleMatchReconciliationApplied(
+  tenantId: string,
+  seasonId: number,
+  sidesRepaired: number,
+  rowsRepaired: number,
+): void {
+  emit("info", {
+    event: "sfv_stale_match_reconciliation_applied",
+    tenantId,
+    source: "SFV",
+    seasonId,
+    sidesRepaired,
+    rowsRepaired,
+  });
+}
+
+/**
  * Emits a warning when a schedule entry cannot be resolved to any local team.
  * Only logs the external match ID and team IDs — no team names or personal data.
  */

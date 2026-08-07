@@ -27,6 +27,7 @@
     "stage-cleanup-01:dry-run": "tsx scripts/stage-cleanup-01-fca-canonical-data.ts --dry-run",
     "team-sfv-mapping-01:inventory": "tsx scripts/team-sfv-mapping-01-fca-reconciliation.ts --inventory",
     "team-sfv-mapping-01:dry-run": "tsx scripts/team-sfv-mapping-01-fca-reconciliation.ts --dry-run",
+    "team-sfv-mapping-04:dry-run": "tsx scripts/team-sfv-mapping-04-stale-match-reconciliation.ts --dry-run",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
