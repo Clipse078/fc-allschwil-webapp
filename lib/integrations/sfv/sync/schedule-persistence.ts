@@ -42,6 +42,7 @@ import {
   resolveOpponentNameFromClassification,
   mapSfvHomeAway,
 } from "./schedule-mapper";
+import { parseSfvMatchDateTime } from "./provider-time";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -315,7 +316,8 @@ export async function updateMatchRecord(
   isHome: boolean,
 ): Promise<SchedulePersistenceOutcome & { status: "updated" | "failed" }> {
   const mappingFields = buildMappingFields(entry, context, homeTeamId, awayTeamId);
-  const kickoff = new Date(entry.matchDate);
+  // entry.matchDate is Europe/Zurich civil time (no offset) — see provider-time.ts.
+  const kickoff = parseSfvMatchDateTime(entry.matchDate);
   const status = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
   const resultLabel = buildResultLabel(entry.scoreTeamA, entry.scoreTeamB, status);
   const competition = entry.leagueName ?? entry.divisionName ?? null;
@@ -453,7 +455,7 @@ export async function processScheduleEntry(
 
   // Detect what changed
   const incomingMapping = buildMappingFields(entry, context, homeTeamId, awayTeamId);
-  const incomingKickoff = new Date(entry.matchDate);
+  const incomingKickoff = parseSfvMatchDateTime(entry.matchDate);
   const incomingStatus = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
   const canonicalHomeAway = mapSfvHomeAway(isHome);
 

@@ -21,6 +21,12 @@
  *   SFV-provided, written to Event (updated on sync — rescheduling):
  *     startAt (kickoff datetime)
  *
+ *     IMPORTANT — kickoff time semantics: `entry.matchDate` is an offset-less
+ *     string representing Europe/Zurich CIVIL (wall-clock) time, not UTC (see
+ *     provider-time.ts for the live-verified evidence). It is converted to
+ *     the correct UTC instant via parseSfvMatchDateTime(), which honors DST
+ *     — never treat it as UTC and never apply a hardcoded +1h/+2h offset.
+ *
  *   SFV-provided, written to Event (updated on sync — display):
  *     opponentName, competitionLabel, location, resultLabel, status, homeAway
  *
@@ -45,6 +51,7 @@
 
 import type { ClubScheduleEntry } from "../client";
 import type { SfvScheduleSyncContext } from "./schedule-types";
+import { parseSfvMatchDateTime } from "./provider-time";
 
 // ── Canonical homeAway helper ─────────────────────────────────────────────────
 
@@ -173,7 +180,7 @@ export function buildNewEventFields(
   externalSourceId: string;
   lastSyncedAt: Date;
 } {
-  const kickoff = new Date(entry.matchDate);
+  const kickoff = parseSfvMatchDateTime(entry.matchDate);
   const status = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
   const resultLabel = buildResultLabel(entry.scoreTeamA, entry.scoreTeamB, status);
 

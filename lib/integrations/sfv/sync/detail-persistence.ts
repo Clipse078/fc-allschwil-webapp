@@ -33,6 +33,7 @@ import type { Prisma } from "@prisma/client";
 import type { MatchDetail } from "../client";
 import type { SfvDetailSyncContext } from "./detail-types";
 import { mapMatchStateToEventStatus } from "./schedule-mapper";
+import { parseSfvMatchDateTime } from "./provider-time";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -103,13 +104,17 @@ export async function loadMappingsForDetailSync(
 /**
  * Parses an SFV match date consistently.
  *
- * SFV may return an ISO timestamp without an explicit timezone. Those values
- * represent UTC provider timestamps and must not be interpreted in the
- * server's local timezone.
+ * CORRECTED (SFV-MATCH-SYNC-HOTFIX-01): SFV returns matchDate without an
+ * explicit timezone offset. Live verification against the real SFV API
+ * (see lib/integrations/sfv/sync/provider-time.ts for full evidence) proved
+ * these offset-less values are Europe/Zurich CIVIL (wall-clock) time, NOT
+ * UTC. The previous implementation here appended "Z" — treating the value
+ * as UTC — which produced a +1h/+2h kickoff time error (DST-dependent) once
+ * rendered back in Europe/Zurich. Delegates to the single canonical parser
+ * shared with the schedule sync path.
  */
 function parseProviderMatchDate(matchDate: string): Date {
-  const hasExplicitTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(matchDate);
-  return new Date(hasExplicitTimezone ? matchDate : `${matchDate}Z`);
+  return parseSfvMatchDateTime(matchDate);
 }
 
 /**

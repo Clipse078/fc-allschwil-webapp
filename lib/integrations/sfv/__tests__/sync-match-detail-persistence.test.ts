@@ -196,7 +196,9 @@ describe("applyDetailUpdate — exact Prisma payload", () => {
     const [updateCall] = mockEventUpdate.mock.calls[0] as [{ where: unknown; data: Record<string, unknown> }];
     const data = updateCall.data;
 
-    expect(data.startAt).toEqual(new Date("2026-09-13T16:00:00.000Z"));
+    // detail.matchDate "2026-09-13T16:00:00" is Europe/Zurich civil time
+    // (CEST, UTC+2 in September) → 14:00 UTC.
+    expect(data.startAt).toEqual(new Date("2026-09-13T14:00:00.000Z"));
     expect(data.status).toBe("LIVE");
     expect(data.location).toBe("Neues Sportcenter");
     expect(data.competitionLabel).toBe("4. Liga Gruppe 2");
@@ -238,7 +240,9 @@ describe("detectDetailChanges", () => {
     const mapping = makeMapping();
     // Construct detail that matches existing event exactly
     const identicalDetail = makeDetail({
-      matchDate: "2026-09-13T15:00:00",  // UTC: matches existing startAt
+      // Europe/Zurich civil time (CEST, UTC+2) 17:00 → 15:00 UTC, matching
+      // the existing event's startAt of "2026-09-13T15:00:00.000Z".
+      matchDate: "2026-09-13T17:00:00",
       matchState: 0,
       matchStateName: "angesetzt",       // → SCHEDULED
       playgroundName: "Altes Stadion",   // same location
