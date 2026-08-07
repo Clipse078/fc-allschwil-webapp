@@ -12,6 +12,7 @@ type Props = {
     | "teamName"
     | "teamSlug"
     | "teamShortName"
+    | "teamAlternativeName"
     | "teamGenderGroup"
     | "teamAgeGroup"
     | "teamSortOrder"
@@ -26,12 +27,19 @@ type Props = {
  * StepTeamIdentity — Step 2 of the Team registration wizard.
  *
  * Captures Team identity fields:
- *   - Teamname (required)
+ *   - Langname (required) — canonical Team.name
  *   - Slug (auto-generated, editable)
- *   - Kurzname (optional)
+ *   - Kurzname (optional) — seasonal TeamSeason.shortName (this season only)
+ *   - Alternativname (optional) — canonical Team.alternativeName
  *   - Geschlecht (optional)
  *   - Altersklasse (optional)
  *   - Sortierung (optional)
+ *
+ * TEAM-IDENTITY-01: Team.name (Langname) and Team.alternativeName are
+ * tenant-owned and set only once, at Team creation, here. They are never
+ * touched by provider sync. When reusing an existing Team for a new season
+ * (existingTeamId set), these fields are disabled — edit them later via the
+ * Team settings page instead.
  *
  * Also allows explicitly reusing an existing Team identity.
  */
@@ -44,6 +52,7 @@ export default function StepTeamIdentity({
   const nameId = useId();
   const slugId = useId();
   const shortNameId = useId();
+  const alternativeNameId = useId();
   const genderGroupId = useId();
   const ageGroupId = useId();
   const sortOrderId = useId();
@@ -190,11 +199,11 @@ export default function StepTeamIdentity({
         </div>
       )}
 
-      {/* ── Required: Teamname ─────────────────────────────────────────────── */}
+      {/* ── Required: Langname ─────────────────────────────────────────────── */}
       <div>
         <label htmlFor={nameId} className="block space-y-1.5">
           <span className="fca-label">
-            Teamname{" "}
+            Langname{" "}
             <span className="text-[var(--sce-danger)]" aria-hidden="true">
               *
             </span>
@@ -242,7 +251,26 @@ export default function StepTeamIdentity({
           />
         </label>
         <p className="mt-1 text-xs text-[var(--text-2)]">
-          Wird für Platzanzeigen und kompakte Ansichten verwendet.
+          Wird für Platzanzeigen und kompakte Ansichten in dieser Saison verwendet.
+        </p>
+      </div>
+
+      {/* ── Optional: Alternativname ─────────────────────────────────────── */}
+      <div>
+        <label htmlFor={alternativeNameId} className="block space-y-1.5">
+          <span className="fca-label">Alternativname</span>
+          <input
+            id={alternativeNameId}
+            type="text"
+            value={form.teamAlternativeName}
+            onChange={(e) => onFieldChange("teamAlternativeName", e.target.value)}
+            className="fca-input w-full"
+            placeholder="z. B. Junioren B2"
+            disabled={isReusingExisting}
+          />
+        </label>
+        <p className="mt-1 text-xs text-[var(--text-2)]">
+          Dauerhafter Namensfallback für das Team, unabhängig von der Saison.
         </p>
       </div>
 

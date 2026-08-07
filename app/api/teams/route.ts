@@ -109,6 +109,18 @@ export async function POST(request: NextRequest) {
     const category = String(body.category ?? "").trim();
     const seasonId = String(body.seasonId ?? "").trim();
 
+    // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME.
+    // Both optional. Never derived from string parsing of `name`.
+    const shortName: string | null =
+      body.shortName === null || body.shortName === undefined
+        ? null
+        : String(body.shortName).trim() || null;
+
+    const alternativeName: string | null =
+      body.alternativeName === null || body.alternativeName === undefined
+        ? null
+        : String(body.alternativeName).trim() || null;
+
     const genderGroup =
       body.genderGroup === null || body.genderGroup === undefined
         ? null
@@ -435,6 +447,8 @@ export async function POST(request: NextRequest) {
     const team = await prisma.team.create({
       data: {
         name,
+        shortName,
+        alternativeName,
         slug,
         category: category as TeamCategory,
         genderGroup,
@@ -470,6 +484,8 @@ export async function POST(request: NextRequest) {
       action: "CREATE",
       afterJson: {
         name,
+        shortName,
+        alternativeName,
         slug,
         category,
         genderGroup,

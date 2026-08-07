@@ -194,6 +194,107 @@ describe("registerTeamSeason — new Team identity", () => {
   });
 });
 
+// ── TEAM-IDENTITY-01 — canonical Team.shortName / Team.alternativeName ────────
+
+describe("registerTeamSeason — TEAM-IDENTITY-01 canonical naming on new Team", () => {
+  function captureTeamCreateData() {
+    const teamCreateSpy = vi.fn().mockResolvedValue({ id: TEAM_ID });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+      const tx = {
+        team: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: teamCreateSpy,
+        },
+        teamSeason: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: TEAM_SEASON_ID }),
+        },
+        teamSeasonOrgUnit: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        teamSeasonCompetition: { create: vi.fn().mockResolvedValue({ id: "tsc-01" }) },
+        teamExternalMapping: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          update: vi.fn().mockResolvedValue({}),
+          create: vi.fn().mockResolvedValue({}),
+        },
+      };
+      return fn(tx);
+    });
+    return teamCreateSpy;
+  }
+
+  it("shortName optional: persists Team.shortName when provided", async () => {
+    const teamCreateSpy = captureTeamCreateData();
+
+    await registerTeamSeason({
+      ...baseInput,
+      team: { name: "Junioren B2", shortName: "B2" },
+    });
+
+    expect(teamCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ shortName: "B2" }) }),
+    );
+  });
+
+  it("shortName optional: Team.shortName stays null when omitted (no guessed data)", async () => {
+    const teamCreateSpy = captureTeamCreateData();
+
+    await registerTeamSeason({ ...baseInput, team: { name: "Junioren B2" } });
+
+    expect(teamCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ shortName: null }) }),
+    );
+  });
+
+  it("alternativeName optional: persists Team.alternativeName when provided", async () => {
+    const teamCreateSpy = captureTeamCreateData();
+
+    await registerTeamSeason({
+      ...baseInput,
+      team: { name: "Junioren B2", alternativeName: "FC Allschwil Junioren B2" },
+    });
+
+    expect(teamCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ alternativeName: "FC Allschwil Junioren B2" }),
+      }),
+    );
+  });
+
+  it("alternativeName optional: Team.alternativeName stays null when omitted (no guessed data)", async () => {
+    const teamCreateSpy = captureTeamCreateData();
+
+    await registerTeamSeason({ ...baseInput, team: { name: "Junioren B2" } });
+
+    expect(teamCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ alternativeName: null }) }),
+    );
+  });
+
+  it("manual team works: Team.name (long name) is always persisted", async () => {
+    const teamCreateSpy = captureTeamCreateData();
+
+    await registerTeamSeason({ ...baseInput, team: { name: "Trainingsgruppe Aktive" } });
+
+    expect(teamCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ name: "Trainingsgruppe Aktive" }) }),
+    );
+  });
+
+  it("never derives Team.shortName/alternativeName from Team.name (no string-parsing guess)", async () => {
+    const teamCreateSpy = captureTeamCreateData();
+
+    await registerTeamSeason({
+      ...baseInput,
+      team: { name: "FC Allschwil Junioren B2" },
+    });
+
+    const createArgs = teamCreateSpy.mock.calls[0][0];
+    expect(createArgs.data.shortName).toBeNull();
+    expect(createArgs.data.alternativeName).toBeNull();
+  });
+});
+
 // ── Success: existing Team reuse ───────────────────────────────────────────────
 
 describe("registerTeamSeason — existing Team reuse", () => {

@@ -15,9 +15,20 @@ type OrgUnitOption = {
   type: string;
 };
 
+type ProviderMappingInfo = {
+  provider: string;
+  teamName: string | null;
+  isActive: boolean;
+  lastSyncedAt: string;
+} | null;
+
 type Team = {
   id: string;
   name: string;
+  // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME.
+  // Optional. Never written by provider sync.
+  shortName: string | null;
+  alternativeName: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -27,6 +38,8 @@ type Team = {
   websiteVisible: boolean;
   infoboardVisible: boolean;
   orgUnitId: string | null;
+  // TEAM-IDENTITY-01: read-only provider identity/name. Never edited here.
+  providerMapping?: ProviderMappingInfo;
   teamSeasons?: Array<{
     id: string;
     season: {
@@ -146,6 +159,8 @@ export default function TeamSettingsCard({
         },
         body: JSON.stringify({
           name: form.name,
+          shortName: form.shortName,
+          alternativeName: form.alternativeName,
           category: form.category,
           genderGroup: form.genderGroup,
           ageGroup: form.ageGroup,
@@ -218,14 +233,47 @@ export default function TeamSettingsCard({
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <label className="block space-y-2">
-          <span className="fca-label">Teamname</span>
+          <span className="fca-label">Langname</span>
           <input
             type="text"
             value={form.name}
             disabled={!canManage}
             onChange={(event) => updateField("name", event.target.value)}
             className="fca-input"
+            placeholder="z. B. FC Allschwil Junioren B2"
           />
+        </label>
+
+        <label className="block space-y-2">
+          <span className="fca-label">Kurzname</span>
+          <input
+            type="text"
+            value={form.shortName ?? ""}
+            disabled={!canManage}
+            onChange={(event) =>
+              updateField("shortName", event.target.value || null)
+            }
+            className="fca-input"
+            placeholder="z. B. B2"
+          />
+        </label>
+
+        <label className="block space-y-2 md:col-span-2">
+          <span className="fca-label">Alternativname</span>
+          <input
+            type="text"
+            value={form.alternativeName ?? ""}
+            disabled={!canManage}
+            onChange={(event) =>
+              updateField("alternativeName", event.target.value || null)
+            }
+            className="fca-input"
+            placeholder="z. B. Junioren B2"
+          />
+          <p className="text-xs text-slate-400">
+            Langname, Kurzname und Alternativname gehören dem Verein und werden
+            von einer allfälligen Verbandsanbindung (z. B. SFV) nie überschrieben.
+          </p>
         </label>
 
         <label className="block space-y-2">
@@ -352,6 +400,35 @@ export default function TeamSettingsCard({
           onChange={(value) => updateField("infoboardVisible", value)}
         />
       </div>
+
+      {/* TEAM-IDENTITY-01: provider identity is read-only and clearly separate
+          from the tenant-owned naming fields above. Never editable here —
+          providerTeamName is refreshed exclusively by provider sync /
+          the provider-mapping workflow. */}
+      {form.providerMapping ? (
+        <div className="mt-6 rounded-[var(--radius-lg,0.75rem)] border border-slate-200 bg-slate-50 p-4">
+          <p className="fca-eyebrow">Anbieter (nur lesbar)</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div>
+              <span className="fca-label block">Anbieter</span>
+              <span className="text-sm font-semibold text-slate-700">
+                {form.providerMapping.provider}
+              </span>
+            </div>
+            <div>
+              <span className="fca-label block">Anbieter-Teamname</span>
+              <span className="text-sm text-slate-700">
+                {form.providerMapping.teamName ?? "—"}
+              </span>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-slate-400">
+            Diese Angaben stammen aus der Synchronisation und werden hier nicht
+            bearbeitet. Sie überschreiben nie Langname, Kurzname oder
+            Alternativname.
+          </p>
+        </div>
+      ) : null}
 
       {canManage ? (
         <div className="mt-6 flex items-center justify-end gap-3">

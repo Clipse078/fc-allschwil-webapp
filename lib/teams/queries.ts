@@ -1,5 +1,6 @@
 ﻿import { prisma } from "@/lib/db/prisma";
 import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
+import { resolveLongTeamName, resolveCompactTeamName } from "@/lib/teams/team-naming";
 
 export async function getAvailableTeamSeasons() {
   const seasons = await prisma.season.findMany({
@@ -42,6 +43,10 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
     select: {
       id: true,
       name: true,
+      // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME.
+      // Never written by provider sync — see lib/teams/team-naming.ts.
+      shortName: true,
+      alternativeName: true,
       slug: true,
       category: true,
       genderGroup: true,
@@ -96,6 +101,9 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
           providerIsActive: true,
           lastSyncedAt: true,
           mappingSource: true,
+          // TEAM-IDENTITY-01: provider-owned display name, used only as the
+          // final fallback in the canonical naming contract (lib/teams/team-naming.ts).
+          providerTeamName: true,
         },
       },
     },
@@ -106,9 +114,20 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
     const primaryCompetition = activeSeasonEntry?.competitions[0]?.competition ?? null;
     const latestMapping = team.externalMappings[0] ?? null;
 
+    // TEAM-IDENTITY-01: canonical naming contract — see lib/teams/team-naming.ts.
+    const namingInput = {
+      teamSeasonDisplayName: activeSeasonEntry?.displayName ?? null,
+      teamName: team.name,
+      teamShortName: team.shortName,
+      teamAlternativeName: team.alternativeName,
+      providerTeamName: latestMapping?.providerTeamName ?? null,
+    };
+
     return {
       id: team.id,
       name: team.name,
+      shortName: team.shortName,
+      alternativeName: team.alternativeName,
       slug: team.slug,
       category: team.category,
       genderGroup: team.genderGroup,
@@ -117,6 +136,8 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
       isActive: team.isActive,
       websiteVisible: team.websiteVisible,
       infoboardVisible: team.infoboardVisible,
+      displayName: resolveLongTeamName(namingInput),
+      compactName: resolveCompactTeamName(namingInput),
       activeSeason: activeSeasonEntry
         ? {
             seasonKey: activeSeasonEntry.season.key,
@@ -138,6 +159,7 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
             isActive: latestMapping.providerIsActive,
             lastSyncedAt: latestMapping.lastSyncedAt.toISOString(),
             source: latestMapping.mappingSource,
+            teamName: latestMapping.providerTeamName,
           }
         : null,
     };
@@ -160,6 +182,10 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     select: {
       id: true,
       name: true,
+      // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME.
+      // Never written by provider sync — see lib/teams/team-naming.ts.
+      shortName: true,
+      alternativeName: true,
       slug: true,
       category: true,
       genderGroup: true,
@@ -175,6 +201,20 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
           name: true,
           key: true,
           type: true,
+        },
+      },
+      // TEAM-IDENTITY-01: read-only provider identity/name for display.
+      // Never edited here — provider mapping ownership lives in
+      // lib/integrations/sfv/sync/* and the provider-mapping workflow.
+      externalMappings: {
+        orderBy: { lastSyncedAt: "desc" },
+        take: 1,
+        select: {
+          provider: true,
+          providerTeamName: true,
+          providerIsActive: true,
+          externalTeamId: true,
+          lastSyncedAt: true,
         },
       },
       teamSeasons: {
@@ -227,8 +267,46 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     return null;
   }
 
+  const activeSeasonEntry =
+    team.teamSeasons.find((entry) => entry.season.isActive) ??
+    team.teamSeasons[0] ??
+    null;
+  const latestMapping = team.externalMappings?.[0] ?? null;
+
+  // TEAM-IDENTITY-01: canonical naming contract — see lib/teams/team-naming.ts.
+  const namingInput = {
+    teamSeasonDisplayName: activeSeasonEntry?.displayName ?? null,
+    teamName: team.name,
+    teamShortName: team.shortName,
+    teamAlternativeName: team.alternativeName,
+    providerTeamName: latestMapping?.providerTeamName ?? null,
+  };
+
   return {
-    ...team,
+    id: team.id,
+    name: team.name,
+    shortName: team.shortName,
+    alternativeName: team.alternativeName,
+    slug: team.slug,
+    category: team.category,
+    genderGroup: team.genderGroup,
+    ageGroup: team.ageGroup,
+    sortOrder: team.sortOrder,
+    isActive: team.isActive,
+    websiteVisible: team.websiteVisible,
+    infoboardVisible: team.infoboardVisible,
+    orgUnitId: team.orgUnitId,
+    orgUnit: team.orgUnit,
+    displayName: resolveLongTeamName(namingInput),
+    compactName: resolveCompactTeamName(namingInput),
+    providerMapping: latestMapping
+      ? {
+          provider: latestMapping.provider,
+          teamName: latestMapping.providerTeamName,
+          isActive: latestMapping.providerIsActive,
+          lastSyncedAt: latestMapping.lastSyncedAt.toISOString(),
+        }
+      : null,
     teamSeasons: team.teamSeasons.map((entry) => ({
       ...entry,
       season: {

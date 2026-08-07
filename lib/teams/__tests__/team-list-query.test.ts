@@ -176,3 +176,193 @@ describe("getTeamsListData — provider mapping enrichment", () => {
     expect(team.competition?.name).toBe("Senioren 30+ Promotion");
   });
 });
+
+// ── TEAM-IDENTITY-01 — canonical naming enrichment ────────────────────────────
+
+describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
+  it("7 — long name works: prefers TeamSeason.displayName over Team.name", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        name: "Junioren B2",
+        teamSeasons: [
+          {
+            season: { key: "2027", name: "2027/28" },
+            displayName: "FC Allschwil Junioren B2",
+            shortName: "B2",
+            status: "ACTIVE",
+            competitions: [],
+          },
+        ],
+      }),
+    ]);
+
+    const [team] = await getTeamsListData();
+
+    expect(team.displayName).toBe("FC Allschwil Junioren B2");
+  });
+
+  it("8 — shortName optional: Team.shortName surfaces through to the list item", async () => {
+    mockFindMany.mockResolvedValueOnce([makeTeamRow({ shortName: "B2" })]);
+
+    const [team] = await getTeamsListData();
+
+    expect(team.shortName).toBe("B2");
+  });
+
+  it("9 — alternativeName optional: Team.alternativeName surfaces through to the list item", async () => {
+    mockFindMany.mockResolvedValueOnce([makeTeamRow({ alternativeName: "Junioren B2" })]);
+
+    const [team] = await getTeamsListData();
+
+    expect(team.alternativeName).toBe("Junioren B2");
+  });
+
+  it("10 — compact fallback prefers Team.shortName over Team.name", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        name: "FC Allschwil Junioren B2",
+        shortName: "B2",
+        teamSeasons: [
+          {
+            season: { key: "2027", name: "2027/28" },
+            displayName: "FC Allschwil Junioren B2",
+            shortName: null,
+            status: "ACTIVE",
+            competitions: [],
+          },
+        ],
+      }),
+    ]);
+
+    const [team] = await getTeamsListData();
+
+    expect(team.compactName).toBe("B2");
+  });
+
+  it("11 — manual team (no provider mapping) resolves naming purely from tenant fields", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        name: "Trainingsgruppe Aktive",
+        shortName: null,
+        alternativeName: null,
+        externalMappings: [],
+        teamSeasons: [
+          {
+            season: { key: "2027", name: "2027/28" },
+            displayName: null,
+            shortName: null,
+            status: "ACTIVE",
+            competitions: [],
+          },
+        ],
+      }),
+    ]);
+
+    const [team] = await getTeamsListData();
+
+    expect(team.displayName).toBe("Trainingsgruppe Aktive");
+    expect(team.providerMapping).toBeNull();
+  });
+
+  it("12 — provider-connected team falls back to providerTeamName only when tenant fields are absent", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        name: "",
+        shortName: null,
+        alternativeName: null,
+        teamSeasons: [
+          {
+            season: { key: "2027", name: "2027/28" },
+            displayName: null,
+            shortName: null,
+            status: "ACTIVE",
+            competitions: [],
+          },
+        ],
+        externalMappings: [
+          {
+            provider: "SFV",
+            providerIsActive: true,
+            lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+            mappingSource: "SYNC",
+            providerTeamName: "FC Allschwil C1 (4. Liga)",
+          },
+        ],
+      }),
+    ]);
+
+    const [team] = await getTeamsListData();
+
+    expect(team.displayName).toBe("FC Allschwil C1 (4. Liga)");
+  });
+
+  it("13 — provider sync does not overwrite tenant names: a provider-connected team still prefers Team.name/shortName", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        name: "FC Allschwil Junioren B2",
+        shortName: "B2",
+        teamSeasons: [
+          {
+            season: { key: "2027", name: "2027/28" },
+            displayName: null,
+            shortName: null,
+            status: "ACTIVE",
+            competitions: [],
+          },
+        ],
+        externalMappings: [
+          {
+            provider: "SFV",
+            providerIsActive: true,
+            lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+            mappingSource: "SYNC",
+            providerTeamName: "FC Allschwil Junioren B2 (4. Liga)",
+          },
+        ],
+      }),
+    ]);
+
+    const [team] = await getTeamsListData();
+
+    expect(team.displayName).toBe("FC Allschwil Junioren B2");
+    expect(team.compactName).toBe("B2");
+    expect(team.providerMapping?.teamName).toBe("FC Allschwil Junioren B2 (4. Liga)");
+  });
+
+  it("14 — same name, different externalTeamId: two Team rows remain distinct list entries (identity safety)", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        id: "team-b1",
+        name: "FC Allschwil",
+        externalMappings: [
+          {
+            provider: "SFV",
+            providerIsActive: true,
+            lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+            mappingSource: "SYNC",
+            providerTeamName: "FC Allschwil B1",
+          },
+        ],
+      }),
+      makeTeamRow({
+        id: "team-b2",
+        name: "FC Allschwil",
+        externalMappings: [
+          {
+            provider: "SFV",
+            providerIsActive: true,
+            lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+            mappingSource: "SYNC",
+            providerTeamName: "FC Allschwil B2",
+          },
+        ],
+      }),
+    ]);
+
+    const teams = await getTeamsListData();
+
+    expect(teams).toHaveLength(2);
+    expect(teams.map((t) => t.id)).toEqual(["team-b1", "team-b2"]);
+    expect(teams[0].id).not.toBe(teams[1].id);
+  });
+});

@@ -121,6 +121,10 @@ export type WizardFormData = {
   teamName: string;
   teamSlug: string;
   teamShortName: string;
+  // TEAM-IDENTITY-01: Team.alternativeName — tenant-owned, optional, canonical
+  // ALTERNATIVE NAME (distinct from teamShortName, which maps to the
+  // seasonal TeamSeason.shortName).
+  teamAlternativeName: string;
   teamGenderGroup: string;
   teamAgeGroup: string;
   teamSortOrder: number;
@@ -150,6 +154,7 @@ export const INITIAL_FORM_DATA: WizardFormData = {
   teamName: "",
   teamSlug: "",
   teamShortName: "",
+  teamAlternativeName: "",
   teamGenderGroup: "",
   teamAgeGroup: "",
   teamSortOrder: 0,
