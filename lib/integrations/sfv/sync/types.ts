@@ -56,8 +56,16 @@ export type SfvTeamSyncResult = {
   seasonId: number;
   /** Number of team records fetched from the provider. */
   fetched: number;
-  /** Number of new teams created (no prior mapping existed). */
+  /** Number of new teams created (no prior mapping existed for any season). */
   created: number;
+  /**
+   * Number of teams relinked to their EXISTING canonical Team from a prior
+   * season (TEAM-SFV-MAPPING-01 season carryover) — only a new
+   * TeamExternalMapping row was created, never a new Team. A non-zero value
+   * here is expected and healthy whenever the tenant's configured SFV season
+   * advances; it is what prevents duplicate "FC Allschwil"-style Team rows.
+   */
+  relinked: number;
   /** Number of existing mappings updated with changed provider data. */
   updated: number;
   /** Number of records with no detectable change — skipped. */

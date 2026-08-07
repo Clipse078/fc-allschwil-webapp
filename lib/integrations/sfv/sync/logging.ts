@@ -56,6 +56,7 @@ export function logSyncCompleted(result: SfvTeamSyncResult): void {
     seasonId: result.seasonId,
     fetched: result.fetched,
     created: result.created,
+    relinked: result.relinked,
     updated: result.updated,
     unchanged: result.unchanged,
     markedInactive: result.markedInactive,

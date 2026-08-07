@@ -66,6 +66,36 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
           displayName: true,
           shortName: true,
           status: true,
+          // TEAM-SFV-MAPPING-01: surface the competition/league on the teams
+          // list so rows that otherwise share a generic display name (e.g.
+          // multiple provider-imported "FC Allschwil" rows) remain
+          // distinguishable without opening each team.
+          competitions: {
+            where: { isPrimary: true },
+            take: 1,
+            select: {
+              competition: {
+                select: {
+                  officialName: true,
+                  shortName: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      // TEAM-SFV-MAPPING-01: provider mapping / sync status for recognition.
+      // A Team may carry mapping rows from several historical seasons (one
+      // per season it was synced) — the most recently synced row reflects
+      // current provider status.
+      externalMappings: {
+        orderBy: { lastSyncedAt: "desc" },
+        take: 1,
+        select: {
+          provider: true,
+          providerIsActive: true,
+          lastSyncedAt: true,
+          mappingSource: true,
         },
       },
     },
@@ -73,6 +103,8 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
 
   return teams.map((team) => {
     const activeSeasonEntry = team.teamSeasons[0] ?? null;
+    const primaryCompetition = activeSeasonEntry?.competitions[0]?.competition ?? null;
+    const latestMapping = team.externalMappings[0] ?? null;
 
     return {
       id: team.id,
@@ -92,6 +124,20 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
             displayName: activeSeasonEntry.displayName,
             shortName: activeSeasonEntry.shortName,
             status: activeSeasonEntry.status,
+          }
+        : null,
+      competition: primaryCompetition
+        ? {
+            name: primaryCompetition.officialName,
+            shortName: primaryCompetition.shortName,
+          }
+        : null,
+      providerMapping: latestMapping
+        ? {
+            provider: latestMapping.provider,
+            isActive: latestMapping.providerIsActive,
+            lastSyncedAt: latestMapping.lastSyncedAt.toISOString(),
+            source: latestMapping.mappingSource,
           }
         : null,
     };

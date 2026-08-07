@@ -75,11 +75,13 @@ vi.mock("../tenant-config-repository", () => ({
 // ── Mock: team-persistence ────────────────────────────────────────────────────
 
 const mockLoadExistingMappings = vi.fn();
+const mockLoadCrossSeasonTeamIds = vi.fn();
 const mockProcessTeamDetail = vi.fn();
 const mockMarkMappingsInactive = vi.fn();
 
 vi.mock("../sync/team-persistence", () => ({
   loadExistingMappings: (...args: unknown[]) => mockLoadExistingMappings(...args),
+  loadCrossSeasonTeamIds: (...args: unknown[]) => mockLoadCrossSeasonTeamIds(...args),
   processTeamDetail: (...args: unknown[]) => mockProcessTeamDetail(...args),
   markMappingsInactive: (...args: unknown[]) => mockMarkMappingsInactive(...args),
 }));
@@ -149,6 +151,7 @@ function makeExistingMapping(externalTeamId = 31927) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockMarkMappingsInactive.mockResolvedValue(0);
+  mockLoadCrossSeasonTeamIds.mockResolvedValue(new Map());
 });
 
 // ── 1-3: First synchronization ────────────────────────────────────────────────
@@ -260,6 +263,7 @@ describe("Update behavior", () => {
       expect.objectContaining({ teamId: 31927 }),
       expect.objectContaining({ tenantId: TENANT_A }),
       existing,
+      expect.any(Map),
     );
   });
 });
@@ -360,6 +364,68 @@ describe("Tenant isolation", () => {
 
     const [, contextArg] = mockProcessTeamDetail.mock.calls[0];
     expect((contextArg as SfvTeamSyncContext).tenantId).toBe(TENANT_A);
+  });
+});
+
+// ── Season carryover (TEAM-SFV-MAPPING-01) ────────────────────────────────────
+
+describe("Season carryover (TEAM-SFV-MAPPING-01)", () => {
+  it("loads cross-season team ids scoped to tenant/provider/current season", async () => {
+    mockRequireEnabledSfvConfigForTenant.mockResolvedValueOnce(makeTenantConfig(TENANT_A));
+    mockFetchTeamList.mockResolvedValueOnce([]);
+    mockLoadExistingMappings.mockResolvedValueOnce(new Map());
+    mockLoadCrossSeasonTeamIds.mockResolvedValueOnce(new Map());
+
+    await syncSfvTeams(TENANT_A);
+
+    expect(mockLoadCrossSeasonTeamIds).toHaveBeenCalledWith(TENANT_A, "SFV", 2027);
+  });
+
+  it("a team known from a prior season is relinked, not created, when the tenant's SFV season advances", async () => {
+    mockRequireEnabledSfvConfigForTenant.mockResolvedValueOnce(
+      makeTenantConfig(TENANT_A, { defaultSeasonId: 2027 }),
+    );
+    mockFetchTeamList.mockResolvedValueOnce([makeTeamDetail({ teamId: 31927 })]);
+    // No mapping yet for season 2027 — but a prior-season canonical Team exists.
+    mockLoadExistingMappings.mockResolvedValueOnce(new Map());
+    mockLoadCrossSeasonTeamIds.mockResolvedValueOnce(new Map([[31927, "team-from-2026"]]));
+    mockProcessTeamDetail.mockResolvedValueOnce({ status: "relinked" });
+
+    const result = await syncSfvTeams(TENANT_A);
+
+    expect(result.relinked).toBe(1);
+    expect(result.created).toBe(0);
+  });
+
+  it("passes the cross-season map through to processTeamDetail as the 4th argument", async () => {
+    const crossSeasonMap = new Map([[31927, "team-from-2026"]]);
+    mockRequireEnabledSfvConfigForTenant.mockResolvedValueOnce(makeTenantConfig(TENANT_A));
+    mockFetchTeamList.mockResolvedValueOnce([makeTeamDetail({ teamId: 31927 })]);
+    mockLoadExistingMappings.mockResolvedValueOnce(new Map());
+    mockLoadCrossSeasonTeamIds.mockResolvedValueOnce(crossSeasonMap);
+    mockProcessTeamDetail.mockResolvedValueOnce({ status: "relinked" });
+
+    await syncSfvTeams(TENANT_A);
+
+    expect(mockProcessTeamDetail).toHaveBeenCalledWith(
+      expect.objectContaining({ teamId: 31927 }),
+      expect.objectContaining({ tenantId: TENANT_A }),
+      expect.any(Map),
+      crossSeasonMap,
+    );
+  });
+
+  it("a genuinely new team (no current or prior mapping) is still created normally", async () => {
+    mockRequireEnabledSfvConfigForTenant.mockResolvedValueOnce(makeTenantConfig(TENANT_A));
+    mockFetchTeamList.mockResolvedValueOnce([makeTeamDetail({ teamId: 99999 })]);
+    mockLoadExistingMappings.mockResolvedValueOnce(new Map());
+    mockLoadCrossSeasonTeamIds.mockResolvedValueOnce(new Map([[31927, "team-from-2026"]]));
+    mockProcessTeamDetail.mockResolvedValueOnce({ status: "created" });
+
+    const result = await syncSfvTeams(TENANT_A);
+
+    expect(result.created).toBe(1);
+    expect(result.relinked).toBe(0);
   });
 });
 
@@ -468,6 +534,7 @@ describe("Result structure", () => {
     expect(result).toHaveProperty("seasonId");
     expect(result).toHaveProperty("fetched");
     expect(result).toHaveProperty("created");
+    expect(result).toHaveProperty("relinked");
     expect(result).toHaveProperty("updated");
     expect(result).toHaveProperty("unchanged");
     expect(result).toHaveProperty("markedInactive");

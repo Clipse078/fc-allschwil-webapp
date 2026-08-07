@@ -236,9 +236,12 @@ function DiagnosticsResult({ data }: { data: SfvAdminDiagnostics }) {
 function TeamSyncResult({ data }: { data: SfvTeamSyncResult }) {
   const hasErrors = data.errors.length > 0;
 
+  const relinked = data.relinked ?? 0;
+
   const rows: { label: string; value: number | string }[] = [
     { label: "Abgerufen", value: data.fetched },
     { label: "Neu erstellt", value: data.created },
+    { label: "Saison-Übernahme", value: relinked },
     { label: "Aktualisiert", value: data.updated },
     { label: "Unverändert", value: data.unchanged },
     { label: "Inaktiv markiert", value: data.markedInactive },
@@ -250,7 +253,13 @@ function TeamSyncResult({ data }: { data: SfvTeamSyncResult }) {
     <div className="space-y-4" data-testid="team-sync-result">
       <div className="flex flex-wrap items-center gap-3">
         <StatusIndicator
-          variant={hasErrors ? (data.created + data.updated + data.unchanged > 0 ? "warning" : "danger") : "success"}
+          variant={
+            hasErrors
+              ? data.created + relinked + data.updated + data.unchanged > 0
+                ? "warning"
+                : "danger"
+              : "success"
+          }
           label={hasErrors ? "Abgeschlossen (mit Fehlern)" : "Erfolgreich abgeschlossen"}
           data-testid="team-sync-status"
         />
