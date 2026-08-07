@@ -250,6 +250,48 @@ describe("Matchcenter query service", () => {
     );
   });
 
+  it("CLUB-DIRECTORY-02B: resolves a SFV-enriched data: URI club crest the same as any other logoUrl value", async () => {
+    // resolveProviderLogoDataUri (lib/integrations/sfv/sync/team-logo.ts)
+    // persists SFV-discovered crests as `data:` URIs into
+    // ExternalClub.logoUrl, since SFV has no stable logo URL to store
+    // verbatim (see that module's doc comment). Matchcenter must resolve
+    // this exactly like any other logoUrl string — no special-casing.
+    const dataUriLogo = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+    const database = createDatabase({
+      list: [
+        createEvent({
+          matchExternalMapping: {
+            ...createEvent().matchExternalMapping,
+            awayTeam: null,
+            awayExternalTeam: {
+              id: "ext-team-1",
+              name: "SV Muttenz Erste Mannschaft",
+              shortName: "1M",
+              alternativeName: null,
+              logoUrl: null,
+              externalClub: { id: "ext-club-1", logoUrl: dataUriLogo },
+            },
+          },
+        }),
+      ],
+    });
+
+    const result = await listMatchcenterMatches(database, {
+      tenantId: "tenant-1",
+      from: new Date("2026-08-01T00:00:00.000Z"),
+      to: new Date("2026-09-01T00:00:00.000Z"),
+    });
+
+    expect(result[0].away).toEqual(
+      expect.objectContaining({
+        canonicalExternalTeamId: "ext-team-1",
+        canonicalExternalClubId: "ext-club-1",
+        externalLogoUrl: dataUriLogo,
+      }),
+    );
+  });
+
   it("falls back to the raw provider name when no canonical ExternalTeam is linked yet", async () => {
     const database = createDatabase({
       list: [createEvent()], // fixture's away side has no homeExternalTeam/awayExternalTeam
