@@ -556,23 +556,23 @@ model User {
   tenantId String?
   tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
-  userRoles                  UserRole[]
-  tenantMemberships          TenantMembership[]
-  auditLogs                  AuditLog[]           @relation("AuditActor")
-  assignedRegistrations      Registration[]       @relation("RegistrationAssignedUser")
-  duplicateIgnoredRegistrations Registration[]    @relation("RegistrationDuplicateIgnoredBy")
-  orgUnitMemberships         OrgUnitMembership[]
-  reviewedHomepageSections   HomepageSection[]    @relation("HomepageSectionReviewer")
-  approvedHomepageSections   HomepageSection[]    @relation("HomepageSectionApprovedBy")
-  rejectedHomepageSections   HomepageSection[]    @relation("HomepageSectionRejectedBy")
-  reviewedPageSections       WebsitePageSection[] @relation("PageSectionReviewer")
-  approvedPageSections       WebsitePageSection[] @relation("PageSectionApprovedBy")
-  rejectedPageSections       WebsitePageSection[] @relation("PageSectionRejectedBy")
-  contentRevisions           ContentRevision[]
-  createdReusableComponents  ReusableComponent[]  @relation("ReusableComponentCreatedBy")
-  reviewedReusableComponents ReusableComponent[]  @relation("ReusableComponentReviewer")
-  approvedReusableComponents ReusableComponent[]  @relation("ReusableComponentApprovedBy")
-  rejectedReusableComponents ReusableComponent[]  @relation("ReusableComponentRejectedBy")
+  userRoles                     UserRole[]
+  tenantMemberships             TenantMembership[]
+  auditLogs                     AuditLog[]           @relation("AuditActor")
+  assignedRegistrations         Registration[]       @relation("RegistrationAssignedUser")
+  duplicateIgnoredRegistrations Registration[]       @relation("RegistrationDuplicateIgnoredBy")
+  orgUnitMemberships            OrgUnitMembership[]
+  reviewedHomepageSections      HomepageSection[]    @relation("HomepageSectionReviewer")
+  approvedHomepageSections      HomepageSection[]    @relation("HomepageSectionApprovedBy")
+  rejectedHomepageSections      HomepageSection[]    @relation("HomepageSectionRejectedBy")
+  reviewedPageSections          WebsitePageSection[] @relation("PageSectionReviewer")
+  approvedPageSections          WebsitePageSection[] @relation("PageSectionApprovedBy")
+  rejectedPageSections          WebsitePageSection[] @relation("PageSectionRejectedBy")
+  contentRevisions              ContentRevision[]
+  createdReusableComponents     ReusableComponent[]  @relation("ReusableComponentCreatedBy")
+  reviewedReusableComponents    ReusableComponent[]  @relation("ReusableComponentReviewer")
+  approvedReusableComponents    ReusableComponent[]  @relation("ReusableComponentApprovedBy")
+  rejectedReusableComponents    ReusableComponent[]  @relation("ReusableComponentRejectedBy")
 
   // Workspace
   createdWorkspaceFolders          WorkspaceFolder[]          @relation("WorkspaceFolderCreatedBy")
@@ -630,14 +630,14 @@ model Registration {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  assignedToUser   User?        @relation("RegistrationAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  targetGroup      TargetGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  person           Person?      @relation("RegistrationPerson", fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  duplicateIgnoredBy User?      @relation("RegistrationDuplicateIgnoredBy", fields: [duplicateIgnoredById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant             Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assignedToUser     User?        @relation("RegistrationAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  targetGroup        TargetGroup? @relation(fields: [targetGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  person             Person?      @relation("RegistrationPerson", fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  duplicateIgnoredBy User?        @relation("RegistrationDuplicateIgnoredBy", fields: [duplicateIgnoredById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   // Back-relation for Person.createdRegistrationId — the Person record(s)
   // that were created from this registration (see Goal 3).
-  createdPersons   Person[]     @relation("PersonCreatedFromRegistration")
+  createdPersons     Person[]     @relation("PersonCreatedFromRegistration")
 
   @@index([tenantId, status])
   @@index([tenantId, type])
@@ -650,14 +650,14 @@ model Registration {
 }
 
 model Role {
-  id                              String    @id @default(cuid())
-  key                             String    @unique
+  id                              String   @id @default(cuid())
+  key                             String   @unique
   name                            String
   description                     String?
-  canAccessVereinsleitung         Boolean   @default(false)
-  canAttendVereinsleitungMeetings Boolean   @default(false)
-  createdAt                       DateTime  @default(now())
-  updatedAt                       DateTime  @updatedAt
+  canAccessVereinsleitung         Boolean  @default(false)
+  canAttendVereinsleitungMeetings Boolean  @default(false)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
 
   // RPERM-02: tenant-aware role foundation
   scope      RoleScope @default(PLATFORM)
@@ -3053,6 +3053,15 @@ model TrainingSeries {
 // A TrainingSeries may recur on one or more weekdays per week.
 // Each row represents one active weekday in the series' recurrence pattern.
 //
+// TRAININGCENTER-03A: startsAt/endsAt — optional per-weekday time override.
+//   A recurring series can meet at different times on different weekdays
+//   (e.g. Monday 17:00–18:00, Wednesday 16:00–17:00). When both are set,
+//   they take precedence over the parent TrainingSeries.startsAt/endsAt for
+//   occurrences generated on this weekday. When either is null, generation
+//   falls back to the parent series' startsAt/endsAt for this weekday.
+//   Additive/nullable by design — existing rows (uniform time across all
+//   weekdays) continue to resolve exactly as before.
+//
 // Architecture invariants:
 //   - Duplicate (trainingSeriesId, weekday) is prevented at DB level.
 //   - Cascade-delete with the parent TrainingSeries.
@@ -3063,6 +3072,10 @@ model TrainingSeriesRecurrenceDay {
   id               String   @id @default(cuid())
   trainingSeriesId String
   weekday          Weekday
+  /// Per-weekday override of the start time ("HH:mm"). Null = fall back to TrainingSeries.startsAt.
+  startsAt         String?
+  /// Per-weekday override of the end time ("HH:mm"). Null = fall back to TrainingSeries.endsAt.
+  endsAt           String?
   createdAt        DateTime @default(now())
 
   trainingSeries TrainingSeries @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -3368,6 +3381,16 @@ enum TrainingSessionStatus {
   CANCELLED
   POSTPONED
   MOVED
+  /// TRAININGCENTER-03A-FIX: this generated occurrence's date no longer
+  /// satisfies its TrainingSeries' recurrence rule (weekday removed,
+  /// validFrom/validUntil narrowed, ...). Distinct from CANCELLED, which
+  /// means "this actual scheduled training was cancelled" — RECURRENCE_REMOVED
+  /// means "this occurrence is no longer part of the series definition".
+  /// Reconciliation (see session-generation-service.ts) is the only writer
+  /// of this status; it never overwrites CANCELLED/POSTPONED/MOVED rows, and
+  /// it clears RECURRENCE_REMOVED back to SCHEDULED if the date matches the
+  /// recurrence again (e.g. a removed weekday is re-added).
+  RECURRENCE_REMOVED
 }
 
 // ---------------------------------------------------------------------------
@@ -3417,7 +3440,10 @@ model TrainingSession {
   endAt            DateTime
   /// IANA timezone snapshot used to resolve startAt/endAt for this occurrence.
   timezone         String
-  /// Lifecycle status. Generation only ever writes/updates SCHEDULED rows.
+  /// Lifecycle status. Generation writes SCHEDULED rows and reconciles
+  /// RECURRENCE_REMOVED <-> SCHEDULED transitions when the parent series'
+  /// recurrence rule changes; it never writes/overwrites CANCELLED,
+  /// POSTPONED, or MOVED (see session-generation-service.ts).
   status           TrainingSessionStatus @default(SCHEDULED)
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt

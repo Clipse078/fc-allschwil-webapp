@@ -37,6 +37,21 @@ export type TrainingPlanAssignmentStatus = "SCHEDULED" | "NOT_SCHEDULED";
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
+/**
+ * TRAININGCENTER-03A: a single weekday's resolved (effective) schedule.
+ *
+ * "Resolved" means the per-weekday override when set, else the series-level
+ * startsAt/endsAt fallback — this is always the concrete time that
+ * generation will use for occurrences on this weekday.
+ */
+export interface WeekdayScheduleDto {
+  weekday: Weekday;
+  /** Resolved time-of-day string "HH:mm" interpreted in `timezone`. */
+  startsAt: string;
+  /** Resolved time-of-day string "HH:mm" interpreted in `timezone`. */
+  endsAt: string;
+}
+
 /** The resolved public shape returned by every service method. */
 export interface TrainingSeriesDto {
   id: string;
@@ -45,16 +60,20 @@ export interface TrainingSeriesDto {
   title: string;
   description: string | null;
   status: TrainingSeriesStatus;
-  /** Time-of-day string "HH:mm" interpreted in `timezone`. */
+  /** Time-of-day string "HH:mm" interpreted in `timezone`. Fallback default for weekdays without their own override. */
   startsAt: string;
-  /** Time-of-day string "HH:mm" interpreted in `timezone`. */
+  /** Time-of-day string "HH:mm" interpreted in `timezone`. Fallback default for weekdays without their own override. */
   endsAt: string;
   /** IANA timezone identifier, e.g. "Europe/Zurich". */
   timezone: string;
   weekdays: Weekday[];
+  /** TRAININGCENTER-03A: resolved per-weekday start/end times, ordered by weekday. */
+  weekdaySchedules: WeekdayScheduleDto[];
   validFrom: string | null;
   validUntil: string | null;
   archivedAt: string | null;
+  /** TRAININGCENTER-03A: number of canonical TrainingSession rows generated for this series. */
+  sessionCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -101,18 +120,35 @@ export interface TrainingPlanAssignmentDto {
 
 // ── Input shapes ──────────────────────────────────────────────────────────────
 
+/** TRAININGCENTER-03A: a per-weekday time override supplied to create/update. */
+export interface WeekdayTimeOverrideInput {
+  weekday: Weekday;
+  /** Time-of-day "HH:mm" this weekday starts. Must be before endsAt. */
+  startsAt: string;
+  /** Time-of-day "HH:mm" this weekday ends. */
+  endsAt: string;
+}
+
 export interface CreateTrainingSeriesInput {
   teamSeasonId: string;
   title: string;
   description?: string | null;
-  /** Time-of-day "HH:mm". Required. */
+  /** Time-of-day "HH:mm". Required. Fallback for any weekday without its own entry in `weekdayTimes`. */
   startsAt: string;
-  /** Time-of-day "HH:mm". Required. Must be after startsAt. */
+  /** Time-of-day "HH:mm". Required. Must be after startsAt. Fallback for any weekday without its own entry in `weekdayTimes`. */
   endsAt: string;
   /** IANA timezone. Defaults to "UTC" when omitted. */
   timezone?: string;
   /** Weekdays on which the series recurs. At least one required. */
   weekdays: Weekday[];
+  /**
+   * TRAININGCENTER-03A: optional per-weekday start/end time overrides — one
+   * recurring series may meet at different times on different weekdays
+   * (e.g. Monday 17:00–18:00, Wednesday 16:00–17:00). Every entry's weekday
+   * must also appear in `weekdays`. Weekdays present in `weekdays` but
+   * without an entry here fall back to `startsAt`/`endsAt`.
+   */
+  weekdayTimes?: WeekdayTimeOverrideInput[];
   validFrom?: Date | null;
   validUntil?: Date | null;
 }
@@ -124,6 +160,8 @@ export interface UpdateTrainingSeriesInput {
   endsAt?: string;
   timezone?: string;
   weekdays?: Weekday[];
+  /** TRAININGCENTER-03A: per-weekday time overrides. Only applied when `weekdays` is also provided (recurrence days are always fully replaced together). */
+  weekdayTimes?: WeekdayTimeOverrideInput[];
   validFrom?: Date | null;
   validUntil?: Date | null;
   status?: Exclude<TrainingSeriesStatus, "ARCHIVED">;
@@ -233,11 +271,25 @@ export interface ListTrainingAllocationsFilter {
 /**
  * Lifecycle status of a generated TrainingSession.
  *
- * CANCELLED / POSTPONED / MOVED are reserved for future exception handling
- * (holidays, skipped dates, ad-hoc changes). The generator introduced in
- * this PR only ever writes/updates SCHEDULED rows.
+ * SCHEDULED           — canonical, active occurrence. Default consumer-facing state.
+ * CANCELLED           — a genuine, manually-set operational status: "this actual
+ *                        scheduled training was cancelled". Never written or
+ *                        cleared by reconciliation.
+ * POSTPONED / MOVED    — reserved for future exception handling (ad-hoc changes).
+ *                        Same non-interference guarantee as CANCELLED.
+ * RECURRENCE_REMOVED  — reconciliation-owned: "this generated occurrence is no
+ *                        longer part of the TrainingSeries recurrence definition"
+ *                        (weekday removed, validFrom/validUntil narrowed, ...).
+ *                        Distinct from CANCELLED — see session-generation-service.ts.
+ *                        Excluded from listTrainingSessions() by default; opt in
+ *                        with `includeInactive: true` or an explicit `status` filter.
  */
-export type TrainingSessionStatus = "SCHEDULED" | "CANCELLED" | "POSTPONED" | "MOVED";
+export type TrainingSessionStatus =
+  | "SCHEDULED"
+  | "CANCELLED"
+  | "POSTPONED"
+  | "MOVED"
+  | "RECURRENCE_REMOVED";
 
 /** Public shape for a canonical generated training session. */
 export interface TrainingSessionDto {
@@ -281,6 +333,19 @@ export interface GenerateTrainingSessionsResult {
   updated: number;
   /** Existing rows that already matched the derived schedule exactly (no write issued). */
   unchanged: number;
+  /**
+   * TRAININGCENTER-03A-FIX: previously SCHEDULED rows transitioned to
+   * RECURRENCE_REMOVED because their date no longer matches the series'
+   * recurrence rule. Never applied to CANCELLED/POSTPONED/MOVED rows.
+   */
+  deactivated: number;
+  /**
+   * TRAININGCENTER-03A-FIX: previously RECURRENCE_REMOVED rows transitioned
+   * back to SCHEDULED because their date matches the recurrence rule again
+   * (e.g. a removed weekday was re-added). Reuses the existing row — never
+   * creates a duplicate for the same (trainingSeriesId, date).
+   */
+  reactivated: number;
 }
 
 export interface ListTrainingSessionsFilter {
@@ -291,4 +356,12 @@ export interface ListTrainingSessionsFilter {
   dateFrom?: Date;
   /** Inclusive upper bound (calendar date). */
   dateTo?: Date;
+  /**
+   * TRAININGCENTER-03A-FIX: canonical reads (Weekplanner, Dayplanner,
+   * Website, Infoboard) exclude RECURRENCE_REMOVED rows by default. Set to
+   * `true` for historical/admin access that needs to see them too. Has no
+   * effect when `status` is explicitly provided — an explicit status filter
+   * is itself an opt-in to that specific status.
+   */
+  includeInactive?: boolean;
 }

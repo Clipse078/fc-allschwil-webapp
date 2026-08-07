@@ -139,6 +139,14 @@ export function zonedTimeToUtc(dateKey: string, time: string, timeZone: string):
 
 // ── Occurrence generation ────────────────────────────────────────────────────
 
+/** A per-weekday time-of-day override (TRAININGCENTER-03A: separate start/end time per weekday). */
+export interface WeekdayTimeOverride {
+  /** Time-of-day "HH:mm" this weekday's occurrences start. */
+  startsAt: string;
+  /** Time-of-day "HH:mm" this weekday's occurrences end. */
+  endsAt: string;
+}
+
 /** The recurrence-relevant subset of a TrainingSeries, decoupled from Prisma row shapes. */
 export interface TrainingSeriesRecurrenceInput {
   /** Inclusive calendar-date lower bound of the series, or null for unbounded. */
@@ -149,10 +157,18 @@ export interface TrainingSeriesRecurrenceInput {
   weekdays: Weekday[];
   /** IANA timezone identifier, e.g. "Europe/Zurich". */
   timezone: string;
-  /** Time-of-day "HH:mm" the session starts. */
+  /** Time-of-day "HH:mm" the session starts. Used as the fallback for any weekday without an entry in `weekdayTimes`. */
   startsAt: string;
-  /** Time-of-day "HH:mm" the session ends. */
+  /** Time-of-day "HH:mm" the session ends. Used as the fallback for any weekday without an entry in `weekdayTimes`. */
   endsAt: string;
+  /**
+   * Optional per-weekday time overrides (TRAININGCENTER-03A). A recurring
+   * series may meet at different times on different weekdays — e.g. Monday
+   * 17:00–18:00, Wednesday 16:00–17:00. When a weekday has an entry here, it
+   * takes precedence over `startsAt`/`endsAt` for occurrences on that
+   * weekday. Weekdays without an entry fall back to `startsAt`/`endsAt`.
+   */
+  weekdayTimes?: Partial<Record<Weekday, WeekdayTimeOverride>>;
 }
 
 /** Bounds a single generation run. Both ends are inclusive calendar dates. */
@@ -172,6 +188,66 @@ export interface GeneratedTrainingOccurrence {
   startAt: Date;
   /** Resolved UTC instant the occurrence ends. */
   endAt: Date;
+}
+
+/** Returns the Weekday for a UTC calendar date (ignores any time-of-day component). */
+export function weekdayFromDate(date: Date): Weekday {
+  return JS_DAY_TO_WEEKDAY[toDateOnlyUtc(date).getUTCDay()];
+}
+
+/**
+ * Returns whether `date` is a live occurrence of `series` — i.e. its weekday
+ * is one of `series.weekdays` AND it falls within [validFrom, validUntil]
+ * (both inclusive, unbounded when null).
+ *
+ * Deliberately independent of any generation window: this is the single
+ * source of truth for "is this calendar date still part of the recurrence
+ * rule", used by the reconciliation logic in session-generation-service.ts
+ * to detect TrainingSession rows that have gone stale (weekday removed,
+ * validFrom moved forward, validUntil moved back) regardless of whether
+ * that row's date happens to lie inside the currently requested generation
+ * window.
+ */
+export function matchesRecurrence(
+  date: Date,
+  series: Pick<TrainingSeriesRecurrenceInput, "validFrom" | "validUntil" | "weekdays">,
+): boolean {
+  const ms = toDateOnlyUtc(date).getTime();
+  if (series.validFrom && ms < toDateOnlyUtc(series.validFrom).getTime()) return false;
+  if (series.validUntil && ms > toDateOnlyUtc(series.validUntil).getTime()) return false;
+  return series.weekdays.includes(weekdayFromDate(date));
+}
+
+/**
+ * Computes the single occurrence `series` produces on `date`, or `null` when
+ * `date` does not match the recurrence rule (see `matchesRecurrence`).
+ *
+ * Used by the reconciliation logic to (re)compute the resolved schedule for
+ * a specific date without generating a full window — e.g. when reactivating
+ * a previously RECURRENCE_REMOVED row whose weekday was re-added.
+ *
+ * @throws {RangeError} When `series.timezone` is not a valid IANA timezone identifier.
+ */
+export function computeOccurrenceForDate(
+  date: Date,
+  series: TrainingSeriesRecurrenceInput,
+): GeneratedTrainingOccurrence | null {
+  if (!matchesRecurrence(date, series)) return null;
+
+  const normalised = toDateOnlyUtc(date);
+  const weekday = weekdayFromDate(normalised);
+  const dateKey = dateKeyFromDate(normalised);
+  const override = series.weekdayTimes?.[weekday];
+  const startsAt = override?.startsAt ?? series.startsAt;
+  const endsAt = override?.endsAt ?? series.endsAt;
+
+  return {
+    dateKey,
+    date: normalised,
+    weekday,
+    startAt: zonedTimeToUtc(dateKey, startsAt, series.timezone),
+    endAt: zonedTimeToUtc(dateKey, endsAt, series.timezone),
+  };
 }
 
 /**
@@ -232,13 +308,16 @@ export function generateTrainingSessionOccurrences(
 
     const date = new Date(ms);
     const dateKey = dateKeyFromDate(date);
+    const override = series.weekdayTimes?.[weekday];
+    const startsAt = override?.startsAt ?? series.startsAt;
+    const endsAt = override?.endsAt ?? series.endsAt;
 
     occurrences.push({
       dateKey,
       date,
       weekday,
-      startAt: zonedTimeToUtc(dateKey, series.startsAt, series.timezone),
-      endAt: zonedTimeToUtc(dateKey, series.endsAt, series.timezone),
+      startAt: zonedTimeToUtc(dateKey, startsAt, series.timezone),
+      endAt: zonedTimeToUtc(dateKey, endsAt, series.timezone),
     });
   }
 

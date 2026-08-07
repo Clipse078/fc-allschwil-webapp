@@ -361,6 +361,91 @@ describe("A. createTrainingSeries", () => {
     ).rejects.toThrow(TrainingSeriesValidationError);
   });
 
+  it("TRAININGCENTER-03A: persists per-weekday time overrides via weekdayTimes", async () => {
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(activeTeamSeason as never);
+    vi.mocked(prisma.trainingSeries.create).mockResolvedValue({
+      ...baseRow,
+      recurrenceDays: [
+        { weekday: "MONDAY", startsAt: null, endsAt: null },
+        { weekday: "WEDNESDAY", startsAt: "16:00", endsAt: "17:00" },
+      ],
+    } as never);
+
+    const result = await createTrainingSeries(TENANT_A, {
+      teamSeasonId: TEAM_SEASON_ID,
+      title: "Mon/Wed Training",
+      startsAt: "17:00",
+      endsAt: "18:00",
+      weekdays: ["MONDAY", "WEDNESDAY"],
+      weekdayTimes: [{ weekday: "WEDNESDAY", startsAt: "16:00", endsAt: "17:00" }],
+    });
+
+    const call = vi.mocked(prisma.trainingSeries.create).mock.calls[0][0];
+    const created = (
+      call.data.recurrenceDays as { create: Array<{ weekday: string; startsAt: string | null; endsAt: string | null }> }
+    ).create;
+    const monday = created.find((d) => d.weekday === "MONDAY")!;
+    const wednesday = created.find((d) => d.weekday === "WEDNESDAY")!;
+    expect(monday.startsAt).toBeNull();
+    expect(monday.endsAt).toBeNull();
+    expect(wednesday.startsAt).toBe("16:00");
+    expect(wednesday.endsAt).toBe("17:00");
+
+    // Resolved DTO exposes the effective per-weekday schedule.
+    expect(result.weekdaySchedules).toEqual([
+      { weekday: "MONDAY", startsAt: "19:00", endsAt: "21:00" }, // falls back to baseRow's series-level time
+      { weekday: "WEDNESDAY", startsAt: "16:00", endsAt: "17:00" },
+    ]);
+  });
+
+  it("throws TrainingSeriesValidationError when weekdayTimes references a weekday not in weekdays", async () => {
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(activeTeamSeason as never);
+
+    await expect(
+      createTrainingSeries(TENANT_A, {
+        teamSeasonId: TEAM_SEASON_ID,
+        title: "Mon Training",
+        startsAt: "17:00",
+        endsAt: "18:00",
+        weekdays: ["MONDAY"],
+        weekdayTimes: [{ weekday: "FRIDAY", startsAt: "16:00", endsAt: "17:00" }],
+      }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
+  it("throws TrainingSeriesValidationError when a weekdayTimes entry has an invalid time range", async () => {
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(activeTeamSeason as never);
+
+    await expect(
+      createTrainingSeries(TENANT_A, {
+        teamSeasonId: TEAM_SEASON_ID,
+        title: "Mon Training",
+        startsAt: "17:00",
+        endsAt: "18:00",
+        weekdays: ["MONDAY"],
+        weekdayTimes: [{ weekday: "MONDAY", startsAt: "18:00", endsAt: "17:00" }],
+      }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
+  it("throws TrainingSeriesValidationError on duplicate weekdayTimes entries for the same weekday", async () => {
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(activeTeamSeason as never);
+
+    await expect(
+      createTrainingSeries(TENANT_A, {
+        teamSeasonId: TEAM_SEASON_ID,
+        title: "Mon Training",
+        startsAt: "17:00",
+        endsAt: "18:00",
+        weekdays: ["MONDAY"],
+        weekdayTimes: [
+          { weekday: "MONDAY", startsAt: "17:00", endsAt: "18:00" },
+          { weekday: "MONDAY", startsAt: "19:00", endsAt: "20:00" },
+        ],
+      }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
   it("throws TrainingSeriesConflictError on duplicate title within TeamSeason", async () => {
     vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(activeTeamSeason as never);
     vi.mocked(prisma.trainingSeries.create).mockRejectedValue(
@@ -459,6 +544,44 @@ describe("B. updateTrainingSeries", () => {
   it("throws TrainingSeriesValidationError when updated weekdays is empty array", async () => {
     await expect(
       updateTrainingSeries(TENANT_A, SERIES_ID, { weekdays: [] }),
+    ).rejects.toThrow(TrainingSeriesValidationError);
+  });
+
+  it("TRAININGCENTER-03A: replaces recurrence days with per-weekday time overrides when both weekdays and weekdayTimes are provided", async () => {
+    vi.mocked(prisma.trainingSeries.findFirst).mockResolvedValue(baseRow as never);
+    vi.mocked(prisma.trainingSeries.update).mockResolvedValue({
+      ...baseRow,
+      recurrenceDays: [
+        { weekday: "MONDAY", startsAt: "17:00", endsAt: "18:00" },
+        { weekday: "WEDNESDAY", startsAt: "16:00", endsAt: "17:00" },
+      ],
+    } as never);
+
+    const result = await updateTrainingSeries(TENANT_A, SERIES_ID, {
+      weekdays: ["MONDAY", "WEDNESDAY"],
+      weekdayTimes: [
+        { weekday: "MONDAY", startsAt: "17:00", endsAt: "18:00" },
+        { weekday: "WEDNESDAY", startsAt: "16:00", endsAt: "17:00" },
+      ],
+    });
+
+    expect(result.weekdaySchedules).toEqual([
+      { weekday: "MONDAY", startsAt: "17:00", endsAt: "18:00" },
+      { weekday: "WEDNESDAY", startsAt: "16:00", endsAt: "17:00" },
+    ]);
+    const call = vi.mocked(prisma.trainingSeries.update).mock.calls[0][0];
+    const created = (
+      call.data.recurrenceDays as { create: Array<{ weekday: string; startsAt: string | null; endsAt: string | null }> }
+    ).create;
+    expect(created.find((d) => d.weekday === "MONDAY")?.startsAt).toBe("17:00");
+    expect(created.find((d) => d.weekday === "WEDNESDAY")?.startsAt).toBe("16:00");
+  });
+
+  it("throws TrainingSeriesValidationError when weekdayTimes is provided without weekdays", async () => {
+    await expect(
+      updateTrainingSeries(TENANT_A, SERIES_ID, {
+        weekdayTimes: [{ weekday: "MONDAY", startsAt: "17:00", endsAt: "18:00" }],
+      }),
     ).rejects.toThrow(TrainingSeriesValidationError);
   });
 
@@ -760,6 +883,20 @@ describe("F. getTrainingSeries", () => {
 
     expect(result.createdAt).toBe(createdAt.toISOString());
     expect(result.updatedAt).toBe(updatedAt.toISOString());
+  });
+
+  it("TRAININGCENTER-03A: resolves sessionCount from the _count.sessions aggregate, defaulting to 0", async () => {
+    vi.mocked(prisma.trainingSeries.findFirst).mockResolvedValue({
+      ...baseRow,
+      _count: { sessions: 27 },
+    } as never);
+
+    const result = await getTrainingSeries(TENANT_A, SERIES_ID);
+    expect(result.sessionCount).toBe(27);
+
+    vi.mocked(prisma.trainingSeries.findFirst).mockResolvedValue(baseRow as never);
+    const resultNoCount = await getTrainingSeries(TENANT_A, SERIES_ID);
+    expect(resultNoCount.sessionCount).toBe(0);
   });
 
   it("includes validFrom and validUntil as ISO strings when set", async () => {
