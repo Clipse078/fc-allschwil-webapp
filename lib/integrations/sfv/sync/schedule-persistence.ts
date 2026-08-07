@@ -79,6 +79,9 @@ export type ExistingMatchMappingRow = {
   providerAwayTeamName: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
+  /** CLUB-DIRECTORY-02: canonical Club Directory identity for external sides. */
+  homeExternalTeamId: string | null;
+  awayExternalTeamId: string | null;
   event: {
     startAt: Date;
     status: string;
@@ -121,6 +124,8 @@ export async function loadExistingMatchMappings(
       providerAwayTeamName: true,
       homeTeamId: true,
       awayTeamId: true,
+      homeExternalTeamId: true,
+      awayExternalTeamId: true,
       event: {
         select: { startAt: true, status: true, teamId: true, homeAway: true },
       },
@@ -214,9 +219,19 @@ export async function createMatchWithMapping(
   isHome: boolean,
   homeTeamId: string | null,
   awayTeamId: string | null,
+  /** CLUB-DIRECTORY-02: canonical Club Directory identity for external sides. */
+  homeExternalTeamId: string | null = null,
+  awayExternalTeamId: string | null = null,
 ): Promise<SchedulePersistenceOutcome> {
   const eventFields = buildNewEventFields(entry, context, localTeamId, opponentName, isHome);
-  const mappingFields = buildMappingFields(entry, context, homeTeamId, awayTeamId);
+  const mappingFields = buildMappingFields(
+    entry,
+    context,
+    homeTeamId,
+    awayTeamId,
+    homeExternalTeamId,
+    awayExternalTeamId,
+  );
 
   if (seasonId === null) {
     return {
@@ -314,8 +329,18 @@ export async function updateMatchRecord(
   awayTeamId: string | null,
   localTeamId: string | null,
   isHome: boolean,
+  /** CLUB-DIRECTORY-02: canonical Club Directory identity for external sides. */
+  homeExternalTeamId: string | null = null,
+  awayExternalTeamId: string | null = null,
 ): Promise<SchedulePersistenceOutcome & { status: "updated" | "failed" }> {
-  const mappingFields = buildMappingFields(entry, context, homeTeamId, awayTeamId);
+  const mappingFields = buildMappingFields(
+    entry,
+    context,
+    homeTeamId,
+    awayTeamId,
+    homeExternalTeamId,
+    awayExternalTeamId,
+  );
   // entry.matchDate is Europe/Zurich civil time (no offset) — see provider-time.ts.
   const kickoff = parseSfvMatchDateTime(entry.matchDate);
   const status = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
@@ -401,6 +426,20 @@ export async function processScheduleEntry(
   existingMappings: Map<number, ExistingMatchMappingRow>,
   teamMappings: Map<number, string>,
   clubOwnedSfvTeamIds: ReadonlySet<number>,
+  /**
+   * CLUB-DIRECTORY-02: resolves an external opponent's SFV teamId to a
+   * canonical Club Directory ExternalTeam id (creating it on first sight —
+   * see lib/club-directory/discovery-service.ts). Defaults to a no-op
+   * resolver so every pre-existing caller/test continues to compile and
+   * behave exactly as before (homeExternalTeamId/awayExternalTeamId stay
+   * null). Never called for club-owned participants. Must never throw —
+   * callers (schedule.ts) wrap discovery failures so a single opponent
+   * lookup issue can never block match persistence.
+   */
+  resolveExternalTeamId: (
+    sfvTeamId: number,
+    sfvTeamName: string | null,
+  ) => Promise<string | null> = async () => null,
 ): Promise<{ outcome: SchedulePersistenceOutcome; participantCounts: ParticipantCounts }> {
   // Classify both participants using confirmed club ownership + TeamExternalMapping
   const homeClassification = classifyParticipant(
@@ -437,6 +476,16 @@ export async function processScheduleEntry(
     awayClassification,
   );
 
+  // CLUB-DIRECTORY-02: resolve/discover canonical Club Directory identity for
+  // external opponent sides only — never for club-owned participants (those
+  // keep resolving exclusively through TeamExternalMapping, unchanged).
+  const homeExternalTeamId = isExternalOpponent(homeClassification)
+    ? await resolveExternalTeamId(entry.teamAId, entry.teamNameA)
+    : null;
+  const awayExternalTeamId = isExternalOpponent(awayClassification)
+    ? await resolveExternalTeamId(entry.teamBId, entry.teamNameB)
+    : null;
+
   const existing = existingMappings.get(entry.matchId);
 
   if (existing === undefined) {
@@ -449,12 +498,21 @@ export async function processScheduleEntry(
       isHome,
       homeTeamId,
       awayTeamId,
+      homeExternalTeamId,
+      awayExternalTeamId,
     );
     return { outcome, participantCounts };
   }
 
   // Detect what changed
-  const incomingMapping = buildMappingFields(entry, context, homeTeamId, awayTeamId);
+  const incomingMapping = buildMappingFields(
+    entry,
+    context,
+    homeTeamId,
+    awayTeamId,
+    homeExternalTeamId,
+    awayExternalTeamId,
+  );
   const incomingKickoff = parseSfvMatchDateTime(entry.matchDate);
   const incomingStatus = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
   const canonicalHomeAway = mapSfvHomeAway(isHome);
@@ -483,6 +541,8 @@ export async function processScheduleEntry(
     awayTeamId,
     localTeamId,
     isHome,
+    homeExternalTeamId,
+    awayExternalTeamId,
   );
 
   if (rawOutcome.status === "failed") {
