@@ -510,24 +510,29 @@ model Tenant {
 
   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
-  sfvConfig                TenantSfvConfig?
-  teamExternalMappings     TeamExternalMapping[]
-  matchExternalMappings    MatchExternalMapping[]
-  opponents                Opponent[]
-  opponentExternalMappings OpponentExternalMapping[]
+  sfvConfig                 TenantSfvConfig?
+  teamExternalMappings      TeamExternalMapping[]
+  matchExternalMappings     MatchExternalMapping[]
+  // CLUB-DIRECTORY-01: canonical external club/team directory. Supersedes
+  // the earlier "Opponent"/"OpponentExternalMapping" foundation (MC-04B),
+  // which was never wired to any write path or UI and had no club/team split.
+  externalClubs             ExternalClub[]
+  externalClubProviderLinks ExternalClubProviderMapping[]
+  externalTeams             ExternalTeam[]
+  externalTeamProviderLinks ExternalTeamProviderMapping[]
   // TEAM-CORE-02: canonical seasonal OrgUnit assignments
-  teamSeasonOrgUnits       TeamSeasonOrgUnit[]
+  teamSeasonOrgUnits        TeamSeasonOrgUnit[]
   // COMPETITION-01: canonical competition entities
-  competitions             Competition[]
+  competitions              Competition[]
   // TRAINING-CORE-01: canonical recurring training series
-  trainingSeries           TrainingSeries[]
+  trainingSeries            TrainingSeries[]
   // TRAINING-PLANS-01: tenant-defined training plans and assignments
-  trainingPlans            TrainingPlan[]
-  trainingPlanAssignments  TrainingPlanAssignment[]
+  trainingPlans             TrainingPlan[]
+  trainingPlanAssignments   TrainingPlanAssignment[]
   // TRAINING-ALLOCATIONS-01: canonical facility resource allocations
-  trainingAllocations      TrainingAllocation[]
+  trainingAllocations       TrainingAllocation[]
   // TRAININGCENTER-02: canonical generated training sessions
-  trainingSessions         TrainingSession[]
+  trainingSessions          TrainingSession[]
 
   // RPERM-02
   tenantMemberships TenantMembership[]
@@ -2895,64 +2900,206 @@ model TenantSfvConfig {
   @@index([enabled])
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Opponent — reusable tenant-scoped opponent identity.
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUB-DIRECTORY-01 — Canonical external club/team directory
 //
-// Opponents are deliberately separate from Team:
-// - Team represents a tenant-owned team.
-// - Opponent represents an external or manually managed opposing club/team.
+// Supersedes the earlier "Opponent" foundation (MC-04B, migration
+// 20260722233000_opponent_domain_foundation). That foundation modeled a flat,
+// team-level-only "Opponent" with no club/team split, had no write path, and
+// was never wired into Matchcenter's actual home/away rendering (which reads
+// MatchExternalMapping.providerHomeTeamName / providerAwayTeamName directly).
+// It is removed by this migration and replaced by the model below.
 //
-// Local display-name overrides remain on Opponent and are never provider-owned.
-// ─────────────────────────────────────────────────────────────────────────────
+// Rationale ("opponent" is contextual — the same club/team can be an opponent
+// in Matchcenter, a participant in a friendly, a TournamentCenter participant,
+// or shown on Infoboard/Website):
+//   - ExternalClub  — canonical external club identity (e.g. "SV Muttenz").
+//   - ExternalTeam  — canonical external team identity, always scoped to one
+//                      ExternalClub (e.g. "SV Muttenz B1").
+//
+// Identity rule: names are never identity keys.
+//   - Provider-linked records are identified by provider + provider-assigned
+//     numeric id (ExternalClubProviderMapping / ExternalTeamProviderMapping).
+//   - Manually-created records use the SportClubEvo canonical cuid — no
+//     auto-merge by name, ever. A manual record may later be linked to a
+//     provider identity by creating a mapping row.
+//
+// Both models are tenant-scoped (tenant isolation first; no shared global
+// directory introduced by this slice).
+// ═════════════════════════════════════════════════════════════════════════════
 
-model Opponent {
-  id            String    @id @default(cuid())
-  tenantId      String
-  officialName  String
-  shortName     String?
-  websiteName   String?
-  infoboardName String?
-  notes         String?
-  archivedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+model ExternalClub {
+  id String @id @default(cuid())
 
-  tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  externalMappings OpponentExternalMapping[]
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Canonical long/official name (e.g. "SV Muttenz"). Tenant-managed —
+  /// provider sync (see ExternalClubProviderMapping) never overwrites this.
+  name            String
+  /// Optional compact name for constrained UI contexts. Tenant-managed.
+  shortName       String?
+  /// Optional alternative/legacy name. Tenant-managed.
+  alternativeName String?
+  /// Optional website URL. Tenant-managed.
+  website         String?
+  /// Optional free-form location/address. Tenant-managed.
+  location        String?
+  /// Persisted crest/logo URL (e.g. Vercel Blob CDN URL). Cached once at
+  /// club level so Matchcenter, TournamentCenter, Infoboard, and Website can
+  /// all reuse it without re-fetching from any provider. Tenant-managed once
+  /// set manually; may also be populated from a provider sync (see
+  /// ExternalClubProviderMapping.providerLogoUrl) when no tenant override exists.
+  logoUrl         String?
+  /// Free-form provenance note (e.g. "Erstellt via SFV-Sync", "Manuell erfasst").
+  notes           String?
+  /// How this record originated. "MANUAL" (Club Admin) or "SFV" (first seen via
+  /// provider sync). Informational only — never gates identity or behaviour.
+  source          String    @default("MANUAL")
+  /// Null = active. Set = archived (soft-delete pattern used across this codebase).
+  archivedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  providerMappings ExternalClubProviderMapping[]
+  externalTeams    ExternalTeam[]
 
   @@index([tenantId])
   @@index([tenantId, archivedAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OpponentExternalMapping — provider identity for a reusable Opponent.
+// ExternalClubProviderMapping — provider identity for an ExternalClub.
 //
-// externalSeasonId uses 0 as the explicit seasonless sentinel. PostgreSQL unique
-// constraints allow multiple NULL values, so a nullable season identifier would
-// not safely prevent duplicate seasonless provider identities.
+// Field ownership:
+//   - Provider-owned (refreshed on sync): providerClubName, providerLogoUrl,
+//     providerWebsite, providerIsActive, lastSyncedAt.
+//   - Never overwrites ExternalClub.name / shortName / alternativeName /
+//     website / logoUrl / location / notes — those stay tenant-managed once set.
 // ─────────────────────────────────────────────────────────────────────────────
 
-model OpponentExternalMapping {
-  id                     String    @id @default(cuid())
-  tenantId               String
-  opponentId             String
+model ExternalClubProviderMapping {
+  id       String @id @default(cuid())
+  tenantId String
+
+  externalClubId String
+  externalClub   ExternalClub @relation(fields: [externalClubId], references: [id], onDelete: Cascade)
+
+  /// External provider identifier, e.g. "SFV".
+  provider         String
+  /// Provider-assigned numeric club identifier (SFV: TeamDetail.clubNumber).
+  providerClubId   Int
+  /// Provider-reported club name at time of last sync.
+  providerClubName String?
+  /// Provider-reported club logo/crest URL at time of last sync, if the
+  /// provider exposes one. Copied into ExternalClub.logoUrl only when no
+  /// tenant-managed logo is already set (see lib/club-directory/logo.ts).
+  providerLogoUrl  String?
+  /// Provider-reported website, if any.
+  providerWebsite  String?
+  /// Whether the provider currently reports this club as active.
+  providerIsActive Boolean   @default(true)
+  /// Timestamp of the last successful sync that touched this mapping. Null
+  /// until the first sync/refresh runs (e.g. immediately after manual linking).
+  lastSyncedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, providerClubId])
+  @@index([tenantId, provider])
+  @@index([externalClubId])
+}
+
+model ExternalTeam {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// The ExternalClub this team belongs to. Every ExternalTeam belongs to
+  /// exactly one ExternalClub — club/team split is structural, not inferred.
+  externalClubId String
+  externalClub   ExternalClub @relation(fields: [externalClubId], references: [id], onDelete: Cascade)
+
+  /// Canonical long/display name (e.g. "SV Muttenz B1"). Tenant-managed.
+  name            String
+  /// Optional compact name. Tenant-managed.
+  shortName       String?
+  /// Optional alternative name. Tenant-managed.
+  alternativeName String?
+  /// Optional free-form age/category label (e.g. "B1", "Herren 1").
+  /// Deliberately a free-form string, not the tenant TeamCategory enum —
+  /// external teams are not tenant-owned Teams and must not be coerced into
+  /// tenant category semantics.
+  categoryLabel   String?
+  /// Optional team-level logo override. When null, consumers fall back to
+  /// externalClub.logoUrl (see lib/club-directory/logo.ts) — SFV evidence
+  /// shows provider team pictures are actually club-level crests, so a
+  /// per-team override is the exception, not the default.
+  logoUrl         String?
+  source          String    @default("MANUAL")
+  archivedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  providerMappings ExternalTeamProviderMapping[]
+
+  @@index([tenantId])
+  @@index([tenantId, archivedAt])
+  @@index([externalClubId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ExternalTeamProviderMapping — provider identity for an ExternalTeam.
+//
+// providerSeasonId uses 0 as the explicit seasonless sentinel (PostgreSQL
+// unique constraints allow multiple NULL values, so a nullable season
+// identifier would not safely prevent duplicate seasonless provider identities
+// — same rationale as the superseded OpponentExternalMapping).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ExternalTeamProviderMapping {
+  id       String @id @default(cuid())
+  tenantId String
+
+  externalTeamId String
+  externalTeam   ExternalTeam @relation(fields: [externalTeamId], references: [id], onDelete: Cascade)
+
+  /// External provider identifier, e.g. "SFV".
   provider               String
-  externalTeamId         Int
-  externalSeasonId       Int       @default(0)
+  /// Provider-assigned numeric team identifier (SFV: TeamDetail.teamId /
+  /// ClubScheduleEntry.teamAId/teamBId / ClubRankingEntry.teamId).
+  providerTeamId         Int
+  providerSeasonId       Int       @default(0)
+  /// Provider-reported team name at time of last sync.
   providerTeamName       String?
+  /// Provider-reported club identifier at time of sync, for traceability only
+  /// (e.g. SFV clubNumber seen alongside this team). Not used for identity —
+  /// club membership is the structural ExternalTeam.externalClubId link, set
+  /// by the Club Admin, never inferred from this field.
+  providerClubId         Int?
+  /// Provider-reported organisation identifier.
   providerOrganisationId Int?
+  /// Provider-reported team picture URL/reference at time of last sync.
+  /// SFV fetchTeamPicture() returns club-level imagery keyed by teamId — see
+  /// lib/club-directory/logo.ts for how this feeds ExternalClub.logoUrl.
   providerLogoUrl        String?
   providerIsActive       Boolean   @default(true)
   lastSyncedAt           DateTime?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  opponent Opponent @relation(fields: [opponentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([tenantId, provider, externalTeamId, externalSeasonId])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, providerTeamId, providerSeasonId])
   @@index([tenantId, provider])
-  @@index([opponentId])
+  @@index([externalTeamId])
 }
 
 // =============================================================================
