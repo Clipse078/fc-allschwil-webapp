@@ -53,6 +53,7 @@ const sfvConfig = {
   lastScheduleSyncAt: null,
   lastMatchDetailSyncAt: null,
   lastCompetitionSyncAt: null,
+  lastClubMasterImportAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

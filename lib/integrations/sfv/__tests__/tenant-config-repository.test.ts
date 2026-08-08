@@ -58,6 +58,7 @@ const {
   listEnabledSfvConfigTenantIds,
   claimSfvScheduleSyncLock,
   releaseSfvScheduleSyncLock,
+  markClubMasterImportSuccessful,
 } = await import("../tenant-config-repository");
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -76,6 +77,7 @@ function makeConfig(overrides: Partial<TenantSfvConfig> = {}): TenantSfvConfig {
     lastScheduleSyncAt: null,
     lastMatchDetailSyncAt: null,
     lastCompetitionSyncAt: null,
+    lastClubMasterImportAt: null,
     syncLockedAt: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
     updatedAt: new Date("2026-07-01T00:00:00.000Z"),
@@ -136,6 +138,7 @@ describe("findSfvConfigByTenantId", () => {
         "lastScheduleSyncAt",
         "lastMatchDetailSyncAt",
         "lastCompetitionSyncAt",
+        "lastClubMasterImportAt",
         "syncLockedAt",
         "createdAt",
         "updatedAt",
@@ -218,6 +221,7 @@ describe("getEnabledSfvConfigByTenantId", () => {
         "lastScheduleSyncAt",
         "lastMatchDetailSyncAt",
         "lastCompetitionSyncAt",
+        "lastClubMasterImportAt",
         "syncLockedAt",
         "createdAt",
         "updatedAt",
@@ -374,6 +378,30 @@ describe("releaseSfvScheduleSyncLock", () => {
       where: { tenantId: TENANT_ID },
       data: { syncLockedAt: null },
     });
+  });
+});
+
+// ── markClubMasterImportSuccessful (CLUB-DIRECTORY-05) ───────────────────────
+
+describe("markClubMasterImportSuccessful", () => {
+  it("25 — sets lastClubMasterImportAt for the exact tenantId", async () => {
+    mockUpdate.mockResolvedValueOnce({});
+    const finishedAt = new Date("2026-08-08T12:00:00.000Z");
+
+    await markClubMasterImportSuccessful(TENANT_ID, finishedAt);
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { tenantId: TENANT_ID },
+      data: { lastClubMasterImportAt: finishedAt },
+    });
+  });
+
+  it("26 — forwards Prisma errors (does not swallow)", async () => {
+    mockUpdate.mockRejectedValueOnce(new Error("DB unavailable"));
+
+    await expect(
+      markClubMasterImportSuccessful(TENANT_ID, new Date()),
+    ).rejects.toThrow("DB unavailable");
   });
 
   it("25 — forwards Prisma errors (does not swallow)", async () => {
