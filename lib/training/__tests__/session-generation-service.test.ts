@@ -710,7 +710,13 @@ function makeSessionRow(overrides: Record<string, unknown> = {}) {
     status: "SCHEDULED",
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
     updatedAt: new Date("2026-07-01T00:00:00.000Z"),
-    trainingSeries: { title: "F2 Monday Training" },
+    trainingSeries: {
+      title: "F2 Monday Training",
+      teamSeason: {
+        displayName: "F2",
+        team: { name: "FC Allschwil F2", shortName: null, alternativeName: null },
+      },
+    },
     ...overrides,
   };
 }
@@ -728,6 +734,7 @@ describe("C. listTrainingSessions / getTrainingSession", () => {
         trainingSeriesId: SERIES_ID,
         trainingSeriesTitle: "F2 Monday Training",
         teamSeasonId: TEAM_SEASON_ID,
+        teamName: "F2",
         date: "2026-08-03",
         weekday: "MONDAY",
         startAt: "2026-08-03T15:00:00.000Z",

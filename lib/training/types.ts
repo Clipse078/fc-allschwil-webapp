@@ -300,6 +300,12 @@ export interface TrainingSessionDto {
   trainingSeriesTitle: string;
   /** Denormalised from the parent TrainingSeries for join-free filtering. */
   teamSeasonId: string;
+  /**
+   * TRAININGCENTER-01: resolved team display name (TeamSeason.displayName
+   * → Team.name → Team.alternativeName, via lib/teams/team-naming.ts) for
+   * Month/Week/Day operational views.
+   */
+  teamName: string;
   /** Calendar date of this occurrence, "YYYY-MM-DD". */
   date: string;
   weekday: Weekday;

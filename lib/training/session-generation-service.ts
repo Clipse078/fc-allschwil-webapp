@@ -50,6 +50,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { resolveLongTeamName } from "@/lib/teams/team-naming";
 import {
   generateTrainingSessionOccurrences,
   matchesRecurrence,
@@ -84,12 +85,20 @@ import type {
 
 /** Converts a DB row to the public DTO shape. */
 function toDto(row: TrainingSessionRow): TrainingSessionDto {
+  const teamSeason = row.trainingSeries.teamSeason;
   return {
     id: row.id,
     tenantId: row.tenantId,
     trainingSeriesId: row.trainingSeriesId,
     trainingSeriesTitle: row.trainingSeries.title,
     teamSeasonId: row.teamSeasonId,
+    teamName:
+      resolveLongTeamName({
+        teamSeasonDisplayName: teamSeason.displayName,
+        teamName: teamSeason.team.name,
+        teamShortName: teamSeason.team.shortName,
+        teamAlternativeName: teamSeason.team.alternativeName,
+      }) ?? teamSeason.displayName,
     date: dateKeyFromDate(row.date),
     weekday: row.weekday as Weekday,
     startAt: row.startAt.toISOString(),
