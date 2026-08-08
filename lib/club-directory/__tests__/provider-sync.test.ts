@@ -59,9 +59,34 @@ describe("buildExternalTeamMappingUpdate", () => {
       providerClubId: 483,
       providerOrganisationId: 12,
       providerLogoUrl: "https://sfv.example.com/logo.gif",
+      providerLeagueName: null,
+      providerGroupName: null,
       providerIsActive: false,
       lastSyncedAt: NOW,
     });
+  });
+
+  it("CLUB-DIRECTORY-04: refreshes real provider-reported league/group context", () => {
+    const update = buildExternalTeamMappingUpdate(
+      {
+        providerTeamName: "AC Rossoneri",
+        providerLeagueName: "3. Liga",
+        providerGroupName: "Gruppe 1",
+      },
+      NOW,
+    );
+
+    expect(update).toMatchObject({
+      providerLeagueName: "3. Liga",
+      providerGroupName: "Gruppe 1",
+    });
+  });
+
+  it("defaults missing league/group context to null (never invents a value)", () => {
+    const update = buildExternalTeamMappingUpdate({ providerTeamName: "AC Rossoneri" }, NOW);
+
+    expect(update.providerLeagueName).toBeNull();
+    expect(update.providerGroupName).toBeNull();
   });
 });
 

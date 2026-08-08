@@ -30,6 +30,8 @@ type FakeTeamMappingRow = ExternalTeamProviderMappingRow & {
   providerClubId?: number | null;
   providerOrganisationId?: number | null;
   providerLogoUrl?: string | null;
+  providerLeagueName?: string | null;
+  providerGroupName?: string | null;
   providerIsActive?: boolean;
   lastSyncedAt?: Date;
 };
@@ -1015,5 +1017,123 @@ describe("discoverExternalTeamFromProvider — tenant isolation", () => {
 
     expect(tenantBResult.discovered).toBe(true);
     expect(clubs.filter((c) => c.tenantId === "tenant-b")).toHaveLength(1);
+  });
+});
+
+// ── CLUB-DIRECTORY-04 — External Team Competition Context ───────────────────
+
+describe("discoverExternalTeamFromProvider — CLUB-DIRECTORY-04 competition context", () => {
+  it("persists real provider-reported league/group context on first discovery", async () => {
+    const result = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4001,
+      providerTeamName: "AC Rossoneri",
+      providerLeagueName: "3. Liga",
+      providerGroupName: "Gruppe 1",
+    });
+
+    expect(result.team.name).toBe("AC Rossoneri");
+    expect(teamMappings[0]?.providerLeagueName).toBe("3. Liga");
+    expect(teamMappings[0]?.providerGroupName).toBe("Gruppe 1");
+    // Never displayed, but the provider Team-ID stays available internally
+    // for identity/sync/reconciliation.
+    expect(teamMappings[0]?.providerTeamId).toBe(4001);
+  });
+
+  it("distinguishes four identically-named provider teams (AC Rossoneri) by real, distinct context", async () => {
+    const teamOne = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4001,
+      providerTeamName: "AC Rossoneri",
+      providerLeagueName: "3. Liga",
+      providerGroupName: "Gruppe 1",
+    });
+    const teamTwo = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4002,
+      providerTeamName: "AC Rossoneri",
+      providerLeagueName: "2. Liga",
+      providerGroupName: "Gruppe 2",
+    });
+    const teamThree = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4003,
+      providerTeamName: "AC Rossoneri",
+      providerLeagueName: "Senioren 30+",
+      providerGroupName: "Gruppe 2",
+    });
+    const teamFour = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4004,
+      providerTeamName: "AC Rossoneri",
+      providerLeagueName: "Junioren B",
+      providerGroupName: "Promotion",
+    });
+
+    // All four canonically display the same name...
+    expect([teamOne, teamTwo, teamThree, teamFour].map((r) => r.team.name)).toEqual([
+      "AC Rossoneri",
+      "AC Rossoneri",
+      "AC Rossoneri",
+      "AC Rossoneri",
+    ]);
+    // ...but are four distinct canonical ExternalTeam records...
+    const teamIds = new Set([teamOne, teamTwo, teamThree, teamFour].map((r) => r.team.id));
+    expect(teamIds.size).toBe(4);
+    // ...each carrying its own real, distinguishing sporting context.
+    expect(teamMappings.map((m) => `${m.providerLeagueName} · ${m.providerGroupName}`)).toEqual([
+      "3. Liga · Gruppe 1",
+      "2. Liga · Gruppe 2",
+      "Senioren 30+ · Gruppe 2",
+      "Junioren B · Promotion",
+    ]);
+  });
+
+  it("refreshes league/group context on re-sync without touching the tenant-managed canonical name", async () => {
+    await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4001,
+      providerTeamName: "AC Rossoneri",
+      providerLeagueName: "3. Liga",
+      providerGroupName: "Gruppe 1",
+    });
+
+    // A Club Admin renames the canonical team (tenant enrichment).
+    teams[0]!.name = "AC Rossoneri (1. Mannschaft)";
+
+    // Provider sync reports a league change (e.g. promotion/relegation).
+    const resynced = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4001,
+      providerTeamName: "AC Rossoneri",
+      providerLeagueName: "2. Liga",
+      providerGroupName: "Gruppe 2",
+    });
+
+    // Canonical name is untouched by the sync.
+    expect(resynced.team.name).toBe("AC Rossoneri (1. Mannschaft)");
+    // Sporting context is refreshed to the new, real values.
+    expect(teamMappings[0]?.providerLeagueName).toBe("2. Liga");
+    expect(teamMappings[0]?.providerGroupName).toBe("Gruppe 2");
+  });
+
+  it("persists an all-null context when the provider does not report one — never invents a value", async () => {
+    const result = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4001,
+      providerTeamName: "AC Rossoneri",
+    });
+
+    expect(result.team.name).toBe("AC Rossoneri");
+    expect(teamMappings[0]?.providerLeagueName).toBeNull();
+    expect(teamMappings[0]?.providerGroupName).toBeNull();
   });
 });

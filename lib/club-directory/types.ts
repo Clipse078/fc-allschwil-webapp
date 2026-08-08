@@ -6,6 +6,8 @@
  * of `provider`, never hard-coded into a type.
  */
 
+import type { ExternalTeamCompetitionContext } from "./competition-context";
+
 // ── Provider mapping DTOs ──────────────────────────────────────────────────────
 
 export type ExternalClubProviderMappingDto = {
@@ -28,6 +30,10 @@ export type ExternalTeamProviderMappingDto = {
   providerClubId: number | null;
   providerOrganisationId: number | null;
   providerLogoUrl: string | null;
+  /** CLUB-DIRECTORY-04 — real provider-reported league/competition name. */
+  providerLeagueName: string | null;
+  /** CLUB-DIRECTORY-04 — real provider-reported competition group name. */
+  providerGroupName: string | null;
   providerIsActive: boolean;
   lastSyncedAt: Date | null;
 };
@@ -65,6 +71,15 @@ export type ExternalTeamSummaryDto = {
   createdAt: Date;
   updatedAt: Date;
   providerMappings: ExternalTeamProviderMappingDto[];
+  /**
+   * CLUB-DIRECTORY-04 — real sporting context (league/competition,
+   * competition group) resolved from `providerMappings`, for display next
+   * to the canonical team name when multiple ExternalTeams share the same
+   * name. Never includes a provider Team-ID; all-null when the provider
+   * has not reported any usable context for this team yet — see
+   * lib/club-directory/competition-context.ts.
+   */
+  competitionContext: ExternalTeamCompetitionContext;
 };
 
 export type ExternalClubDetailDto = ExternalClubSummaryDto & {
