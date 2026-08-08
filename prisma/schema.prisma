@@ -3109,6 +3109,21 @@ model ExternalTeamProviderMapping {
   /// SFV fetchTeamPicture() returns club-level imagery keyed by teamId — see
   /// lib/club-directory/logo.ts for how this feeds ExternalClub.logoUrl.
   providerLogoUrl        String?
+  /// CLUB-DIRECTORY-04: provider-reported league/competition name at time of
+  /// last sync (e.g. "3. Liga", "Senioren 30+"). SFV source: ClubRankingEntry
+  /// .leagueName (GET /api/club/ranking), which reports this PER TEAM for
+  /// every team appearing in the tenant's current standings — own teams and
+  /// opponents alike (see lib/integrations/sfv/sync/team-competition-context.ts).
+  /// Provider-owned — refreshed on every sync, never a substitute for
+  /// ExternalTeam.name/categoryLabel and never displayed as editable
+  /// canonical identity. Null when the provider does not currently report
+  /// standings coverage for this team.
+  providerLeagueName     String?
+  /// CLUB-DIRECTORY-04: provider-reported competition group name at time of
+  /// last sync (e.g. "Gruppe 1", "Promotion"). SFV source: ClubRankingEntry
+  /// .groupName. Provider-owned, same refresh/ownership rules as
+  /// providerLeagueName above.
+  providerGroupName      String?
   providerIsActive       Boolean   @default(true)
   lastSyncedAt           DateTime?
 
