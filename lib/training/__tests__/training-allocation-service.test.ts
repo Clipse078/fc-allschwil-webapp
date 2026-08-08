@@ -80,6 +80,7 @@ import {
   listAllocationsByTrainingSeries,
   listAllocationsByFacilityResource,
   getTrainingAllocation,
+  listAllocationSummaryByTenant,
 } from "../training-allocation-service";
 import {
   TrainingSeriesNotFoundError,
@@ -593,5 +594,73 @@ describe("G. ordering", () => {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
       }),
     );
+  });
+});
+
+// ── H. listAllocationSummaryByTenant ─────────────────────────────────────────
+
+describe("H. listAllocationSummaryByTenant", () => {
+  it("H1. returns an empty map when the tenant has no allocations", async () => {
+    vi.mocked(prisma.trainingAllocation.findMany).mockResolvedValue([]);
+
+    const result = await listAllocationSummaryByTenant(TENANT_A);
+
+    expect(result.size).toBe(0);
+    expect(prisma.trainingAllocation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: TENANT_A } }),
+    );
+  });
+
+  it("H2. a series with only a pitch allocation has hasDressingRoomAllocation=false", async () => {
+    vi.mocked(prisma.trainingAllocation.findMany).mockResolvedValue([
+      { trainingSeriesId: SERIES_ID, facilityResource: { type: "FULL_PITCH" } },
+    ] as never);
+
+    const result = await listAllocationSummaryByTenant(TENANT_A);
+
+    expect(result.get(SERIES_ID)).toEqual({
+      hasPitchAllocation: true,
+      hasDressingRoomAllocation: false,
+    });
+  });
+
+  it("H3. a series with a pitch AND a dressing room allocation is fully covered", async () => {
+    vi.mocked(prisma.trainingAllocation.findMany).mockResolvedValue([
+      { trainingSeriesId: SERIES_ID, facilityResource: { type: "HALF_PITCH" } },
+      { trainingSeriesId: SERIES_ID, facilityResource: { type: "DRESSING_ROOM" } },
+    ] as never);
+
+    const result = await listAllocationSummaryByTenant(TENANT_A);
+
+    expect(result.get(SERIES_ID)).toEqual({
+      hasPitchAllocation: true,
+      hasDressingRoomAllocation: true,
+    });
+  });
+
+  it("H4. multiple series are tracked independently", async () => {
+    vi.mocked(prisma.trainingAllocation.findMany).mockResolvedValue([
+      { trainingSeriesId: SERIES_ID, facilityResource: { type: "FULL_PITCH" } },
+      { trainingSeriesId: SERIES_ID_2, facilityResource: { type: "OTHER" } },
+    ] as never);
+
+    const result = await listAllocationSummaryByTenant(TENANT_A);
+
+    expect(result.get(SERIES_ID)).toEqual({
+      hasPitchAllocation: true,
+      hasDressingRoomAllocation: false,
+    });
+    expect(result.get(SERIES_ID_2)).toEqual({
+      hasPitchAllocation: false,
+      hasDressingRoomAllocation: false,
+    });
+  });
+
+  it("H5. a series absent from the map is treated by callers as fully unallocated", async () => {
+    vi.mocked(prisma.trainingAllocation.findMany).mockResolvedValue([]);
+
+    const result = await listAllocationSummaryByTenant(TENANT_A);
+
+    expect(result.has(SERIES_ID)).toBe(false);
   });
 });
