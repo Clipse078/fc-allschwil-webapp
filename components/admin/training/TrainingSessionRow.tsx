@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Layers, MapPin } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Layers, MapPin, Pencil } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { TrainingSessionRowViewModel } from "@/lib/training/view-model";
 import type { TrainingAllocationSummary } from "@/lib/training/operational-state";
@@ -98,6 +98,15 @@ export default function TrainingSessionRow({
         <span className="truncate text-sm font-medium text-[var(--foreground)]">{session.teamName}</span>
         <span className="truncate text-xs text-[var(--muted)]">{session.trainingSeriesTitle}</span>
         <StatusBadge status={assessment.status} />
+        {session.isRescheduled && !isCancelled && (
+          <span
+            className="inline-flex h-5 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-[0.65rem] font-semibold text-blue-700"
+            data-testid="training-session-rescheduled-badge"
+            title={`Serienstandard: ${session.originalDate}`}
+          >
+            Angepasst
+          </span>
+        )}
       </div>
 
       {!isCancelled && (
@@ -119,6 +128,16 @@ export default function TrainingSessionRow({
           )}
           Ressourcen
         </Link>
+        {canManage && !isCancelled && (
+          <Link
+            href={`/dashboard/training/sessions/${session.id}/edit`}
+            data-testid="training-session-edit-link"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)]"
+          >
+            <Pencil className="h-3.5 w-3.5 text-[var(--blue)]" />
+            Bearbeiten
+          </Link>
+        )}
         {canManage && <TrainingSessionCancelButton sessionId={session.id} isCancelled={isCancelled} />}
       </div>
     </div>

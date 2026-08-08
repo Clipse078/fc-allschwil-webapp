@@ -239,6 +239,12 @@ describe("A. generateTrainingSessions", () => {
     // `status` must never appear in the update payload — regeneration must
     // never overwrite future exception handling (CANCELLED/POSTPONED/MOVED).
     expect(updateCall.data).not.toHaveProperty("status");
+    // TRAININGCENTER-02: regeneration must never touch the occurrence-level
+    // reschedule override columns either — those are exclusively owned by
+    // session-reschedule-service.ts.
+    expect(updateCall.data).not.toHaveProperty("overrideDate");
+    expect(updateCall.data).not.toHaveProperty("overrideStartAt");
+    expect(updateCall.data).not.toHaveProperty("overrideEndAt");
   });
 
   it("A9: a CANCELLED (future-state) row is left untouched by regeneration when its schedule matches", async () => {
@@ -741,6 +747,10 @@ describe("C. listTrainingSessions / getTrainingSession", () => {
         endAt: "2026-08-03T16:00:00.000Z",
         timezone: "Europe/Zurich",
         status: "SCHEDULED",
+        originalDate: "2026-08-03",
+        originalStartAt: "2026-08-03T15:00:00.000Z",
+        originalEndAt: "2026-08-03T16:00:00.000Z",
+        isRescheduled: false,
         createdAt: "2026-07-01T00:00:00.000Z",
         updatedAt: "2026-07-01T00:00:00.000Z",
       },
@@ -819,5 +829,84 @@ describe("C. listTrainingSessions / getTrainingSession", () => {
     };
     expect(call.where).toMatchObject({ status: "RECURRENCE_REMOVED" });
     expect(call.where).not.toHaveProperty("NOT");
+  });
+
+  // TRAININGCENTER-02: DTO resolution of occurrence-level overrides
+  it("C8: getTrainingSession resolves the EFFECTIVE date/time from the override columns, exposing the canonical schedule as originalDate/originalStartAt/originalEndAt", async () => {
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(
+      makeSessionRow({
+        overrideDate: new Date("2026-08-05T00:00:00.000Z"),
+        overrideStartAt: new Date("2026-08-05T16:00:00.000Z"),
+        overrideEndAt: new Date("2026-08-05T17:00:00.000Z"),
+      }) as never,
+    );
+
+    const result = await getTrainingSession(TENANT_A, "sess-1");
+
+    expect(result.date).toBe("2026-08-05");
+    expect(result.weekday).toBe("WEDNESDAY");
+    expect(result.startAt).toBe("2026-08-05T16:00:00.000Z");
+    expect(result.endAt).toBe("2026-08-05T17:00:00.000Z");
+    expect(result.originalDate).toBe("2026-08-03");
+    expect(result.originalStartAt).toBe("2026-08-03T15:00:00.000Z");
+    expect(result.originalEndAt).toBe("2026-08-03T16:00:00.000Z");
+    expect(result.isRescheduled).toBe(true);
+  });
+
+  it("C9: getTrainingSession reports isRescheduled=false and effective===canonical when no override columns are set", async () => {
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(makeSessionRow() as never);
+
+    const result = await getTrainingSession(TENANT_A, "sess-1");
+
+    expect(result.date).toBe(result.originalDate);
+    expect(result.startAt).toBe(result.originalStartAt);
+    expect(result.endAt).toBe(result.originalEndAt);
+    expect(result.isRescheduled).toBe(false);
+  });
+
+  it("C10: getTrainingSession resolves a time-only override without recomputing the weekday", async () => {
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(
+      makeSessionRow({
+        overrideStartAt: new Date("2026-08-03T17:00:00.000Z"),
+        overrideEndAt: new Date("2026-08-03T18:00:00.000Z"),
+      }) as never,
+    );
+
+    const result = await getTrainingSession(TENANT_A, "sess-1");
+
+    expect(result.date).toBe("2026-08-03"); // canonical date, unchanged
+    expect(result.weekday).toBe("MONDAY"); // unchanged — no date override
+    expect(result.startAt).toBe("2026-08-03T17:00:00.000Z");
+    expect(result.isRescheduled).toBe(true);
+  });
+
+  // TRAININGCENTER-02: date-window filtering must use the EFFECTIVE date
+  it("C11: listTrainingSessions filters dateFrom/dateTo against the effective date (overrideDate when set, else the canonical date)", async () => {
+    vi.mocked(prisma.trainingSession.findMany).mockResolvedValue([] as never);
+
+    const dateFrom = new Date("2026-08-01T00:00:00.000Z");
+    const dateTo = new Date("2026-08-31T00:00:00.000Z");
+    await listTrainingSessions(TENANT_A, { dateFrom, dateTo });
+
+    const call = vi.mocked(prisma.trainingSession.findMany).mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(call.where).toMatchObject({
+      OR: [
+        { overrideDate: { not: null, gte: dateFrom, lte: dateTo } },
+        { overrideDate: null, date: { gte: dateFrom, lte: dateTo } },
+      ],
+    });
+  });
+
+  it("C12: listTrainingSessions issues no date OR-filter when neither dateFrom nor dateTo is supplied", async () => {
+    vi.mocked(prisma.trainingSession.findMany).mockResolvedValue([] as never);
+
+    await listTrainingSessions(TENANT_A, { trainingSeriesId: SERIES_ID });
+
+    const call = vi.mocked(prisma.trainingSession.findMany).mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(call.where).not.toHaveProperty("OR");
   });
 });

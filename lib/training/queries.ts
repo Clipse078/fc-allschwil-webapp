@@ -191,6 +191,10 @@ export type TrainingSessionRow = TrainingSessionScheduleRow & {
   teamSeasonId: string;
   createdAt: Date;
   updatedAt: Date;
+  /** TRAININGCENTER-02: occurrence-level schedule override fields — see TrainingSession doc comment in schema.prisma. */
+  overrideDate: Date | null;
+  overrideStartAt: Date | null;
+  overrideEndAt: Date | null;
   trainingSeries: {
     title: string;
     teamSeason: {
@@ -217,6 +221,9 @@ const sessionFullSelect = {
   teamSeasonId: true,
   createdAt: true,
   updatedAt: true,
+  overrideDate: true,
+  overrideStartAt: true,
+  overrideEndAt: true,
   trainingSeries: {
     select: {
       title: true,
@@ -361,6 +368,27 @@ export async function updateTrainingSessionStatus(
   });
 }
 
+/**
+ * TRAININGCENTER-02: sets (or clears, when passed null) this single
+ * TrainingSession's occurrence-level schedule override — see the
+ * `overrideDate`/`overrideStartAt`/`overrideEndAt` doc comments on the
+ * TrainingSession Prisma model. Never touches `status`, `date`, `startAt`,
+ * `endAt`, or `weekday` — those remain exclusively owned by
+ * session-generation-service.ts regeneration/reconciliation.
+ *
+ * Only ever called by session-reschedule-service.ts (see there for the
+ * guarded transition and validation rules).
+ */
+export async function updateTrainingSessionOverride(
+  sessionId: string,
+  override: { overrideDate: Date | null; overrideStartAt: Date | null; overrideEndAt: Date | null },
+): Promise<void> {
+  await prisma.trainingSession.update({
+    where: { id: sessionId },
+    data: override,
+  });
+}
+
 /** Returns a single TrainingSession by id, scoped to the tenant. */
 export async function findTrainingSessionById(
   tenantId: string,
@@ -382,6 +410,12 @@ export async function findTrainingSessionById(
  * consumers). Pass `includeInactive: true` for historical/admin access.
  * An explicit `status` filter is itself an opt-in and is never combined
  * with the default exclusion.
+ *
+ * TRAININGCENTER-02: `dateFrom`/`dateTo` filter by each row's EFFECTIVE
+ * date — `overrideDate` when a reschedule override is set, else the
+ * canonical `date` — so a rescheduled occurrence is correctly included in
+ * (or excluded from) the Month/Week/Day window it actually falls in, even
+ * when that differs from its original recurrence slot.
  */
 export async function findAllTrainingSessions(
   tenantId: string,
@@ -397,6 +431,11 @@ export async function findAllTrainingSessions(
   const { trainingSeriesId, teamSeasonId, status, dateFrom, dateTo, includeInactive = false } =
     opts;
 
+  const dateRange = {
+    ...(dateFrom ? { gte: dateFrom } : {}),
+    ...(dateTo ? { lte: dateTo } : {}),
+  };
+
   return prisma.trainingSession.findMany({
     where: {
       tenantId,
@@ -409,10 +448,10 @@ export async function findAllTrainingSessions(
           : {}),
       ...(dateFrom || dateTo
         ? {
-            date: {
-              ...(dateFrom ? { gte: dateFrom } : {}),
-              ...(dateTo ? { lte: dateTo } : {}),
-            },
+            OR: [
+              { overrideDate: { not: null, ...dateRange } },
+              { overrideDate: null, date: dateRange },
+            ],
           }
         : {}),
     },

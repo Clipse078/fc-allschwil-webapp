@@ -20,6 +20,10 @@ function session(overrides: Partial<TrainingSessionDto> = {}): TrainingSessionDt
     endAt: "2026-08-11T17:30:00.000Z",
     timezone: "Europe/Zurich",
     status: "SCHEDULED",
+    originalDate: "2026-08-11",
+    originalStartAt: "2026-08-11T16:00:00.000Z",
+    originalEndAt: "2026-08-11T17:30:00.000Z",
+    isRescheduled: false,
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
     ...overrides,
@@ -110,5 +114,66 @@ describe("buildTrainingCenterViewModel", () => {
     const sessions = [session()];
     const model = buildTrainingCenterViewModel(sessions, new Map());
     expect(model.filteredRows).toHaveLength(1);
+  });
+
+  // TRAININGCENTER-02 — occurrence-level allocation override resolution
+  describe("sessionAllocationOverrides (occurrence-level allocation overrides)", () => {
+    it("a session-level pitch override alone flips that occurrence from OPEN to READY, even though its series has no allocation", () => {
+      const sessions = [session({ id: "s1", trainingSeriesId: "series-unallocated" })];
+      const model = buildTrainingCenterViewModel(sessions, new Map([["series-unallocated", UNALLOCATED]]), {
+        sessionAllocationOverrides: new Map([
+          ["s1", { hasPitchAllocation: true, hasDressingRoomAllocation: true }],
+        ]),
+      });
+
+      expect(model.rows[0].assessment.status).toBe("READY");
+      expect(model.rows[0].allocationSummary).toEqual({
+        hasPitchAllocation: true,
+        hasDressingRoomAllocation: true,
+      });
+      expect(model.kpis).toEqual({ gesamt: 1, offen: 0, erledigt: 1 });
+    });
+
+    it("an override for only ONE group leaves the other group resolved from the series default (partial override)", () => {
+      const sessions = [session({ id: "s1", trainingSeriesId: "series-half-allocated" })];
+      const model = buildTrainingCenterViewModel(
+        sessions,
+        new Map([["series-half-allocated", { hasPitchAllocation: false, hasDressingRoomAllocation: true }]]),
+        {
+          sessionAllocationOverrides: new Map([["s1", { hasPitchAllocation: true, hasDressingRoomAllocation: false }]]),
+        },
+      );
+
+      // Pitch: session override wins (true). Dressing room: falls back to series (true).
+      expect(model.rows[0].allocationSummary).toEqual({
+        hasPitchAllocation: true,
+        hasDressingRoomAllocation: true,
+      });
+      expect(model.rows[0].assessment.status).toBe("READY");
+    });
+
+    it("unaffected sibling sessions of the same series are never influenced by another occurrence's override", () => {
+      const sessions = [
+        session({ id: "s1", trainingSeriesId: "series-1" }),
+        session({ id: "s2", trainingSeriesId: "series-1" }),
+      ];
+      const model = buildTrainingCenterViewModel(sessions, new Map([["series-1", UNALLOCATED]]), {
+        sessionAllocationOverrides: new Map([["s1", FULLY_ALLOCATED]]),
+      });
+
+      const s1 = model.rows.find((r) => r.session.id === "s1")!;
+      const s2 = model.rows.find((r) => r.session.id === "s2")!;
+      expect(s1.assessment.status).toBe("READY");
+      expect(s2.assessment.status).toBe("OPEN"); // still inherits the (unallocated) series default
+      expect(s2.allocationSummary).toEqual(UNALLOCATED);
+    });
+
+    it("resolves to the series-level summary when no override map is provided at all (regression of series-level defaults)", () => {
+      const sessions = [session({ id: "s1", trainingSeriesId: "series-1" })];
+      const model = buildTrainingCenterViewModel(sessions, new Map([["series-1", FULLY_ALLOCATED]]));
+
+      expect(model.rows[0].allocationSummary).toEqual(FULLY_ALLOCATED);
+      expect(model.rows[0].assessment.status).toBe("READY");
+    });
   });
 });

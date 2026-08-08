@@ -22,6 +22,16 @@ export type TrainingActionFilter = "ALLE" | "OFFEN" | "ERLEDIGT";
 export type TrainingSessionRowViewModel = {
   session: TrainingSessionDto;
   assessment: TrainingOperationalAssessment;
+  /**
+   * TRAININGCENTER-02: the EFFECTIVE allocation summary for this specific
+   * occurrence — its own TrainingSessionAllocation overrides (per group,
+   * see lib/training/session-allocation-service.ts) OR'd with its series'
+   * TrainingAllocation summary. `assessment` above is already derived from
+   * this same resolved value, so the two can never disagree; this is
+   * exposed separately so presentation code (e.g. TrainingSessionRow's
+   * Spielfeld/Halle + Garderobe chips) doesn't need to re-resolve it.
+   */
+  allocationSummary: TrainingAllocationSummary;
 };
 
 export type TrainingCenterKpis = {
@@ -52,6 +62,19 @@ export function normalizeTrainingActionFilter(
   return isValidActionFilter(upper) ? upper : "ALLE";
 }
 
+/** Combines a per-group series-level summary with a per-group occurrence override: override wins per group, series is the fallback. */
+function resolveEffectiveAllocationSummary(
+  seriesSummary: TrainingAllocationSummary | undefined,
+  sessionOverride: TrainingAllocationSummary | undefined,
+): TrainingAllocationSummary {
+  return {
+    hasPitchAllocation: Boolean(sessionOverride?.hasPitchAllocation || seriesSummary?.hasPitchAllocation),
+    hasDressingRoomAllocation: Boolean(
+      sessionOverride?.hasDressingRoomAllocation || seriesSummary?.hasDressingRoomAllocation,
+    ),
+  };
+}
+
 /**
  * Builds the TrainingCenter view model from an already date-scoped session
  * list: per-row operational assessment, KPI counts, and action-filter
@@ -59,7 +82,14 @@ export function normalizeTrainingActionFilter(
  *
  * `allocationSummaries` maps trainingSeriesId -> that series' allocation
  * coverage (see lib/training/operational-state.ts) — allocation is
- * series-level, so every occurrence of the same series shares one summary.
+ * series-level by default, so every occurrence of the same series shares
+ * one summary.
+ *
+ * `sessionAllocationOverrides` (TRAININGCENTER-02) optionally maps
+ * trainingSessionId -> that specific occurrence's override coverage (see
+ * lib/training/session-allocation-service.ts). When present for a given
+ * allocation group (Spielfeld/Halle or Garderobe), it supersedes the
+ * series-level summary for that occurrence only — independently per group.
  *
  * KPI counts always reflect the FULL window population (never the active
  * action filter) so switching Alle/Offen/Erledigt never changes the
@@ -68,19 +98,27 @@ export function normalizeTrainingActionFilter(
 export function buildTrainingCenterViewModel(
   sessions: readonly TrainingSessionDto[],
   allocationSummaries: ReadonlyMap<string, TrainingAllocationSummary>,
-  options: { actionFilter?: TrainingActionFilter } = {},
+  options: {
+    actionFilter?: TrainingActionFilter;
+    sessionAllocationOverrides?: ReadonlyMap<string, TrainingAllocationSummary>;
+  } = {},
 ): TrainingCenterViewModel {
   const actionFilter = options.actionFilter ?? "ALLE";
+  const sessionAllocationOverrides = options.sessionAllocationOverrides;
 
   const rows: TrainingSessionRowViewModel[] = [...sessions]
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
-    .map((session) => ({
-      session,
-      assessment: assessTrainingOperationalState(
-        session,
+    .map((session) => {
+      const allocationSummary = resolveEffectiveAllocationSummary(
         allocationSummaries.get(session.trainingSeriesId),
-      ),
-    }));
+        sessionAllocationOverrides?.get(session.id),
+      );
+      return {
+        session,
+        assessment: assessTrainingOperationalState(session, allocationSummary),
+        allocationSummary,
+      };
+    });
 
   const offenCount = rows.filter((row) => row.assessment.status === "OPEN").length;
 

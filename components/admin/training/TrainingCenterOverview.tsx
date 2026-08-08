@@ -5,7 +5,6 @@ import { EmptyState } from "@/components/ui/page/EmptyState";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import type { TrainingCenterView } from "@/lib/training/date-range";
 import type { TrainingActionFilter, TrainingCenterViewModel } from "@/lib/training/view-model";
-import type { TrainingAllocationSummary } from "@/lib/training/operational-state";
 import TrainingMonthCalendar from "./TrainingMonthCalendar";
 import TrainingSessionRow from "./TrainingSessionRow";
 
@@ -22,7 +21,6 @@ type Props = {
   view: TrainingCenterView;
   actionFilter: TrainingActionFilter;
   viewModel: TrainingCenterViewModel;
-  allocationSummaries: ReadonlyMap<string, TrainingAllocationSummary>;
   monthWindow: TrainingCenterWindowLike & { weeks: { date: string; inMonth: boolean }[][] };
   weekWindow: TrainingCenterWindowLike & { days: string[] };
   dayWindow: TrainingCenterWindowLike & { date: string };
@@ -77,7 +75,6 @@ export default function TrainingCenterOverview({
   view,
   actionFilter,
   viewModel,
-  allocationSummaries,
   monthWindow,
   weekWindow,
   dayWindow,
@@ -213,7 +210,7 @@ export default function TrainingCenterOverview({
                     <TrainingSessionRow
                       key={row.session.id}
                       row={row}
-                      allocationSummary={allocationSummaries.get(row.session.trainingSeriesId)}
+                      allocationSummary={row.allocationSummary}
                       canManage={canManage}
                       locale={locale}
                       timezone={timezone}
@@ -231,7 +228,7 @@ export default function TrainingCenterOverview({
               <TrainingSessionRow
                 key={row.session.id}
                 row={row}
-                allocationSummary={allocationSummaries.get(row.session.trainingSeriesId)}
+                allocationSummary={row.allocationSummary}
                 canManage={canManage}
                 locale={locale}
                 timezone={timezone}
