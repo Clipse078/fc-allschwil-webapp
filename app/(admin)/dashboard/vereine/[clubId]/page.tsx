@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Globe, MapPin, Pencil, Plus, Users } from "lucide-react";
+import { ArrowLeft, Globe, MapPin, Merge, Pencil, Plus, Users } from "lucide-react";
 
 import { prisma } from "@/lib/db/prisma";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
@@ -69,6 +69,15 @@ export default async function ClubDetailPage({ params }: Props) {
               <ArrowLeft className="h-3.5 w-3.5" />
               Zurück
             </Link>
+            {canManage && !isArchived ? (
+              <Link
+                href={`/dashboard/vereine/${club.id}/merge`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+              >
+                <Merge className="h-3.5 w-3.5" />
+                Duplikate zusammenführen
+              </Link>
+            ) : null}
             {canManage ? (
               <Link
                 href={`/dashboard/vereine/${club.id}/edit`}

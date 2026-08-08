@@ -10,6 +10,7 @@ import { getExternalTeamById } from "@/lib/club-directory/query-service";
 import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 import TeamForm from "@/components/admin/club-directory/TeamForm";
 import { LogoUploadCard } from "@/components/admin/club-directory/LogoUploadCard";
+import { MoveTeamCard } from "@/components/admin/club-directory/MoveTeamCard";
 import { ProviderLinkPanel } from "@/components/admin/club-directory/ProviderLinkPanel";
 import {
   ClubDirectoryArchiveButton,
@@ -83,6 +84,15 @@ export default async function EditExternalTeamPage({ params }: Props) {
                 }))}
               />
             </SectionCard>
+
+            {!isArchived ? (
+              <SectionCard
+                title="Verein wechseln"
+                description="Team einem anderen kanonischen Verein zuordnen."
+              >
+                <MoveTeamCard teamId={team.id} teamName={team.name} currentClubId={team.externalClubId} />
+              </SectionCard>
+            ) : null}
 
             <SectionCard title="Status">
               {isArchived ? (
