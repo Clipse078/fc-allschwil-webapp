@@ -17,13 +17,24 @@
  *     exactly as before CLUB-DIRECTORY-02 when discovery fails
  *     (homeExternalTeamId/awayExternalTeamId simply stay null, same as the
  *     pre-existing "external opponent — name only" behaviour).
- *   - CLUB-DIRECTORY-02B: opportunistically enrich the resolved
+ *   - CLUB-DIRECTORY-02C: resolve a stable SFV club identity (`clubNumber`)
+ *     for this teamId, when this run's ranking/team-list data covers it
+ *     (see club-identity.ts), and forward it as `providerClubId` so
+ *     discoverExternalTeamFromProvider consolidates onto ONE canonical
+ *     ExternalClub per real-world club instead of one dedicated club per
+ *     team. See discovery-service.ts's module doc for the full identity
+ *     strategy and race-safety guarantees.
+ *   - CLUB-DIRECTORY-02B/02C: opportunistically enrich the resolved
  *     ExternalClub's crest from SFV's team-picture endpoint (see
  *     team-logo.ts) — but ONLY when the club does not already have a logo
  *     (tenant-managed or previously provider-filled). This keeps repeated
  *     syncs idempotent and avoids an SFV network call for every already-
  *     enriched opponent on every run (see resolveOpponentLogoIfNeeded
- *     below). The actual "never overwrite a tenant logo" rule is enforced
+ *     below). CLUB-DIRECTORY-02C widens the candidate set beyond just this
+ *     one teamId to every OTHER provider teamId already linked to the same
+ *     resolved club, so one team's picture-fetch failure never means the
+ *     club stays logo-less while a sibling team could have supplied the
+ *     crest. The actual "never overwrite a tenant logo" rule is enforced
  *     one layer down, unchanged, by
  *     lib/club-directory/provider-sync.ts#buildExternalClubTenantFieldUpdate
  *     — this module never touches ExternalClub.logoUrl directly.
@@ -38,15 +49,35 @@ import { prisma } from "@/lib/db/prisma";
 import { createClubDirectoryMutationDatabase } from "@/lib/club-directory/prisma-mutation-adapter";
 import { createClubDirectoryQueryDatabase } from "@/lib/club-directory/prisma-adapter";
 import { discoverExternalTeamFromProvider } from "@/lib/club-directory/discovery-service";
-import { findExternalTeamByProviderIdentity } from "@/lib/club-directory/query-service";
-import { resolveProviderLogoDataUri } from "./team-logo";
+import {
+  findExternalClubByProviderClubId,
+  findExternalTeamByProviderIdentity,
+} from "@/lib/club-directory/query-service";
+import { resolveClubLogoFromCandidateTeamIds } from "./team-logo";
+import { resolveProviderClubId } from "./club-identity";
+import { logClubLogoEnrichmentExhausted } from "./schedule-logging";
 
 const PROVIDER = "SFV";
+
+/**
+ * Defensive cap on how many linked sibling teamIds a single logo-enrichment
+ * attempt will try for one still-logo-less club, in addition to the
+ * currently-discovered team itself. Bounds the worst-case number of SFV
+ * calls per resolver invocation even for a club with many teams — a club
+ * legitimately has at most a handful of teams in practice (see the CLUB-
+ * DIRECTORY-02C canonical model), so this is a safety bound, not an expected
+ * limit.
+ */
+const MAX_LOGO_CANDIDATE_TEAM_IDS = 8;
 
 export type ExternalOpponentResolver = (
   sfvTeamId: number,
   sfvTeamName: string | null,
 ) => Promise<string | null>;
+
+function dedupeCandidateTeamIds(teamIds: readonly number[]): number[] {
+  return [...new Set(teamIds)].slice(0, MAX_LOGO_CANDIDATE_TEAM_IDS);
+}
 
 /**
  * Decides whether this SFV teamId still needs a fresh logo fetch, and
@@ -61,6 +92,15 @@ export type ExternalOpponentResolver = (
  * satisfying "avoid unnecessary provider/network calls" without needing any
  * separate cache: the ExternalClub row itself is the durable memoization.
  *
+ * CLUB-DIRECTORY-02C: when a `providerClubId` is resolved for this teamId
+ * (see club-identity.ts) and it already identifies a known ExternalClub,
+ * the candidate set widens to every OTHER provider teamId already linked to
+ * that same club (capped, see MAX_LOGO_CANDIDATE_TEAM_IDS) — so a failure
+ * for this one teamId does not leave an otherwise-enrichable club logo-less.
+ * When every candidate fails and the club identity is known, this emits a
+ * diagnosable warning (logClubLogoEnrichmentExhausted) rather than silently
+ * treating "still no crest" as unremarkable.
+ *
  * Never throws: a failure of this pre-check (e.g. a transient DB error)
  * simply skips enrichment for this call — discovery/link below still
  * proceeds exactly as it would if no logo were available this round.
@@ -69,23 +109,49 @@ async function resolveOpponentLogoIfNeeded(
   queryDatabase: ReturnType<typeof createClubDirectoryQueryDatabase>,
   tenantId: string,
   sfvTeamId: number,
+  providerClubId: number | null,
 ): Promise<string | null> {
+  let candidateTeamIds: number[] = [sfvTeamId];
+
   try {
-    const existing = await findExternalTeamByProviderIdentity(queryDatabase, {
+    const existingTeam = await findExternalTeamByProviderIdentity(queryDatabase, {
       tenantId,
       provider: PROVIDER,
       providerTeamId: sfvTeamId,
     });
 
-    const alreadyEnriched = existing !== null && existing.externalClub.logoUrl !== null;
-    if (alreadyEnriched) {
+    if (existingTeam !== null && existingTeam.externalClub.logoUrl !== null) {
       return null;
+    }
+
+    if (providerClubId !== null) {
+      const club = await findExternalClubByProviderClubId(queryDatabase, {
+        tenantId,
+        provider: PROVIDER,
+        providerClubId,
+      });
+
+      if (club !== null) {
+        if (club.logoUrl !== null) {
+          // A sibling team already supplied the crest for this club — no
+          // fetch needed at all, regardless of whether THIS teamId's own
+          // mapping row exists yet.
+          return null;
+        }
+        candidateTeamIds = dedupeCandidateTeamIds([sfvTeamId, ...club.linkedProviderTeamIds]);
+      }
     }
   } catch {
     return null;
   }
 
-  return resolveProviderLogoDataUri(sfvTeamId);
+  const { logoUrl, attemptedTeamIds } = await resolveClubLogoFromCandidateTeamIds(candidateTeamIds);
+
+  if (logoUrl === null && providerClubId !== null) {
+    logClubLogoEnrichmentExhausted(tenantId, providerClubId, attemptedTeamIds);
+  }
+
+  return logoUrl;
 }
 
 /**
@@ -94,10 +160,19 @@ async function resolveOpponentLogoIfNeeded(
  * `syncedAt` is the sync run's own timestamp (SfvScheduleSyncContext.syncedAt)
  * so `lastSyncedAt` on any refreshed ExternalTeamProviderMapping matches the
  * rest of this run's provider-owned fields.
+ *
+ * `providerClubIdIndex` (CLUB-DIRECTORY-02C, optional) is a pre-built
+ * `teamId -> clubNumber` map for this run (see
+ * club-identity.ts#buildProviderClubIdIndex, built once from this run's
+ * already-fetched TeamDetail[]/ClubRankingEntry[] — no extra SFV calls).
+ * Omitted (or a teamId not covered by it) falls back to the narrow,
+ * documented "no club identity evidence" behaviour, unchanged from
+ * CLUB-DIRECTORY-02.
  */
 export function createExternalOpponentResolver(
   tenantId: string,
   syncedAt: Date,
+  providerClubIdIndex?: ReadonlyMap<number, number>,
 ): ExternalOpponentResolver {
   const database = createClubDirectoryMutationDatabase(prisma);
   const queryDatabase = createClubDirectoryQueryDatabase(prisma);
@@ -110,7 +185,14 @@ export function createExternalOpponentResolver(
     }
 
     const pending = (async () => {
-      const providerLogoUrl = await resolveOpponentLogoIfNeeded(queryDatabase, tenantId, sfvTeamId);
+      const providerClubId = resolveProviderClubId(providerClubIdIndex, sfvTeamId);
+
+      const providerLogoUrl = await resolveOpponentLogoIfNeeded(
+        queryDatabase,
+        tenantId,
+        sfvTeamId,
+        providerClubId,
+      );
 
       const result = await discoverExternalTeamFromProvider(
         database,
@@ -119,6 +201,7 @@ export function createExternalOpponentResolver(
           provider: PROVIDER,
           providerTeamId: sfvTeamId,
           providerTeamName: sfvTeamName,
+          providerClubId,
           providerLogoUrl,
         },
         syncedAt,

@@ -34,12 +34,13 @@ export type ClubDirectoryMutationPrismaClient = ClubDirectoryMutationPrismaDeleg
 /**
  * Detects a Postgres/Prisma unique-constraint violation (P2002).
  *
- * ExternalTeamProviderMapping has exactly one unique constraint besides its
- * cuid() primary key — `@@unique([tenantId, provider, providerTeamId,
- * providerSeasonId])` — and this wrapper is only ever used for a plain
- * `create()` call carrying that exact key (see the interface doc on
- * `ClubDirectoryMutationDatabase.externalTeamProviderMapping.create`), so
- * any P2002 raised by that specific call is guaranteed to be this
+ * Both ExternalTeamProviderMapping (`@@unique([tenantId, provider,
+ * providerTeamId, providerSeasonId])`) and ExternalClubProviderMapping
+ * (`@@unique([tenantId, provider, providerClubId])`) have exactly one
+ * unique constraint besides their cuid() primary key, and this wrapper is
+ * only ever used for a plain `create()` call carrying that exact key (see
+ * the interface docs on `ClubDirectoryMutationDatabase`), so any P2002
+ * raised by either specific call is guaranteed to be that row's own
  * constraint. Any other error code propagates unchanged — this adapter
  * never masks a real failure as a benign race.
  */
@@ -72,6 +73,20 @@ function buildDelegates(
         client.externalClubProviderMapping.upsert(
           args as Prisma.ExternalClubProviderMappingUpsertArgs,
         ),
+      create: async (args: object) => {
+        try {
+          return await client.externalClubProviderMapping.create(
+            args as Prisma.ExternalClubProviderMappingCreateArgs,
+          );
+        } catch (error) {
+          if (isProviderMappingUniqueViolation(error)) {
+            throw new ClubDirectoryUniqueConstraintError(
+              "ExternalClubProviderMapping already exists for this (tenantId, provider, providerClubId).",
+            );
+          }
+          throw error;
+        }
+      },
     },
     externalTeamProviderMapping: {
       findFirst: (args: object) =>

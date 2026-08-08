@@ -120,3 +120,29 @@ export type ProviderIdentityLookupInput = {
   provider: string;
   providerTeamId: number;
 };
+
+/**
+ * CLUB-DIRECTORY-02C — lookup input for resolving the canonical ExternalClub
+ * by its provider CLUB identity (SFV: clubNumber), as opposed to
+ * `ProviderIdentityLookupInput` above which resolves by provider TEAM id.
+ */
+export type ProviderClubIdentityLookupInput = {
+  tenantId: string;
+  provider: string;
+  providerClubId: number;
+};
+
+/**
+ * CLUB-DIRECTORY-02C — logo-completeness lookup result: the canonical
+ * club's current logo state plus every distinct provider teamId already
+ * linked under it (across all of its ExternalTeams), so a logo-enrichment
+ * attempt can try additional linked team IDs when the first one yields no
+ * crest (see lib/integrations/sfv/sync/team-logo.ts).
+ */
+export type ExternalClubProviderLookupResult = {
+  id: string;
+  logoUrl: string | null;
+  archivedAt: Date | null;
+  /** Distinct provider teamIds linked to this club, in ascending order. */
+  linkedProviderTeamIds: number[];
+};

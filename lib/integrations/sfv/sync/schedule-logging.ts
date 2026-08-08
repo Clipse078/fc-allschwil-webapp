@@ -130,6 +130,61 @@ export function logStaleMatchReconciliationApplied(
 }
 
 /**
+ * CLUB-DIRECTORY-02C — LOGO COMPLETENESS diagnostics.
+ *
+ * Emits a warning when a canonical ExternalClub with a known, resolved SFV
+ * clubNumber still has no crest after trying every currently-linked
+ * provider teamId (see
+ * lib/integrations/sfv/sync/team-logo.ts#resolveClubLogoFromCandidateTeamIds).
+ * This is the "missing provider logos after attempted enrichment must be
+ * diagnosable rather than silently treated as normal" requirement — a real
+ * SFV club genuinely has no picture on file for ANY of its currently-known
+ * teams, which is worth an operator's attention, as distinct from the
+ * ordinary (unlogged) "brand-new opponent, no club identity resolved yet"
+ * case that every sync run naturally passes through before enrichment ever
+ * has a chance to run.
+ *
+ * Only logs identifiers and counts — never team names or raw provider
+ * payloads.
+ */
+export function logClubLogoEnrichmentExhausted(
+  tenantId: string,
+  providerClubId: number,
+  attemptedTeamIds: readonly number[],
+): void {
+  emit("warn", {
+    event: "sfv_club_logo_enrichment_exhausted",
+    tenantId,
+    source: "SFV",
+    providerClubId,
+    attemptedTeamIdCount: attemptedTeamIds.length,
+    attemptedTeamIds: [...attemptedTeamIds],
+  });
+}
+
+/**
+ * CLUB-DIRECTORY-02C — emitted when the same SFV teamId reports two
+ * different clubNumbers within one run's ranking/team-list data (see
+ * lib/integrations/sfv/sync/club-identity.ts#buildProviderClubIdIndex). The
+ * teamId is excluded from consolidation entirely rather than guessed — this
+ * log is what makes that "avoid false consolidation" decision diagnosable
+ * instead of a silent no-op.
+ */
+export function logClubIdentityConflict(
+  tenantId: string,
+  teamId: number,
+  observedClubIds: readonly number[],
+): void {
+  emit("warn", {
+    event: "sfv_club_identity_conflict",
+    tenantId,
+    source: "SFV",
+    teamId,
+    observedClubIds: [...observedClubIds],
+  });
+}
+
+/**
  * Emits a warning when a schedule entry cannot be resolved to any local team.
  * Only logs the external match ID and team IDs — no team names or personal data.
  */

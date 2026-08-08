@@ -92,6 +92,20 @@ export interface ClubDirectoryMutationDatabase {
   externalClubProviderMapping: {
     findFirst(args: object): Promise<ExternalClubProviderMappingRow | null>;
     upsert(args: object): Promise<ExternalClubProviderMappingRow>;
+    /**
+     * CLUB-DIRECTORY-02C — a plain (non-upsert) create used exclusively to
+     * atomically *claim* a provider CLUB identity inside `transaction()`
+     * below, mirroring the CLUB-DIRECTORY-02 team-identity race fix one
+     * level up. Implementations MUST reject a duplicate (tenantId,
+     * provider, providerClubId) by throwing
+     * `ClubDirectoryUniqueConstraintError` — never by silently updating the
+     * existing row (that is what `upsert` is for) — so a losing concurrent
+     * caller (e.g. two overlapping syncs both discovering a brand-new SFV
+     * club for the first time via two different teams) can detect the
+     * conflict and roll back its own transaction, then adopt the winner's
+     * canonical ExternalClub instead of creating a duplicate.
+     */
+    create(args: object): Promise<ExternalClubProviderMappingRow>;
   };
   externalTeamProviderMapping: {
     findFirst(args: object): Promise<ExternalTeamProviderMappingRow | null>;

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CLUB_DIRECTORY_DEFAULT_LIMIT,
   CLUB_DIRECTORY_MAX_LIMIT,
+  findExternalClubByProviderClubId,
   findExternalTeamByProviderIdentity,
   getExternalClubById,
   getExternalTeamById,
@@ -281,5 +282,108 @@ describe("findExternalTeamByProviderIdentity — Matchcenter/TournamentCenter fo
         providerTeamId: 0,
       }),
     ).rejects.toThrow("providerTeamId must be a positive integer.");
+  });
+});
+
+describe("findExternalClubByProviderClubId — CLUB-DIRECTORY-02C logo-completeness hook", () => {
+  it("resolves via provider + providerClubId, uppercasing the provider", async () => {
+    const database = createDatabase({
+      clubDetail: createClubDetailRecord({ id: "club-1", logoUrl: null, externalTeams: [] }),
+    });
+
+    await findExternalClubByProviderClubId(database, {
+      tenantId: "tenant-1",
+      provider: "sfv",
+      providerClubId: 700,
+    });
+
+    expect(database.externalClub.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant-1",
+        providerMappings: { some: { provider: "SFV", providerClubId: 700 } },
+      },
+    });
+  });
+
+  it("returns null when no ExternalClub has this provider club identity yet", async () => {
+    const database = createDatabase({ clubDetail: null });
+
+    const result = await findExternalClubByProviderClubId(database, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerClubId: 700,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("collects distinct provider teamIds across every ExternalTeam under the club, sorted ascending", async () => {
+    const database = createDatabase({
+      clubDetail: createClubDetailRecord({
+        id: "club-1",
+        logoUrl: null,
+        externalTeams: [
+          createTeamListRecord({
+            id: "team-1",
+            providerMappings: [{ provider: "SFV", providerTeamId: 2002 }],
+          }),
+          createTeamListRecord({
+            id: "team-2",
+            providerMappings: [
+              { provider: "SFV", providerTeamId: 2001 },
+              // Duplicate providerTeamId across seasons — must be deduplicated.
+              { provider: "SFV", providerTeamId: 2001 },
+            ],
+          }),
+          // A different provider's mapping must never be mixed in.
+          createTeamListRecord({
+            id: "team-3",
+            providerMappings: [{ provider: "OTHERPROVIDER", providerTeamId: 999 }],
+          }),
+        ],
+      }),
+    });
+
+    const result = await findExternalClubByProviderClubId(database, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerClubId: 700,
+    });
+
+    expect(result?.linkedProviderTeamIds).toEqual([2001, 2002]);
+  });
+
+  it("returns the club's current logoUrl and archivedAt", async () => {
+    const database = createDatabase({
+      clubDetail: createClubDetailRecord({
+        id: "club-1",
+        logoUrl: "https://cdn.example.com/crest.png",
+        archivedAt: null,
+        externalTeams: [],
+      }),
+    });
+
+    const result = await findExternalClubByProviderClubId(database, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerClubId: 700,
+    });
+
+    expect(result).toMatchObject({
+      id: "club-1",
+      logoUrl: "https://cdn.example.com/crest.png",
+      archivedAt: null,
+    });
+  });
+
+  it("rejects a non-positive providerClubId", async () => {
+    const database = createDatabase();
+    await expect(
+      findExternalClubByProviderClubId(database, {
+        tenantId: "tenant-1",
+        provider: "SFV",
+        providerClubId: 0,
+      }),
+    ).rejects.toThrow("providerClubId must be a positive integer.");
   });
 });

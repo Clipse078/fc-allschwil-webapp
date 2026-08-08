@@ -42,14 +42,34 @@ vi.mock("@/lib/club-directory/prisma-adapter", () => ({
 }));
 
 const mockFindExternalTeamByProviderIdentity = vi.fn();
+const mockFindExternalClubByProviderClubId = vi.fn();
 vi.mock("@/lib/club-directory/query-service", () => ({
   findExternalTeamByProviderIdentity: (...args: unknown[]) =>
     mockFindExternalTeamByProviderIdentity(...args),
+  findExternalClubByProviderClubId: (...args: unknown[]) =>
+    mockFindExternalClubByProviderClubId(...args),
 }));
 
 const mockResolveProviderLogoDataUri = vi.fn();
 vi.mock("../team-logo", () => ({
   resolveProviderLogoDataUri: (...args: unknown[]) => mockResolveProviderLogoDataUri(...args),
+  // Mirrors the real resolveClubLogoFromCandidateTeamIds (team-logo.ts) —
+  // tries each candidate via the mocked resolveProviderLogoDataUri, in
+  // order, stopping at the first non-null result — so this wiring test
+  // exercises the exact same call pattern external-team-discovery.ts
+  // depends on, without re-testing team-logo.ts's own logic (see
+  // lib/integrations/sfv/sync/__tests__/team-logo.test.ts for that).
+  resolveClubLogoFromCandidateTeamIds: async (candidateTeamIds: number[]) => {
+    const attemptedTeamIds: number[] = [];
+    for (const teamId of candidateTeamIds) {
+      attemptedTeamIds.push(teamId);
+      const logoUrl = await mockResolveProviderLogoDataUri(teamId);
+      if (logoUrl !== null && logoUrl !== undefined) {
+        return { logoUrl, attemptedTeamIds };
+      }
+    }
+    return { logoUrl: null, attemptedTeamIds };
+  },
 }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: { fake: "prisma-client" } }));
@@ -69,6 +89,7 @@ function discoveryResult(overrides: { clubId?: string; logoUrl?: string | null }
 beforeEach(() => {
   vi.clearAllMocks();
   mockDiscoverExternalTeamFromProvider.mockResolvedValue(discoveryResult());
+  mockFindExternalClubByProviderClubId.mockResolvedValue(null);
 });
 
 describe("createExternalOpponentResolver — CLUB-DIRECTORY-02B logo enrichment", () => {
@@ -83,6 +104,7 @@ describe("createExternalOpponentResolver — CLUB-DIRECTORY-02B logo enrichment"
       { fake: "query-database" },
       { tenantId: "tenant-1", provider: "SFV", providerTeamId: 51234 },
     );
+    expect(mockFindExternalClubByProviderClubId).not.toHaveBeenCalled();
     expect(mockResolveProviderLogoDataUri).toHaveBeenCalledWith(51234);
     expect(mockDiscoverExternalTeamFromProvider).toHaveBeenCalledWith(
       { fake: "mutation-database" },
@@ -91,6 +113,7 @@ describe("createExternalOpponentResolver — CLUB-DIRECTORY-02B logo enrichment"
         provider: "SFV",
         providerTeamId: 51234,
         providerTeamName: "SV Muttenz B1",
+        providerClubId: null,
         providerLogoUrl: "data:image/gif;base64,R0lGOD==",
       },
       SYNCED_AT,
