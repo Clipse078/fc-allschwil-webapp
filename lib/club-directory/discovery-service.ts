@@ -160,6 +160,18 @@ export type DiscoverExternalTeamInput = {
   providerOrganisationId?: number | null;
   /** Provider-reported logo/crest URL, when the provider payload exposes one. */
   providerLogoUrl?: string | null;
+  /**
+   * CLUB-DIRECTORY-04 — provider-reported league/competition name, when the
+   * provider payload exposes one (e.g. SFV ClubRankingEntry.leagueName).
+   * Provider-owned; forwarded verbatim to linkExternalTeamProvider — never
+   * inspected, never used to derive identity or club membership.
+   */
+  providerLeagueName?: string | null;
+  /**
+   * CLUB-DIRECTORY-04 — provider-reported competition group name, when the
+   * provider payload exposes one (e.g. SFV ClubRankingEntry.groupName).
+   */
+  providerGroupName?: string | null;
   providerIsActive?: boolean;
 };
 
@@ -498,6 +510,8 @@ export async function discoverExternalTeamFromProvider(
       providerClubId,
       providerOrganisationId: input.providerOrganisationId ?? null,
       providerLogoUrl: input.providerLogoUrl ?? null,
+      providerLeagueName: input.providerLeagueName ?? null,
+      providerGroupName: input.providerGroupName ?? null,
       providerIsActive: input.providerIsActive ?? true,
     },
     now,

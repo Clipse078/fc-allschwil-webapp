@@ -24,6 +24,7 @@ import type {
   ProviderClubIdentityLookupInput,
   ProviderIdentityLookupInput,
 } from "./types";
+import { resolveExternalTeamCompetitionContext } from "./competition-context";
 
 export const CLUB_DIRECTORY_DEFAULT_LIMIT = 50;
 export const CLUB_DIRECTORY_MAX_LIMIT = 200;
@@ -50,6 +51,8 @@ interface ExternalTeamProviderMappingRecord {
   providerClubId: number | null;
   providerOrganisationId: number | null;
   providerLogoUrl: string | null;
+  providerLeagueName: string | null;
+  providerGroupName: string | null;
   providerIsActive: boolean;
   lastSyncedAt: Date | null;
 }
@@ -196,6 +199,8 @@ function toTeamMappingDto(
     providerClubId: record.providerClubId,
     providerOrganisationId: record.providerOrganisationId,
     providerLogoUrl: record.providerLogoUrl,
+    providerLeagueName: record.providerLeagueName,
+    providerGroupName: record.providerGroupName,
     providerIsActive: record.providerIsActive,
     lastSyncedAt: record.lastSyncedAt,
   };
@@ -233,6 +238,7 @@ function toTeamSummaryDto(record: ExternalTeamListRecord): ExternalTeamSummaryDt
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     providerMappings: record.providerMappings.map(toTeamMappingDto),
+    competitionContext: resolveExternalTeamCompetitionContext(record.providerMappings),
   };
 }
 

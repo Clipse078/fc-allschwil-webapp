@@ -196,6 +196,8 @@ describe("getExternalClubById — tenant isolation", () => {
                 providerClubId: 483,
                 providerOrganisationId: null,
                 providerLogoUrl: null,
+                providerLeagueName: null,
+                providerGroupName: null,
                 providerIsActive: true,
                 lastSyncedAt: null,
               },
@@ -208,6 +210,106 @@ describe("getExternalClubById — tenant isolation", () => {
     const club = await getExternalClubById(database, { tenantId: "tenant-1", id: "club-1" });
     expect(club?.teams).toHaveLength(1);
     expect(club?.teams[0]?.providerMappings[0]?.provider).toBe("SFV");
+  });
+
+  it("CLUB-DIRECTORY-04: distinguishes multiple identically-named teams under one club by real sporting context", async () => {
+    const database = createDatabase({
+      clubDetail: createClubDetailRecord({
+        name: "AC Rossoneri",
+        externalTeams: [
+          createTeamListRecord({
+            id: "team-1",
+            name: "AC Rossoneri",
+            providerMappings: [
+              {
+                id: "map-1",
+                provider: "SFV",
+                providerTeamId: 4001,
+                providerSeasonId: 0,
+                providerTeamName: "AC Rossoneri",
+                providerClubId: 111,
+                providerOrganisationId: null,
+                providerLogoUrl: null,
+                providerLeagueName: "3. Liga",
+                providerGroupName: "Gruppe 1",
+                providerIsActive: true,
+                lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
+              },
+            ],
+          }),
+          createTeamListRecord({
+            id: "team-2",
+            name: "AC Rossoneri",
+            providerMappings: [
+              {
+                id: "map-2",
+                provider: "SFV",
+                providerTeamId: 4002,
+                providerSeasonId: 0,
+                providerTeamName: "AC Rossoneri",
+                providerClubId: 111,
+                providerOrganisationId: null,
+                providerLogoUrl: null,
+                providerLeagueName: "Senioren 30+",
+                providerGroupName: "Gruppe 2",
+                providerIsActive: true,
+                lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
+              },
+            ],
+          }),
+          createTeamListRecord({
+            id: "team-3",
+            name: "AC Rossoneri",
+            providerMappings: [
+              {
+                id: "map-3",
+                provider: "SFV",
+                providerTeamId: 4003,
+                providerSeasonId: 0,
+                providerTeamName: "AC Rossoneri",
+                providerClubId: 111,
+                providerOrganisationId: null,
+                providerLogoUrl: null,
+                providerLeagueName: null,
+                providerGroupName: null,
+                providerIsActive: true,
+                lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
+              },
+            ],
+          }),
+        ],
+      }),
+    });
+
+    const club = await getExternalClubById(database, { tenantId: "tenant-1", id: "club-1" });
+    expect(club?.teams.map((t) => t.name)).toEqual([
+      "AC Rossoneri",
+      "AC Rossoneri",
+      "AC Rossoneri",
+    ]);
+
+    expect(club?.teams[0]?.competitionContext).toEqual({
+      leagueName: "3. Liga",
+      groupName: "Gruppe 1",
+    });
+    expect(club?.teams[1]?.competitionContext).toEqual({
+      leagueName: "Senioren 30+",
+      groupName: "Gruppe 2",
+    });
+    // Team 3 has a provider mapping but no reported sporting context yet —
+    // graceful "no context" rather than any fabricated or technical-id value.
+    expect(club?.teams[2]?.competitionContext).toEqual({ leagueName: null, groupName: null });
+
+    // Every distinguishable team's context is genuinely distinct, and the
+    // raw provider Team-ID is present only inside providerMappings (for
+    // internal identity/sync use) — never inside competitionContext.
+    const contexts = club?.teams.map((t) => JSON.stringify(t.competitionContext)) ?? [];
+    expect(new Set(contexts.filter((c) => c !== JSON.stringify({ leagueName: null, groupName: null }))).size).toBe(2);
+    for (const team of club?.teams ?? []) {
+      expect(JSON.stringify(team.competitionContext)).not.toContain("4001");
+      expect(JSON.stringify(team.competitionContext)).not.toContain("4002");
+      expect(JSON.stringify(team.competitionContext)).not.toContain("4003");
+    }
   });
 });
 
@@ -240,6 +342,39 @@ describe("getExternalTeamById", () => {
 
     expect(team?.externalClub.id).toBe("club-1");
     expect(team?.externalClubId).toBe("club-1");
+  });
+
+  it("CLUB-DIRECTORY-04: includes the resolved competitionContext from its provider mapping", async () => {
+    const database = createDatabase({
+      teamDetail: createTeamDetailRecord({
+        providerMappings: [
+          {
+            id: "map-1",
+            provider: "SFV",
+            providerTeamId: 51234,
+            providerSeasonId: 0,
+            providerTeamName: "AC Rossoneri",
+            providerClubId: 111,
+            providerOrganisationId: null,
+            providerLogoUrl: null,
+            providerLeagueName: "3. Liga",
+            providerGroupName: "Gruppe 1",
+            providerIsActive: true,
+            lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
+          },
+        ],
+      }),
+    });
+
+    const team = await getExternalTeamById(database, { tenantId: "tenant-1", id: "team-1" });
+    expect(team?.competitionContext).toEqual({ leagueName: "3. Liga", groupName: "Gruppe 1" });
+  });
+
+  it("CLUB-DIRECTORY-04: returns an all-null competitionContext when there is no provider mapping (manual team)", async () => {
+    const database = createDatabase({ teamDetail: createTeamDetailRecord({ providerMappings: [] }) });
+
+    const team = await getExternalTeamById(database, { tenantId: "tenant-1", id: "team-1" });
+    expect(team?.competitionContext).toEqual({ leagueName: null, groupName: null });
   });
 });
 

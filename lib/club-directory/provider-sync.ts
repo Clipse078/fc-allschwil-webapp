@@ -34,6 +34,17 @@ export type ProviderTeamSyncPayload = {
   providerClubId?: number | null;
   providerOrganisationId?: number | null;
   providerLogoUrl?: string | null;
+  /**
+   * CLUB-DIRECTORY-04 — provider-reported league/competition name (e.g.
+   * "3. Liga"). Provider-owned, refreshed on every sync. Never a substitute
+   * for ExternalTeam.name/categoryLabel.
+   */
+  providerLeagueName?: string | null;
+  /**
+   * CLUB-DIRECTORY-04 — provider-reported competition group name (e.g.
+   * "Gruppe 1"). Provider-owned, refreshed on every sync.
+   */
+  providerGroupName?: string | null;
   providerIsActive?: boolean;
 };
 
@@ -50,6 +61,8 @@ export type ExternalTeamMappingUpdate = {
   providerClubId: number | null;
   providerOrganisationId: number | null;
   providerLogoUrl: string | null;
+  providerLeagueName: string | null;
+  providerGroupName: string | null;
   providerIsActive: boolean;
   lastSyncedAt: Date;
 };
@@ -88,6 +101,8 @@ export function buildExternalTeamMappingUpdate(
     providerClubId: payload.providerClubId ?? null,
     providerOrganisationId: payload.providerOrganisationId ?? null,
     providerLogoUrl: payload.providerLogoUrl ?? null,
+    providerLeagueName: payload.providerLeagueName ?? null,
+    providerGroupName: payload.providerGroupName ?? null,
     providerIsActive: payload.providerIsActive ?? true,
     lastSyncedAt: now,
   };

@@ -10,6 +10,7 @@ import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { createClubDirectoryQueryDatabase } from "@/lib/club-directory/prisma-adapter";
 import { getExternalClubById } from "@/lib/club-directory/query-service";
 import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { formatExternalTeamCompetitionContext } from "@/lib/club-directory/competition-context";
 import { ClubLogo } from "@/components/admin/club-directory/ClubLogo";
 import { LogoUploadCard } from "@/components/admin/club-directory/LogoUploadCard";
 import { ProviderLinkPanel } from "@/components/admin/club-directory/ProviderLinkPanel";
@@ -173,6 +174,9 @@ export default async function ClubDetailPage({ params }: Props) {
             <div className="divide-y divide-[var(--border)]">
               {club.teams.map((team) => {
                 const effectiveLogoUrl = resolveExternalTeamLogoUrl(team, club);
+                const competitionContext = formatExternalTeamCompetitionContext(
+                  team.competitionContext,
+                );
                 return (
                   <Link
                     key={team.id}
@@ -197,6 +201,11 @@ export default async function ClubDetailPage({ params }: Props) {
                           </Badge>
                         ) : null}
                       </div>
+                      {competitionContext ? (
+                        <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
+                          {competitionContext}
+                        </p>
+                      ) : null}
                     </div>
                   </Link>
                 );

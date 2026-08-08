@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Merge, Search, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { ClubLogo } from "./ClubLogo";
+import {
+  formatExternalTeamCompetitionContext,
+  type ExternalTeamCompetitionContext,
+} from "@/lib/club-directory/competition-context";
 
 type ClubSearchResult = {
   id: string;
@@ -20,7 +24,12 @@ type ClubDetail = {
   id: string;
   name: string;
   logoUrl: string | null;
-  teams: { id: string; name: string; archivedAt: string | null }[];
+  teams: {
+    id: string;
+    name: string;
+    archivedAt: string | null;
+    competitionContext: ExternalTeamCompetitionContext;
+  }[];
   providerMappings: { id: string; provider: string; providerClubId: number }[];
 };
 
@@ -238,12 +247,29 @@ export default function MergeClubForm({ survivingClub }: MergeClubFormProps) {
                       </Badge>
                     </div>
                     {detail ? (
-                      <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
-                        <Users className="h-3 w-3" />
-                        {detail.teams.length} Team{detail.teams.length !== 1 ? "s" : ""} ·{" "}
-                        {detail.providerMappings.length} Anbieter-Verknüpfung
-                        {detail.providerMappings.length !== 1 ? "en" : ""} werden übertragen
-                      </p>
+                      <>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                          <Users className="h-3 w-3" />
+                          {detail.teams.length} Team{detail.teams.length !== 1 ? "s" : ""} ·{" "}
+                          {detail.providerMappings.length} Anbieter-Verknüpfung
+                          {detail.providerMappings.length !== 1 ? "en" : ""} werden übertragen
+                        </p>
+                        {detail.teams.length > 0 ? (
+                          <ul className="mt-1.5 space-y-0.5 pl-5 text-xs text-slate-400">
+                            {detail.teams.map((team) => {
+                              const context = formatExternalTeamCompetitionContext(
+                                team.competitionContext,
+                              );
+                              return (
+                                <li key={team.id} className="truncate">
+                                  {team.name}
+                                  {context ? <span className="text-slate-300"> · {context}</span> : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </>
                     ) : (
                       <p className="mt-0.5 text-xs text-slate-400">Lädt…</p>
                     )}

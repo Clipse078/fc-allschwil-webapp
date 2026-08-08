@@ -51,6 +51,7 @@ import { fetchClubRanking, fetchClubSchedule, fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
 import { createExternalOpponentResolver } from "./external-team-discovery";
 import { buildProviderClubIdIndex } from "./club-identity";
+import { buildProviderCompetitionContextIndex } from "./team-competition-context";
 import { runSfvClubConsolidationForCurrentSync } from "./club-consolidation";
 import { logClubIdentityConflict } from "./schedule-logging";
 import type { SfvScheduleSyncContext, SfvScheduleSyncResult } from "./schedule-types";
@@ -248,6 +249,16 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
   // narrow, documented "no club identity evidence" behaviour for every
   // opponent this run, identical to pre-CLUB-DIRECTORY-02C behaviour.
   let providerClubIdIndex: ReadonlyMap<number, number> | undefined;
+  // CLUB-DIRECTORY-04: teamId -> { leagueName, groupName }, built from the
+  // SAME already-fetched `rankingEntries` below (zero extra SFV calls) —
+  // see team-competition-context.ts for the full investigation. Lets
+  // discovered external opponents carry real sporting context (league,
+  // competition group) instead of just a name, so identically-named
+  // provider teams (e.g. four different "AC Rossoneri" SFV teams) can be
+  // told apart in the Club Directory UI.
+  let providerCompetitionContextIndex:
+    | ReadonlyMap<number, { leagueName: string | null; groupName: string | null }>
+    | undefined;
   try {
     const rankingEntries = await fetchClubRanking({
       SeasonId: context.seasonId,
@@ -261,12 +272,13 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
       rankingEntries,
     );
     providerClubIdIndex = indexByTeamId;
+    providerCompetitionContextIndex = buildProviderCompetitionContextIndex(rankingEntries);
     for (const conflict of conflicts) {
       logClubIdentityConflict(tenantId, conflict.teamId, conflict.observedClubIds);
     }
   } catch {
-    // Ranking fetch failed — proceed without club-identity evidence this
-    // run. Never blocks schedule sync.
+    // Ranking fetch failed — proceed without club-identity/competition-context
+    // evidence this run. Never blocks schedule sync.
   }
 
   // ── CLUB-DIRECTORY-02C: opportunistic backfill/consolidation ─────────────
@@ -381,6 +393,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     tenantId,
     context.syncedAt,
     providerClubIdIndex,
+    providerCompetitionContextIndex,
   );
 
   // ── Process each schedule entry ──────────────────────────────────────────
