@@ -8,6 +8,7 @@ import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { listTrainingSeries } from "@/lib/training/training-service";
 import { listTrainingSessions } from "@/lib/training/session-generation-service";
 import { listAllocationSummaryByTenant } from "@/lib/training/training-allocation-service";
+import { listSessionAllocationSummaryByTenant } from "@/lib/training/session-allocation-service";
 import {
   resolveTrainingDayWindow,
   resolveTrainingMonthWindow,
@@ -114,12 +115,16 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
 
   const activeRange = view === "WEEK" ? weekWindow : view === "DAY" ? dayWindow : monthWindow;
 
-  const [sessions, allocationSummaries] = await Promise.all([
+  const [sessions, allocationSummaries, sessionAllocationOverrides] = await Promise.all([
     listTrainingSessions(tenantContext.id, { dateFrom: activeRange.from, dateTo: activeRange.to }),
     listAllocationSummaryByTenant(tenantContext.id),
+    listSessionAllocationSummaryByTenant(tenantContext.id),
   ]);
 
-  const viewModel = buildTrainingCenterViewModel(sessions, allocationSummaries, { actionFilter });
+  const viewModel = buildTrainingCenterViewModel(sessions, allocationSummaries, {
+    actionFilter,
+    sessionAllocationOverrides,
+  });
 
   return (
     <div className="max-w-[1400px] space-y-6">
@@ -143,7 +148,6 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
         view={view}
         actionFilter={actionFilter}
         viewModel={viewModel}
-        allocationSummaries={allocationSummaries}
         monthWindow={{
           param: monthWindow.param,
           label: formatTrainingMonthLabel(monthWindow, locale, timezone),
