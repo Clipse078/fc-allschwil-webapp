@@ -9,6 +9,8 @@ import {
   createExternalTeam,
   linkExternalClubProvider,
   linkExternalTeamProvider,
+  mergeExternalClubs,
+  moveExternalTeamToClub,
   setExternalClubArchived,
   setExternalTeamArchived,
   updateExternalClub,
@@ -119,6 +121,12 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
         const { where } = args as FindFirstArgs;
         return teams.find((t) => t.id === where.id && t.tenantId === where.tenantId) ?? null;
       },
+      findMany: async (args: object) => {
+        const { where } = args as FindFirstArgs;
+        return teams.filter(
+          (t) => t.tenantId === where.tenantId && t.externalClubId === where.externalClubId,
+        );
+      },
       create: async (args: object) => {
         const { data } = args as CreateArgs;
         const team: ExternalTeamRow = {
@@ -152,6 +160,19 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
               m.providerClubId === where.providerClubId,
           ) ?? null
         );
+      },
+      findMany: async (args: object) => {
+        const { where } = args as FindFirstArgs;
+        return clubMappings.filter(
+          (m) => m.tenantId === where.tenantId && m.externalClubId === where.externalClubId,
+        );
+      },
+      update: async (args: object) => {
+        const { where, data } = args as UpdateArgs;
+        const mapping = clubMappings.find((m) => m.id === where.id);
+        if (!mapping) throw new Error("club provider mapping not found in fake DB");
+        Object.assign(mapping, data);
+        return mapping;
       },
       upsert: async (args: object) => {
         const { where, create, update } = args as MappingUpsertArgs;
@@ -274,13 +295,17 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
     // `fn` throws. `tx` is the same database instance (a fake doesn't need
     // per-connection isolation), which is sufficient to exercise "an error
     // inside the transaction rolls back every write performed within it".
+    //
+    // Deep-clones the snapshot (structuredClone) rather than shallow-copying
+    // the arrays: `update()` mutates row objects in place (Object.assign),
+    // so a shallow `[...clubs]` copy would still share the same mutated
+    // object references and fail to actually revert field-level changes on
+    // rollback (only array membership) — CLUB-DIRECTORY-03's
+    // `mergeExternalClubs` mutates existing rows via `update()` inside a
+    // transaction, unlike the create-only flows this fake originally had to
+    // support.
     transaction: async <T>(fn: (tx: ClubDirectoryMutationDatabase) => Promise<T>): Promise<T> => {
-      const snapshot = {
-        clubs: [...clubs],
-        teams: [...teams],
-        clubMappings: [...clubMappings],
-        teamMappings: [...teamMappings],
-      };
+      const snapshot = structuredClone({ clubs, teams, clubMappings, teamMappings });
       try {
         return await fn(database);
       } catch (err) {
@@ -666,5 +691,327 @@ describe("updateExternalClub — tenant-managed fields", () => {
     await expect(
       updateExternalClub(db, { tenantId: "tenant-1", id: club.id, name: "   " }),
     ).rejects.toThrow(ClubDirectoryValidationError);
+  });
+});
+
+// ── CLUB-DIRECTORY-03: moveExternalTeamToClub ───────────────────────────────────
+
+describe("moveExternalTeamToClub", () => {
+  it("re-parents a team onto a different canonical club", async () => {
+    const clubA = seedClub({ name: "BSC Old Boys B1 (falscher Verein)" });
+    const clubB = seedClub({ name: "BSC Old Boys" });
+    const team = seedTeam({ externalClubId: clubA.id, name: "BSC Old Boys B1" });
+
+    const moved = await moveExternalTeamToClub(db, {
+      tenantId: "tenant-1",
+      id: team.id,
+      targetExternalClubId: clubB.id,
+    });
+
+    expect(moved.externalClubId).toBe(clubB.id);
+  });
+
+  it("preserves the team's provider mapping across the move", async () => {
+    const clubA = seedClub({ name: "BSC Old Boys B1 (falscher Verein)" });
+    const clubB = seedClub({ name: "BSC Old Boys" });
+    const team = seedTeam({ externalClubId: clubA.id, name: "BSC Old Boys B1" });
+
+    await linkExternalTeamProvider(db, {
+      tenantId: "tenant-1",
+      externalTeamId: team.id,
+      provider: "SFV",
+      providerTeamId: 51234,
+    });
+
+    await moveExternalTeamToClub(db, {
+      tenantId: "tenant-1",
+      id: team.id,
+      targetExternalClubId: clubB.id,
+    });
+
+    expect(teamMappings).toHaveLength(1);
+    expect(teamMappings[0]?.externalTeamId).toBe(team.id);
+    expect(teamMappings[0]?.providerTeamId).toBe(51234);
+  });
+
+  it("is a no-op when the team already belongs to the target club", async () => {
+    const club = seedClub();
+    const team = seedTeam({ externalClubId: club.id });
+
+    const result = await moveExternalTeamToClub(db, {
+      tenantId: "tenant-1",
+      id: team.id,
+      targetExternalClubId: club.id,
+    });
+
+    expect(result.externalClubId).toBe(club.id);
+  });
+
+  it("rejects moving into an archived club", async () => {
+    const club = seedClub();
+    const team = seedTeam({ externalClubId: club.id });
+    const archivedTarget = seedClub({ name: "Archiviert", archivedAt: new Date() });
+
+    await expect(
+      moveExternalTeamToClub(db, {
+        tenantId: "tenant-1",
+        id: team.id,
+        targetExternalClubId: archivedTarget.id,
+      }),
+    ).rejects.toThrow(/archived/);
+  });
+
+  it("rejects moving into a club that does not exist", async () => {
+    const club = seedClub();
+    const team = seedTeam({ externalClubId: club.id });
+
+    await expect(
+      moveExternalTeamToClub(db, { tenantId: "tenant-1", id: team.id, targetExternalClubId: "missing" }),
+    ).rejects.toThrow(ClubDirectoryNotFoundError);
+  });
+
+  it("rejects moving a team belonging to another tenant (tenant isolation)", async () => {
+    const clubOtherTenant = seedClub({ tenantId: "tenant-2" });
+    const team = seedTeam({ tenantId: "tenant-2", externalClubId: clubOtherTenant.id });
+    const targetClub = seedClub({ tenantId: "tenant-1" });
+
+    await expect(
+      moveExternalTeamToClub(db, {
+        tenantId: "tenant-1",
+        id: team.id,
+        targetExternalClubId: targetClub.id,
+      }),
+    ).rejects.toThrow(ClubDirectoryNotFoundError);
+  });
+
+  it("rejects moving a team into a club belonging to another tenant (tenant isolation)", async () => {
+    const club = seedClub({ tenantId: "tenant-1" });
+    const team = seedTeam({ tenantId: "tenant-1", externalClubId: club.id });
+    const targetClubOtherTenant = seedClub({ tenantId: "tenant-2" });
+
+    await expect(
+      moveExternalTeamToClub(db, {
+        tenantId: "tenant-1",
+        id: team.id,
+        targetExternalClubId: targetClubOtherTenant.id,
+      }),
+    ).rejects.toThrow(ClubDirectoryNotFoundError);
+    expect(team.externalClubId).toBe(club.id);
+  });
+});
+
+// ── CLUB-DIRECTORY-03: mergeExternalClubs ───────────────────────────────────────
+
+describe("mergeExternalClubs", () => {
+  it("moves every team from the losing club onto the surviving club and archives the loser", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri" });
+    const loser = seedClub({ name: "AC Rossoneri (Duplikat)" });
+    const teamA = seedTeam({ externalClubId: loser.id, name: "AC Rossoneri 1" });
+    const teamB = seedTeam({ externalClubId: loser.id, name: "AC Rossoneri 2" });
+
+    const result = await mergeExternalClubs(db, {
+      tenantId: "tenant-1",
+      survivingClubId: survivor.id,
+      losingClubIds: [loser.id],
+    });
+
+    expect(result.teamsMoved).toBe(2);
+    expect(result.mergedClubIds).toEqual([loser.id]);
+    expect(teams.find((t) => t.id === teamA.id)?.externalClubId).toBe(survivor.id);
+    expect(teams.find((t) => t.id === teamB.id)?.externalClubId).toBe(survivor.id);
+
+    const archivedLoser = clubs.find((c) => c.id === loser.id);
+    expect(archivedLoser?.archivedAt).not.toBeNull();
+    // NEVER deleted — the fake DB still contains the row.
+    expect(clubs.some((c) => c.id === loser.id)).toBe(true);
+  });
+
+  it("moves every team from the losing club regardless of the team's own archived state", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri" });
+    const loser = seedClub({ name: "AC Rossoneri (Duplikat)" });
+    const archivedTeam = seedTeam({
+      externalClubId: loser.id,
+      name: "AC Rossoneri Reserve",
+      archivedAt: new Date(),
+    });
+
+    await mergeExternalClubs(db, {
+      tenantId: "tenant-1",
+      survivingClubId: survivor.id,
+      losingClubIds: [loser.id],
+    });
+
+    expect(teams.find((t) => t.id === archivedTeam.id)?.externalClubId).toBe(survivor.id);
+  });
+
+  it("re-points every provider mapping from the losing club onto the surviving club", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri" });
+    const loser = seedClub({ name: "AC Rossoneri (Duplikat)" });
+
+    await linkExternalClubProvider(db, {
+      tenantId: "tenant-1",
+      externalClubId: loser.id,
+      provider: "SFV",
+      providerClubId: 4242,
+    });
+
+    const result = await mergeExternalClubs(db, {
+      tenantId: "tenant-1",
+      survivingClubId: survivor.id,
+      losingClubIds: [loser.id],
+    });
+
+    expect(result.providerMappingsMoved).toBe(1);
+    expect(clubMappings).toHaveLength(1);
+    expect(clubMappings[0]?.externalClubId).toBe(survivor.id);
+    expect(clubMappings[0]?.providerClubId).toBe(4242);
+  });
+
+  it("supports merging several losing clubs into one surviving club in a single call", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri" });
+    const loserA = seedClub({ name: "AC Rossoneri (Duplikat A)" });
+    const loserB = seedClub({ name: "AC Rossoneri (Duplikat B)" });
+    seedTeam({ externalClubId: loserA.id });
+    seedTeam({ externalClubId: loserB.id });
+
+    const result = await mergeExternalClubs(db, {
+      tenantId: "tenant-1",
+      survivingClubId: survivor.id,
+      losingClubIds: [loserA.id, loserB.id],
+    });
+
+    expect(result.teamsMoved).toBe(2);
+    expect(result.mergedClubIds.sort()).toEqual([loserA.id, loserB.id].sort());
+    expect(clubs.find((c) => c.id === loserA.id)?.archivedAt).not.toBeNull();
+    expect(clubs.find((c) => c.id === loserB.id)?.archivedAt).not.toBeNull();
+  });
+
+  it("adopts a logo from a losing club when the surviving club has none", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri", logoUrl: null });
+    const loser = seedClub({ name: "AC Rossoneri (Duplikat)", logoUrl: "https://example.com/crest.png" });
+
+    const result = await mergeExternalClubs(db, {
+      tenantId: "tenant-1",
+      survivingClubId: survivor.id,
+      losingClubIds: [loser.id],
+    });
+
+    expect(result.logoAdoptedFromClubId).toBe(loser.id);
+    expect(clubs.find((c) => c.id === survivor.id)?.logoUrl).toBe("https://example.com/crest.png");
+  });
+
+  it("never overwrites an existing surviving-club logo with a losing club's logo", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri", logoUrl: "https://example.com/tenant-crest.png" });
+    const loser = seedClub({ name: "AC Rossoneri (Duplikat)", logoUrl: "https://example.com/other.png" });
+
+    const result = await mergeExternalClubs(db, {
+      tenantId: "tenant-1",
+      survivingClubId: survivor.id,
+      losingClubIds: [loser.id],
+    });
+
+    expect(result.logoAdoptedFromClubId).toBeNull();
+    expect(clubs.find((c) => c.id === survivor.id)?.logoUrl).toBe("https://example.com/tenant-crest.png");
+  });
+
+  it("rejects self-merge (surviving club listed as its own loser)", async () => {
+    const club = seedClub();
+    await expect(
+      mergeExternalClubs(db, { tenantId: "tenant-1", survivingClubId: club.id, losingClubIds: [club.id] }),
+    ).rejects.toThrow(ClubDirectoryValidationError);
+  });
+
+  it("rejects a merge with no losing clubs", async () => {
+    const club = seedClub();
+    await expect(
+      mergeExternalClubs(db, { tenantId: "tenant-1", survivingClubId: club.id, losingClubIds: [] }),
+    ).rejects.toThrow(ClubDirectoryValidationError);
+  });
+
+  it("rejects merging a losing club that does not exist", async () => {
+    const club = seedClub();
+    await expect(
+      mergeExternalClubs(db, {
+        tenantId: "tenant-1",
+        survivingClubId: club.id,
+        losingClubIds: ["missing"],
+      }),
+    ).rejects.toThrow(ClubDirectoryNotFoundError);
+  });
+
+  it("rejects merging a losing club belonging to another tenant (cross-tenant merge prevention)", async () => {
+    const survivor = seedClub({ tenantId: "tenant-1" });
+    const loserOtherTenant = seedClub({ tenantId: "tenant-2" });
+    const team = seedTeam({ tenantId: "tenant-2", externalClubId: loserOtherTenant.id });
+
+    await expect(
+      mergeExternalClubs(db, {
+        tenantId: "tenant-1",
+        survivingClubId: survivor.id,
+        losingClubIds: [loserOtherTenant.id],
+      }),
+    ).rejects.toThrow(ClubDirectoryNotFoundError);
+
+    // Nothing was mutated — the cross-tenant club/team are untouched.
+    expect(loserOtherTenant.archivedAt).toBeNull();
+    expect(team.externalClubId).toBe(loserOtherTenant.id);
+  });
+
+  it("rejects merging into a surviving club belonging to another tenant (tenant isolation)", async () => {
+    const survivorOtherTenant = seedClub({ tenantId: "tenant-2" });
+    const loser = seedClub({ tenantId: "tenant-1" });
+
+    await expect(
+      mergeExternalClubs(db, {
+        tenantId: "tenant-1",
+        survivingClubId: survivorOtherTenant.id,
+        losingClubIds: [loser.id],
+      }),
+    ).rejects.toThrow(ClubDirectoryNotFoundError);
+  });
+
+  it("rolls back every write when the transaction fails partway through", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri" });
+    const loser = seedClub({ name: "AC Rossoneri (Duplikat)" });
+    const team = seedTeam({ externalClubId: loser.id });
+
+    const originalUpdate = db.externalClub.update;
+    // The team move (externalTeam.update) happens before the archive step
+    // (externalClub.update) — forcing every externalClub.update call to
+    // fail simulates a failure during archiving, *after* the team has
+    // already been re-parented within the same transaction.
+    db.externalClub.update = async () => {
+      throw new Error("simulated failure");
+    };
+
+    await expect(
+      mergeExternalClubs(db, {
+        tenantId: "tenant-1",
+        survivingClubId: survivor.id,
+        losingClubIds: [loser.id],
+      }),
+    ).rejects.toThrow("simulated failure");
+
+    db.externalClub.update = originalUpdate;
+
+    // The team move that happened before the simulated failure must have
+    // been rolled back by the transaction wrapper.
+    expect(teams.find((t) => t.id === team.id)?.externalClubId).toBe(loser.id);
+    expect(clubs.find((c) => c.id === loser.id)?.archivedAt).toBeNull();
+  });
+
+  it("deduplicates repeated losing club ids", async () => {
+    const survivor = seedClub({ name: "AC Rossoneri" });
+    const loser = seedClub({ name: "AC Rossoneri (Duplikat)" });
+    seedTeam({ externalClubId: loser.id });
+
+    const result = await mergeExternalClubs(db, {
+      tenantId: "tenant-1",
+      survivingClubId: survivor.id,
+      losingClubIds: [loser.id, loser.id],
+    });
+
+    expect(result.mergedClubIds).toEqual([loser.id]);
+    expect(result.teamsMoved).toBe(1);
   });
 });

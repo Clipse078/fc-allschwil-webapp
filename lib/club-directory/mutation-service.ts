@@ -86,12 +86,38 @@ export interface ClubDirectoryMutationDatabase {
   };
   externalTeam: {
     findFirst(args: object): Promise<ExternalTeamRow | null>;
+    /**
+     * CLUB-DIRECTORY-03 — used by `mergeExternalClubs` to enumerate every
+     * ExternalTeam currently parented under a losing club (active *and*
+     * archived — a merge never leaves a team behind just because it was
+     * already archived) before re-parenting each one onto the surviving
+     * club.
+     */
+    findMany(args: object): Promise<ExternalTeamRow[]>;
     create(args: object): Promise<ExternalTeamRow>;
     update(args: object): Promise<ExternalTeamRow>;
   };
   externalClubProviderMapping: {
     findFirst(args: object): Promise<ExternalClubProviderMappingRow | null>;
+    /**
+     * CLUB-DIRECTORY-03 — used by `mergeExternalClubs` to enumerate every
+     * provider mapping still pointing at a losing club before re-pointing
+     * each one (by primary key, via `update` below) onto the surviving
+     * club. Never used to *discover* merge candidates — merges are always
+     * explicit, never inferred from shared provider identity.
+     */
+    findMany(args: object): Promise<ExternalClubProviderMappingRow[]>;
     upsert(args: object): Promise<ExternalClubProviderMappingRow>;
+    /**
+     * CLUB-DIRECTORY-03 — re-points a single provider mapping's
+     * `externalClubId` (by primary key) onto the surviving club during a
+     * manual merge. Distinct from `upsert` above: this never creates a
+     * row and never touches the (tenantId, provider, providerClubId)
+     * identity itself, only which ExternalClub it currently belongs to —
+     * so multiple mappings can safely be re-pointed onto the same
+     * surviving club without ever colliding on that unique constraint.
+     */
+    update(args: object): Promise<ExternalClubProviderMappingRow>;
     /**
      * CLUB-DIRECTORY-02C — a plain (non-upsert) create used exclusively to
      * atomically *claim* a provider CLUB identity inside `transaction()`
@@ -402,6 +428,65 @@ export async function updateExternalTeam(
   });
 }
 
+// ── ExternalTeam: move / reassign to another canonical club ────────────────────
+
+export type MoveExternalTeamInput = {
+  tenantId: string;
+  /** The ExternalTeam to reassign. */
+  id: string;
+  /** The canonical ExternalClub the team should move to. */
+  targetExternalClubId: string;
+};
+
+/**
+ * Re-parents an ExternalTeam onto a different (canonical) ExternalClub.
+ *
+ * Used by the Club Directory UI to correct mis-discovered team/club splits
+ * — e.g. "BSC Old Boys B1" and "BSC Old Boys C1" originally surfaced as
+ * their own ExternalClub shells and need moving under the real "BSC Old
+ * Boys" canonical club.
+ *
+ * Provider identity is untouched: ExternalTeamProviderMapping rows key off
+ * `externalTeamId`, which never changes here, so every provider mapping
+ * for this team stays linked exactly as before — only the team's parent
+ * club changes.
+ *
+ * Both the team and the target club must belong to the same tenant
+ * (tenant isolation — enforced by `requireExternalTeam`/`requireExternalClub`
+ * scoping every lookup to `tenantId`). Moving into an archived club is
+ * rejected, mirroring `createExternalTeam`'s same rule for newly created
+ * teams.
+ */
+export async function moveExternalTeamToClub(
+  database: ClubDirectoryMutationDatabase,
+  input: MoveExternalTeamInput,
+): Promise<ExternalTeamRow> {
+  const tenantId = requireIdentifier(input.tenantId, "tenantId");
+  const id = requireIdentifier(input.id, "id");
+  const targetExternalClubId = requireIdentifier(
+    input.targetExternalClubId,
+    "targetExternalClubId",
+  );
+
+  const team = await requireExternalTeam(database, tenantId, id);
+
+  if (team.externalClubId === targetExternalClubId) {
+    return team;
+  }
+
+  const targetClub = await requireExternalClub(database, tenantId, targetExternalClubId);
+  if (targetClub.archivedAt !== null) {
+    throw new ClubDirectoryValidationError(
+      "Cannot move an ExternalTeam to an archived ExternalClub.",
+    );
+  }
+
+  return database.externalTeam.update({
+    where: { id },
+    data: { externalClubId: targetExternalClubId },
+  });
+}
+
 export type SetExternalTeamArchivedInput = {
   tenantId: string;
   id: string;
@@ -563,4 +648,162 @@ export async function linkExternalTeamProvider(
   }
 
   return { mapping, team };
+}
+
+// ── Manual club merge ───────────────────────────────────────────────────────────
+//
+// CLUB-DIRECTORY-03 — merges one or more duplicate ExternalClub records
+// ("losing" clubs, explicitly chosen by a tenant admin) into a single
+// "surviving" canonical ExternalClub. This is ALWAYS an explicit, one-shot
+// admin action — never inferred from names or run as a background sweep
+// (see lib/club-directory/consolidation-service.ts for the separate,
+// provider-identity-driven backfill this deliberately does NOT duplicate).
+//
+// Safety invariants (mirrors consolidation-service.ts's proven rules):
+//   - NEVER deletes anything. Losing clubs are archived (`archivedAt` set),
+//     never removed — reversible via the existing restore endpoint.
+//   - NEVER loses a team: every ExternalTeam under a losing club (active or
+//     archived) is re-parented onto the surviving club.
+//   - NEVER loses a provider mapping: every ExternalClubProviderMapping row
+//     under a losing club is re-pointed (by primary key) onto the surviving
+//     club. The unique identity constraint is (tenantId, provider,
+//     providerClubId) — it does not include externalClubId — so re-pointing
+//     several mappings onto the same surviving club can never collide.
+//   - NEVER merges across tenants or merges a club into itself: every club
+//     (surviving + losing) is resolved through `requireExternalClub`, which
+//     scopes the lookup to `tenantId` and 404s on any cross-tenant id, and
+//     self-merge is rejected explicitly before any write.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type MergeExternalClubsInput = {
+  tenantId: string;
+  /** The canonical ExternalClub that survives the merge. */
+  survivingClubId: string;
+  /** One or more ExternalClub ids to merge into the surviving club. */
+  losingClubIds: string[];
+};
+
+export type MergeExternalClubsResult = {
+  survivingClubId: string;
+  /** Losing ExternalClub ids that were archived (never deleted) by this merge. */
+  mergedClubIds: string[];
+  /** Total ExternalTeam rows re-parented onto the surviving club. */
+  teamsMoved: number;
+  /** Total ExternalClubProviderMapping rows re-pointed onto the surviving club. */
+  providerMappingsMoved: number;
+  /** The losing ExternalClub a logo was adopted from, or null. */
+  logoAdoptedFromClubId: string | null;
+};
+
+/**
+ * Adopts a logo onto the surviving club ONLY when it currently has none —
+ * mirrors provider-sync.ts's `buildExternalClubTenantFieldUpdate` /
+ * consolidation-service.ts's `chooseLogoDonor`: an existing tenant-managed
+ * (or previously adopted) logo is never overwritten by a merge.
+ */
+async function adoptLogoDuringMerge(
+  database: ClubDirectoryMutationDatabase,
+  survivingClub: ExternalClubRow,
+  losingClubs: readonly ExternalClubRow[],
+): Promise<string | null> {
+  if (survivingClub.logoUrl !== null && survivingClub.logoUrl.trim() !== "") {
+    return null;
+  }
+
+  const donor = [...losingClubs]
+    .filter((c) => c.logoUrl !== null && c.logoUrl.trim() !== "")
+    .sort((a, b) => a.id.localeCompare(b.id))[0];
+
+  if (donor === undefined) return null;
+
+  await database.externalClub.update({
+    where: { id: survivingClub.id },
+    data: { logoUrl: donor.logoUrl },
+  });
+
+  return donor.id;
+}
+
+/**
+ * Merges one or more explicitly-chosen "losing" ExternalClub records into a
+ * single "surviving" canonical ExternalClub.
+ *
+ * Every team and provider mapping under a losing club is moved onto the
+ * surviving club, a logo is adopted from a losing club when the survivor
+ * has none, and every losing club is archived (never deleted) — all inside
+ * one transaction so a mid-merge failure never leaves teams or mappings
+ * split across a half-migrated state.
+ */
+export async function mergeExternalClubs(
+  database: ClubDirectoryMutationDatabase,
+  input: MergeExternalClubsInput,
+  now: Date = new Date(),
+): Promise<MergeExternalClubsResult> {
+  const tenantId = requireIdentifier(input.tenantId, "tenantId");
+  const survivingClubId = requireIdentifier(input.survivingClubId, "survivingClubId");
+
+  const rawLosingIds = Array.isArray(input.losingClubIds) ? input.losingClubIds : [];
+  const losingClubIds = [...new Set(rawLosingIds.map((id) => requireIdentifier(id, "losingClubIds")))];
+
+  if (losingClubIds.length === 0) {
+    throw new ClubDirectoryValidationError("At least one losing club is required to merge.");
+  }
+  if (losingClubIds.includes(survivingClubId)) {
+    throw new ClubDirectoryValidationError("Cannot merge a club into itself.");
+  }
+
+  // Resolving every club through requireExternalClub — tenant-scoped —
+  // before any write means a missing or cross-tenant id fails the whole
+  // merge up front; nothing is ever partially applied.
+  const survivingClub = await requireExternalClub(database, tenantId, survivingClubId);
+  const losingClubs: ExternalClubRow[] = [];
+  for (const losingClubId of losingClubIds) {
+    losingClubs.push(await requireExternalClub(database, tenantId, losingClubId));
+  }
+
+  return database.transaction(async (tx) => {
+    let teamsMoved = 0;
+    let providerMappingsMoved = 0;
+
+    for (const losingClub of losingClubs) {
+      const teams = await tx.externalTeam.findMany({
+        where: { tenantId, externalClubId: losingClub.id },
+      });
+      for (const team of teams) {
+        await tx.externalTeam.update({
+          where: { id: team.id },
+          data: { externalClubId: survivingClubId },
+        });
+        teamsMoved++;
+      }
+
+      const mappings = await tx.externalClubProviderMapping.findMany({
+        where: { tenantId, externalClubId: losingClub.id },
+      });
+      for (const mapping of mappings) {
+        await tx.externalClubProviderMapping.update({
+          where: { id: mapping.id },
+          data: { externalClubId: survivingClubId },
+        });
+        providerMappingsMoved++;
+      }
+    }
+
+    const logoAdoptedFromClubId = await adoptLogoDuringMerge(tx, survivingClub, losingClubs);
+
+    for (const losingClubId of losingClubIds) {
+      await tx.externalClub.update({
+        where: { id: losingClubId },
+        data: { archivedAt: now },
+      });
+    }
+
+    return {
+      survivingClubId,
+      mergedClubIds: losingClubIds,
+      teamsMoved,
+      providerMappingsMoved,
+      logoAdoptedFromClubId,
+    };
+  });
 }
