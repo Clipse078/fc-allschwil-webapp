@@ -94,6 +94,7 @@
  */
 
 import {
+  linkExternalClubProvider,
   linkExternalTeamProvider,
   ClubDirectoryNotFoundError,
   ClubDirectoryUniqueConstraintError,
@@ -526,4 +527,194 @@ export async function discoverExternalTeamFromProvider(
   }
 
   return { club, team: updatedTeam, discovered };
+}
+
+// ── CLUB-DIRECTORY-05: club-only resolve-or-create (master import) ────────────
+//
+// SFV's ranking table (GET /api/club/ranking) reports a stable clubNumber for
+// EVERY team appearing in every league/group the tenant's own teams
+// currently compete in — including clubs the tenant has not yet actually
+// played (no synced match exists for them yet this season). This lets the
+// Club Directory be pre-populated with the broadest reliable SFV coverage
+// instead of only ever growing opportunistically, one opponent at a time, as
+// matches happen to be synced (see docs/integrations/
+// sfv-slice-club-directory-05-master-import.md for the full capability
+// investigation and its documented coverage limits).
+//
+// This reuses the EXACT SAME identity rule as
+// discoverExternalTeamFromProvider above — providerClubId is the ONLY
+// identity signal, the resolve-or-create is idempotent, and a brand-new
+// providerClubId is claimed race-safely — but deliberately never creates an
+// ExternalTeam: a master-imported club may have zero linked teams until (and
+// unless) one of its teams is later discovered through ordinary
+// schedule/ranking-driven opponent discovery. When that later discovery
+// happens, it resolves the SAME ExternalClubProviderMapping already claimed
+// here and attaches the team under it — one canonical club, never a
+// duplicate, regardless of which path (master import or opponent discovery)
+// saw the clubNumber first.
+
+export type DiscoverExternalClubInput = {
+  tenantId: string;
+  /** External provider identifier, e.g. "SFV". Case-insensitive; stored upper-case. */
+  provider: string;
+  /** Provider-assigned numeric club identifier (stable identity — never a name). */
+  providerClubId: number;
+  /** Provider-reported club/team display name, used only as a provisional label. */
+  providerClubName?: string | null;
+  /** Provider-reported logo/crest URL, when the provider payload exposes one. */
+  providerLogoUrl?: string | null;
+  /** Provider-reported website, when the provider payload exposes one. */
+  providerWebsite?: string | null;
+  providerIsActive?: boolean;
+};
+
+export type DiscoverExternalClubResult = {
+  club: ExternalClubRow;
+  /** True only when this call created a brand-new canonical club. */
+  discovered: boolean;
+};
+
+/**
+ * Creates a brand-new ExternalClub and claims the (tenantId, provider,
+ * providerClubId) identity, atomically — mirrors createClubAndTeamShell
+ * above but never creates an ExternalTeam.
+ *
+ * Returns the newly-created ExternalClub id on success. Returns null when a
+ * concurrent caller already claimed this exact providerClubId — the unique
+ * constraint on ExternalClubProviderMapping causes this transaction's own
+ * mapping create() to fail, rolling back the club created earlier in the
+ * SAME transaction (nothing is left behind).
+ */
+async function createClubShellOnly(
+  database: ClubDirectoryMutationDatabase,
+  tenantId: string,
+  provider: string,
+  providerClubId: number,
+  fallbackName: string,
+): Promise<string | null> {
+  try {
+    const club = await database.transaction(async (tx) => {
+      const createdClub = await tx.externalClub.create({
+        data: {
+          tenantId,
+          name: fallbackName,
+          // Provider-discovered origin, informational only — mirrors
+          // ExternalClub.source semantics from CLUB-DIRECTORY-01.
+          source: provider,
+        },
+      });
+
+      // Plain create() — never upsert() — race-safe exactly like
+      // createClubAndTeamShell above: a concurrent winner's already-
+      // committed mapping causes this to hit the real unique constraint and
+      // throw, rolling back this entire transaction (the just-created
+      // ExternalClub included).
+      await tx.externalClubProviderMapping.create({
+        data: { tenantId, externalClubId: createdClub.id, provider, providerClubId },
+      });
+
+      return createdClub;
+    });
+
+    return club.id;
+  } catch (err) {
+    if (err instanceof ClubDirectoryUniqueConstraintError) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Resolves-or-creates the canonical ExternalClub for a provider-reported
+ * club, WITHOUT ever creating an ExternalTeam — used by the SFV club master
+ * import (CLUB-DIRECTORY-05) to pre-populate the Club Directory from the
+ * broadest reliable SFV coverage rather than waiting for one of the club's
+ * teams to be discovered through schedule sync.
+ *
+ * Idempotent: calling this repeatedly with the same (tenantId, provider,
+ * providerClubId) after the first call never creates a second club — it
+ * always resolves to the same canonical ExternalClub and only refreshes
+ * provider-owned mapping fields via linkExternalClubProvider, which never
+ * touches tenant-managed fields (name, shortName, alternativeName, website,
+ * location, notes) once set, and only ever fills logoUrl when the club has
+ * none yet (see provider-sync.ts).
+ *
+ * Concurrency-safe exactly like discoverExternalTeamFromProvider's club-
+ * identity race guard above: two overlapping calls for the same brand-new
+ * providerClubId can never both commit a duplicate club — the losing call
+ * transparently adopts the winner's canonical record instead of surfacing an
+ * error or leaving an orphan behind.
+ *
+ * When a team of this SAME providerClubId is later discovered through
+ * ordinary opponent discovery (discoverExternalTeamFromProvider above), it
+ * finds the ExternalClubProviderMapping already claimed here and attaches
+ * itself under this exact club — never a second, duplicate club.
+ */
+export async function discoverExternalClubFromProvider(
+  database: ClubDirectoryMutationDatabase,
+  input: DiscoverExternalClubInput,
+  now: Date = new Date(),
+): Promise<DiscoverExternalClubResult> {
+  const tenantId = requireIdentifier(input.tenantId, "tenantId");
+  const provider = requireIdentifier(input.provider, "provider").toUpperCase();
+  const providerClubId = requirePositiveInteger(input.providerClubId, "providerClubId");
+
+  const existingMapping = await database.externalClubProviderMapping.findFirst({
+    where: { tenantId, provider, providerClubId },
+  });
+
+  let externalClubId: string;
+  let discovered = false;
+
+  if (existingMapping !== null) {
+    externalClubId = existingMapping.externalClubId;
+  } else {
+    const fallbackName =
+      normalizeOptionalString(input.providerClubName) ?? `${provider} ${providerClubId}`;
+
+    const createdClubId = await createClubShellOnly(
+      database,
+      tenantId,
+      provider,
+      providerClubId,
+      fallbackName,
+    );
+
+    if (createdClubId !== null) {
+      externalClubId = createdClubId;
+      discovered = true;
+    } else {
+      // Lost the race: a concurrent caller already committed this exact
+      // providerClubId — guaranteed visible by the time our create() saw
+      // the conflict (Postgres unique-index conflict semantics).
+      const winningMapping = await database.externalClubProviderMapping.findFirst({
+        where: { tenantId, provider, providerClubId },
+      });
+
+      if (winningMapping === null) {
+        // Defensive only — should be unreachable given the guarantee above.
+        throw new ClubDirectoryNotFoundError("ExternalClubProviderMapping");
+      }
+
+      externalClubId = winningMapping.externalClubId;
+    }
+  }
+
+  const { club } = await linkExternalClubProvider(
+    database,
+    {
+      tenantId,
+      externalClubId,
+      provider,
+      providerClubId,
+      providerClubName: input.providerClubName ?? null,
+      providerLogoUrl: input.providerLogoUrl ?? null,
+      providerWebsite: input.providerWebsite ?? null,
+      providerIsActive: input.providerIsActive ?? true,
+    },
+    now,
+  );
+
+  return { club, discovered };
 }
