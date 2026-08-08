@@ -65,6 +65,7 @@ function makeConfig(overrides: Partial<TenantSfvConfig> = {}): TenantSfvConfig {
     lastScheduleSyncAt: null,
     lastMatchDetailSyncAt: null,
     lastCompetitionSyncAt: null,
+    lastClubMasterImportAt: null,
     syncLockedAt: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
     updatedAt: new Date("2026-07-01T00:00:00.000Z"),
@@ -1175,6 +1176,204 @@ describe("Last-sync timestamp refresh", () => {
 
     expect(screen.getByTestId("last-detail-sync").textContent).toContain(
       originalTimestamp.toLocaleString("de-CH"),
+    );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUB-DIRECTORY-05 — SFV-Vereinsverzeichnis synchronisieren
+// ═════════════════════════════════════════════════════════════════════════════
+
+function makeClubMasterImportResult(overrides: Record<string, unknown> = {}) {
+  return {
+    startedAt: "2026-08-08T12:00:00.000Z",
+    finishedAt: "2026-08-08T12:00:01.000Z",
+    durationMs: 1000,
+    tenantId: TENANT_ID,
+    source: "SFV",
+    clubId: 483,
+    seasonId: 2027,
+    rankingRowsFetched: 24,
+    candidateClubs: 6,
+    created: 4,
+    updated: 2,
+    failed: 0,
+    errors: [],
+    coverageDescription:
+      "Quelle: SFV-Rangliste (GET /api/club/ranking) für die konfigurierte Saison des eigenen Clubs.",
+    ...overrides,
+  };
+}
+
+describe("CLUB-DIRECTORY-05 club master import", () => {
+  it("CMI-1. calls POST /api/admin/integrations/sfv/clubs/master-import when button clicked", async () => {
+    const mockFetch = mockFetchSuccess({ result: makeClubMasterImportResult() });
+    globalThis.fetch = mockFetch;
+
+    const config = makeConfig({ enabled: true });
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/admin/integrations/sfv/clubs/master-import");
+    expect(options.method).toBe("POST");
+  });
+
+  it("CMI-2. button is disabled when the integration is not configured/enabled", () => {
+    render(<SfvTenantConfigPanel initialConfig={null} />);
+
+    expect(screen.getByTestId("btn-club-master-import")).toBeDisabled();
+  });
+
+  it("CMI-3. shows loading state while the import is running", async () => {
+    let resolveFetch!: (value: unknown) => void;
+    globalThis.fetch = vi.fn().mockReturnValueOnce(
+      new Promise((resolve) => { resolveFetch = resolve; }),
+    );
+
+    const config = makeConfig({ enabled: true });
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("club-master-import-loading")).toBeTruthy();
+    });
+
+    act(() => {
+      resolveFetch({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ result: makeClubMasterImportResult() }),
+      });
+    });
+  });
+
+  it("CMI-4. shows the result summary, counts, and coverage description on success", async () => {
+    globalThis.fetch = mockFetchSuccess({
+      result: makeClubMasterImportResult({ created: 5, updated: 1, candidateClubs: 6 }),
+    });
+
+    const config = makeConfig({ enabled: true });
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("club-master-import-result")).toBeTruthy();
+    });
+
+    expect(screen.getByTestId("club-master-import-status").textContent).toContain(
+      "Erfolgreich abgeschlossen",
+    );
+    expect(screen.getByTestId("club-master-import-coverage").textContent).toContain(
+      "SFV-Rangliste",
+    );
+  });
+
+  it("CMI-5. updates the last-sync timestamp after a fully successful import", async () => {
+    const finishedAt = "2026-08-08T12:05:00.000Z";
+    globalThis.fetch = mockFetchSuccess({
+      result: makeClubMasterImportResult({ finishedAt, failed: 0 }),
+    });
+
+    render(<SfvTenantConfigPanel initialConfig={makeConfig()} />);
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("last-club-master-import").textContent).toContain(
+        new Date(finishedAt).toLocaleString("de-CH"),
+      );
+    });
+  });
+
+  it("CMI-6. does not update the last-sync timestamp when the result contains failures", async () => {
+    const originalTimestamp = new Date("2026-08-01T09:00:00.000Z");
+
+    globalThis.fetch = mockFetchSuccess({
+      result: makeClubMasterImportResult({
+        failed: 1,
+        errors: [{ code: "INTERNAL_ERROR", message: "providerClubId 123: failed." }],
+      }),
+    });
+
+    render(
+      <SfvTenantConfigPanel
+        initialConfig={makeConfig({ lastClubMasterImportAt: originalTimestamp })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("club-master-import-result")).toBeTruthy();
+    });
+
+    expect(screen.getByTestId("last-club-master-import").textContent).toContain(
+      originalTimestamp.toLocaleString("de-CH"),
+    );
+  });
+
+  it("CMI-7. shows error message on 404 (no config found)", async () => {
+    globalThis.fetch = mockFetchError(404, { error: "No SFV configuration found for this tenant" });
+
+    const config = makeConfig({ enabled: true });
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      const errEl = screen.getByTestId("club-master-import-error");
+      expect(errEl.textContent).toContain("Keine SFV-Konfiguration gefunden");
+    });
+  });
+
+  it("CMI-8. shows error message on 409 (integration disabled)", async () => {
+    globalThis.fetch = mockFetchError(409, { error: "SFV integration is disabled" });
+
+    const config = makeConfig({ enabled: true });
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      const errEl = screen.getByTestId("club-master-import-error");
+      expect(errEl.textContent).toContain("deaktiviert");
+    });
+  });
+
+  it("CMI-9. shows error entries when the result contains per-club failures", async () => {
+    globalThis.fetch = mockFetchSuccess({
+      result: makeClubMasterImportResult({
+        failed: 1,
+        created: 3,
+        errors: [{ code: "INTERNAL_ERROR", message: "providerClubId 999: failed to persist." }],
+      }),
+    });
+
+    const config = makeConfig({ enabled: true });
+    render(<SfvTenantConfigPanel initialConfig={config} />);
+
+    fireEvent.click(screen.getByTestId("btn-club-master-import"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("club-master-import-errors")).toBeTruthy();
+    });
+
+    expect(screen.getByText(/providerClubId 999/)).toBeTruthy();
+  });
+
+  it("CMI-10. shows 'Noch nie synchronisiert' when no import has completed yet", () => {
+    render(<SfvTenantConfigPanel initialConfig={makeConfig({ lastClubMasterImportAt: null })} />);
+
+    expect(screen.getByTestId("last-club-master-import").textContent).toContain(
+      "Noch nie synchronisiert",
     );
   });
 });

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildProviderClubIdIndex, resolveProviderClubId } from "../club-identity";
+import { buildClubMasterCandidates, buildProviderClubIdIndex, resolveProviderClubId } from "../club-identity";
 import type { ClubRankingEntry, TeamDetail } from "../../client";
 
 function ownTeam(overrides: Partial<TeamDetail> = {}): TeamDetail {
@@ -163,5 +163,105 @@ describe("resolveProviderClubId", () => {
 
   it("returns null when no index is supplied at all", () => {
     expect(resolveProviderClubId(undefined, 1001)).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLUB-DIRECTORY-05 — buildClubMasterCandidates
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("buildClubMasterCandidates — club master import candidate list", () => {
+  it("excludes the tenant's own club (ownClubId) from the candidate list", () => {
+    const { candidates } = buildClubMasterCandidates(
+      483,
+      [ownTeam({ teamId: 1001, clubNumber: 483 })],
+      [rankingEntry({ teamId: 1001, clubNumber: 483 })],
+    );
+
+    expect(candidates.find((c) => c.providerClubId === 483)).toBeUndefined();
+  });
+
+  it("returns one distinct candidate per opponent clubNumber, even when it appears via multiple teams", () => {
+    const { candidates } = buildClubMasterCandidates(
+      483,
+      [ownTeam({ teamId: 1001, clubNumber: 483 })],
+      [
+        rankingEntry({ teamId: 1001, clubNumber: 483 }),
+        rankingEntry({ teamId: 2001, clubNumber: 700, teamName: "FC Therwil 1" }),
+        rankingEntry({ teamId: 2002, clubNumber: 700, teamName: "FC Therwil 2" }),
+        rankingEntry({ teamId: 3001, clubNumber: 850, teamName: "FC Aesch 1" }),
+      ],
+    );
+
+    expect(candidates).toHaveLength(2);
+    expect(candidates.map((c) => c.providerClubId)).toEqual([700, 850]);
+  });
+
+  it("also discovers a club that only ever appears in the standings, never in an actual played/synced match", () => {
+    // A club appearing in the season's ranking table but never yet faced —
+    // exactly the coverage-widening scenario this slice targets.
+    const { candidates } = buildClubMasterCandidates(
+      483,
+      [ownTeam({ teamId: 1001, clubNumber: 483 })],
+      [
+        rankingEntry({ teamId: 1001, clubNumber: 483 }),
+        rankingEntry({ teamId: 9001, clubNumber: 555, teamName: "SV Muttenz 1" }),
+      ],
+    );
+
+    expect(candidates).toEqual([{ providerClubId: 555, providerClubName: "SV Muttenz 1" }]);
+  });
+
+  it("picks the LOWEST teamId's name deterministically when a club is reachable via several teamIds", () => {
+    const { candidates } = buildClubMasterCandidates(
+      483,
+      [],
+      [
+        rankingEntry({ teamId: 2002, clubNumber: 700, teamName: "FC Therwil 2" }),
+        rankingEntry({ teamId: 2001, clubNumber: 700, teamName: "FC Therwil 1" }),
+      ],
+    );
+
+    expect(candidates).toEqual([{ providerClubId: 700, providerClubName: "FC Therwil 1" }]);
+  });
+
+  it("sorts candidates deterministically by providerClubId", () => {
+    const { candidates } = buildClubMasterCandidates(
+      483,
+      [],
+      [
+        rankingEntry({ teamId: 3001, clubNumber: 850, teamName: "FC Aesch 1" }),
+        rankingEntry({ teamId: 2001, clubNumber: 700, teamName: "FC Therwil 1" }),
+      ],
+    );
+
+    expect(candidates.map((c) => c.providerClubId)).toEqual([700, 850]);
+  });
+
+  it("propagates the SAME conflict guard as buildProviderClubIdIndex — never guesses", () => {
+    const { candidates, conflicts } = buildClubMasterCandidates(
+      483,
+      [ownTeam({ teamId: 5001, clubNumber: 483 })],
+      [rankingEntry({ teamId: 5001, clubNumber: 999 })],
+    );
+
+    expect(candidates).toHaveLength(0);
+    expect(conflicts).toEqual([{ teamId: 5001, observedClubIds: [483, 999] }]);
+  });
+
+  it("returns an empty candidate list for empty inputs (e.g. a best-effort fetch failure)", () => {
+    const { candidates, conflicts } = buildClubMasterCandidates(483, [], []);
+    expect(candidates).toHaveLength(0);
+    expect(conflicts).toHaveLength(0);
+  });
+
+  it("never invents a name — falls back to null when the provider gives none", () => {
+    const { candidates } = buildClubMasterCandidates(
+      483,
+      [],
+      [rankingEntry({ teamId: 2001, clubNumber: 700, teamName: null })],
+    );
+
+    expect(candidates).toEqual([{ providerClubId: 700, providerClubName: null }]);
   });
 });

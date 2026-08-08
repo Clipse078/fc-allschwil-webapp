@@ -32,6 +32,7 @@ const sfvConfigSelect = {
   lastScheduleSyncAt: true,
   lastMatchDetailSyncAt: true,
   lastCompetitionSyncAt: true,
+  lastClubMasterImportAt: true,
   syncLockedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -148,6 +149,20 @@ export async function markCompetitionSyncSuccessful(
   await prisma.tenantSfvConfig.update({
     where: { tenantId },
     data: { lastCompetitionSyncAt: finishedAt },
+  });
+}
+
+/**
+ * CLUB-DIRECTORY-05: records completion of the most recent fully successful
+ * SFV club master import (see lib/integrations/sfv/sync/club-master-import.ts).
+ */
+export async function markClubMasterImportSuccessful(
+  tenantId: string,
+  finishedAt: Date,
+): Promise<void> {
+  await prisma.tenantSfvConfig.update({
+    where: { tenantId },
+    data: { lastClubMasterImportAt: finishedAt },
   });
 }
 

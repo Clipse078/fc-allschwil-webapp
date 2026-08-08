@@ -2900,6 +2900,12 @@ model TenantSfvConfig {
   lastMatchDetailSyncAt DateTime?
   /// Completion time of the most recent fully successful tenant-level competition synchronization.
   lastCompetitionSyncAt DateTime?
+  /// CLUB-DIRECTORY-05: completion time of the most recent fully successful
+  /// tenant-level SFV club master import (see
+  /// lib/integrations/sfv/sync/club-master-import.ts). Null until the first
+  /// run. Distinct from lastScheduleSyncAt — this tracks the broadest-
+  /// reliable-coverage club pre-population run, not schedule/match sync.
+  lastClubMasterImportAt DateTime?
   /// SFV-MATCH-SYNC-HOTFIX-01: set while an automatic (cron-triggered) schedule
   /// sync is in progress for this tenant; null when idle. Used as an atomic,
   /// TTL-based overlap guard — see claimSfvScheduleSyncLock() in

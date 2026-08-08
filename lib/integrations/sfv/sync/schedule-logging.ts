@@ -185,6 +185,74 @@ export function logClubIdentityConflict(
 }
 
 /**
+ * CLUB-DIRECTORY-05 — emitted when an SFV club master import run begins.
+ */
+export function logClubMasterImportStarted(
+  tenantId: string,
+  clubId: number,
+  seasonId: number,
+): void {
+  emit("info", {
+    event: "sfv_club_master_import_started",
+    tenantId,
+    source: "SFV",
+    clubId,
+    seasonId,
+  });
+}
+
+/**
+ * CLUB-DIRECTORY-05 — emitted when an SFV club master import run completes
+ * (whether or not individual candidate clubs failed to persist).
+ */
+export function logClubMasterImportCompleted(
+  tenantId: string,
+  clubId: number,
+  seasonId: number,
+  counts: {
+    rankingRowsFetched: number;
+    candidateClubs: number;
+    created: number;
+    updated: number;
+    failed: number;
+  },
+  durationMs: number,
+): void {
+  emit("info", {
+    event: "sfv_club_master_import_completed",
+    tenantId,
+    source: "SFV",
+    clubId,
+    seasonId,
+    ...counts,
+    durationMs,
+  });
+}
+
+/**
+ * CLUB-DIRECTORY-05 — emitted when the ranking fetch itself fails, aborting
+ * the whole import run before any candidate club is processed (no database
+ * mutation occurs in this case).
+ */
+export function logClubMasterImportFailed(
+  tenantId: string,
+  clubId: number,
+  seasonId: number,
+  errorCode: string,
+  durationMs: number,
+): void {
+  emit("error", {
+    event: "sfv_club_master_import_failed",
+    tenantId,
+    source: "SFV",
+    clubId,
+    seasonId,
+    errorCode,
+    durationMs,
+  });
+}
+
+/**
  * Emits a warning when a schedule entry cannot be resolved to any local team.
  * Only logs the external match ID and team IDs — no team names or personal data.
  */

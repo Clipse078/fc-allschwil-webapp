@@ -63,6 +63,13 @@ export type TenantSfvConfig = {
   /** Most recent fully successful competition sync completion time. */
   lastCompetitionSyncAt: Date | null;
   /**
+   * CLUB-DIRECTORY-05: most recent fully successful SFV club master import
+   * completion time. Null until the first run. Distinct from
+   * lastScheduleSyncAt — tracks the broadest-reliable-coverage club
+   * pre-population run (see lib/integrations/sfv/sync/club-master-import.ts).
+   */
+  lastClubMasterImportAt: Date | null;
+  /**
    * Set while an automatic (cron-triggered) schedule sync is in progress for
    * this tenant; null when idle. TTL-based overlap guard — see
    * claimSfvScheduleSyncLock() in tenant-config-repository.ts. Manual
