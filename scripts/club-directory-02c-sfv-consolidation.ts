@@ -57,8 +57,9 @@
  *   - Requires the SFV integration credentials (SFV_* env vars) to already
  *     be configured for a live clubNumber resolution — refuses to run any
  *     mode without them (never falls back to guessing identity).
- *   - Writes a pre-change JSON backup (every affected ExternalClub +
- *     ExternalTeam row) to .tmp/ (gitignored) before executing.
+ *   - Writes a pre-change JSON backup (every affected ExternalClub,
+ *     ExternalTeam, and ExternalClubProviderMapping row) to .tmp/
+ *     (gitignored) before executing.
  *   - Delegates every actual write to the same transactional, per-group
  *     service used by ordinary sync (lib/club-directory/consolidation-service.ts)
  *     — this script adds NO parallel mutation logic of its own.
@@ -78,6 +79,7 @@ import { pathToFileURL } from "url";
 
 import { buildProviderClubIdIndex } from "@/lib/integrations/sfv/sync/club-identity";
 import { chooseCanonicalClubId, chooseLogoDonor } from "@/lib/club-directory/consolidation-service";
+import { fetchTeamList, fetchClubRanking } from "@/lib/integrations/sfv/client";
 
 // `club-consolidation.ts` (the mutating orchestrator) transitively imports
 // the shared `@/lib/db/prisma` singleton, which throws at import time when
@@ -280,29 +282,60 @@ export async function resolveTenantContexts(
   }));
 }
 
-export async function loadTenantInventory(
-  prisma: PrismaClient,
+export type TenantProviderClubIdIndex = {
+  indexByTeamId: ReadonlyMap<number, number>;
+};
+
+/**
+ * Fetches this tenant's own team list (`fetchTeamList`) and club ranking
+ * (`fetchClubRanking`) from SFV EXACTLY ONCE and builds the resulting
+ * `providerTeamId -> providerClubId` identity index — the single live-SFV
+ * step `loadTenantInventory()` below performs internally.
+ *
+ * Exported separately (as well as being used internally by
+ * `loadTenantInventory`) so a caller that also needs to feed this EXACT
+ * index into a mutation path can do so from the SAME fetch, instead of
+ * calling `loadTenantInventory()` again (which would re-fetch SFV a second
+ * time). See app/api/ops/club-directory-02c-sfv-consolidation-execute/route.ts
+ * — the only caller that needs this — for why that TOCTOU-avoidance matters:
+ * regenerating a plan and then executing against a SECOND, independently
+ * fetched SFV snapshot would let the executed identity map silently drift
+ * from the exact map the regenerated/fingerprinted plan was built from.
+ */
+export async function resolveProviderClubIdIndex(
   tenant: TenantSfvContext,
-): Promise<TenantInventory> {
+): Promise<TenantProviderClubIdIndex> {
   const [ownTeams, rankingEntries] = await Promise.all([
-    import("@/lib/integrations/sfv/client").then((m) =>
-      m.fetchTeamList({
-        SeasonId: tenant.seasonId,
-        ClubId: tenant.clubId,
-        ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
-      }),
-    ),
-    import("@/lib/integrations/sfv/client").then((m) =>
-      m.fetchClubRanking({
-        SeasonId: tenant.seasonId,
-        ClubId: tenant.clubId,
-        ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
-      }),
-    ),
+    fetchTeamList({
+      SeasonId: tenant.seasonId,
+      ClubId: tenant.clubId,
+      ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
+    }),
+    fetchClubRanking({
+      SeasonId: tenant.seasonId,
+      ClubId: tenant.clubId,
+      ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
+    }),
   ]);
 
   const { indexByTeamId } = buildProviderClubIdIndex(ownTeams, rankingEntries);
+  return { indexByTeamId };
+}
 
+/**
+ * Builds a tenant's duplicate-group inventory from an ALREADY-RESOLVED
+ * `providerTeamId -> providerClubId` index (read-only DB query + pure
+ * grouping — no SFV/network call of its own). `loadTenantInventory()` below
+ * is simply `resolveProviderClubIdIndex()` followed by this function; it is
+ * exposed separately so a caller can reuse one already-fetched index for
+ * both "build the inventory/plan" and "execute the mutation" without a
+ * second SFV fetch in between (see `resolveProviderClubIdIndex` doc above).
+ */
+export async function loadTenantInventoryFromIndex(
+  prisma: PrismaClient,
+  tenant: TenantSfvContext,
+  indexByTeamId: ReadonlyMap<number, number>,
+): Promise<TenantInventory> {
   const mappingRows = await prisma.externalTeamProviderMapping.findMany({
     where: {
       tenantId: tenant.tenantId,
@@ -322,6 +355,14 @@ export async function loadTenantInventory(
     resolvedTeamCount: indexByTeamId.size,
     duplicateGroups: findDuplicateGroups(rows, indexByTeamId),
   };
+}
+
+export async function loadTenantInventory(
+  prisma: PrismaClient,
+  tenant: TenantSfvContext,
+): Promise<TenantInventory> {
+  const { indexByTeamId } = await resolveProviderClubIdIndex(tenant);
+  return loadTenantInventoryFromIndex(prisma, tenant, indexByTeamId);
 }
 
 export async function buildTenantPlan(prisma: PrismaClient, inventory: TenantInventory): Promise<TenantPlan> {
@@ -352,6 +393,24 @@ export async function buildTenantPlan(prisma: PrismaClient, inventory: TenantInv
 // Backup
 // ---------------------------------------------------------------------------
 
+/**
+ * Captures the complete PRE-MUTATION state needed to understand/reconstruct
+ * every ExternalClub / ExternalTeam / ExternalClubProviderMapping row that
+ * consolidation may touch for the given (already-computed, read-only)
+ * inventories.
+ *
+ * `clubProviderMappings` covers the gap consolidation's own
+ * `ensureClubProviderMapping()` (lib/club-directory/consolidation-service.ts)
+ * writes to but the original snapshot did not capture: consolidation
+ * creates/re-points the ExternalClubProviderMapping for each affected
+ * duplicate group's `providerClubId` to the chosen canonical club. Scoped to
+ * this tenant + this provider + exactly the `providerClubId`s appearing in
+ * `inv.duplicateGroups` (the same set the rest of this snapshot is built
+ * from) — never any other tenant's mappings, and never a mapping for a
+ * `providerClubId` outside the affected groups. A group with no pre-existing
+ * mapping yields zero rows here, which correctly reflects that there was
+ * nothing to restore for it.
+ */
 export async function buildBackupSnapshot(prisma: PrismaClient, inventories: TenantInventory[]) {
   const snapshot: Record<string, unknown> = { generatedAt: new Date().toISOString(), tenants: [] };
   const tenants: unknown[] = [];
@@ -359,9 +418,19 @@ export async function buildBackupSnapshot(prisma: PrismaClient, inventories: Ten
   for (const inv of inventories) {
     if (inv.duplicateGroups.length === 0) continue;
     const clubIds = [...new Set(inv.duplicateGroups.flatMap((g) => g.distinctClubIds))];
+    const providerClubIds = [...new Set(inv.duplicateGroups.map((g) => g.providerClubId))];
     const clubs = await prisma.externalClub.findMany({ where: { id: { in: clubIds } } });
     const teams = await prisma.externalTeam.findMany({ where: { externalClubId: { in: clubIds } } });
-    tenants.push({ tenantId: inv.tenant.tenantId, tenantKey: inv.tenant.tenantKey, clubs, teams });
+    const clubProviderMappings = await prisma.externalClubProviderMapping.findMany({
+      where: { tenantId: inv.tenant.tenantId, provider: PROVIDER, providerClubId: { in: providerClubIds } },
+    });
+    tenants.push({
+      tenantId: inv.tenant.tenantId,
+      tenantKey: inv.tenant.tenantKey,
+      clubs,
+      teams,
+      clubProviderMappings,
+    });
   }
 
   snapshot.tenants = tenants;

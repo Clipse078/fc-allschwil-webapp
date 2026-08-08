@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
 
 const mockResolveTenantContexts = vi.fn();
 const mockLoadTenantInventory = vi.fn();
@@ -441,6 +442,54 @@ describe("GET — dry-run mode", () => {
     expect(mockResolveTenantContexts).toHaveBeenCalledOnce();
     expect(mockLoadTenantInventory).toHaveBeenCalledOnce();
     expect(mockBuildTenantPlan).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dry-run plan fingerprint — CLUB-DIRECTORY-02C-EXEC plan-pinning contract
+// ---------------------------------------------------------------------------
+
+describe("GET — dry-run plan fingerprint", () => {
+  it("includes a deterministic SHA-256 planFingerprint computed by the shared pure helper", async () => {
+    const response = await GET(
+      makeRequest({ tenant: TENANT_KEY, mode: "dry-run" }, authHeaders()),
+    );
+    const body = await response.json();
+
+    const expected = computePlanFingerprint({
+      tenantKey: TENANT_KEY,
+      groups: PLAN.groups,
+    });
+
+    expect(body.planFingerprint).toBe(expected);
+    expect(body.planFingerprint).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("does not include a planFingerprint in inventory mode", async () => {
+    const response = await GET(
+      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders()),
+    );
+    const body = await response.json();
+
+    expect(body.planFingerprint).toBeUndefined();
+  });
+
+  it("changes when the plan content changes", async () => {
+    const changedPlan = {
+      tenant: TENANT_CONTEXT,
+      groups: [
+        { ...PLAN.groups[0], teamsToMove: 999 },
+      ],
+    };
+    mockBuildTenantPlan.mockResolvedValue(changedPlan);
+
+    const response = await GET(
+      makeRequest({ tenant: TENANT_KEY, mode: "dry-run" }, authHeaders()),
+    );
+    const body = await response.json();
+
+    const originalFingerprint = computePlanFingerprint({ tenantKey: TENANT_KEY, groups: PLAN.groups });
+    expect(body.planFingerprint).not.toBe(originalFingerprint);
   });
 });
 
