@@ -57,8 +57,9 @@
  *   - Requires the SFV integration credentials (SFV_* env vars) to already
  *     be configured for a live clubNumber resolution — refuses to run any
  *     mode without them (never falls back to guessing identity).
- *   - Writes a pre-change JSON backup (every affected ExternalClub +
- *     ExternalTeam row) to .tmp/ (gitignored) before executing.
+ *   - Writes a pre-change JSON backup (every affected ExternalClub,
+ *     ExternalTeam, and ExternalClubProviderMapping row) to .tmp/
+ *     (gitignored) before executing.
  *   - Delegates every actual write to the same transactional, per-group
  *     service used by ordinary sync (lib/club-directory/consolidation-service.ts)
  *     — this script adds NO parallel mutation logic of its own.
@@ -392,6 +393,24 @@ export async function buildTenantPlan(prisma: PrismaClient, inventory: TenantInv
 // Backup
 // ---------------------------------------------------------------------------
 
+/**
+ * Captures the complete PRE-MUTATION state needed to understand/reconstruct
+ * every ExternalClub / ExternalTeam / ExternalClubProviderMapping row that
+ * consolidation may touch for the given (already-computed, read-only)
+ * inventories.
+ *
+ * `clubProviderMappings` covers the gap consolidation's own
+ * `ensureClubProviderMapping()` (lib/club-directory/consolidation-service.ts)
+ * writes to but the original snapshot did not capture: consolidation
+ * creates/re-points the ExternalClubProviderMapping for each affected
+ * duplicate group's `providerClubId` to the chosen canonical club. Scoped to
+ * this tenant + this provider + exactly the `providerClubId`s appearing in
+ * `inv.duplicateGroups` (the same set the rest of this snapshot is built
+ * from) — never any other tenant's mappings, and never a mapping for a
+ * `providerClubId` outside the affected groups. A group with no pre-existing
+ * mapping yields zero rows here, which correctly reflects that there was
+ * nothing to restore for it.
+ */
 export async function buildBackupSnapshot(prisma: PrismaClient, inventories: TenantInventory[]) {
   const snapshot: Record<string, unknown> = { generatedAt: new Date().toISOString(), tenants: [] };
   const tenants: unknown[] = [];
@@ -399,9 +418,19 @@ export async function buildBackupSnapshot(prisma: PrismaClient, inventories: Ten
   for (const inv of inventories) {
     if (inv.duplicateGroups.length === 0) continue;
     const clubIds = [...new Set(inv.duplicateGroups.flatMap((g) => g.distinctClubIds))];
+    const providerClubIds = [...new Set(inv.duplicateGroups.map((g) => g.providerClubId))];
     const clubs = await prisma.externalClub.findMany({ where: { id: { in: clubIds } } });
     const teams = await prisma.externalTeam.findMany({ where: { externalClubId: { in: clubIds } } });
-    tenants.push({ tenantId: inv.tenant.tenantId, tenantKey: inv.tenant.tenantKey, clubs, teams });
+    const clubProviderMappings = await prisma.externalClubProviderMapping.findMany({
+      where: { tenantId: inv.tenant.tenantId, provider: PROVIDER, providerClubId: { in: providerClubIds } },
+    });
+    tenants.push({
+      tenantId: inv.tenant.tenantId,
+      tenantKey: inv.tenant.tenantKey,
+      clubs,
+      teams,
+      clubProviderMappings,
+    });
   }
 
   snapshot.tenants = tenants;

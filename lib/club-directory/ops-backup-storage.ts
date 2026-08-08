@@ -28,8 +28,9 @@
  *
  * ACCESS LEVEL
  *   `access: "private"` — this snapshot contains internal ExternalClub/
- *   ExternalTeam rows (ids, names, timestamps), not a public asset. It must
- *   never be served from a public CDN URL the way logos are.
+ *   ExternalTeam/ExternalClubProviderMapping rows (ids, names, timestamps),
+ *   not a public asset. It must never be served from a public CDN URL the
+ *   way logos are.
  *
  * FAIL-CLOSED CONTRACT
  *   Never throws. Returns `{ ok: false }` when BLOB_READ_WRITE_TOKEN is
