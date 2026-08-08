@@ -97,10 +97,31 @@
  *
  * FAILURE SAFETY / CREDENTIAL HYGIENE
  *   Every guard above runs, in order, before any SFV/DB access; any failure
- *   returns before `consolidateExternalClubsByProviderIdentity` is ever
- *   called. All error responses are sanitized generic messages — no
- *   DATABASE_URL / SFV_* / CRON_SECRET value, and no raw internal error
- *   message, is ever included in a response body.
+ *   up through and including the pre-mutation backup returns
+ *   `mutationStarted: false` — mutation is guaranteed to not have started.
+ *   All error responses are sanitized generic messages — no DATABASE_URL /
+ *   SFV_* / CRON_SECRET value, and no raw internal error message, is ever
+ *   included in a response body.
+ *
+ * MID-EXECUTION FAILURE IS REPORTED EXPLICITLY, NEVER AS A GENERIC ERROR
+ *   `consolidateExternalClubsByProviderIdentity` commits one transaction PER
+ *   duplicate group (see its own module doc) — it is not one atomic
+ *   transaction across every group. If it (or the read-only postcondition
+ *   check right after it) throws, groups already processed before the
+ *   throw may already be committed. Returning the same generic 500 used for
+ *   pre-mutation failures here would let an operator mistake "some groups
+ *   may already be merged" for "nothing happened" and re-run destructively.
+ *   Instead, once execution reaches this point, any thrown error is caught
+ *   separately and reported as:
+ *     { "error": "Consolidation execution failed after mutation processing started.",
+ *       "mutationStarted": true, "partialCompletionPossible": true,
+ *       "backup": { "pathname": "..." },
+ *       "nextAction": "Run a fresh inventory and dry-run before retrying." }
+ *   The already-persisted backup's pathname is always included so the
+ *   operator can inspect/restore from it. No exact per-group progress is
+ *   reported — this is a one-time operational endpoint, not a job-tracking
+ *   system; the operator is simply told to re-run inventory/dry-run before
+ *   ever retrying `--execute` again.
  */
 
 import { NextResponse } from "next/server";
@@ -359,6 +380,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           error:
             "Plan fingerprint mismatch — the live plan no longer matches the reviewed/pinned plan. Aborting with zero mutations.",
+          mutationStarted: false,
           expectedPlanFingerprint,
           actualPlanFingerprint,
           tenant: serializeTenant(tenant),
@@ -390,48 +412,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           error: "Pre-mutation backup could not be persisted. Aborting with zero mutations.",
+          mutationStarted: false,
           tenant: serializeTenant(tenant),
         },
         { status: backupResult.status },
       );
     }
 
-    // ── 8. Real mutation — the ONLY write-capable call in this route ────────
-    // Uses the exact `indexByTeamId` regenerated/fingerprinted in step 5
-    // above — NOT `runSfvClubConsolidationForTenant`, which would perform a
-    // second, independent SFV fetch (see module doc's TOCTOU analysis).
-    const database = createClubConsolidationDatabase(prisma);
-    const consolidation = await consolidateExternalClubsByProviderIdentity(database, {
-      tenantId: tenant.tenantId,
-      provider: PROVIDER,
-      resolvedClubIdsByTeamId: indexByTeamId,
-    });
+    // ── 8./9. Mutation + postcondition — the ONLY phase that can leave the
+    // database partially changed. `consolidateExternalClubsByProviderIdentity`
+    // runs one transaction PER group (see its own module doc); if it throws
+    // partway through, earlier groups' transactions may already have
+    // committed while later groups were never attempted. From here on, any
+    // thrown error is therefore reported via the dedicated "mutation may be
+    // partial" response below instead of the generic pre-mutation error
+    // response — a plain 500 at this point would be indistinguishable from
+    // "nothing happened", which is unsafe for an operator deciding whether to
+    // retry.
+    try {
+      // Uses the exact `indexByTeamId` regenerated/fingerprinted in step 5
+      // above — NOT `runSfvClubConsolidationForTenant`, which would perform a
+      // second, independent SFV fetch (see module doc's TOCTOU analysis).
+      const database = createClubConsolidationDatabase(prisma);
+      const consolidation = await consolidateExternalClubsByProviderIdentity(database, {
+        tenantId: tenant.tenantId,
+        provider: PROVIDER,
+        resolvedClubIdsByTeamId: indexByTeamId,
+      });
 
-    // ── 9. Postcondition verification ────────────────────────────────────────
-    const postcondition = await verifyPostcondition(tenant, indexByTeamId, plan);
+      const postcondition = await verifyPostcondition(tenant, indexByTeamId, plan);
 
-    return NextResponse.json(
-      {
-        tenant: serializeTenant(tenant),
-        planFingerprint: actualPlanFingerprint,
-        mutated: true,
-        backup: { pathname: backupResult.pathname },
-        consolidation: {
-          groupsProcessed: consolidation.groupsProcessed,
-          groupsMerged: consolidation.groupsMerged,
-          groupsAlreadyConsolidated: consolidation.groupsAlreadyConsolidated,
-          teamsMoved: consolidation.teamsMoved,
-          clubsArchived: consolidation.clubsArchived,
+      return NextResponse.json(
+        {
+          tenant: serializeTenant(tenant),
+          planFingerprint: actualPlanFingerprint,
+          mutated: true,
+          backup: { pathname: backupResult.pathname },
+          consolidation: {
+            groupsProcessed: consolidation.groupsProcessed,
+            groupsMerged: consolidation.groupsMerged,
+            groupsAlreadyConsolidated: consolidation.groupsAlreadyConsolidated,
+            teamsMoved: consolidation.teamsMoved,
+            clubsArchived: consolidation.clubsArchived,
+          },
+          postcondition,
         },
-        postcondition,
-      },
-      { status: 200 },
-    );
+        { status: 200 },
+      );
+    } catch (mutationErr) {
+      console.error(
+        "[ops/club-directory-02c-sfv-consolidation-execute] Error during/after mutation phase — partial completion possible:",
+        mutationErr instanceof Error ? mutationErr.message : "unknown",
+      );
+      return NextResponse.json(
+        {
+          error: "Consolidation execution failed after mutation processing started.",
+          mutationStarted: true,
+          partialCompletionPossible: true,
+          backup: { pathname: backupResult.pathname },
+          nextAction: "Run a fresh inventory and dry-run before retrying.",
+        },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error(
-      "[ops/club-directory-02c-sfv-consolidation-execute] Unexpected error:",
+      "[ops/club-directory-02c-sfv-consolidation-execute] Unexpected error before mutation phase:",
       err instanceof Error ? err.message : "unknown",
     );
-    return NextResponse.json({ error: GENERIC_ERROR_MESSAGE }, { status: 500 });
+    return NextResponse.json({ error: GENERIC_ERROR_MESSAGE, mutationStarted: false }, { status: 500 });
   }
 }

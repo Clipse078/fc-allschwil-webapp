@@ -734,4 +734,133 @@ describe("POST — no credential leakage", () => {
     expect(json).not.toContain("supersecret");
     expect(json).not.toContain("postgresql://");
   });
+
+  it("mid-execution failure response contains no secrets either", async () => {
+    mockConsolidateExternalClubsByProviderIdentity.mockRejectedValue(
+      new Error("connection string postgresql://user:supersecret@host/db"),
+    );
+
+    const response = await POST(makeRequest(validBody(), authHeaders()));
+    const json = JSON.stringify(await response.json());
+
+    expect(response.status).toBe(500);
+    expect(json).not.toContain("supersecret");
+    expect(json).not.toContain("postgresql://");
+    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain("super-secret-blob-token");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mid-execution failure reporting (CLUB-DIRECTORY-02C-EXEC-C1 FIX 2) —
+// distinguishing "failed before any mutation" from "failed after mutation
+// processing started, partial completion possible".
+// ---------------------------------------------------------------------------
+
+describe("POST — mid-execution failure reporting", () => {
+  it("a pre-mutation failure (before the mutation phase) reports mutationStarted: false, never true", async () => {
+    mockResolveTenantContexts.mockRejectedValue(new Error("boom before mutation"));
+
+    const response = await POST(makeRequest(validBody(), authHeaders()));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.mutationStarted).toBe(false);
+    expect(body.partialCompletionPossible).toBeUndefined();
+  });
+
+  it("the plan-fingerprint-mismatch response (already zero mutations) also states mutationStarted: false", async () => {
+    const response = await POST(
+      makeRequest(validBody({ expectedPlanFingerprint: "0".repeat(64) }), authHeaders()),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.mutationStarted).toBe(false);
+  });
+
+  it("a backup-persistence failure (already zero mutations) also states mutationStarted: false", async () => {
+    mockPersistConsolidationBackupSnapshot.mockResolvedValue({
+      ok: false,
+      status: 503,
+      error: "Backup-Speicher ist nicht konfiguriert.",
+    });
+
+    const response = await POST(makeRequest(validBody(), authHeaders()));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.mutationStarted).toBe(false);
+  });
+
+  it("an exception thrown by consolidateExternalClubsByProviderIdentity is reported as a partial-completion-possible failure, not a generic error", async () => {
+    mockConsolidateExternalClubsByProviderIdentity.mockRejectedValue(
+      new Error("later group's transaction failed"),
+    );
+
+    const response = await POST(makeRequest(validBody(), authHeaders()));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toBe("Consolidation execution failed after mutation processing started.");
+    expect(body.mutationStarted).toBe(true);
+    expect(body.partialCompletionPossible).toBe(true);
+    expect(body.backup).toEqual({
+      pathname: "ops-backups/club-directory-02c-sfv-consolidation/fc-allschwil-x.json",
+    });
+    expect(body.nextAction).toMatch(/inventory/i);
+    expect(body.nextAction).toMatch(/dry-run/i);
+  });
+
+  it("an exception thrown during postcondition verification (after mutation already ran) is ALSO reported as partial-completion-possible, never a bare 200/generic error", async () => {
+    mockExternalClubFindMany.mockRejectedValue(new Error("read failure during postcondition check"));
+
+    const response = await POST(makeRequest(validBody(), authHeaders()));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.mutationStarted).toBe(true);
+    expect(body.partialCompletionPossible).toBe(true);
+    expect(mockConsolidateExternalClubsByProviderIdentity).toHaveBeenCalledOnce();
+  });
+
+  it("never reports partialCompletionPossible for any failure that happens before the mutation phase", async () => {
+    mockLoadTenantInventoryFromIndex.mockReset().mockRejectedValue(new Error("SFV fetch decoding failed"));
+
+    const response = await POST(makeRequest(validBody(), authHeaders()));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.mutationStarted).toBe(false);
+    expect(body.partialCompletionPossible).toBeUndefined();
+    expect(mockConsolidateExternalClubsByProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it("does not affect the happy-path success response shape (no mutationStarted/partialCompletionPossible noise on success)", async () => {
+    const response = await POST(makeRequest(validBody(), authHeaders()));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mutated).toBe(true);
+    expect(body.partialCompletionPossible).toBeUndefined();
+  });
+
+  it("retry/idempotency behaviour is unaffected: a second call after a mid-execution failure still regenerates and re-fingerprints the plan live", async () => {
+    mockConsolidateExternalClubsByProviderIdentity.mockRejectedValueOnce(new Error("transient failure"));
+
+    const first = await POST(makeRequest(validBody(), authHeaders()));
+    expect(first.status).toBe(500);
+    const firstBody = await first.json();
+    expect(firstBody.mutationStarted).toBe(true);
+
+    // A second attempt (e.g. after the operator re-runs inventory/dry-run and
+    // re-confirms) still goes through the exact same live plan regeneration
+    // and fingerprint check — no special-cased "retry" code path exists.
+    vi.clearAllMocks();
+    setupHappyPathMocks();
+    const second = await POST(makeRequest(validBody(), authHeaders()));
+    expect(second.status).toBe(200);
+    expect(mockResolveProviderClubIdIndex).toHaveBeenCalledOnce();
+    expect(mockConsolidateExternalClubsByProviderIdentity).toHaveBeenCalledOnce();
+  });
 });
