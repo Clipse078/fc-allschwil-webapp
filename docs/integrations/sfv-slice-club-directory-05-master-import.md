@@ -2,7 +2,10 @@
 
 > **Document type:** Integration specification and runbook
 > **Status:** Implemented and unit-tested. Not yet run against STAGE (see
-> "Delivery status" below).
+> "Delivery status" below). **Superseded in part by CLUB-DIRECTORY-05-C1**
+> (see addendum at the end of this document) — the manual admin trigger
+> described in STEP 4 below has been removed; the import now runs
+> automatically once per day via cron.
 > **Last updated:** 2026-08-08
 > **Maintained by:** SportClubEvo engineering team
 
@@ -256,5 +259,59 @@ been run against STAGE — it requires live SFV credentials and STAGE write
 access, neither of which is available or appropriate in this sandboxed
 environment. All logic is unit-tested against synthetic SFV responses and a
 real, disposable local PostgreSQL instance.
+
+**READY FOR REVIEW**
+
+---
+
+## Addendum — CLUB-DIRECTORY-05-C1: manual trigger removed, daily cron added
+
+**Product decision:** tenant admins must not trigger the SFV club master
+import manually. It now runs automatically, once per day, using the exact
+same operational pattern already established for the SFV match/schedule
+sync cron (`app/api/cron/sfv-sync/route.ts`).
+
+Changes on top of CLUB-DIRECTORY-05 (smallest safe change — the import
+service itself, `runSfvClubMasterImport()`, is untouched):
+
+| File | Change |
+|---|---|
+| `components/admin/integrations/SfvTenantConfigPanel.tsx` | Removed the "SFV-Vereinsverzeichnis synchronisieren" action card, its button, its client-side fetch handler, and its result-summary sub-component. The read-only "Letzte Vereinsverzeichnis-Synchronisierung" timestamp row (sourced from `TenantSfvConfig.lastClubMasterImportAt`) is kept in the connection-status card for observability. |
+| `lib/integrations/sfv/sync/auto-club-master-import.ts` | New. `runAutomaticSfvClubMasterImport()` — iterates every tenant returned by the existing `listEnabledSfvConfigTenantIds()` (the same tenant-discovery query the match-sync cron orchestrator uses) and calls the unchanged `runSfvClubMasterImport(tenantId)` once per tenant, sequentially, isolating per-tenant failures exactly like `auto-sync.ts#runAutomaticSfvScheduleSync`. |
+| `app/api/cron/sfv-club-master-import/route.ts` | New. `GET` route, `Authorization: Bearer ${CRON_SECRET}`-gated (identical fail-closed pattern to `app/api/cron/sfv-sync/route.ts`), delegates to `runAutomaticSfvClubMasterImport()`. |
+| `vercel.json` | Added a second daily cron entry — `/api/cron/sfv-club-master-import` at `0 4 * * *` UTC, independent of the existing `/api/cron/sfv-sync` entry (`0 1 * * *`) so neither cron's schedule, success, or failure has any bearing on the other. |
+| `app/api/admin/integrations/sfv/clubs/master-import/route.ts` | Left in place, unchanged and still gated by the platform-only `TENANTS_MANAGE` permission (never grantable to a tenant `Club Admin` role — see `prisma/seed.ts`), as a lower-level operational escape hatch. It is no longer linked from any admin page. |
+
+**Not coupled to the match/schedule sync run:** the club master import cron
+is a fully separate route, orchestrator, and schedule entry — it does not
+call, and is not called by, `runAutomaticSfvScheduleSync()` or
+`/api/cron/sfv-sync`. Either can run, succeed, or fail independently.
+
+**No new scheduling framework:** reuses the existing Vercel Cron +
+`CRON_SECRET` + `vercel.json` mechanism verbatim.
+
+**Verification:**
+
+- Club Admin cannot trigger the import manually: the manual trigger no
+  longer exists in the admin UI, and the underlying route it used to call
+  remains gated by `tenants.manage`, a `PermissionScope.PLATFORM`,
+  `grantableByAdmin: false` permission that a tenant-scoped `Club Admin`
+  role can never hold (`prisma/seed.ts`) — see
+  `components/admin/integrations/__tests__/SfvTenantConfigPanel.test.tsx`
+  "CLUB-DIRECTORY-05-C1 club master import — manual trigger removed".
+- Cron route is `CRON_SECRET`-protected (fail-closed when unset): see
+  `app/api/cron/sfv-club-master-import/__tests__/route.test.ts`.
+- One run per scheduled invocation, per tenant: `runSfvClubMasterImport` is
+  called exactly once per enabled tenant per orchestrator invocation — see
+  `lib/integrations/sfv/sync/__tests__/auto-club-master-import.test.ts`.
+- Rerun idempotency and tenant isolation are unchanged, inherited directly
+  from the untouched `runSfvClubMasterImport()` / `discoverExternalClubFromProvider()`
+  (see CLUB-DIRECTORY-05 test coverage above — still green, unmodified).
+- Failures are logged and isolated per tenant, never corrupting another
+  tenant's data or aborting the run for other tenants — same pattern as
+  `runAutomaticSfvScheduleSync`.
+- Existing match sync behavior (`/api/cron/sfv-sync`, `auto-sync.ts`,
+  `schedule.ts`) is entirely untouched — full pre-existing test suite for
+  those files is unmodified and still green.
 
 **READY FOR REVIEW**
