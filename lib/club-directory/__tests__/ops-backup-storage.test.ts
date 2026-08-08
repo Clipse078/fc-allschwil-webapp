@@ -28,8 +28,8 @@ afterEach(() => {
 });
 
 describe("persistConsolidationBackupSnapshot", () => {
-  it("fails closed (no throw) when BLOB_READ_WRITE_TOKEN is not configured", async () => {
-    delete process.env.BLOB_READ_WRITE_TOKEN;
+  it("fails closed (no throw) when OPS_BACKUP_READ_WRITE_TOKEN is not configured", async () => {
+    delete process.env.OPS_BACKUP_READ_WRITE_TOKEN;
 
     const result = await persistConsolidationBackupSnapshot({ some: "data" }, "backups/a.json");
 
@@ -40,8 +40,21 @@ describe("persistConsolidationBackupSnapshot", () => {
     expect(mockPut).not.toHaveBeenCalled();
   });
 
-  it("uploads the snapshot as a private JSON blob at the given key", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-blob-token";
+  it("does not fall back to the general BLOB_READ_WRITE_TOKEN (public store) when OPS_BACKUP_READ_WRITE_TOKEN is missing", async () => {
+    delete process.env.OPS_BACKUP_READ_WRITE_TOKEN;
+    process.env.BLOB_READ_WRITE_TOKEN = "general-public-store-token";
+
+    const result = await persistConsolidationBackupSnapshot({ some: "data" }, "backups/a.json");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(503);
+    }
+    expect(mockPut).not.toHaveBeenCalled();
+  });
+
+  it("uploads the snapshot as a private JSON blob at the given key, using the dedicated OPS_BACKUP token", async () => {
+    process.env.OPS_BACKUP_READ_WRITE_TOKEN = "test-ops-backup-token";
     mockPut.mockResolvedValue({ url: "https://blob.example/backups/a.json", pathname: "backups/a.json" });
 
     const snapshot = { generatedAt: "2026-08-08T00:00:00.000Z", tenants: [] };
@@ -60,13 +73,13 @@ describe("persistConsolidationBackupSnapshot", () => {
     expect(options).toMatchObject({
       access: "private",
       contentType: "application/json",
-      token: "test-blob-token",
+      token: "test-ops-backup-token",
       allowOverwrite: false,
     });
   });
 
   it("returns ok:false without throwing when the upload fails", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "test-blob-token";
+    process.env.OPS_BACKUP_READ_WRITE_TOKEN = "test-ops-backup-token";
     mockPut.mockRejectedValue(new Error("network failure with sensitive detail"));
 
     const result = await persistConsolidationBackupSnapshot({ some: "data" }, "backups/a.json");
@@ -79,11 +92,11 @@ describe("persistConsolidationBackupSnapshot", () => {
   });
 
   it("never includes the blob token in the returned result", async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = "super-secret-blob-token";
+    process.env.OPS_BACKUP_READ_WRITE_TOKEN = "super-secret-ops-backup-token";
     mockPut.mockResolvedValue({ url: "https://blob.example/backups/a.json", pathname: "backups/a.json" });
 
     const result = await persistConsolidationBackupSnapshot({ some: "data" }, "backups/a.json");
 
-    expect(JSON.stringify(result)).not.toContain("super-secret-blob-token");
+    expect(JSON.stringify(result)).not.toContain("super-secret-ops-backup-token");
   });
 });
