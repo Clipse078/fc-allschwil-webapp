@@ -115,6 +115,8 @@ describe("createExternalOpponentResolver — CLUB-DIRECTORY-02B logo enrichment"
         providerTeamName: "SV Muttenz B1",
         providerClubId: null,
         providerLogoUrl: "data:image/gif;base64,R0lGOD==",
+        providerLeagueName: null,
+        providerGroupName: null,
       },
       SYNCED_AT,
     );

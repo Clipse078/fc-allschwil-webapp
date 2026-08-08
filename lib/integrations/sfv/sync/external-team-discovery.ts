@@ -38,6 +38,13 @@
  *     one layer down, unchanged, by
  *     lib/club-directory/provider-sync.ts#buildExternalClubTenantFieldUpdate
  *     — this module never touches ExternalClub.logoUrl directly.
+ *   - CLUB-DIRECTORY-04: forwards real sporting context (league/competition
+ *     group name), when this run's ranking data covers this teamId (see
+ *     team-competition-context.ts), as `providerLeagueName`/
+ *     `providerGroupName` — so identically-named provider teams (e.g. four
+ *     different "AC Rossoneri" SFV teams) can be distinguished in the Club
+ *     Directory UI without exposing the provider Team-ID. Provider-owned,
+ *     refreshed every sync, never inspected or derived from the team name.
  *
  * Architecture invariant: this module NEVER creates a tenant-owned Team —
  * only canonical Club Directory ExternalClub/ExternalTeam records, which is
@@ -55,6 +62,10 @@ import {
 } from "@/lib/club-directory/query-service";
 import { resolveClubLogoFromCandidateTeamIds } from "./team-logo";
 import { resolveProviderClubId } from "./club-identity";
+import {
+  resolveProviderCompetitionContext,
+  type ProviderCompetitionContext,
+} from "./team-competition-context";
 import { logClubLogoEnrichmentExhausted } from "./schedule-logging";
 
 const PROVIDER = "SFV";
@@ -168,11 +179,20 @@ async function resolveOpponentLogoIfNeeded(
  * Omitted (or a teamId not covered by it) falls back to the narrow,
  * documented "no club identity evidence" behaviour, unchanged from
  * CLUB-DIRECTORY-02.
+ *
+ * `providerCompetitionContextIndex` (CLUB-DIRECTORY-04, optional) is a
+ * pre-built `teamId -> { leagueName, groupName }` map for this run (see
+ * team-competition-context.ts#buildProviderCompetitionContextIndex, built
+ * from the SAME already-fetched ClubRankingEntry[] — no extra SFV calls).
+ * Omitted (or a teamId not covered by it) simply means no sporting context
+ * is refreshed this run — the Club Directory falls back to whatever real
+ * context was persisted on a previous run, or to no context at all.
  */
 export function createExternalOpponentResolver(
   tenantId: string,
   syncedAt: Date,
   providerClubIdIndex?: ReadonlyMap<number, number>,
+  providerCompetitionContextIndex?: ReadonlyMap<number, ProviderCompetitionContext>,
 ): ExternalOpponentResolver {
   const database = createClubDirectoryMutationDatabase(prisma);
   const queryDatabase = createClubDirectoryQueryDatabase(prisma);
@@ -186,6 +206,10 @@ export function createExternalOpponentResolver(
 
     const pending = (async () => {
       const providerClubId = resolveProviderClubId(providerClubIdIndex, sfvTeamId);
+      const competitionContext = resolveProviderCompetitionContext(
+        providerCompetitionContextIndex,
+        sfvTeamId,
+      );
 
       const providerLogoUrl = await resolveOpponentLogoIfNeeded(
         queryDatabase,
@@ -203,6 +227,8 @@ export function createExternalOpponentResolver(
           providerTeamName: sfvTeamName,
           providerClubId,
           providerLogoUrl,
+          providerLeagueName: competitionContext.leagueName,
+          providerGroupName: competitionContext.groupName,
         },
         syncedAt,
       );

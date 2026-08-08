@@ -58,6 +58,11 @@ describe("createExternalOpponentResolver", () => {
         // external-team-discovery-logo-enrichment.test.ts for dedicated,
         // properly-mocked coverage of the enrichment behaviour itself.
         providerLogoUrl: null,
+        // No providerCompetitionContextIndex was supplied to
+        // createExternalOpponentResolver in this test — CLUB-DIRECTORY-04's
+        // narrow, documented "no context evidence" fallback.
+        providerLeagueName: null,
+        providerGroupName: null,
       },
       new Date("2026-08-01T00:00:00.000Z"),
     );
