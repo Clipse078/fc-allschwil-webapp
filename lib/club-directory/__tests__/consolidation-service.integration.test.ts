@@ -24,6 +24,19 @@
  *      unchanged, even when a losing club has a different logo.
  *   7. An existing provider-filled logo on a losing club is adopted onto a
  *      still-logo-less canonical club.
+ *   8. Shared providerTeamId across two tenants — SFV providerTeamIds are
+ *      provider-global (not tenant-scoped), so two different tenants can
+ *      legitimately reference the exact same (provider, providerTeamId).
+ *      Consolidating tenant A must never read, mutate, reparent, archive, or
+ *      adopt logo/data from tenant B's records, even when they collide on
+ *      this shared identifier. Unlike test #4 above (disjoint ids), this
+ *      exercises the exact collision.
+ *   9. Genuine concurrency — two overlapping consolidation runs (two fully
+ *      independent PrismaClient/Pool instances, mirroring
+ *      discovery-service-club-identity.integration.test.ts's race tests) for
+ *      the SAME tenant/providerClubId group produce exactly one stable
+ *      canonical club, no orphaned/lost teams, a correct provider mapping,
+ *      no errors, and a subsequent rerun stays idempotent.
  *
  * SAFETY:
  *   - This suite ONLY runs when `CLUB_DIRECTORY_02C_TEST_DATABASE_URL` is
@@ -67,6 +80,14 @@ function isSafeLocalTestUrl(url: string): boolean {
 const canRun = Boolean(TEST_DATABASE_URL) && isSafeLocalTestUrl(TEST_DATABASE_URL ?? "");
 
 const PROVIDER = "SFV";
+
+/** A fully independent PrismaClient + Pool, for simulating two overlapping processes. */
+function createIndependentClient(): { prisma: PrismaClient; pool: Pool } {
+  const pool = new Pool({ connectionString: TEST_DATABASE_URL });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
+  return { prisma, pool };
+}
 
 describe.skipIf(!canRun)(
   "CLUB-DIRECTORY-02C consolidation service (real disposable Postgres)",
@@ -433,6 +454,203 @@ describe.skipIf(!canRun)(
 
       const canonicalClub = await prisma.externalClub.findUniqueOrThrow({ where: { id: clubIds[0] } });
       expect(canonicalClub.logoUrl).toBe("data:image/gif;base64,ADOPTEDCREST=");
+    });
+
+    // SFV `providerTeamId` is a provider-global numeric id (assigned by SFV,
+    // not by SportClubEvo) — two entirely different tenants can legitimately
+    // have their own `ExternalTeamProviderMapping` row for the exact SAME
+    // `(provider, providerTeamId)` pair (schema-valid: the unique constraint
+    // is `@@unique([tenantId, provider, providerTeamId, providerSeasonId])`,
+    // i.e. tenant-scoped). Test #4 above uses DISJOINT providerTeamIds per
+    // tenant and therefore never exercises this exact collision. This test
+    // does, against a real database, and proves tenant B is left completely
+    // untouched — not merely "ends up in a different club", but genuinely
+    // never read, mutated, reparented, archived, or used as a logo/data donor.
+    it("8 — shared providerTeamId across two tenants: consolidating tenant A never touches tenant B's records", async () => {
+      const SHARED_PROVIDER_TEAM_ID = 900701;
+
+      const { clubIds: tenantAClubIds, teamIds: tenantATeamIds } = await seedDuplicateClubPerTeam(tenantAId, [
+        { providerTeamId: SHARED_PROVIDER_TEAM_ID, name: "FC SharedId 1", createdAtOffsetDays: 5 },
+        { providerTeamId: 900702, name: "FC SharedId B1" },
+      ]);
+
+      const { clubIds: tenantBClubIds, teamIds: tenantBTeamIds } = await seedDuplicateClubPerTeam(tenantBId, [
+        {
+          providerTeamId: SHARED_PROVIDER_TEAM_ID,
+          name: "FC Tenant B Own Club",
+          logoUrl: "https://cdn.example.com/tenant-b-own-logo.png",
+          createdAtOffsetDays: 3650, // far earlier than tenant A's clubs — would "win" canonical selection if ever incorrectly pulled into tenant A's group
+        },
+      ]);
+      await prisma.externalClubProviderMapping.create({
+        data: {
+          tenantId: tenantBId,
+          externalClubId: tenantBClubIds[0],
+          provider: PROVIDER,
+          providerClubId: 999,
+        },
+      });
+
+      const tenantBBefore = {
+        club: await prisma.externalClub.findUniqueOrThrow({ where: { id: tenantBClubIds[0] } }),
+        team: await prisma.externalTeam.findUniqueOrThrow({ where: { id: tenantBTeamIds[0] } }),
+        teamMapping: await prisma.externalTeamProviderMapping.findFirstOrThrow({
+          where: { tenantId: tenantBId, provider: PROVIDER, providerTeamId: SHARED_PROVIDER_TEAM_ID },
+        }),
+        clubMapping: await prisma.externalClubProviderMapping.findUniqueOrThrow({
+          where: {
+            tenantId_provider_providerClubId: { tenantId: tenantBId, provider: PROVIDER, providerClubId: 999 },
+          },
+        }),
+      };
+
+      const result = await runConsolidation(
+        tenantAId,
+        new Map([
+          [SHARED_PROVIDER_TEAM_ID, 708],
+          [900702, 708],
+        ]),
+      );
+
+      // Tenant A's own genuine pre-existing duplicate merges correctly.
+      expect(result.groupsMerged).toBe(1);
+      const tenantATeamsAfter = await prisma.externalTeam.findMany({ where: { id: { in: tenantATeamIds } } });
+      const tenantACanonicalClubIds = new Set(tenantATeamsAfter.map((t) => t.externalClubId));
+      expect(tenantACanonicalClubIds.size).toBe(1);
+      const tenantACanonicalClubId = [...tenantACanonicalClubIds][0];
+      expect(tenantACanonicalClubId).not.toBe(tenantBClubIds[0]);
+      expect(tenantAClubIds).toContain(tenantACanonicalClubId); // canonical is one of tenant A's OWN pre-existing clubs
+
+      // Tenant B is byte-for-byte / relationship-equivalent unchanged.
+      const tenantBAfter = {
+        club: await prisma.externalClub.findUniqueOrThrow({ where: { id: tenantBClubIds[0] } }),
+        team: await prisma.externalTeam.findUniqueOrThrow({ where: { id: tenantBTeamIds[0] } }),
+        teamMapping: await prisma.externalTeamProviderMapping.findFirstOrThrow({
+          where: { tenantId: tenantBId, provider: PROVIDER, providerTeamId: SHARED_PROVIDER_TEAM_ID },
+        }),
+        clubMapping: await prisma.externalClubProviderMapping.findUniqueOrThrow({
+          where: {
+            tenantId_provider_providerClubId: { tenantId: tenantBId, provider: PROVIDER, providerClubId: 999 },
+          },
+        }),
+      };
+      expect(tenantBAfter.club).toEqual(tenantBBefore.club);
+      expect(tenantBAfter.team).toEqual(tenantBBefore.team);
+      expect(tenantBAfter.teamMapping).toEqual(tenantBBefore.teamMapping);
+      expect(tenantBAfter.clubMapping).toEqual(tenantBBefore.clubMapping);
+
+      // Explicit per-guarantee checks:
+      expect(tenantBAfter.team.externalClubId).toBe(tenantBClubIds[0]); // never reparented
+      expect(tenantBAfter.club.archivedAt).toBeNull(); // never archived
+      expect(tenantBAfter.club.logoUrl).toBe("https://cdn.example.com/tenant-b-own-logo.png"); // logo never adopted/overwritten
+      expect(tenantBAfter.clubMapping.providerClubId).toBe(999); // provider mapping value untouched
+      expect(tenantBAfter.clubMapping.externalClubId).toBe(tenantBClubIds[0]); // mapping never repointed to tenant A's club
+
+      // Nothing spuriously created or deleted for tenant B's club/team
+      // specifically seeded by THIS test (other tests in this file share the
+      // same tenantBId and accumulate their own unrelated rows).
+      const tenantBClubStillExists = await prisma.externalClub.count({ where: { id: tenantBClubIds[0] } });
+      const tenantBTeamStillExists = await prisma.externalTeam.count({ where: { id: tenantBTeamIds[0] } });
+      expect(tenantBClubStillExists).toBe(1);
+      expect(tenantBTeamStillExists).toBe(1);
+    });
+
+    // CONCURRENCY HARDENING: two fully independent PrismaClient/Pool
+    // instances (simulating two overlapping schedule-sync processes for the
+    // same tenant — e.g. an auto cron sync and a manual admin-triggered sync
+    // racing each other) both run consolidation for the SAME
+    // tenant/providerClubId group at the same time. Mirrors the race-proof
+    // pattern already used for the forward discovery path in
+    // discovery-service-club-identity.integration.test.ts test #3.
+    it("9 — genuine concurrency: two overlapping consolidation runs for the SAME tenant/providerClubId group converge on one stable canonical club with no orphans, no errors, and stay idempotent on rerun", async () => {
+      const PROVIDER_CLUB_ID = 900801;
+      const { clubIds, teamIds } = await seedDuplicateClubPerTeam(tenantAId, [
+        { providerTeamId: 900801, name: "FC Concurrent 1", createdAtOffsetDays: 5 },
+        { providerTeamId: 900802, name: "FC Concurrent B1" },
+        { providerTeamId: 900803, name: "FC Concurrent D7 gelb" },
+      ]);
+
+      const resolvedMap = new Map([
+        [900801, PROVIDER_CLUB_ID],
+        [900802, PROVIDER_CLUB_ID],
+        [900803, PROVIDER_CLUB_ID],
+      ]);
+
+      const clientA = createIndependentClient();
+      const clientB = createIndependentClient();
+
+      try {
+        const databaseA = createClubConsolidationDatabase(clientA.prisma);
+        const databaseB = createClubConsolidationDatabase(clientB.prisma);
+
+        // Two genuinely overlapping consolidation runs for the identical
+        // group, racing against two independent connections — no errors
+        // expected from either.
+        const [resultA, resultB] = await Promise.all([
+          consolidateExternalClubsByProviderIdentity(databaseA, {
+            tenantId: tenantAId,
+            provider: PROVIDER,
+            resolvedClubIdsByTeamId: resolvedMap,
+          }),
+          consolidateExternalClubsByProviderIdentity(databaseB, {
+            tenantId: tenantAId,
+            provider: PROVIDER,
+            resolvedClubIdsByTeamId: resolvedMap,
+          }),
+        ]);
+        expect(resultA.groupsProcessed).toBe(1);
+        expect(resultB.groupsProcessed).toBe(1);
+
+        // One stable canonical club — every original team belongs to it.
+        const teamsAfter = await prisma.externalTeam.findMany({ where: { id: { in: teamIds } } });
+        expect(teamsAfter).toHaveLength(3); // no orphaned/lost teams
+        const canonicalClubIds = new Set(teamsAfter.map((t) => t.externalClubId));
+        expect(canonicalClubIds.size).toBe(1);
+        const canonicalClubId = [...canonicalClubIds][0];
+
+        // Losing clubs archived once/effectively once — never deleted, never
+        // double-processed into a corrupted state.
+        const clubsAfter = await prisma.externalClub.findMany({ where: { id: { in: clubIds } } });
+        expect(clubsAfter).toHaveLength(3);
+        const losing = clubsAfter.filter((c) => c.id !== canonicalClubId);
+        expect(losing).toHaveLength(2);
+        for (const c of losing) {
+          expect(c.archivedAt).not.toBeNull();
+        }
+
+        // Provider mapping remains correct — exactly one row, pointing at
+        // the (single, stable) canonical club.
+        const clubMappings = await prisma.externalClubProviderMapping.findMany({
+          where: { tenantId: tenantAId, provider: PROVIDER, providerClubId: PROVIDER_CLUB_ID },
+        });
+        expect(clubMappings).toHaveLength(1);
+        expect(clubMappings[0].externalClubId).toBe(canonicalClubId);
+
+        // Every original ExternalTeamProviderMapping row survives untouched.
+        const teamMappings = await prisma.externalTeamProviderMapping.findMany({
+          where: { tenantId: tenantAId, provider: PROVIDER, providerTeamId: { in: [900801, 900802, 900803] } },
+        });
+        expect(teamMappings).toHaveLength(3);
+
+        // Rerun (sequential, third call) stays idempotent.
+        const rerun = await runConsolidation(tenantAId, resolvedMap);
+        expect(rerun.groupsMerged).toBe(0);
+        expect(rerun.groupsAlreadyConsolidated).toBe(1);
+        expect(rerun.teamsMoved).toBe(0);
+        expect(rerun.clubsArchived).toBe(0);
+
+        const teamsAfterRerun = await prisma.externalTeam.findMany({ where: { id: { in: teamIds } } });
+        expect(teamsAfterRerun.every((t) => t.externalClubId === canonicalClubId)).toBe(true);
+        const clubMappingsAfterRerun = await prisma.externalClubProviderMapping.findMany({
+          where: { tenantId: tenantAId, provider: PROVIDER, providerClubId: PROVIDER_CLUB_ID },
+        });
+        expect(clubMappingsAfterRerun).toHaveLength(1);
+      } finally {
+        await clientA.prisma.$disconnect();
+        await clientA.pool.end();
+        await clientB.prisma.$disconnect();
+        await clientB.pool.end();
+      }
     });
   },
 );

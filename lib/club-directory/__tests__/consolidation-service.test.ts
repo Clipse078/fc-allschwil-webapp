@@ -107,13 +107,23 @@ function createFakeDatabase(): ClubConsolidationDatabase {
     externalTeamProviderMapping: {
       findMany: async (args: object) => {
         const { where } = args as {
-          where: { tenantId: string; provider: string; providerTeamId: { in: number[] } };
+          where: { tenantId?: string; provider: string; providerTeamId: { in: number[] } };
         };
         const idSet = new Set(where.providerTeamId.in);
+        // Mirrors real Prisma/SQL semantics exactly: a `where` clause that
+        // omits `tenantId` altogether does NOT filter by tenant at all (it is
+        // not equivalent to "match tenantId === undefined"). This fidelity
+        // matters for mutation-testing the production query below — see the
+        // "shared providerTeamId across tenants" describe block, which
+        // deliberately strips `tenantId` from the real call to prove the fake
+        // (and the real Postgres integration test) both expose the resulting
+        // cross-tenant leak instead of silently returning zero rows.
         return teamMappings
           .filter(
             (m) =>
-              m.tenantId === where.tenantId && m.provider === where.provider && idSet.has(m.providerTeamId),
+              (where.tenantId === undefined || m.tenantId === where.tenantId) &&
+              m.provider === where.provider &&
+              idSet.has(m.providerTeamId),
           )
           .map((m): ConsolidationTeamMappingRow => {
             const team = teams.find((t) => t.id === m.externalTeamId);
@@ -558,6 +568,105 @@ describe("consolidateExternalClubsByProviderIdentity — tenant isolation", () =
     expect(tenantBLiveClubIds.size).toBe(1);
     // Independent canonical clubs — never cross-tenant-merged.
     expect([...tenantALiveClubIds][0]).not.toBe([...tenantBLiveClubIds][0]);
+  });
+
+  // SFV `providerTeamId` values are provider-global (assigned by SFV, not by
+  // SportClubEvo) — two entirely different SportClubEvo tenants can
+  // legitimately reference the exact SAME numeric `providerTeamId` (e.g. both
+  // tenants play against the same real-world opponent team). This describe
+  // block proves consolidation scoped to tenant A never touches tenant B's
+  // records even when the two tenants' `ExternalTeamProviderMapping` rows
+  // share the identical `(provider, providerTeamId)` pair — the disjoint-id
+  // tests above do not exercise this specific, realistic collision.
+  describe("shared providerTeamId across two different tenants", () => {
+    it("consolidating tenant A never reads, reparents, archives, or otherwise mutates tenant B's records for a providerTeamId both tenants happen to share", async () => {
+      const SHARED_PROVIDER_TEAM_ID = 900301;
+
+      // Tenant A: a genuine pre-existing duplicate — two clubs whose teams
+      // both resolve to the same real-world clubNumber (500) this run. One of
+      // those two teams uses SHARED_PROVIDER_TEAM_ID.
+      const tenantAClubX = seedClub({
+        tenantId: "tenant-a",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+      const tenantATeamX = seedTeam(tenantAClubX.id, { tenantId: "tenant-a" });
+      seedTeamMapping(tenantATeamX.id, SHARED_PROVIDER_TEAM_ID, { tenantId: "tenant-a" });
+
+      const tenantAClubY = seedClub({
+        tenantId: "tenant-a",
+        createdAt: new Date("2026-02-01T00:00:00.000Z"),
+      });
+      const tenantATeamY = seedTeam(tenantAClubY.id, { tenantId: "tenant-a" });
+      seedTeamMapping(tenantATeamY.id, 900302, { tenantId: "tenant-a" });
+
+      // Tenant B: a completely independent club/team/mapping that happens to
+      // use the exact SAME numeric providerTeamId as tenant A's teamX above,
+      // with its OWN distinct clubNumber (999), its OWN tenant-managed logo,
+      // and a much earlier createdAt (which would "win" canonical selection
+      // by the earliest-created tie-break if it were ever incorrectly pulled
+      // into tenant A's group).
+      const tenantBClub = seedClub({
+        tenantId: "tenant-b",
+        logoUrl: "https://cdn.example.com/tenant-b-own-logo.png",
+        createdAt: new Date("2020-01-01T00:00:00.000Z"),
+      });
+      const tenantBTeam = seedTeam(tenantBClub.id, { tenantId: "tenant-b" });
+      seedTeamMapping(tenantBTeam.id, SHARED_PROVIDER_TEAM_ID, { tenantId: "tenant-b" });
+      clubMappings.push({
+        id: freshId("club-map"),
+        tenantId: "tenant-b",
+        provider: "SFV",
+        providerClubId: 999,
+        externalClubId: tenantBClub.id,
+      });
+
+      // Full snapshot of every tenant-B row BEFORE any tenant-A-scoped call —
+      // used below for a byte-for-byte / relationship-equivalent comparison.
+      const tenantBBefore = {
+        club: { ...clubs.find((c) => c.id === tenantBClub.id)! },
+        team: { ...teams.find((t) => t.id === tenantBTeam.id)! },
+        teamMapping: { ...teamMappings.find((m) => m.externalTeamId === tenantBTeam.id)! },
+        clubMapping: { ...clubMappings.find((m) => m.externalClubId === tenantBClub.id)! },
+      };
+
+      const result = await consolidateExternalClubsByProviderIdentity(db, {
+        tenantId: "tenant-a",
+        provider: "SFV",
+        resolvedClubIdsByTeamId: new Map([
+          [SHARED_PROVIDER_TEAM_ID, 500],
+          [900302, 500],
+        ]),
+      });
+
+      // Tenant A's own pre-existing duplicate DOES merge correctly...
+      expect(result.groupsMerged).toBe(1);
+      const tenantACanonicalClubId = teams.find((t) => t.id === tenantATeamX.id)!.externalClubId;
+      expect(teams.find((t) => t.id === tenantATeamY.id)!.externalClubId).toBe(tenantACanonicalClubId);
+
+      // ...but tenant B is completely untouched: reads, mutations, archival,
+      // provider mappings, and logo/data adoption all excluded.
+      expect(clubs.find((c) => c.id === tenantBClub.id)).toEqual(tenantBBefore.club);
+      expect(teams.find((t) => t.id === tenantBTeam.id)).toEqual(tenantBBefore.team);
+      expect(teamMappings.find((m) => m.externalTeamId === tenantBTeam.id)).toEqual(tenantBBefore.teamMapping);
+      expect(clubMappings.find((m) => m.externalClubId === tenantBClub.id)).toEqual(tenantBBefore.clubMapping);
+
+      // Explicit per-guarantee assertions (redundant with the snapshot above,
+      // but each one maps directly to a specific requirement):
+      expect(teams.find((t) => t.id === tenantBTeam.id)!.externalClubId).toBe(tenantBClub.id); // never reparented
+      expect(clubs.find((c) => c.id === tenantBClub.id)!.archivedAt).toBeNull(); // never archived
+      expect(clubs.find((c) => c.id === tenantBClub.id)!.logoUrl).toBe(
+        "https://cdn.example.com/tenant-b-own-logo.png",
+      ); // logo never adopted/overwritten
+      expect(clubMappings.filter((m) => m.tenantId === "tenant-b")).toHaveLength(1); // mapping not duplicated/repointed
+      expect(clubMappings.find((m) => m.tenantId === "tenant-b")!.providerClubId).toBe(999); // mapping value untouched
+
+      // Tenant A's canonical club must never resolve to tenant B's club, and
+      // tenant B's earlier createdAt must never have "won" canonical
+      // selection for tenant A's group.
+      expect(tenantACanonicalClubId).not.toBe(tenantBClub.id);
+      expect(clubs).toHaveLength(3); // A's two + B's one — nothing deleted, nothing spuriously created
+      expect(teams).toHaveLength(3);
+    });
   });
 });
 
