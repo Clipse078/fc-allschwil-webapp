@@ -74,7 +74,17 @@
  *   - tenant (key), resolved team count, duplicate groups (always).
  *   - dry-run only: the per-group plan (canonical club, teams to move, logo
  *     donor, clubs to archive) — identical shape to the CLI's `--dry-run`
- *     output.
+ *     output — plus a deterministic SHA-256 `planFingerprint` computed by
+ *     the shared, pure `computePlanFingerprint` helper
+ *     (lib/club-directory/plan-fingerprint.ts). An operator pins this
+ *     fingerprint after reviewing the plan; the separate, temporary,
+ *     POST-only execute endpoint
+ *     (app/api/ops/club-directory-02c-sfv-consolidation-execute/route.ts)
+ *     requires it to match a freshly regenerated plan's fingerprint before
+ *     it will mutate anything. Computing this fingerprint is a pure,
+ *     read-only operation — it does NOT weaken this route's no-write
+ *     guarantee (see "WHY EXECUTE CAN NEVER HAPPEN THROUGH THIS ROUTE"
+ *     above, which still holds unchanged).
  *   - Never includes SFV credentials, tokens, or raw SFV response payloads
  *     — `loadTenantInventory`/`buildTenantPlan` never return them, and this
  *     route does not read process.env.SFV_* itself.
@@ -93,6 +103,7 @@ import {
   buildTenantPlan,
   type TenantInventory,
 } from "@/scripts/club-directory-02c-sfv-consolidation";
+import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
 
 export const dynamic = "force-dynamic";
 
@@ -189,12 +200,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // mode === "dry-run" — read-only preview, zero database writes.
     const plan = await buildTenantPlan(prisma, inventory);
+    const planFingerprint = computePlanFingerprint({
+      tenantKey: inventory.tenant.tenantKey,
+      groups: plan.groups,
+    });
 
     return NextResponse.json(
       {
         mode,
         ...serializeInventory(inventory),
         plan: plan.groups,
+        planFingerprint,
       },
       { status: 200 },
     );
