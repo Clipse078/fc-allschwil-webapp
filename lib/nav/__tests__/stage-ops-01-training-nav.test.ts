@@ -120,13 +120,16 @@ describe("STAGE-OPS-01 — Training Planner navigation regression", () => {
     expect(veranstaltungen).not.toBeNull();
   });
 
-  it("Planung section contains exactly trainingcenter and veranstaltungen children (no extras)", () => {
+  it("Planung section contains exactly trainingcenter, tournamentcenter and veranstaltungen children (no extras)", () => {
+    // TOURNAMENTCENTER-01: TournamentCenter was deliberately added as a
+    // Planung child, gated by the same events.view/events.manage
+    // permissions as Veranstaltungen (see lib/nav/nav-config.ts).
     const sections = getVisibleNavSections(Object.values(PERMISSIONS));
     const planungItem = sections
       .flatMap((s) => s.items)
       .find((i) => i.key === "planung");
     const childKeys = planungItem?.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingcenter", "veranstaltungen"]);
+    expect(childKeys).toEqual(["trainingcenter", "tournamentcenter", "veranstaltungen"]);
   });
 
   it("TrainingCenter route and direct-route /dashboard/training require the same permissions", () => {

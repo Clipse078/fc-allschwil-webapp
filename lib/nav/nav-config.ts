@@ -228,6 +228,15 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.TRAININGS_VIEW, PERMISSIONS.TRAININGS_MANAGE],
           },
           {
+            // TOURNAMENTCENTER-01: canonical Tournament Management MVP.
+            // Reuses Event.type=TOURNAMENT + events.view/events.manage —
+            // no dedicated tournaments.* permission was introduced.
+            key: "tournamentcenter",
+            label: "TournamentCenter",
+            href: "/dashboard/tournamentcenter",
+            permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
+          },
+          {
             key: "veranstaltungen",
             label: "Veranstaltungen",
             href: "/dashboard/events",

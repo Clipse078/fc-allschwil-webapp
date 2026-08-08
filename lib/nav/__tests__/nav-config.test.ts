@@ -41,7 +41,7 @@ function findItemByKey(
 // ── Static structure tests ────────────────────────────────────────────────────
 
 describe("NAV_SECTIONS static structure", () => {
-  it("Planung section contains exactly TrainingCenter and Veranstaltungen", () => {
+  it("Planung section contains exactly TrainingCenter, TournamentCenter and Veranstaltungen", () => {
     const betrieb = findSection("Betrieb");
     expect(betrieb).toBeDefined();
 
@@ -49,7 +49,15 @@ describe("NAV_SECTIONS static structure", () => {
     expect(planung).toBeDefined();
 
     const childKeys = planung!.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingcenter", "veranstaltungen"]);
+    expect(childKeys).toEqual(["trainingcenter", "tournamentcenter", "veranstaltungen"]);
+  });
+
+  it("TournamentCenter points to /dashboard/tournamentcenter", () => {
+    const betrieb = findSection("Betrieb");
+    const planung = betrieb!.items.find((i) => i.key === "planung");
+    const tournamentcenter = planung!.children?.find((c) => c.key === "tournamentcenter");
+    expect(tournamentcenter?.href).toBe("/dashboard/tournamentcenter");
+    expect(tournamentcenter?.label).toBe("TournamentCenter");
   });
 
   it("Anlagen does not appear under Planung", () => {
