@@ -22,13 +22,23 @@ export type FacilityGroup = {
 };
 
 type Props = {
-  /** All non-archived resources grouped by facility. */
+  /** Non-archived resources for this allocation group, grouped by facility. */
   facilityGroups: FacilityGroup[];
   /** IDs of resources already allocated (will be shown as disabled). */
   allocatedResourceIds: Set<string>;
   /** Called when the user selects a resource to add. */
   onAdd: (resourceId: string) => Promise<void>;
   disabled?: boolean;
+  /** Placeholder shown as the first, unselectable `<option>`. */
+  placeholder?: string;
+  /** Label for the submit button. */
+  addButtonLabel?: string;
+  /** Shown instead of the selector when the tenant has zero resources of this group's type. */
+  noResourcesMessage?: string;
+  /** Shown instead of the selector when resources exist but are all already allocated. */
+  allAllocatedMessage?: string;
+  /** Stable identifier suffix for data-testid hooks (e.g. "pitch-hall", "dressing-room"). */
+  testId?: string;
 };
 
 // ── Resource type label map ───────────────────────────────────────────────────
@@ -47,11 +57,17 @@ export function FacilityResourceSelector({
   allocatedResourceIds,
   onAdd,
   disabled = false,
+  placeholder = "auswählen…",
+  addButtonLabel = "Zuweisen",
+  noResourcesMessage = "Keine Ressourcen dieses Typs konfiguriert.",
+  allAllocatedMessage = "Alle verfügbaren Ressourcen wurden bereits zugewiesen.",
+  testId,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const totalResourceCount = facilityGroups.reduce((sum, fg) => sum + fg.resources.length, 0);
   const hasAvailable = facilityGroups.some((fg) =>
     fg.resources.some((r) => !allocatedResourceIds.has(r.id)),
   );
@@ -69,10 +85,18 @@ export function FacilityResourceSelector({
     });
   }, [selectedId, onAdd]);
 
+  if (totalResourceCount === 0) {
+    return (
+      <p className="text-sm text-gray-500 italic" data-testid={testId ? `${testId}-no-resources` : undefined}>
+        {noResourcesMessage}
+      </p>
+    );
+  }
+
   if (!hasAvailable) {
     return (
-      <p className="text-sm text-gray-500 italic">
-        Alle verfügbaren Ressourcen wurden bereits zugewiesen.
+      <p className="text-sm text-gray-500 italic" data-testid={testId ? `${testId}-all-allocated` : undefined}>
+        {allAllocatedMessage}
       </p>
     );
   }
@@ -84,9 +108,11 @@ export function FacilityResourceSelector({
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
           disabled={disabled || isPending}
+          data-testid={testId ? `${testId}-select` : undefined}
+          aria-label={placeholder}
           className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
         >
-          <option value="">Ressource auswählen…</option>
+          <option value="">{placeholder}</option>
           {facilityGroups.map((fg) => {
             const available = fg.resources.filter((r) => !allocatedResourceIds.has(r.id));
             if (available.length === 0) return null;
@@ -106,6 +132,7 @@ export function FacilityResourceSelector({
           type="button"
           onClick={handleAdd}
           disabled={!selectedId || disabled || isPending}
+          data-testid={testId ? `${testId}-add-button` : undefined}
           className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending ? (
@@ -113,7 +140,7 @@ export function FacilityResourceSelector({
           ) : (
             <Plus size={14} />
           )}
-          Hinzufügen
+          {addButtonLabel}
         </button>
       </div>
 

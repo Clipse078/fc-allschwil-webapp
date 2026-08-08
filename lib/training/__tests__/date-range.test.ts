@@ -99,6 +99,24 @@ describe("formatTrainingMonthLabel", () => {
 });
 
 describe("resolveTrainingWeekWindow", () => {
+  it("defaults to the current week (Europe/Zurich) when no param is given", () => {
+    // 2026-08-07T22:00:00Z is 2026-08-08 00:00 CEST (Saturday) — current week's Monday is Aug 3.
+    const window = resolveTrainingWeekWindow({
+      now: new Date("2026-08-07T22:00:00.000Z"),
+      timeZone: "Europe/Zurich",
+    });
+    expect(window.param).toBe("2026-08-03");
+    expect(window.days).toEqual([
+      "2026-08-03",
+      "2026-08-04",
+      "2026-08-05",
+      "2026-08-06",
+      "2026-08-07",
+      "2026-08-08",
+      "2026-08-09",
+    ]);
+  });
+
   it("normalises any weekday param to that week's Monday", () => {
     // 2026-08-07 is a Friday.
     const window = resolveTrainingWeekWindow({
@@ -129,6 +147,17 @@ describe("resolveTrainingWeekWindow", () => {
   it("handles a Sunday param (end of week) correctly", () => {
     const window = resolveTrainingWeekWindow({ weekParam: "2026-08-09" });
     expect(window.param).toBe("2026-08-03");
+  });
+
+  it("honors the DST spring-forward boundary (last Sunday of March)", () => {
+    // 2026-03-29 is the Europe/Zurich spring DST transition (02:00 -> 03:00 CEST).
+    const window = resolveTrainingWeekWindow({
+      weekParam: "2026-03-30",
+      timeZone: "Europe/Zurich",
+    });
+    expect(window.param).toBe("2026-03-30");
+    expect(window.from.toISOString()).toBe("2026-03-29T22:00:00.000Z");
+    expect(window.to.toISOString()).toBe("2026-04-05T21:59:59.999Z");
   });
 });
 
@@ -163,6 +192,16 @@ describe("resolveTrainingDayWindow", () => {
     expect(window.previousParam).toBe("2026-08-30");
     expect(window.nextParam).toBe("2026-09-01");
   });
+
+  it("honors the DST fall-back boundary (last Sunday of October)", () => {
+    // 2026-10-25 is the Europe/Zurich autumn DST transition (03:00 -> 02:00 CET).
+    const window = resolveTrainingDayWindow({
+      dayParam: "2026-10-25",
+      timeZone: "Europe/Zurich",
+    });
+    expect(window.from.toISOString()).toBe("2026-10-24T22:00:00.000Z");
+    expect(window.to.toISOString()).toBe("2026-10-25T22:59:59.999Z");
+  });
 });
 
 describe("formatTrainingDayLabel", () => {
@@ -170,6 +209,71 @@ describe("formatTrainingDayLabel", () => {
     const label = formatTrainingDayLabel("2026-08-08", "de-CH");
     expect(label).toContain("2026");
     expect(label).toContain("August");
+  });
+});
+
+describe("TRAININGCENTER-01B — default-date + per-view param isolation", () => {
+  // Fixed "now": 2026-08-08T20:00:43Z == 2026-08-08 22:00 CEST (Saturday).
+  const NOW = new Date("2026-08-08T20:00:43.000Z");
+  const TZ = "Europe/Zurich";
+
+  it("no day param → Day view defaults to today, regardless of other params", () => {
+    const window = resolveTrainingDayWindow({ dayParam: undefined, now: NOW, timeZone: TZ });
+    expect(window.date).toBe("2026-08-08");
+  });
+
+  it("no week param → Week view defaults to the current week", () => {
+    const window = resolveTrainingWeekWindow({ weekParam: undefined, now: NOW, timeZone: TZ });
+    expect(window.param).toBe("2026-08-03"); // Monday of the week containing Aug 8
+    expect(window.days).toContain("2026-08-08");
+  });
+
+  it("no month param → Month view defaults to the current month", () => {
+    const window = resolveTrainingMonthWindow({ monthParam: undefined, now: NOW, timeZone: TZ });
+    expect(window.param).toBe("2026-08");
+  });
+
+  it("an explicit day param is preserved and does not leak into the week/month defaults", () => {
+    const dayWindow = resolveTrainingDayWindow({ dayParam: "2026-07-27", now: NOW, timeZone: TZ });
+    const weekWindow = resolveTrainingWeekWindow({ weekParam: undefined, now: NOW, timeZone: TZ });
+    const monthWindow = resolveTrainingMonthWindow({ monthParam: undefined, now: NOW, timeZone: TZ });
+
+    expect(dayWindow.date).toBe("2026-07-27");
+    // Week/Month must still resolve to "current", unaffected by the Day view's explicit param.
+    expect(weekWindow.param).toBe("2026-08-03");
+    expect(monthWindow.param).toBe("2026-08");
+  });
+
+  it("an explicit week param is preserved and does not leak into the day/month defaults", () => {
+    const weekWindow = resolveTrainingWeekWindow({ weekParam: "2026-07-27", now: NOW, timeZone: TZ });
+    const dayWindow = resolveTrainingDayWindow({ dayParam: undefined, now: NOW, timeZone: TZ });
+    const monthWindow = resolveTrainingMonthWindow({ monthParam: undefined, now: NOW, timeZone: TZ });
+
+    expect(weekWindow.param).toBe("2026-07-27");
+    expect(dayWindow.date).toBe("2026-08-08");
+    expect(monthWindow.param).toBe("2026-08");
+  });
+
+  it("an explicit month param is preserved and does not leak into the day/week defaults", () => {
+    const monthWindow = resolveTrainingMonthWindow({ monthParam: "2026-07", now: NOW, timeZone: TZ });
+    const dayWindow = resolveTrainingDayWindow({ dayParam: undefined, now: NOW, timeZone: TZ });
+    const weekWindow = resolveTrainingWeekWindow({ weekParam: undefined, now: NOW, timeZone: TZ });
+
+    expect(monthWindow.param).toBe("2026-07");
+    expect(dayWindow.date).toBe("2026-08-08");
+    expect(weekWindow.param).toBe("2026-08-03");
+  });
+
+  it("previous/next navigation still works from an explicit Day param", () => {
+    const window = resolveTrainingDayWindow({ dayParam: "2026-07-27", now: NOW, timeZone: TZ });
+    expect(window.previousParam).toBe("2026-07-26");
+    expect(window.nextParam).toBe("2026-07-28");
+  });
+
+  it("previous/next navigation still works from the default (today) Day window", () => {
+    const window = resolveTrainingDayWindow({ dayParam: undefined, now: NOW, timeZone: TZ });
+    expect(window.previousParam).toBe("2026-08-07");
+    expect(window.nextParam).toBe("2026-08-09");
   });
 });
 

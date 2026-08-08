@@ -9,8 +9,6 @@ import { listTrainingSeries } from "@/lib/training/training-service";
 import { listTrainingSessions } from "@/lib/training/session-generation-service";
 import { listAllocationSummaryByTenant } from "@/lib/training/training-allocation-service";
 import {
-  parseDateParam,
-  parseMonthParam,
   resolveTrainingDayWindow,
   resolveTrainingMonthWindow,
   resolveTrainingWeekWindow,
@@ -39,17 +37,6 @@ type TrainingPageSearchParams = {
 type Props = {
   searchParams?: Promise<TrainingPageSearchParams>;
 };
-
-/** "YYYY-MM-DD" for the 1st of a "YYYY-MM" month param, or undefined if malformed. */
-function firstOfMonthKey(monthParam: string | undefined): string | undefined {
-  const parsed = parseMonthParam(monthParam);
-  if (!parsed) return undefined;
-  return `${parsed.year.toString().padStart(4, "0")}-${parsed.month.toString().padStart(2, "0")}-01`;
-}
-
-function normalizedDateKey(param: string | undefined): string | undefined {
-  return parseDateParam(param) ? param : undefined;
-}
 
 const TOP_TABS: { key: "kalender" | "serien"; label: string }[] = [
   { key: "kalender", label: "Kalender" },
@@ -102,28 +89,26 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
   const view = normalizeTrainingCenterView(params.view);
   const actionFilter = normalizeTrainingActionFilter(params.filter);
 
-  // Derive one coherent reference date across all three windows, so
-  // switching Monat/Woche/Tag always lands on a sensible date rather than
-  // silently resetting to "today".
-  const referenceDateKey =
-    (view === "MONTH" ? firstOfMonthKey(params.month) : undefined) ??
-    (view === "WEEK" ? normalizedDateKey(params.week) : undefined) ??
-    (view === "DAY" ? normalizedDateKey(params.day) : undefined) ??
-    normalizedDateKey(params.week) ??
-    normalizedDateKey(params.day) ??
-    firstOfMonthKey(params.month);
-
-  const monthParamForWindow = view === "MONTH" ? params.month : undefined;
+  // TRAININGCENTER-01B: each window resolves strictly from its own URL
+  // param — Month/Week/Day never borrow a reference date from one another.
+  // Per the product rule, an absent param always defaults to the current
+  // Europe/Zurich month/week/day ("today"), and an explicit param is always
+  // preserved as-is. A single shared `now` keeps all three windows (and any
+  // cross-tab links built from them) consistent within one request.
+  const now = new Date();
   const monthWindow = resolveTrainingMonthWindow({
-    monthParam: monthParamForWindow ?? referenceDateKey?.slice(0, 7),
+    monthParam: params.month,
+    now,
     timeZone: timezone,
   });
   const weekWindow = resolveTrainingWeekWindow({
-    weekParam: view === "WEEK" ? params.week : referenceDateKey,
+    weekParam: params.week,
+    now,
     timeZone: timezone,
   });
   const dayWindow = resolveTrainingDayWindow({
-    dayParam: view === "DAY" ? params.day : referenceDateKey,
+    dayParam: params.day,
+    now,
     timeZone: timezone,
   });
 

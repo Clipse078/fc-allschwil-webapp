@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useTransition, useCallback } from "react";
-import { Loader2, X, GripVertical, MapPin, Building2 } from "lucide-react";
+import { Loader2, X, GripVertical, MapPin, Building2, ChevronDown } from "lucide-react";
 import type { TrainingAllocationDto } from "@/lib/training/types";
 import type { FacilityGroup } from "./FacilityResourceSelector";
 import { FacilityResourceSelector } from "./FacilityResourceSelector";
 import type { FacilityResourceType } from "@prisma/client";
+import {
+  groupAllocationsByAllocationGroup,
+  splitFacilityGroupsByAllocationGroup,
+  TRAINING_ALLOCATION_GROUP_LABELS,
+} from "@/lib/training/allocation-groups";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -105,6 +110,42 @@ function AllocationRow({
   );
 }
 
+// ── Grouped allocation list ────────────────────────────────────────────────────
+
+function AllocationGroupSection({
+  title,
+  allocations,
+  onRemove,
+  canManage,
+  testId,
+}: {
+  title: string;
+  allocations: TrainingAllocationDto[];
+  onRemove: (id: string) => Promise<void>;
+  canManage: boolean;
+  testId: string;
+}) {
+  if (allocations.length === 0) return null;
+
+  return (
+    <div data-testid={testId}>
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        {title} ({allocations.length})
+      </p>
+      <ul className="space-y-2">
+        {allocations.map((allocation) => (
+          <AllocationRow
+            key={allocation.id}
+            allocation={allocation}
+            onRemove={onRemove}
+            canManage={canManage}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ── Main editor component ─────────────────────────────────────────────────────
 
 export function TrainingAllocationEditor({
@@ -118,6 +159,10 @@ export function TrainingAllocationEditor({
     useState<TrainingAllocationDto[]>(initialAllocations);
 
   const allocatedIds = new Set(allocations.map((a) => a.facilityResourceId));
+  const allocationsByGroup = groupAllocationsByAllocationGroup(allocations);
+  const facilityGroupsByGroup = splitFacilityGroupsByAllocationGroup(facilityGroups);
+  const hasOtherResources =
+    facilityGroupsByGroup.OTHER.length > 0 || allocationsByGroup.OTHER.length > 0;
 
   const handleAdd = useCallback(
     async (facilityResourceId: string) => {
@@ -193,30 +238,85 @@ export function TrainingAllocationEditor({
             </p>
           </div>
         ) : (
-          <ul className="space-y-2">
-            {allocations.map((allocation) => (
-              <AllocationRow
-                key={allocation.id}
-                allocation={allocation}
-                onRemove={handleRemove}
-                canManage={canManage}
-              />
-            ))}
-          </ul>
+          <div className="space-y-4">
+            <AllocationGroupSection
+              title={TRAINING_ALLOCATION_GROUP_LABELS.PITCH_HALL}
+              allocations={allocationsByGroup.PITCH_HALL}
+              onRemove={handleRemove}
+              canManage={canManage}
+              testId="training-allocations-pitch-hall"
+            />
+            <AllocationGroupSection
+              title={TRAINING_ALLOCATION_GROUP_LABELS.DRESSING_ROOM}
+              allocations={allocationsByGroup.DRESSING_ROOM}
+              onRemove={handleRemove}
+              canManage={canManage}
+              testId="training-allocations-dressing-room"
+            />
+            <AllocationGroupSection
+              title={TRAINING_ALLOCATION_GROUP_LABELS.OTHER}
+              allocations={allocationsByGroup.OTHER}
+              onRemove={handleRemove}
+              canManage={canManage}
+              testId="training-allocations-other"
+            />
+          </div>
         )}
       </div>
 
-      {/* Add new allocation */}
+      {/* Add new allocation — TrainingCenter trainings are always home
+          activities, so Spielfeld/Halle and Garderobe are always exposed as
+          separate, dedicated selectors rather than one generic resource
+          dropdown. Non-standard resources remain available, but tucked
+          under an optional "Weitere Ressourcen" section. */}
       {canManage && (
-        <div>
-          <h3 className="mb-3 text-sm font-medium text-gray-700">
-            Ressource hinzufügen
-          </h3>
-          <FacilityResourceSelector
-            facilityGroups={facilityGroups}
-            allocatedResourceIds={allocatedIds}
-            onAdd={handleAdd}
-          />
+        <div className="space-y-5">
+          <h3 className="text-sm font-medium text-gray-700">Ressourcen</h3>
+
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-gray-600">
+              {TRAINING_ALLOCATION_GROUP_LABELS.PITCH_HALL} zuweisen
+            </p>
+            <FacilityResourceSelector
+              facilityGroups={facilityGroupsByGroup.PITCH_HALL}
+              allocatedResourceIds={allocatedIds}
+              onAdd={handleAdd}
+              testId="training-allocation-add-pitch-hall"
+            />
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-gray-600">
+              {TRAINING_ALLOCATION_GROUP_LABELS.DRESSING_ROOM} zuweisen
+            </p>
+            <FacilityResourceSelector
+              facilityGroups={facilityGroupsByGroup.DRESSING_ROOM}
+              allocatedResourceIds={allocatedIds}
+              onAdd={handleAdd}
+              testId="training-allocation-add-dressing-room"
+            />
+          </div>
+
+          {hasOtherResources && (
+            <details className="group rounded-lg border border-gray-200 px-3 py-2">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-gray-600">
+                <ChevronDown
+                  size={14}
+                  className="text-gray-400 transition-transform group-open:rotate-180"
+                  aria-hidden
+                />
+                {TRAINING_ALLOCATION_GROUP_LABELS.OTHER}
+              </summary>
+              <div className="mt-3">
+                <FacilityResourceSelector
+                  facilityGroups={facilityGroupsByGroup.OTHER}
+                  allocatedResourceIds={allocatedIds}
+                  onAdd={handleAdd}
+                  testId="training-allocation-add-other"
+                />
+              </div>
+            </details>
+          )}
         </div>
       )}
     </div>
