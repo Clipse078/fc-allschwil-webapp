@@ -13,8 +13,27 @@
  *      enriched from provider data (SFV team-picture -> data: URI).
  *   2. An existing canonical club with an empty logoUrl gets enriched on a
  *      later sync.
- *   3. A tenant-managed (pre-set) ExternalClub.logoUrl is NEVER overwritten
- *      by provider sync, even when the provider reports a different crest.
+ *   3a. Sync-level: a tenant-managed (pre-set) ExternalClub.logoUrl survives
+ *      a later "sync run" (via this file's syncOneOpponent helper, the same
+ *      composition external-team-discovery.ts uses) that would otherwise
+ *      report a different crest. NOTE: because syncOneOpponent's own
+ *      pre-check mirrors production's resolveOpponentLogoIfNeeded ("club
+ *      already has a logo -> never even call fetchTeamPicture, never pass a
+ *      real providerLogoUrl"), this test alone does NOT prove the deeper
+ *      write-layer (buildExternalClubTenantFieldUpdate / mergeProviderLogoUrl)
+ *      actually refuses a competing value — it only proves the outer skip
+ *      never lets one arrive. See 3b for that direct proof.
+ *   3b. DIRECT WRITE-BOUNDARY PROOF (the one that matters): calls
+ *      linkExternalTeamProvider() directly — the exact function
+ *      discoverExternalTeamFromProvider() delegates to, and the one that
+ *      contains buildExternalClubTenantFieldUpdate — with an explicit,
+ *      different, non-null providerLogoUrl against a club that already has
+ *      a tenant-managed logo, completely bypassing syncOneOpponent's
+ *      pre-check. This is the test that must fail if
+ *      buildExternalClubTenantFieldUpdate/mergeProviderLogoUrl is ever
+ *      sabotaged to prefer the provider value (verified by deliberately
+ *      sabotaging both functions during review — see PR history/review
+ *      notes; test 3a passed regardless, test 3b correctly failed).
  *   4. Repeated sync is idempotent: once enriched, a second/third run makes
  *      no further writes and does not call the SFV client again (proves the
  *      "avoid unnecessary provider/network calls" requirement against real
@@ -27,10 +46,10 @@
  *
  * Mocks ONLY the SFV network boundary (fetchTeamPicture in ../../client) —
  * every database interaction (discoverExternalTeamFromProvider,
- * findExternalTeamByProviderIdentity, the real Prisma adapters) is real SQL
- * against a real Postgres instance, exercising the exact composition
- * external-team-discovery.ts#createExternalOpponentResolver uses in
- * production (see lib/integrations/sfv/sync/__tests__/
+ * linkExternalTeamProvider, findExternalTeamByProviderIdentity, the real
+ * Prisma adapters) is real SQL against a real Postgres instance, exercising
+ * the exact composition external-team-discovery.ts#createExternalOpponentResolver
+ * uses in production (see lib/integrations/sfv/sync/__tests__/
  * external-team-discovery-logo-enrichment.test.ts for the equivalent
  * fully-mocked wiring-shape proof).
  *
@@ -66,6 +85,7 @@ vi.mock("../../client", () => ({
 const { createClubDirectoryMutationDatabase } = await import("../../../../club-directory/prisma-mutation-adapter");
 const { createClubDirectoryQueryDatabase } = await import("../../../../club-directory/prisma-adapter");
 const { discoverExternalTeamFromProvider } = await import("../../../../club-directory/discovery-service");
+const { linkExternalTeamProvider } = await import("../../../../club-directory/mutation-service");
 const { findExternalTeamByProviderIdentity } = await import("../../../../club-directory/query-service");
 const { resolveProviderLogoDataUri } = await import("../team-logo");
 
@@ -232,7 +252,7 @@ describe.skipIf(!canRun)(
       expect(second.club.logoUrl).toBe(`data:image/gif;base64,${GIF_BASE64}`);
     });
 
-    it("3 — never overwrites a tenant-managed logoUrl, even when provider sync reports a different crest", async () => {
+    it("3a — sync-level: a tenant-managed logoUrl survives a later sync run reporting a different crest", async () => {
       const sfvTeamId = 810003;
 
       mockFetchTeamPicture.mockResolvedValueOnce(picturePayload(GIF_BASE64));
@@ -267,6 +287,75 @@ describe.skipIf(!canRun)(
 
       const persisted = await prisma.externalClub.findUniqueOrThrow({ where: { id: first.club.id } });
       expect(persisted.logoUrl).toBe(tenantLogoUrl);
+    });
+
+    it("3b — DIRECT write-boundary proof: linkExternalTeamProvider() never overwrites a tenant-managed club logo, even with an explicit differing providerLogoUrl", async () => {
+      const tenantLogoUrl = "https://blob.example.com/tenant-uploaded-crest-direct.png";
+
+      // 1. Create an ExternalClub with a tenant-managed logoUrl ALREADY set
+      //    — plain Prisma writes, no sync/discovery/pre-check involved at all.
+      const club = await prisma.externalClub.create({
+        data: {
+          tenantId: tenantAId,
+          name: "SV Direct Write Boundary Test",
+          logoUrl: tenantLogoUrl,
+          source: "MANUAL",
+        },
+      });
+
+      // 2. Create the ExternalTeam under that club — no provider mapping yet.
+      const team = await prisma.externalTeam.create({
+        data: {
+          tenantId: tenantAId,
+          externalClubId: club.id,
+          name: "SV Direct Write Boundary Test",
+          source: "MANUAL",
+        },
+      });
+
+      // 3. Directly invoke the REAL production write boundary —
+      //    linkExternalTeamProvider() — the exact function
+      //    discoverExternalTeamFromProvider() delegates to, and the one
+      //    that contains the buildExternalClubTenantFieldUpdate() call.
+      //    This completely bypasses this file's syncOneOpponent() pre-check
+      //    helper (and the production resolveOpponentLogoIfNeeded() it
+      //    mirrors) — mockFetchTeamPicture is never even touched here — so
+      //    a differing, non-null providerLogoUrl genuinely reaches the
+      //    merge/write layer, unlike test 3a above.
+      const differentProviderLogo =
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAAAAACH5BAEAAAAALAAAAAABAAEAAAICTAEAOw==";
+      const mutationDatabase = createClubDirectoryMutationDatabase(prisma);
+
+      const { team: updatedTeam } = await linkExternalTeamProvider(
+        mutationDatabase,
+        {
+          tenantId: tenantAId,
+          externalTeamId: team.id,
+          provider: PROVIDER,
+          providerTeamId: 810099,
+          providerTeamName: "SV Direct Write Boundary Test",
+          providerLogoUrl: differentProviderLogo,
+        },
+        new Date("2026-08-01T00:00:00.000Z"),
+      );
+      expect(updatedTeam.externalClubId).toBe(club.id);
+
+      // 4. Reload the ExternalClub from Postgres — not the in-memory
+      //    return value of any helper — for an independent, real-row check.
+      const reloadedClub = await prisma.externalClub.findUniqueOrThrow({
+        where: { id: club.id },
+      });
+
+      // 5. The original tenant-managed logo must remain, byte-for-byte —
+      //    this is the assertion that fails if buildExternalClubTenantFieldUpdate
+      //    / mergeProviderLogoUrl is ever sabotaged to prefer the provider
+      //    value (independently confirmed during review by temporarily
+      //    inverting mergeProviderLogoUrl's precedence: only this test and
+      //    the pre-existing lib/club-directory/__tests__/logo.test.ts /
+      //    provider-sync.test.ts / mutation-service.test.ts caught it — the
+      //    old (now 3a) sync-level test did not).
+      expect(reloadedClub.logoUrl).toBe(tenantLogoUrl);
+      expect(reloadedClub.logoUrl).not.toBe(differentProviderLogo);
     });
 
     it("4 — repeated sync is idempotent and stops calling the SFV picture endpoint once enriched", async () => {
