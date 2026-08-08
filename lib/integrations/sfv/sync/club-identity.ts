@@ -130,3 +130,89 @@ export function resolveProviderClubId(
 ): number | null {
   return index?.get(teamId) ?? null;
 }
+
+// ── CLUB-DIRECTORY-05: club master import candidate list ──────────────────────
+
+/**
+ * One distinct SFV club discoverable from this run's ranking/team-list data,
+ * excluding the tenant's own club (see buildClubMasterCandidates below).
+ */
+export type ClubMasterCandidate = {
+  /** Stable SFV club identifier (clubNumber) — the only identity ever used. */
+  providerClubId: number;
+  /**
+   * Best-available provider display name for this club. SFV's ranking/team-
+   * list data never exposes a club-level name — only a TEAM's display name
+   * (e.g. "FC Therwil 1") — so this is a provisional label only, exactly
+   * like discoverExternalTeamFromProvider's narrow "no club identity"
+   * fallback naming already established in CLUB-DIRECTORY-02C. It is used
+   * ONLY as the initial ExternalClub.name on first creation (tenant-managed
+   * afterwards, never overwritten again) and to refresh the provider
+   * mapping's providerClubName on every run.
+   */
+  providerClubName: string | null;
+};
+
+/**
+ * Builds the distinct list of SFV clubs discoverable from this run's
+ * already-fetched own-team list (`TeamDetail[]`) and ranking data
+ * (`ClubRankingEntry[]`) — the same two sources, and the same
+ * `buildProviderClubIdIndex` identity resolution (including its conflict
+ * guard), that opponent discovery already uses — so a club found here is
+ * GUARANTEED to resolve to the exact same `providerClubId` a later schedule
+ * sync's opponent discovery would resolve for one of its teams. No separate
+ * identity logic, no separate conflict handling.
+ *
+ * `ownClubId` (the tenant's own configured SFV clubId, e.g. 483 for FC
+ * Allschwil) is always excluded: the ranking table also lists the tenant's
+ * own teams, and those are not "opponent" clubs — they must never be
+ * imported into the (opponent-only) Club Directory.
+ *
+ * When the same clubNumber is reachable via more than one teamId in this
+ * run's data (e.g. the tenant has several own teams, each facing a
+ * different team of the same opponent club in a different league group),
+ * the LOWEST teamId is used deterministically to pick a display name — this
+ * only affects which team's name is used as the provisional label, never
+ * identity.
+ *
+ * Pure and side-effect-free: never throws, never mutates its inputs, and
+ * performs no network or database calls itself. Safe to call with empty
+ * arrays.
+ */
+export function buildClubMasterCandidates(
+  ownClubId: number,
+  ownTeams: readonly TeamDetail[],
+  rankingEntries: readonly ClubRankingEntry[],
+): { candidates: ClubMasterCandidate[]; conflicts: ProviderClubIdConflict[] } {
+  const { indexByTeamId, conflicts } = buildProviderClubIdIndex(ownTeams, rankingEntries);
+
+  const nameByTeamId = new Map<number, string | null>();
+  for (const team of ownTeams) {
+    if (!nameByTeamId.has(team.teamId)) {
+      nameByTeamId.set(team.teamId, team.clubName ?? team.teamName ?? null);
+    }
+  }
+  for (const entry of rankingEntries) {
+    if (!nameByTeamId.has(entry.teamId)) {
+      nameByTeamId.set(entry.teamId, entry.teamName ?? null);
+    }
+  }
+
+  const bestTeamIdByClubId = new Map<number, number>();
+  for (const [teamId, clubId] of indexByTeamId) {
+    if (clubId === ownClubId) continue;
+    const existingTeamId = bestTeamIdByClubId.get(clubId);
+    if (existingTeamId === undefined || teamId < existingTeamId) {
+      bestTeamIdByClubId.set(clubId, teamId);
+    }
+  }
+
+  const candidates = [...bestTeamIdByClubId.entries()]
+    .map(([providerClubId, teamId]) => ({
+      providerClubId,
+      providerClubName: nameByTeamId.get(teamId) ?? null,
+    }))
+    .sort((a, b) => a.providerClubId - b.providerClubId);
+
+  return { candidates, conflicts };
+}
