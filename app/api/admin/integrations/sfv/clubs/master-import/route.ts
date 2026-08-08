@@ -3,6 +3,15 @@
  *
  * CLUB-DIRECTORY-05 — tenant-scoped SFV club master import endpoint.
  *
+ * CLUB-DIRECTORY-05-C1: this import now runs automatically once per day via
+ * cron (app/api/cron/sfv-club-master-import/route.ts) and the manual
+ * "SFV-Vereinsverzeichnis synchronisieren" trigger has been removed from
+ * the tenant admin UI (SfvTenantConfigPanel) — tenant admins have no way to
+ * invoke it on demand. This route is intentionally left in place, unchanged
+ * and still gated by the platform-only TENANTS_MANAGE permission, purely as
+ * a lower-level operational escape hatch; it is no longer linked from any
+ * admin page.
+ *
  * Fetches the tenant's current SFV ranking table (the broadest reliable
  * club-enumeration source the SFV API exposes — see
  * lib/integrations/sfv/sync/club-master-import.ts for the full capability
