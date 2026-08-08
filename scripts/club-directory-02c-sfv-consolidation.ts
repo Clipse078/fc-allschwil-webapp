@@ -78,6 +78,7 @@ import { pathToFileURL } from "url";
 
 import { buildProviderClubIdIndex } from "@/lib/integrations/sfv/sync/club-identity";
 import { chooseCanonicalClubId, chooseLogoDonor } from "@/lib/club-directory/consolidation-service";
+import { fetchTeamList, fetchClubRanking } from "@/lib/integrations/sfv/client";
 
 // `club-consolidation.ts` (the mutating orchestrator) transitively imports
 // the shared `@/lib/db/prisma` singleton, which throws at import time when
@@ -280,29 +281,60 @@ export async function resolveTenantContexts(
   }));
 }
 
-export async function loadTenantInventory(
-  prisma: PrismaClient,
+export type TenantProviderClubIdIndex = {
+  indexByTeamId: ReadonlyMap<number, number>;
+};
+
+/**
+ * Fetches this tenant's own team list (`fetchTeamList`) and club ranking
+ * (`fetchClubRanking`) from SFV EXACTLY ONCE and builds the resulting
+ * `providerTeamId -> providerClubId` identity index — the single live-SFV
+ * step `loadTenantInventory()` below performs internally.
+ *
+ * Exported separately (as well as being used internally by
+ * `loadTenantInventory`) so a caller that also needs to feed this EXACT
+ * index into a mutation path can do so from the SAME fetch, instead of
+ * calling `loadTenantInventory()` again (which would re-fetch SFV a second
+ * time). See app/api/ops/club-directory-02c-sfv-consolidation-execute/route.ts
+ * — the only caller that needs this — for why that TOCTOU-avoidance matters:
+ * regenerating a plan and then executing against a SECOND, independently
+ * fetched SFV snapshot would let the executed identity map silently drift
+ * from the exact map the regenerated/fingerprinted plan was built from.
+ */
+export async function resolveProviderClubIdIndex(
   tenant: TenantSfvContext,
-): Promise<TenantInventory> {
+): Promise<TenantProviderClubIdIndex> {
   const [ownTeams, rankingEntries] = await Promise.all([
-    import("@/lib/integrations/sfv/client").then((m) =>
-      m.fetchTeamList({
-        SeasonId: tenant.seasonId,
-        ClubId: tenant.clubId,
-        ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
-      }),
-    ),
-    import("@/lib/integrations/sfv/client").then((m) =>
-      m.fetchClubRanking({
-        SeasonId: tenant.seasonId,
-        ClubId: tenant.clubId,
-        ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
-      }),
-    ),
+    fetchTeamList({
+      SeasonId: tenant.seasonId,
+      ClubId: tenant.clubId,
+      ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
+    }),
+    fetchClubRanking({
+      SeasonId: tenant.seasonId,
+      ClubId: tenant.clubId,
+      ...(tenant.organisationId !== null ? { OrganisationId: tenant.organisationId } : {}),
+    }),
   ]);
 
   const { indexByTeamId } = buildProviderClubIdIndex(ownTeams, rankingEntries);
+  return { indexByTeamId };
+}
 
+/**
+ * Builds a tenant's duplicate-group inventory from an ALREADY-RESOLVED
+ * `providerTeamId -> providerClubId` index (read-only DB query + pure
+ * grouping — no SFV/network call of its own). `loadTenantInventory()` below
+ * is simply `resolveProviderClubIdIndex()` followed by this function; it is
+ * exposed separately so a caller can reuse one already-fetched index for
+ * both "build the inventory/plan" and "execute the mutation" without a
+ * second SFV fetch in between (see `resolveProviderClubIdIndex` doc above).
+ */
+export async function loadTenantInventoryFromIndex(
+  prisma: PrismaClient,
+  tenant: TenantSfvContext,
+  indexByTeamId: ReadonlyMap<number, number>,
+): Promise<TenantInventory> {
   const mappingRows = await prisma.externalTeamProviderMapping.findMany({
     where: {
       tenantId: tenant.tenantId,
@@ -322,6 +354,14 @@ export async function loadTenantInventory(
     resolvedTeamCount: indexByTeamId.size,
     duplicateGroups: findDuplicateGroups(rows, indexByTeamId),
   };
+}
+
+export async function loadTenantInventory(
+  prisma: PrismaClient,
+  tenant: TenantSfvContext,
+): Promise<TenantInventory> {
+  const { indexByTeamId } = await resolveProviderClubIdIndex(tenant);
+  return loadTenantInventoryFromIndex(prisma, tenant, indexByTeamId);
 }
 
 export async function buildTenantPlan(prisma: PrismaClient, inventory: TenantInventory): Promise<TenantPlan> {
