@@ -36,6 +36,7 @@ import type { SfvAdminDiagnostics, SfvDiagnosticIssue } from "@/lib/integrations
 import type { SfvTeamSyncResult } from "@/lib/integrations/sfv/sync/types";
 import type { SfvScheduleSyncResult } from "@/lib/integrations/sfv/sync/schedule-types";
 import type { SfvDetailSyncResult } from "@/lib/integrations/sfv/sync/detail-types";
+import type { SfvClubMasterImportResult } from "@/lib/integrations/sfv/sync/club-master-import";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,12 @@ type DetailSyncState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; data: SfvDetailSyncResult }
+  | { status: "error"; message: string };
+
+type ClubMasterImportState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; data: SfvClubMasterImportResult }
   | { status: "error"; message: string };
 
 type SfvTenantConfigPanelProps = {
@@ -474,6 +481,88 @@ function DetailSyncResult({ data }: { data: SfvDetailSyncResult }) {
   );
 }
 
+// ── Sub-component: Club Master Import Result ─────────────────────────────────
+
+function ClubMasterImportResultView({ data }: { data: SfvClubMasterImportResult }) {
+  const hasErrors = data.errors.length > 0;
+  const statusVariant: "success" | "warning" | "danger" =
+    hasErrors && data.created + data.updated === 0
+      ? "danger"
+      : hasErrors
+        ? "warning"
+        : "success";
+  const statusLabel =
+    statusVariant === "danger"
+      ? "Fehlgeschlagen"
+      : statusVariant === "warning"
+        ? "Abgeschlossen (mit Fehlern)"
+        : "Erfolgreich abgeschlossen";
+
+  const rows: { label: string; value: number | string }[] = [
+    { label: "Ranglisten-Einträge", value: data.rankingRowsFetched },
+    { label: "Gefundene Vereine", value: data.candidateClubs },
+    { label: "Neu erstellt", value: data.created },
+    { label: "Aktualisiert (bereits bekannt)", value: data.updated },
+    { label: "Fehler", value: data.failed },
+    { label: "Dauer", value: `${data.durationMs} ms` },
+  ];
+
+  return (
+    <div className="space-y-4" data-testid="club-master-import-result">
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusIndicator
+          variant={statusVariant}
+          label={statusLabel}
+          data-testid="club-master-import-status"
+        />
+        <span className="text-xs text-[var(--muted)]">
+          Saison {data.seasonId} · Club {data.clubId}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        {rows.map(({ label, value }) => (
+          <div
+            key={label}
+            className="flex justify-between gap-2 border-b border-[var(--border)] py-1.5"
+          >
+            <span className="text-[var(--text-2)]">{label}</span>
+            <span className="font-semibold text-[var(--foreground)]">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs text-[var(--muted)]" data-testid="club-master-import-coverage">
+        {data.coverageDescription}
+      </p>
+
+      {hasErrors && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Fehlerdetails ({data.errors.length})
+          </p>
+          <ul className="space-y-1.5" data-testid="club-master-import-errors">
+            {data.errors.map((err, idx) => (
+              <li
+                key={`${err.code}-${idx}`}
+                className="flex items-start gap-2 rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-3 py-2"
+              >
+                <StatusIndicator variant="danger" size="sm" className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-mono text-[0.68rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">
+                    {err.code}
+                  </p>
+                  <p className="mt-0.5 text-sm text-[var(--foreground)]">{err.message}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigPanelProps) {
@@ -487,6 +576,7 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
   const [teamSync, setTeamSync] = useState<TeamSyncState>({ status: "idle" });
   const [scheduleSync, setScheduleSync] = useState<ScheduleSyncState>({ status: "idle" });
   const [detailSync, setDetailSync] = useState<DetailSyncState>({ status: "idle" });
+  const [clubMasterImport, setClubMasterImport] = useState<ClubMasterImportState>({ status: "idle" });
 
   // ── Field change handlers ──────────────────────────────────────────────────
 
@@ -749,6 +839,63 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
     }
   }, []);
 
+  // ── SFV-Vereinsverzeichnis synchronisieren (CLUB-DIRECTORY-05) ───────────
+
+  const handleClubMasterImport = useCallback(async () => {
+    setClubMasterImport({ status: "loading" });
+    try {
+      const res = await fetch("/api/admin/integrations/sfv/clubs/master-import", {
+        method: "POST",
+      });
+
+      const data = await res.json().catch(() => ({})) as {
+        result?: SfvClubMasterImportResult;
+        error?: string;
+      };
+
+      if (res.status === 404) {
+        setClubMasterImport({
+          status: "error",
+          message: "Keine SFV-Konfiguration gefunden. Bitte zuerst speichern.",
+        });
+        return;
+      }
+      if (res.status === 409) {
+        setClubMasterImport({
+          status: "error",
+          message: "SFV-Integration ist deaktiviert.",
+        });
+        return;
+      }
+
+      if (!res.ok || !data.result) {
+        setClubMasterImport({
+          status: "error",
+          message: data.error ?? "Unbekannter Fehler bei der Vereinsverzeichnis-Synchronisierung.",
+        });
+        return;
+      }
+
+      setClubMasterImport({ status: "success", data: data.result });
+
+      if (data.result.failed === 0) {
+        setConfig((current) =>
+          current
+            ? {
+                ...current,
+                lastClubMasterImportAt: new Date(data.result!.finishedAt),
+              }
+            : current,
+        );
+      }
+    } catch {
+      setClubMasterImport({
+        status: "error",
+        message: "Netzwerkfehler. Bitte Seite neu laden.",
+      });
+    }
+  }, []);
+
   // ── Connection status ─────────────────────────────────────────────────────
 
   const isConfigured = config !== null && config.enabled;
@@ -943,6 +1090,15 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
                 {formatLastSync(config.lastMatchDetailSyncAt)}
               </dd>
             </div>
+            <div
+              className="flex justify-between gap-4 border-b border-[var(--border)] pb-2"
+              data-testid="last-club-master-import"
+            >
+              <dt className="text-[var(--text-2)]">Letzte Vereinsverzeichnis-Synchronisierung</dt>
+              <dd className="text-right font-mono text-xs text-[var(--muted)]">
+                {formatLastSync(config.lastClubMasterImportAt)}
+              </dd>
+            </div>
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--text-2)]">Konfiguration aktualisiert</dt>
               <dd className="text-right font-mono text-xs text-[var(--muted)]">
@@ -1093,6 +1249,54 @@ export default function SfvTenantConfigPanel({ initialConfig }: SfvTenantConfigP
 
           {teamSync.status === "success" && (
             <TeamSyncResult data={teamSync.data} />
+          )}
+        </div>
+      </SectionCard>
+
+      {/* ── SFV-Vereinsverzeichnis synchronisieren (CLUB-DIRECTORY-05) ─────── */}
+      <SectionCard
+        title="SFV-Vereinsverzeichnis synchronisieren"
+        description="Vereine aus der aktuellen SFV-Rangliste des eigenen Clubs in das Club-Verzeichnis übernehmen — auch Vereine ohne bereits synchronisiertes Direktduell. Keine landesweite SFV-Vollständigkeit; siehe Abdeckungshinweis nach der Ausführung."
+      >
+        <div className="space-y-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleClubMasterImport}
+            loading={clubMasterImport.status === "loading"}
+            disabled={clubMasterImport.status === "loading" || !isConfigured}
+            data-testid="btn-club-master-import"
+          >
+            {clubMasterImport.status === "loading"
+              ? "Synchronisierung läuft…"
+              : "Vereinsverzeichnis synchronisieren"}
+          </Button>
+
+          {!isConfigured && clubMasterImport.status === "idle" && (
+            <p className="text-xs text-[var(--muted)]">
+              Konfigurieren und aktivieren Sie die Integration, um das Vereinsverzeichnis zu synchronisieren.
+            </p>
+          )}
+
+          {clubMasterImport.status === "loading" && (
+            <p className="text-sm text-[var(--text-2)]" data-testid="club-master-import-loading">
+              Vereinsverzeichnis wird synchronisiert — dies kann einige Sekunden dauern…
+            </p>
+          )}
+
+          {clubMasterImport.status === "error" && (
+            <div
+              className="rounded-lg border border-[var(--sce-danger-border)] bg-[var(--sce-danger-light)] px-4 py-3"
+              data-testid="club-master-import-error"
+            >
+              <p className="text-sm font-medium text-[var(--sce-danger)]">
+                {clubMasterImport.message}
+              </p>
+            </div>
+          )}
+
+          {clubMasterImport.status === "success" && (
+            <ClubMasterImportResultView data={clubMasterImport.data} />
           )}
         </div>
       </SectionCard>
