@@ -47,6 +47,12 @@ describe("createExternalOpponentResolver", () => {
         provider: "SFV",
         providerTeamId: 51234,
         providerTeamName: "SV Muttenz B1",
+        // No real Prisma client is wired in this test (prisma is mocked to
+        // `{ fake: "prisma-client" }`), so the CLUB-DIRECTORY-02B logo
+        // pre-check throws internally and is swallowed — see
+        // external-team-discovery-logo-enrichment.test.ts for dedicated,
+        // properly-mocked coverage of the enrichment behaviour itself.
+        providerLogoUrl: null,
       },
       new Date("2026-08-01T00:00:00.000Z"),
     );
