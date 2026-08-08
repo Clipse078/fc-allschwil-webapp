@@ -17,14 +17,19 @@
  *   `@vercel/blob` is already a project dependency, already durable/
  *   operator-recoverable, and already used for exactly this kind of
  *   "persist something outside the request lifecycle" need — e.g.
- *   lib/assets/storage.ts (tenant/club/team logos via the general
+ *   lib/assets/storage.ts (tenant/club/team logos via the general, public
  *   `BLOB_READ_WRITE_TOKEN` store) and lib/workspace/upload-storage.ts (a
- *   second, dedicated private store for the Workspace module). Reusing the
- *   general store here — the same one already used for Club Directory logo
- *   assets — is the simplest existing project-supported durable mechanism;
- *   it introduces no new infrastructure, no new provider, and no new
- *   permanent secret (BLOB_READ_WRITE_TOKEN is already configured on STAGE
- *   for logo uploads to work at all).
+ *   second, dedicated private store for the Workspace module).
+ *
+ * WHY A DEDICATED STORE (OPS_BACKUP_READ_WRITE_TOKEN)
+ *   The general `BLOB_READ_WRITE_TOKEN` store (sportclubevo-assets) is
+ *   configured for PUBLIC access (it serves logos), and Vercel Blob does
+ *   not allow writing a `private` blob into a public store. This backup
+ *   contains internal ExternalClub/ExternalTeam/ExternalClubProviderMapping
+ *   rows and must stay private, so it is written to a separate, dedicated
+ *   PRIVATE store (sportclubevo-ops-backups) via its own connection token,
+ *   `OPS_BACKUP_READ_WRITE_TOKEN`. This does not change the public store or
+ *   its usage elsewhere.
  *
  * ACCESS LEVEL
  *   `access: "private"` — this snapshot contains internal ExternalClub/
@@ -33,10 +38,10 @@
  *   way logos are.
  *
  * FAIL-CLOSED CONTRACT
- *   Never throws. Returns `{ ok: false }` when BLOB_READ_WRITE_TOKEN is
- *   absent or the upload fails, so the caller can refuse to mutate anything
- *   ("no mutation may occur unless the backup has been successfully
- *   created/persisted" — see the execute route).
+ *   Never throws. Returns `{ ok: false }` when OPS_BACKUP_READ_WRITE_TOKEN
+ *   is absent or the upload fails, so the caller can refuse to mutate
+ *   anything ("no mutation may occur unless the backup has been
+ *   successfully created/persisted" — see the execute route).
  */
 
 import { put } from "@vercel/blob";
@@ -48,7 +53,9 @@ export type PersistBackupSnapshotResult =
 /**
  * Persists `snapshot` (expected: the return value of
  * scripts/club-directory-02c-sfv-consolidation.ts#buildBackupSnapshot) as a
- * private JSON blob at `key` in the project's existing Vercel Blob store.
+ * private JSON blob at `key` in the project's dedicated, private
+ * ops-backup Vercel Blob store (`OPS_BACKUP_READ_WRITE_TOKEN`) — not the
+ * general public store used for logos.
  *
  * `key` should be unique per execution attempt (the caller includes a
  * timestamp) so repeated attempts never silently overwrite an earlier
@@ -58,13 +65,13 @@ export async function persistConsolidationBackupSnapshot(
   snapshot: unknown,
   key: string,
 ): Promise<PersistBackupSnapshotResult> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  const token = process.env.OPS_BACKUP_READ_WRITE_TOKEN?.trim();
 
   if (!token) {
     return {
       ok: false,
       status: 503,
-      error: "Backup-Speicher ist nicht konfiguriert (BLOB_READ_WRITE_TOKEN fehlt).",
+      error: "Backup-Speicher ist nicht konfiguriert (OPS_BACKUP_READ_WRITE_TOKEN fehlt).",
     };
   }
 
