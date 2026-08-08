@@ -510,29 +510,31 @@ model Tenant {
 
   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
-  sfvConfig                 TenantSfvConfig?
-  teamExternalMappings      TeamExternalMapping[]
-  matchExternalMappings     MatchExternalMapping[]
+  sfvConfig                  TenantSfvConfig?
+  teamExternalMappings       TeamExternalMapping[]
+  matchExternalMappings      MatchExternalMapping[]
   // CLUB-DIRECTORY-01: canonical external club/team directory. Supersedes
   // the earlier "Opponent"/"OpponentExternalMapping" foundation (MC-04B),
   // which was never wired to any write path or UI and had no club/team split.
-  externalClubs             ExternalClub[]
-  externalClubProviderLinks ExternalClubProviderMapping[]
-  externalTeams             ExternalTeam[]
-  externalTeamProviderLinks ExternalTeamProviderMapping[]
+  externalClubs              ExternalClub[]
+  externalClubProviderLinks  ExternalClubProviderMapping[]
+  externalTeams              ExternalTeam[]
+  externalTeamProviderLinks  ExternalTeamProviderMapping[]
   // TEAM-CORE-02: canonical seasonal OrgUnit assignments
-  teamSeasonOrgUnits        TeamSeasonOrgUnit[]
+  teamSeasonOrgUnits         TeamSeasonOrgUnit[]
   // COMPETITION-01: canonical competition entities
-  competitions              Competition[]
+  competitions               Competition[]
   // TRAINING-CORE-01: canonical recurring training series
-  trainingSeries            TrainingSeries[]
+  trainingSeries             TrainingSeries[]
   // TRAINING-PLANS-01: tenant-defined training plans and assignments
-  trainingPlans             TrainingPlan[]
-  trainingPlanAssignments   TrainingPlanAssignment[]
+  trainingPlans              TrainingPlan[]
+  trainingPlanAssignments    TrainingPlanAssignment[]
   // TRAINING-ALLOCATIONS-01: canonical facility resource allocations
-  trainingAllocations       TrainingAllocation[]
+  trainingAllocations        TrainingAllocation[]
   // TRAININGCENTER-02: canonical generated training sessions
-  trainingSessions          TrainingSession[]
+  trainingSessions           TrainingSession[]
+  // TRAININGCENTER-02: occurrence-level allocation overrides
+  trainingSessionAllocations TrainingSessionAllocation[]
 
   // RPERM-02
   tenantMemberships TenantMembership[]
@@ -1832,7 +1834,8 @@ model FacilityResource {
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  trainingAllocations TrainingAllocation[]
+  trainingAllocations        TrainingAllocation[]
+  trainingSessionAllocations TrainingSessionAllocation[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2879,27 +2882,27 @@ model MatchExternalMapping {
 }
 
 model TenantSfvConfig {
-  id                    String    @id @default(cuid())
-  tenantId              String    @unique
+  id                     String    @id @default(cuid())
+  tenantId               String    @unique
   /// Positive integer SFV club identifier (e.g. 483 for FC Allschwil).
   /// Must be a numeric identifier as returned by the SFV API.
-  clubId                Int
+  clubId                 Int
   /// Positive integer SFV season identifier used as the default when no
   /// explicit seasonId is provided (e.g. 2027 for the 2026/2027 season).
-  defaultSeasonId       Int
+  defaultSeasonId        Int
   /// Optional SFV organisation identifier. Null when not assigned or not required.
-  organisationId        Int?
+  organisationId         Int?
   /// When false, the SFV integration is administratively disabled.
   /// Consumers must treat disabled configs as "not configured".
-  enabled               Boolean   @default(true)
+  enabled                Boolean   @default(true)
   /// Completion time of the most recent fully successful tenant-level team synchronization.
-  lastTeamSyncAt        DateTime?
+  lastTeamSyncAt         DateTime?
   /// Completion time of the most recent fully successful tenant-level schedule synchronization.
-  lastScheduleSyncAt    DateTime?
+  lastScheduleSyncAt     DateTime?
   /// Completion time of the most recent fully successful tenant-level match-detail synchronization.
-  lastMatchDetailSyncAt DateTime?
+  lastMatchDetailSyncAt  DateTime?
   /// Completion time of the most recent fully successful tenant-level competition synchronization.
-  lastCompetitionSyncAt DateTime?
+  lastCompetitionSyncAt  DateTime?
   /// CLUB-DIRECTORY-05: completion time of the most recent fully successful
   /// tenant-level SFV club master import (see
   /// lib/integrations/sfv/sync/club-master-import.ts). Null until the first
@@ -2911,9 +2914,9 @@ model TenantSfvConfig {
   /// TTL-based overlap guard — see claimSfvScheduleSyncLock() in
   /// tenant-config-repository.ts. Never read/written by manual admin-triggered
   /// syncs, which remain unaffected by this lock.
-  syncLockedAt          DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  syncLockedAt           DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
@@ -3639,12 +3642,19 @@ model TrainingSession {
   /// Denormalised from TrainingSeries.teamSeasonId for join-free filtering.
   teamSeasonId     String
   /// Calendar date of this occurrence, stored at UTC midnight (date key).
+  /// This is the CANONICAL recurrence-slot identity — @@unique([trainingSeriesId, date])
+  /// keys off this field, and session-generation-service.ts's reconciliation
+  /// diffing depends on it never being mutated by an occurrence-level
+  /// exception. A rescheduled occurrence's *effective* date lives in
+  /// `overrideDate` instead (see TRAININGCENTER-02 doc comment below).
   date             DateTime
   /// Weekday of `date`, denormalised for display/filtering without recompute.
   weekday          Weekday
   /// Resolved UTC instant the session starts (derived from series startsAt + timezone).
+  /// Canonical/regeneration-owned — see `date` doc comment above.
   startAt          DateTime
   /// Resolved UTC instant the session ends (derived from series endsAt + timezone).
+  /// Canonical/regeneration-owned — see `date` doc comment above.
   endAt            DateTime
   /// IANA timezone snapshot used to resolve startAt/endAt for this occurrence.
   timezone         String
@@ -3653,12 +3663,35 @@ model TrainingSession {
   /// recurrence rule changes; it never writes/overwrites CANCELLED,
   /// POSTPONED, or MOVED (see session-generation-service.ts).
   status           TrainingSessionStatus @default(SCHEDULED)
+  /// TRAININGCENTER-02 (occurrence exceptions): explicit occurrence-level
+  /// override of the calendar date this session actually happens on, set by
+  /// session-reschedule-service.ts. Null means "no date override — use
+  /// `date`". Never written by generation/reconciliation. Public DTOs
+  /// resolve the *effective* date as `overrideDate ?? date` while exposing
+  /// the canonical `date` separately as `originalDate`, so downstream
+  /// consumers (Month/Week/Day views) bucket the occurrence under the date
+  /// it actually happens on without ever mutating the recurrence identity.
+  overrideDate     DateTime?
+  /// TRAININGCENTER-02: explicit occurrence-level override of the resolved
+  /// UTC start instant. Null means "no override — use `startAt`". Set/cleared
+  /// together with `overrideEndAt` by session-reschedule-service.ts.
+  overrideStartAt  DateTime?
+  /// TRAININGCENTER-02: explicit occurrence-level override of the resolved
+  /// UTC end instant. Null means "no override — use `endAt`".
+  overrideEndAt    DateTime?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
 
-  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  trainingSeries TrainingSeries @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  teamSeason     TeamSeason     @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSeries     TrainingSeries              @relation(fields: [trainingSeriesId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason         TeamSeason                  @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  /// TRAININGCENTER-02: occurrence-level resource allocation overrides.
+  /// Presence of any row here for a given allocation group (Spielfeld/Halle
+  /// or Garderobe — see lib/training/allocation-groups.ts) overrides that
+  /// group's series-level TrainingAllocation rows for this occurrence only.
+  /// Removing every override row for a group reverts that group back to
+  /// the TrainingSeries default. See lib/training/session-allocation-service.ts.
+  sessionAllocations TrainingSessionAllocation[]
 
   /// Canonical rule: one generated session per series per date. Never duplicated.
   @@unique([trainingSeriesId, date])
@@ -3668,4 +3701,52 @@ model TrainingSession {
   @@index([tenantId, date])
   @@index([teamSeasonId, date])
   @@index([tenantId, status])
+}
+
+// ---------------------------------------------------------------------------
+// TrainingSessionAllocation — occurrence-level resource allocation override.
+//
+// Mirrors TrainingAllocation exactly, but scoped to a single canonical
+// TrainingSession occurrence instead of the recurring TrainingSeries. Used
+// only when one specific occurrence needs a different Spielfeld/Halle or
+// Garderobe than its series' default (e.g. a one-off room conflict) —
+// TRAININGCENTER-02.
+//
+// Architecture invariants:
+//   - tenantId must match both TrainingSession.tenantId and FacilityResource.tenantId.
+//   - @@unique([trainingSessionId, facilityResourceId]) prevents duplicates.
+//   - Archived FacilityResources cannot receive new allocations (same rule
+//     as TrainingAllocation).
+//   - Cascade-delete when the parent TrainingSession or FacilityResource is deleted.
+//   - Never touched by session-generation-service.ts regeneration/reconciliation.
+//
+// Security invariants:
+//   - All queries must scope by tenantId.
+//   - Tenant A cannot read or modify Tenant B's session allocation overrides.
+// ---------------------------------------------------------------------------
+model TrainingSessionAllocation {
+  id                 String   @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId           String
+  /// The canonical TrainingSession occurrence this override belongs to.
+  trainingSessionId  String
+  /// The facility resource allocated to this occurrence.
+  facilityResourceId String
+  /// Optional free-text note for this override.
+  notes              String?
+  /// Display position within the override allocations for this occurrence.
+  displayOrder       Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSession  TrainingSession  @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facilityResource FacilityResource @relation(fields: [facilityResourceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Prevent duplicate allocation of the same resource to the same occurrence.
+  @@unique([trainingSessionId, facilityResourceId])
+  @@index([tenantId])
+  @@index([trainingSessionId])
+  @@index([facilityResourceId])
+  @@index([tenantId, trainingSessionId])
 }
