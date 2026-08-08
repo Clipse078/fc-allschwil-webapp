@@ -8,6 +8,7 @@ import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { createClubDirectoryQueryDatabase } from "@/lib/club-directory/prisma-adapter";
 import { getExternalTeamById } from "@/lib/club-directory/query-service";
 import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { formatExternalTeamCompetitionContext } from "@/lib/club-directory/competition-context";
 import TeamForm from "@/components/admin/club-directory/TeamForm";
 import { LogoUploadCard } from "@/components/admin/club-directory/LogoUploadCard";
 import { MoveTeamCard } from "@/components/admin/club-directory/MoveTeamCard";
@@ -37,13 +38,18 @@ export default async function EditExternalTeamPage({ params }: Props) {
 
   const isArchived = team.archivedAt !== null;
   const effectiveLogoUrl = resolveExternalTeamLogoUrl(team, team.externalClub);
+  const competitionContext = formatExternalTeamCompetitionContext(team.competitionContext);
 
   return (
     <PageShell fullWidth>
       <FormPagePattern
         eyebrow="Organisation · Vereine"
         title={`${team.name} bearbeiten`}
-        description={`Team von ${team.externalClub.name}`}
+        description={
+          competitionContext
+            ? `Team von ${team.externalClub.name} · ${competitionContext}`
+            : `Team von ${team.externalClub.name}`
+        }
         breadcrumbs={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Vereine", href: "/dashboard/vereine" },
