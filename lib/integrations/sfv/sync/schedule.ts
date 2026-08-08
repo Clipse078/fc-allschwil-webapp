@@ -51,6 +51,7 @@ import { fetchClubRanking, fetchClubSchedule, fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
 import { createExternalOpponentResolver } from "./external-team-discovery";
 import { buildProviderClubIdIndex } from "./club-identity";
+import { runSfvClubConsolidationForCurrentSync } from "./club-consolidation";
 import { logClubIdentityConflict } from "./schedule-logging";
 import type { SfvScheduleSyncContext, SfvScheduleSyncResult } from "./schedule-types";
 import type { SyncErrorEntry } from "./types";
@@ -266,6 +267,25 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
   } catch {
     // Ranking fetch failed — proceed without club-identity evidence this
     // run. Never blocks schedule sync.
+  }
+
+  // ── CLUB-DIRECTORY-02C: opportunistic backfill/consolidation ─────────────
+  //
+  // Reconciles any PRE-EXISTING duplicate ExternalClub rows for exactly the
+  // teamIds this run's providerClubIdIndex covers — bounded, zero extra SFV
+  // calls (reuses the ranking/team-list data just fetched above). Runs
+  // BEFORE external opponent discovery below so a just-merged canonical
+  // club is what discovery sees this run, rather than risking a stale read.
+  // Best-effort: never blocks schedule sync on failure. See
+  // lib/club-directory/consolidation-service.ts for the full safety
+  // invariants (never loses a team, never deletes a club, tenant-scoped,
+  // idempotent). runSfvClubConsolidationForCurrentSync already swallows its
+  // own errors — this try/catch is defense-in-depth only, matching every
+  // other best-effort step in this function.
+  try {
+    await runSfvClubConsolidationForCurrentSync(tenantId, providerClubIdIndex);
+  } catch {
+    // Best-effort: consolidation must never block schedule sync.
   }
 
   // ── TEAM-SFV-MAPPING-02: heal missing current-season team mappings ───────

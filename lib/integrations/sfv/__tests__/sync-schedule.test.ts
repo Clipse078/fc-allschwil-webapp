@@ -142,6 +142,18 @@ vi.mock("../sync/external-team-discovery", () => ({
     mockCreateExternalOpponentResolver(...args),
 }));
 
+// ── Mock: club-consolidation (CLUB-DIRECTORY-02C) ─────────────────────────────
+//
+// No real database access from this orchestrator-level test file —
+// consolidation itself is unit-tested independently in
+// lib/club-directory/__tests__/consolidation-service.test.ts.
+
+const mockRunSfvClubConsolidationForCurrentSync = vi.fn();
+vi.mock("../sync/club-consolidation", () => ({
+  runSfvClubConsolidationForCurrentSync: (...args: unknown[]) =>
+    mockRunSfvClubConsolidationForCurrentSync(...args),
+}));
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 const { syncSfvSchedule } = await import("../sync/schedule");
@@ -297,6 +309,7 @@ beforeEach(() => {
   // Default: no ranking coverage this run (CLUB-DIRECTORY-02C club-identity
   // resolution) — most tests in this file don't care about club identity.
   mockFetchClubRanking.mockResolvedValue([]);
+  mockRunSfvClubConsolidationForCurrentSync.mockResolvedValue(null);
 });
 
 // ── 1-3: First synchronization ────────────────────────────────────────────────
@@ -1433,5 +1446,63 @@ describe("CLUB-DIRECTORY-02C — provider club-identity index wiring", () => {
     const [, , providerClubIdIndex] = mockCreateExternalOpponentResolver.mock.calls[0];
     expect(providerClubIdIndex).toBeInstanceOf(Map);
     expect(providerClubIdIndex.size).toBe(0);
+  });
+});
+
+describe("CLUB-DIRECTORY-02C — opportunistic backfill/consolidation wiring", () => {
+  it("invokes consolidation with the tenantId and the resolved providerClubIdIndex", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([]);
+    mockFetchClubRanking.mockResolvedValueOnce([
+      {
+        leagueId: 1,
+        leagueNumber: 1,
+        leagueName: "4. Liga",
+        divisionId: 1,
+        divisionName: "Vorrunde",
+        groupId: 1,
+        groupName: "Gruppe 1",
+        teamName: "FC Therwil 1",
+        clubNumber: 700,
+        position: 3,
+        matches: 5,
+        wins: 2,
+        draws: 1,
+        losses: 2,
+        penaltyPoints: 0,
+        goalsFor: 8,
+        goalsAgainst: 9,
+        points: 7,
+        teamId: 2001,
+      },
+    ]);
+
+    await syncSfvSchedule(TENANT_A);
+
+    expect(mockRunSfvClubConsolidationForCurrentSync).toHaveBeenCalledTimes(1);
+    const [calledTenantId, calledIndex] = mockRunSfvClubConsolidationForCurrentSync.mock.calls[0];
+    expect(calledTenantId).toBe(TENANT_A);
+    expect(calledIndex.get(2001)).toBe(700);
+  });
+
+  it("never blocks schedule sync when consolidation itself fails", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([]);
+    mockRunSfvClubConsolidationForCurrentSync.mockRejectedValueOnce(new Error("consolidation boom"));
+
+    await expect(syncSfvSchedule(TENANT_A)).resolves.toMatchObject({ failed: 0 });
+  });
+
+  it("runs consolidation BEFORE the external-opponent resolver is even constructed for this run", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([]);
+    let resolverFactoryCalledDuringConsolidation = false;
+    mockRunSfvClubConsolidationForCurrentSync.mockImplementationOnce(async () => {
+      resolverFactoryCalledDuringConsolidation = mockCreateExternalOpponentResolver.mock.calls.length > 0;
+      return null;
+    });
+
+    await syncSfvSchedule(TENANT_A);
+
+    expect(resolverFactoryCalledDuringConsolidation).toBe(false);
+    expect(mockRunSfvClubConsolidationForCurrentSync).toHaveBeenCalledTimes(1);
+    expect(mockCreateExternalOpponentResolver).toHaveBeenCalledTimes(1);
   });
 });
