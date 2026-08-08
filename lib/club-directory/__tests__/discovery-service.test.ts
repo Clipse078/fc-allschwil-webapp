@@ -90,6 +90,12 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
         const { where } = args as FindFirstArgs;
         return teams.find((t) => t.id === where.id && t.tenantId === where.tenantId) ?? null;
       },
+      findMany: async (args: object) => {
+        const { where } = args as FindFirstArgs;
+        return teams.filter(
+          (t) => t.tenantId === where.tenantId && t.externalClubId === where.externalClubId,
+        );
+      },
       create: async (args: object) => {
         const { data } = args as CreateArgs;
         const team: ExternalTeamRow = {
@@ -123,6 +129,19 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
               m.providerClubId === where.providerClubId,
           ) ?? null
         );
+      },
+      findMany: async (args: object) => {
+        const { where } = args as FindFirstArgs;
+        return clubMappings.filter(
+          (m) => m.tenantId === where.tenantId && m.externalClubId === where.externalClubId,
+        );
+      },
+      update: async (args: object) => {
+        const { where, data } = args as UpdateArgs;
+        const mapping = clubMappings.find((m) => m.id === where.id);
+        if (!mapping) throw new Error("club provider mapping not found in fake DB");
+        Object.assign(mapping, data);
+        return mapping;
       },
       upsert: async (args: object) => {
         const { where, create, update } = args as MappingUpsertArgs;

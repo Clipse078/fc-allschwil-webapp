@@ -61,6 +61,8 @@ function buildDelegates(
     externalTeam: {
       findFirst: (args: object) =>
         client.externalTeam.findFirst(args as Prisma.ExternalTeamFindFirstArgs),
+      findMany: (args: object) =>
+        client.externalTeam.findMany(args as Prisma.ExternalTeamFindManyArgs),
       create: (args: object) => client.externalTeam.create(args as Prisma.ExternalTeamCreateArgs),
       update: (args: object) => client.externalTeam.update(args as Prisma.ExternalTeamUpdateArgs),
     },
@@ -69,9 +71,17 @@ function buildDelegates(
         client.externalClubProviderMapping.findFirst(
           args as Prisma.ExternalClubProviderMappingFindFirstArgs,
         ),
+      findMany: (args: object) =>
+        client.externalClubProviderMapping.findMany(
+          args as Prisma.ExternalClubProviderMappingFindManyArgs,
+        ),
       upsert: (args: object) =>
         client.externalClubProviderMapping.upsert(
           args as Prisma.ExternalClubProviderMappingUpsertArgs,
+        ),
+      update: (args: object) =>
+        client.externalClubProviderMapping.update(
+          args as Prisma.ExternalClubProviderMappingUpdateArgs,
         ),
       create: async (args: object) => {
         try {
