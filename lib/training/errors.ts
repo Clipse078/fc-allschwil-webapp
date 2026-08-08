@@ -277,3 +277,78 @@ export class TrainingSessionInvalidTransitionError extends Error {
     this.name = "TrainingSessionInvalidTransitionError";
   }
 }
+
+// =============================================================================
+// TRAININGCENTER-02 errors — single-occurrence reschedule (date/time exception)
+// =============================================================================
+
+/** The requested reschedule input is invalid (bad date/time format, start >= end). */
+export class TrainingSessionRescheduleValidationError extends Error {
+  readonly code = "TRAINING_SESSION_RESCHEDULE_VALIDATION" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "TrainingSessionRescheduleValidationError";
+  }
+}
+
+// =============================================================================
+// TRAININGCENTER-02 errors — occurrence-level allocation overrides
+// (TrainingSessionAllocation). Mirrors the TRAINING-ALLOCATIONS-01 errors
+// above, scoped to a single TrainingSession instead of a TrainingSeries.
+// =============================================================================
+
+/** The requested TrainingSessionAllocation was not found (or belongs to another tenant). */
+export class TrainingSessionAllocationNotFoundError extends Error {
+  readonly code = "TRAINING_SESSION_ALLOCATION_NOT_FOUND" as const;
+  constructor(allocationId: string) {
+    super(`TrainingSessionAllocation not found: ${allocationId}`);
+    this.name = "TrainingSessionAllocationNotFoundError";
+  }
+}
+
+/** A duplicate override allocation of the same resource to the same occurrence. */
+export class TrainingSessionAllocationDuplicateError extends Error {
+  readonly code = "TRAINING_SESSION_ALLOCATION_DUPLICATE" as const;
+  constructor(trainingSessionId: string, facilityResourceId: string) {
+    super(
+      `FacilityResource "${facilityResourceId}" is already allocated (as an override) to TrainingSession "${trainingSessionId}"`,
+    );
+    this.name = "TrainingSessionAllocationDuplicateError";
+  }
+}
+
+/** The FacilityResource is archived and cannot receive new allocations. */
+export class TrainingSessionAllocationArchivedResourceError extends Error {
+  readonly code = "TRAINING_SESSION_ALLOCATION_ARCHIVED_RESOURCE" as const;
+  constructor(facilityResourceId: string) {
+    super(`FacilityResource "${facilityResourceId}" is archived and cannot receive new allocations`);
+    this.name = "TrainingSessionAllocationArchivedResourceError";
+  }
+}
+
+/** The parent Facility of the FacilityResource is archived and cannot receive new allocations. */
+export class TrainingSessionAllocationArchivedFacilityError extends Error {
+  readonly code = "TRAINING_SESSION_ALLOCATION_ARCHIVED_FACILITY" as const;
+  constructor(facilityId: string) {
+    super(`Facility "${facilityId}" is archived. Its resources cannot receive new allocations.`);
+    this.name = "TrainingSessionAllocationArchivedFacilityError";
+  }
+}
+
+/** The FacilityResource does not belong to the tenant or does not exist. */
+export class TrainingSessionAllocationResourceNotFoundError extends Error {
+  readonly code = "TRAINING_SESSION_ALLOCATION_RESOURCE_NOT_FOUND" as const;
+  constructor(facilityResourceId: string) {
+    super(`FacilityResource not found: ${facilityResourceId}`);
+    this.name = "TrainingSessionAllocationResourceNotFoundError";
+  }
+}
+
+/** The TrainingSession and FacilityResource belong to different tenants. */
+export class TrainingSessionAllocationTenantMismatchError extends Error {
+  readonly code = "TRAINING_SESSION_ALLOCATION_TENANT_MISMATCH" as const;
+  constructor() {
+    super("TrainingSession and FacilityResource belong to different tenants");
+    this.name = "TrainingSessionAllocationTenantMismatchError";
+  }
+}

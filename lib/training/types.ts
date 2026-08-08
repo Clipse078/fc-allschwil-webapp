@@ -260,6 +260,42 @@ export interface ListTrainingAllocationsFilter {
 }
 
 // =============================================================================
+// TRAININGCENTER-02: Occurrence-level allocation override types
+// (TrainingSessionAllocation) — mirrors TrainingAllocationDto above, scoped
+// to a single canonical TrainingSession instead of the recurring
+// TrainingSeries.
+// =============================================================================
+
+/** Public shape for an occurrence-level (single-TrainingSession) resource allocation override. */
+export interface TrainingSessionAllocationDto {
+  id: string;
+  tenantId: string;
+  trainingSessionId: string;
+  facilityResourceId: string;
+  /** Human-readable resource name, denormalised from FacilityResource. */
+  facilityResourceName: string;
+  /** Resource code, denormalised from FacilityResource. */
+  facilityResourceCode: string;
+  /** Resource type, denormalised from FacilityResource. */
+  facilityResourceType: string;
+  /** Facility id owning the resource. */
+  facilityId: string;
+  /** Facility name, denormalised from Facility. */
+  facilityName: string;
+  notes: string | null;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTrainingSessionAllocationInput {
+  trainingSessionId: string;
+  facilityResourceId: string;
+  notes?: string | null;
+  displayOrder?: number;
+}
+
+// =============================================================================
 // TRAININGCENTER-02: Canonical Training Session Engine types
 //
 // TrainingSession is the canonical, dated occurrence generated from a
@@ -291,7 +327,18 @@ export type TrainingSessionStatus =
   | "MOVED"
   | "RECURRENCE_REMOVED";
 
-/** Public shape for a canonical generated training session. */
+/**
+ * Public shape for a canonical generated training session.
+ *
+ * TRAININGCENTER-02 (occurrence exceptions): `date` / `weekday` / `startAt` /
+ * `endAt` are the EFFECTIVE (resolved) values — `overrideDate ?? date` etc.
+ * — so every existing consumer that reads these fields automatically sees a
+ * rescheduled occurrence at its actual date/time without any change on
+ * their end. The canonical, series-derived values (what generation/
+ * reconciliation own and would regenerate) are always available separately
+ * as `originalDate` / `originalStartAt` / `originalEndAt`. `isRescheduled`
+ * is a convenience flag: true whenever any override is set.
+ */
 export interface TrainingSessionDto {
   id: string;
   tenantId: string;
@@ -306,18 +353,44 @@ export interface TrainingSessionDto {
    * Month/Week/Day operational views.
    */
   teamName: string;
-  /** Calendar date of this occurrence, "YYYY-MM-DD". */
+  /** Effective calendar date of this occurrence, "YYYY-MM-DD" (reflects a reschedule override, if any). */
   date: string;
+  /** Effective weekday, derived from the effective `date`. */
   weekday: Weekday;
-  /** ISO-8601 UTC instant the session starts. */
+  /** Effective ISO-8601 UTC instant the session starts (reflects a reschedule override, if any). */
   startAt: string;
-  /** ISO-8601 UTC instant the session ends. */
+  /** Effective ISO-8601 UTC instant the session ends (reflects a reschedule override, if any). */
   endAt: string;
   /** IANA timezone snapshot used to resolve startAt/endAt for this occurrence. */
   timezone: string;
   status: TrainingSessionStatus;
+  /** Canonical (series-derived) calendar date, "YYYY-MM-DD" — the recurrence-slot identity. Unaffected by any reschedule override. */
+  originalDate: string;
+  /** Canonical (series-derived) UTC start instant. Unaffected by any reschedule override. */
+  originalStartAt: string;
+  /** Canonical (series-derived) UTC end instant. Unaffected by any reschedule override. */
+  originalEndAt: string;
+  /** True when this occurrence's date and/or time was overridden away from its series-derived default. */
+  isRescheduled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * TRAININGCENTER-02: input to rescheduleTrainingSession() — sets (or, when
+ * matching the series-derived default, clears) this single occurrence's
+ * date/time override. `startsAt`/`endsAt` are always required (an edit
+ * form always submits the full effective schedule); `date` is optional —
+ * omitting it (or passing the occurrence's own canonical date) keeps the
+ * occurrence on its original calendar date and only overrides the time.
+ */
+export interface RescheduleTrainingSessionInput {
+  /** New effective calendar date "YYYY-MM-DD", or omitted/null to keep the canonical date. */
+  date?: string | null;
+  /** New effective start time-of-day "HH:mm", interpreted in the occurrence's timezone. */
+  startsAt: string;
+  /** New effective end time-of-day "HH:mm". Must be after startsAt. */
+  endsAt: string;
 }
 
 /** Input to generateTrainingSessions(): bounds the generation window. */

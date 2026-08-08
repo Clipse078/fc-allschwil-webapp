@@ -56,6 +56,7 @@ import {
   matchesRecurrence,
   toDateOnlyUtc,
   dateKeyFromDate,
+  weekdayFromDate,
 } from "./recurrence";
 import {
   TrainingSeriesNotFoundError,
@@ -83,9 +84,24 @@ import type {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Converts a DB row to the public DTO shape. */
+/**
+ * Converts a DB row to the public DTO shape.
+ *
+ * TRAININGCENTER-02: resolves the EFFECTIVE date/weekday/startAt/endAt —
+ * `overrideDate ?? date`, `overrideStartAt ?? startAt`, `overrideEndAt ??
+ * endAt` — while exposing the canonical (series-derived) values separately
+ * as `originalDate`/`originalStartAt`/`originalEndAt`. The weekday is only
+ * recomputed when the date itself was overridden; a time-only override
+ * never changes which weekday the occurrence falls on.
+ */
 function toDto(row: TrainingSessionRow): TrainingSessionDto {
   const teamSeason = row.trainingSeries.teamSeason;
+
+  const effectiveDate = row.overrideDate ?? row.date;
+  const effectiveStartAt = row.overrideStartAt ?? row.startAt;
+  const effectiveEndAt = row.overrideEndAt ?? row.endAt;
+  const isRescheduled = Boolean(row.overrideDate || row.overrideStartAt || row.overrideEndAt);
+
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -99,12 +115,16 @@ function toDto(row: TrainingSessionRow): TrainingSessionDto {
         teamShortName: teamSeason.team.shortName,
         teamAlternativeName: teamSeason.team.alternativeName,
       }) ?? teamSeason.displayName,
-    date: dateKeyFromDate(row.date),
-    weekday: row.weekday as Weekday,
-    startAt: row.startAt.toISOString(),
-    endAt: row.endAt.toISOString(),
+    date: dateKeyFromDate(effectiveDate),
+    weekday: row.overrideDate ? weekdayFromDate(effectiveDate) : (row.weekday as Weekday),
+    startAt: effectiveStartAt.toISOString(),
+    endAt: effectiveEndAt.toISOString(),
     timezone: row.timezone,
     status: row.status as TrainingSessionStatus,
+    originalDate: dateKeyFromDate(row.date),
+    originalStartAt: row.startAt.toISOString(),
+    originalEndAt: row.endAt.toISOString(),
+    isRescheduled,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
