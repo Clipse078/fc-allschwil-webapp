@@ -191,7 +191,13 @@ export type TrainingSessionRow = TrainingSessionScheduleRow & {
   teamSeasonId: string;
   createdAt: Date;
   updatedAt: Date;
-  trainingSeries: { title: string };
+  trainingSeries: {
+    title: string;
+    teamSeason: {
+      displayName: string;
+      team: { name: string; shortName: string | null; alternativeName: string | null };
+    };
+  };
 };
 
 const sessionScheduleSelect = {
@@ -211,7 +217,17 @@ const sessionFullSelect = {
   teamSeasonId: true,
   createdAt: true,
   updatedAt: true,
-  trainingSeries: { select: { title: true } },
+  trainingSeries: {
+    select: {
+      title: true,
+      teamSeason: {
+        select: {
+          displayName: true,
+          team: { select: { name: true, shortName: true, alternativeName: true } },
+        },
+      },
+    },
+  },
 } as const;
 
 /**
@@ -321,6 +337,27 @@ export async function reactivateTrainingSessionSchedule(
   await prisma.trainingSession.update({
     where: { id: sessionId },
     data: { ...data, status: "SCHEDULED" },
+  });
+}
+
+/**
+ * TRAININGCENTER-01: transitions a TrainingSession's manually-set
+ * operational status (SCHEDULED <-> CANCELLED today; POSTPONED/MOVED are
+ * reserved for future exception handling per the schema doc comment).
+ *
+ * Deliberately separate from updateTrainingSessionSchedule() /
+ * deactivateTrainingSession() / reactivateTrainingSessionSchedule(), which
+ * are owned exclusively by the regeneration/reconciliation path — this
+ * helper is the only writer of a genuine, manually-triggered status change
+ * (see session-lifecycle-service.ts for the guarded transitions).
+ */
+export async function updateTrainingSessionStatus(
+  sessionId: string,
+  status: TrainingSessionStatus,
+): Promise<void> {
+  await prisma.trainingSession.update({
+    where: { id: sessionId },
+    data: { status },
   });
 }
 

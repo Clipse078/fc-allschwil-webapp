@@ -260,3 +260,20 @@ export class TrainingSessionGenerationWindowError extends Error {
     this.name = "TrainingSessionGenerationWindowError";
   }
 }
+
+// =============================================================================
+// TRAININGCENTER-01 errors — single-occurrence lifecycle (cancel/restore)
+// =============================================================================
+
+/**
+ * The requested manually-triggered status transition is not allowed from
+ * the session's current status (e.g. cancelling a RECURRENCE_REMOVED
+ * session, or restoring a session that isn't CANCELLED).
+ */
+export class TrainingSessionInvalidTransitionError extends Error {
+  readonly code = "TRAINING_SESSION_INVALID_TRANSITION" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "TrainingSessionInvalidTransitionError";
+  }
+}

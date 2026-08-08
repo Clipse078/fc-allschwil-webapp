@@ -28,6 +28,7 @@ import type {
   UpdateTrainingAllocationInput,
   ListTrainingAllocationsFilter,
 } from "./types";
+import type { TrainingAllocationSummary } from "./operational-state";
 import {
   TrainingAllocationNotFoundError,
   TrainingAllocationDuplicateError,
@@ -278,6 +279,48 @@ export async function getTrainingAllocation(
   allocationId: string,
 ): Promise<TrainingAllocationDto> {
   return allocationToDto(await requireAllocation(tenantId, allocationId));
+}
+
+/**
+ * TRAININGCENTER-01: builds a tenant-wide lookup of each TrainingSeries'
+ * allocation coverage — whether it has at least one pitch/resource
+ * allocation (FULL_PITCH/HALF_PITCH) and at least one dressing-room
+ * allocation (DRESSING_ROOM). Used by the Month/Week/Day operational views
+ * (lib/training/operational-state.ts) to assess open actions without an
+ * N+1 query per session — allocation is series-level, so one row per
+ * TrainingSeries with any allocations covers every one of its occurrences.
+ *
+ * Series with zero allocations at all are simply absent from the returned
+ * map; callers treat a missing entry as "nothing allocated" (see
+ * assessTrainingOperationalState()'s `allocationSummary ?? { ... false }`
+ * fallback).
+ */
+export async function listAllocationSummaryByTenant(
+  tenantId: string,
+): Promise<Map<string, TrainingAllocationSummary>> {
+  const rows = await prisma.trainingAllocation.findMany({
+    where: { tenantId },
+    select: {
+      trainingSeriesId: true,
+      facilityResource: { select: { type: true } },
+    },
+  });
+
+  const summary = new Map<string, TrainingAllocationSummary>();
+  for (const row of rows) {
+    const entry = summary.get(row.trainingSeriesId) ?? {
+      hasPitchAllocation: false,
+      hasDressingRoomAllocation: false,
+    };
+    if (row.facilityResource.type === "FULL_PITCH" || row.facilityResource.type === "HALF_PITCH") {
+      entry.hasPitchAllocation = true;
+    }
+    if (row.facilityResource.type === "DRESSING_ROOM") {
+      entry.hasDressingRoomAllocation = true;
+    }
+    summary.set(row.trainingSeriesId, entry);
+  }
+  return summary;
 }
 
 /**
