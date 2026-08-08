@@ -19,7 +19,7 @@ vi.mock("../../client", () => ({
   fetchTeamPicture: (...args: unknown[]) => mockFetchTeamPicture(...args),
 }));
 
-import { resolveProviderLogoDataUri } from "../team-logo";
+import { resolveClubLogoFromCandidateTeamIds, resolveProviderLogoDataUri } from "../team-logo";
 import { SfvAuthError, SfvNetworkError } from "../../errors";
 
 /** Minimal valid 1x1 transparent GIF — same fixture used by team-picture.test.ts. */
@@ -169,5 +169,97 @@ describe("resolveProviderLogoDataUri — best-effort: never throws", () => {
     mockFetchTeamPicture.mockRejectedValueOnce(new Error("boom"));
 
     await expect(resolveProviderLogoDataUri(31927)).resolves.toBeNull();
+  });
+});
+
+// ── CLUB-DIRECTORY-02C — multi-candidate club logo resolution ────────────────
+
+describe("resolveClubLogoFromCandidateTeamIds — first candidate succeeds", () => {
+  it("returns the first successful crest and never tries a second candidate", async () => {
+    mockFetchTeamPicture.mockResolvedValueOnce({
+      base64: GIF_BASE64,
+      contentType: "application/json",
+      contentLength: null,
+      etag: null,
+      lastModified: null,
+      cacheControl: null,
+    });
+
+    const result = await resolveClubLogoFromCandidateTeamIds([31927, 31928, 31929]);
+
+    expect(result.logoUrl).toBe(`data:image/gif;base64,${GIF_BASE64}`);
+    expect(result.attemptedTeamIds).toEqual([31927]);
+    expect(mockFetchTeamPicture).toHaveBeenCalledTimes(1);
+    expect(mockFetchTeamPicture).toHaveBeenCalledWith(31927);
+  });
+});
+
+describe("resolveClubLogoFromCandidateTeamIds — first candidate fails, sibling succeeds", () => {
+  it("falls through to a later candidate teamId when an earlier one has no picture on file", async () => {
+    mockFetchTeamPicture
+      .mockRejectedValueOnce(new SfvNetworkError("SFV_NOT_FOUND", "no picture on file"))
+      .mockResolvedValueOnce({
+        base64: GIF_BASE64,
+        contentType: "application/json",
+        contentLength: null,
+        etag: null,
+        lastModified: null,
+        cacheControl: null,
+      });
+
+    const result = await resolveClubLogoFromCandidateTeamIds([31927, 31928]);
+
+    expect(result.logoUrl).toBe(`data:image/gif;base64,${GIF_BASE64}`);
+    expect(result.attemptedTeamIds).toEqual([31927, 31928]);
+    expect(mockFetchTeamPicture).toHaveBeenNthCalledWith(1, 31927);
+    expect(mockFetchTeamPicture).toHaveBeenNthCalledWith(2, 31928);
+  });
+
+  it("skips a malformed-payload candidate and succeeds on the next one", async () => {
+    mockFetchTeamPicture
+      .mockResolvedValueOnce({
+        base64: Buffer.from("not an image").toString("base64"),
+        contentType: "application/json",
+        contentLength: null,
+        etag: null,
+        lastModified: null,
+        cacheControl: null,
+      })
+      .mockResolvedValueOnce({
+        base64: GIF_BASE64,
+        contentType: "application/json",
+        contentLength: null,
+        etag: null,
+        lastModified: null,
+        cacheControl: null,
+      });
+
+    const result = await resolveClubLogoFromCandidateTeamIds([31927, 31928]);
+
+    expect(result.logoUrl).toBe(`data:image/gif;base64,${GIF_BASE64}`);
+    expect(result.attemptedTeamIds).toEqual([31927, 31928]);
+  });
+});
+
+describe("resolveClubLogoFromCandidateTeamIds — every candidate fails", () => {
+  it("returns null with the full attempted-team-id list when no candidate has a crest", async () => {
+    mockFetchTeamPicture
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new SfvNetworkError("SFV_NOT_FOUND", "no picture on file"))
+      .mockResolvedValueOnce(null);
+
+    const result = await resolveClubLogoFromCandidateTeamIds([31927, 31928, 31929]);
+
+    expect(result.logoUrl).toBeNull();
+    expect(result.attemptedTeamIds).toEqual([31927, 31928, 31929]);
+    expect(mockFetchTeamPicture).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns null with an empty attempted list for an empty candidate list", async () => {
+    const result = await resolveClubLogoFromCandidateTeamIds([]);
+
+    expect(result.logoUrl).toBeNull();
+    expect(result.attemptedTeamIds).toEqual([]);
+    expect(mockFetchTeamPicture).not.toHaveBeenCalled();
   });
 });

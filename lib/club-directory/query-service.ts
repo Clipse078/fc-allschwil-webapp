@@ -13,6 +13,7 @@ import type {
   ExternalClubDetailDto,
   ExternalClubDetailInput,
   ExternalClubListInput,
+  ExternalClubProviderLookupResult,
   ExternalClubProviderMappingDto,
   ExternalClubSummaryDto,
   ExternalTeamDetailDto,
@@ -20,6 +21,7 @@ import type {
   ExternalTeamListInput,
   ExternalTeamProviderMappingDto,
   ExternalTeamSummaryDto,
+  ProviderClubIdentityLookupInput,
   ProviderIdentityLookupInput,
 } from "./types";
 
@@ -365,4 +367,56 @@ export async function findExternalTeamByProviderIdentity(
   });
 
   return record === null ? null : toTeamDetailDto(record);
+}
+
+/**
+ * CLUB-DIRECTORY-02C LOGO COMPLETENESS forward-compatibility hook.
+ *
+ * Resolves the canonical ExternalClub for a provider CLUB identity (SFV:
+ * clubNumber) together with every distinct provider teamId already linked
+ * to one of its ExternalTeams — the full candidate set a logo-enrichment
+ * attempt may try (see lib/integrations/sfv/sync/team-logo.ts
+ * `resolveClubLogoFromCandidateTeamIds`), so that a picture-fetch failure
+ * for ONE linked team never means the club stays logo-less if ANOTHER
+ * already-linked team can provide the crest.
+ *
+ * Returns null when no ExternalClub has been linked to that provider club
+ * identity yet (brand-new club — nothing to look up).
+ */
+export async function findExternalClubByProviderClubId(
+  database: ClubDirectoryQueryDatabase,
+  input: ProviderClubIdentityLookupInput,
+): Promise<ExternalClubProviderLookupResult | null> {
+  const tenantId = requireIdentifier(input.tenantId, "tenantId");
+  const provider = requireIdentifier(input.provider, "provider").toUpperCase();
+
+  if (!Number.isInteger(input.providerClubId) || input.providerClubId <= 0) {
+    throw new Error("providerClubId must be a positive integer.");
+  }
+
+  const record = await database.externalClub.findFirst({
+    where: {
+      tenantId,
+      providerMappings: { some: { provider, providerClubId: input.providerClubId } },
+    },
+  });
+
+  if (record === null) return null;
+
+  const linkedProviderTeamIds = [
+    ...new Set(
+      record.externalTeams.flatMap((team) =>
+        team.providerMappings
+          .filter((mapping) => mapping.provider === provider)
+          .map((mapping) => mapping.providerTeamId),
+      ),
+    ),
+  ].sort((a, b) => a - b);
+
+  return {
+    id: record.id,
+    logoUrl: record.logoUrl,
+    archivedAt: record.archivedAt,
+    linkedProviderTeamIds,
+  };
 }

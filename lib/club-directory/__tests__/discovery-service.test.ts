@@ -144,6 +144,33 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
         clubMappings.push(created);
         return created;
       },
+      // CLUB-DIRECTORY-02C: plain create() — never upsert() — used
+      // exclusively inside transaction() to atomically claim a provider
+      // CLUB identity. Mirrors the real Postgres unique-constraint
+      // behaviour: a duplicate (tenantId, provider, providerClubId) throws
+      // ClubDirectoryUniqueConstraintError instead of silently updating the
+      // existing row.
+      create: async (args: object) => {
+        const { data } = args as CreateArgs;
+        const key = data as { tenantId: string; provider: string; providerClubId: number };
+        const existing = clubMappings.find(
+          (m) =>
+            m.tenantId === key.tenantId &&
+            m.provider === key.provider &&
+            m.providerClubId === key.providerClubId,
+        );
+        if (existing) {
+          throw new ClubDirectoryUniqueConstraintError(
+            "ExternalClubProviderMapping already exists for this identity.",
+          );
+        }
+        const created: FakeClubMappingRow = {
+          id: freshId("club-map"),
+          ...data,
+        } as FakeClubMappingRow;
+        clubMappings.push(created);
+        return created;
+      },
     },
     externalTeamProviderMapping: {
       findFirst: async (args: object) => {
@@ -627,6 +654,303 @@ describe("discoverExternalTeamFromProvider — concurrency (CLUB-DIRECTORY-02 fi
 
     // The failed transaction must not leave a dangling club behind either.
     expect(clubs).toHaveLength(0);
+  });
+});
+
+// ── CLUB-DIRECTORY-02C — club identity consolidation ──────────────────────────
+
+describe("discoverExternalTeamFromProvider — providerClubId consolidation", () => {
+  it("consolidates two brand-new teams sharing the same providerClubId onto ONE ExternalClub", async () => {
+    const first = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 2001,
+      providerTeamName: "FC Therwil 1",
+      providerClubId: 700,
+    });
+
+    const second = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 2002,
+      providerTeamName: "FC Therwil B1",
+      providerClubId: 700,
+    });
+
+    expect(first.club.id).toBe(second.club.id);
+    expect(first.team.id).not.toBe(second.team.id);
+    expect(clubs).toHaveLength(1);
+    expect(teams).toHaveLength(2);
+    expect(clubMappings).toHaveLength(1);
+    expect(clubMappings[0]).toMatchObject({
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerClubId: 700,
+      externalClubId: first.club.id,
+    });
+  });
+
+  it("attaches a THIRD never-seen team with the same providerClubId to the already-established club, discovered on a later sync", async () => {
+    const first = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 2001,
+      providerTeamName: "FC Therwil 1",
+      providerClubId: 700,
+    });
+
+    const third = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 2003,
+      providerTeamName: "FC Therwil D7 gelb",
+      providerClubId: 700,
+    });
+
+    expect(third.club.id).toBe(first.club.id);
+    expect(clubs).toHaveLength(1);
+    expect(teams).toHaveLength(2);
+  });
+
+  it("keeps two teams with DIFFERENT providerClubId as distinct clubs, even with similar names", async () => {
+    const rossoneriA = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4001,
+      providerTeamName: "AC Rossoneri",
+      providerClubId: 111,
+    });
+
+    const rossoneriB = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 4002,
+      providerTeamName: "AC Rossoneri Nord",
+      providerClubId: 222,
+    });
+
+    expect(rossoneriA.club.id).not.toBe(rossoneriB.club.id);
+    expect(clubs).toHaveLength(2);
+    expect(clubMappings).toHaveLength(2);
+  });
+
+  it("never strips team-name suffixes to guess identity — consolidation happens ONLY via providerClubId", async () => {
+    // Same "B1" suffix, deliberately DIFFERENT providerClubId — must stay distinct.
+    const therwil = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 5001,
+      providerTeamName: "FC Therwil B1",
+      providerClubId: 700,
+    });
+    const aesch = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 5002,
+      providerTeamName: "FC Aesch B1",
+      providerClubId: 850,
+    });
+
+    expect(therwil.club.id).not.toBe(aesch.club.id);
+  });
+
+  it("falls back to the narrow per-team-club behaviour when providerClubId is unavailable", async () => {
+    const result = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 6001,
+      providerTeamName: "FC Cup Opponent",
+      providerClubId: null,
+    });
+
+    expect(clubMappings).toHaveLength(0);
+    expect(result.club.name).toBe("FC Cup Opponent");
+  });
+
+  it("ignores a non-positive-integer providerClubId defensively (treated as no identity evidence)", async () => {
+    const result = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 6002,
+      providerTeamName: "FC Malformed Identity",
+      providerClubId: -5,
+    });
+
+    expect(clubMappings).toHaveLength(0);
+    expect(result.discovered).toBe(true);
+  });
+
+  it("re-syncing the same team with the same providerClubId is fully idempotent (no duplicate club/team/mapping)", async () => {
+    for (let i = 0; i < 3; i++) {
+      await discoverExternalTeamFromProvider(db, {
+        tenantId: "tenant-1",
+        provider: "SFV",
+        providerTeamId: 2001,
+        providerTeamName: "FC Therwil 1",
+        providerClubId: 700,
+      });
+    }
+
+    expect(clubs).toHaveLength(1);
+    expect(teams).toHaveLength(1);
+    expect(clubMappings).toHaveLength(1);
+    expect(teamMappings).toHaveLength(1);
+  });
+
+  it("tenant isolation: the same providerClubId under two different tenants resolves to two independent clubs", async () => {
+    const tenantA = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-a",
+      provider: "SFV",
+      providerTeamId: 2001,
+      providerTeamName: "FC Therwil 1",
+      providerClubId: 700,
+    });
+    const tenantB = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-b",
+      provider: "SFV",
+      providerTeamId: 9001,
+      providerTeamName: "FC Therwil 1",
+      providerClubId: 700,
+    });
+
+    expect(tenantA.club.id).not.toBe(tenantB.club.id);
+    expect(clubMappings.filter((m) => m.providerClubId === 700)).toHaveLength(2);
+  });
+});
+
+describe("discoverExternalTeamFromProvider — providerClubId race (CLUB-DIRECTORY-02C concurrency fix)", () => {
+  it("rolls back its own new club and attaches its team under the winner when a CLUB-identity race is lost", async () => {
+    const originalTransaction = db.transaction.bind(db);
+    let winnerClubId: string | null = null;
+    let hasInjectedWinner = false;
+
+    db.transaction = (async (fn: (tx: ClubDirectoryMutationDatabase) => Promise<unknown>) => {
+      // Only inject the competing winner ONCE — the recovery path below
+      // (createTeamShellUnderClub, attaching our team under the winner's
+      // already-resolved club) also goes through this same patched
+      // transaction() and must NOT see a second "fresh" winner injected on
+      // top of the first, or this test would be asserting against its own
+      // artifact rather than the real recovery behaviour.
+      if (hasInjectedWinner) {
+        return originalTransaction(fn);
+      }
+      hasInjectedWinner = true;
+
+      // A competing caller already committed a brand-new club for the SAME
+      // providerClubId (via a different team) by the time this transaction
+      // starts.
+      const winnerClub: ExternalClubRow = {
+        id: freshId("club"),
+        tenantId: "tenant-1",
+        name: "FC Therwil",
+        shortName: null,
+        alternativeName: null,
+        website: null,
+        location: null,
+        logoUrl: null,
+        notes: null,
+        source: "SFV",
+        archivedAt: null,
+      };
+      clubs.push(winnerClub);
+      winnerClubId = winnerClub.id;
+
+      const winnerTeam: ExternalTeamRow = {
+        id: freshId("team"),
+        tenantId: "tenant-1",
+        externalClubId: winnerClub.id,
+        name: "FC Therwil 1",
+        shortName: null,
+        alternativeName: null,
+        categoryLabel: null,
+        logoUrl: null,
+        source: "SFV",
+        archivedAt: null,
+      };
+      teams.push(winnerTeam);
+
+      clubMappings.push({
+        id: freshId("club-map"),
+        tenantId: "tenant-1",
+        externalClubId: winnerClub.id,
+        provider: "SFV",
+        providerClubId: 700,
+      });
+      teamMappings.push({
+        id: freshId("team-map"),
+        tenantId: "tenant-1",
+        externalTeamId: winnerTeam.id,
+        provider: "SFV",
+        providerTeamId: 2001,
+        providerSeasonId: 0,
+      });
+
+      return originalTransaction(fn);
+    }) as typeof db.transaction;
+
+    // Our own call is discovering a DIFFERENT team (2002) under the SAME
+    // brand-new providerClubId — it must attach to the winner's club, not
+    // create a second one.
+    const result = await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 2002,
+      providerTeamName: "FC Therwil B1",
+      providerClubId: 700,
+    });
+
+    expect(result.club.id).toBe(winnerClubId);
+    expect(result.discovered).toBe(true);
+    // Exactly one club/club-mapping survive — our own attempted club
+    // (created inside the now-rolled-back transaction) never persisted.
+    expect(clubs).toHaveLength(1);
+    expect(clubMappings).toHaveLength(1);
+    // Both teams (winner's + ours) persist under that one club.
+    expect(teams).toHaveLength(2);
+    expect(teams.every((t) => t.externalClubId === winnerClubId)).toBe(true);
+  });
+
+  it("does not leave an orphan club behind when the club-mapping create conflicts", async () => {
+    const originalTransaction = db.transaction.bind(db);
+
+    db.transaction = (async (fn: (tx: ClubDirectoryMutationDatabase) => Promise<unknown>) => {
+      const winnerClub: ExternalClubRow = {
+        id: freshId("club"),
+        tenantId: "tenant-1",
+        name: "Winner Club",
+        shortName: null,
+        alternativeName: null,
+        website: null,
+        location: null,
+        logoUrl: null,
+        notes: null,
+        source: "SFV",
+        archivedAt: null,
+      };
+      clubs.push(winnerClub);
+
+      clubMappings.push({
+        id: freshId("club-map"),
+        tenantId: "tenant-1",
+        externalClubId: winnerClub.id,
+        provider: "SFV",
+        providerClubId: 999999,
+      });
+
+      return originalTransaction(fn);
+    }) as typeof db.transaction;
+
+    await discoverExternalTeamFromProvider(db, {
+      tenantId: "tenant-1",
+      provider: "SFV",
+      providerTeamId: 7001,
+      providerTeamName: "Race Team",
+      providerClubId: 999999,
+    });
+
+    // Our own attempt (inside the now-rolled-back transaction) tried to
+    // create a club named "Race Team" — it must not survive.
+    expect(clubs.filter((c) => c.name === "Race Team")).toHaveLength(0);
   });
 });
 

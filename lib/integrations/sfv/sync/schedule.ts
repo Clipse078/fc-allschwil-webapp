@@ -47,9 +47,12 @@
 
 import { requireEnabledSfvConfigForTenant } from "../tenant-config-service";
 import { markScheduleSyncSuccessful } from "../tenant-config-repository";
-import { fetchClubSchedule, fetchTeamList } from "../client";
+import { fetchClubRanking, fetchClubSchedule, fetchTeamList } from "../client";
 import { toSafePublicError } from "../errors";
 import { createExternalOpponentResolver } from "./external-team-discovery";
+import { buildProviderClubIdIndex } from "./club-identity";
+import { runSfvClubConsolidationForCurrentSync } from "./club-consolidation";
+import { logClubIdentityConflict } from "./schedule-logging";
 import type { SfvScheduleSyncContext, SfvScheduleSyncResult } from "./schedule-types";
 import type { SyncErrorEntry } from "./types";
 import {
@@ -229,6 +232,62 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     clubOwnedSfvTeamIds = new Set(teamMappings.keys());
   }
 
+  // ── CLUB-DIRECTORY-02C: resolve a stable SFV club identity (clubNumber) ──
+  //
+  // GET /api/club/ranking reports `clubNumber` for EVERY team appearing in
+  // the tenant's current league/group standings — own teams AND opponents
+  // alike (see club-identity.ts module doc for the full investigation).
+  // Combined with the own-team `clubTeamList` fetched just above (which
+  // already carries `clubNumber` per TeamDetail), this builds a per-run
+  // `teamId -> clubNumber` index that lets external opponent discovery
+  // consolidate onto ONE canonical ExternalClub per real-world club instead
+  // of one dedicated club per team (see external-team-discovery.ts).
+  //
+  // Best-effort, exactly like the team-list fetch above: a ranking-fetch
+  // failure never blocks schedule sync — discovery simply falls back to its
+  // narrow, documented "no club identity evidence" behaviour for every
+  // opponent this run, identical to pre-CLUB-DIRECTORY-02C behaviour.
+  let providerClubIdIndex: ReadonlyMap<number, number> | undefined;
+  try {
+    const rankingEntries = await fetchClubRanking({
+      SeasonId: context.seasonId,
+      ClubId: context.clubId,
+      ...(context.organisationId !== null
+        ? { OrganisationId: context.organisationId }
+        : {}),
+    });
+    const { indexByTeamId, conflicts } = buildProviderClubIdIndex(
+      clubTeamList ?? [],
+      rankingEntries,
+    );
+    providerClubIdIndex = indexByTeamId;
+    for (const conflict of conflicts) {
+      logClubIdentityConflict(tenantId, conflict.teamId, conflict.observedClubIds);
+    }
+  } catch {
+    // Ranking fetch failed — proceed without club-identity evidence this
+    // run. Never blocks schedule sync.
+  }
+
+  // ── CLUB-DIRECTORY-02C: opportunistic backfill/consolidation ─────────────
+  //
+  // Reconciles any PRE-EXISTING duplicate ExternalClub rows for exactly the
+  // teamIds this run's providerClubIdIndex covers — bounded, zero extra SFV
+  // calls (reuses the ranking/team-list data just fetched above). Runs
+  // BEFORE external opponent discovery below so a just-merged canonical
+  // club is what discovery sees this run, rather than risking a stale read.
+  // Best-effort: never blocks schedule sync on failure. See
+  // lib/club-directory/consolidation-service.ts for the full safety
+  // invariants (never loses a team, never deletes a club, tenant-scoped,
+  // idempotent). runSfvClubConsolidationForCurrentSync already swallows its
+  // own errors — this try/catch is defense-in-depth only, matching every
+  // other best-effort step in this function.
+  try {
+    await runSfvClubConsolidationForCurrentSync(tenantId, providerClubIdIndex);
+  } catch {
+    // Best-effort: consolidation must never block schedule sync.
+  }
+
   // ── TEAM-SFV-MAPPING-02: heal missing current-season team mappings ───────
   //
   // The automatic (cron-triggered) sync never calls syncSfvTeams — only this
@@ -318,7 +377,11 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
   // appearing in several matches within the same run is only discovered
   // once. Never throws — discovery failures must never block schedule sync
   // (see createExternalOpponentResolver).
-  const resolveExternalTeamId = createExternalOpponentResolver(tenantId, context.syncedAt);
+  const resolveExternalTeamId = createExternalOpponentResolver(
+    tenantId,
+    context.syncedAt,
+    providerClubIdIndex,
+  );
 
   // ── Process each schedule entry ──────────────────────────────────────────
 

@@ -173,6 +173,33 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
         clubMappings.push(created);
         return created;
       },
+      // CLUB-DIRECTORY-02C: plain create() — never upsert() — used
+      // exclusively inside transaction() to atomically claim a provider
+      // CLUB identity. Mirrors the real Postgres unique-constraint
+      // behaviour: a duplicate (tenantId, provider, providerClubId) throws
+      // ClubDirectoryUniqueConstraintError instead of silently updating the
+      // existing row.
+      create: async (args: object) => {
+        const { data } = args as CreateArgs;
+        const key = data as { tenantId: string; provider: string; providerClubId: number };
+        const existing = clubMappings.find(
+          (m) =>
+            m.tenantId === key.tenantId &&
+            m.provider === key.provider &&
+            m.providerClubId === key.providerClubId,
+        );
+        if (existing) {
+          throw new ClubDirectoryUniqueConstraintError(
+            "ExternalClubProviderMapping already exists for this identity.",
+          );
+        }
+        const created: ExternalClubProviderMappingRow = {
+          id: freshId("club-map"),
+          ...data,
+        } as ExternalClubProviderMappingRow;
+        clubMappings.push(created);
+        return created;
+      },
     },
     externalTeamProviderMapping: {
       findFirst: async (args: object) => {

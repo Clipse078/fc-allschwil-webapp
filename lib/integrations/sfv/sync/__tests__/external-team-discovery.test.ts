@@ -47,6 +47,11 @@ describe("createExternalOpponentResolver", () => {
         provider: "SFV",
         providerTeamId: 51234,
         providerTeamName: "SV Muttenz B1",
+        // No providerClubIdIndex was supplied to createExternalOpponentResolver
+        // in this test (see external-team-discovery-club-identity.test.ts for
+        // dedicated coverage of that resolution), so providerClubId is null —
+        // the narrow, documented "no club identity evidence" fallback.
+        providerClubId: null,
         // No real Prisma client is wired in this test (prisma is mocked to
         // `{ fake: "prisma-client" }`), so the CLUB-DIRECTORY-02B logo
         // pre-check throws internally and is swallowed — see

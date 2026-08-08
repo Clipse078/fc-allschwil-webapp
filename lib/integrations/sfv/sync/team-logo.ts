@@ -95,6 +95,43 @@ const ALLOWED_PROVIDER_LOGO_MIME_TYPES = new Set([
  * field-ownership rules already used for every other provider-sourced field
  * (lib/club-directory/provider-sync.ts / mutation-service.ts).
  */
+/**
+ * ─── CLUB-DIRECTORY-02C — LOGO COMPLETENESS: multi-candidate resolution ────────
+ *
+ * A canonical ExternalClub now legitimately has several linked SFV teamIds
+ * (CLUB-DIRECTORY-02C consolidation). SFV's team-picture endpoint sometimes
+ * has no picture on file for one specific teamId (204/404) even though the
+ * SAME real club has a picture on file for a sibling team. A failure for one
+ * linked teamId must therefore never be treated as "this club has no crest"
+ * — every other already-linked teamId is tried, in order, before giving up.
+ *
+ * Stops at the first non-null result and never calls `resolveProviderLogoDataUri`
+ * for any later candidate — "successful logo is stored once at club level,
+ * do not repeatedly fetch."
+ */
+export type ClubLogoCandidateResolution = {
+  /** The resolved `data:` URI, or null when every candidate yielded nothing. */
+  logoUrl: string | null;
+  /** Every candidate teamId actually tried, in order (for diagnostics). */
+  attemptedTeamIds: number[];
+};
+
+export async function resolveClubLogoFromCandidateTeamIds(
+  candidateTeamIds: readonly number[],
+): Promise<ClubLogoCandidateResolution> {
+  const attemptedTeamIds: number[] = [];
+
+  for (const teamId of candidateTeamIds) {
+    attemptedTeamIds.push(teamId);
+    const logoUrl = await resolveProviderLogoDataUri(teamId);
+    if (logoUrl !== null) {
+      return { logoUrl, attemptedTeamIds };
+    }
+  }
+
+  return { logoUrl: null, attemptedTeamIds };
+}
+
 export async function resolveProviderLogoDataUri(sfvTeamId: number): Promise<string | null> {
   try {
     const picture = await fetchTeamPicture(sfvTeamId);
