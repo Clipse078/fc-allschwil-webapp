@@ -294,7 +294,7 @@ export default function TeamsOverviewGrid({
                   {/* Status + provider mapping + visibility + chevron */}
                   <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
                     <AdminStatusPill
-                      label={team.isActive ? "Aktiv" : "Inaktiv"}
+                      label={team.isActive ? "Aktiv" : "Archiviert"}
                       tone={team.isActive ? "success" : "muted"}
                     />
                     <ProviderMappingBadge providerMapping={team.providerMapping} />

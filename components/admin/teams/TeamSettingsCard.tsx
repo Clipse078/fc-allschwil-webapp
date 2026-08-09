@@ -378,14 +378,7 @@ export default function TeamSettingsCard({
         </label>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Toggle
-          label="Aktiv"
-          value={form.isActive}
-          disabled={!canManage}
-          onChange={(value) => updateField("isActive", value)}
-        />
-
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Toggle
           label="Website sichtbar"
           value={form.websiteVisible}

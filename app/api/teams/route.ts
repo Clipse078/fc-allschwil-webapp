@@ -32,6 +32,13 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  // Tenant isolation: never list Teams belonging to another tenant. tenantId
+  // is resolved server-side from the trusted session, never from client input.
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
+  if (!tenant) {
+    return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+  }
+
   const currentSeason = getCurrentSwissFootballSeason();
   const currentSeasonWhere = currentSeason
     ? {
@@ -46,6 +53,7 @@ export async function GET() {
       };
 
   const teams = await prisma.team.findMany({
+    where: { tenantId: tenant.id },
     orderBy: [
       { category: "asc" },
       { sortOrder: "asc" },
@@ -99,6 +107,13 @@ export async function POST(request: NextRequest) {
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  // Tenant isolation: resolved once, up front, from the trusted session —
+  // every create/uniqueness check below is scoped to this tenant.
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
+  if (!tenant) {
+    return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
   }
 
   try {
@@ -161,7 +176,6 @@ export async function POST(request: NextRequest) {
 
     // Validate orgUnitId against active tenant if provided.
     if (orgUnitId !== null) {
-      const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
       const orgUnit = await prisma.orgUnit.findUnique({
         where: { id: orgUnitId },
         select: { id: true, tenantId: true },
@@ -205,6 +219,7 @@ export async function POST(request: NextRequest) {
       where: {
         seasonId,
         team: {
+          tenantId: tenant.id,
           name: {
             equals: name,
             mode: "insensitive",
@@ -250,6 +265,7 @@ export async function POST(request: NextRequest) {
       where: {
         seasonId,
         team: {
+          tenantId: tenant.id,
           slug,
         },
       },
@@ -272,39 +288,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TEAM-CORE-02: slug uniqueness is now tenant-scoped.
+    // TEAM-CORE-02: slug uniqueness is tenant-scoped.
     // Use compound key lookup (tenantId + slug) instead of global slug findUnique.
-    const currentTenantForSlugCheck = await getTenantFromSession(access.session.user?.activeTenantId);
-    const existingTeamBySlug = currentTenantForSlugCheck
-      ? await prisma.team.findUnique({
-          where: {
-            tenantId_slug: {
-              tenantId: currentTenantForSlugCheck.id,
-              slug,
-            },
-          },
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            category: true,
-            genderGroup: true,
-            ageGroup: true,
-            sortOrder: true,
-          },
-        })
-      : await prisma.team.findFirst({
-          where: { slug },
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            category: true,
-            genderGroup: true,
-            ageGroup: true,
-            sortOrder: true,
-          },
-        });
+    const existingTeamBySlug = await prisma.team.findUnique({
+      where: {
+        tenantId_slug: {
+          tenantId: tenant.id,
+          slug,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        category: true,
+        genderGroup: true,
+        ageGroup: true,
+        sortOrder: true,
+      },
+    });
 
     if (
       existingTeamBySlug &&
@@ -327,10 +329,8 @@ export async function POST(request: NextRequest) {
           equals: name,
           mode: "insensitive",
         },
-        // Scope name uniqueness check to same tenant when tenantId is known.
-        ...(currentTenantForSlugCheck
-          ? { tenantId: currentTenantForSlugCheck.id }
-          : {}),
+        // Tenant isolation: name uniqueness is scoped to the active tenant.
+        tenantId: tenant.id,
       },
       select: {
         id: true,
@@ -446,6 +446,7 @@ export async function POST(request: NextRequest) {
 
     const team = await prisma.team.create({
       data: {
+        tenantId: tenant.id,
         name,
         shortName,
         alternativeName,

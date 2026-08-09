@@ -18,15 +18,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireApiPermission: vi.fn(),
+  requireApiAnyPermission: vi.fn(),
   getTenantFromSession: vi.fn(),
   logAction: vi.fn(),
   seasonFindUnique: vi.fn(),
   teamSeasonFindFirst: vi.fn(),
+  teamFindMany: vi.fn(),
   teamFindUnique: vi.fn(),
   teamFindFirst: vi.fn(),
   teamCreate: vi.fn(),
   teamSeasonCreate: vi.fn(),
   teamUpdate: vi.fn(),
+  orgUnitFindUnique: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-api-permission", () => ({
@@ -34,7 +37,7 @@ vi.mock("@/lib/permissions/require-api-permission", () => ({
 }));
 
 vi.mock("@/lib/permissions/require-api-any-permission", () => ({
-  requireApiAnyPermission: vi.fn(),
+  requireApiAnyPermission: mocks.requireApiAnyPermission,
 }));
 
 vi.mock("@/lib/tenants/queries", () => ({
@@ -53,15 +56,23 @@ vi.mock("@/lib/db/prisma", () => ({
       create: (...args: unknown[]) => mocks.teamSeasonCreate(...args),
     },
     team: {
+      findMany: (...args: unknown[]) => mocks.teamFindMany(...args),
       findUnique: (...args: unknown[]) => mocks.teamFindUnique(...args),
       findFirst: (...args: unknown[]) => mocks.teamFindFirst(...args),
       create: (...args: unknown[]) => mocks.teamCreate(...args),
       update: (...args: unknown[]) => mocks.teamUpdate(...args),
     },
+    orgUnit: {
+      findUnique: (...args: unknown[]) => mocks.orgUnitFindUnique(...args),
+    },
   },
 }));
 
-import { POST } from "../route";
+vi.mock("@/lib/seasons/season-logic", () => ({
+  getCurrentSwissFootballSeason: () => null,
+}));
+
+import { GET, POST } from "../route";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -168,5 +179,58 @@ describe("POST /api/teams — TEAM-IDENTITY-01 naming fields", () => {
     );
     expect(response.status).toBe(201);
     expect(mocks.teamCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("POST /api/teams — tenant isolation", () => {
+  it("6 — assigns the caller's active tenantId to the newly created Team", async () => {
+    await POST(makeRequest(VALID_BODY));
+
+    const createArgs = mocks.teamCreate.mock.calls[0][0];
+    expect(createArgs.data.tenantId).toBe("tenant-a");
+  });
+
+  it("7 — scopes duplicate-name/slug lookups to the caller's active tenant", async () => {
+    await POST(makeRequest(VALID_BODY));
+
+    expect(mocks.teamSeasonFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          team: expect.objectContaining({ tenantId: "tenant-a" }),
+        }),
+      }),
+    );
+    expect(mocks.teamFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tenantId: "tenant-a" }) }),
+    );
+  });
+
+  it("8 — rejects an orgUnitId belonging to a different tenant (cross-tenant relationship assignment rejected)", async () => {
+    mocks.orgUnitFindUnique.mockResolvedValueOnce({ id: "ou-1", tenantId: "tenant-other" });
+
+    const response = await POST(makeRequest({ ...VALID_BODY, orgUnitId: "ou-1" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/aktiven Mandanten/);
+    expect(mocks.teamCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/teams — tenant isolation", () => {
+  it("9 — lists only Teams scoped to the caller's active tenant", async () => {
+    mocks.requireApiAnyPermission.mockResolvedValueOnce({
+      ok: true as const,
+      status: 200,
+      error: null,
+      session: { user: { id: "user-01", activeTenantId: "tenant-a" } },
+    });
+    mocks.teamFindMany.mockResolvedValueOnce([]);
+
+    await GET();
+
+    expect(mocks.teamFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: "tenant-a" } }),
+    );
   });
 });

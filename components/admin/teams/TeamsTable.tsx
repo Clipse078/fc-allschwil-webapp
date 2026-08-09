@@ -125,7 +125,7 @@ export default function TeamsTable({ initialTeams }: TeamsTableProps) {
               meta={
                 <>
                   <AdminStatusPill
-                    label={team.isActive ? "Aktiv" : "Inaktiv"}
+                    label={team.isActive ? "Aktiv" : "Archiviert"}
                     tone={team.isActive ? "success" : "muted"}
                   />
                   <span className="fca-pill">
