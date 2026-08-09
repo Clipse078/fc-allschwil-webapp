@@ -67,7 +67,7 @@ describe("getTeamsListData — competition enrichment", () => {
   it("1 — returns null competition when no primary competition is linked", async () => {
     mockFindMany.mockResolvedValueOnce([makeTeamRow()]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.competition).toBeNull();
   });
@@ -91,7 +91,7 @@ describe("getTeamsListData — competition enrichment", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.competition).toEqual({
       name: "Junioren C Promotion",
@@ -104,7 +104,7 @@ describe("getTeamsListData — provider mapping enrichment", () => {
   it("3 — returns null providerMapping for a manual (non-SFV) team", async () => {
     mockFindMany.mockResolvedValueOnce([makeTeamRow({ externalMappings: [] })]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.providerMapping).toBeNull();
   });
@@ -123,7 +123,7 @@ describe("getTeamsListData — provider mapping enrichment", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.providerMapping).toEqual({
       provider: "SFV",
@@ -147,7 +147,7 @@ describe("getTeamsListData — provider mapping enrichment", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.providerMapping?.isActive).toBe(false);
   });
@@ -170,7 +170,7 @@ describe("getTeamsListData — provider mapping enrichment", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.providerMapping).toBeNull();
     expect(team.competition?.name).toBe("Senioren 30+ Promotion");
@@ -196,7 +196,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.displayName).toBe("FC Allschwil Junioren B2");
   });
@@ -204,7 +204,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
   it("8 — shortName optional: Team.shortName surfaces through to the list item", async () => {
     mockFindMany.mockResolvedValueOnce([makeTeamRow({ shortName: "B2" })]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.shortName).toBe("B2");
   });
@@ -212,7 +212,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
   it("9 — alternativeName optional: Team.alternativeName surfaces through to the list item", async () => {
     mockFindMany.mockResolvedValueOnce([makeTeamRow({ alternativeName: "Junioren B2" })]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.alternativeName).toBe("Junioren B2");
   });
@@ -234,7 +234,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.compactName).toBe("B2");
   });
@@ -258,7 +258,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.displayName).toBe("Trainingsgruppe Aktive");
     expect(team.providerMapping).toBeNull();
@@ -291,7 +291,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.displayName).toBe("FC Allschwil C1 (4. Liga)");
   });
@@ -322,7 +322,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
       }),
     ]);
 
-    const [team] = await getTeamsListData();
+    const [team] = await getTeamsListData("tenant-1");
 
     expect(team.displayName).toBe("FC Allschwil Junioren B2");
     expect(team.compactName).toBe("B2");
@@ -359,7 +359,7 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
       }),
     ]);
 
-    const teams = await getTeamsListData();
+    const teams = await getTeamsListData("tenant-1");
 
     expect(teams).toHaveLength(2);
     expect(teams.map((t) => t.id)).toEqual(["team-b1", "team-b2"]);

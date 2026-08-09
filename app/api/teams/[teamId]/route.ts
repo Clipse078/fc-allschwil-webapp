@@ -4,8 +4,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { logAction } from "@/lib/audit/log-action";
 import { getTenantFromSession } from "@/lib/tenants/queries";
+import {
+  TeamDeletionBlockedError,
+  TeamNotFoundError,
+  deleteTeamSafely,
+} from "@/lib/teams/team-lifecycle-service";
 
 type Context = {
   params: Promise<{ teamId: string }>;
@@ -32,8 +38,14 @@ export async function GET(_: NextRequest, context: Context) {
 
   const { teamId } = await context.params;
 
-  const team = await prisma.team.findUnique({
-    where: { id: teamId },
+  // Tenant isolation: never resolve a Team belonging to another tenant.
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
+  if (!tenant) {
+    return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+  }
+
+  const team = await prisma.team.findFirst({
+    where: { id: teamId, tenantId: tenant.id },
     include: {
       teamSeasons: {
         include: {
@@ -66,8 +78,14 @@ export async function PATCH(request: NextRequest, context: Context) {
     const { teamId } = await context.params;
     const body = await request.json();
 
-    const existing = await prisma.team.findUnique({
-      where: { id: teamId },
+    // Tenant isolation: never read or mutate a Team belonging to another tenant.
+    const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
+    if (!tenant) {
+      return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+    }
+
+    const existing = await prisma.team.findFirst({
+      where: { id: teamId, tenantId: tenant.id },
     });
 
     if (!existing) {
@@ -137,7 +155,6 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     // Validate orgUnitId against active tenant if explicitly set to a non-null value.
     if (orgUnitId !== undefined && orgUnitId !== null) {
-      const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
       const orgUnit = await prisma.orgUnit.findUnique({
         where: { id: orgUnitId },
         select: { id: true, tenantId: true },
@@ -166,7 +183,11 @@ export async function PATCH(request: NextRequest, context: Context) {
         genderGroup,
         ageGroup,
         sortOrder,
-        isActive: Boolean(body.isActive),
+        // isActive (archive state) is deliberately NOT force-defaulted to
+        // false when omitted — archive/restore now have dedicated actions
+        // (POST /api/teams/[teamId]/archive|restore) to prevent a plain
+        // settings save from silently un-archiving/archiving a Team.
+        isActive: typeof body.isActive === "boolean" ? body.isActive : existing.isActive,
         websiteVisible: Boolean(body.websiteVisible),
         infoboardVisible: Boolean(body.infoboardVisible),
         ...(orgUnitId !== undefined ? { orgUnitId } : {}),
@@ -259,6 +280,66 @@ export async function PATCH(request: NextRequest, context: Context) {
   }
 }
 
+/**
+ * DELETE — safe hard delete. Requires TEAMS_MANAGE, strictly tenant-scoped.
+ *
+ * Refuses to delete when meaningful dependencies/history exist (roster,
+ * training, matches, tournaments, provider mappings, multi-season history,
+ * organisation assignments) — recommends archiving instead. Never
+ * cascade-deletes sporting history just to remove a Team record.
+ */
+export async function DELETE(_request: NextRequest, context: Context) {
+  const access = await requireApiPermission(PERMISSIONS.TEAMS_MANAGE);
 
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
 
+  const { teamId } = await context.params;
+
+  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
+  if (!tenant) {
+    return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+  }
+
+  try {
+    const deleted = await deleteTeamSafely(tenant.id, teamId);
+
+    await logAction({
+      actorUserId:
+        access.session?.user?.effectiveUserId ??
+        access.session?.user?.id ??
+        null,
+      moduleKey: "teams",
+      entityType: "Team",
+      entityId: teamId,
+      action: "DELETE",
+      beforeJson: deleted,
+    });
+
+    revalidatePath("/dashboard/teams");
+
+    return NextResponse.json({ message: "Team wurde endgültig gelöscht." });
+  } catch (error) {
+    if (error instanceof TeamNotFoundError) {
+      return NextResponse.json({ error: "Team nicht gefunden." }, { status: 404 });
+    }
+
+    if (error instanceof TeamDeletionBlockedError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          blockers: error.blockers,
+        },
+        { status: 409 }
+      );
+    }
+
+    console.error("Delete team failed:", error);
+    return NextResponse.json(
+      { error: "Team konnte nicht gelöscht werden." },
+      { status: 500 }
+    );
+  }
+}
 

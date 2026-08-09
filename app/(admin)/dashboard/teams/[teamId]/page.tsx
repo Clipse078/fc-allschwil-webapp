@@ -2,6 +2,7 @@
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
+import TeamLifecycleCard from "@/components/admin/teams/TeamLifecycleCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -81,8 +82,8 @@ export default async function TeamDetailPage({ params }: Props) {
         title={displayTitle}
         description={displayTitle !== team.name ? team.name : undefined}
         headerBadge={
-          <Badge variant={team.isActive ? "success" : "default"}>
-            {team.isActive ? "Aktiv" : "Inaktiv"}
+          <Badge variant={team.isActive ? "success" : "outline"}>
+            {team.isActive ? "Aktiv" : "Archiviert"}
           </Badge>
         }
         breadcrumbs={[
@@ -142,6 +143,13 @@ export default async function TeamDetailPage({ params }: Props) {
         }
         sidebar={
           <>
+            <TeamLifecycleCard
+              teamId={team.id}
+              teamName={displayTitle}
+              isActive={team.isActive}
+              canManage={canManage}
+            />
+
             {activeSeason ? (
               <SectionCard title="Saison">
                 <PropertyGrid

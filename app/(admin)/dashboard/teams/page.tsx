@@ -5,7 +5,9 @@ import TeamsCategorySummary from "@/components/admin/teams/TeamsCategorySummary"
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { notFound } from "next/navigation";
 import { getAvailableTeamSeasons, getTeamsListData } from "@/lib/teams/queries";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
 
@@ -54,6 +56,11 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
     PERMISSIONS.TEAMS_MANAGE,
   ]);
 
+  const tenant = await getActiveTenant();
+  if (!tenant) {
+    notFound();
+  }
+
   const params = (await searchParams) ?? {};
   const availableSeasons = await getAvailableTeamSeasons();
 
@@ -70,7 +77,7 @@ export default async function TeamsPage({ searchParams }: TeamsPageProps) {
   const selectedSeason =
     availableSeasons.find((season) => season.key === selectedSeasonKey) ?? null;
 
-  const teams = await getTeamsListData(selectedSeasonKey);
+  const teams = await getTeamsListData(tenant.id, selectedSeasonKey);
 
   const categoryMap = new Map<string, number>();
   for (const team of teams) {

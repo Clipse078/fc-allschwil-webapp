@@ -18,7 +18,14 @@ export async function getAvailableTeamSeasons() {
   return seasons;
 }
 
-export async function getTeamsListData(selectedSeasonKey?: string) {
+/**
+ * Returns the tenant-scoped Teams list for the dashboard overview.
+ *
+ * tenantId is required and always sourced from the trusted server-side
+ * session/tenant context (never from client input) — see callers in
+ * app/(admin)/dashboard/teams/page.tsx and app/api/teams/route.ts.
+ */
+export async function getTeamsListData(tenantId: string, selectedSeasonKey?: string) {
   const currentSeason = getCurrentSwissFootballSeason();
 
   const resolvedSeasonKey =
@@ -39,6 +46,7 @@ export async function getTeamsListData(selectedSeasonKey?: string) {
       };
 
   const teams = await prisma.team.findMany({
+    where: { tenantId },
     orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     select: {
       id: true,
