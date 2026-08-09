@@ -4012,6 +4012,26 @@ enum WeekplannerAllocationGroup {
 // migration SQL (Prisma cannot express a partial/conditional @@unique
 // natively; mirrors the identical TrainingPlan.name technique).
 //
+// WEEKPLANNER-01E — Operational Plan Activation Foundation:
+//
+// `isActive` persists which single alternative WeekplannerPlan (if any) is
+// operationally effective for its (tenantId, weekId) — consumed later by
+// Infoboard/Website publication (not wired in this slice). Selecting
+// `?plan=<id>` only changes admin VIEW state (see WeekplannerPlanBar /
+// the week page's `activePlanId`) and never implicitly activates a plan —
+// activation is a separate, explicit management action
+// (activateWeekplannerPlan / deactivateWeekplannerPlan, see
+// lib/weekplanner/plan-service.ts).
+//
+// `isActive=false` for every plan in a (tenantId, weekId) means Standardplan
+// (the canonical Training/Match/Tournament state — never a row here, see
+// module doc comment above) is operationally active. At most one
+// non-archived plan may have `isActive=true` per (tenantId, weekId) —
+// enforced via a partial unique index in the migration SQL (mirrors
+// TrainingPlan.isDefault's identical technique). Archiving an active plan
+// always clears `isActive` in the same update, so the week is never left
+// with an active-but-archived plan.
+//
 // Security invariants:
 //   - All queries must scope by tenantId.
 //   - Tenant A cannot read or modify Tenant B's plans.
@@ -4029,6 +4049,11 @@ model WeekplannerPlan {
   updatedAt       DateTime  @updatedAt
   /// Set when archived (soft delete). Null while active.
   archivedAt      DateTime?
+  /// WEEKPLANNER-01E — operationally active flag. At most one non-archived
+  /// plan per (tenantId, weekId) may be true — see partial unique index in
+  /// the migration SQL. False for every plan == Standardplan operationally
+  /// active. Never true while archivedAt is set.
+  isActive        Boolean   @default(false)
 
   tenant            Tenant                            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   allocations       WeekplannerPlanAllocation[]
@@ -4037,6 +4062,7 @@ model WeekplannerPlan {
   @@index([tenantId])
   @@index([tenantId, weekId])
   @@index([tenantId, weekId, archivedAt])
+  @@index([tenantId, weekId, isActive])
 }
 
 // ---------------------------------------------------------------------------

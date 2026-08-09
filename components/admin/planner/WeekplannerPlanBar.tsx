@@ -14,11 +14,18 @@
  *     + Plan erstellen
  *
  * Fully generic — no plan name is ever hardcoded here.
+ *
+ * WEEKPLANNER-01E — adds the OPERATIONAL activation status/action, fully
+ * independent of `activePlanId` (which is only the admin VIEW selection —
+ * `?plan=<id>` never implicitly activates a plan). The operational banner
+ * always reflects `plans.find((p) => p.isActive)` (null == Standardplan
+ * operationally active); activation/deactivation is only offered while
+ * viewing that same alternative plan, as an explicit action.
  */
 
 import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Archive, Check, Loader2, Pencil, Plus, Power, PowerOff, Trash2, X } from "lucide-react";
 import type { WeekplannerPlanDto } from "@/lib/weekplanner/plan-types";
 
 const STANDARDPLAN_VALUE = "";
@@ -46,6 +53,11 @@ export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }
   const [renameValue, setRenameValue] = useState("");
 
   const activePlan = activePlanId ? plans.find((p) => p.id === activePlanId) ?? null : null;
+
+  // WEEKPLANNER-01E — the OPERATIONALLY active plan (or null == Standardplan
+  // operationally active). Deliberately independent of `activePlan` above
+  // (the admin VIEW selection) — viewing a plan never activates it.
+  const operationalPlan = plans.find((p) => p.isActive) ?? null;
 
   const handleSelect = useCallback(
     (value: string) => {
@@ -129,6 +141,48 @@ export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }
     });
   }, [activePlan, weekParam, router]);
 
+  const handleActivate = useCallback(() => {
+    if (!activePlan) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/weekplanner/plans/${activePlan.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active: true }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
+        }
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Fehler beim Aktivieren");
+      }
+    });
+  }, [activePlan, router]);
+
+  const handleDeactivate = useCallback(() => {
+    if (!activePlan) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/weekplanner/plans/${activePlan.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active: false }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
+        }
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Fehler beim Deaktivieren");
+      }
+    });
+  }, [activePlan, router]);
+
   const handleDelete = useCallback(() => {
     if (!activePlan) return;
     setError(null);
@@ -195,6 +249,29 @@ export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }
               <Pencil className="h-3 w-3" />
               Umbenennen
             </button>
+            {activePlan.isActive ? (
+              <button
+                type="button"
+                onClick={() => startTransition(handleDeactivate)}
+                disabled={isPending}
+                data-testid="weekplanner-plan-deactivate-button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] disabled:opacity-50"
+              >
+                <PowerOff className="h-3 w-3" />
+                Betriebsplan deaktivieren
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => startTransition(handleActivate)}
+                disabled={isPending}
+                data-testid="weekplanner-plan-activate-button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] disabled:opacity-50"
+              >
+                <Power className="h-3 w-3" />
+                Als Betriebsplan aktivieren
+              </button>
+            )}
             <button
               type="button"
               onClick={() => startTransition(handleArchive)}
@@ -291,6 +368,13 @@ export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }
           {error}
         </p>
       )}
+
+      <div
+        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+        data-testid="weekplanner-operational-plan-banner"
+      >
+        Betriebsplan · {operationalPlan ? operationalPlan.name : "Standardplan"}
+      </div>
 
       {activePlan && (
         <div

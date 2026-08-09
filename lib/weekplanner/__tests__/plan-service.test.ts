@@ -23,8 +23,10 @@ vi.mock("@/lib/db/prisma", () => ({
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
+    $transaction: vi.fn(),
     weekplannerPlanAllocation: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
@@ -54,6 +56,9 @@ import {
   renameWeekplannerPlan,
   archiveWeekplannerPlan,
   deleteWeekplannerPlan,
+  activateWeekplannerPlan,
+  deactivateWeekplannerPlan,
+  getOperationalWeekplannerPlan,
   createWeekplannerPlanAllocation,
   deleteWeekplannerPlanAllocation,
   setWeekplannerPlanActivityTimeOverride,
@@ -89,6 +94,7 @@ function planRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
     updatedAt: new Date("2026-08-01T00:00:00.000Z"),
     archivedAt: null,
+    isActive: false,
     ...overrides,
   };
 }
@@ -133,6 +139,16 @@ function allocationRow(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(prisma.$transaction).mockImplementation(async (arg) => {
+    if (Array.isArray(arg)) return Promise.all(arg);
+    const mockTx = {
+      weekplannerPlan: {
+        update: prisma.weekplannerPlan.update,
+        updateMany: prisma.weekplannerPlan.updateMany,
+      },
+    };
+    return (arg as (tx: typeof mockTx) => Promise<unknown>)(mockTx);
+  });
 });
 
 describe("A. createWeekplannerPlan", () => {
@@ -695,5 +711,153 @@ describe("H. getWeekplannerPlanActivityOverride — tenant isolation", () => {
       getWeekplannerPlanActivityOverride(TENANT_B, PLAN_ID, "TRAINING", "session-1"),
     ).rejects.toThrow(WeekplannerPlanNotFoundError);
     expect(prisma.weekplannerPlanActivityOverride.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+// ── I. WEEKPLANNER-01E — Operational Plan Activation Foundation ───────────
+
+describe("I. getOperationalWeekplannerPlan — read resolver", () => {
+  it("I1: no active alternative plan → resolver returns null (Standardplan operationally active)", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+
+    const result = await getOperationalWeekplannerPlan(TENANT_A, WEEK_ID);
+
+    expect(result).toBeNull();
+    expect(prisma.weekplannerPlan.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: TENANT_A, weekId: WEEK_ID, isActive: true, archivedAt: null },
+    });
+  });
+
+  it("I2: returns the single active alternative plan", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ isActive: true }) as never);
+
+    const result = await getOperationalWeekplannerPlan(TENANT_A, WEEK_ID);
+
+    expect(result?.id).toBe(PLAN_ID);
+    expect(result?.isActive).toBe(true);
+  });
+
+  it("I3: different weeks resolve independently (query is scoped by weekId)", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+
+    await getOperationalWeekplannerPlan(TENANT_A, "2026-08-17");
+
+    expect(prisma.weekplannerPlan.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ weekId: "2026-08-17" }) }),
+    );
+  });
+
+  it("I4: different tenants resolve independently (query is scoped by tenantId)", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+
+    await getOperationalWeekplannerPlan(TENANT_B, WEEK_ID);
+
+    expect(prisma.weekplannerPlan.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tenantId: TENANT_B }) }),
+    );
+  });
+});
+
+describe("J. activateWeekplannerPlan", () => {
+  it("J1: activates Plan A — no prior active plan in this tenant+week", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.weekplannerPlan.updateMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.weekplannerPlan.update).mockResolvedValue(planRow({ isActive: true }) as never);
+
+    const plan = await activateWeekplannerPlan(TENANT_A, PLAN_ID);
+
+    expect(plan.isActive).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.weekplannerPlan.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: TENANT_A, weekId: WEEK_ID, isActive: true, archivedAt: null, NOT: { id: PLAN_ID } },
+      data: { isActive: false },
+    });
+    expect(prisma.weekplannerPlan.update).toHaveBeenCalledWith({
+      where: { id: PLAN_ID },
+      data: { isActive: true },
+    });
+  });
+
+  it("J2: activating Plan B while Plan A is active deactivates Plan A atomically — never two active plans", async () => {
+    const PLAN_B = "plan-2";
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ id: PLAN_B, isActive: false }) as never);
+    vi.mocked(prisma.weekplannerPlan.updateMany).mockResolvedValue({ count: 1 } as never);
+    vi.mocked(prisma.weekplannerPlan.update).mockResolvedValue(planRow({ id: PLAN_B, isActive: true }) as never);
+
+    const plan = await activateWeekplannerPlan(TENANT_A, PLAN_B);
+
+    expect(plan.id).toBe(PLAN_B);
+    expect(plan.isActive).toBe(true);
+    // Plan A (and any other active plan in this tenant+week) is cleared BEFORE Plan B is set.
+    expect(prisma.weekplannerPlan.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: TENANT_A, weekId: WEEK_ID, isActive: true, NOT: { id: PLAN_B } }),
+        data: { isActive: false },
+      }),
+    );
+  });
+
+  it("J3: archived plans cannot be activated", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ archivedAt: new Date() }) as never);
+
+    await expect(activateWeekplannerPlan(TENANT_A, PLAN_ID)).rejects.toThrow(WeekplannerPlanArchivedError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("J4: cross-tenant activation is rejected as not found", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+
+    await expect(activateWeekplannerPlan(TENANT_B, PLAN_ID)).rejects.toThrow(WeekplannerPlanNotFoundError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("J5: activation never mutates canonical Training/Match/Tournament data — only WeekplannerPlan rows are touched", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.weekplannerPlan.updateMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.weekplannerPlan.update).mockResolvedValue(planRow({ isActive: true }) as never);
+
+    await activateWeekplannerPlan(TENANT_A, PLAN_ID);
+
+    expect(prisma.trainingSession.findFirst).not.toHaveBeenCalled();
+    expect(prisma.event.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("K. deactivateWeekplannerPlan", () => {
+  it("K1: deactivates the active plan — no active alternative remains (Standardplan operationally active)", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ isActive: true }) as never);
+    vi.mocked(prisma.weekplannerPlan.update).mockResolvedValue(planRow({ isActive: false }) as never);
+
+    const plan = await deactivateWeekplannerPlan(TENANT_A, PLAN_ID);
+
+    expect(plan.isActive).toBe(false);
+    expect(prisma.weekplannerPlan.update).toHaveBeenCalledWith({
+      where: { id: PLAN_ID },
+      data: { isActive: false },
+    });
+  });
+
+  it("K2: cross-tenant deactivation is rejected as not found", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+
+    await expect(deactivateWeekplannerPlan(TENANT_B, PLAN_ID)).rejects.toThrow(WeekplannerPlanNotFoundError);
+    expect(prisma.weekplannerPlan.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("L. archiveWeekplannerPlan — activation interaction", () => {
+  it("L1: archiving the active plan clears isActive in the same update — Standardplan becomes operationally effective", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ isActive: true }) as never);
+    vi.mocked(prisma.weekplannerPlan.update).mockResolvedValue(
+      planRow({ isActive: false, archivedAt: new Date() }) as never,
+    );
+
+    const plan = await archiveWeekplannerPlan(TENANT_A, PLAN_ID);
+
+    expect(plan.isActive).toBe(false);
+    expect(plan.archivedAt).not.toBeNull();
+    expect(prisma.weekplannerPlan.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: PLAN_ID }, data: expect.objectContaining({ isActive: false, archivedAt: expect.any(Date) }) }),
+    );
   });
 });

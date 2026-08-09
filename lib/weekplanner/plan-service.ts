@@ -75,6 +75,7 @@ type PlanRow = {
   createdAt: Date;
   updatedAt: Date;
   archivedAt: Date | null;
+  isActive: boolean;
   _count?: { allocations: number };
 };
 
@@ -124,6 +125,7 @@ function planToDto(row: PlanRow): WeekplannerPlanDto {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
+    isActive: row.isActive,
   };
 }
 
@@ -367,12 +369,20 @@ export async function renameWeekplannerPlan(
   }
 }
 
-/** Soft-deletes (archives) a plan. Hides it from the plan selector while preserving its overrides for history. */
+/**
+ * Soft-deletes (archives) a plan. Hides it from the plan selector while
+ * preserving its overrides for history.
+ *
+ * WEEKPLANNER-01E — always clears `isActive` in the same update: archiving
+ * the operationally active plan must never leave the week with an
+ * active-but-archived plan; Standardplan becomes operationally effective
+ * again.
+ */
 export async function archiveWeekplannerPlan(tenantId: string, planId: string): Promise<WeekplannerPlanDto> {
   await requirePlan(tenantId, planId);
   const plan = await prisma.weekplannerPlan.update({
     where: { id: planId },
-    data: { archivedAt: new Date() },
+    data: { archivedAt: new Date(), isActive: false },
   });
   return planToDto(plan);
 }
@@ -391,6 +401,80 @@ export async function deleteWeekplannerPlan(tenantId: string, planId: string): P
     throw new WeekplannerPlanDeleteUnsafeError(planId);
   }
   await prisma.weekplannerPlan.delete({ where: { id: planId } });
+}
+
+// ── Public API — WEEKPLANNER-01E: Operational Plan Activation ─────────────
+//
+// Persisted activation state — deterministic input for downstream
+// operational/publication consumers (e.g. Infoboard — not wired in this
+// slice). Fully independent from admin VIEW state (`?plan=<id>` /
+// `activePlanId` elsewhere in this module and the UI) — selecting a plan
+// for viewing/editing never activates it; only these two functions do.
+
+/**
+ * Makes `planId` the operationally active plan for its (tenantId, weekId),
+ * atomically deactivating any other active plan in the same tenant+week
+ * first — never exposes a final state with two active alternatives (also
+ * enforced at the DB layer by a partial unique index, see the migration
+ * SQL). Archived plans cannot be activated (WeekplannerPlanArchivedError).
+ */
+export async function activateWeekplannerPlan(tenantId: string, planId: string): Promise<WeekplannerPlanDto> {
+  const target = await requireActivePlan(tenantId, planId);
+
+  const plan = await prisma.$transaction(async (tx) => {
+    await tx.weekplannerPlan.updateMany({
+      where: {
+        tenantId,
+        weekId: target.weekId,
+        isActive: true,
+        archivedAt: null,
+        NOT: { id: planId },
+      },
+      data: { isActive: false },
+    });
+
+    return tx.weekplannerPlan.update({
+      where: { id: planId },
+      data: { isActive: true },
+    });
+  });
+
+  return planToDto(plan);
+}
+
+/**
+ * Deactivates `planId` if it is currently the operationally active plan.
+ * Standardplan automatically becomes operationally effective again — there
+ * is no separate "activate Standardplan" mutation since Standardplan is
+ * never a row (see module doc comment). Idempotent: deactivating an
+ * already-inactive plan is a no-op.
+ */
+export async function deactivateWeekplannerPlan(tenantId: string, planId: string): Promise<WeekplannerPlanDto> {
+  await requirePlan(tenantId, planId);
+  const plan = await prisma.weekplannerPlan.update({
+    where: { id: planId },
+    data: { isActive: false },
+  });
+  return planToDto(plan);
+}
+
+/**
+ * Canonical read resolver for which plan is OPERATIONALLY active for a
+ * tenant+week — the contract future Infoboard/Website publication
+ * consumers resolve against (not wired in this slice).
+ *
+ * Returns null when Standardplan is operationally active (no active
+ * alternative plan exists), or the active WeekplannerPlan otherwise. Never
+ * returns an archived plan.
+ */
+export async function getOperationalWeekplannerPlan(
+  tenantId: string,
+  weekId: string,
+): Promise<WeekplannerPlanDto | null> {
+  const plan = await prisma.weekplannerPlan.findFirst({
+    where: { tenantId, weekId, isActive: true, archivedAt: null },
+  });
+  return plan ? planToDto(plan) : null;
 }
 
 // ── Public API — WeekplannerPlanAllocation (overrides) ────────────────────
