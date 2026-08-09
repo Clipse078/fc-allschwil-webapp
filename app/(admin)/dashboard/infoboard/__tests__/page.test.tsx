@@ -68,6 +68,7 @@ vi.mock("@/lib/publishing/infoboard/screen1-live-service", async () => {
 
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ const ACTIVE_TENANT = {
   seasonTransitionMonth: 8,
   primaryColor: null,
   secondaryColor: null,
+  infoboardDisplayTheme: null,
   approvedDataOnly: false,
 };
 
@@ -309,5 +311,45 @@ describe("InfoboardAdminPage", () => {
     expect(mocks.buildScreen1LivePayload).toHaveBeenCalledOnce();
     // Since buildScreen1LivePayload is mocked, prisma is not called directly
     expect(mocks.eventFindMany).not.toHaveBeenCalled();
+  });
+
+  describe("display theme toggle (INFOBOARD-INTEGRATION-01B)", () => {
+    it("renders the Dark/Light theme toggle", async () => {
+      await renderPage();
+      expect(screen.getByTestId("infoboard-theme-toggle")).toBeInTheDocument();
+      expect(screen.getByTestId("infoboard-theme-option-dark")).toBeInTheDocument();
+      expect(screen.getByTestId("infoboard-theme-option-light")).toBeInTheDocument();
+    });
+
+    it("marks DARK active when tenant.infoboardDisplayTheme is null (default)", async () => {
+      await renderPage();
+      expect(
+        screen.getByTestId("infoboard-theme-option-dark").getAttribute("aria-checked"),
+      ).toBe("true");
+    });
+
+    it("marks LIGHT active when tenant.infoboardDisplayTheme is 'LIGHT'", async () => {
+      mocks.getActiveTenant.mockResolvedValue({
+        ...ACTIVE_TENANT,
+        infoboardDisplayTheme: "LIGHT",
+      });
+      await renderPage();
+      expect(
+        screen.getByTestId("infoboard-theme-option-light").getAttribute("aria-checked"),
+      ).toBe("true");
+    });
+
+    it("passes tenant.infoboardDisplayTheme through to the live service tenant context", async () => {
+      mocks.getActiveTenant.mockResolvedValue({
+        ...ACTIVE_TENANT,
+        infoboardDisplayTheme: "LIGHT",
+      });
+      await renderPage();
+      expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant: expect.objectContaining({ infoboardDisplayTheme: "LIGHT" }),
+        }),
+      );
+    });
   });
 });
