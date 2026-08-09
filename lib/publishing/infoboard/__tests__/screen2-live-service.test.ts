@@ -20,12 +20,26 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+
+// Screen 2 shares the canonical Weekplanner-backed source loader with
+// Screen 1 (see canonical-source-loader.ts). These tests are only
+// concerned with pitch inventory / branding / tenant / timezone plumbing,
+// not with canonical planning resolution itself (that is covered by
+// canonical-source-loader.test.ts and lib/weekplanner's own tests) — so the
+// Weekplanner layer is mocked to consistently return "no activities today".
+vi.mock("@/lib/weekplanner/queries", () => ({
+  getWeekplannerDay: vi.fn().mockResolvedValue({ dayKey: "2026-09-12", items: [] }),
+}));
+vi.mock("@/lib/weekplanner/plan-service", () => ({
+  getOperationalWeekplannerPlan: vi.fn().mockResolvedValue(null),
+}));
+
 import {
   buildScreen2LivePayload,
   type Screen2SourceDatabase,
   type Screen2TenantContext,
 } from "../screen2-live-service";
-import type { Screen1DbEventRow } from "../screen1-source-loader";
+import type { CanonicalEventPolicyRow } from "../canonical-source-loader";
 import type { Screen2PitchRow } from "../screen2-live-service";
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -59,11 +73,14 @@ function makePitchRow(code: string, name: string, facilityName = "Brüelstadion"
 
 function makeDatabase(
   pitchRows: Screen2PitchRow[],
-  eventRows: Screen1DbEventRow[] = [],
+  eventRows: CanonicalEventPolicyRow[] = [],
 ): Screen2SourceDatabase {
   return {
     event: {
       findMany: vi.fn().mockResolvedValue(eventRows),
+    },
+    trainingSession: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
     facilityResource: {
       findMany: vi.fn().mockResolvedValue(pitchRows),

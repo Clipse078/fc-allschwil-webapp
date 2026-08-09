@@ -32,11 +32,9 @@ import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
-  createScreen1SourceLoader,
-  type Screen1SourceDatabase,
-  type Screen1DbEventRow,
-  type Screen1FacilityResourceRow,
-} from "@/lib/publishing/infoboard/screen1-source-loader";
+  createCanonicalInfoboardSourceLoader,
+  type CanonicalInfoboardPolicyDatabase,
+} from "@/lib/publishing/infoboard/canonical-source-loader";
 import {
   buildScreen1LivePayload,
   type Screen1TenantContext,
@@ -48,19 +46,19 @@ export const metadata: Metadata = {
 
 // ── Prisma adapter ────────────────────────────────────────────────────────────
 
-function createPrismaDb(): Screen1SourceDatabase {
+function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
   return {
     event: {
       findMany: (args) =>
         prisma.event.findMany(
           args as Parameters<typeof prisma.event.findMany>[0],
-        ) as unknown as Promise<Screen1DbEventRow[]>,
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["event"]["findMany"]>,
     },
-    facilityResource: {
+    trainingSession: {
       findMany: (args) =>
-        prisma.facilityResource.findMany(
-          args as Parameters<typeof prisma.facilityResource.findMany>[0],
-        ) as unknown as Promise<Screen1FacilityResourceRow[]>,
+        prisma.trainingSession.findMany(
+          args as Parameters<typeof prisma.trainingSession.findMany>[0],
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["trainingSession"]["findMany"]>,
     },
   };
 }
@@ -107,7 +105,7 @@ export default async function InfoboardScreen1Page() {
 
   // ── Build live payload ─────────────────────────────────────────────────────
   const db = createPrismaDb();
-  const loader = createScreen1SourceLoader(db);
+  const loader = createCanonicalInfoboardSourceLoader(db);
   const payload = await buildScreen1LivePayload({ tenant, now, loader });
 
   // ── Render ─────────────────────────────────────────────────────────────────
