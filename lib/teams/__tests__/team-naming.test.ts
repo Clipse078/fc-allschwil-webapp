@@ -5,10 +5,16 @@
  *
  * Pure functions only. No database or network access.
  *
+ * TEAMCENTER-UX-01B: Team.name is the canonical, tenant-managed Team
+ * identity and must be the PRIMARY value in long/detail contexts. A
+ * seasonal TeamSeason.displayName override (or any provider/SFV name) must
+ * never substitute for it while Team.name is present — see test 1 and the
+ * "root-cause regression" describe block below.
+ *
  * TEST COVERAGE MAP:
  *   resolveLongTeamName
- *     1.  Prefers TeamSeason.displayName when present.
- *     2.  Falls back to Team.name (long name) when no seasonal override exists.
+ *     1.  Prefers Team.name over a conflicting TeamSeason.displayName.
+ *     2.  Falls back to TeamSeason.displayName only when Team.name is absent.
  *     3.  Falls back to Team.alternativeName when name is absent.
  *     4.  Falls back to providerTeamName as the last resort.
  *     5.  Returns null when every candidate is absent (TENANT_NAMING_REQUIRED case).
@@ -30,22 +36,22 @@ import { describe, it, expect } from "vitest";
 import { resolveLongTeamName, resolveCompactTeamName } from "../team-naming";
 
 describe("resolveLongTeamName", () => {
-  it("1 — prefers TeamSeason.displayName when present", () => {
+  it("1 — prefers Team.name over a conflicting TeamSeason.displayName (TEAMCENTER-UX-01B root cause)", () => {
     expect(
       resolveLongTeamName({
-        teamSeasonDisplayName: "FC Allschwil Junioren B2",
-        teamName: "Junioren B2",
+        teamSeasonDisplayName: "Junioren B2",
+        teamName: "FC Allschwil Junioren B2",
         teamAlternativeName: "B2 Team",
         providerTeamName: "Provider Name",
       }),
     ).toBe("FC Allschwil Junioren B2");
   });
 
-  it("2 — falls back to Team.name (long name) when no seasonal override exists", () => {
+  it("2 — falls back to TeamSeason.displayName only when Team.name is absent", () => {
     expect(
       resolveLongTeamName({
-        teamSeasonDisplayName: null,
-        teamName: "FC Allschwil Junioren B2",
+        teamSeasonDisplayName: "FC Allschwil Junioren B2",
+        teamName: null,
         teamAlternativeName: "Junioren B2",
         providerTeamName: "Provider Name",
       }),
@@ -183,5 +189,36 @@ describe("manual vs. provider-connected teams", () => {
         providerTeamName: "FC Allschwil Junioren B2 (4. Liga)",
       }),
     ).toBe("B2");
+  });
+});
+
+// ── TEAMCENTER-UX-01B — STAGE naming-inconsistency root-cause regression ─────
+//
+// Reproduces the exact STAGE symptom: Team detail showed "FC Allschwil
+// Junioren E1"/"E3" (Team.name) while the Teams overview showed a different,
+// shorter or mismatched value ("Junioren E1" / "FC Allschwil Junioren E2")
+// sourced from TeamSeason.displayName or provider data. Both surfaces call
+// resolveLongTeamName with the same input shape, so this test guarantees
+// they can never diverge again.
+describe("TEAMCENTER-UX-01B — root-cause regression: Team.name must win", () => {
+  it("Team.name = 'FC Allschwil Junioren E3' wins over a stale TeamSeason.displayName of 'FC Allschwil Junioren E2'", () => {
+    expect(
+      resolveLongTeamName({
+        teamName: "FC Allschwil Junioren E3",
+        teamSeasonDisplayName: "FC Allschwil Junioren E2",
+        teamShortName: "E3",
+        teamAlternativeName: "Junioren E3",
+        providerTeamName: "FC Allschwil Junioren E2 (SFV)",
+      }),
+    ).toBe("FC Allschwil Junioren E3");
+  });
+
+  it("Team.name = 'FC Allschwil Junioren E1' wins over a truncated TeamSeason.displayName of 'Junioren E1'", () => {
+    expect(
+      resolveLongTeamName({
+        teamName: "FC Allschwil Junioren E1",
+        teamSeasonDisplayName: "Junioren E1",
+      }),
+    ).toBe("FC Allschwil Junioren E1");
   });
 });

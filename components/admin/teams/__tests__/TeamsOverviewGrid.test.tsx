@@ -118,16 +118,11 @@ describe("TeamsOverviewGrid — recognition (MINIMAL TEAMS UX)", () => {
     expect(screen.getByText("Manuell")).toBeTruthy();
   });
 
-  it("renders no competition line when the team has none", () => {
+  it("shows a restrained 'Kein Wettbewerb' fallback when the team has no competition (no warning styling)", () => {
     render(<TeamsOverviewGrid teams={[makeTeam({ competition: null })]} />);
 
     expect(screen.queryByText("Junioren C Promotion")).toBeNull();
-  });
-
-  it("renders the season pill alongside the display name", () => {
-    render(<TeamsOverviewGrid teams={[makeTeam()]} />);
-
-    expect(screen.getByText("2027/28")).toBeTruthy();
+    expect(screen.getByText("Kein Wettbewerb")).toBeTruthy();
   });
 });
 

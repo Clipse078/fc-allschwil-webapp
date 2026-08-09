@@ -365,4 +365,51 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
     const result = await getTeamDetailData(TENANT_A, TEAM_ID_B);
     expect(result).toBeNull();
   });
+
+  it("TEAMCENTER-UX-01B: surfaces Liga/Wettbewerb from the active season's primary TeamSeasonCompetition", async () => {
+    const teamSeasonWithComp = makeTeamSeason(1);
+    const teamRow = { ...makeTeamRow(), teamSeasons: [teamSeasonWithComp] };
+    mockPrisma.team.findFirst.mockResolvedValue(teamRow);
+
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
+    expect(result?.competition).toEqual({ name: "Liga 1", shortName: "L1" });
+  });
+
+  it("TEAMCENTER-UX-01B: competition is null (renders as 'Kein Wettbewerb') when no primary competition exists", async () => {
+    const teamSeasonNoComp = makeTeamSeason(0);
+    const teamRow = { ...makeTeamRow(), teamSeasons: [teamSeasonNoComp] };
+    mockPrisma.team.findFirst.mockResolvedValue(teamRow);
+
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
+    expect(result?.competition).toBeNull();
+  });
+
+  it("TEAMCENTER-UX-01B root-cause regression: Team.name = 'FC Allschwil Junioren E3' wins over a conflicting TeamSeason.displayName of 'FC Allschwil Junioren E2'", async () => {
+    const teamRow = {
+      ...makeTeamRow(),
+      name: "FC Allschwil Junioren E3",
+      shortName: "E3",
+      alternativeName: null,
+      externalMappings: [
+        {
+          provider: "SFV",
+          providerTeamName: "FC Allschwil Junioren E2 (SFV)",
+          providerIsActive: true,
+          externalTeamId: 12345,
+          lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+        },
+      ],
+      teamSeasons: [
+        {
+          ...makeTeamSeason(0),
+          displayName: "FC Allschwil Junioren E2",
+        },
+      ],
+    };
+    mockPrisma.team.findFirst.mockResolvedValue(teamRow);
+
+    const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
+    expect(result?.displayName).toBe("FC Allschwil Junioren E3");
+    expect(result?.displayName).not.toBe("FC Allschwil Junioren E2");
+  });
 });

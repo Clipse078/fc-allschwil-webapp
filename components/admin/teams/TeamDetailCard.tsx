@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import TeamSettingsCard from "@/components/admin/teams/TeamSettingsCard";
-import TeamSeasonCreateCard from "@/components/admin/teams/TeamSeasonCreateCard";
-import TeamSeasonListCard from "@/components/admin/teams/TeamSeasonListCard";
 import TeamRosterOverviewCard from "@/components/admin/teams/TeamRosterOverviewCard";
 
 type TeamSeasonStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
@@ -47,21 +45,6 @@ type TeamSeasonItem = {
   }>;
 };
 
-type SavedTeamSeasonPayload = {
-  id: string;
-  displayName: string;
-  shortName: string | null;
-  status: TeamSeasonStatus;
-  websiteVisible: boolean;
-  infoboardVisible: boolean;
-  season: {
-    id: string;
-    key: string;
-    name: string;
-    isActive: boolean;
-  };
-};
-
 type OrgUnitOption = {
   id: string;
   name: string;
@@ -74,6 +57,11 @@ type ProviderMappingInfo = {
   teamName: string | null;
   isActive: boolean;
   lastSyncedAt: string;
+} | null;
+
+type CompetitionInfo = {
+  name: string | null;
+  shortName: string | null;
 } | null;
 
 type Team = {
@@ -94,37 +82,19 @@ type Team = {
   orgUnit: OrgUnitOption | null;
   // TEAM-IDENTITY-01: read-only provider identity/name. Never edited here.
   providerMapping?: ProviderMappingInfo;
+  // TEAMCENTER-UX-01B: read-only Liga/Wettbewerb from TeamSeasonCompetition.
+  competition?: CompetitionInfo;
   teamSeasons: TeamSeasonItem[];
-};
-
-type SeasonOption = {
-  id: string;
-  key: string;
-  name: string;
-  isActive: boolean;
-  startDate: Date | string;
-  endDate: Date | string;
 };
 
 type Props = {
   initialTeam: Team;
-  availableSeasons: SeasonOption[];
-  availableOrgUnits: OrgUnitOption[];
   canManage: boolean;
+  availableOrgUnits: OrgUnitOption[];
 };
-
-function sortTeamSeasonsDesc(entries: TeamSeasonItem[]) {
-  return [...entries].sort((a, b) => {
-    const aTime = new Date(a.season.startDate).getTime();
-    const bTime = new Date(b.season.startDate).getTime();
-
-    return bTime - aTime;
-  });
-}
 
 export default function TeamDetailCard({
   initialTeam,
-  availableSeasons,
   availableOrgUnits,
   canManage,
 }: Props) {
@@ -157,41 +127,6 @@ export default function TeamDetailCard({
     }));
   }
 
-  function handleSeasonSaved(updatedEntry: SavedTeamSeasonPayload) {
-    setTeam((current) => ({
-      ...current,
-      teamSeasons: sortTeamSeasonsDesc(
-        current.teamSeasons.map((entry) =>
-          entry.id === updatedEntry.id
-            ? {
-                ...entry,
-                id: updatedEntry.id,
-                displayName: updatedEntry.displayName,
-                shortName: updatedEntry.shortName,
-                status: updatedEntry.status,
-                websiteVisible: updatedEntry.websiteVisible,
-                infoboardVisible: updatedEntry.infoboardVisible,
-                season: {
-                  ...entry.season,
-                  id: updatedEntry.season.id,
-                  key: updatedEntry.season.key,
-                  name: updatedEntry.season.name,
-                  isActive: updatedEntry.season.isActive,
-                },
-              }
-            : entry
-        )
-      ),
-    }));
-  }
-
-  function handleSeasonCreated(createdEntry: TeamSeasonItem) {
-    setTeam((current) => ({
-      ...current,
-      teamSeasons: sortTeamSeasonsDesc([...current.teamSeasons, createdEntry]),
-    }));
-  }
-
   return (
     <div className="space-y-6">
       <TeamSettingsCard
@@ -210,31 +145,23 @@ export default function TeamDetailCard({
           infoboardVisible: team.infoboardVisible,
           orgUnitId: team.orgUnitId,
           providerMapping: team.providerMapping,
-          teamSeasons: team.teamSeasons.map((entry) => ({
-            id: entry.id,
-            season: entry.season,
-          })),
+          competition: team.competition,
         }}
         availableOrgUnits={availableOrgUnits}
         canManage={canManage}
         onSaved={handleTeamSaved}
       />
 
-      <TeamSeasonCreateCard
-        teamId={team.id}
-        teamName={team.name}
-        canManage={canManage}
-        availableSeasons={availableSeasons}
-        existingTeamSeasons={team.teamSeasons}
-        onCreated={handleSeasonCreated}
-      />
-
-      <TeamSeasonListCard
-        teamId={team.id}
-        canManage={canManage}
-        teamSeasons={team.teamSeasons}
-        onSaved={handleSeasonSaved}
-      />
+      {/*
+       * TEAMCENTER-UX-01B (H): the previous duplicated "Saison Verwaltung" /
+       * "Team-Saison hinzufügen" (TeamSeasonCreateCard) and "Saison
+       * Übersicht" / "Team-Saisons" (TeamSeasonListCard, TeamSeasonEditForm)
+       * management surfaces have been removed from this page. They
+       * duplicated the canonical Team settings above (name/visibility) and
+       * created ambiguity over which value was authoritative — see
+       * lib/teams/team-naming.ts. TeamSeason data/schema/services are
+       * untouched; only this duplicated edit UX was removed.
+       */}
 
       <TeamRosterOverviewCard
         teamId={team.id}

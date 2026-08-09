@@ -281,6 +281,12 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     null;
   const latestMapping = team.externalMappings?.[0] ?? null;
 
+  // TEAM-SFV-MAPPING-01 / TEAMCENTER-UX-01B: Liga/Wettbewerb for the Team
+  // detail header/settings surface — sourced strictly from the canonical
+  // TeamSeasonCompetition -> Competition relation of the active season.
+  // Never fabricated/manual.
+  const primaryCompetition = activeSeasonEntry?.competitions[0]?.competition ?? null;
+
   // TEAM-IDENTITY-01: canonical naming contract — see lib/teams/team-naming.ts.
   const namingInput = {
     teamSeasonDisplayName: activeSeasonEntry?.displayName ?? null,
@@ -307,6 +313,12 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     orgUnit: team.orgUnit,
     displayName: resolveLongTeamName(namingInput),
     compactName: resolveCompactTeamName(namingInput),
+    competition: primaryCompetition
+      ? {
+          name: primaryCompetition.officialName,
+          shortName: primaryCompetition.shortName,
+        }
+      : null,
     providerMapping: latestMapping
       ? {
           provider: latestMapping.provider,
