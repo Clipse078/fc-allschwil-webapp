@@ -1,6 +1,8 @@
 /**
  * GET    /api/weekplanner/plans/[planId]
- * PATCH  /api/weekplanner/plans/[planId]  — rename ({ name }) or archive ({ archived: true })
+ * PATCH  /api/weekplanner/plans/[planId]  — rename ({ name }), archive
+ *        ({ archived: true }), or activate/deactivate as the OPERATIONAL
+ *        plan ({ active: true } / { active: false }) — WEEKPLANNER-01E.
  * DELETE /api/weekplanner/plans/[planId]  — hard delete, only when safe (zero overrides)
  *
  * WEEKPLANNER-01B — minimal plan lifecycle management (rename / archive /
@@ -16,12 +18,15 @@ import {
   renameWeekplannerPlan,
   archiveWeekplannerPlan,
   deleteWeekplannerPlan,
+  activateWeekplannerPlan,
+  deactivateWeekplannerPlan,
 } from "@/lib/weekplanner/plan-service";
 import {
   WeekplannerPlanNotFoundError,
   WeekplannerPlanValidationError,
   WeekplannerPlanNameConflictError,
   WeekplannerPlanArchivedError,
+  WeekplannerPlanActivationConflictError,
   WeekplannerPlanDeleteUnsafeError,
 } from "@/lib/weekplanner/plan-errors";
 
@@ -73,12 +78,25 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ plan });
     }
 
+    if (body.active === true) {
+      const plan = await activateWeekplannerPlan(tenantId, planId);
+      return NextResponse.json({ plan });
+    }
+
+    if (body.active === false) {
+      const plan = await deactivateWeekplannerPlan(tenantId, planId);
+      return NextResponse.json({ plan });
+    }
+
     if (typeof body.name === "string") {
       const plan = await renameWeekplannerPlan(tenantId, planId, body.name);
       return NextResponse.json({ plan });
     }
 
-    return NextResponse.json({ error: "Provide { name } to rename or { archived: true } to archive" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Provide { name } to rename, { archived: true } to archive, or { active: true|false } to activate/deactivate" },
+      { status: 400 },
+    );
   } catch (err) {
     if (err instanceof WeekplannerPlanNotFoundError) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
@@ -90,6 +108,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     if (err instanceof WeekplannerPlanArchivedError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof WeekplannerPlanActivationConflictError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     throw err;

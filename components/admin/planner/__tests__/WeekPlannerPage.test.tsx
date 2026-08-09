@@ -59,6 +59,7 @@ const PLAN: WeekplannerPlanDto = {
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
   archivedAt: null,
+  isActive: false,
 };
 
 const FACILITY_GROUPS_BY_GROUP = {

@@ -9,8 +9,19 @@
  *   - rename the active alternative plan
  *   - archive the active alternative plan
  *   - delete the active alternative plan
- *   - "Alternativplan aktiv" banner only shown while an alternative is selected
+ *   - "Ansicht · <name>" (VIEW selection) banner only shown while an alternative is selected
  *   - management actions hidden entirely for read-only viewers
+ *
+ * WEEKPLANNER-01E-C1 — adds direct coverage for the operational activation
+ * status/actions added in WEEKPLANNER-01E (previously untested at the
+ * component level):
+ *   - no active alternative → "Betriebsplan · Standardplan"
+ *   - an active alternative → its name is shown in the operational banner
+ *   - viewing ?plan=<id> alone (activePlanId set, but that plan is NOT the
+ *     operationally active one) never changes the operational banner
+ *   - "Als Betriebsplan aktivieren" sends the correct explicit PATCH
+ *   - "Betriebsplan deaktivieren" sends the correct explicit PATCH
+ *   - activation/deactivation controls are MANAGE-gated
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -35,6 +46,7 @@ function plan(overrides: Partial<WeekplannerPlanDto> = {}): WeekplannerPlanDto {
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
     archivedAt: null,
+    isActive: false,
     ...overrides,
   };
 }
@@ -71,7 +83,7 @@ describe("WeekplannerPlanBar — Standardplan default + alternative selector", (
     expect(pushMock).toHaveBeenCalledWith("/dashboard/planner/week?week=2026-08-10&plan=plan-schlechtwetter");
 
     const banner = screen.getByTestId("weekplanner-active-plan-banner");
-    expect(banner).toHaveTextContent("Alternativplan aktiv");
+    expect(banner).toHaveTextContent("Ansicht");
     expect(banner).toHaveTextContent("Schlechtwetterplan");
   });
 
@@ -189,5 +201,163 @@ describe("WeekplannerPlanBar — read-only viewers", () => {
     // The selector and active-plan banner remain visible — a viewer can still see which plan is active.
     expect(screen.getByTestId("weekplanner-plan-select")).toBeInTheDocument();
     expect(screen.getByTestId("weekplanner-active-plan-banner")).toBeInTheDocument();
+  });
+});
+
+// ── WEEKPLANNER-01E-C1 — Finding 3: operational activation UI coverage ────
+
+describe("WeekplannerPlanBar — operational activation status (WEEKPLANNER-01E-C1 Finding 3)", () => {
+  it("1: no active alternative → operational banner reads 'Betriebsplan · Standardplan'", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-10"
+        plans={[plan({ isActive: false })]}
+        activePlanId={null}
+        canManage
+      />,
+    );
+
+    const banner = screen.getByTestId("weekplanner-operational-plan-banner");
+    expect(banner).toHaveTextContent("Betriebsplan · Standardplan");
+  });
+
+  it("2: an active alternative → operational banner shows that plan's name, not 'Standardplan'", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-10"
+        plans={[plan({ isActive: true, name: "Schlechtwetterplan" })]}
+        activePlanId={null}
+        canManage
+      />,
+    );
+
+    const banner = screen.getByTestId("weekplanner-operational-plan-banner");
+    expect(banner).toHaveTextContent("Betriebsplan · Schlechtwetterplan");
+  });
+
+  it("3: viewing ?plan=<id> alone (activePlanId set) does NOT change the operational banner when that plan is not the active one", () => {
+    const viewedPlan = plan({ id: "plan-viewed", name: "Ferienplan", isActive: false });
+    const otherActivePlan = plan({ id: "plan-other", name: "Schlechtwetterplan", isActive: true });
+
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-10"
+        plans={[viewedPlan, otherActivePlan]}
+        activePlanId="plan-viewed"
+        canManage
+      />,
+    );
+
+    // The VIEW banner reflects the viewed plan...
+    expect(screen.getByTestId("weekplanner-active-plan-banner")).toHaveTextContent("Ferienplan");
+    // ...but the OPERATIONAL banner is fully independent — still the other plan.
+    const operationalBanner = screen.getByTestId("weekplanner-operational-plan-banner");
+    expect(operationalBanner).toHaveTextContent("Betriebsplan · Schlechtwetterplan");
+    expect(operationalBanner).not.toHaveTextContent("Ferienplan");
+  });
+
+  it("4: merely selecting a plan for viewing (no explicit activation call) never touches the activation endpoint", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <WeekplannerPlanBar weekParam="2026-08-10" plans={[plan()]} activePlanId={null} canManage />,
+    );
+
+    fireEvent.change(screen.getByTestId("weekplanner-plan-select"), { target: { value: "plan-schlechtwetter" } });
+
+    expect(pushMock).toHaveBeenCalledWith("/dashboard/planner/week?week=2026-08-10&plan=plan-schlechtwetter");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("5: 'Als Betriebsplan aktivieren' sends the correct explicit PATCH { active: true } for the viewed plan", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ plan: plan({ isActive: true }) }, 200));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-10"
+        plans={[plan({ isActive: false })]}
+        activePlanId="plan-schlechtwetter"
+        canManage
+      />,
+    );
+
+    const activateButton = screen.getByTestId("weekplanner-plan-activate-button");
+    expect(activateButton).toHaveTextContent("Als Betriebsplan aktivieren");
+    fireEvent.click(activateButton);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekplanner/plans/plan-schlechtwetter",
+        expect.objectContaining({ method: "PATCH", body: JSON.stringify({ active: true }) }),
+      ),
+    );
+    await waitFor(() => expect(refreshMock).toHaveBeenCalled());
+    expect(screen.queryByTestId("weekplanner-plan-deactivate-button")).not.toBeInTheDocument();
+  });
+
+  it("6: 'Betriebsplan deaktivieren' sends the correct explicit PATCH { active: false } for the viewed (active) plan", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ plan: plan({ isActive: false }) }, 200));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-10"
+        plans={[plan({ isActive: true })]}
+        activePlanId="plan-schlechtwetter"
+        canManage
+      />,
+    );
+
+    const deactivateButton = screen.getByTestId("weekplanner-plan-deactivate-button");
+    expect(deactivateButton).toHaveTextContent("Betriebsplan deaktivieren");
+    fireEvent.click(deactivateButton);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekplanner/plans/plan-schlechtwetter",
+        expect.objectContaining({ method: "PATCH", body: JSON.stringify({ active: false }) }),
+      ),
+    );
+    await waitFor(() => expect(refreshMock).toHaveBeenCalled());
+    expect(screen.queryByTestId("weekplanner-plan-activate-button")).not.toBeInTheDocument();
+  });
+
+  it("7: surfaces an activation conflict error (e.g. 409 from a concurrent activation) without navigating away", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({ error: 'WeekplannerPlan "plan-schlechtwetter" could not be activated — another plan was activated concurrently for this week' }, 409),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-10"
+        plans={[plan({ isActive: false })]}
+        activePlanId="plan-schlechtwetter"
+        canManage
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("weekplanner-plan-activate-button"));
+
+    expect(await screen.findByTestId("weekplanner-plan-bar-error")).toHaveTextContent("concurrently");
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it("8: activation/deactivation controls are hidden entirely for a viewer without MANAGE permission, even while viewing the active plan", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-10"
+        plans={[plan({ isActive: true })]}
+        activePlanId="plan-schlechtwetter"
+        canManage={false}
+      />,
+    );
+
+    expect(screen.queryByTestId("weekplanner-plan-activate-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("weekplanner-plan-deactivate-button")).not.toBeInTheDocument();
+    // The operational status itself remains visible to read-only viewers.
+    expect(screen.getByTestId("weekplanner-operational-plan-banner")).toHaveTextContent("Schlechtwetterplan");
   });
 });

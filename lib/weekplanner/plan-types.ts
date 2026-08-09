@@ -21,6 +21,14 @@ export type WeekplannerPlanDto = {
   updatedAt: string;
   /** Null while active. Set when archived (soft delete). */
   archivedAt: string | null;
+  /**
+   * WEEKPLANNER-01E — whether this plan is OPERATIONALLY active for its
+   * (tenantId, weekId). At most one non-archived plan per (tenantId,
+   * weekId) may be true. False for every plan == Standardplan
+   * operationally active. Independent of admin VIEW state (`?plan=<id>`) —
+   * see lib/weekplanner/plan-service.ts#activateWeekplannerPlan.
+   */
+  isActive: boolean;
 };
 
 export type WeekplannerPlanAllocationDto = {
