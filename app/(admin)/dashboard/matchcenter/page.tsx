@@ -93,7 +93,7 @@ export default async function MatchcenterPage({
         description="Zentrale Spielplanung und operative Matchvorbereitung."
         actions={
           <Link
-            href="/dashboard/events/matches/new"
+            href="/dashboard/matchcenter/new"
             className="fca-button-primary"
           >
             <Plus className="h-4 w-4" />
