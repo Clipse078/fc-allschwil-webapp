@@ -41,7 +41,7 @@ function findItemByKey(
 // ── Static structure tests ────────────────────────────────────────────────────
 
 describe("NAV_SECTIONS static structure", () => {
-  it("Planung section contains exactly TrainingCenter, TournamentCenter and Veranstaltungen", () => {
+  it("Planung section contains exactly TrainingCenter, TournamentCenter, Veranstaltungen and Wochenplanner", () => {
     const betrieb = findSection("Betrieb");
     expect(betrieb).toBeDefined();
 
@@ -49,7 +49,15 @@ describe("NAV_SECTIONS static structure", () => {
     expect(planung).toBeDefined();
 
     const childKeys = planung!.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingcenter", "tournamentcenter", "veranstaltungen"]);
+    expect(childKeys).toEqual(["trainingcenter", "tournamentcenter", "veranstaltungen", "wochenplanner"]);
+  });
+
+  it("Wochenplanner (WEEKPLANNER-01A/01B) points to /dashboard/planner/week", () => {
+    const betrieb = findSection("Betrieb");
+    const planung = betrieb!.items.find((i) => i.key === "planung");
+    const wochenplanner = planung!.children?.find((c) => c.key === "wochenplanner");
+    expect(wochenplanner?.href).toBe("/dashboard/planner/week");
+    expect(wochenplanner?.label).toBe("Wochenplanner");
   });
 
   it("TournamentCenter points to /dashboard/tournamentcenter", () => {
@@ -258,13 +266,12 @@ describe("route deduplication", () => {
     expect(adminFacilities).toHaveLength(1);
   });
 
-  it("there is no Wochenplanung entry in any section", () => {
+  it("there is no legacy 'Wochenplanung' entry in any section — WEEKPLANNER-01B's 'Wochenplanner' (the canonical read-only aggregation) is the sole intentional exception", () => {
     const sections = getVisibleNavSections(Object.values(PERMISSIONS));
     const flat = flatItems(sections);
-    const wochenplanung = flat.find((i) =>
-      i.label.toLowerCase().includes("wochenplan"),
-    );
-    expect(wochenplanung).toBeUndefined();
+    const wochenplanEntries = flat.filter((i) => i.label.toLowerCase().includes("wochenplan"));
+    expect(wochenplanEntries.map((i) => i.label)).toEqual(["Wochenplanner"]);
+    expect(wochenplanEntries[0]?.href).toBe("/dashboard/planner/week");
   });
 
   it("there is no Ressourcenzuteilung entry in any section", () => {

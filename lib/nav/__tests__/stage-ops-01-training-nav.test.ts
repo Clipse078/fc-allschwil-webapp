@@ -120,16 +120,19 @@ describe("STAGE-OPS-01 — Training Planner navigation regression", () => {
     expect(veranstaltungen).not.toBeNull();
   });
 
-  it("Planung section contains exactly trainingcenter, tournamentcenter and veranstaltungen children (no extras)", () => {
+  it("Planung section contains exactly trainingcenter, tournamentcenter, veranstaltungen and wochenplanner children (no extras)", () => {
     // TOURNAMENTCENTER-01: TournamentCenter was deliberately added as a
     // Planung child, gated by the same events.view/events.manage
     // permissions as Veranstaltungen (see lib/nav/nav-config.ts).
+    // WEEKPLANNER-01B: Wochenplanner (the canonical read-only aggregation +
+    // its optional named alternative planning variants) was deliberately
+    // added last, gated by the same permission set already used above.
     const sections = getVisibleNavSections(Object.values(PERMISSIONS));
     const planungItem = sections
       .flatMap((s) => s.items)
       .find((i) => i.key === "planung");
     const childKeys = planungItem?.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingcenter", "tournamentcenter", "veranstaltungen"]);
+    expect(childKeys).toEqual(["trainingcenter", "tournamentcenter", "veranstaltungen", "wochenplanner"]);
   });
 
   it("TrainingCenter route and direct-route /dashboard/training require the same permissions", () => {

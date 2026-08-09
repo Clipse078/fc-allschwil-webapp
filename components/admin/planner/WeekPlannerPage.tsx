@@ -19,6 +19,28 @@ import type {
   WeekplannerResourceRef,
   WeekplannerWeek,
 } from "@/lib/weekplanner/types";
+import type { WeekplannerPlanDto } from "@/lib/weekplanner/plan-types";
+import { planOverrideKey } from "@/lib/weekplanner/plan-override-key";
+import { WeekplannerPlanBar } from "./WeekplannerPlanBar";
+import {
+  WeekplannerAllocationOverrideEditor,
+  type WeekplannerOverrideRow,
+} from "./WeekplannerAllocationOverrideEditor";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+
+/**
+ * WEEKPLANNER-01B — populated only when an alternative plan is selected AND
+ * the caller can manage plans. Threads the per-item override editing
+ * context down to each WeekplannerCard. Omitted entirely for the
+ * Standardplan (no plan selected) or a read-only viewer — the card renders
+ * exactly as it did in 01A in both cases.
+ */
+type OverrideEditingContext = {
+  planId: string;
+  /** Keyed via lib/weekplanner/plan-override-key.ts#planOverrideKey — one entry per overridden group. */
+  overridesByKey: Record<string, WeekplannerOverrideRow[]>;
+  facilityGroupsByAllocationGroup: { PITCH_HALL: FacilityGroup[]; DRESSING_ROOM: FacilityGroup[] };
+};
 
 type WeekPlannerPageProps = {
   week: WeekplannerWeek;
@@ -26,6 +48,13 @@ type WeekPlannerPageProps = {
   todayParam: string;
   locale?: string;
   timezone?: string;
+  /** WEEKPLANNER-01B — active (non-archived) plans for this tenant+week. Never includes a "Standardplan" row. */
+  plans?: WeekplannerPlanDto[];
+  /** WEEKPLANNER-01B — the currently selected alternative plan, or null for the Standardplan. */
+  activePlanId?: string | null;
+  /** WEEKPLANNER-01B — whether the current user can create/rename/archive/delete plans and edit overrides. */
+  canManagePlans?: boolean;
+  overrideEditing?: OverrideEditingContext;
 };
 
 const TYPE_META: Record<
@@ -83,10 +112,13 @@ function ResourceChips({
   icon: Icon,
   refs,
   emptyLabel,
+  overridden,
 }: {
   icon: typeof MapPin;
   refs: WeekplannerResourceRef[];
   emptyLabel?: string;
+  /** WEEKPLANNER-01B — true when the currently selected plan overrides this group. Adds a subtle "angepasst" marker. */
+  overridden?: boolean;
 }) {
   if (refs.length === 0) {
     return emptyLabel ? (
@@ -102,13 +134,26 @@ function ResourceChips({
       {refs.map((ref) => (
         <span
           key={ref.facilityResourceId}
-          className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-2)]"
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+            overridden
+              ? "border-blue-200 bg-blue-50 text-blue-700"
+              : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-2)]",
+          )}
           title={ref.facilityName}
         >
           <Icon className="h-3 w-3" />
           {ref.name}
         </span>
       ))}
+      {overridden && (
+        <span
+          className="text-[10px] font-semibold uppercase tracking-wide text-blue-600"
+          data-testid="weekplanner-override-marker"
+        >
+          angepasst
+        </span>
+      )}
     </div>
   );
 }
@@ -130,18 +175,26 @@ function ConflictBadge({ item }: { item: WeekplannerItem }) {
   );
 }
 
+/** Resolves the canonical activityId for an item — TrainingSession.id (TRAINING) or Event.id (MATCH/TOURNAMENT). */
+function activityIdOf(item: WeekplannerItem): string {
+  return item.type === "TRAINING" ? item.trainingSessionId : item.eventId;
+}
+
 function WeekplannerCard({
   item,
   locale,
   timezone,
+  overrideEditing,
 }: {
   item: WeekplannerItem;
   locale: string;
   timezone: string;
+  overrideEditing?: OverrideEditingContext;
 }) {
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
   const hasConflict = item.conflicts.length > 0;
+  const activityId = activityIdOf(item);
 
   return (
     <div
@@ -171,9 +224,33 @@ function WeekplannerCard({
           <p className="text-sm font-semibold text-[var(--foreground)]">{item.teamNames[0] ?? item.title}</p>
           <p className="mt-0.5 text-xs text-[var(--text-2)]">{item.title}</p>
           <div className="mt-2 space-y-1">
-            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" />
-            <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} />
+            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" overridden={item.pitchOverridden} />
+            <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} overridden={item.dressingRoomOverridden} />
           </div>
+          {overrideEditing && (
+            <>
+              <WeekplannerAllocationOverrideEditor
+                planId={overrideEditing.planId}
+                activityType="TRAINING"
+                activityId={activityId}
+                allocationGroup="PITCH_HALL"
+                label="Spielfeld/Halle"
+                standardplanAllocations={toStandardplanRows(item.pitchAllocations)}
+                initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("TRAINING", activityId, "PITCH_HALL")] ?? []}
+                facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.PITCH_HALL}
+              />
+              <WeekplannerAllocationOverrideEditor
+                planId={overrideEditing.planId}
+                activityType="TRAINING"
+                activityId={activityId}
+                allocationGroup="DRESSING_ROOM"
+                label="Garderobe"
+                standardplanAllocations={toStandardplanRows(item.dressingRoomAllocations)}
+                initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("TRAINING", activityId, "DRESSING_ROOM")] ?? []}
+                facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.DRESSING_ROOM}
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -183,10 +260,34 @@ function WeekplannerCard({
             {item.teamNames[0] ?? item.title} <span className="text-[var(--text-2)]">vs.</span> {item.opponentName ?? "TBD"}
           </p>
           <div className="mt-2 space-y-1">
-            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" />
-            <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} emptyLabel="Heimkabine offen" />
+            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" overridden={item.pitchOverridden} />
+            <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} emptyLabel="Heimkabine offen" overridden={item.dressingRoomOverridden} />
             <ResourceChips icon={DoorOpen} refs={item.awayDressingRoomAllocations} emptyLabel="Gastkabine offen" />
           </div>
+          {overrideEditing && (
+            <>
+              <WeekplannerAllocationOverrideEditor
+                planId={overrideEditing.planId}
+                activityType="MATCH"
+                activityId={activityId}
+                allocationGroup="PITCH_HALL"
+                label="Spielfeld/Halle"
+                standardplanAllocations={toStandardplanRows(item.pitchAllocations)}
+                initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("MATCH", activityId, "PITCH_HALL")] ?? []}
+                facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.PITCH_HALL}
+              />
+              <WeekplannerAllocationOverrideEditor
+                planId={overrideEditing.planId}
+                activityType="MATCH"
+                activityId={activityId}
+                allocationGroup="DRESSING_ROOM"
+                label="Garderobe (Heim)"
+                standardplanAllocations={toStandardplanRows(item.dressingRoomAllocations)}
+                initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("MATCH", activityId, "DRESSING_ROOM")] ?? []}
+                facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.DRESSING_ROOM}
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -197,16 +298,48 @@ function WeekplannerCard({
             <p className="mt-0.5 text-xs text-[var(--text-2)]">{item.teamNames.join(", ")}</p>
           )}
           <div className="mt-2 space-y-1">
-            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" />
+            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" overridden={item.pitchOverridden} />
             {item.participantAllocations.map((participant) =>
               participant.dressingRoomAllocations.length > 0 ? (
-                <div key={participant.participantLabel} className="flex flex-wrap items-center gap-1.5">
+                <div key={participant.participantId} className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-[var(--muted)]">{participant.participantLabel}:</span>
-                  <ResourceChips icon={DoorOpen} refs={participant.dressingRoomAllocations} />
+                  <ResourceChips icon={DoorOpen} refs={participant.dressingRoomAllocations} overridden={participant.dressingRoomOverridden} />
                 </div>
               ) : null,
             )}
           </div>
+          {overrideEditing && (
+            <>
+              <WeekplannerAllocationOverrideEditor
+                planId={overrideEditing.planId}
+                activityType="TOURNAMENT"
+                activityId={activityId}
+                allocationGroup="PITCH_HALL"
+                label="Spielfeld/Halle"
+                standardplanAllocations={toStandardplanRows(item.pitchAllocations)}
+                initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("TOURNAMENT", activityId, "PITCH_HALL")] ?? []}
+                facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.PITCH_HALL}
+              />
+              {item.participantAllocations.map((participant) => (
+                <WeekplannerAllocationOverrideEditor
+                  key={participant.participantId}
+                  planId={overrideEditing.planId}
+                  activityType="TOURNAMENT"
+                  activityId={activityId}
+                  allocationGroup="DRESSING_ROOM"
+                  participantId={participant.participantId}
+                  label={`Garderobe · ${participant.participantLabel}`}
+                  standardplanAllocations={toStandardplanRows(participant.dressingRoomAllocations)}
+                  initialOverrideAllocations={
+                    overrideEditing.overridesByKey[
+                      planOverrideKey("TOURNAMENT", activityId, "DRESSING_ROOM", participant.participantId)
+                    ] ?? []
+                  }
+                  facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.DRESSING_ROOM}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -215,14 +348,26 @@ function WeekplannerCard({
   );
 }
 
+function toStandardplanRows(
+  refs: WeekplannerResourceRef[],
+): { facilityResourceId: string; facilityResourceName: string; facilityResourceCode: string }[] {
+  return refs.map((ref) => ({
+    facilityResourceId: ref.facilityResourceId,
+    facilityResourceName: ref.name,
+    facilityResourceCode: ref.code,
+  }));
+}
+
 function DayColumn({
   day,
   locale,
   timezone,
+  overrideEditing,
 }: {
   day: WeekplannerDay;
   locale: string;
   timezone: string;
+  overrideEditing?: OverrideEditingContext;
 }) {
   const today = isToday(day.dayKey, timezone);
 
@@ -258,7 +403,15 @@ function DayColumn({
         {day.items.length === 0 ? (
           <p className="px-1 py-3 text-center text-[11px] text-[var(--muted)]">Keine Einträge</p>
         ) : (
-          day.items.map((item) => <WeekplannerCard key={item.id} item={item} locale={locale} timezone={timezone} />)
+          day.items.map((item) => (
+            <WeekplannerCard
+              key={item.id}
+              item={item}
+              locale={locale}
+              timezone={timezone}
+              overrideEditing={overrideEditing}
+            />
+          ))
         )}
       </div>
     </div>
@@ -270,6 +423,10 @@ export default function WeekPlannerPage({
   todayParam,
   locale = "de-CH",
   timezone = "Europe/Zurich",
+  plans = [],
+  activePlanId = null,
+  canManagePlans = false,
+  overrideEditing,
 }: WeekPlannerPageProps) {
   const totalItems = week.days.reduce((sum, day) => sum + day.items.length, 0);
   const conflictCount = week.days.reduce(
@@ -284,6 +441,15 @@ export default function WeekPlannerPage({
         title="Wochenplanung"
         description="Trainings, Heimspiele und Heimturniere einer Kalenderwoche in einer koordinierten Ansicht — inklusive Platz- und Garderobenzuteilung."
       />
+
+      <SectionCard>
+        <WeekplannerPlanBar
+          weekParam={week.param}
+          plans={plans}
+          activePlanId={activePlanId}
+          canManage={canManagePlans}
+        />
+      </SectionCard>
 
       <SectionCard noPadding>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -348,7 +514,13 @@ export default function WeekPlannerPage({
         <div className="-mx-1 overflow-x-auto pb-2">
           <div className="flex min-w-full gap-3 px-1">
             {week.days.map((day) => (
-              <DayColumn key={day.dayKey} day={day} locale={locale} timezone={timezone} />
+              <DayColumn
+                key={day.dayKey}
+                day={day}
+                locale={locale}
+                timezone={timezone}
+                overrideEditing={overrideEditing}
+              />
             ))}
           </div>
         </div>

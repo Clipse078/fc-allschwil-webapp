@@ -242,6 +242,21 @@ export const NAV_SECTIONS: NavSection[] = [
             href: "/dashboard/events",
             permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
           },
+          {
+            // WEEKPLANNER-01A/01B: read-only aggregation of TrainingSession +
+            // HOME Event(MATCH) + HOME Event(TOURNAMENT), with optional
+            // named alternative planning variants — no permission of its
+            // own, reuses the exact set already gating "Planung".
+            key: "wochenplanner",
+            label: "Wochenplanner",
+            href: "/dashboard/planner/week",
+            permissionKeys: [
+              PERMISSIONS.TRAININGS_VIEW,
+              PERMISSIONS.TRAININGS_MANAGE,
+              PERMISSIONS.EVENTS_VIEW,
+              PERMISSIONS.EVENTS_MANAGE,
+            ],
+          },
         ],
       },
       {
