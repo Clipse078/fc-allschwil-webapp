@@ -689,6 +689,75 @@ export const PREVIEW_FIXTURE_2EVENTS: InfoboardScreen1Feed = {
 };
 
 /**
+ * INFOBOARD-INTEGRATION-01B — combined manual-verification scenario.
+ *
+ * One training (pitch assigned, dressing room missing — restrained warning)
+ * plus one upcoming HOME match (fully allocated). Used only by the
+ * `/infoboard/preview/screen-1-theme-check` preview route to manually verify
+ * both Dark and Light themes against a single representative scenario.
+ */
+export const PREVIEW_FIXTURE_THEME_CHECK: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+  current: [
+    {
+      id: "evt-theme-check-1",
+      type: "TRAINING",
+      displayTitle: "Juniorinnen FF-14",
+      teamDisplayName: "Juniorinnen FF-14",
+      opponentDisplayName: null,
+      organizerDisplayName: "FC Allschwil",
+      competitionLabel: null,
+      startAt: "2026-09-12T15:00:00.000Z",
+      endAt: "2026-09-12T16:30:00.000Z",
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KR2",
+        homeDressingRoomLabel: null,
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  next: [
+    {
+      id: "evt-theme-check-2",
+      type: "MATCH",
+      displayTitle: "FC Allschwil E1 – FC Binningen E1",
+      teamDisplayName: "FC Allschwil E1",
+      opponentDisplayName: "FC Binningen E1",
+      organizerDisplayName: null,
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T17:00:00.000Z",
+      endAt: null,
+      meetingTime: null,
+      status: "SCHEDULED",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "next",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "Stadion",
+        homeDressingRoomLabel: "Kabine E1",
+        awayDressingRoomLabel: "Kabine E2",
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  later: [],
+  isEmpty: false,
+  emptyStateReason: null,
+};
+
+/**
  * Missing allocation scenario: one event with no pitch and no dressing room.
  * Used to test the amber NOCH NICHT ZUGETEILT warning display.
  */
