@@ -53,7 +53,7 @@ import {
   type Screen2PitchRow,
 } from "@/lib/publishing/infoboard/screen2-live-service";
 import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
-import type { Screen1DbEventRow } from "@/lib/publishing/infoboard/screen1-source-loader";
+import type { CanonicalInfoboardPolicyDatabase } from "@/lib/publishing/infoboard/canonical-source-loader";
 import { fetchCurrentWeather } from "@/lib/weather/weather-service";
 
 export const metadata: Metadata = {
@@ -68,7 +68,13 @@ function createPrismaScreen2Db(): Screen2SourceDatabase {
       findMany: (args) =>
         prisma.event.findMany(
           args as Parameters<typeof prisma.event.findMany>[0],
-        ) as unknown as Promise<Screen1DbEventRow[]>,
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["event"]["findMany"]>,
+    },
+    trainingSession: {
+      findMany: (args) =>
+        prisma.trainingSession.findMany(
+          args as Parameters<typeof prisma.trainingSession.findMany>[0],
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["trainingSession"]["findMany"]>,
     },
     facilityResource: {
       findMany: (args) =>

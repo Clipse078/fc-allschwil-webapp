@@ -27,11 +27,10 @@
 import { buildInfoboardScreen2Feed } from "./screen2-feed-builder";
 import type { InfoboardScreen2Feed, InfoboardTenantRef } from "../event-types";
 import {
-  createScreen1SourceLoader,
-  type Screen1SourceDatabase,
-  type Screen1DbEventRow,
-  type Screen1FacilityResourceRow,
-} from "./screen1-source-loader";
+  createCanonicalInfoboardSourceLoader,
+  type CanonicalInfoboardPolicyDatabase,
+} from "./canonical-source-loader";
+import type { Screen1FacilityResourceRow } from "./screen1-source-loader";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -54,15 +53,16 @@ export type Screen2PitchRow = Screen1FacilityResourceRow & {
 /**
  * Injected database contract for the Screen 2 live service.
  *
- * Structurally compatible with Screen1SourceDatabase; differs only in:
- *   - facilityResource is required (not optional).
- *   - facilityResource.findMany accepts an optional orderBy.
+ * `event` / `trainingSession` are the same canonical publication-policy
+ * metadata lookups CanonicalInfoboardPolicyDatabase requires (see
+ * canonical-source-loader.ts) — Screen 2 shares the exact same canonical
+ * Weekplanner-backed loader as Screen 1, never a second event/planning
+ * query. `facilityResource` additionally supplies the pitch inventory.
  *
  * Callers at the route/composition boundary implement this using the Prisma
  * client. Tests supply lightweight mocks.
  */
-export type Screen2SourceDatabase = {
-  readonly event: Screen1SourceDatabase["event"];
+export type Screen2SourceDatabase = CanonicalInfoboardPolicyDatabase & {
   readonly facilityResource: {
     readonly findMany: (args: {
       readonly where: Record<string, unknown>;
@@ -157,18 +157,10 @@ export async function buildScreen2LivePayload(params: {
     facilityName: (row as any)?.facility?.name ?? resolvedFacilityName,
   }));
 
-  // ── Build event loader (reuses Screen 1 source loader logic) ───────────────
-  // Wrap Screen2SourceDatabase to satisfy Screen1SourceDatabase interface.
-  const screen1Db: Screen1SourceDatabase = {
-    event: database.event,
-    facilityResource: {
-      findMany: (args) =>
-        database.facilityResource.findMany(args) as unknown as Promise<
-          ReadonlyArray<Screen1FacilityResourceRow>
-        >,
-    },
-  };
-  const loader = createScreen1SourceLoader(screen1Db);
+  // ── Build event loader (shares the canonical Screen 1 source loader) ───────
+  // Screen 2 consumes the SAME canonical Weekplanner-backed effective
+  // activities as Screen 1 — never a second event/planning query.
+  const loader = createCanonicalInfoboardSourceLoader(database);
 
   // ── Tenant reference ────────────────────────────────────────────────────────
   const tenantRef: InfoboardTenantRef = {

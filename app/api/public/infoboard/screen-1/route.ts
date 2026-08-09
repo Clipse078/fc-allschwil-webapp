@@ -35,11 +35,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
 import {
-  createScreen1SourceLoader,
-  type Screen1SourceDatabase,
-  type Screen1DbEventRow,
-  type Screen1FacilityResourceRow,
-} from "@/lib/publishing/infoboard/screen1-source-loader";
+  createCanonicalInfoboardSourceLoader,
+  type CanonicalInfoboardPolicyDatabase,
+} from "@/lib/publishing/infoboard/canonical-source-loader";
 import {
   buildScreen1LivePayload,
   type Screen1TenantContext,
@@ -68,24 +66,26 @@ type InforboardTenantRow = {
 // ── Prisma adapter ────────────────────────────────────────────────────────────
 
 /**
- * Creates a Screen1SourceDatabase implementation backed by the Prisma client.
- * Type assertions bridge the gap between Prisma's generic findMany signatures
- * and the specific Screen1DbEventRow / Screen1FacilityResourceRow shapes.
- * The runtime behaviour is correct: Prisma returns exactly the selected fields.
+ * Creates a CanonicalInfoboardPolicyDatabase implementation backed by the
+ * Prisma client. Only publication-policy metadata (never planning/time/
+ * resource data — that comes from the canonical Weekplanner pipeline) is
+ * read here. Type assertions bridge the gap between Prisma's generic
+ * findMany signatures and the specific row shapes; the runtime behaviour is
+ * correct since Prisma returns exactly the selected fields.
  */
-function createPrismaDb(): Screen1SourceDatabase {
+function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
   return {
     event: {
       findMany: (args) =>
         prisma.event.findMany(
           args as Parameters<typeof prisma.event.findMany>[0],
-        ) as unknown as Promise<Screen1DbEventRow[]>,
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["event"]["findMany"]>,
     },
-    facilityResource: {
+    trainingSession: {
       findMany: (args) =>
-        prisma.facilityResource.findMany(
-          args as Parameters<typeof prisma.facilityResource.findMany>[0],
-        ) as unknown as Promise<Screen1FacilityResourceRow[]>,
+        prisma.trainingSession.findMany(
+          args as Parameters<typeof prisma.trainingSession.findMany>[0],
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["trainingSession"]["findMany"]>,
     },
   };
 }
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // ── Source loader ──────────────────────────────────────────────────────
     const db = createPrismaDb();
-    const loader = createScreen1SourceLoader(db);
+    const loader = createCanonicalInfoboardSourceLoader(db);
 
     // ── Build live payload ─────────────────────────────────────────────────
     const payload = await buildScreen1LivePayload({ tenant, now, loader });

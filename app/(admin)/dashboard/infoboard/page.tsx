@@ -43,11 +43,9 @@ import {
   type Screen1TenantContext,
 } from "@/lib/publishing/infoboard/screen1-live-service";
 import {
-  createScreen1SourceLoader,
-  type Screen1SourceDatabase,
-  type Screen1DbEventRow,
-  type Screen1FacilityResourceRow,
-} from "@/lib/publishing/infoboard/screen1-source-loader";
+  createCanonicalInfoboardSourceLoader,
+  type CanonicalInfoboardPolicyDatabase,
+} from "@/lib/publishing/infoboard/canonical-source-loader";
 import { buildScreen1AdminSummary } from "@/lib/publishing/infoboard/screen1-admin-summary";
 import { toLocalDateKey } from "@/lib/publishing/time/temporal-grouping";
 
@@ -128,19 +126,19 @@ function addOneDay(dateKey: string): string {
 
 // ── Prisma adapter ─────────────────────────────────────────────────────────────
 
-function createPrismaDb(): Screen1SourceDatabase {
+function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
   return {
     event: {
       findMany: (args) =>
         prisma.event.findMany(
           args as Parameters<typeof prisma.event.findMany>[0],
-        ) as unknown as Promise<Screen1DbEventRow[]>,
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["event"]["findMany"]>,
     },
-    facilityResource: {
+    trainingSession: {
       findMany: (args) =>
-        prisma.facilityResource.findMany(
-          args as Parameters<typeof prisma.facilityResource.findMany>[0],
-        ) as unknown as Promise<Screen1FacilityResourceRow[]>,
+        prisma.trainingSession.findMany(
+          args as Parameters<typeof prisma.trainingSession.findMany>[0],
+        ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["trainingSession"]["findMany"]>,
     },
   };
 }
@@ -206,7 +204,7 @@ export default async function InfoboardAdminPage({
   // ── Build Screen 1 live payload ─────────────────────────────────────────────
   // Calls the Screen 1 live service directly — no HTTP fetch to /api/public/*.
   const db = createPrismaDb();
-  const loader = createScreen1SourceLoader(db);
+  const loader = createCanonicalInfoboardSourceLoader(db);
   const payload = await buildScreen1LivePayload({ tenant, now, loader });
 
   // ── Admin summary ───────────────────────────────────────────────────────────
