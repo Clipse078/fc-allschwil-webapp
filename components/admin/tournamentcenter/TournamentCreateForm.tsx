@@ -341,12 +341,39 @@ export default function TournamentCreateForm({
     setResources((prev) => prev.filter((r) => r.localId !== localId));
   }, []);
 
+  // TOURNAMENTCENTER-01D-V: once a submission has partially failed, the
+  // Event (and whatever else succeeded) already exists — resubmitting this
+  // same form would call createEvent() again and re-add every draft
+  // participant/resource, producing a second, duplicate Event instead of
+  // "retrying" anything. The only safe way to finish an incomplete creation
+  // is the existing TournamentCenter edit flow (see the banner below), so
+  // the primary submit action is disabled until that partial result is
+  // cleared (e.g. by editing a draft, which starts a fresh attempt).
+  const hasUnresolvedPartialFailure =
+    !!partialResult &&
+    (partialResult.participantErrors.length > 0 ||
+      partialResult.resourceAllocationErrors.length > 0 ||
+      partialResult.dressingRoomAllocationErrors.length > 0);
+
   const canSubmit =
-    !submitting && !!seasonId && !!title.trim() && !!startAt && participants.length > 0;
+    !submitting &&
+    !hasUnresolvedPartialFailure &&
+    !!seasonId &&
+    !!title.trim() &&
+    !!startAt &&
+    participants.length > 0;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (hasUnresolvedPartialFailure) {
+      // Defense in depth — the button is disabled for this case, but a
+      // native form submit (e.g. pressing Enter in a text field) still
+      // calls this handler regardless of the button's disabled state.
+      return;
+    }
+
     setPartialResult(null);
 
     if (participants.length === 0) {
@@ -888,10 +915,15 @@ export default function TournamentCreateForm({
               <li key={`d-${i}`}>Garderobe: {e.error}</li>
             ))}
           </ul>
+          <p className="mt-2 text-xs text-[var(--text-2)]">
+            „Turnier erstellen“ ist deaktiviert, um ein doppeltes Turnier zu vermeiden — bitte die fehlenden
+            Elemente direkt am bereits angelegten Turnier nachtragen.
+          </p>
           <button
             type="button"
             onClick={() => router.push(`/dashboard/tournamentcenter/${partialResult.tournamentId}/edit`)}
             className="fca-button-secondary mt-3"
+            data-testid="tournament-create-goto-edit"
           >
             Zum Turnier wechseln und korrigieren
           </button>
@@ -901,7 +933,17 @@ export default function TournamentCreateForm({
       {error ? <div className="fca-status-box fca-status-box-error">{error}</div> : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={!canSubmit} data-testid="tournament-create-submit" className="fca-button-primary">
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          data-testid="tournament-create-submit"
+          title={
+            hasUnresolvedPartialFailure
+              ? "Turnier wurde bereits angelegt — bitte über \"Zum Turnier wechseln und korrigieren\" fortsetzen."
+              : undefined
+          }
+          className="fca-button-primary"
+        >
           {submitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
