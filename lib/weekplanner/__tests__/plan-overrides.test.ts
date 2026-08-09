@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   trainingSessionFindMany: vi.fn(),
   eventFindMany: vi.fn(),
   weekplannerPlanAllocationFindMany: vi.fn(),
+  weekplannerPlanActivityOverrideFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -33,6 +34,7 @@ vi.mock("@/lib/db/prisma", () => ({
     trainingSession: { findMany: mocks.trainingSessionFindMany },
     event: { findMany: mocks.eventFindMany },
     weekplannerPlanAllocation: { findMany: mocks.weekplannerPlanAllocationFindMany },
+    weekplannerPlanActivityOverride: { findMany: mocks.weekplannerPlanActivityOverrideFindMany },
   },
 }));
 
@@ -242,6 +244,7 @@ beforeEach(() => {
   mocks.trainingSessionFindMany.mockResolvedValue([]);
   mocks.eventFindMany.mockResolvedValue([]);
   mocks.weekplannerPlanAllocationFindMany.mockResolvedValue([]);
+  mocks.weekplannerPlanActivityOverrideFindMany.mockResolvedValue([]);
 });
 
 describe("getWeekplannerWeek — sparse override fallback to Standardplan", () => {

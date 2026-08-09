@@ -127,3 +127,26 @@ export class WeekplannerPlanAllocationArchivedFacilityError extends Error {
     this.name = "WeekplannerPlanAllocationArchivedFacilityError";
   }
 }
+
+/** WEEKPLANNER-01D — the requested WeekplannerPlanActivityOverride was not found (or belongs to another tenant/plan). */
+export class WeekplannerPlanTimeOverrideNotFoundError extends Error {
+  readonly code = "WEEKPLANNER_PLAN_TIME_OVERRIDE_NOT_FOUND" as const;
+  constructor(activityType: string, activityId: string) {
+    super(`WeekplannerPlanActivityOverride not found for ${activityType} activity ${activityId}`);
+    this.name = "WeekplannerPlanTimeOverrideNotFoundError";
+  }
+}
+
+/**
+ * WEEKPLANNER-01D — the requested override start/end would resolve to
+ * either an invalid range (end at or before start) or a different calendar
+ * day than the canonical activity — a time override may only shift the
+ * time-of-day within the SAME day (anti-drift: no date/day overrides).
+ */
+export class WeekplannerPlanTimeOverrideInvalidRangeError extends Error {
+  readonly code = "WEEKPLANNER_PLAN_TIME_OVERRIDE_INVALID_RANGE" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "WeekplannerPlanTimeOverrideInvalidRangeError";
+  }
+}

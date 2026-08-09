@@ -13,7 +13,8 @@
  *     upstream by lib/weekplanner/queries.ts — see plan-overrides.test.ts)
  */
 
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import WeekPlannerPage from "@/components/admin/planner/WeekPlannerPage";
 import type { WeekplannerDay, WeekplannerWeek } from "@/lib/weekplanner/types";
@@ -83,10 +84,15 @@ const TRAINING_ITEM = {
   type: "TRAINING" as const,
   startAt: new Date("2026-08-10T16:00:00.000Z"),
   endAt: new Date("2026-08-10T17:30:00.000Z"),
+  canonicalStartAt: new Date("2026-08-10T16:00:00.000Z"),
+  canonicalEndAt: new Date("2026-08-10T17:30:00.000Z"),
+  timeOverridden: false,
   title: "E2 Training",
   teamNames: ["FC Allschwil E2"],
   pitchAllocations: [{ facilityResourceId: "res-kr2", code: "KR2", name: "Kunstrasen 2", facilityName: "Sportanlage Bruel" }],
   dressingRoomAllocations: [],
+  canonicalPitchAllocations: [{ facilityResourceId: "res-kr2", code: "KR2", name: "Kunstrasen 2", facilityName: "Sportanlage Bruel" }],
+  canonicalDressingRoomAllocations: [],
   pitchOverridden: false,
   dressingRoomOverridden: false,
   conflicts: [{ facilityResourceId: "res-kr2", facilityResourceName: "Kunstrasen 2" }],
@@ -100,6 +106,9 @@ const MATCH_ITEM = {
   type: "MATCH" as const,
   startAt: new Date("2026-08-15T13:00:00.000Z"),
   endAt: new Date("2026-08-15T14:30:00.000Z"),
+  canonicalStartAt: new Date("2026-08-15T13:00:00.000Z"),
+  canonicalEndAt: new Date("2026-08-15T14:30:00.000Z"),
+  timeOverridden: false,
   title: "FC Allschwil 1 - Gegner FC",
   teamNames: ["FC Allschwil 1"],
   opponentName: "Gegner FC",
@@ -107,6 +116,8 @@ const MATCH_ITEM = {
   eventId: "event-match-1",
   pitchAllocations: [{ facilityResourceId: "res-pitch-standard", code: "KR2", name: "Kunstrasen 2", facilityName: "Sportanlage Bruel" }],
   dressingRoomAllocations: [{ facilityResourceId: "res-room-standard", code: "G1", name: "Garderobe 1", facilityName: "Garderobentrakt" }],
+  canonicalPitchAllocations: [{ facilityResourceId: "res-pitch-standard", code: "KR2", name: "Kunstrasen 2", facilityName: "Sportanlage Bruel" }],
+  canonicalDressingRoomAllocations: [{ facilityResourceId: "res-room-standard", code: "G1", name: "Garderobe 1", facilityName: "Garderobentrakt" }],
   pitchOverridden: false,
   dressingRoomOverridden: false,
   awayDressingRoomAllocations: [],
@@ -119,12 +130,17 @@ const TOURNAMENT_ITEM = {
   type: "TOURNAMENT" as const,
   startAt: new Date("2026-08-15T08:00:00.000Z"),
   endAt: new Date("2026-08-15T16:00:00.000Z"),
+  canonicalStartAt: new Date("2026-08-15T08:00:00.000Z"),
+  canonicalEndAt: new Date("2026-08-15T16:00:00.000Z"),
+  timeOverridden: false,
   title: "FCA Sommerturnier",
   teamNames: ["FC Allschwil E1"],
   homeAway: "HOME" as const,
   eventId: "event-tournament-1",
   pitchAllocations: [{ facilityResourceId: "res-pitch-standard", code: "KR2", name: "Kunstrasen 2", facilityName: "Sportanlage Bruel" }],
   dressingRoomAllocations: [],
+  canonicalPitchAllocations: [{ facilityResourceId: "res-pitch-standard", code: "KR2", name: "Kunstrasen 2", facilityName: "Sportanlage Bruel" }],
+  canonicalDressingRoomAllocations: [],
   pitchOverridden: false,
   dressingRoomOverridden: false,
   participantAllocations: [
@@ -132,6 +148,7 @@ const TOURNAMENT_ITEM = {
       participantId: "participant-1",
       participantLabel: "FC Allschwil E1",
       dressingRoomAllocations: [{ facilityResourceId: "res-room-standard", code: "G1", name: "Garderobe 1", facilityName: "Garderobentrakt" }],
+      canonicalDressingRoomAllocations: [{ facilityResourceId: "res-room-standard", code: "G1", name: "Garderobe 1", facilityName: "Garderobentrakt" }],
       dressingRoomOverridden: false,
     },
   ],
@@ -167,6 +184,7 @@ describe("WeekPlannerPage — Standardplan safety", () => {
   });
 
   it("hides the safety note once an alternative plan is active", async () => {
+    const user = userEvent.setup();
     const week = makeWeek([{ dayKey: "2026-08-10", items: [TRAINING_ITEM] }]);
     render(
       <WeekPlannerPage
@@ -184,13 +202,42 @@ describe("WeekPlannerPage — Standardplan safety", () => {
       />,
     );
 
+    // Override editors are collapsed behind "Anpassen" by default (compact UX) — open it first.
+    await user.click(screen.getByTestId("weekplanner-anpassen-toggle-TRAINING:session-1"));
     await screen.findAllByTestId("weekplanner-override-badge-standard");
     expect(screen.queryByTestId("weekplanner-standardplan-safety-note")).not.toBeInTheDocument();
   });
 });
 
+describe("WeekPlannerPage — compact default card / Anpassen disclosure", () => {
+  it("does NOT render the resource/time editors until 'Anpassen' is opened", () => {
+    const week = makeWeek([{ dayKey: "2026-08-10", items: [TRAINING_ITEM] }]);
+    render(
+      <WeekPlannerPage
+        week={week}
+        todayParam="2026-08-10"
+        plans={[PLAN]}
+        activePlanId={PLAN.id}
+        canManagePlans
+        overrideEditing={{
+          planId: PLAN.id,
+          planName: PLAN.name,
+          overridesByKey: {},
+          facilityGroupsByAllocationGroup: FACILITY_GROUPS_BY_GROUP,
+        }}
+      />,
+    );
+
+    const trainingCard = screen.getByTestId("weekplanner-item-training");
+    expect(within(trainingCard).queryByText("Spielfeld/Halle anpassen")).not.toBeInTheDocument();
+    expect(within(trainingCard).queryByText("Zeit anpassen")).not.toBeInTheDocument();
+    expect(within(trainingCard).getByTestId("weekplanner-anpassen-toggle-TRAINING:session-1")).toBeInTheDocument();
+  });
+});
+
 describe("WeekPlannerPage — override editing per activity type", () => {
-  it("renders the override editor for TRAINING, HOME MATCH, and HOME TOURNAMENT when an alternative plan is active", async () => {
+  it("renders the override editor for TRAINING, HOME MATCH, and HOME TOURNAMENT once 'Anpassen' is opened per card", async () => {
+    const user = userEvent.setup();
     const week = makeWeek([
       { dayKey: "2026-08-10", items: [TRAINING_ITEM] },
       { dayKey: "2026-08-15", items: [MATCH_ITEM, TOURNAMENT_ITEM] },
@@ -213,17 +260,105 @@ describe("WeekPlannerPage — override editing per activity type", () => {
     );
 
     const trainingCard = screen.getByTestId("weekplanner-item-training");
+    await user.click(within(trainingCard).getByTestId("weekplanner-anpassen-toggle-TRAINING:session-1"));
     expect(within(trainingCard).getAllByText("Spielfeld/Halle anpassen").length).toBeGreaterThan(0);
+    expect(within(trainingCard).getByText("Zeit anpassen")).toBeInTheDocument();
     const trainingBadges = await within(trainingCard).findAllByTestId("weekplanner-override-badge-standard");
     expect(trainingBadges.some((badge) => badge.textContent === "Standardplan: Kunstrasen 2")).toBe(true);
 
+    // Opening a different activity's "Anpassen" closes the training one — only ONE activity edits at a time.
     const matchCard = screen.getByTestId("weekplanner-item-match");
+    await user.click(within(matchCard).getByTestId("weekplanner-anpassen-toggle-MATCH:event-match-1"));
+    expect(within(trainingCard).queryByText("Zeit anpassen")).not.toBeInTheDocument();
     expect(within(matchCard).getAllByText(/anpassen/).length).toBeGreaterThan(0);
     await within(matchCard).findAllByTestId("weekplanner-override-badge-standard");
 
     const tournamentCard = screen.getByTestId("weekplanner-item-tournament");
+    await user.click(within(tournamentCard).getByTestId("weekplanner-anpassen-toggle-TOURNAMENT:event-tournament-1"));
     expect(within(tournamentCard).getAllByText(/anpassen/).length).toBeGreaterThan(0);
     await within(tournamentCard).findAllByTestId("weekplanner-override-badge-standard");
+  });
+});
+
+describe("WeekPlannerPage — WEEKPLANNER-01D effective time drives availability (test 8)", () => {
+  it("passes the EFFECTIVE (overridden) start/end — not the canonical time — into the availability lookup once 'Anpassen' is opened", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ availability: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const overriddenTraining = {
+      ...TRAINING_ITEM,
+      startAt: new Date("2026-08-10T18:00:00.000Z"),
+      endAt: new Date("2026-08-10T19:00:00.000Z"),
+      timeOverridden: true,
+    };
+    const week = makeWeek([{ dayKey: "2026-08-10", items: [overriddenTraining] }]);
+    render(
+      <WeekPlannerPage
+        week={week}
+        todayParam="2026-08-10"
+        plans={[PLAN]}
+        activePlanId={PLAN.id}
+        canManagePlans
+        overrideEditing={{
+          planId: PLAN.id,
+          planName: PLAN.name,
+          overridesByKey: {},
+          facilityGroupsByAllocationGroup: FACILITY_GROUPS_BY_GROUP,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByTestId("weekplanner-anpassen-toggle-TRAINING:session-1"));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("startAt=2026-08-10T18%3A00%3A00.000Z"),
+        expect.anything(),
+      ),
+    );
+    // Never the canonical (un-overridden) 16:00 start.
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("2026-08-10T16%3A00"))).toBe(false);
+  });
+});
+
+describe("WeekPlannerPage — WEEKPLANNER-01D time override indicator", () => {
+  it("shows a restrained 'Schlechtwetterplan angepasst' indicator + 'Standard: …' summary when an activity's time or resources are overridden — even for read-only viewers", () => {
+    const overriddenTraining = {
+      ...TRAINING_ITEM,
+      startAt: new Date("2026-08-10T17:00:00.000Z"),
+      timeOverridden: true,
+      pitchAllocations: [{ facilityResourceId: "res-halle", code: "HALLE", name: "Halle Gartenhof", facilityName: "Sportanlage Bruel" }],
+      pitchOverridden: true,
+    };
+    const week = makeWeek([{ dayKey: "2026-08-10", items: [overriddenTraining] }]);
+    render(
+      <WeekPlannerPage
+        week={week}
+        todayParam="2026-08-10"
+        plans={[PLAN]}
+        activePlanId={PLAN.id}
+        canManagePlans={false}
+      />,
+    );
+
+    const trainingCard = screen.getByTestId("weekplanner-item-training");
+    const indicator = within(trainingCard).getByTestId("weekplanner-override-indicator");
+    expect(indicator).toHaveTextContent("Schlechtwetterplan angepasst");
+    expect(indicator).toHaveTextContent("Standard:");
+    expect(indicator).toHaveTextContent("Kunstrasen 2");
+    // Read-only viewers never see the editing affordance.
+    expect(screen.queryByTestId("weekplanner-anpassen-toggle-TRAINING:session-1")).not.toBeInTheDocument();
+  });
+
+  it("shows no override indicator for an untouched (non-overridden) activity", () => {
+    const week = makeWeek([{ dayKey: "2026-08-10", items: [TRAINING_ITEM] }]);
+    render(
+      <WeekPlannerPage week={week} todayParam="2026-08-10" plans={[PLAN]} activePlanId={PLAN.id} canManagePlans={false} />,
+    );
+
+    const trainingCard = screen.getByTestId("weekplanner-item-training");
+    expect(within(trainingCard).queryByTestId("weekplanner-override-indicator")).not.toBeInTheDocument();
   });
 });
 

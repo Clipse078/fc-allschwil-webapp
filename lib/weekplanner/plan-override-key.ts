@@ -21,3 +21,13 @@ export function planOverrideKey(
 ): string {
   return `${activityType}:${activityId}:${allocationGroup}:${participantId}`;
 }
+
+/**
+ * WEEKPLANNER-01D — the key format identifying one (activityType,
+ * activityId) time-override target — one row per canonical activity per
+ * plan, so unlike planOverrideKey() above it has no allocationGroup/
+ * participantId dimension.
+ */
+export function planTimeOverrideKey(activityType: WeekplannerItemType, activityId: string): string {
+  return `${activityType}:${activityId}`;
+}

@@ -27,6 +27,9 @@ import {
   WeekplannerAllocationOverrideEditor,
   type WeekplannerOverrideRow,
 } from "./WeekplannerAllocationOverrideEditor";
+import { WeekplannerActivityTimeOverrideEditor } from "./WeekplannerActivityTimeOverrideEditor";
+import { WeekplannerActivityOverridePanel } from "./WeekplannerActivityOverridePanel";
+import { WeekplannerOverridePanelProvider } from "./WeekplannerOverridePanelContext";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 
 /**
@@ -156,14 +159,52 @@ function ResourceChips({
           {ref.name}
         </span>
       ))}
-      {overridden && (
-        <span
-          className="text-[10px] font-semibold uppercase tracking-wide text-blue-600"
-          data-testid="weekplanner-override-marker"
-        >
-          angepasst
-        </span>
-      )}
+    </div>
+  );
+}
+
+/** True when the currently selected plan overrides ANY part (time and/or resources) of this item. Always false for the Standardplan. */
+function isItemOverridden(item: WeekplannerItem): boolean {
+  const resourceOverridden =
+    item.pitchOverridden ||
+    item.dressingRoomOverridden ||
+    (item.type === "TOURNAMENT" && item.participantAllocations.some((p) => p.dressingRoomOverridden));
+  return item.timeOverridden || resourceOverridden;
+}
+
+/**
+ * WEEKPLANNER-01D — restrained "Standard: 17:00–18:00 · Kunstrasen 2 · E2"
+ * secondary summary, built purely from the item's untouched canonical
+ * (never-overridden) fields — see WeekplannerItemBase's canonicalStartAt/
+ * canonicalEndAt/canonicalPitchAllocations/canonicalDressingRoomAllocations
+ * doc comments. TOURNAMENT dressing rooms are per-participant (not shown
+ * here) — this stays deliberately restrained, not an exhaustive diff.
+ */
+function formatStandardSummary(item: WeekplannerItem, locale: string, timeZone: string): string {
+  const parts = [formatTimeRange(item.canonicalStartAt, item.canonicalEndAt, locale, timeZone)];
+  for (const ref of item.canonicalPitchAllocations) parts.push(ref.name);
+  for (const ref of item.canonicalDressingRoomAllocations) parts.push(ref.name);
+  return parts.join(" · ");
+}
+
+/** WEEKPLANNER-01D — one restrained, consolidated "<Plan> angepasst" indicator + "Standard: …" line, replacing the previous per-group "angepasst" tags. */
+function OverrideIndicator({
+  item,
+  planName,
+  locale,
+  timezone,
+}: {
+  item: WeekplannerItem;
+  planName: string;
+  locale: string;
+  timezone: string;
+}) {
+  if (!isItemOverridden(item)) return null;
+
+  return (
+    <div className="mt-1.5 space-y-0.5" data-testid="weekplanner-override-indicator">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">{planName} angepasst</p>
+      <p className="text-[10px] text-[var(--muted)]">Standard: {formatStandardSummary(item, locale, timezone)}</p>
     </div>
   );
 }
@@ -194,17 +235,33 @@ function WeekplannerCard({
   item,
   locale,
   timezone,
+  planName,
   overrideEditing,
 }: {
   item: WeekplannerItem;
   locale: string;
   timezone: string;
+  /** The currently selected alternative plan's display name, e.g. "Schlechtwetterplan" — null for the Standardplan. Shown even for read-only viewers. */
+  planName?: string | null;
   overrideEditing?: OverrideEditingContext;
 }) {
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
   const hasConflict = item.conflicts.length > 0;
   const activityId = activityIdOf(item);
+  const activityKey = `${item.type}:${activityId}`;
+
+  const timeEditor = overrideEditing ? (
+    <WeekplannerActivityTimeOverrideEditor
+      planId={overrideEditing.planId}
+      activityType={item.type}
+      activityId={activityId}
+      effectiveStartAt={item.startAt.toISOString()}
+      effectiveEndAt={item.endAt.toISOString()}
+      isOverridden={item.timeOverridden}
+      timeZone={timezone}
+    />
+  ) : null;
 
   return (
     <div
@@ -237,8 +294,10 @@ function WeekplannerCard({
             <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" overridden={item.pitchOverridden} />
             <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} overridden={item.dressingRoomOverridden} />
           </div>
+          {planName && <OverrideIndicator item={item} planName={planName} locale={locale} timezone={timezone} />}
           {overrideEditing && (
-            <>
+            <WeekplannerActivityOverridePanel activityKey={activityKey}>
+              {timeEditor}
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
                 planName={overrideEditing.planName}
@@ -265,7 +324,7 @@ function WeekplannerCard({
                 startAt={item.startAt.toISOString()}
                 endAt={item.endAt.toISOString()}
               />
-            </>
+            </WeekplannerActivityOverridePanel>
           )}
         </div>
       )}
@@ -280,8 +339,10 @@ function WeekplannerCard({
             <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} emptyLabel="Heimkabine offen" overridden={item.dressingRoomOverridden} />
             <ResourceChips icon={DoorOpen} refs={item.awayDressingRoomAllocations} emptyLabel="Gastkabine offen" />
           </div>
+          {planName && <OverrideIndicator item={item} planName={planName} locale={locale} timezone={timezone} />}
           {overrideEditing && (
-            <>
+            <WeekplannerActivityOverridePanel activityKey={activityKey}>
+              {timeEditor}
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
                 planName={overrideEditing.planName}
@@ -308,7 +369,7 @@ function WeekplannerCard({
                 startAt={item.startAt.toISOString()}
                 endAt={item.endAt.toISOString()}
               />
-            </>
+            </WeekplannerActivityOverridePanel>
           )}
         </div>
       )}
@@ -330,8 +391,10 @@ function WeekplannerCard({
               ) : null,
             )}
           </div>
+          {planName && <OverrideIndicator item={item} planName={planName} locale={locale} timezone={timezone} />}
           {overrideEditing && (
-            <>
+            <WeekplannerActivityOverridePanel activityKey={activityKey}>
+              {timeEditor}
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
                 planName={overrideEditing.planName}
@@ -366,7 +429,7 @@ function WeekplannerCard({
                   endAt={item.endAt.toISOString()}
                 />
               ))}
-            </>
+            </WeekplannerActivityOverridePanel>
           )}
         </div>
       )}
@@ -390,11 +453,13 @@ function DayColumn({
   day,
   locale,
   timezone,
+  planName,
   overrideEditing,
 }: {
   day: WeekplannerDay;
   locale: string;
   timezone: string;
+  planName?: string | null;
   overrideEditing?: OverrideEditingContext;
 }) {
   const today = isToday(day.dayKey, timezone);
@@ -437,6 +502,7 @@ function DayColumn({
               item={item}
               locale={locale}
               timezone={timezone}
+              planName={planName}
               overrideEditing={overrideEditing}
             />
           ))
@@ -461,6 +527,10 @@ export default function WeekPlannerPage({
     (sum, day) => sum + day.items.filter((item) => item.conflicts.length > 0).length,
     0,
   );
+  // WEEKPLANNER-01D — the active alternative plan's display name, shown by
+  // OverrideIndicator for EVERY viewer (not just managers) — informational,
+  // not an editing affordance.
+  const planName = activePlanId ? plans.find((p) => p.id === activePlanId)?.name ?? null : null;
 
   return (
     <div className="space-y-6">
@@ -564,17 +634,20 @@ export default function WeekPlannerPage({
         </SectionCard>
       ) : (
         <div className="-mx-1 overflow-x-auto pb-2">
-          <div className="flex min-w-full gap-3 px-1">
-            {week.days.map((day) => (
-              <DayColumn
-                key={day.dayKey}
-                day={day}
-                locale={locale}
-                timezone={timezone}
-                overrideEditing={overrideEditing}
-              />
-            ))}
-          </div>
+          <WeekplannerOverridePanelProvider>
+            <div className="flex min-w-full gap-3 px-1">
+              {week.days.map((day) => (
+                <DayColumn
+                  key={day.dayKey}
+                  day={day}
+                  locale={locale}
+                  timezone={timezone}
+                  planName={planName}
+                  overrideEditing={overrideEditing}
+                />
+              ))}
+            </div>
+          </WeekplannerOverridePanelProvider>
         </div>
       )}
     </div>

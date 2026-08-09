@@ -33,6 +33,12 @@ vi.mock("@/lib/db/prisma", () => ({
       count: vi.fn(),
       aggregate: vi.fn(),
     },
+    weekplannerPlanActivityOverride: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+      delete: vi.fn(),
+    },
     trainingSession: { findFirst: vi.fn() },
     event: { findFirst: vi.fn() },
     tournamentParticipant: { findFirst: vi.fn() },
@@ -50,6 +56,9 @@ import {
   deleteWeekplannerPlan,
   createWeekplannerPlanAllocation,
   deleteWeekplannerPlanAllocation,
+  setWeekplannerPlanActivityTimeOverride,
+  clearWeekplannerPlanActivityTimeOverride,
+  getWeekplannerPlanActivityOverride,
 } from "../plan-service";
 import {
   WeekplannerPlanNotFoundError,
@@ -62,6 +71,7 @@ import {
   WeekplannerPlanAllocationInvalidParticipantError,
   WeekplannerPlanAllocationGroupMismatchError,
   WeekplannerPlanAllocationDuplicateError,
+  WeekplannerPlanTimeOverrideInvalidRangeError,
 } from "../plan-errors";
 
 const TENANT_A = "tenant-a";
@@ -462,5 +472,228 @@ describe("E. deleteWeekplannerPlanAllocation", () => {
       WeekplannerPlanAllocationNotFoundError,
     );
     expect(prisma.weekplannerPlanAllocation.delete).not.toHaveBeenCalled();
+  });
+});
+
+// ── F. WeekplannerPlanActivityOverride — WEEKPLANNER-01D time overrides ────
+
+const TRAINING_SESSION_WINDOW = {
+  startAt: new Date("2026-08-10T16:00:00.000Z"),
+  endAt: new Date("2026-08-10T17:30:00.000Z"),
+};
+const MATCH_EVENT_WINDOW = {
+  startAt: new Date("2026-08-15T13:00:00.000Z"),
+  endAt: new Date("2026-08-15T14:30:00.000Z"),
+};
+const TOURNAMENT_EVENT_WINDOW = {
+  startAt: new Date("2026-08-15T08:00:00.000Z"),
+  endAt: new Date("2026-08-15T16:00:00.000Z"),
+};
+
+function timeOverrideRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "time-override-1",
+    tenantId: TENANT_A,
+    weekplannerPlanId: PLAN_ID,
+    activityType: "TRAINING",
+    activityId: "session-1",
+    overrideStartAt: new Date("2026-08-10T17:00:00.000Z"),
+    overrideEndAt: new Date("2026-08-10T18:00:00.000Z"),
+    createdAt: new Date("2026-08-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+describe("F. setWeekplannerPlanActivityTimeOverride", () => {
+  it("F1: sets a start/end time override for a TRAINING activity, replacing the canonical Standardplan time for THIS plan only", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(TRAINING_SESSION_WINDOW as never);
+    vi.mocked(prisma.weekplannerPlanActivityOverride.upsert).mockResolvedValue(timeOverrideRow() as never);
+
+    const override = await setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+      weekplannerPlanId: PLAN_ID,
+      activityType: "TRAINING",
+      activityId: "session-1",
+      overrideStartAt: "2026-08-10T17:00:00.000Z",
+      overrideEndAt: "2026-08-10T18:00:00.000Z",
+    });
+
+    expect(override?.overrideStartAt).toBe("2026-08-10T17:00:00.000Z");
+    expect(override?.overrideEndAt).toBe("2026-08-10T18:00:00.000Z");
+    // Never mutates the canonical TrainingSession — only findFirst is ever called on it.
+    expect(prisma.trainingSession.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "session-1", tenantId: TENANT_A } }),
+    );
+  });
+
+  it("F2: sets a time override for a HOME MATCH activity", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(MATCH_EVENT_WINDOW as never);
+    vi.mocked(prisma.weekplannerPlanActivityOverride.upsert).mockResolvedValue(
+      timeOverrideRow({
+        activityType: "MATCH",
+        activityId: "match-1",
+        overrideStartAt: new Date("2026-08-15T14:00:00.000Z"),
+        overrideEndAt: new Date("2026-08-15T15:30:00.000Z"),
+      }) as never,
+    );
+
+    const override = await setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+      weekplannerPlanId: PLAN_ID,
+      activityType: "MATCH",
+      activityId: "match-1",
+      overrideStartAt: "2026-08-15T14:00:00.000Z",
+      overrideEndAt: "2026-08-15T15:30:00.000Z",
+    });
+
+    expect(override?.activityType).toBe("MATCH");
+    expect(prisma.event.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "match-1", tenantId: TENANT_A, type: "MATCH" } }),
+    );
+  });
+
+  it("F3: sets a time override for a HOME TOURNAMENT activity", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(TOURNAMENT_EVENT_WINDOW as never);
+    vi.mocked(prisma.weekplannerPlanActivityOverride.upsert).mockResolvedValue(
+      timeOverrideRow({
+        activityType: "TOURNAMENT",
+        activityId: "tournament-1",
+        overrideStartAt: new Date("2026-08-15T09:00:00.000Z"),
+        overrideEndAt: null,
+      }) as never,
+    );
+
+    const override = await setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+      weekplannerPlanId: PLAN_ID,
+      activityType: "TOURNAMENT",
+      activityId: "tournament-1",
+      overrideStartAt: "2026-08-15T09:00:00.000Z",
+    });
+
+    expect(override?.activityType).toBe("TOURNAMENT");
+    expect(override?.overrideEndAt).toBeNull();
+    expect(prisma.event.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "tournament-1", tenantId: TENANT_A, type: "TOURNAMENT" } }),
+    );
+  });
+
+  it("F4: rejects an override that would move the activity to a different calendar day (anti-drift)", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(TRAINING_SESSION_WINDOW as never);
+
+    await expect(
+      setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+        weekplannerPlanId: PLAN_ID,
+        activityType: "TRAINING",
+        activityId: "session-1",
+        // Canonical day is 2026-08-10 (Europe/Zurich) — this instant is the NEXT day.
+        overrideStartAt: "2026-08-11T17:00:00.000Z",
+      }),
+    ).rejects.toThrow(WeekplannerPlanTimeOverrideInvalidRangeError);
+    expect(prisma.weekplannerPlanActivityOverride.upsert).not.toHaveBeenCalled();
+  });
+
+  it("F5: rejects an override where the effective end is not after the effective start", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(TRAINING_SESSION_WINDOW as never);
+
+    await expect(
+      setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+        weekplannerPlanId: PLAN_ID,
+        activityType: "TRAINING",
+        activityId: "session-1",
+        overrideStartAt: "2026-08-10T18:00:00.000Z",
+        overrideEndAt: "2026-08-10T17:00:00.000Z",
+      }),
+    ).rejects.toThrow(WeekplannerPlanTimeOverrideInvalidRangeError);
+    expect(prisma.weekplannerPlanActivityOverride.upsert).not.toHaveBeenCalled();
+  });
+
+  it("F6: rejects overriding an activity that does not belong to this tenant", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(null);
+
+    await expect(
+      setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+        weekplannerPlanId: PLAN_ID,
+        activityType: "TRAINING",
+        activityId: "session-cross-tenant",
+        overrideStartAt: "2026-08-10T17:00:00.000Z",
+      }),
+    ).rejects.toThrow(WeekplannerPlanAllocationActivityNotFoundError);
+  });
+
+  it("F7: rejects a time override on an archived plan", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ archivedAt: new Date() }) as never);
+
+    await expect(
+      setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+        weekplannerPlanId: PLAN_ID,
+        activityType: "TRAINING",
+        activityId: "session-1",
+        overrideStartAt: "2026-08-10T17:00:00.000Z",
+      }),
+    ).rejects.toThrow(WeekplannerPlanArchivedError);
+  });
+
+  it("F8: passing no start/end clears any existing override — 'Standardzeit verwenden' by omission", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue(TRAINING_SESSION_WINDOW as never);
+    vi.mocked(prisma.weekplannerPlanActivityOverride.delete).mockResolvedValue({} as never);
+
+    const result = await setWeekplannerPlanActivityTimeOverride(TENANT_A, {
+      weekplannerPlanId: PLAN_ID,
+      activityType: "TRAINING",
+      activityId: "session-1",
+    });
+
+    expect(result).toBeNull();
+    expect(prisma.weekplannerPlanActivityOverride.delete).toHaveBeenCalledWith({
+      where: { weekplannerPlanId_activityType_activityId: { weekplannerPlanId: PLAN_ID, activityType: "TRAINING", activityId: "session-1" } },
+    });
+    expect(prisma.weekplannerPlanActivityOverride.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("G. clearWeekplannerPlanActivityTimeOverride — 'Standardzeit verwenden'", () => {
+  it("G1: removes an existing override, restoring the canonical Standardplan time", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.weekplannerPlanActivityOverride.delete).mockResolvedValue({} as never);
+
+    await clearWeekplannerPlanActivityTimeOverride(TENANT_A, PLAN_ID, "TRAINING", "session-1");
+
+    expect(prisma.weekplannerPlanActivityOverride.delete).toHaveBeenCalledWith({
+      where: { weekplannerPlanId_activityType_activityId: { weekplannerPlanId: PLAN_ID, activityType: "TRAINING", activityId: "session-1" } },
+    });
+  });
+
+  it("G2: is idempotent — clearing when no override exists does not throw", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.weekplannerPlanActivityOverride.delete).mockRejectedValue(new Error("Record not found"));
+
+    await expect(
+      clearWeekplannerPlanActivityTimeOverride(TENANT_A, PLAN_ID, "TRAINING", "session-1"),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe("H. getWeekplannerPlanActivityOverride — tenant isolation", () => {
+  it("H1: returns null when no override row exists for this activity", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow() as never);
+    vi.mocked(prisma.weekplannerPlanActivityOverride.findFirst).mockResolvedValue(null);
+
+    const override = await getWeekplannerPlanActivityOverride(TENANT_A, PLAN_ID, "TRAINING", "session-1");
+    expect(override).toBeNull();
+  });
+
+  it("H2: a cross-tenant plan id is treated as not found, never leaking another tenant's override", async () => {
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+
+    await expect(
+      getWeekplannerPlanActivityOverride(TENANT_B, PLAN_ID, "TRAINING", "session-1"),
+    ).rejects.toThrow(WeekplannerPlanNotFoundError);
+    expect(prisma.weekplannerPlanActivityOverride.findFirst).not.toHaveBeenCalled();
   });
 });

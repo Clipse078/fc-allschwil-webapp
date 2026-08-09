@@ -62,3 +62,33 @@ export type CreateWeekplannerPlanAllocationInput = {
   notes?: string | null;
   displayOrder?: number;
 };
+
+/**
+ * WEEKPLANNER-01D — one sparse alternative start/end TIME override for one
+ * canonical activity (TrainingSession.id for TRAINING; Event.id for
+ * MATCH/TOURNAMENT), within one WeekplannerPlan. Never present for the
+ * Standardplan (see lib/weekplanner/plan-service.ts).
+ */
+export type WeekplannerPlanActivityOverrideDto = {
+  id: string;
+  tenantId: string;
+  weekplannerPlanId: string;
+  activityType: WeekplannerActivityType;
+  activityId: string;
+  /** ISO instant, or null to inherit the canonical Standardplan start. */
+  overrideStartAt: string | null;
+  /** ISO instant, or null to inherit the canonical Standardplan end. */
+  overrideEndAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SetWeekplannerPlanActivityTimeOverrideInput = {
+  weekplannerPlanId: string;
+  activityType: WeekplannerActivityType;
+  activityId: string;
+  /** ISO instant, or null/undefined to inherit the canonical start. */
+  overrideStartAt?: string | null;
+  /** ISO instant, or null/undefined to inherit the canonical end. */
+  overrideEndAt?: string | null;
+};

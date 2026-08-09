@@ -26,6 +26,19 @@
  * each allocation group as (plan override, if any) else (Standardplan
  * default) — see queries.ts's module doc comment for the full
  * "override by presence, per allocation group" semantics.
+ *
+ * WEEKPLANNER-01D — Alternative Time Overrides.
+ *
+ * `startAt`/`endAt` above are already the EFFECTIVE time for the currently
+ * selected plan (plan override, if any, else the canonical Standardplan
+ * time) — every downstream consumer (day-bucketing, conflict detection,
+ * rendering, availability lookups) reads them and therefore automatically
+ * operates on effective time with no changes of its own. `canonicalStartAt`/
+ * `canonicalEndAt` preserve the untouched Standardplan value for display
+ * ("Standard: 17:00–18:00 · …") and `timeOverridden` flags whether the
+ * selected plan replaced it. Always `startAt === canonicalStartAt` (and
+ * `endAt === canonicalEndAt`, `timeOverridden === false`) for the
+ * Standardplan.
  */
 
 export type WeekplannerItemType = "TRAINING" | "MATCH" | "TOURNAMENT";
@@ -51,6 +64,8 @@ export type WeekplannerTournamentParticipantAllocation = {
   participantId: string;
   participantLabel: string;
   dressingRoomAllocations: WeekplannerResourceRef[];
+  /** Untouched canonical Standardplan Garderobe for this participant — for restrained "Standard: …" display when overridden. */
+  canonicalDressingRoomAllocations: WeekplannerResourceRef[];
   /** True when the currently selected plan overrides this participant's Garderobe. Always false for the Standardplan. */
   dressingRoomOverridden: boolean;
 };
@@ -60,8 +75,16 @@ export type WeekplannerItemBase = {
   id: string;
   tenantId: string;
   type: WeekplannerItemType;
+  /** EFFECTIVE start — the selected plan's time override, if any, else the canonical Standardplan start. See module doc comment. */
   startAt: Date;
+  /** EFFECTIVE end — the selected plan's time override, if any, else the canonical Standardplan end. See module doc comment. */
   endAt: Date;
+  /** Untouched canonical Standardplan start — never overridden, for "Standard: …" display. */
+  canonicalStartAt: Date;
+  /** Untouched canonical Standardplan end — never overridden, for "Standard: …" display. */
+  canonicalEndAt: Date;
+  /** True when the currently selected plan overrides start and/or end. Always false for the Standardplan. */
+  timeOverridden: boolean;
   title: string;
   /** FC Allschwil team(s) associated with this item. */
   teamNames: string[];
@@ -69,6 +92,10 @@ export type WeekplannerItemBase = {
   pitchAllocations: WeekplannerResourceRef[];
   /** Garderobe allocation(s) — the item's own/home side for MATCH. Same override/fallback semantics as pitchAllocations. */
   dressingRoomAllocations: WeekplannerResourceRef[];
+  /** Untouched canonical Standardplan Spielfeld/Halle — never overridden, for restrained "Standard: …" display. */
+  canonicalPitchAllocations: WeekplannerResourceRef[];
+  /** Untouched canonical Standardplan Garderobe (home side) — never overridden, for restrained "Standard: …" display. */
+  canonicalDressingRoomAllocations: WeekplannerResourceRef[];
   /** True when the currently selected plan overrides pitchAllocations for this item. Always false for the Standardplan. */
   pitchOverridden: boolean;
   /** True when the currently selected plan overrides dressingRoomAllocations for this item. Always false for the Standardplan. */
