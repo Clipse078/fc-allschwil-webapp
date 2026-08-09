@@ -39,6 +39,26 @@
  *     client-supplied input.
  *   - Every query below is scoped by tenantId; a cross-tenant TrainingSeries/
  *     TrainingSession/FacilityResource/Event can never leak into the result.
+ *
+ * WEEKPLANNER-01B — Multiple Planning Variants.
+ *
+ * `getWeekplannerWeek()` accepts an optional `planId`. When present, this
+ * module additionally loads that WeekplannerPlan's sparse
+ * WeekplannerPlanAllocation override rows (scoped by tenantId +
+ * weekplannerPlanId — a planId belonging to a different tenant simply
+ * yields zero rows, i.e. behaves exactly like no plan selected) and
+ * resolves each item's Spielfeld/Halle and Garderobe allocations as
+ * (plan override, if any) else (Standardplan default) — "override by
+ * presence, per allocation group", mirroring the identical
+ * TrainingSessionAllocation-over-TrainingAllocation precedence already
+ * used for TRAINING above. When `planId` is omitted, every code path below
+ * is byte-for-byte identical to WEEKPLANNER-01A — the Standardplan.
+ *
+ * Because the override map is scoped to exactly one plan per call, and
+ * conflict detection (view-model.ts) always runs against this call's
+ * already-resolved EFFECTIVE items, two different plans' conflicts can
+ * never leak into each other — conflict isolation falls out of this
+ * request-scoped resolution, with no changes needed to view-model.ts.
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -51,6 +71,7 @@ import {
 import { listTournaments } from "@/lib/tournaments/tournament-service";
 import { formatWeekNumberLabel, formatWeekRangeLabel } from "./date";
 import { buildWeekplannerWeek } from "./view-model";
+import { planOverrideKey } from "./plan-override-key";
 import type {
   WeekplannerItem,
   WeekplannerMatchItem,
@@ -103,6 +124,63 @@ async function findFacilityResourceCodeMap(
   return new Map(resources.map((resource) => [resource.code, toResourceRef(resource)]));
 }
 
+// ── WEEKPLANNER-01B: plan override resolution ───────────────────────────────
+//
+// planOverrideKey() itself lives in ./plan-override-key.ts (a pure, I/O-free
+// module) so both this server-side resolver and WeekPlannerPage.tsx (a
+// server component deciding which override editor to render) share the
+// exact same key format without ever drifting apart.
+
+/**
+ * Groups a plan's WeekplannerPlanAllocation rows by exactly the key an
+ * item's allocation resolution looks up — one entry per
+ * (activityType, activityId, allocationGroup, participantId) combination
+ * that has at least one override row. A combination absent from this map
+ * has NO override — the caller falls back to the Standardplan default for
+ * that group.
+ */
+async function findWeekplannerPlanOverrides(
+  tenantId: string,
+  planId: string | undefined,
+): Promise<Map<string, WeekplannerResourceRef[]>> {
+  const map = new Map<string, WeekplannerResourceRef[]>();
+  if (!planId) return map;
+
+  const rows = await prisma.weekplannerPlanAllocation.findMany({
+    where: { tenantId, weekplannerPlanId: planId },
+    select: {
+      activityType: true,
+      activityId: true,
+      allocationGroup: true,
+      participantId: true,
+      facilityResource: { select: { id: true, code: true, name: true, facility: { select: { name: true } } } },
+    },
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  for (const row of rows) {
+    const key = planOverrideKey(row.activityType, row.activityId, row.allocationGroup, row.participantId);
+    const list = map.get(key) ?? [];
+    list.push(toResourceRef(row.facilityResource));
+    map.set(key, list);
+  }
+
+  return map;
+}
+
+/** Resolves one allocation group as (plan override, if present) else `standardplanDefault` — the "override by presence" rule. */
+function resolveEffectiveAllocation(
+  overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
+  key: string,
+  standardplanDefault: WeekplannerResourceRef[],
+): { allocations: WeekplannerResourceRef[]; overridden: boolean } {
+  const override = overridesByKey.get(key);
+  if (override && override.length > 0) {
+    return { allocations: override, overridden: true };
+  }
+  return { allocations: standardplanDefault, overridden: false };
+}
+
 // ── TrainingSession → WeekplannerTrainingItem ───────────────────────────────
 
 type AllocationResourceRow = {
@@ -134,6 +212,7 @@ function groupAllocationRows(
 async function findWeekplannerTrainingItems(
   tenantId: string,
   days: readonly string[],
+  overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
 ): Promise<WeekplannerTrainingItem[]> {
   if (days.length === 0) return [];
 
@@ -192,13 +271,26 @@ async function findWeekplannerTrainingItems(
     const overrideRows = sessionOverridesById.get(session.id) ?? [];
     const overrideGroups = groupAllocationRows(overrideRows);
 
-    // TRAININGCENTER-02 override-by-presence-per-group: any override row
-    // for a group supersedes that group's series-level default for this
-    // occurrence only (see lib/training/session-allocation-service.ts).
-    const pitchAllocations =
+    // TRAININGCENTER-02 override-by-presence-per-group: any TrainingSessionAllocation
+    // override row for a group supersedes that group's series-level default for this
+    // occurrence only (see lib/training/session-allocation-service.ts). This
+    // resolved value is the Standardplan default the WEEKPLANNER-01B plan
+    // override (if any) is layered on top of below.
+    const standardplanPitch =
       overrideGroups.pitch.length > 0 ? overrideGroups.pitch : seriesGroups.pitch;
-    const dressingRoomAllocations =
+    const standardplanDressingRoom =
       overrideGroups.dressingRoom.length > 0 ? overrideGroups.dressingRoom : seriesGroups.dressingRoom;
+
+    const pitch = resolveEffectiveAllocation(
+      overridesByKey,
+      planOverrideKey("TRAINING", session.id, "PITCH_HALL"),
+      standardplanPitch,
+    );
+    const dressingRoom = resolveEffectiveAllocation(
+      overridesByKey,
+      planOverrideKey("TRAINING", session.id, "DRESSING_ROOM"),
+      standardplanDressingRoom,
+    );
 
     return {
       id: `training:${session.id}`,
@@ -208,8 +300,10 @@ async function findWeekplannerTrainingItems(
       endAt: new Date(session.endAt),
       title: session.trainingSeriesTitle,
       teamNames: [session.teamName],
-      pitchAllocations,
-      dressingRoomAllocations,
+      pitchAllocations: pitch.allocations,
+      dressingRoomAllocations: dressingRoom.allocations,
+      pitchOverridden: pitch.overridden,
+      dressingRoomOverridden: dressingRoom.overridden,
       conflicts: [],
       trainingSeriesId: session.trainingSeriesId,
       trainingSessionId: session.id,
@@ -233,6 +327,7 @@ async function findWeekplannerHomeMatches(
   from: Date,
   to: Date,
   resourceByCode: ReadonlyMap<string, WeekplannerResourceRef>,
+  overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
 ): Promise<WeekplannerMatchItem[]> {
   const database = prisma as unknown as MatchcenterQueryDatabase;
   const matches = await listMatchcenterMatches(database, { tenantId, from, to });
@@ -252,6 +347,20 @@ async function findWeekplannerHomeMatches(
       ? resourceByCode.get(match.operational.awayDressingRoomCode)
       : undefined;
 
+    // WEEKPLANNER-01B only supports overrides for the HOME side (Spielfeld/
+    // Halle + the club's own Garderobe) — the away room is always the
+    // legacy/Standardplan value, see WeekplannerMatchItem.awayDressingRoomAllocations doc comment.
+    const pitch = resolveEffectiveAllocation(
+      overridesByKey,
+      planOverrideKey("MATCH", match.id, "PITCH_HALL"),
+      pitchRef ? [pitchRef] : [],
+    );
+    const dressingRoom = resolveEffectiveAllocation(
+      overridesByKey,
+      planOverrideKey("MATCH", match.id, "DRESSING_ROOM"),
+      homeRoomRef ? [homeRoomRef] : [],
+    );
+
     return {
       id: `match:${match.id}`,
       tenantId: match.tenantId,
@@ -263,8 +372,10 @@ async function findWeekplannerHomeMatches(
       opponentName: match.away.displayName,
       homeAway: "HOME",
       eventId: match.id,
-      pitchAllocations: pitchRef ? [pitchRef] : [],
-      dressingRoomAllocations: homeRoomRef ? [homeRoomRef] : [],
+      pitchAllocations: pitch.allocations,
+      dressingRoomAllocations: dressingRoom.allocations,
+      pitchOverridden: pitch.overridden,
+      dressingRoomOverridden: dressingRoom.overridden,
       awayDressingRoomAllocations: awayRoomRef ? [awayRoomRef] : [],
       conflicts: [],
     } satisfies WeekplannerMatchItem;
@@ -277,6 +388,7 @@ async function findWeekplannerHomeTournaments(
   tenantId: string,
   from: Date,
   to: Date,
+  overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
 ): Promise<WeekplannerTournamentItem[]> {
   const tournaments = await listTournaments(tenantId);
 
@@ -297,6 +409,18 @@ async function findWeekplannerHomeTournaments(
       .filter((participant) => participant.kind === "TEAM")
       .map((participant) => participant.displayName);
 
+    const standardplanPitch = tournament.resourceAllocations.map((allocation) => ({
+      facilityResourceId: allocation.facilityResourceId,
+      code: allocation.facilityResourceCode,
+      name: allocation.facilityResourceName,
+      facilityName: allocation.facilityName,
+    }));
+    const pitch = resolveEffectiveAllocation(
+      overridesByKey,
+      planOverrideKey("TOURNAMENT", tournament.id, "PITCH_HALL"),
+      standardplanPitch,
+    );
+
     return {
       id: `tournament:${tournament.id}`,
       tenantId: tournament.tenantId,
@@ -307,22 +431,30 @@ async function findWeekplannerHomeTournaments(
       teamNames: ownTeamNames,
       homeAway: "HOME",
       eventId: tournament.id,
-      pitchAllocations: tournament.resourceAllocations.map((allocation) => ({
-        facilityResourceId: allocation.facilityResourceId,
-        code: allocation.facilityResourceCode,
-        name: allocation.facilityResourceName,
-        facilityName: allocation.facilityName,
-      })),
+      pitchAllocations: pitch.allocations,
       dressingRoomAllocations: [],
-      participantAllocations: tournament.participants.map((participant) => ({
-        participantLabel: participant.displayName,
-        dressingRoomAllocations: participant.dressingRoomAllocations.map((allocation) => ({
+      pitchOverridden: pitch.overridden,
+      dressingRoomOverridden: false,
+      participantAllocations: tournament.participants.map((participant) => {
+        const standardplanDressingRoom = participant.dressingRoomAllocations.map((allocation) => ({
           facilityResourceId: allocation.facilityResourceId,
           code: allocation.facilityResourceCode,
           name: allocation.facilityResourceName,
           facilityName: allocation.facilityName,
-        })),
-      })),
+        }));
+        const dressingRoom = resolveEffectiveAllocation(
+          overridesByKey,
+          planOverrideKey("TOURNAMENT", tournament.id, "DRESSING_ROOM", participant.id),
+          standardplanDressingRoom,
+        );
+
+        return {
+          participantId: participant.id,
+          participantLabel: participant.displayName,
+          dressingRoomAllocations: dressingRoom.allocations,
+          dressingRoomOverridden: dressingRoom.overridden,
+        };
+      }),
       conflicts: [],
     } satisfies WeekplannerTournamentItem;
   });
@@ -335,17 +467,28 @@ async function findWeekplannerHomeTournaments(
  * HOME matches + HOME tournaments, tenant-scoped, day-bucketed,
  * chronologically ordered, and annotated with resource-conflict
  * ("⚠ Doppelbelegung") indicators.
+ *
+ * WEEKPLANNER-01B: when `planId` is provided, every item's Spielfeld/Halle
+ * and Garderobe allocations resolve to that WeekplannerPlan's EFFECTIVE
+ * allocation (its own override, else the Standardplan default) — see the
+ * module doc comment. Omitting `planId` (or passing a value that does not
+ * resolve to any override rows for this tenant) is byte-for-byte identical
+ * to WEEKPLANNER-01A: the Standardplan.
  */
 export async function getWeekplannerWeek(
   tenantId: string,
   window: WeekplannerWindow,
+  planId?: string,
 ): Promise<WeekplannerWeek> {
-  const resourceByCode = await findFacilityResourceCodeMap(tenantId);
+  const [resourceByCode, overridesByKey] = await Promise.all([
+    findFacilityResourceCodeMap(tenantId),
+    findWeekplannerPlanOverrides(tenantId, planId),
+  ]);
 
   const [trainingItems, matchItems, tournamentItems] = await Promise.all([
-    findWeekplannerTrainingItems(tenantId, window.days),
-    findWeekplannerHomeMatches(tenantId, window.from, window.to, resourceByCode),
-    findWeekplannerHomeTournaments(tenantId, window.from, window.to),
+    findWeekplannerTrainingItems(tenantId, window.days, overridesByKey),
+    findWeekplannerHomeMatches(tenantId, window.from, window.to, resourceByCode, overridesByKey),
+    findWeekplannerHomeTournaments(tenantId, window.from, window.to, overridesByKey),
   ]);
 
   const items: WeekplannerItem[] = [...trainingItems, ...matchItems, ...tournamentItems];

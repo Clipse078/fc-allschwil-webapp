@@ -540,6 +540,10 @@ model Tenant {
   tournamentParticipants           TournamentParticipant[]
   tournamentResourceAllocations    TournamentResourceAllocation[]
   tournamentParticipantAllocations TournamentParticipantAllocation[]
+  // WEEKPLANNER-01B: tenant-defined, week-scoped alternative planning
+  // variants + their sparse resource-allocation overrides.
+  weekplannerPlans                 WeekplannerPlan[]
+  weekplannerPlanAllocations       WeekplannerPlanAllocation[]
 
   // RPERM-02
   tenantMemberships TenantMembership[]
@@ -1857,6 +1861,9 @@ model FacilityResource {
   // no parallel resource model.
   tournamentResourceAllocations    TournamentResourceAllocation[]
   tournamentParticipantAllocations TournamentParticipantAllocation[]
+  // WEEKPLANNER-01B: alternative-plan Spielfeld/Halle + Garderobe
+  // overrides — same canonical FacilityResource, no parallel resource model.
+  weekplannerPlanAllocations       WeekplannerPlanAllocation[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3919,4 +3926,175 @@ model TournamentParticipantAllocation {
   @@index([tournamentParticipantId])
   @@index([facilityResourceId])
   @@index([tenantId, tournamentParticipantId])
+}
+
+// =============================================================================
+// WEEKPLANNER-01B: Multiple Planning Variants
+//
+// Adds the smallest safe foundation for MULTIPLE named, tenant-defined
+// alternative Weekplanner variants per week (e.g. "Schlechtwetterplan",
+// "Winterplan", "Ferienbetrieb") on top of the read-only WEEKPLANNER-01A
+// aggregation (see lib/weekplanner/).
+//
+// CORE DOMAIN RULE — this layer NEVER duplicates a canonical activity:
+//   there remains exactly one TrainingSession, one Event(type=MATCH), one
+//   Event(type=TOURNAMENT) per real-world occurrence. A WeekplannerPlan
+//   only stores SPARSE resource-allocation OVERRIDES for those same
+//   canonical activities — never a copy of the activity itself.
+//
+// "Standardplan" is NOT a WeekplannerPlan row. It is exactly the existing
+// canonical allocations already resolved by WEEKPLANNER-01A (TrainingAllocation
+// / TrainingSessionAllocation, legacy Event.pitchCode/*DressingRoomCode,
+// TournamentResourceAllocation / TournamentParticipantAllocation) — "no
+// alternative plan selected" == Standardplan == unchanged 01A behaviour.
+// Copying those rows into this table merely to represent the Standardplan
+// is deliberately out of scope.
+//
+// Architecture:
+//   Tenant → WeekplannerPlan → WeekplannerPlanAllocation → FacilityResource
+//
+// WeekplannerPlanAllocation deliberately does NOT hold a DB relation to
+// TrainingSession/Event — `activityId` is a plain tenant-validated
+// reference (mirrors the existing legacy Event.pitchCode-by-code
+// resolution technique already used by lib/weekplanner/queries.ts) so this
+// slice never has to modify the TrainingSession/Event models. It DOES hold
+// a real relation to FacilityResource — "Use canonical FacilityResource
+// references" is an explicit product requirement.
+//
+// "Override by presence, per allocation group" (same principle already
+// used by TrainingSessionAllocation — see lib/training/session-allocation-
+// service.ts): a plan has NO override rows for an (activity, group) by
+// default, in which case it fully inherits the Standardplan's effective
+// allocation for that group. The moment ANY override row exists for that
+// (activityId, allocationGroup[, participantId]) combination, it fully
+// REPLACES the Standardplan default for that group in that plan only —
+// every other plan (including Standardplan) is completely unaffected.
+// =============================================================================
+
+enum WeekplannerActivityType {
+  TRAINING
+  MATCH
+  TOURNAMENT
+}
+
+/// Deliberately only the two allocation groups the product spec calls out
+/// ("at minimum: Spielfeld/Halle, Garderobe") — see
+/// lib/training/allocation-groups.ts#TrainingAllocationGroupKey for the
+/// (currently TrainingCenter-only) three-way UI split this is a subset of.
+enum WeekplannerAllocationGroup {
+  PITCH_HALL
+  DRESSING_ROOM
+}
+
+// ---------------------------------------------------------------------------
+// WeekplannerPlan — a tenant-defined, week-scoped, NAMED alternative
+// operational resource-allocation plan.
+//
+// Scope:
+//   - tenant scoped (tenantId).
+//   - week scoped (weekId — the Monday "YYYY-MM-DD" Europe/Zurich calendar
+//     date identifying the week; the same value already used as
+//     lib/weekplanner's WeekplannerWindow.param / lib/training/date-
+//     range.ts's TrainingWeekWindow.param).
+//   - named — tenant-chosen, generic. No plan name or behaviour is ever
+//     hardcoded in application code; "Schlechtwetterplan" is merely the
+//     product spec's example name.
+//
+// Lifecycle: ACTIVE -> ARCHIVED (archivedAt set) is a soft delete that
+// preserves the plan's overrides for history while hiding it from the plan
+// selector. A hard DELETE is only permitted while the plan has zero
+// WeekplannerPlanAllocation rows — see lib/weekplanner/plan-service.ts.
+//
+// Name uniqueness: unique (case-insensitive) among non-archived plans
+// within (tenantId, weekId) — enforced via a partial unique index in the
+// migration SQL (Prisma cannot express a partial/conditional @@unique
+// natively; mirrors the identical TrainingPlan.name technique).
+//
+// Security invariants:
+//   - All queries must scope by tenantId.
+//   - Tenant A cannot read or modify Tenant B's plans.
+// ---------------------------------------------------------------------------
+model WeekplannerPlan {
+  id              String    @id @default(cuid())
+  tenantId        String
+  /// Monday "YYYY-MM-DD" (Europe/Zurich) identifying the scoped week.
+  weekId          String
+  /// Tenant-chosen, generic plan name (e.g. "Schlechtwetterplan").
+  name            String
+  /// Best-effort audit trail of who created the plan. Not an authorization input.
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  /// Set when archived (soft delete). Null while active.
+  archivedAt      DateTime?
+
+  tenant      Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  allocations WeekplannerPlanAllocation[]
+
+  @@index([tenantId])
+  @@index([tenantId, weekId])
+  @@index([tenantId, weekId, archivedAt])
+}
+
+// ---------------------------------------------------------------------------
+// WeekplannerPlanAllocation — one SPARSE resource-allocation override row
+// within a WeekplannerPlan, for exactly one canonical activity's one
+// allocation group.
+//
+// `activityType` + `activityId` identify the canonical activity being
+// overridden (TrainingSession.id for TRAINING; Event.id for MATCH/
+// TOURNAMENT — both already tenant-scoped and validated at the service
+// layer, never a DB relation — see the module doc comment above).
+//
+// `participantId` is only meaningful for TOURNAMENT + DRESSING_ROOM
+// overrides (one canonical TournamentParticipant's Garderobe override);
+// it is the empty string sentinel `""` for every other (activityType,
+// allocationGroup) combination. A plain empty-string sentinel (rather than
+// SQL NULL) is used deliberately so the uniqueness constraint below behaves
+// predictably — Postgres treats every NULL as distinct, which would silently
+// allow duplicate non-participant override rows.
+//
+// Architecture invariants:
+//   - tenantId must match the parent WeekplannerPlan's tenantId (enforced
+//     at the service layer) and FacilityResource.tenantId.
+//   - @@unique(...) prevents a duplicate override for the same activity +
+//     group + participant + resource within one plan.
+//   - Cascade-delete when the parent WeekplannerPlan is deleted.
+//   - Cascade-delete when the parent FacilityResource is deleted.
+//
+// Security invariants:
+//   - All queries must scope by tenantId.
+//   - Tenant A cannot read or modify Tenant B's plan allocations.
+// ---------------------------------------------------------------------------
+model WeekplannerPlanAllocation {
+  id                 String                     @id @default(cuid())
+  tenantId           String
+  weekplannerPlanId  String
+  activityType       WeekplannerActivityType
+  /// TrainingSession.id (TRAINING) or Event.id (MATCH/TOURNAMENT) — tenant-
+  /// validated at the service layer, deliberately not a DB relation.
+  activityId         String
+  allocationGroup    WeekplannerAllocationGroup
+  /// TournamentParticipant.id for TOURNAMENT+DRESSING_ROOM overrides; `""`
+  /// (empty-string sentinel) for every other combination — see doc comment.
+  participantId      String                     @default("")
+  facilityResourceId String
+  /// Optional free-text note for this override.
+  notes              String?
+  /// Display position within this override group.
+  displayOrder       Int                        @default(0)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  weekplannerPlan  WeekplannerPlan  @relation(fields: [weekplannerPlanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facilityResource FacilityResource @relation(fields: [facilityResourceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Prevent a duplicate override of the same resource for the same
+  /// activity + group + participant within one plan.
+  @@unique([weekplannerPlanId, activityType, activityId, allocationGroup, participantId, facilityResourceId])
+  @@index([tenantId])
+  @@index([weekplannerPlanId])
+  @@index([weekplannerPlanId, activityType, activityId])
+  @@index([facilityResourceId])
 }
