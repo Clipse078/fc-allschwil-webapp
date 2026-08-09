@@ -183,7 +183,6 @@ export default function TeamsOverviewGrid({
       config: getCategoryConfig(category),
       teams: items,
       activeCount: items.filter((t) => t.isActive).length,
-      withSeason: items.filter((t) => t.activeSeason !== null).length,
     }));
   }, [teams]);
 
@@ -209,7 +208,7 @@ export default function TeamsOverviewGrid({
 
   return (
     <div className="space-y-8">
-      {grouped.map(({ category, config, teams: categoryTeams, activeCount, withSeason }) => (
+      {grouped.map(({ category, config, teams: categoryTeams, activeCount }) => (
         <section key={category}>
           {/* Category header */}
           <div className="mb-4 flex items-center gap-3">
@@ -221,11 +220,6 @@ export default function TeamsOverviewGrid({
             {activeCount < categoryTeams.length ? (
               <span className="text-xs text-[var(--muted)]">
                 · {activeCount} aktiv
-              </span>
-            ) : null}
-            {selectedSeasonName && withSeason > 0 ? (
-              <span className="text-xs text-[var(--muted)]">
-                · {withSeason} in Saison
               </span>
             ) : null}
           </div>
@@ -250,8 +244,9 @@ export default function TeamsOverviewGrid({
                     !isLast ? "border-b border-[var(--border)]" : ""
                   }`}
                 >
-                  {/* Team avatar */}
-                  <AdminAvatar name={team.ageGroup ?? team.name} size="sm" />
+                  {/* Team avatar — TEAMCENTER-UX-01B (F): never derived from
+                      the (no longer displayed) Teamstufe/ageGroup field. */}
+                  <AdminAvatar name={compactName ?? displayName ?? team.name} size="sm" />
 
                   {/* Name + meta */}
                   <div className="min-w-0 flex-1">
@@ -267,28 +262,17 @@ export default function TeamsOverviewGrid({
                           {compactName}
                         </span>
                       ) : null}
-                      {team.activeSeason?.seasonName ? (
-                        <span className="fca-pill">
-                          {team.activeSeason.seasonName}
-                        </span>
-                      ) : null}
                     </div>
                     <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      {[
-                        config.label,
-                        team.genderGroup,
-                        team.ageGroup,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      {[config.label, team.genderGroup].filter(Boolean).join(" · ")}
                     </p>
-                    {/* TEAM-SFV-MAPPING-01: competition/league — key
-                        disambiguator when several rows share a generic name. */}
-                    {team.competition ? (
-                      <p className="mt-0.5 truncate text-xs font-medium text-[var(--text-2)]">
-                        {team.competition.name}
-                      </p>
-                    ) : null}
+                    {/* TEAMCENTER-UX-01B (I): Liga/Wettbewerb from the
+                        canonical TeamSeasonCompetition -> Competition
+                        relation — restrained "Kein Wettbewerb" when absent,
+                        never a warning-heavy treatment. */}
+                    <p className="mt-0.5 truncate text-xs font-medium text-[var(--text-2)]">
+                      {team.competition ? team.competition.name : "Kein Wettbewerb"}
+                    </p>
                   </div>
 
                   {/* Status + provider mapping + visibility + chevron */}
