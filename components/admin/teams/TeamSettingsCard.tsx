@@ -1,12 +1,7 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
-import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
-import {
-  getAllowedBirthYearsForSeason,
-  getCanonicalSeasonLabel,
-} from "@/lib/teams/jahrgang-rules";
+import { useState } from "react";
+import { SectionCard } from "@/components/ui/page";
 
 type OrgUnitOption = {
   id: string;
@@ -20,6 +15,11 @@ type ProviderMappingInfo = {
   teamName: string | null;
   isActive: boolean;
   lastSyncedAt: string;
+} | null;
+
+type CompetitionInfo = {
+  name: string | null;
+  shortName: string | null;
 } | null;
 
 type Team = {
@@ -40,17 +40,9 @@ type Team = {
   orgUnitId: string | null;
   // TEAM-IDENTITY-01: read-only provider identity/name. Never edited here.
   providerMapping?: ProviderMappingInfo;
-  teamSeasons?: Array<{
-    id: string;
-    season: {
-      id: string;
-      key: string;
-      name: string;
-      startDate: string;
-      endDate: string;
-      isActive: boolean;
-    };
-  }>;
+  // TEAMCENTER-UX-01B: read-only Liga/Wettbewerb, sourced strictly from
+  // TeamSeasonCompetition -> Competition. Never edited here.
+  competition?: CompetitionInfo;
 };
 
 type Props = {
@@ -69,20 +61,38 @@ const CATEGORY_OPTIONS = [
   { value: "TRAININGSGRUPPE", label: "Trainingsgruppe" },
 ];
 
-const TEAM_STAGE_OPTIONS = [
-  { value: "G", label: "G-Junioren" },
-  { value: "F", label: "F-Junioren" },
-  { value: "E", label: "E-Junioren" },
-  { value: "D7", label: "D7-Junioren" },
-  { value: "D9", label: "D9-Junioren" },
-  { value: "C", label: "C-Junioren" },
-  { value: "B", label: "B-Junioren" },
-  { value: "A", label: "A-Junioren" },
-];
+// TEAMCENTER-UX-01B (E): Geschlechtergruppe is a String column with no DB
+// enum (see prisma/schema.prisma Team.genderGroup). Rather than add a
+// migration purely for UX, this is a controlled dropdown over the values
+// already observed in the domain (seed data / registration flow: "Mixed",
+// "Men"), extended with the Boys/Girls/Women distinctions the Teams module
+// otherwise implies (Junioren/Frauen categories). Any pre-existing stored
+// value that isn't in this list is preserved and injected as an extra
+// option so it never silently disappears or gets overwritten on save.
+const GENDER_GROUP_OPTIONS = ["Boys", "Girls", "Mixed", "Men", "Women"];
 
-function getCategoryLabel(category: string) {
-  const option = CATEGORY_OPTIONS.find((entry) => entry.value === category);
-  return option?.label ?? category;
+const fieldClass =
+  "w-full rounded-[12px] border border-[var(--border)] bg-white px-3.5 py-2.5 text-sm text-[var(--foreground)] placeholder-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--blue)]/30 disabled:bg-[var(--surface-2)] disabled:text-[var(--muted)] disabled:cursor-not-allowed";
+const labelClass = "block text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--muted)] mb-1.5";
+
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0">
+      <h4 className="text-sm font-semibold text-[var(--foreground)]">{title}</h4>
+      {description && (
+        <p className="mt-0.5 text-xs text-[var(--text-2)]">{description}</p>
+      )}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">{children}</div>
+    </div>
+  );
 }
 
 export default function TeamSettingsCard({
@@ -96,40 +106,13 @@ export default function TeamSettingsCard({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const currentSeasonKey = useMemo(() => {
-    return getCurrentSwissFootballSeason()?.key ?? null;
-  }, []);
+  const genderGroupOptions =
+    form.genderGroup && !GENDER_GROUP_OPTIONS.includes(form.genderGroup)
+      ? [form.genderGroup, ...GENDER_GROUP_OPTIONS]
+      : GENDER_GROUP_OPTIONS;
 
-  const activeSeason = useMemo(() => {
-    return (
-      form.teamSeasons?.find((entry) => entry.season.key === currentSeasonKey) ??
-      form.teamSeasons?.find((entry) => entry.season.isActive) ??
-      form.teamSeasons?.[0] ??
-      null
-    );
-  }, [form.teamSeasons, currentSeasonKey]);
-
-  const saisonLabel = useMemo(() => {
-    if (!activeSeason) {
-      return null;
-    }
-
-    return (
-      getCanonicalSeasonLabel(activeSeason.season.startDate) ??
-      activeSeason.season.name
-    );
-  }, [activeSeason]);
-
-  const jahrgaenge = useMemo(() => {
-    if (!activeSeason) {
-      return [];
-    }
-
-    return getAllowedBirthYearsForSeason(
-      form.ageGroup,
-      activeSeason.season.startDate
-    );
-  }, [form.ageGroup, activeSeason]);
+  const competitionLabel =
+    form.competition?.shortName ?? form.competition?.name ?? null;
 
   function updateField<K extends keyof Team>(field: K, value: Team[K]) {
     if (!canManage) {
@@ -163,6 +146,9 @@ export default function TeamSettingsCard({
           alternativeName: form.alternativeName,
           category: form.category,
           genderGroup: form.genderGroup,
+          // TEAMCENTER-UX-01B (F): Teamstufe (ageGroup) is no longer editable
+          // in this UX — its stored value is preserved as-is, never cleared
+          // or overwritten by a settings save.
           ageGroup: form.ageGroup,
           sortOrder: form.sortOrder,
           isActive: form.isActive,
@@ -197,201 +183,178 @@ export default function TeamSettingsCard({
   }
 
   return (
-    <AdminSurfaceCard className="p-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="fca-eyebrow">Team Details</p>
-          <h3 className="fca-heading mt-2">{form.name}</h3>
-          <p className="mt-3 text-sm text-slate-500">Slug: {form.slug}</p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <span className="fca-pill">{getCategoryLabel(form.category)}</span>
-          {form.ageGroup ? <span className="fca-pill">Stufe: {form.ageGroup}</span> : null}
-          {saisonLabel ? <span className="fca-pill">Saison: {saisonLabel}</span> : null}
-        </div>
-      </div>
-
+    <SectionCard
+      title="Team-Einstellungen"
+      description={`Slug: ${form.slug}`}
+    >
       {!canManage ? (
-        <div className="fca-status-box fca-status-box-warn mt-5">
+        <div className="fca-status-box fca-status-box-warn mb-5">
           Diese Teamdaten sind aktuell nur lesbar. Bearbeitung ist nur mit
           Team-Verwaltung erlaubt.
         </div>
       ) : null}
 
       {message ? (
-        <div className="fca-status-box fca-status-box-success mt-5">
+        <div className="fca-status-box fca-status-box-success mb-5">
           {message}
         </div>
       ) : null}
 
       {error ? (
-        <div className="fca-status-box fca-status-box-error mt-5">
+        <div className="fca-status-box fca-status-box-error mb-5">
           {error}
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <label className="block space-y-2">
-          <span className="fca-label">Langname</span>
-          <input
-            type="text"
-            value={form.name}
-            disabled={!canManage}
-            onChange={(event) => updateField("name", event.target.value)}
-            className="fca-input"
-            placeholder="z. B. FC Allschwil Junioren B2"
-          />
-        </label>
+      <div className="space-y-5">
+        <FormSection
+          title="Identität"
+          description="Gehört dem Verein — wird nie durch eine Verbandsanbindung (z. B. SFV) überschrieben."
+        >
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Langname</span>
+            <input
+              type="text"
+              value={form.name}
+              disabled={!canManage}
+              onChange={(event) => updateField("name", event.target.value)}
+              className={fieldClass}
+              placeholder="z. B. FC Allschwil Junioren B2"
+            />
+          </label>
 
-        <label className="block space-y-2">
-          <span className="fca-label">Kurzname</span>
-          <input
-            type="text"
-            value={form.shortName ?? ""}
-            disabled={!canManage}
-            onChange={(event) =>
-              updateField("shortName", event.target.value || null)
-            }
-            className="fca-input"
-            placeholder="z. B. B2"
-          />
-        </label>
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Kurzname</span>
+            <input
+              type="text"
+              value={form.shortName ?? ""}
+              disabled={!canManage}
+              onChange={(event) =>
+                updateField("shortName", event.target.value || null)
+              }
+              className={fieldClass}
+              placeholder="z. B. B2"
+            />
+          </label>
 
-        <label className="block space-y-2 md:col-span-2">
-          <span className="fca-label">Alternativname</span>
-          <input
-            type="text"
-            value={form.alternativeName ?? ""}
-            disabled={!canManage}
-            onChange={(event) =>
-              updateField("alternativeName", event.target.value || null)
-            }
-            className="fca-input"
-            placeholder="z. B. Junioren B2"
-          />
-          <p className="text-xs text-slate-400">
-            Langname, Kurzname und Alternativname gehören dem Verein und werden
-            von einer allfälligen Verbandsanbindung (z. B. SFV) nie überschrieben.
-          </p>
-        </label>
+          <label className="block space-y-1.5 md:col-span-2">
+            <span className={labelClass}>Alternativname</span>
+            <input
+              type="text"
+              value={form.alternativeName ?? ""}
+              disabled={!canManage}
+              onChange={(event) =>
+                updateField("alternativeName", event.target.value || null)
+              }
+              className={fieldClass}
+              placeholder="z. B. Junioren B2"
+            />
+          </label>
+        </FormSection>
 
-        <label className="block space-y-2">
-          <span className="fca-label">Kategorie</span>
-          <select
-            value={form.category}
-            disabled={!canManage}
-            onChange={(event) => updateField("category", event.target.value)}
-            className="fca-select"
-          >
-            {CATEGORY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormSection title="Klassifikation">
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Kategorie</span>
+            <select
+              value={form.category}
+              disabled={!canManage}
+              onChange={(event) => updateField("category", event.target.value)}
+              className={fieldClass}
+            >
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="block space-y-2">
-          <span className="fca-label">Geschlechtergruppe</span>
-          <input
-            type="text"
-            value={form.genderGroup ?? ""}
-            disabled={!canManage}
-            onChange={(event) =>
-              updateField("genderGroup", event.target.value || null)
-            }
-            className="fca-input"
-            placeholder="z. B. Boys, Girls, Mixed"
-          />
-        </label>
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Geschlechtergruppe</span>
+            <select
+              value={form.genderGroup ?? ""}
+              disabled={!canManage}
+              onChange={(event) =>
+                updateField("genderGroup", event.target.value || null)
+              }
+              className={fieldClass}
+            >
+              <option value="">— keine Angabe —</option>
+              {genderGroupOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="block space-y-2">
-          <span className="fca-label">Teamstufe</span>
-          <select
-            value={form.ageGroup ?? ""}
-            disabled={!canManage}
-            onChange={(event) => updateField("ageGroup", event.target.value || null)}
-            className="fca-select"
-          >
-            <option value="">Bitte wählen</option>
-            {TEAM_STAGE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="block space-y-1.5 md:max-w-[220px]">
+            <span className={labelClass}>Sortierung</span>
+            <input
+              type="number"
+              value={form.sortOrder}
+              disabled={!canManage}
+              onChange={(event) =>
+                updateField("sortOrder", Number(event.target.value))
+              }
+              className={fieldClass}
+            />
+          </label>
+        </FormSection>
 
-        <div className="block space-y-2 md:col-span-2">
-          <span className="fca-label">
-            Jahrgänge {saisonLabel ? "für " + saisonLabel : "der aktuellen Saison"}
-          </span>
-          <div className="fca-section-card flex min-h-[62px] flex-wrap items-center gap-2 px-4 py-3">
-            {jahrgaenge.length === 0 ? (
-              <span className="fca-body-muted">
-                Keine automatische Jahrgangslogik verfügbar. Bitte Teamstufe und Saison prüfen.
-              </span>
-            ) : (
-              jahrgaenge.map((year) => (
-                <span key={year} className="fca-pill-year">
-                  {year}
-                </span>
-              ))
-            )}
+        <FormSection title="Organisation">
+          <label className="block space-y-1.5 md:col-span-2">
+            <span className={labelClass}>Organisationseinheit</span>
+            <select
+              value={form.orgUnitId ?? ""}
+              disabled={!canManage}
+              onChange={(event) =>
+                updateField("orgUnitId", event.target.value || null)
+              }
+              className={fieldClass}
+            >
+              <option value="">— keine Verknüpfung —</option>
+              {availableOrgUnits.map((ou) => (
+                <option key={ou.id} value={ou.id}>
+                  {ou.name} ({ou.key})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-[var(--muted)]">
+              Optionale Verknüpfung mit einer Organisationseinheit des aktiven Mandanten.
+            </p>
+          </label>
+        </FormSection>
+
+        {/* TEAMCENTER-UX-01B (I): Liga/Wettbewerb — strictly sourced from
+            TeamSeasonCompetition -> Competition of the active season.
+            Read-only here; never a fabricated/manual duplicate field. */}
+        <FormSection title="Wettbewerb">
+          <div className="md:col-span-2">
+            <span className={labelClass}>Liga</span>
+            <p className="text-sm text-[var(--foreground)]">
+              {competitionLabel ?? (
+                <span className="text-[var(--muted)]">Kein Wettbewerb</span>
+              )}
+            </p>
           </div>
-        </div>
+        </FormSection>
 
-        <label className="block space-y-2 md:max-w-[220px]">
-          <span className="fca-label">Sortierung</span>
-          <input
-            type="number"
-            value={form.sortOrder}
+        <FormSection title="Sichtbarkeit">
+          <Toggle
+            label="Website sichtbar"
+            value={form.websiteVisible}
             disabled={!canManage}
-            onChange={(event) =>
-              updateField("sortOrder", Number(event.target.value))
-            }
-            className="fca-input"
+            onChange={(value) => updateField("websiteVisible", value)}
           />
-        </label>
 
-        <label className="block space-y-2 md:col-span-2">
-          <span className="fca-label">Organisationseinheit</span>
-          <select
-            value={form.orgUnitId ?? ""}
+          <Toggle
+            label="Infoboard sichtbar"
+            value={form.infoboardVisible}
             disabled={!canManage}
-            onChange={(event) =>
-              updateField("orgUnitId", event.target.value || null)
-            }
-            className="fca-select"
-          >
-            <option value="">— keine Verknüpfung —</option>
-            {availableOrgUnits.map((ou) => (
-              <option key={ou.id} value={ou.id}>
-                {ou.name} ({ou.key})
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-slate-400">
-            Optionale Verknüpfung mit einer Organisationseinheit. Nur Einheiten des aktiven Mandanten stehen zur Auswahl.
-          </p>
-        </label>
-      </div>
-
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Toggle
-          label="Website sichtbar"
-          value={form.websiteVisible}
-          disabled={!canManage}
-          onChange={(value) => updateField("websiteVisible", value)}
-        />
-
-        <Toggle
-          label="Infoboard sichtbar"
-          value={form.infoboardVisible}
-          disabled={!canManage}
-          onChange={(value) => updateField("infoboardVisible", value)}
-        />
+            onChange={(value) => updateField("infoboardVisible", value)}
+          />
+        </FormSection>
       </div>
 
       {/* TEAM-IDENTITY-01: provider identity is read-only and clearly separate
@@ -399,23 +362,25 @@ export default function TeamSettingsCard({
           providerTeamName is refreshed exclusively by provider sync /
           the provider-mapping workflow. */}
       {form.providerMapping ? (
-        <div className="mt-6 rounded-[var(--radius-lg,0.75rem)] border border-slate-200 bg-slate-50 p-4">
-          <p className="fca-eyebrow">Anbieter (nur lesbar)</p>
+        <div className="mt-5 rounded-[12px] border border-[var(--border)] bg-[var(--surface-2)] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">
+            Anbieter (nur lesbar)
+          </p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <div>
-              <span className="fca-label block">Anbieter</span>
-              <span className="text-sm font-semibold text-slate-700">
+              <span className={labelClass}>Anbieter</span>
+              <span className="text-sm font-semibold text-[var(--foreground)]">
                 {form.providerMapping.provider}
               </span>
             </div>
             <div>
-              <span className="fca-label block">Anbieter-Teamname</span>
-              <span className="text-sm text-slate-700">
+              <span className={labelClass}>Anbieter-Teamname</span>
+              <span className="text-sm text-[var(--text-2)]">
                 {form.providerMapping.teamName ?? "—"}
               </span>
             </div>
           </div>
-          <p className="mt-3 text-xs text-slate-400">
+          <p className="mt-3 text-xs text-[var(--muted)]">
             Diese Angaben stammen aus der Synchronisation und werden hier nicht
             bearbeitet. Sie überschreiben nie Langname, Kurzname oder
             Alternativname.
@@ -424,7 +389,7 @@ export default function TeamSettingsCard({
       ) : null}
 
       {canManage ? (
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-5 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={handleSave}
@@ -435,10 +400,17 @@ export default function TeamSettingsCard({
           </button>
         </div>
       ) : null}
-    </AdminSurfaceCard>
+    </SectionCard>
   );
 }
 
+/**
+ * Compact ON/OFF toggle switch (TEAMCENTER-UX-01B, letter G).
+ *
+ * Replaces the previous raw checkbox presentation with a proper switch
+ * control. Same underlying boolean field + onChange contract — no new
+ * publication architecture.
+ */
 function Toggle({
   label,
   value,
@@ -451,15 +423,25 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="fca-toggle-row">
-      <span className="fca-label">{label}</span>
-      <input
-        type="checkbox"
-        checked={value}
+    <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--border)] bg-white px-3.5 py-2.5">
+      <span className="text-sm font-medium text-[var(--foreground)]">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        className="fca-toggle-checkbox disabled:opacity-50"
-      />
+        onClick={() => onChange(!value)}
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--blue)]/30 disabled:cursor-not-allowed disabled:opacity-50 ${
+          value ? "bg-emerald-500" : "bg-[var(--border-strong)]"
+        }`}
+      >
+        <span
+          className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow transition-transform ${
+            value ? "translate-x-[22px]" : "translate-x-[3px]"
+          }`}
+        />
+      </button>
     </div>
   );
 }

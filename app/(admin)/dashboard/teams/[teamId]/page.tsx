@@ -1,13 +1,12 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
 import TeamLifecycleCard from "@/components/admin/teams/TeamLifecycleCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTeamDetailData } from "@/lib/teams/queries";
-import { getSeasonOptionsData } from "@/lib/seasons/queries";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { PageShell } from "@/components/ui/page";
@@ -55,9 +54,8 @@ export default async function TeamDetailPage({ params }: Props) {
   }
   const tenantId = tenant.id;
 
-  const [team, availableSeasons, availableOrgUnits] = await Promise.all([
+  const [team, availableOrgUnits] = await Promise.all([
     getTeamDetailData(tenantId, teamId),
-    getSeasonOptionsData(),
     getOrgUnits(tenantId),
   ]);
 
@@ -72,15 +70,28 @@ export default async function TeamDetailPage({ params }: Props) {
     null;
 
   // TEAM-IDENTITY-01: canonical long-name fallback (lib/teams/team-naming.ts),
-  // already resolved by getTeamDetailData.
+  // already resolved by getTeamDetailData. Team.name is the primary Team
+  // identity — never substituted by a seasonal displayName/provider name.
   const displayTitle = team.displayName ?? team.name;
+
+  // TEAMCENTER-UX-01B (C, I): one-line supporting metadata under the primary
+  // header — shortName · category · Liga/Wettbewerb. Never repeats the Team
+  // identity itself (that is the page title above).
+  const competitionLabel = team.competition?.shortName ?? team.competition?.name ?? null;
+  const metaLine = [
+    team.shortName && team.shortName !== displayTitle ? team.shortName : null,
+    categoryLabel,
+    competitionLabel ?? "Kein Wettbewerb",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <PageShell fullWidth>
       <DetailPagePattern
         eyebrow="Teams"
         title={displayTitle}
-        description={displayTitle !== team.name ? team.name : undefined}
+        description={metaLine}
         headerBadge={
           <Badge variant={team.isActive ? "success" : "outline"}>
             {team.isActive ? "Aktiv" : "Archiviert"}
@@ -153,10 +164,7 @@ export default async function TeamDetailPage({ params }: Props) {
             {activeSeason ? (
               <SectionCard title="Saison">
                 <PropertyGrid
-                  items={[
-                    { label: "Anzeigename", value: activeSeason.displayName },
-                    { label: "Saison", value: activeSeason.season.name },
-                  ]}
+                  items={[{ label: "Saison", value: activeSeason.season.name }]}
                   columns={1}
                 />
               </SectionCard>
@@ -174,40 +182,6 @@ export default async function TeamDetailPage({ params }: Props) {
                         ] ?? activeSeason.participationType,
                       icon: <Trophy className="h-3.5 w-3.5" />,
                     },
-                    ...(activeSeason.competitions[0]
-                      ? [
-                          {
-                            label: "Wettkampf",
-                            value:
-                              activeSeason.competitions[0].competition
-                                .shortName ??
-                              activeSeason.competitions[0].competition
-                                .officialName,
-                            icon: <Trophy className="h-3.5 w-3.5" />,
-                          },
-                          {
-                            label: "Anbieter",
-                            value:
-                              activeSeason.competitions[0].competition
-                                .provider === "MANUAL"
-                                ? "Manuell"
-                                : activeSeason.competitions[0].competition
-                                    .provider,
-                          },
-                        ]
-                      : activeSeason.participationType === "COMPETITION"
-                        ? [
-                            {
-                              label: "Wettkampf",
-                              value: (
-                                <span className="inline-flex items-center gap-1 text-amber-600">
-                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                  Kein Wettkampf zugeordnet
-                                </span>
-                              ),
-                            },
-                          ]
-                        : []),
                   ]}
                   columns={1}
                 />
@@ -229,7 +203,6 @@ export default async function TeamDetailPage({ params }: Props) {
       >
         <TeamDetailCard
           initialTeam={team}
-          availableSeasons={availableSeasons}
           availableOrgUnits={availableOrgUnits.map((ou) => ({
             id: ou.id,
             name: ou.name,
