@@ -20,9 +20,17 @@
  * Provider-owned display fallback (last resort only):
  *   - TeamExternalMapping.providerTeamName
  *
+ * TEAMCENTER-UX-01B: Team.name is the canonical tenant-managed Team identity.
+ * It MUST be the primary value shown everywhere the Team's name is rendered
+ * (Teams overview row title, Team detail heading) — a seasonal
+ * TeamSeason.displayName override (which may drift out of sync, e.g. a
+ * provider re-sync that only touches the current season row) must never
+ * substitute for it while Team.name is present. TeamSeason.displayName is
+ * only consulted as a fallback when the canonical Team fields are absent.
+ *
  * Fallback priority:
  *   Long contexts (e.g. Teams overview title, Team detail heading):
- *     TeamSeason.displayName → Team.name → Team.alternativeName → providerTeamName
+ *     Team.name → TeamSeason.displayName → Team.alternativeName → providerTeamName
  *
  *   Compact contexts (e.g. space-constrained badges/lists):
  *     Team.shortName → Team.name → Team.alternativeName → providerTeamName
@@ -73,14 +81,18 @@ export type TeamNamingInput = {
 /**
  * Resolves the best tenant-facing LONG name for a Team.
  *
- * Priority: TeamSeason.displayName → Team.name → Team.alternativeName → providerTeamName
+ * Priority: Team.name → TeamSeason.displayName → Team.alternativeName → providerTeamName
  *
- * Use for long/detail contexts: Teams overview row title, Team detail heading.
+ * TEAMCENTER-UX-01B: Team.name is the canonical, tenant-managed identity and
+ * must win whenever it is present — it is never substituted by a seasonal
+ * TeamSeason.displayName override, a provider/SFV name, or any generated
+ * category/stage name. Use for long/detail contexts: Teams overview row
+ * title, Team detail heading.
  */
 export function resolveLongTeamName(input: TeamNamingInput): string | null {
   return firstMeaningful([
-    input.teamSeasonDisplayName,
     input.teamName,
+    input.teamSeasonDisplayName,
     input.teamAlternativeName,
     input.providerTeamName,
   ]);

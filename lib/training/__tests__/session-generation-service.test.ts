@@ -740,7 +740,10 @@ describe("C. listTrainingSessions / getTrainingSession", () => {
         trainingSeriesId: SERIES_ID,
         trainingSeriesTitle: "F2 Monday Training",
         teamSeasonId: TEAM_SEASON_ID,
-        teamName: "F2",
+        // TEAMCENTER-UX-01B: lib/teams/team-naming.ts now resolves the
+        // canonical Team.name ahead of a seasonal TeamSeason.displayName
+        // override — Team.name is the canonical Team identity everywhere.
+        teamName: "FC Allschwil F2",
         date: "2026-08-03",
         weekday: "MONDAY",
         startAt: "2026-08-03T15:00:00.000Z",

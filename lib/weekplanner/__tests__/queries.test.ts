@@ -255,7 +255,13 @@ describe("getWeekplannerWeek — TrainingSession", () => {
     expect(monday?.items).toHaveLength(1);
     const [item] = monday!.items;
     expect(item.type).toBe("TRAINING");
-    expect(item.teamNames).toEqual(["FC Allschwil E2"]);
+    // TEAMCENTER-UX-01B: the shared lib/teams/team-naming.ts contract now
+    // resolves Team.name ("E2") ahead of a seasonal TeamSeason.displayName
+    // override ("FC Allschwil E2") — Team.name is the canonical Team
+    // identity everywhere it is consumed, including here via
+    // lib/training/session-generation-service.ts. Weekplanner itself is
+    // untouched; only the shared naming utility's priority changed.
+    expect(item.teamNames).toEqual(["E2"]);
     expect(item.pitchAllocations.map((r) => r.code)).toEqual([PITCH_RESOURCE.code]);
     expect(item.dressingRoomAllocations.map((r) => r.code)).toEqual([HOME_ROOM_RESOURCE.code]);
 

@@ -180,14 +180,14 @@ describe("getTeamsListData — provider mapping enrichment", () => {
 // ── TEAM-IDENTITY-01 — canonical naming enrichment ────────────────────────────
 
 describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
-  it("7 — long name works: prefers TeamSeason.displayName over Team.name", async () => {
+  it("7 — long name works: Team.name wins over a conflicting TeamSeason.displayName (TEAMCENTER-UX-01B)", async () => {
     mockFindMany.mockResolvedValueOnce([
       makeTeamRow({
-        name: "Junioren B2",
+        name: "FC Allschwil Junioren B2",
         teamSeasons: [
           {
             season: { key: "2027", name: "2027/28" },
-            displayName: "FC Allschwil Junioren B2",
+            displayName: "Junioren B2",
             shortName: "B2",
             status: "ACTIVE",
             competitions: [],
@@ -327,6 +327,39 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
     expect(team.displayName).toBe("FC Allschwil Junioren B2");
     expect(team.compactName).toBe("B2");
     expect(team.providerMapping?.teamName).toBe("FC Allschwil Junioren B2 (4. Liga)");
+  });
+
+  it("15 — TEAMCENTER-UX-01B root-cause regression: Team.name = 'FC Allschwil Junioren E3' renders even though season/provider display 'FC Allschwil Junioren E2'", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        id: "team-e3",
+        name: "FC Allschwil Junioren E3",
+        shortName: "E3",
+        teamSeasons: [
+          {
+            season: { key: "2027", name: "2027/28" },
+            displayName: "FC Allschwil Junioren E2",
+            shortName: "E2",
+            status: "ACTIVE",
+            competitions: [],
+          },
+        ],
+        externalMappings: [
+          {
+            provider: "SFV",
+            providerIsActive: true,
+            lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+            mappingSource: "SYNC",
+            providerTeamName: "FC Allschwil Junioren E2 (SFV)",
+          },
+        ],
+      }),
+    ]);
+
+    const [team] = await getTeamsListData("tenant-1");
+
+    expect(team.displayName).toBe("FC Allschwil Junioren E3");
+    expect(team.displayName).not.toBe("FC Allschwil Junioren E2");
   });
 
   it("14 — same name, different externalTeamId: two Team rows remain distinct list entries (identity safety)", async () => {
