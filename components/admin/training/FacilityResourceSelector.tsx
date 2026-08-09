@@ -21,6 +21,19 @@ export type FacilityGroup = {
   resources: ResourceOption[];
 };
 
+/**
+ * PLANNING-CREATION-UX-01A — optional live availability annotation for a
+ * single FacilityResource, sourced from lib/facilities/availability-service.ts.
+ * Purely additive: when a caller doesn't pass `availabilityByResourceId`,
+ * the selector renders exactly as before.
+ */
+export type ResourceAvailabilityAnnotation = {
+  status: "FREE" | "OCCUPIED";
+  conflictLabel?: string | null;
+  conflictStartAt?: string | null;
+  conflictEndAt?: string | null;
+};
+
 type Props = {
   /** Non-archived resources for this allocation group, grouped by facility. */
   facilityGroups: FacilityGroup[];
@@ -39,7 +52,28 @@ type Props = {
   allAllocatedMessage?: string;
   /** Stable identifier suffix for data-testid hooks (e.g. "pitch-hall", "dressing-room"). */
   testId?: string;
+  /**
+   * PLANNING-CREATION-UX-01A — live Frei/Belegt availability per resource id
+   * for the currently selected date/time. When provided, occupied resources
+   * remain selectable (visible, never hidden) but are annotated inline, e.g.
+   * "Kunstrasen 3 A — Belegt · Training E2 · 17:00–18:00".
+   */
+  availabilityByResourceId?: Map<string, ResourceAvailabilityAnnotation>;
 };
+
+function formatClockTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatAvailabilitySuffix(annotation: ResourceAvailabilityAnnotation | undefined): string {
+  if (!annotation) return "";
+  if (annotation.status === "FREE") return " — Frei";
+  const timeRange =
+    annotation.conflictStartAt && annotation.conflictEndAt
+      ? ` · ${formatClockTime(annotation.conflictStartAt)}–${formatClockTime(annotation.conflictEndAt)}`
+      : "";
+  return ` — Belegt${annotation.conflictLabel ? ` · ${annotation.conflictLabel}` : ""}${timeRange}`;
+}
 
 // ── Resource type label map ───────────────────────────────────────────────────
 
@@ -62,6 +96,7 @@ export function FacilityResourceSelector({
   noResourcesMessage = "Keine Ressourcen dieses Typs konfiguriert.",
   allAllocatedMessage = "Alle verfügbaren Ressourcen wurden bereits zugewiesen.",
   testId,
+  availabilityByResourceId,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [isPending, startTransition] = useTransition();
@@ -121,6 +156,7 @@ export function FacilityResourceSelector({
                 {available.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name} ({RESOURCE_TYPE_LABELS[r.type] ?? r.type})
+                    {formatAvailabilitySuffix(availabilityByResourceId?.get(r.id))}
                   </option>
                 ))}
               </optgroup>

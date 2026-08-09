@@ -30,7 +30,11 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2, Plus, Shirt, Trash2, UserRound, UsersRound } from "lucide-react";
 import { SectionCard } from "@/components/ui/page/SectionCard";
-import { FacilityResourceSelector, type FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import {
+  FacilityResourceSelector,
+  type FacilityGroup,
+  type ResourceAvailabilityAnnotation,
+} from "@/components/admin/training/FacilityResourceSelector";
 import {
   orchestrateTournamentCreation,
   type TournamentCreationOrchestrationResult,
@@ -81,6 +85,9 @@ type ResourceDraftRow = {
   facilityResourceName: string;
   facilityName: string;
 };
+
+/** Shape of one row in GET /api/facilities/availability's `availability` array. */
+type ResourceAvailabilityRow = ResourceAvailabilityAnnotation & { resourceId: string };
 
 type TournamentCreateFormProps = {
   pitchHallFacilityGroups: FacilityGroup[];
@@ -157,6 +164,15 @@ export default function TournamentCreateForm({
   // ── Ressourcen · Spielfeld/Halle (draft, pre-creation) ────────────────
   const [resources, setResources] = useState<ResourceDraftRow[]>([]);
 
+  // ── PLANNING-CREATION-UX-01A: live Spielfeld/Halle + Garderobe availability
+  // for the currently selected date/time, sourced from
+  // lib/facilities/availability-service.ts. HOME-only — AWAY tournaments
+  // never touch FCA facilities, so no availability lookup runs for them.
+  const [pitchAvailability, setPitchAvailability] = useState<Map<string, ResourceAvailabilityAnnotation>>(new Map());
+  const [dressingRoomAvailability, setDressingRoomAvailability] = useState<Map<string, ResourceAvailabilityAnnotation>>(
+    new Map(),
+  );
+
   // ── Submission ─────────────────────────────────────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,6 +236,50 @@ export default function TournamentCreateForm({
       active = false;
     };
   }, []);
+
+  // PLANNING-CREATION-UX-01A: once Start (and optionally Ende) is known for
+  // a HOME tournament, immediately show which Spielfeld/Halle and Garderobe
+  // resources are Frei/Belegt for that exact interval — reusing the EXISTING
+  // canonical booking sources (Training, Match, Tournament) via
+  // GET /api/facilities/availability, never a new planning engine.
+  useEffect(() => {
+    if (homeAway !== "HOME" || !startAt) {
+      setPitchAvailability(new Map());
+      setDressingRoomAvailability(new Map());
+      return;
+    }
+
+    let active = true;
+
+    async function loadAvailability() {
+      const params = new URLSearchParams({ startAt });
+      if (endAt) params.set("endAt", endAt);
+
+      async function fetchGroup(group: "PITCH_HALL" | "DRESSING_ROOM") {
+        try {
+          const res = await fetch(`/api/facilities/availability?${params.toString()}&group=${group}`, {
+            cache: "no-store",
+          });
+          const data = (await res.json().catch(() => null)) as { availability?: ResourceAvailabilityRow[] } | null;
+          if (!res.ok || !data?.availability) return new Map<string, ResourceAvailabilityAnnotation>();
+          return new Map(data.availability.map((a) => [a.resourceId, a]));
+        } catch {
+          return new Map<string, ResourceAvailabilityAnnotation>();
+        }
+      }
+
+      const [pitch, room] = await Promise.all([fetchGroup("PITCH_HALL"), fetchGroup("DRESSING_ROOM")]);
+      if (!active) return;
+      setPitchAvailability(pitch);
+      setDressingRoomAvailability(room);
+    }
+
+    loadAvailability();
+
+    return () => {
+      active = false;
+    };
+  }, [homeAway, startAt, endAt]);
 
   const assignedTeamIds = useMemo(
     () => new Set(participants.map((p) => p.teamId).filter((id): id is string => !!id)),
@@ -362,6 +422,29 @@ export default function TournamentCreateForm({
     !!title.trim() &&
     !!startAt &&
     participants.length > 0;
+
+  // PLANNING-CREATION-UX-01A: lightweight guided-creation nudge — a compact,
+  // always-visible list of what's still missing before this tournament is
+  // ready to submit. Not a wizard/gate — every section stays reachable and
+  // editable regardless of this list; it only nudges.
+  const missingItems = useMemo(() => {
+    const items: string[] = [];
+    if (!title.trim()) items.push("Titel angeben");
+    if (!seasonId) items.push("Saison auswählen");
+    if (!startAt) items.push("Start angeben");
+    if (participants.length === 0) items.push("Mindestens ein teilnehmendes Team hinzufügen");
+
+    if (homeAway === "HOME" && startAt) {
+      if (resources.length === 0) items.push("Spielfeld / Halle zuweisen");
+      for (const participant of participants) {
+        if (participant.dressingRooms.length === 0) {
+          items.push(`Garderobe für ${participant.displayName}`);
+        }
+      }
+    }
+
+    return items;
+  }, [title, seasonId, startAt, participants, homeAway, resources.length]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -517,7 +600,30 @@ export default function TournamentCreateForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" data-testid="tournament-create-form">
-      <SectionCard title="Turnier" description="Titel, Zeitrahmen und Rahmendaten">
+      {missingItems.length > 0 ? (
+        <div
+          className="fca-status-box fca-status-box-muted text-sm"
+          data-testid="tournament-create-guided-progress"
+        >
+          <p className="font-semibold">
+            Noch {missingItems.length} {missingItems.length === 1 ? "Angabe fehlt" : "Angaben fehlen"}
+          </p>
+          <ul className="mt-1.5 list-inside list-disc space-y-0.5" data-testid="tournament-create-guided-progress-list">
+            {missingItems.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div
+          className="fca-status-box fca-status-box-success text-sm"
+          data-testid="tournament-create-guided-progress"
+        >
+          Alle Angaben vollständig — bereit zum Einreichen.
+        </div>
+      )}
+
+      <SectionCard title="1 · Turnier" description="Titel, Zeitrahmen und Rahmendaten">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-2 md:col-span-2">
             <span className="fca-label">Titel</span>
@@ -652,8 +758,8 @@ export default function TournamentCreateForm({
       </SectionCard>
 
       <SectionCard
-        title="Teilnehmende Teams"
-        description="Mindestens ein Team erforderlich — FC Allschwil Teams und externe Teams aus dem Vereinsverzeichnis, in beliebiger Mischung und Anzahl."
+        title="2 · Teilnehmende Teams"
+        description="Mindestens ein Team erforderlich — FC Allschwil Teams und externe Teams aus dem Vereinsverzeichnis, in beliebiger Mischung und Anzahl. Garderobenzuweisung (4 · Garderoben) erfolgt direkt pro Team."
       >
         <div className="space-y-4">
           {participants.length === 0 ? (
@@ -731,6 +837,7 @@ export default function TournamentCreateForm({
                         onAdd={(resourceId) => addDressingRoomDraft(participant.localId, resourceId)}
                         placeholder="Garderobe auswählen…"
                         addButtonLabel="Zuweisen"
+                        availabilityByResourceId={dressingRoomAvailability}
                         testId={`tournament-create-participant-${participant.localId}-dressing-room`}
                       />
                     </div>
@@ -836,8 +943,8 @@ export default function TournamentCreateForm({
 
       {homeAway === "HOME" && (
         <SectionCard
-          title="Ressourcen · Spielfeld / Halle"
-          description="Ein Heimturnier kann mehr als ein Spielfeld bzw. mehr als eine Halle belegen."
+          title="3 · Spielfeld / Halle"
+          description="Ein Heimturnier kann mehr als ein Spielfeld bzw. mehr als eine Halle belegen. Verfügbarkeit wird live für Start–Ende angezeigt."
         >
           <div className="space-y-4">
             {resources.length === 0 ? (
@@ -877,13 +984,14 @@ export default function TournamentCreateForm({
               onAdd={addResourceDraft}
               placeholder="Spielfeld / Halle auswählen…"
               addButtonLabel="Zuweisen"
+              availabilityByResourceId={pitchAvailability}
               testId="tournament-create-resource-add"
             />
           </div>
         </SectionCard>
       )}
 
-      <SectionCard title="Veröffentlichung" description="Ausgabekanäle für dieses Turnier">
+      <SectionCard title="5 · Prüfen & Einreichen — Veröffentlichung" description="Ausgabekanäle für dieses Turnier">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <Toggle label="Website" value={websiteVisible} onChange={setWebsiteVisible} />
           <Toggle label="Infoboard" value={infoboardVisible} onChange={setInfoboardVisible} />
