@@ -25,6 +25,11 @@
 --   - Backfill INSERTs are guarded with NOT EXISTS to stay idempotent if
 --     this migration is ever re-run against a partially-migrated database.
 --   - No existing rows are modified or deleted.
+--   - Every backfill join (Team in 4a, FacilityResource in 4b/4c) requires
+--     an exact tenantId match against the source Event — a legacy
+--     Event.teamId/pitchCode/homeDressingRoomCode referencing a
+--     different tenant's row (or a null-tenant row) is simply skipped,
+--     never backfilled cross-tenant.
 -- ---------------------------------------------------------------------------
 
 -- 1. CREATE TournamentParticipant
@@ -187,6 +192,24 @@ END $$;
 --     Skipped when Event.tenantId is null (cannot determine the owning
 --     tenant for the new tenant-scoped row) — matches the existing
 --     tenant-isolation convention used by lib/tournaments/queries.ts.
+--
+--     Tenant-safe Team match (TOURNAMENTCENTER-01-C1 hardening): joins
+--     back to "Team" and requires t."tenantId" = e."tenantId", mirroring
+--     the exact tenant semantics already enforced by
+--     lib/tournaments/participant-service.ts::addTournamentParticipant()
+--     for every NEW participant (Team.tenantId is nullable/backward-compat
+--     per schema.prisma, so a plain SQL equality join already excludes
+--     both null-tenant and cross-tenant Team rows — no explicit NULL
+--     branch is added, keeping this consistent with the strict equality
+--     the application itself requires). Event.teamId has never been
+--     tenant-validated by every historical write path (see
+--     app/api/events/route.ts), so this prevents a rare pre-existing
+--     data inconsistency from being backfilled into a new, structurally
+--     tenant-scoped table. An Event whose legacy teamId fails this check
+--     is simply left without a backfilled participant — its own
+--     tenantId/pitchCode/dressing-room columns are untouched, and the
+--     correct participant can still be added later via the validated
+--     TournamentCenter UI.
 INSERT INTO "TournamentParticipant" (
     "id", "tenantId", "eventId", "teamId", "displayOrder", "createdAt", "updatedAt"
 )
@@ -199,6 +222,7 @@ SELECT
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 FROM "Event" e
+JOIN "Team" t ON t."id" = e."teamId" AND t."tenantId" = e."tenantId"
 WHERE e."type" = 'TOURNAMENT'
   AND e."teamId" IS NOT NULL
   AND e."tenantId" IS NOT NULL
