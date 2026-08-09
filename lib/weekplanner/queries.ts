@@ -84,6 +84,7 @@ import { formatWeekNumberLabel, formatWeekRangeLabel } from "./date";
 import { buildWeekplannerWeek } from "./view-model";
 import { planOverrideKey, planTimeOverrideKey } from "./plan-override-key";
 import type {
+  WeekplannerDay,
   WeekplannerItem,
   WeekplannerMatchItem,
   WeekplannerResourceRef,
@@ -97,6 +98,23 @@ export type WeekplannerWindow = {
   to: Date;
   /** 7 "YYYY-MM-DD" day keys, Monday first (Europe/Zurich calendar dates). */
   days: readonly string[];
+  param: string;
+  previousParam: string;
+  nextParam: string;
+};
+
+/**
+ * DAYPLANNER-01A — the single-day equivalent of WeekplannerWindow. Comes
+ * from lib/training/date-range.ts#resolveTrainingDayWindow — the same
+ * DST-safe, Europe/Zurich, TrainingCenter "Tag" boundary resolver already
+ * proven correct (see lib/training/__tests__/date-range.test.ts) — not a
+ * second date-window implementation.
+ */
+export type WeekplannerDayWindow = {
+  from: Date;
+  to: Date;
+  /** "YYYY-MM-DD" Europe/Zurich calendar date. */
+  date: string;
   param: string;
   previousParam: string;
   nextParam: string;
@@ -610,4 +628,50 @@ export async function getWeekplannerWeek(
     previousParam: window.previousParam,
     nextParam: window.nextParam,
   });
+}
+
+/**
+ * DAYPLANNER-01A — Day Planning is explicitly NOT a second planning engine
+ * (see product spec's "CORE ARCHITECTURAL RULE"): it is a ONE-DAY
+ * operational projection of the exact same effective planning state
+ * Weekplanner already resolves.
+ *
+ * This function therefore does not re-implement any query/resolution
+ * logic — it narrows `getWeekplannerWeek()`'s window to a single day and
+ * returns that one day's already fully-resolved bucket (canonical
+ * TrainingSession/Match/Tournament items, layered with the SAME
+ * WeekplannerPlan's resource + time overrides, conflict-annotated,
+ * chronologically sorted). For the same tenant + activity + planId,
+ * Weekplanner and Day Planning are therefore guaranteed byte-for-byte
+ * identical on effective time/resources — there is no separate code path
+ * that could drift.
+ *
+ * Bucketing (view-model.ts#buildWeekplannerWeek) buckets by each item's
+ * EFFECTIVE start (plan override, if any, else canonical) — an activity
+ * belongs to `window.date` according to its effective time under the
+ * selected plan, not its canonical time. A time override can never move an
+ * activity to a different Europe/Zurich calendar day in the first place
+ * (see lib/weekplanner/plan-service.ts#requireSameCalendarDay), so
+ * fetching each canonical source by its own canonical-day window (exactly
+ * as Weekplanner does per day) can never miss an activity that only
+ * "moved days" due to an override.
+ */
+export async function getWeekplannerDay(
+  tenantId: string,
+  window: WeekplannerDayWindow,
+  planId?: string,
+): Promise<WeekplannerDay> {
+  const week = await getWeekplannerWeek(
+    tenantId,
+    {
+      from: window.from,
+      to: window.to,
+      days: [window.date],
+      param: window.param,
+      previousParam: window.previousParam,
+      nextParam: window.nextParam,
+    },
+    planId,
+  );
+  return week.days[0];
 }
