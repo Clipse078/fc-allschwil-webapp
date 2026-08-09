@@ -381,7 +381,7 @@ export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }
           className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
           data-testid="weekplanner-active-plan-banner"
         >
-          Alternativplan aktiv · {activePlan.name}
+          Ansicht · {activePlan.name}
         </div>
       )}
     </div>

@@ -33,6 +33,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 import type { WeekplannerActivityType, WeekplannerAllocationGroup } from "@prisma/client";
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
 import { zonedDateKey, WEEKPLANNER_DEFAULT_TIMEZONE } from "./date";
@@ -49,6 +50,7 @@ import {
   WeekplannerPlanValidationError,
   WeekplannerPlanNameConflictError,
   WeekplannerPlanArchivedError,
+  WeekplannerPlanActivationConflictError,
   WeekplannerPlanDeleteUnsafeError,
   WeekplannerPlanAllocationNotFoundError,
   WeekplannerPlanAllocationDuplicateError,
@@ -417,29 +419,71 @@ export async function deleteWeekplannerPlan(tenantId: string, planId: string): P
  * first — never exposes a final state with two active alternatives (also
  * enforced at the DB layer by a partial unique index, see the migration
  * SQL). Archived plans cannot be activated (WeekplannerPlanArchivedError).
+ *
+ * WEEKPLANNER-01E-C1 — concurrency hardening:
+ *
+ *   1. archive/activate race: the top-of-function `requireActivePlan` check
+ *      alone is not enough — a concurrent archiveWeekplannerPlan() could
+ *      commit between that check and the final write. The final activation
+ *      is therefore a conditional `updateMany` that RE-CHECKS `archivedAt:
+ *      null` at write time and verifies exactly one row matched. Zero rows
+ *      means the target became archived in between; this throws
+ *      WeekplannerPlanArchivedError INSIDE the transaction, which aborts
+ *      the whole transaction — so the earlier deactivation of the
+ *      previously active plan is rolled back too, never left committed
+ *      against a target that in fact stayed inactive.
+ *   2. concurrent A/B activation: even with (1), two different plans in
+ *      the same tenant+week can still both reach their final `updateMany`
+ *      concurrently; the DB's partial unique index is the ultimate
+ *      arbiter and makes the losing transaction fail with a Postgres
+ *      unique-violation (Prisma P2002). This is the ONLY unique
+ *      constraint this transaction's writes can hit, so any P2002 here is
+ *      mapped to WeekplannerPlanActivationConflictError — never swallowed,
+ *      never silently retried — for the route layer to surface as 409.
  */
 export async function activateWeekplannerPlan(tenantId: string, planId: string): Promise<WeekplannerPlanDto> {
   const target = await requireActivePlan(tenantId, planId);
 
-  const plan = await prisma.$transaction(async (tx) => {
-    await tx.weekplannerPlan.updateMany({
-      where: {
-        tenantId,
-        weekId: target.weekId,
-        isActive: true,
-        archivedAt: null,
-        NOT: { id: planId },
-      },
-      data: { isActive: false },
+  try {
+    const plan = await prisma.$transaction(async (tx) => {
+      await tx.weekplannerPlan.updateMany({
+        where: {
+          tenantId,
+          weekId: target.weekId,
+          isActive: true,
+          archivedAt: null,
+          NOT: { id: planId },
+        },
+        data: { isActive: false },
+      });
+
+      const activated = await tx.weekplannerPlan.updateMany({
+        where: { id: planId, tenantId, weekId: target.weekId, archivedAt: null },
+        data: { isActive: true },
+      });
+
+      if (activated.count !== 1) {
+        // The target became archived (or no longer matches tenant/week)
+        // between requireActivePlan() above and this write — throwing here
+        // rolls back the ENTIRE transaction, including the deactivation
+        // performed above.
+        throw new WeekplannerPlanArchivedError(planId);
+      }
+
+      return tx.weekplannerPlan.findFirst({ where: { id: planId, tenantId } });
     });
 
-    return tx.weekplannerPlan.update({
-      where: { id: planId },
-      data: { isActive: true },
-    });
-  });
-
-  return planToDto(plan);
+    if (!plan) throw new WeekplannerPlanNotFoundError(planId);
+    return planToDto(plan);
+  } catch (err) {
+    if (err instanceof WeekplannerPlanArchivedError || err instanceof WeekplannerPlanNotFoundError) {
+      throw err;
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new WeekplannerPlanActivationConflictError(planId);
+    }
+    throw err;
+  }
 }
 
 /**

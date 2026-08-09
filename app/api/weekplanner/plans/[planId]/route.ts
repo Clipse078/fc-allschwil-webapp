@@ -26,6 +26,7 @@ import {
   WeekplannerPlanValidationError,
   WeekplannerPlanNameConflictError,
   WeekplannerPlanArchivedError,
+  WeekplannerPlanActivationConflictError,
   WeekplannerPlanDeleteUnsafeError,
 } from "@/lib/weekplanner/plan-errors";
 
@@ -107,6 +108,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     if (err instanceof WeekplannerPlanArchivedError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof WeekplannerPlanActivationConflictError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     throw err;

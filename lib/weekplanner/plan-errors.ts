@@ -43,6 +43,24 @@ export class WeekplannerPlanArchivedError extends Error {
 }
 
 /**
+ * WEEKPLANNER-01E-C1 — a concurrent activateWeekplannerPlan() call for a
+ * DIFFERENT plan in the same tenant+week committed first, so the DB's
+ * partial unique index (`WeekplannerPlan_tenantId_weekId_isActive_unique`)
+ * rejected this request's own activation (Postgres unique-violation /
+ * Prisma P2002). The target plan was NOT activated and the previously
+ * active plan (if any) was left untouched — see
+ * lib/weekplanner/plan-service.ts#activateWeekplannerPlan. Safe to retry;
+ * no retry is implemented here.
+ */
+export class WeekplannerPlanActivationConflictError extends Error {
+  readonly code = "WEEKPLANNER_PLAN_ACTIVATION_CONFLICT" as const;
+  constructor(planId: string) {
+    super(`WeekplannerPlan "${planId}" could not be activated — another plan was activated concurrently for this week`);
+    this.name = "WeekplannerPlanActivationConflictError";
+  }
+}
+
+/**
  * Hard-delete is only "safe" (per product spec) when the plan holds zero
  * WeekplannerPlanAllocation rows — otherwise archive instead of delete.
  */
