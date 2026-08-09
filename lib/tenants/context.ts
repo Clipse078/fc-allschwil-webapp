@@ -37,6 +37,8 @@ const tenantContextSelect = {
   logoUrl: true,
   primaryColor: true,
   secondaryColor: true,
+  // Infoboard display preference — INFOBOARD-INTEGRATION-01B
+  infoboardDisplayTheme: true,
   // Website feature flags
   approvedDataOnly: true,
 } as const;
@@ -60,6 +62,10 @@ export type TenantContext = {
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  // Infoboard display preference — INFOBOARD-INTEGRATION-01B. Nullable;
+  // resolveInfoboardDisplayTheme() (lib/publishing/infoboard/display-theme.ts)
+  // applies the DARK default. Presentation-only — never affects planning data.
+  infoboardDisplayTheme: string | null;
   // Website flags — false by default (backward-compatible).
   approvedDataOnly: boolean;
 };

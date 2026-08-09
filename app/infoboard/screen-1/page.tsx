@@ -78,6 +78,7 @@ export default async function InfoboardScreen1Page() {
       name: true,
       timezone: true,
       logoUrl: true,
+      infoboardDisplayTheme: true,
     },
   });
 
@@ -97,6 +98,7 @@ export default async function InfoboardScreen1Page() {
     name: tenantRow.name,
     timezone: tenantRow.timezone,
     logoUrl: tenantRow.logoUrl,
+    infoboardDisplayTheme: tenantRow.infoboardDisplayTheme,
   };
 
   // ── Request time ───────────────────────────────────────────────────────────
@@ -116,6 +118,7 @@ export default async function InfoboardScreen1Page() {
       currentTimeIso={payload.currentTimeIso}
       announcement={payload.announcement ?? undefined}
       eventPresentation={payload.eventPresentation}
+      theme={payload.theme}
     />
   );
 }
