@@ -90,10 +90,12 @@ export default function TournamentListRow({
             </span>
           ) : null}
 
-          {tournament.team ? (
-            <span className="inline-flex items-center gap-1.5">
+          {tournament.participants.length > 0 ? (
+            <span className="inline-flex items-center gap-1.5" title={tournament.participants.map((p) => p.displayName).join(", ")}>
               <Users className="h-3.5 w-3.5" />
-              {tournament.team.name}
+              {tournament.participants.length === 1
+                ? tournament.participants[0]!.displayName
+                : `${tournament.participants.length} Teams`}
             </span>
           ) : null}
         </div>

@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Ban, Loader2, RotateCcw, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SectionCard } from "@/components/ui/page/SectionCard";
-import { getPitchOptionsForEventType } from "@/lib/facilities/pitches";
-import { FCA_DRESSING_ROOMS } from "@/lib/facilities/dressing-rooms";
 import type { TournamentDto } from "@/lib/tournaments/types";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import TournamentParticipantsEditor from "@/components/admin/tournamentcenter/TournamentParticipantsEditor";
+import TournamentResourceAllocationEditor from "@/components/admin/tournamentcenter/TournamentResourceAllocationEditor";
 
 type TeamItem = {
   id: string;
@@ -16,8 +17,6 @@ type TeamItem = {
   genderGroup: string | null;
   isActive: boolean;
 };
-
-const TOURNAMENT_PITCH_OPTIONS = getPitchOptionsForEventType("TOURNAMENT");
 
 function toDateTimeLocalValue(iso: string | null): string {
   if (!iso) return "";
@@ -32,9 +31,18 @@ function formatTeamLabel(team: TeamItem): string {
 type TournamentEditFormProps = {
   tournament: TournamentDto;
   canManage: boolean;
+  /** Non-archived FULL_PITCH/HALF_PITCH resources, grouped by facility — for the tournament-level Spielfeld/Halle editor. */
+  pitchHallFacilityGroups: FacilityGroup[];
+  /** Non-archived DRESSING_ROOM resources, grouped by facility — for the per-participant Garderobe editor. */
+  dressingRoomFacilityGroups: FacilityGroup[];
 };
 
-export default function TournamentEditForm({ tournament, canManage }: TournamentEditFormProps) {
+export default function TournamentEditForm({
+  tournament,
+  canManage,
+  pitchHallFacilityGroups,
+  dressingRoomFacilityGroups,
+}: TournamentEditFormProps) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -49,20 +57,13 @@ export default function TournamentEditForm({ tournament, canManage }: Tournament
   const [resultLabel, setResultLabel] = useState(tournament.resultLabel ?? "");
   const [remarks, setRemarks] = useState(tournament.remarks ?? "");
   const [teamId, setTeamId] = useState(tournament.team?.id ?? "");
+  const [homeAway, setHomeAway] = useState(tournament.homeAway);
 
   const [websiteVisible, setWebsiteVisible] = useState(tournament.visibility.websiteVisible);
   const [infoboardVisible, setInfoboardVisible] = useState(tournament.visibility.infoboardVisible);
   const [homepageVisible, setHomepageVisible] = useState(tournament.visibility.homepageVisible);
   const [wochenplanVisible, setWochenplanVisible] = useState(tournament.visibility.wochenplanVisible);
   const [teamPageVisible, setTeamPageVisible] = useState(tournament.visibility.teamPageVisible);
-
-  const [pitchCode, setPitchCode] = useState(tournament.allocation.pitchCode ?? "");
-  const [homeDressingRoomCode, setHomeDressingRoomCode] = useState(
-    tournament.allocation.homeDressingRoomCode ?? "",
-  );
-  const [awayDressingRoomCode, setAwayDressingRoomCode] = useState(
-    tournament.allocation.awayDressingRoomCode ?? "",
-  );
 
   const [teams, setTeams] = useState<TeamItem[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
@@ -123,14 +124,12 @@ export default function TournamentEditForm({ tournament, canManage }: Tournament
           resultLabel: resultLabel.trim() || null,
           remarks: remarks.trim() || null,
           teamId: teamId || null,
+          homeAway,
           websiteVisible,
           infoboardVisible,
           homepageVisible,
           wochenplanVisible,
           teamPageVisible,
-          pitchCode: pitchCode.trim() || null,
-          homeDressingRoomCode: homeDressingRoomCode.trim() || null,
-          awayDressingRoomCode: awayDressingRoomCode.trim() || null,
         }),
       });
 
@@ -191,7 +190,21 @@ export default function TournamentEditForm({ tournament, canManage }: Tournament
           </label>
 
           <label className="block space-y-2">
-            <span className="fca-label">Team</span>
+            <span className="fca-label">Heim / Auswärts</span>
+            <select
+              value={homeAway}
+              onChange={(e) => setHomeAway(e.target.value === "AWAY" ? "AWAY" : "HOME")}
+              disabled={!isEditable || saving}
+              className="fca-select"
+              data-testid="tournament-home-away-select"
+            >
+              <option value="HOME">Heim (FC Allschwil ausrichtend)</option>
+              <option value="AWAY">Auswärts (extern ausgerichtet)</option>
+            </select>
+          </label>
+
+          <label className="block space-y-2">
+            <span className="fca-label">Hauptteam (Teamseite / Wochenplan)</span>
             <select
               value={teamId}
               onChange={(e) => setTeamId(e.target.value)}
@@ -199,7 +212,7 @@ export default function TournamentEditForm({ tournament, canManage }: Tournament
               className="fca-select"
               data-testid="tournament-team-select"
             >
-              <option value="">{teamsLoading ? "Teams laden..." : "— Kein Team zugeordnet —"}</option>
+              <option value="">{teamsLoading ? "Teams laden..." : "— Kein Hauptteam zugeordnet —"}</option>
               {teams.map((team) => (
                 <option key={team.id} value={team.id}>
                   {formatTeamLabel(team)}
@@ -314,63 +327,31 @@ export default function TournamentEditForm({ tournament, canManage }: Tournament
       </SectionCard>
 
       <SectionCard
-        title="Sportanlage und Garderoben"
-        description="Optional — nur relevant, wenn FC Allschwil das Turnier auf einer eigenen Anlage austrägt."
+        title="Teilnehmende Teams"
+        description="FC Allschwil Teams und externe Teams aus dem Vereinsverzeichnis — beliebig viele, in beliebiger Mischung."
       >
-        <div className="grid gap-4 md:grid-cols-3">
-          <label className="block space-y-2">
-            <span className="fca-label">Spielfeld</span>
-            <select
-              value={pitchCode}
-              onChange={(e) => setPitchCode(e.target.value)}
-              disabled={!isEditable || saving}
-              className="fca-select"
-              data-testid="tournament-pitch-select"
-            >
-              <option value="">— Kein Spielfeld zugeordnet —</option>
-              {TOURNAMENT_PITCH_OPTIONS.map((opt) => (
-                <option key={opt.code} value={opt.code}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block space-y-2">
-            <span className="fca-label">Garderobe Heim</span>
-            <select
-              value={homeDressingRoomCode}
-              onChange={(e) => setHomeDressingRoomCode(e.target.value)}
-              disabled={!isEditable || saving}
-              className="fca-select"
-            >
-              <option value="">— Keine Garderobe zugeordnet —</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
-                <option key={room.code} value={room.code}>
-                  {room.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block space-y-2">
-            <span className="fca-label">Garderobe Gast</span>
-            <select
-              value={awayDressingRoomCode}
-              onChange={(e) => setAwayDressingRoomCode(e.target.value)}
-              disabled={!isEditable || saving}
-              className="fca-select"
-            >
-              <option value="">— Keine Garderobe zugeordnet —</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
-                <option key={room.code} value={room.code}>
-                  {room.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <TournamentParticipantsEditor
+          tournamentId={tournament.id}
+          canManage={isEditable}
+          homeAway={homeAway}
+          initialParticipants={tournament.participants}
+          dressingRoomFacilityGroups={dressingRoomFacilityGroups}
+        />
       </SectionCard>
+
+      {homeAway === "HOME" && (
+        <SectionCard
+          title="Ressourcen · Spielfeld / Halle"
+          description="Ein Heimturnier kann mehr als ein Spielfeld bzw. mehr als eine Halle belegen."
+        >
+          <TournamentResourceAllocationEditor
+            tournamentId={tournament.id}
+            canManage={isEditable}
+            initialAllocations={tournament.resourceAllocations}
+            facilityGroups={pitchHallFacilityGroups}
+          />
+        </SectionCard>
+      )}
 
       <SectionCard title="Veröffentlichung" description="Ausgabekanäle für dieses Turnier">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
