@@ -11,11 +11,21 @@
  * (PLANNING-CREATION-UX-01A / TOURNAMENTCENTER-01D):
  *
  *   1 · Team           — Tenant Team (TeamSeason) + series identity
- *   2 · Tag & Zeit      — the initial occurrence's date + start/end time
+ *   2 · Termin          — the initial occurrence's date + start/end time
  *   3 · Wiederholung    — Ja/Nein; "Ja" adds a recurrence end date
  *   4 · Spielfeld/Halle — live Frei/Belegt availability (01A foundation)
  *   5 · Garderobe       — live Frei/Belegt availability (01A foundation)
  *   6 · Prüfen & Einreichen — summary + Freigeben / Zur Freigabe einreichen
+ *
+ * PLANNING-CREATION-UX-01B-C1: the six steps now render as ONE bordered
+ * surface with divided rows (not six separate cards) — same logical flow
+ * and same six numbered steps, just visually one guided workflow instead of
+ * six administrative panels. Steps 1/2 additionally collapse to a one-line
+ * summary once their own fields are complete and focus moves elsewhere
+ * (see GuidedStep below) so filled-in information stops taking as much
+ * vertical space as the step currently being worked on. This is plain local
+ * UI state — no wizard route/step machine: every field stays reachable and
+ * editable at any time via "Bearbeiten", in any order.
  *
  * Preserves the EXISTING canonical architecture end to end:
  *   - Still posts to POST /api/training-series (createTrainingSeries +
@@ -44,9 +54,9 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import type { FocusEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, CalendarDays, Repeat } from "lucide-react";
-import { SectionCard } from "@/components/ui/page/SectionCard";
+import { Loader2, CalendarDays, Check, Repeat } from "lucide-react";
 import {
   FacilityResourceSelector,
   type FacilityGroup,
@@ -145,6 +155,110 @@ function addDaysToDateKey(dateKey: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Counts Frei/Belegt across a group's resources for the compact scan-line above each selector. */
+function countAvailability(
+  facilityGroups: FacilityGroup[],
+  availability: Map<string, ResourceAvailabilityAnnotation>,
+): { free: number; occupied: number } {
+  let free = 0;
+  let occupied = 0;
+  for (const group of facilityGroups) {
+    for (const resource of group.resources) {
+      const annotation = availability.get(resource.id);
+      if (!annotation) continue;
+      if (annotation.status === "OCCUPIED") occupied += 1;
+      else free += 1;
+    }
+  }
+  return { free, occupied };
+}
+
+/**
+ * PLANNING-CREATION-UX-01B-C1 — compact, highly scannable Frei/Belegt count
+ * line shown above each resource selector (e.g. "2 frei · 1 belegt"),
+ * derived from the same live availability map the selector's per-option
+ * annotations already use (lib/facilities/availability-service.ts via
+ * GET /api/facilities/availability) — no separate computation/engine.
+ */
+function AvailabilityScanLine({ counts, ready }: { counts: { free: number; occupied: number }; ready: boolean }) {
+  if (!ready || counts.free + counts.occupied === 0) {
+    return <p className="text-xs text-[var(--text-2)]">Verfügbarkeit erscheint nach Tag &amp; Zeit.</p>;
+  }
+  return (
+    <p className="text-xs">
+      <span className="font-medium text-emerald-600">{counts.free} frei</span>
+      <span className="text-[var(--text-2)]"> · </span>
+      <span className="font-medium text-rose-600">{counts.occupied} belegt</span>
+    </p>
+  );
+}
+
+/**
+ * PLANNING-CREATION-UX-01B-C1 — collapses a step to a one-line summary once
+ * its own information is complete, so "done" steps stop consuming the same
+ * height as the step currently being filled in. Purely local UI state (a
+ * blur-triggered boolean) — NOT a wizard route/step machine: every step's
+ * fields stay mounted-on-demand and reachable again via "Bearbeiten" any
+ * time, in any order, with no navigation or gating involved.
+ */
+function handleStepBlur(event: FocusEvent<HTMLDivElement>, isComplete: boolean, collapse: () => void): void {
+  if (!isComplete) return;
+  const next = event.relatedTarget as Node | null;
+  if (next && event.currentTarget.contains(next)) return;
+  collapse();
+}
+
+type GuidedStepProps = {
+  index: number;
+  title: string;
+  hint: ReactNode;
+  complete: boolean;
+  collapsed: boolean;
+  summary?: ReactNode;
+  onExpand?: () => void;
+  onBlurCapture?: (event: FocusEvent<HTMLDivElement>) => void;
+  children: ReactNode;
+};
+
+/** One numbered row of the guided flow — expanded while incomplete/active, a compact summary line once done. */
+function GuidedStep({ index, title, hint, complete, collapsed, summary, onExpand, onBlurCapture, children }: GuidedStepProps) {
+  const isCollapsed = complete && collapsed;
+  return (
+    <div className="px-4 py-3" onBlur={onBlurCapture}>
+      <div className="flex items-center gap-2.5">
+        <span
+          className={
+            complete
+              ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sce-primary)] text-white"
+              : "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]"
+          }
+          aria-hidden
+        >
+          {complete ? <Check className="h-3.5 w-3.5" /> : index}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">{title}</h2>
+          {isCollapsed && summary ? (
+            <p className="truncate text-xs text-[var(--text-2)]">{summary}</p>
+          ) : (
+            <p className="text-xs text-[var(--text-2)]">{hint}</p>
+          )}
+        </div>
+        {isCollapsed && onExpand ? (
+          <button
+            type="button"
+            onClick={onExpand}
+            className="shrink-0 text-xs font-medium text-[var(--sce-primary)] hover:underline"
+          >
+            Bearbeiten
+          </button>
+        ) : null}
+      </div>
+      {isCollapsed ? null : <div className="mt-2.5 pl-[2.125rem]">{children}</div>}
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function TrainingSeriesCreateForm({
@@ -193,6 +307,16 @@ export default function TrainingSeriesCreateForm({
   // ── 3 · Wiederholung ────────────────────────────────────────────────────
   const [isRecurring, setIsRecurring] = useState(false);
   const [validUntil, setValidUntil] = useState("");
+
+  // PLANNING-CREATION-UX-01B-C1: per-step collapse state for the "1 Team" /
+  // "2 Termin" steps only (see GuidedStep doc comment) — collapses to a
+  // one-line summary once that step's own fields are complete AND focus has
+  // moved elsewhere, re-expandable any time via "Bearbeiten".
+  const [teamCollapsed, setTeamCollapsed] = useState(false);
+  const [terminCollapsed, setTerminCollapsed] = useState(false);
+
+  const teamStepComplete = !!teamSeasonId && !!title.trim();
+  const terminStepComplete = !!date && timesValid;
 
   // Resolves the effective [validFrom, validUntil] window the API will
   // receive: a single occurrence when not recurring (validUntil = date + 1
@@ -440,285 +564,325 @@ export default function TrainingSeriesCreateForm({
         </div>
       )}
 
-      <SectionCard title="1 · Team" description="Tenant-Team (Team · Saison) und Name der Trainingsserie.">
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block space-y-2 md:col-span-2">
-            <span className="fca-label">Team / Saison</span>
-            <select
-              value={teamSeasonId}
-              onChange={(e) => setTeamSeasonId(e.target.value)}
-              className="fca-select"
-              required
-              data-testid="training-create-team-season-select"
-            >
-              <option value="">— Auswählen —</option>
-              {teamSeasons.map((ts) => (
-                <option key={ts.id} value={ts.id}>
-                  {ts.teamName} · {ts.seasonName}
-                </option>
-              ))}
-            </select>
-          </label>
+      <div className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+        <GuidedStep
+          index={1}
+          title="Team"
+          hint="Team · Saison und Name der Trainingsserie."
+          complete={teamStepComplete}
+          collapsed={teamCollapsed}
+          summary={selectedTeamSeason ? `${selectedTeamSeason.teamName} · ${selectedTeamSeason.seasonName} — „${title}“` : undefined}
+          onExpand={() => setTeamCollapsed(false)}
+          onBlurCapture={(e) => handleStepBlur(e, teamStepComplete, () => setTeamCollapsed(true))}
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block space-y-1 md:col-span-2">
+              <span className="fca-label">Team / Saison</span>
+              <select
+                value={teamSeasonId}
+                onChange={(e) => setTeamSeasonId(e.target.value)}
+                className="fca-select"
+                required
+                data-testid="training-create-team-season-select"
+              >
+                <option value="">— Auswählen —</option>
+                {teamSeasons.map((ts) => (
+                  <option key={ts.id} value={ts.id}>
+                    {ts.teamName} · {ts.seasonName}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="block space-y-2 md:col-span-2">
-            <span className="fca-label">Name der Trainingsserie</span>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setTitleTouched(true);
-              }}
-              placeholder="z. B. E1 Dienstagstraining"
-              className="fca-input"
-              required
-              data-testid="training-create-title"
-            />
-          </label>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="2 · Tag & Zeit" description="Datum und Uhrzeit des ersten Trainingstermins.">
-        <div className="grid gap-4 md:grid-cols-3">
-          <label className="block space-y-2">
-            <span className="fca-label">Datum</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="fca-input"
-              required
-              data-testid="training-create-date"
-            />
-          </label>
-          <label className="block space-y-2">
-            <span className="fca-label">Start</span>
-            <input
-              type="time"
-              value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-              className="fca-input"
-              required
-              data-testid="training-create-starts-at"
-            />
-          </label>
-          <label className="block space-y-2">
-            <span className="fca-label">Ende</span>
-            <input
-              type="time"
-              value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)}
-              className="fca-input"
-              required
-              data-testid="training-create-ends-at"
-            />
-          </label>
-        </div>
-        {date ? (
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-[var(--text-2)]" data-testid="training-create-weekday-label">
-            <CalendarDays className="h-3.5 w-3.5" aria-hidden />
-            Wochentag: {derivedWeekday ? WEEKDAY_LABELS[derivedWeekday] : "—"}
-          </p>
-        ) : null}
-        {date && !timesValid ? (
-          <p className="mt-1 text-xs text-rose-600">Start muss vor Ende liegen.</p>
-        ) : null}
-      </SectionCard>
-
-      <SectionCard
-        title="3 · Wiederholung"
-        description="Wiederholt sich dieses Training wöchentlich am selben Wochentag?"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
-            <Repeat className="h-4 w-4 text-[var(--sce-primary)]" aria-hidden />
-            Wiederholung
-          </div>
-          <div className="flex gap-2" role="radiogroup" aria-label="Wiederholung">
-            <button
-              type="button"
-              onClick={() => setIsRecurring(false)}
-              aria-pressed={!isRecurring}
-              data-testid="training-create-recurrence-no"
-              className={!isRecurring ? "fca-button-primary text-sm" : "fca-button-secondary text-sm"}
-            >
-              Nein
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsRecurring(true)}
-              aria-pressed={isRecurring}
-              data-testid="training-create-recurrence-yes"
-              className={isRecurring ? "fca-button-primary text-sm" : "fca-button-secondary text-sm"}
-            >
-              Ja
-            </button>
-          </div>
-        </div>
-
-        {isRecurring ? (
-          <div className="mt-4">
-            <label className="block space-y-2 md:w-1/2">
-              <span className="fca-label">Wiederholen bis</span>
+            <label className="block space-y-1 md:col-span-2">
+              <span className="fca-label">Name der Trainingsserie</span>
               <input
-                type="date"
-                value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
-                min={date || undefined}
+                type="text"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setTitleTouched(true);
+                }}
+                placeholder="z. B. E1 Dienstagstraining"
                 className="fca-input"
-                required={isRecurring}
-                data-testid="training-create-valid-until"
+                required
+                data-testid="training-create-title"
               />
             </label>
-            {date ? (
-              <p className="mt-2 text-xs text-[var(--text-2)]">
-                Wiederholt sich wöchentlich an {derivedWeekday ? WEEKDAY_LABELS[derivedWeekday] : "—"}, bis zum gewählten Datum.
-              </p>
+          </div>
+        </GuidedStep>
+
+        <GuidedStep
+          index={2}
+          title="Termin"
+          hint="Datum und Uhrzeit des ersten Trainingstermins."
+          complete={terminStepComplete}
+          collapsed={terminCollapsed}
+          summary={
+            date
+              ? `${date} · ${startsAt}–${endsAt}${derivedWeekday ? ` (${WEEKDAY_LABELS[derivedWeekday]})` : ""}`
+              : undefined
+          }
+          onExpand={() => setTerminCollapsed(false)}
+          onBlurCapture={(e) => handleStepBlur(e, terminStepComplete, () => setTerminCollapsed(true))}
+        >
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="block space-y-1">
+              <span className="fca-label">Datum</span>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="fca-input"
+                required
+                data-testid="training-create-date"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="fca-label">Start</span>
+              <input
+                type="time"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+                className="fca-input"
+                required
+                data-testid="training-create-starts-at"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="fca-label">Ende</span>
+              <input
+                type="time"
+                value={endsAt}
+                onChange={(e) => setEndsAt(e.target.value)}
+                className="fca-input"
+                required
+                data-testid="training-create-ends-at"
+              />
+            </label>
+          </div>
+          {date ? (
+            <p
+              className="mt-2 flex items-center gap-1.5 text-xs text-[var(--text-2)]"
+              data-testid="training-create-weekday-label"
+            >
+              <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+              Wochentag: {derivedWeekday ? WEEKDAY_LABELS[derivedWeekday] : "—"}
+            </p>
+          ) : null}
+          {date && !timesValid ? <p className="mt-1 text-xs text-rose-600">Start muss vor Ende liegen.</p> : null}
+        </GuidedStep>
+
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]" aria-hidden>
+              3
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+                <Repeat className="h-3.5 w-3.5 text-[var(--sce-primary)]" aria-hidden />
+                Wiederholung
+              </div>
+              <div className="flex gap-1.5" role="radiogroup" aria-label="Wiederholung">
+                <button
+                  type="button"
+                  onClick={() => setIsRecurring(false)}
+                  aria-pressed={!isRecurring}
+                  data-testid="training-create-recurrence-no"
+                  className={!isRecurring ? "fca-button-primary text-xs" : "fca-button-secondary text-xs"}
+                >
+                  Nein
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRecurring(true)}
+                  aria-pressed={isRecurring}
+                  data-testid="training-create-recurrence-yes"
+                  className={isRecurring ? "fca-button-primary text-xs" : "fca-button-secondary text-xs"}
+                >
+                  Ja
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {isRecurring ? (
+            <div className="mt-2.5 pl-[2.125rem]">
+              <label className="block space-y-1 md:w-1/2">
+                <span className="fca-label">Wiederholen bis</span>
+                <input
+                  type="date"
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  min={date || undefined}
+                  className="fca-input"
+                  required={isRecurring}
+                  data-testid="training-create-valid-until"
+                />
+              </label>
+              {date ? (
+                <p className="mt-1.5 text-xs text-[var(--text-2)]">
+                  Wöchentlich an {derivedWeekday ? WEEKDAY_LABELS[derivedWeekday] : "—"}, bis zum gewählten Datum.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-1.5 pl-[2.125rem] text-xs text-[var(--text-2)]">Einmaliges Training am {date || "gewählten Tag"}.</p>
+          )}
+        </div>
+
+        <div className="px-4 py-3">
+          <div className="mb-2.5 flex items-center gap-2.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]" aria-hidden>
+              4
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">Spielfeld / Halle</h2>
+              <AvailabilityScanLine counts={countAvailability(pitchHallFacilityGroups, pitchAvailability)} ready={!!date && timesValid} />
+            </div>
+          </div>
+          <div className="space-y-2.5 pl-[2.125rem]">
+            {resources.length > 0 ? (
+              <ul className="space-y-1.5" data-testid="training-create-resource-list">
+                {resources.map((resource) => (
+                  <li
+                    key={resource.localId}
+                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[var(--foreground)]">{resource.facilityResourceName}</p>
+                      <p className="truncate text-xs text-[var(--text-2)]">{resource.facilityName}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeResourceDraft(resource.localId)}
+                      aria-label={`${resource.facilityResourceName} entfernen`}
+                      className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
             ) : null}
-          </div>
-        ) : (
-          <p className="mt-3 text-xs text-[var(--text-2)]">Einmaliges Training am {date || "gewählten Tag"}.</p>
-        )}
-      </SectionCard>
 
-      <SectionCard
-        title="4 · Spielfeld / Halle"
-        description="Verfügbarkeit wird live für den ersten Termin angezeigt, sobald Tag und Zeit gewählt sind."
-      >
-        <div className="space-y-4">
-          {resources.length === 0 ? (
-            <div className="rounded-lg border-2 border-dashed border-[var(--border)] py-6 text-center">
-              <p className="text-sm text-[var(--text-2)]">Noch kein Spielfeld / keine Halle zugewiesen.</p>
+            <FacilityResourceSelector
+              facilityGroups={pitchHallFacilityGroups}
+              allocatedResourceIds={allocatedResourceIds}
+              onAdd={addResourceDraft}
+              placeholder="Spielfeld / Halle auswählen…"
+              addButtonLabel="Zuweisen"
+              availabilityByResourceId={pitchAvailability}
+              testId="training-create-resource-add"
+            />
+          </div>
+        </div>
+
+        <div className="px-4 py-3">
+          <div className="mb-2.5 flex items-center gap-2.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]" aria-hidden>
+              5
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">Garderobe</h2>
+              <AvailabilityScanLine counts={countAvailability(dressingRoomFacilityGroups, dressingRoomAvailability)} ready={!!date && timesValid} />
+            </div>
+          </div>
+          <div className="space-y-2.5 pl-[2.125rem]">
+            {dressingRooms.length > 0 ? (
+              <ul className="space-y-1.5" data-testid="training-create-dressing-room-list">
+                {dressingRooms.map((room) => (
+                  <li
+                    key={room.localId}
+                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[var(--foreground)]">{room.facilityResourceName}</p>
+                      <p className="truncate text-xs text-[var(--text-2)]">{room.facilityName}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeDressingRoomDraft(room.localId)}
+                      aria-label={`${room.facilityResourceName} entfernen`}
+                      className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <FacilityResourceSelector
+              facilityGroups={dressingRoomFacilityGroups}
+              allocatedResourceIds={allocatedDressingRoomIds}
+              onAdd={addDressingRoomDraft}
+              placeholder="Garderobe auswählen…"
+              addButtonLabel="Zuweisen"
+              availabilityByResourceId={dressingRoomAvailability}
+              testId="training-create-dressing-room-add"
+            />
+          </div>
+        </div>
+
+        <div className="px-4 py-3">
+          <div className="mb-2.5 flex items-center gap-2.5">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]" aria-hidden>
+              6
+            </span>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Prüfen &amp; Einreichen</h2>
+          </div>
+          <dl className="grid gap-x-6 gap-y-1.5 pl-[2.125rem] text-sm md:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Team</dt>
+              <dd className="text-[var(--foreground)]">
+                {selectedTeamSeason ? `${selectedTeamSeason.teamName} · ${selectedTeamSeason.seasonName}` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Titel</dt>
+              <dd className="text-[var(--foreground)]">{title || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Termin</dt>
+              <dd className="text-[var(--foreground)]">
+                {date ? `${date} · ${startsAt}–${endsAt}${derivedWeekday ? ` (${WEEKDAY_LABELS[derivedWeekday]})` : ""}` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Wiederholung</dt>
+              <dd className="text-[var(--foreground)]">{isRecurring ? `Wöchentlich bis ${validUntil || "—"}` : "Einmalig"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Spielfeld / Halle</dt>
+              <dd className="text-[var(--foreground)]">
+                {resources.length > 0 ? resources.map((r) => r.facilityResourceName).join(", ") : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Garderobe</dt>
+              <dd className="text-[var(--foreground)]">
+                {dressingRooms.length > 0 ? dressingRooms.map((r) => r.facilityResourceName).join(", ") : "—"}
+              </dd>
+            </div>
+          </dl>
+
+          {!canValidateDirectly ? (
+            <div
+              className="fca-status-box fca-status-box-warn ml-[2.125rem] mt-3 text-xs"
+              data-testid="training-create-no-validation-right"
+            >
+              Für die direkte Erstellung ist die Berechtigung „Trainings verwalten“ erforderlich. Bitte wende dich an
+              eine Person mit Freigaberecht.
             </div>
           ) : (
-            <ul className="space-y-2" data-testid="training-create-resource-list">
-              {resources.map((resource) => (
-                <li
-                  key={resource.localId}
-                  className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">{resource.facilityResourceName}</p>
-                    <p className="mt-0.5 text-xs text-[var(--text-2)]">{resource.facilityName}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeResourceDraft(resource.localId)}
-                    aria-label={`${resource.facilityResourceName} entfernen`}
-                    className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <FacilityResourceSelector
-            facilityGroups={pitchHallFacilityGroups}
-            allocatedResourceIds={allocatedResourceIds}
-            onAdd={addResourceDraft}
-            placeholder="Spielfeld / Halle auswählen…"
-            addButtonLabel="Zuweisen"
-            availabilityByResourceId={pitchAvailability}
-            testId="training-create-resource-add"
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard
-        title="5 · Garderobe"
-        description="Verfügbarkeit wird live für den ersten Termin angezeigt, sobald Tag und Zeit gewählt sind."
-      >
-        <div className="space-y-4">
-          {dressingRooms.length === 0 ? (
-            <div className="rounded-lg border-2 border-dashed border-[var(--border)] py-6 text-center">
-              <p className="text-sm text-[var(--text-2)]">Noch keine Garderobe zugewiesen.</p>
+            <div className="fca-status-box fca-status-box-muted ml-[2.125rem] mt-3 text-xs">
+              Mit „{submitLabel}“ wird die Trainingsserie sofort erstellt und aktiv gesetzt (kein separater Prüfschritt
+              in der aktuellen TrainingCenter-Architektur).
             </div>
-          ) : (
-            <ul className="space-y-2" data-testid="training-create-dressing-room-list">
-              {dressingRooms.map((room) => (
-                <li
-                  key={room.localId}
-                  className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">{room.facilityResourceName}</p>
-                    <p className="mt-0.5 text-xs text-[var(--text-2)]">{room.facilityName}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeDressingRoomDraft(room.localId)}
-                    aria-label={`${room.facilityResourceName} entfernen`}
-                    className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
           )}
-
-          <FacilityResourceSelector
-            facilityGroups={dressingRoomFacilityGroups}
-            allocatedResourceIds={allocatedDressingRoomIds}
-            onAdd={addDressingRoomDraft}
-            placeholder="Garderobe auswählen…"
-            addButtonLabel="Zuweisen"
-            availabilityByResourceId={dressingRoomAvailability}
-            testId="training-create-dressing-room-add"
-          />
         </div>
-      </SectionCard>
-
-      <SectionCard title="6 · Prüfen & Einreichen" description="Zusammenfassung vor dem Erstellen der Trainingsserie.">
-        <dl className="grid gap-x-6 gap-y-2 text-sm md:grid-cols-2">
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Team</dt>
-            <dd className="text-[var(--foreground)]">
-              {selectedTeamSeason ? `${selectedTeamSeason.teamName} · ${selectedTeamSeason.seasonName}` : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Titel</dt>
-            <dd className="text-[var(--foreground)]">{title || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Termin</dt>
-            <dd className="text-[var(--foreground)]">
-              {date ? `${date} · ${startsAt}–${endsAt}${derivedWeekday ? ` (${WEEKDAY_LABELS[derivedWeekday]})` : ""}` : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Wiederholung</dt>
-            <dd className="text-[var(--foreground)]">{isRecurring ? `Wöchentlich bis ${validUntil || "—"}` : "Einmalig"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Spielfeld / Halle</dt>
-            <dd className="text-[var(--foreground)]">
-              {resources.length > 0 ? resources.map((r) => r.facilityResourceName).join(", ") : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Garderobe</dt>
-            <dd className="text-[var(--foreground)]">
-              {dressingRooms.length > 0 ? dressingRooms.map((r) => r.facilityResourceName).join(", ") : "—"}
-            </dd>
-          </div>
-        </dl>
-
-        {!canValidateDirectly ? (
-          <div className="fca-status-box fca-status-box-warn mt-4 text-xs" data-testid="training-create-no-validation-right">
-            Für die direkte Erstellung von Trainingsserien ist die Berechtigung „Trainings verwalten“ erforderlich.
-            Bitte wende dich an eine Person mit Freigaberecht.
-          </div>
-        ) : (
-          <div className="fca-status-box fca-status-box-muted mt-4 text-xs">
-            Mit „{submitLabel}“ wird die Trainingsserie sofort erstellt und aktiv gesetzt (kein separater
-            Prüfschritt in der aktuellen TrainingCenter-Architektur).
-          </div>
-        )}
-      </SectionCard>
+      </div>
 
       {result && partialErrors.length > 0 ? (
         <div className="fca-status-box fca-status-box-warn text-sm" data-testid="training-create-partial-warning">
