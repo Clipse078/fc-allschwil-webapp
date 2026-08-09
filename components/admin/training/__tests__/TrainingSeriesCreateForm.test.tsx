@@ -166,6 +166,31 @@ describe("TrainingSeriesCreateForm — live Spielfeld/Halle + Garderobe availabi
     });
   });
 
+  it("PLANNING-CREATION-UX-01B-C1: resolves the Europe/Zurich wall-clock time to the matching UTC instant, not the raw local string", async () => {
+    const { availabilityCalls } = installFetchMock();
+    render(
+      <TrainingSeriesCreateForm
+        teamSeasons={TEAM_SEASONS}
+        pitchHallFacilityGroups={PITCH_HALL_GROUPS}
+        dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS}
+        canValidateDirectly
+      />,
+    );
+
+    // 2026-09-22 is CEST (UTC+2) in Europe/Zurich, so 17:00-18:00 local must
+    // resolve to 15:00-16:00 UTC — the same instant a real TrainingSession
+    // generated for a default-timezone series would use (see
+    // lib/training/recurrence.ts#zonedTimeToUtc). Sending the naive
+    // "2026-09-22T17:00" string instead (no zone) would silently drift the
+    // query interval away from real overlapping bookings.
+    fireEvent.change(screen.getByTestId("training-create-date"), { target: { value: "2026-09-22" } });
+
+    await waitFor(() => expect(availabilityCalls.length).toBeGreaterThan(0));
+    const url = new URL(availabilityCalls[0], "http://localhost");
+    expect(url.searchParams.get("startAt")).toBe("2026-09-22T15:00:00.000Z");
+    expect(url.searchParams.get("endAt")).toBe("2026-09-22T16:00:00.000Z");
+  });
+
   it("does not query availability before both a date and valid start/end times exist", async () => {
     const { availabilityCalls } = installFetchMock();
     render(

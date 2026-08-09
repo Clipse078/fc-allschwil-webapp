@@ -52,7 +52,7 @@ import {
   type FacilityGroup,
   type ResourceAvailabilityAnnotation,
 } from "@/components/admin/training/FacilityResourceSelector";
-import { weekdayFromDate } from "@/lib/training/recurrence";
+import { weekdayFromDate, zonedTimeToUtc } from "@/lib/training/recurrence";
 import type { Weekday } from "@/lib/training/types";
 import {
   orchestrateTrainingSeriesCreation,
@@ -106,6 +106,18 @@ const WEEKDAY_LABELS: Record<Weekday, string> = {
   SATURDAY: "Samstag",
   SUNDAY: "Sonntag",
 };
+
+/**
+ * PLANNING-CREATION-UX-01B-C1: the guided form never collects a timezone
+ * (POST /api/training-series defaults an omitted `timezone` to this exact
+ * value — see app/api/training-series/route.ts). Availability must resolve
+ * the chosen wall-clock date/time to a UTC instant the same way, or the
+ * interval sent to GET /api/facilities/availability silently drifts from
+ * the UTC startAt/endAt real TrainingSessions are generated with (see
+ * lib/training/recurrence.ts#zonedTimeToUtc), causing genuinely overlapping
+ * bookings to be missed.
+ */
+const DEFAULT_TRAINING_SERIES_TIMEZONE = "Europe/Zurich";
 
 let localIdCounter = 0;
 function nextLocalId(prefix: string): string {
@@ -245,8 +257,12 @@ export default function TrainingSeriesCreateForm({
     }
 
     let active = true;
-    const startAtIso = `${date}T${startsAt}`;
-    const endAtIso = `${date}T${endsAt}`;
+    // Resolve the chosen wall-clock date/time to the same UTC instant a
+    // generated TrainingSession would get (see DEFAULT_TRAINING_SERIES_TIMEZONE
+    // doc comment) instead of sending a bare "YYYY-MM-DDTHH:mm" string, which
+    // Date parsing would otherwise resolve in the runtime's local timezone.
+    const startAtIso = zonedTimeToUtc(date, startsAt, DEFAULT_TRAINING_SERIES_TIMEZONE).toISOString();
+    const endAtIso = zonedTimeToUtc(date, endsAt, DEFAULT_TRAINING_SERIES_TIMEZONE).toISOString();
 
     async function loadAvailability() {
       const params = new URLSearchParams({ startAt: startAtIso, endAt: endAtIso });
