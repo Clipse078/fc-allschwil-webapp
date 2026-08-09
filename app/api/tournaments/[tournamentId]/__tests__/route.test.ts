@@ -150,12 +150,26 @@ describe("PATCH /api/tournaments/[tournamentId]", () => {
   });
 
   it("accepts null for optional string fields (clearing them)", async () => {
-    const res = await PATCH(makeRequest({ pitchCode: null, teamId: null }), makeContext());
+    const res = await PATCH(makeRequest({ location: null, teamId: null }), makeContext());
     expect(res.status).toBe(200);
 
     const call = mocks.updateTournament.mock.calls[0]![2];
-    expect(call.pitchCode).toBeNull();
+    expect(call.location).toBeNull();
     expect(call.teamId).toBeNull();
+  });
+
+  it("passes a valid homeAway value through", async () => {
+    const res = await PATCH(makeRequest({ homeAway: "AWAY" }), makeContext());
+    expect(res.status).toBe(200);
+
+    const call = mocks.updateTournament.mock.calls[0]![2];
+    expect(call.homeAway).toBe("AWAY");
+  });
+
+  it("rejects an invalid homeAway value", async () => {
+    const res = await PATCH(makeRequest({ homeAway: "BOTH" }), makeContext());
+    expect(res.status).toBe(400);
+    expect(mocks.updateTournament).not.toHaveBeenCalled();
   });
 
   it("maps TournamentNotFoundError to 404", async () => {

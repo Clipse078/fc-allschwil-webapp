@@ -7,10 +7,20 @@
  *
  * Body (all optional, partial update):
  *   title, description, location, startAt, endAt, meetingTime,
- *   organizerName, competitionLabel, resultLabel, remarks, teamId,
+ *   organizerName, competitionLabel, resultLabel, remarks, teamId, homeAway,
  *   websiteVisible, infoboardVisible, homepageVisible, wochenplanVisible,
- *   teamPageVisible, pitchCode, homeDressingRoomCode, awayDressingRoomCode
+ *   teamPageVisible
  *   status  "CANCELLED" | "SCHEDULED"  — only these two transitions
+ *
+ * TOURNAMENTCENTER-01B: participant management (add/remove Team/
+ * ExternalTeam/manual participants), tournament-level Spielfeld/Halle
+ * allocations, and per-participant Garderobe allocations are NOT handled
+ * here — see app/api/tournaments/[tournamentId]/participants/route.ts,
+ * .../resource-allocations/route.ts, and
+ * .../participants/[participantId]/dressing-room-allocations/route.ts.
+ * The legacy pitchCode/homeDressingRoomCode/awayDressingRoomCode fields are
+ * no longer part of the Tournament update surface (superseded by the
+ * canonical FacilityResource-based allocation model above).
  *
  * `status` is handled as a dedicated lifecycle transition (cancel/restore)
  * via lib/tournaments/tournament-service.ts, separately from the field
@@ -48,12 +58,11 @@ const STRING_OR_NULL_KEYS = [
   "resultLabel",
   "remarks",
   "teamId",
-  "pitchCode",
-  "homeDressingRoomCode",
-  "awayDressingRoomCode",
 ] as const;
 
 const DATE_OR_NULL_KEYS = ["endAt", "meetingTime"] as const;
+
+const ALLOWED_HOME_AWAY = ["HOME", "AWAY"] as const;
 
 const BOOLEAN_KEYS = [
   "websiteVisible",
@@ -164,6 +173,17 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         }
         (data as Record<string, unknown>)[key] = parsed.value;
       }
+    }
+
+    if ("homeAway" in body) {
+      const value = body.homeAway;
+      if (!ALLOWED_HOME_AWAY.includes(value as (typeof ALLOWED_HOME_AWAY)[number])) {
+        return NextResponse.json(
+          { error: `homeAway must be one of: ${ALLOWED_HOME_AWAY.join(", ")}` },
+          { status: 400 },
+        );
+      }
+      data.homeAway = value as (typeof ALLOWED_HOME_AWAY)[number];
     }
 
     for (const key of BOOLEAN_KEYS) {
