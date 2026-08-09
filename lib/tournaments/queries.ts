@@ -12,7 +12,27 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import type { EventStatus } from "@prisma/client";
+import type { EventStatus, Prisma } from "@prisma/client";
+
+/** Shared team reference select — mirrors TournamentTeamReference. */
+const teamReferenceSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  category: true,
+  genderGroup: true,
+  ageGroup: true,
+} as const;
+
+/** Shared FacilityResource(+Facility) reference select — mirrors TournamentFacilityResourceFields. */
+const facilityResourceReferenceSelect = {
+  id: true,
+  code: true,
+  name: true,
+  type: true,
+  facilityId: true,
+  facility: { select: { name: true } },
+} as const;
 
 export const tournamentEventSelect = {
   id: true,
@@ -30,14 +50,12 @@ export const tournamentEventSelect = {
   competitionLabel: true,
   resultLabel: true,
   remarks: true,
+  homeAway: true,
   websiteVisible: true,
   infoboardVisible: true,
   homepageVisible: true,
   wochenplanVisible: true,
   teamPageVisible: true,
-  pitchCode: true,
-  homeDressingRoomCode: true,
-  awayDressingRoomCode: true,
   createdAt: true,
   updatedAt: true,
   season: {
@@ -48,16 +66,58 @@ export const tournamentEventSelect = {
     },
   },
   team: {
+    select: teamReferenceSelect,
+  },
+  // TOURNAMENTCENTER-01B — canonical multi-team participation and
+  // tournament-level facility allocations. See lib/tournaments/types.ts /
+  // tournament-service.ts for the DTO mapping.
+  tournamentParticipants: {
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
-      name: true,
-      slug: true,
-      category: true,
-      genderGroup: true,
-      ageGroup: true,
+      eventId: true,
+      teamId: true,
+      externalTeamId: true,
+      manualLabel: true,
+      displayOrder: true,
+      createdAt: true,
+      updatedAt: true,
+      team: { select: teamReferenceSelect },
+      externalTeam: {
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          categoryLabel: true,
+          externalClub: { select: { id: true, name: true, shortName: true } },
+        },
+      },
+      dressingRoomAllocations: {
+        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          notes: true,
+          displayOrder: true,
+          facilityResource: { select: facilityResourceReferenceSelect },
+        },
+      },
     },
   },
-} as const;
+  tournamentResourceAllocations: {
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      notes: true,
+      displayOrder: true,
+      facilityResource: { select: facilityResourceReferenceSelect },
+    },
+  },
+  // `satisfies` (not `as const`) — the nested `orderBy` arrays above must
+  // stay ordinary mutable arrays to match Prisma's *OrderByWithRelationInput[]
+  // types; `as const` on this outer object would make them readonly tuples
+  // and fail to typecheck, while still validating every field/literal
+  // against the real Prisma.EventSelect shape.
+} satisfies Prisma.EventSelect;
 
 export type TournamentEventRow = NonNullable<
   Awaited<ReturnType<typeof findTournamentEventById>>

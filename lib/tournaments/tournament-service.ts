@@ -40,11 +40,109 @@ import {
 } from "./errors";
 import type {
   TournamentDto,
+  TournamentParticipantDto,
+  TournamentResourceAllocationDto,
+  TournamentHomeAway,
   ListTournamentsFilter,
   UpdateTournamentInput,
 } from "./types";
 
 // ── Mapping ───────────────────────────────────────────────────────────────────
+
+/**
+ * Mirrors lib/matchcenter/operational-state.ts's normalizedHomeAway(): only
+ * an exact "HOME"/"AWAY" (case-insensitive) is recognised; anything else
+ * (including null/unset, which is the default for a freshly created
+ * tournament) is treated as HOME — a tournament is assumed FCA-hosted
+ * until explicitly marked otherwise.
+ */
+function normalizeHomeAway(value: string | null): TournamentHomeAway {
+  return value?.trim().toUpperCase() === "AWAY" ? "AWAY" : "HOME";
+}
+
+function toParticipantDto(
+  row: TournamentEventRow["tournamentParticipants"][number],
+): TournamentParticipantDto {
+  const dressingRoomAllocations = row.dressingRoomAllocations.map((allocation) => ({
+    id: allocation.id,
+    facilityResourceId: allocation.facilityResource.id,
+    facilityResourceCode: allocation.facilityResource.code,
+    facilityResourceName: allocation.facilityResource.name,
+    facilityResourceType: allocation.facilityResource.type,
+    facilityId: allocation.facilityResource.facilityId,
+    facilityName: allocation.facilityResource.facility.name,
+    notes: allocation.notes,
+    displayOrder: allocation.displayOrder,
+  }));
+
+  if (row.team) {
+    return {
+      id: row.id,
+      tournamentId: row.eventId,
+      kind: "TEAM",
+      displayName: row.team.name,
+      team: row.team,
+      externalTeam: null,
+      manualLabel: null,
+      displayOrder: row.displayOrder,
+      dressingRoomAllocations,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  if (row.externalTeam) {
+    return {
+      id: row.id,
+      tournamentId: row.eventId,
+      kind: "EXTERNAL_TEAM",
+      displayName: row.externalTeam.name,
+      team: null,
+      externalTeam: {
+        id: row.externalTeam.id,
+        name: row.externalTeam.name,
+        shortName: row.externalTeam.shortName,
+        categoryLabel: row.externalTeam.categoryLabel,
+        club: row.externalTeam.externalClub,
+      },
+      manualLabel: null,
+      displayOrder: row.displayOrder,
+      dressingRoomAllocations,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  return {
+    id: row.id,
+    tournamentId: row.eventId,
+    kind: "MANUAL",
+    displayName: row.manualLabel ?? "Unbenannt",
+    team: null,
+    externalTeam: null,
+    manualLabel: row.manualLabel,
+    displayOrder: row.displayOrder,
+    dressingRoomAllocations,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function toResourceAllocationDto(
+  row: TournamentEventRow["tournamentResourceAllocations"][number],
+): TournamentResourceAllocationDto {
+  return {
+    id: row.id,
+    facilityResourceId: row.facilityResource.id,
+    facilityResourceCode: row.facilityResource.code,
+    facilityResourceName: row.facilityResource.name,
+    facilityResourceType: row.facilityResource.type,
+    facilityId: row.facilityResource.facilityId,
+    facilityName: row.facilityResource.facility.name,
+    notes: row.notes,
+    displayOrder: row.displayOrder,
+  };
+}
 
 function toDto(row: TournamentEventRow): TournamentDto {
   if (row.tenantId === null) {
@@ -68,17 +166,15 @@ function toDto(row: TournamentEventRow): TournamentDto {
     remarks: row.remarks,
     season: row.season,
     team: row.team,
+    homeAway: normalizeHomeAway(row.homeAway),
+    participants: row.tournamentParticipants.map(toParticipantDto),
+    resourceAllocations: row.tournamentResourceAllocations.map(toResourceAllocationDto),
     visibility: {
       websiteVisible: row.websiteVisible,
       infoboardVisible: row.infoboardVisible,
       homepageVisible: row.homepageVisible,
       wochenplanVisible: row.wochenplanVisible,
       teamPageVisible: row.teamPageVisible,
-    },
-    allocation: {
-      pitchCode: row.pitchCode,
-      homeDressingRoomCode: row.homeDressingRoomCode,
-      awayDressingRoomCode: row.awayDressingRoomCode,
     },
     reviewStage: row.reviewStage,
     createdAt: row.createdAt.toISOString(),
@@ -123,6 +219,14 @@ function validateUpdateInput(input: UpdateTournamentInput): void {
     if (input.meetingTime.getTime() > input.startAt.getTime()) {
       throw new TournamentValidationError("meetingTime must not be after startAt");
     }
+  }
+
+  if (
+    input.homeAway !== undefined &&
+    input.homeAway !== "HOME" &&
+    input.homeAway !== "AWAY"
+  ) {
+    throw new TournamentValidationError('homeAway must be "HOME" or "AWAY"');
   }
 }
 
@@ -198,18 +302,12 @@ export async function updateTournament(
   if (input.resultLabel !== undefined) data.resultLabel = input.resultLabel?.trim() || null;
   if (input.remarks !== undefined) data.remarks = input.remarks?.trim() || null;
   if (input.teamId !== undefined) data.teamId = input.teamId;
+  if (input.homeAway !== undefined) data.homeAway = input.homeAway;
   if (input.websiteVisible !== undefined) data.websiteVisible = input.websiteVisible;
   if (input.infoboardVisible !== undefined) data.infoboardVisible = input.infoboardVisible;
   if (input.homepageVisible !== undefined) data.homepageVisible = input.homepageVisible;
   if (input.wochenplanVisible !== undefined) data.wochenplanVisible = input.wochenplanVisible;
   if (input.teamPageVisible !== undefined) data.teamPageVisible = input.teamPageVisible;
-  if (input.pitchCode !== undefined) data.pitchCode = input.pitchCode?.trim() || null;
-  if (input.homeDressingRoomCode !== undefined) {
-    data.homeDressingRoomCode = input.homeDressingRoomCode?.trim() || null;
-  }
-  if (input.awayDressingRoomCode !== undefined) {
-    data.awayDressingRoomCode = input.awayDressingRoomCode?.trim() || null;
-  }
 
   if (Object.keys(data).length === 0) {
     return toDto(existing);

@@ -1,16 +1,18 @@
 /**
  * lib/tournaments/operational-state.ts
  *
- * TOURNAMENTCENTER-01 — operational readiness assessment for a single
- * Tournament, mirroring lib/matchcenter/operational-state.ts's OPEN/READY
- * concept but scoped to what is actually required to administer a
- * tenant-managed tournament: organiser and venue/location.
+ * TOURNAMENTCENTER-01 / -01B — operational readiness assessment for a
+ * single Tournament, mirroring lib/matchcenter/operational-state.ts's
+ * OPEN/READY concept.
  *
- * Facility allocation (pitch/dressing rooms) is intentionally NOT part of
- * the readiness gate — unlike a home match, a tournament is very often
- * hosted by an external club, so FCA facility allocation legitimately does
- * not apply to most tournaments. It remains editable (see
- * TournamentEditForm) but is not a required field.
+ * TOURNAMENTCENTER-01B — HOME/AWAY facility gating (mirrors MatchCenter's
+ * operational logic at Event level, see lib/matchcenter/operational-state.ts):
+ *   - HOME tournament (Event.homeAway === "HOME", the default when unset):
+ *     FCA facilities are relevant — at least one Spielfeld/Halle allocation
+ *     and, per participating team, a Garderobe allocation are genuine
+ *     operational requirements and contribute OPEN actions when missing.
+ *   - AWAY tournament (Event.homeAway === "AWAY"): FCA facilities never
+ *     apply — no pitch/hall or dressing-room action is ever raised.
  *
  * Pure, synchronous, no I/O.
  */
@@ -63,8 +65,27 @@ export function assessTournamentOperationalState(
   if (!tournament.location?.trim()) {
     actions.push({ key: "location", label: "Ort" });
   }
-  if (!tournament.team) {
-    actions.push({ key: "team", label: "Team" });
+  // TOURNAMENTCENTER-01B: a tournament is multi-team — the genuine
+  // requirement is "at least one participant", not "a single Event.teamId
+  // team" (see lib/tournaments/participant-service.ts).
+  if (tournament.participants.length === 0) {
+    actions.push({ key: "participants", label: "Teilnehmende Teams" });
+  }
+
+  // Facility allocation only ever applies to HOME tournaments — an AWAY
+  // tournament has no FCA pitch/hall or dressing-room requirement at all
+  // (PRODUCT REQUIREMENT: "Away tournaments: allocation requirements are
+  // NOT_APPLICABLE — no facility-related Offen warnings").
+  if (tournament.homeAway === "HOME") {
+    if (tournament.resourceAllocations.length === 0) {
+      actions.push({ key: "pitch-hall", label: "Spielfeld / Halle" });
+    }
+    const hasParticipantMissingDressingRoom = tournament.participants.some(
+      (participant) => participant.dressingRoomAllocations.length === 0,
+    );
+    if (tournament.participants.length > 0 && hasParticipantMissingDressingRoom) {
+      actions.push({ key: "dressing-room", label: "Garderobe" });
+    }
   }
 
   if (actions.length === 0) {
