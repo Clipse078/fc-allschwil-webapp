@@ -94,6 +94,9 @@ function installFetchMock(overrides: {
         ? overrides.addResourceAllocationResponse()
         : jsonResponse({ allocation: {} }, 201);
     }
+    if (url.startsWith("/api/facilities/availability")) {
+      return jsonResponse({ availability: [] });
+    }
 
     throw new Error(`Unexpected fetch call: ${method} ${url}`);
   });
