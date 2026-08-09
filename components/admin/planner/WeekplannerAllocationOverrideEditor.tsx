@@ -15,14 +15,32 @@
  * Never rendered for the Standardplan (no plan selected) — see
  * WeekPlannerPage.tsx, which only mounts this when an alternative plan is
  * active and the caller can manage plans.
+ *
+ * WEEKPLANNER-01C — Operational UX Completion.
+ *
+ *   - The "Standardplan"/plan badge now names the actual effective
+ *     resource(s), matching the product spec's example ("Standardplan:
+ *     Kunstrasen 2" / "Schlechtwetterplan: Halle Gartenhof") instead of a
+ *     generic "angepasst" pill.
+ *   - Reuses the EXISTING live availability aggregator
+ *     (GET /api/facilities/availability, lib/facilities/availability-
+ *     service.ts — the same one TrainingCenter/MatchCenter/TournamentCenter
+ *     guided creation already use) to annotate the resource picker with
+ *     Frei/Belegt + conflict label/time. No second availability engine.
  */
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw, X } from "lucide-react";
-import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import type {
+  FacilityGroup,
+  ResourceAvailabilityAnnotation,
+} from "@/components/admin/training/FacilityResourceSelector";
 import { FacilityResourceSelector } from "@/components/admin/training/FacilityResourceSelector";
 import type { WeekplannerActivityType, WeekplannerAllocationGroup } from "@/lib/weekplanner/plan-types";
+
+/** Shape of one row in GET /api/facilities/availability's `availability` array. */
+type ResourceAvailabilityRow = ResourceAvailabilityAnnotation & { resourceId: string };
 
 export type WeekplannerOverrideRow = {
   id: string;
@@ -33,6 +51,8 @@ export type WeekplannerOverrideRow = {
 
 type Props = {
   planId: string;
+  /** The active alternative plan's name — shown in the override badge, e.g. "Schlechtwetterplan: Halle Gartenhof". */
+  planName: string;
   activityType: WeekplannerActivityType;
   activityId: string;
   allocationGroup: WeekplannerAllocationGroup;
@@ -44,10 +64,14 @@ type Props = {
   /** This plan's current override rows for this exact group (empty when not overridden). */
   initialOverrideAllocations: WeekplannerOverrideRow[];
   facilityGroups: FacilityGroup[];
+  /** The activity's own time window — drives the live Frei/Belegt availability lookup below. */
+  startAt: string;
+  endAt: string;
 };
 
 export function WeekplannerAllocationOverrideEditor({
   planId,
+  planName,
   activityType,
   activityId,
   allocationGroup,
@@ -56,14 +80,51 @@ export function WeekplannerAllocationOverrideEditor({
   standardplanAllocations,
   initialOverrideAllocations,
   facilityGroups,
+  startAt,
+  endAt,
 }: Props) {
   const router = useRouter();
   const [overrides, setOverrides] = useState<WeekplannerOverrideRow[]>(initialOverrideAllocations);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [availabilityByResourceId, setAvailabilityByResourceId] = useState<
+    Map<string, ResourceAvailabilityAnnotation>
+  >(new Map());
 
   const isOverridden = overrides.length > 0;
   const rowsToShow = isOverridden ? overrides : standardplanAllocations.map((a) => ({ ...a, id: a.facilityResourceId }));
+  const badgeName = isOverridden ? planName : "Standardplan";
+  const badgeValue = rowsToShow.length > 0 ? rowsToShow.map((r) => r.facilityResourceName).join(", ") : "keine Zuweisung";
+
+  // WEEKPLANNER-01C — reuses the EXISTING live availability aggregator
+  // (same one guided TrainingCenter/MatchCenter/TournamentCenter creation
+  // uses) to show Frei/Belegt + conflict label/time for every resource
+  // this override could be set to. Purely additive: on fetch failure the
+  // selector simply renders without annotations, exactly as it did before.
+  useEffect(() => {
+    let active = true;
+    // MATCH/TOURNAMENT activityId IS the canonical Event.id — excluding it
+    // avoids the activity's own booking showing up as its own conflict.
+    const excludeEventId = activityType !== "TRAINING" ? activityId : undefined;
+
+    async function loadAvailability() {
+      const params = new URLSearchParams({ startAt, endAt, group: allocationGroup });
+      if (excludeEventId) params.set("excludeEventId", excludeEventId);
+      try {
+        const res = await fetch(`/api/facilities/availability?${params.toString()}`, { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as { availability?: ResourceAvailabilityRow[] } | null;
+        if (!active || !res.ok || !data?.availability) return;
+        setAvailabilityByResourceId(new Map(data.availability.map((a) => [a.resourceId, a])));
+      } catch {
+        if (active) setAvailabilityByResourceId(new Map());
+      }
+    }
+
+    loadAvailability();
+    return () => {
+      active = false;
+    };
+  }, [activityType, activityId, allocationGroup, startAt, endAt]);
 
   const handleAdd = useCallback(
     async (facilityResourceId: string) => {
@@ -136,12 +197,20 @@ export function WeekplannerAllocationOverrideEditor({
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">{label} anpassen</p>
         {isOverridden ? (
-          <span className="inline-flex h-5 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-[10px] font-semibold text-blue-700">
-            Für diesen Plan angepasst
+          <span
+            className="inline-flex max-w-[70%] items-center gap-1 truncate rounded-full border border-blue-200 bg-blue-50 px-2 text-[10px] font-semibold text-blue-700"
+            data-testid="weekplanner-override-badge-active"
+            title={`${badgeName}: ${badgeValue}`}
+          >
+            {badgeName}: {badgeValue}
           </span>
         ) : (
-          <span className="inline-flex h-5 items-center rounded-full border border-[var(--border)] bg-white px-2 text-[10px] font-medium text-[var(--muted)]">
-            Standardplan-Wert
+          <span
+            className="inline-flex max-w-[70%] items-center gap-1 truncate rounded-full border border-[var(--border)] bg-white px-2 text-[10px] font-medium text-[var(--muted)]"
+            data-testid="weekplanner-override-badge-standard"
+            title={`${badgeName}: ${badgeValue}`}
+          >
+            {badgeName}: {badgeValue}
           </span>
         )}
       </div>
@@ -194,6 +263,7 @@ export function WeekplannerAllocationOverrideEditor({
           onAdd={handleAdd}
           placeholder="Für diesen Plan auswählen…"
           addButtonLabel="Zuweisen"
+          availabilityByResourceId={availabilityByResourceId}
           testId={`weekplanner-override-${activityId}-${allocationGroup.toLowerCase()}${participantId ? `-${participantId}` : ""}`}
         />
         {isOverridden && (

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   DoorOpen,
   Dumbbell,
+  Info,
   MapPin,
   Shield,
   Trophy,
@@ -37,9 +38,18 @@ import type { FacilityGroup } from "@/components/admin/training/FacilityResource
  */
 type OverrideEditingContext = {
   planId: string;
+  /** WEEKPLANNER-01C — the active plan's display name, e.g. "Schlechtwetterplan", shown in override badges. */
+  planName: string;
   /** Keyed via lib/weekplanner/plan-override-key.ts#planOverrideKey — one entry per overridden group. */
   overridesByKey: Record<string, WeekplannerOverrideRow[]>;
   facilityGroupsByAllocationGroup: { PITCH_HALL: FacilityGroup[]; DRESSING_ROOM: FacilityGroup[] };
+};
+
+/** WEEKPLANNER-01C — canonical module each item type's Standardplan allocations are actually owned/edited by. */
+const CANONICAL_MODULE_HREF: Record<WeekplannerItem["type"], { label: string; href: string }> = {
+  TRAINING: { label: "TrainingCenter", href: "/dashboard/training" },
+  MATCH: { label: "Matchcenter", href: "/dashboard/matchcenter" },
+  TOURNAMENT: { label: "TournamentCenter", href: "/dashboard/tournamentcenter" },
 };
 
 type WeekPlannerPageProps = {
@@ -231,6 +241,7 @@ function WeekplannerCard({
             <>
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
+                planName={overrideEditing.planName}
                 activityType="TRAINING"
                 activityId={activityId}
                 allocationGroup="PITCH_HALL"
@@ -238,9 +249,12 @@ function WeekplannerCard({
                 standardplanAllocations={toStandardplanRows(item.pitchAllocations)}
                 initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("TRAINING", activityId, "PITCH_HALL")] ?? []}
                 facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.PITCH_HALL}
+                startAt={item.startAt.toISOString()}
+                endAt={item.endAt.toISOString()}
               />
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
+                planName={overrideEditing.planName}
                 activityType="TRAINING"
                 activityId={activityId}
                 allocationGroup="DRESSING_ROOM"
@@ -248,6 +262,8 @@ function WeekplannerCard({
                 standardplanAllocations={toStandardplanRows(item.dressingRoomAllocations)}
                 initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("TRAINING", activityId, "DRESSING_ROOM")] ?? []}
                 facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.DRESSING_ROOM}
+                startAt={item.startAt.toISOString()}
+                endAt={item.endAt.toISOString()}
               />
             </>
           )}
@@ -268,6 +284,7 @@ function WeekplannerCard({
             <>
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
+                planName={overrideEditing.planName}
                 activityType="MATCH"
                 activityId={activityId}
                 allocationGroup="PITCH_HALL"
@@ -275,9 +292,12 @@ function WeekplannerCard({
                 standardplanAllocations={toStandardplanRows(item.pitchAllocations)}
                 initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("MATCH", activityId, "PITCH_HALL")] ?? []}
                 facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.PITCH_HALL}
+                startAt={item.startAt.toISOString()}
+                endAt={item.endAt.toISOString()}
               />
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
+                planName={overrideEditing.planName}
                 activityType="MATCH"
                 activityId={activityId}
                 allocationGroup="DRESSING_ROOM"
@@ -285,6 +305,8 @@ function WeekplannerCard({
                 standardplanAllocations={toStandardplanRows(item.dressingRoomAllocations)}
                 initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("MATCH", activityId, "DRESSING_ROOM")] ?? []}
                 facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.DRESSING_ROOM}
+                startAt={item.startAt.toISOString()}
+                endAt={item.endAt.toISOString()}
               />
             </>
           )}
@@ -312,6 +334,7 @@ function WeekplannerCard({
             <>
               <WeekplannerAllocationOverrideEditor
                 planId={overrideEditing.planId}
+                planName={overrideEditing.planName}
                 activityType="TOURNAMENT"
                 activityId={activityId}
                 allocationGroup="PITCH_HALL"
@@ -319,11 +342,14 @@ function WeekplannerCard({
                 standardplanAllocations={toStandardplanRows(item.pitchAllocations)}
                 initialOverrideAllocations={overrideEditing.overridesByKey[planOverrideKey("TOURNAMENT", activityId, "PITCH_HALL")] ?? []}
                 facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.PITCH_HALL}
+                startAt={item.startAt.toISOString()}
+                endAt={item.endAt.toISOString()}
               />
               {item.participantAllocations.map((participant) => (
                 <WeekplannerAllocationOverrideEditor
                   key={participant.participantId}
                   planId={overrideEditing.planId}
+                  planName={overrideEditing.planName}
                   activityType="TOURNAMENT"
                   activityId={activityId}
                   allocationGroup="DRESSING_ROOM"
@@ -336,6 +362,8 @@ function WeekplannerCard({
                     ] ?? []
                   }
                   facilityGroups={overrideEditing.facilityGroupsByAllocationGroup.DRESSING_ROOM}
+                  startAt={item.startAt.toISOString()}
+                  endAt={item.endAt.toISOString()}
                 />
               ))}
             </>
@@ -450,6 +478,30 @@ export default function WeekPlannerPage({
           canManage={canManagePlans}
         />
       </SectionCard>
+
+      {activePlanId === null && canManagePlans && (
+        <div
+          className="flex flex-wrap items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2.5 text-sm text-[var(--text-2)]"
+          data-testid="weekplanner-standardplan-safety-note"
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" />
+          <span>
+            Standardplan aktiv — Platz- und Garderobenzuteilungen sind hier nur lesbar. Um sie zu ändern, öffnen Sie{" "}
+            <Link href={CANONICAL_MODULE_HREF.TRAINING.href} className="font-semibold text-[var(--sce-primary)] hover:underline">
+              {CANONICAL_MODULE_HREF.TRAINING.label}
+            </Link>
+            ,{" "}
+            <Link href={CANONICAL_MODULE_HREF.MATCH.href} className="font-semibold text-[var(--sce-primary)] hover:underline">
+              {CANONICAL_MODULE_HREF.MATCH.label}
+            </Link>{" "}
+            oder{" "}
+            <Link href={CANONICAL_MODULE_HREF.TOURNAMENT.href} className="font-semibold text-[var(--sce-primary)] hover:underline">
+              {CANONICAL_MODULE_HREF.TOURNAMENT.label}
+            </Link>{" "}
+            — oder erstellen Sie oben einen Alternativplan, um nur für diese Woche abzuweichen.
+          </span>
+        </div>
+      )}
 
       <SectionCard noPadding>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">

@@ -92,6 +92,7 @@ export default async function PlannerWeekPageRoute({
     canManagePlans && activePlan
       ? {
           planId: activePlan.id,
+          planName: activePlan.name,
           overridesByKey: await buildOverridesByKey(tenantContext.id, activePlan.id),
           facilityGroupsByAllocationGroup: await buildFacilityGroupsByAllocationGroup(tenantContext.id),
         }
