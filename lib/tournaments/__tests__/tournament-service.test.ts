@@ -61,18 +61,32 @@ const baseRow = {
   competitionLabel: null,
   resultLabel: null,
   remarks: null,
+  homeAway: null as string | null,
   websiteVisible: true,
   infoboardVisible: false,
   homepageVisible: false,
   wochenplanVisible: false,
   teamPageVisible: false,
-  pitchCode: null,
-  homeDressingRoomCode: null,
-  awayDressingRoomCode: null,
   createdAt: new Date("2026-08-01T00:00:00.000Z"),
   updatedAt: new Date("2026-08-01T00:00:00.000Z"),
   season: { id: "season-1", key: "2026-27", name: "2026/27" },
   team: { id: TEAM_ID, name: "FC Allschwil E1", slug: "e1", category: "JUNIOR", genderGroup: null, ageGroup: "E" },
+  tournamentParticipants: [
+    {
+      id: "participant-1",
+      eventId: TOURNAMENT_ID,
+      teamId: TEAM_ID,
+      externalTeamId: null,
+      manualLabel: null,
+      displayOrder: 0,
+      createdAt: new Date("2026-08-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+      team: { id: TEAM_ID, name: "FC Allschwil E1", slug: "e1", category: "JUNIOR", genderGroup: null, ageGroup: "E" },
+      externalTeam: null,
+      dressingRoomAllocations: [],
+    },
+  ],
+  tournamentResourceAllocations: [],
 };
 
 beforeEach(() => {
@@ -114,6 +128,68 @@ describe("B. getTournament", () => {
     expect(result.id).toBe(TOURNAMENT_ID);
     expect(result.tenantId).toBe(TENANT_A);
     expect(result.team?.id).toBe(TEAM_ID);
+  });
+
+  it("maps tournamentParticipants to the participants DTO list", async () => {
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(baseRow as never);
+
+    const result = await getTournament(TENANT_A, TOURNAMENT_ID);
+
+    expect(result.participants).toHaveLength(1);
+    expect(result.participants[0]).toMatchObject({
+      id: "participant-1",
+      kind: "TEAM",
+      displayName: "FC Allschwil E1",
+    });
+  });
+
+  it("maps tournamentResourceAllocations to the resourceAllocations DTO list", async () => {
+    vi.mocked(prisma.event.findFirst).mockResolvedValue({
+      ...baseRow,
+      tournamentResourceAllocations: [
+        {
+          id: "resource-alloc-1",
+          notes: null,
+          displayOrder: 0,
+          facilityResource: {
+            id: "fr-kr2",
+            code: "KUNSTRASEN_2",
+            name: "Kunstrasen 2",
+            type: "FULL_PITCH",
+            facilityId: "facility-2",
+            facility: { name: "Sportanlage" },
+          },
+        },
+      ],
+    } as never);
+
+    const result = await getTournament(TENANT_A, TOURNAMENT_ID);
+
+    expect(result.resourceAllocations).toEqual([
+      {
+        id: "resource-alloc-1",
+        facilityResourceId: "fr-kr2",
+        facilityResourceCode: "KUNSTRASEN_2",
+        facilityResourceName: "Kunstrasen 2",
+        facilityResourceType: "FULL_PITCH",
+        facilityId: "facility-2",
+        facilityName: "Sportanlage",
+        notes: null,
+        displayOrder: 0,
+      },
+    ]);
+  });
+
+  it("normalizes a null homeAway to HOME (MatchCenter default convention)", async () => {
+    vi.mocked(prisma.event.findFirst).mockResolvedValue({ ...baseRow, homeAway: null } as never);
+    const result = await getTournament(TENANT_A, TOURNAMENT_ID);
+    expect(result.homeAway).toBe("HOME");
+  });
+
+  it("normalizes an explicit AWAY homeAway", async () => {
+    vi.mocked(prisma.event.findFirst).mockResolvedValue({ ...baseRow, homeAway: "AWAY" } as never);
+    const result = await getTournament(TENANT_A, TOURNAMENT_ID);
+    expect(result.homeAway).toBe("AWAY");
   });
 
   it("throws TournamentNotFoundError when not found", async () => {
@@ -191,19 +267,18 @@ describe("C. updateTournament", () => {
     expect(call.data.teamId).toBeNull();
   });
 
-  it("persists facility allocation fields", async () => {
-    await updateTournament(TENANT_A, TOURNAMENT_ID, {
-      pitchCode: "STADION",
-      homeDressingRoomCode: "E1",
-      awayDressingRoomCode: "E2",
-    });
+  it("persists the homeAway field", async () => {
+    await updateTournament(TENANT_A, TOURNAMENT_ID, { homeAway: "AWAY" });
 
     const call = vi.mocked(prisma.event.update).mock.calls[0]![0] as { data: Record<string, unknown> };
-    expect(call.data).toMatchObject({
-      pitchCode: "STADION",
-      homeDressingRoomCode: "E1",
-      awayDressingRoomCode: "E2",
-    });
+    expect(call.data).toEqual({ homeAway: "AWAY" });
+  });
+
+  it("throws TournamentValidationError for an invalid homeAway value", async () => {
+    await expect(
+      updateTournament(TENANT_A, TOURNAMENT_ID, { homeAway: "BOTH" as never }),
+    ).rejects.toThrow(TournamentValidationError);
+    expect(prisma.event.update).not.toHaveBeenCalled();
   });
 });
 
