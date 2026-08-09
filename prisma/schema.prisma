@@ -468,6 +468,18 @@ model Tenant {
   primaryColor   String?
   secondaryColor String?
 
+  // Infoboard display preference — INFOBOARD-INTEGRATION-01B
+  // Presentation-only: which visual theme the public Infoboard displays use.
+  // Nullable, no DB default — application code (resolveInfoboardDisplayTheme in
+  // lib/publishing/infoboard/display-theme.ts) treats null as "DARK" (the
+  // existing premium stadium default). Valid values: "DARK" | "LIGHT",
+  // validated at the API layer — no DB-level enum to keep this additive and
+  // reusable by a future Screen 2 without a second migration. Never read by
+  // planning/resolution code — Infoboard Screen 1/2 logic, Betriebsplan
+  // resolution, and resource allocation are completely unaffected by this
+  // field's value.
+  infoboardDisplayTheme String?
+
   // Website integration flags — Slice 4 (News Detail Endpoint)
   // websiteEnabled: gates all /api/public/v1/website/* endpoints for this tenant.
   // approvedDataOnly: when true, only content that has passed editorial approval
