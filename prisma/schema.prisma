@@ -544,6 +544,8 @@ model Tenant {
   // variants + their sparse resource-allocation overrides.
   weekplannerPlans                 WeekplannerPlan[]
   weekplannerPlanAllocations       WeekplannerPlanAllocation[]
+  // WEEKPLANNER-01D: sparse per-activity start/end TIME overrides.
+  weekplannerPlanActivityOverrides WeekplannerPlanActivityOverride[]
 
   // RPERM-02
   tenantMemberships TenantMembership[]
@@ -4028,8 +4030,9 @@ model WeekplannerPlan {
   /// Set when archived (soft delete). Null while active.
   archivedAt      DateTime?
 
-  tenant      Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  allocations WeekplannerPlanAllocation[]
+  tenant            Tenant                            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  allocations       WeekplannerPlanAllocation[]
+  activityOverrides WeekplannerPlanActivityOverride[]
 
   @@index([tenantId])
   @@index([tenantId, weekId])
@@ -4097,4 +4100,58 @@ model WeekplannerPlanAllocation {
   @@index([weekplannerPlanId])
   @@index([weekplannerPlanId, activityType, activityId])
   @@index([facilityResourceId])
+}
+
+// ---------------------------------------------------------------------------
+// WeekplannerPlanActivityOverride — WEEKPLANNER-01D. One SPARSE alternative
+// start/end TIME override row for exactly one canonical activity, within
+// exactly one WeekplannerPlan.
+//
+// Mirrors WeekplannerPlanAllocation's architecture invariants exactly (see
+// its doc comment above): `activityType` + `activityId` identify the
+// canonical activity (TrainingSession.id for TRAINING; Event.id for
+// MATCH/TOURNAMENT) but are deliberately NOT a DB relation — they are
+// tenant-validated at the service layer only, so this model never owns or
+// duplicates canonical activity identity.
+//
+// Both `overrideStartAt` / `overrideEndAt` are optional and independent —
+// a plan may override only the start, only the end, or both. Either column
+// being non-null makes this row "present" for the activity; a present row's
+// non-null column(s) replace the canonical Standardplan time for THIS plan
+// only. There is no separate "use default" mutation — deleting the row (or
+// clearing both columns, which the service treats identically) reverts to
+// the canonical time. A present override never changes the activity's
+// calendar date — only its time-of-day within the SAME canonical day
+// (enforced at the service layer, never at the DB layer).
+//
+// Security invariants:
+//   - tenantId must match the parent WeekplannerPlan's tenantId (enforced
+//     at the service layer).
+//   - All queries must scope by tenantId.
+//   - Cascade-delete when the parent WeekplannerPlan is deleted.
+// ---------------------------------------------------------------------------
+model WeekplannerPlanActivityOverride {
+  id                String                  @id @default(cuid())
+  tenantId          String
+  weekplannerPlanId String
+  activityType      WeekplannerActivityType
+  /// TrainingSession.id (TRAINING) or Event.id (MATCH/TOURNAMENT) — tenant-
+  /// validated at the service layer, deliberately not a DB relation.
+  activityId        String
+  /// Alternative start instant for this plan, or null to inherit the
+  /// canonical Standardplan start.
+  overrideStartAt   DateTime?
+  /// Alternative end instant for this plan, or null to inherit the
+  /// canonical Standardplan end.
+  overrideEndAt     DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  weekplannerPlan WeekplannerPlan @relation(fields: [weekplannerPlanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// One time-override row per activity, per plan.
+  @@unique([weekplannerPlanId, activityType, activityId])
+  @@index([tenantId])
+  @@index([weekplannerPlanId])
 }

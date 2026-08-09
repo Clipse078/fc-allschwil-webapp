@@ -35,11 +35,14 @@
 import { prisma } from "@/lib/db/prisma";
 import type { WeekplannerActivityType, WeekplannerAllocationGroup } from "@prisma/client";
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
+import { zonedDateKey, WEEKPLANNER_DEFAULT_TIMEZONE } from "./date";
 import type {
   WeekplannerPlanDto,
   WeekplannerPlanAllocationDto,
+  WeekplannerPlanActivityOverrideDto,
   CreateWeekplannerPlanInput,
   CreateWeekplannerPlanAllocationInput,
+  SetWeekplannerPlanActivityTimeOverrideInput,
 } from "./plan-types";
 import {
   WeekplannerPlanNotFoundError,
@@ -55,6 +58,7 @@ import {
   WeekplannerPlanAllocationResourceNotFoundError,
   WeekplannerPlanAllocationArchivedResourceError,
   WeekplannerPlanAllocationArchivedFacilityError,
+  WeekplannerPlanTimeOverrideInvalidRangeError,
 } from "./plan-errors";
 
 const MAX_NAME_LENGTH = 100;
@@ -210,6 +214,35 @@ async function requireActivityInTenant(
     select: { id: true },
   });
   if (!event) throw new WeekplannerPlanAllocationActivityNotFoundError(activityType, activityId);
+}
+
+/**
+ * WEEKPLANNER-01D — validates the referenced canonical activity exists (see
+ * requireActivityInTenant above) AND returns its canonical start/end
+ * instant, needed to (a) resolve the effective fallback time and (b)
+ * enforce that a time override never shifts an activity to another
+ * calendar day (anti-drift — see WeekplannerPlanTimeOverrideInvalidRangeError).
+ */
+async function requireActivityWindow(
+  tenantId: string,
+  activityType: WeekplannerActivityType,
+  activityId: string,
+): Promise<{ startAt: Date; endAt: Date }> {
+  if (activityType === "TRAINING") {
+    const session = await prisma.trainingSession.findFirst({
+      where: { id: activityId, tenantId },
+      select: { startAt: true, endAt: true },
+    });
+    if (!session) throw new WeekplannerPlanAllocationActivityNotFoundError(activityType, activityId);
+    return session;
+  }
+
+  const event = await prisma.event.findFirst({
+    where: { id: activityId, tenantId, type: activityType },
+    select: { startAt: true, endAt: true },
+  });
+  if (!event) throw new WeekplannerPlanAllocationActivityNotFoundError(activityType, activityId);
+  return { startAt: event.startAt, endAt: event.endAt ?? event.startAt };
 }
 
 /** For TOURNAMENT+DRESSING_ROOM only: validates the participant belongs to this tenant and this tournament Event. */
@@ -466,4 +499,151 @@ export async function createWeekplannerPlanAllocation(
 export async function deleteWeekplannerPlanAllocation(tenantId: string, allocationId: string): Promise<void> {
   await requireAllocation(tenantId, allocationId);
   await prisma.weekplannerPlanAllocation.delete({ where: { id: allocationId } });
+}
+
+// ── Public API — WeekplannerPlanActivityOverride (WEEKPLANNER-01D time overrides) ──
+
+type TimeOverrideRow = {
+  id: string;
+  tenantId: string;
+  weekplannerPlanId: string;
+  activityType: WeekplannerActivityType;
+  activityId: string;
+  overrideStartAt: Date | null;
+  overrideEndAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function timeOverrideToDto(row: TimeOverrideRow): WeekplannerPlanActivityOverrideDto {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    weekplannerPlanId: row.weekplannerPlanId,
+    activityType: row.activityType,
+    activityId: row.activityId,
+    overrideStartAt: row.overrideStartAt ? row.overrideStartAt.toISOString() : null,
+    overrideEndAt: row.overrideEndAt ? row.overrideEndAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Validates a single override instant falls on the SAME Europe/Zurich calendar day as the canonical instant it replaces — never a day/date override. */
+function requireSameCalendarDay(overrideAt: Date, canonicalAt: Date, label: string): void {
+  if (zonedDateKey(overrideAt, WEEKPLANNER_DEFAULT_TIMEZONE) !== zonedDateKey(canonicalAt, WEEKPLANNER_DEFAULT_TIMEZONE)) {
+    throw new WeekplannerPlanTimeOverrideInvalidRangeError(
+      `${label} must stay on the activity's canonical calendar day — moving an activity to another day is not supported here`,
+    );
+  }
+}
+
+function parseOverrideInstant(value: string, label: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new WeekplannerPlanTimeOverrideInvalidRangeError(`${label} must be a valid ISO date-time`);
+  }
+  return parsed;
+}
+
+export async function listWeekplannerPlanActivityOverrides(
+  tenantId: string,
+  planId: string,
+): Promise<WeekplannerPlanActivityOverrideDto[]> {
+  await requirePlan(tenantId, planId);
+  const rows = await prisma.weekplannerPlanActivityOverride.findMany({
+    where: { tenantId, weekplannerPlanId: planId },
+  });
+  return rows.map((row) => timeOverrideToDto(row));
+}
+
+export async function getWeekplannerPlanActivityOverride(
+  tenantId: string,
+  planId: string,
+  activityType: WeekplannerActivityType,
+  activityId: string,
+): Promise<WeekplannerPlanActivityOverrideDto | null> {
+  await requirePlan(tenantId, planId);
+  const row = await prisma.weekplannerPlanActivityOverride.findFirst({
+    where: { tenantId, weekplannerPlanId: planId, activityType, activityId },
+  });
+  return row ? timeOverrideToDto(row) : null;
+}
+
+/**
+ * Sets (upserts) this plan's start/end time override for one canonical
+ * activity — TRAINING, MATCH, or TOURNAMENT. Either field may be omitted/
+ * null to keep inheriting the canonical Standardplan value for that side
+ * only (sparse override). Passing both as null/undefined clears the
+ * override entirely (returns null) — equivalent to "Standardzeit
+ * verwenden" — with no separate reset mutation, mirroring
+ * WeekplannerPlanAllocation's "override by presence" convention.
+ *
+ * Never mutates TrainingSession.startAt/endAt or Event.startAt/endAt, never
+ * duplicates the activity, and never moves it to another calendar day
+ * (enforced below against the canonical window).
+ */
+export async function setWeekplannerPlanActivityTimeOverride(
+  tenantId: string,
+  input: SetWeekplannerPlanActivityTimeOverrideInput,
+): Promise<WeekplannerPlanActivityOverrideDto | null> {
+  const { weekplannerPlanId, activityType, activityId } = input;
+
+  await requireActivePlan(tenantId, weekplannerPlanId);
+  const canonical = await requireActivityWindow(tenantId, activityType, activityId);
+
+  const hasStart = input.overrideStartAt !== undefined && input.overrideStartAt !== null;
+  const hasEnd = input.overrideEndAt !== undefined && input.overrideEndAt !== null;
+
+  if (!hasStart && !hasEnd) {
+    await prisma.weekplannerPlanActivityOverride
+      .delete({ where: { weekplannerPlanId_activityType_activityId: { weekplannerPlanId, activityType, activityId } } })
+      .catch(() => undefined);
+    return null;
+  }
+
+  const overrideStartAt = hasStart ? parseOverrideInstant(input.overrideStartAt as string, "Start") : null;
+  const overrideEndAt = hasEnd ? parseOverrideInstant(input.overrideEndAt as string, "Ende") : null;
+
+  if (overrideStartAt) requireSameCalendarDay(overrideStartAt, canonical.startAt, "Start");
+  if (overrideEndAt) requireSameCalendarDay(overrideEndAt, canonical.endAt, "Ende");
+
+  const effectiveStart = overrideStartAt ?? canonical.startAt;
+  const effectiveEnd = overrideEndAt ?? canonical.endAt;
+  if (effectiveEnd.getTime() <= effectiveStart.getTime()) {
+    throw new WeekplannerPlanTimeOverrideInvalidRangeError("Ende muss nach dem Start liegen");
+  }
+
+  const row = await prisma.weekplannerPlanActivityOverride.upsert({
+    where: { weekplannerPlanId_activityType_activityId: { weekplannerPlanId, activityType, activityId } },
+    create: {
+      tenantId,
+      weekplannerPlanId,
+      activityType,
+      activityId,
+      overrideStartAt,
+      overrideEndAt,
+    },
+    update: {
+      overrideStartAt,
+      overrideEndAt,
+    },
+  });
+
+  return timeOverrideToDto(row);
+}
+
+/** Clears this plan's time override for one activity — "Standardzeit verwenden". Idempotent: a no-op when no override exists. */
+export async function clearWeekplannerPlanActivityTimeOverride(
+  tenantId: string,
+  planId: string,
+  activityType: WeekplannerActivityType,
+  activityId: string,
+): Promise<void> {
+  await requireActivePlan(tenantId, planId);
+  await prisma.weekplannerPlanActivityOverride
+    .delete({
+      where: { weekplannerPlanId_activityType_activityId: { weekplannerPlanId: planId, activityType, activityId } },
+    })
+    .catch(() => undefined);
 }

@@ -59,6 +59,17 @@
  * already-resolved EFFECTIVE items, two different plans' conflicts can
  * never leak into each other — conflict isolation falls out of this
  * request-scoped resolution, with no changes needed to view-model.ts.
+ *
+ * WEEKPLANNER-01D — Alternative Time Overrides.
+ *
+ * Exactly the same "override by presence" resolution, applied to each
+ * item's start/end instead of its FacilityResource allocations — see
+ * findWeekplannerPlanTimeOverrides()/resolveEffectiveTime() below and
+ * lib/weekplanner/plan-service.ts's WeekplannerPlanActivityOverride doc
+ * comment. Every item below is built with its EFFECTIVE startAt/endAt
+ * (plan override, if any, else canonical) — view-model.ts's conflict
+ * detection and day-bucketing therefore automatically operate on effective
+ * time with zero changes of their own.
  */
 
 import { prisma } from "@/lib/db/prisma";
@@ -71,7 +82,7 @@ import {
 import { listTournaments } from "@/lib/tournaments/tournament-service";
 import { formatWeekNumberLabel, formatWeekRangeLabel } from "./date";
 import { buildWeekplannerWeek } from "./view-model";
-import { planOverrideKey } from "./plan-override-key";
+import { planOverrideKey, planTimeOverrideKey } from "./plan-override-key";
 import type {
   WeekplannerItem,
   WeekplannerMatchItem,
@@ -181,6 +192,63 @@ function resolveEffectiveAllocation(
   return { allocations: standardplanDefault, overridden: false };
 }
 
+// ── WEEKPLANNER-01D: plan TIME override resolution ──────────────────────────
+//
+// Mirrors findWeekplannerPlanOverrides()/resolveEffectiveAllocation() above
+// exactly, but for one canonical activity's start/end instead of a
+// FacilityResource allocation group — see lib/weekplanner/plan-service.ts's
+// WeekplannerPlanActivityOverride doc comment for the persisted shape.
+
+type TimeOverrideEntry = { overrideStartAt: Date | null; overrideEndAt: Date | null };
+
+/**
+ * Groups a plan's WeekplannerPlanActivityOverride rows by
+ * (activityType, activityId) — a combination absent from this map has NO
+ * time override; the caller falls back to the canonical Standardplan time
+ * for that side (start and/or end independently — see
+ * resolveEffectiveTime()).
+ */
+async function findWeekplannerPlanTimeOverrides(
+  tenantId: string,
+  planId: string | undefined,
+): Promise<Map<string, TimeOverrideEntry>> {
+  const map = new Map<string, TimeOverrideEntry>();
+  if (!planId) return map;
+
+  const rows = await prisma.weekplannerPlanActivityOverride.findMany({
+    where: { tenantId, weekplannerPlanId: planId },
+    select: { activityType: true, activityId: true, overrideStartAt: true, overrideEndAt: true },
+  });
+
+  for (const row of rows) {
+    map.set(planTimeOverrideKey(row.activityType, row.activityId), {
+      overrideStartAt: row.overrideStartAt,
+      overrideEndAt: row.overrideEndAt,
+    });
+  }
+
+  return map;
+}
+
+/**
+ * Resolves one activity's EFFECTIVE start/end as (plan override start/end,
+ * if present) else (canonical Standardplan start/end) — independently per
+ * side, mirroring resolveEffectiveAllocation()'s "override by presence"
+ * rule. `overridden` is true when EITHER side is overridden.
+ */
+function resolveEffectiveTime(
+  timeOverridesByKey: ReadonlyMap<string, TimeOverrideEntry>,
+  key: string,
+  canonicalStartAt: Date,
+  canonicalEndAt: Date,
+): { startAt: Date; endAt: Date; canonicalStartAt: Date; canonicalEndAt: Date; overridden: boolean } {
+  const override = timeOverridesByKey.get(key);
+  const startAt = override?.overrideStartAt ?? canonicalStartAt;
+  const endAt = override?.overrideEndAt ?? canonicalEndAt;
+  const overridden = Boolean(override?.overrideStartAt || override?.overrideEndAt);
+  return { startAt, endAt, canonicalStartAt, canonicalEndAt, overridden };
+}
+
 // ── TrainingSession → WeekplannerTrainingItem ───────────────────────────────
 
 type AllocationResourceRow = {
@@ -213,6 +281,7 @@ async function findWeekplannerTrainingItems(
   tenantId: string,
   days: readonly string[],
   overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
+  timeOverridesByKey: ReadonlyMap<string, TimeOverrideEntry>,
 ): Promise<WeekplannerTrainingItem[]> {
   if (days.length === 0) return [];
 
@@ -291,17 +360,28 @@ async function findWeekplannerTrainingItems(
       planOverrideKey("TRAINING", session.id, "DRESSING_ROOM"),
       standardplanDressingRoom,
     );
+    const time = resolveEffectiveTime(
+      timeOverridesByKey,
+      planTimeOverrideKey("TRAINING", session.id),
+      new Date(session.startAt),
+      new Date(session.endAt),
+    );
 
     return {
       id: `training:${session.id}`,
       tenantId,
       type: "TRAINING",
-      startAt: new Date(session.startAt),
-      endAt: new Date(session.endAt),
+      startAt: time.startAt,
+      endAt: time.endAt,
+      canonicalStartAt: time.canonicalStartAt,
+      canonicalEndAt: time.canonicalEndAt,
+      timeOverridden: time.overridden,
       title: session.trainingSeriesTitle,
       teamNames: [session.teamName],
       pitchAllocations: pitch.allocations,
       dressingRoomAllocations: dressingRoom.allocations,
+      canonicalPitchAllocations: standardplanPitch,
+      canonicalDressingRoomAllocations: standardplanDressingRoom,
       pitchOverridden: pitch.overridden,
       dressingRoomOverridden: dressingRoom.overridden,
       conflicts: [],
@@ -328,6 +408,7 @@ async function findWeekplannerHomeMatches(
   to: Date,
   resourceByCode: ReadonlyMap<string, WeekplannerResourceRef>,
   overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
+  timeOverridesByKey: ReadonlyMap<string, TimeOverrideEntry>,
 ): Promise<WeekplannerMatchItem[]> {
   const database = prisma as unknown as MatchcenterQueryDatabase;
   const matches = await listMatchcenterMatches(database, { tenantId, from, to });
@@ -360,13 +441,24 @@ async function findWeekplannerHomeMatches(
       planOverrideKey("MATCH", match.id, "DRESSING_ROOM"),
       homeRoomRef ? [homeRoomRef] : [],
     );
+    const canonicalStartAt = new Date(match.startAt);
+    const canonicalEndAt = match.endAt ? new Date(match.endAt) : canonicalStartAt;
+    const time = resolveEffectiveTime(
+      timeOverridesByKey,
+      planTimeOverrideKey("MATCH", match.id),
+      canonicalStartAt,
+      canonicalEndAt,
+    );
 
     return {
       id: `match:${match.id}`,
       tenantId: match.tenantId,
       type: "MATCH",
-      startAt: new Date(match.startAt),
-      endAt: match.endAt ? new Date(match.endAt) : new Date(match.startAt),
+      startAt: time.startAt,
+      endAt: time.endAt,
+      canonicalStartAt: time.canonicalStartAt,
+      canonicalEndAt: time.canonicalEndAt,
+      timeOverridden: time.overridden,
       title: match.title,
       teamNames: [match.home.displayName],
       opponentName: match.away.displayName,
@@ -374,6 +466,8 @@ async function findWeekplannerHomeMatches(
       eventId: match.id,
       pitchAllocations: pitch.allocations,
       dressingRoomAllocations: dressingRoom.allocations,
+      canonicalPitchAllocations: pitchRef ? [pitchRef] : [],
+      canonicalDressingRoomAllocations: homeRoomRef ? [homeRoomRef] : [],
       pitchOverridden: pitch.overridden,
       dressingRoomOverridden: dressingRoom.overridden,
       awayDressingRoomAllocations: awayRoomRef ? [awayRoomRef] : [],
@@ -389,6 +483,7 @@ async function findWeekplannerHomeTournaments(
   from: Date,
   to: Date,
   overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
+  timeOverridesByKey: ReadonlyMap<string, TimeOverrideEntry>,
 ): Promise<WeekplannerTournamentItem[]> {
   const tournaments = await listTournaments(tenantId);
 
@@ -402,8 +497,14 @@ async function findWeekplannerHomeTournaments(
   });
 
   return homeTournaments.map((tournament) => {
-    const startAt = new Date(tournament.startAt);
-    const endAt = tournament.endAt ? new Date(tournament.endAt) : startAt;
+    const canonicalStartAt = new Date(tournament.startAt);
+    const canonicalEndAt = tournament.endAt ? new Date(tournament.endAt) : canonicalStartAt;
+    const time = resolveEffectiveTime(
+      timeOverridesByKey,
+      planTimeOverrideKey("TOURNAMENT", tournament.id),
+      canonicalStartAt,
+      canonicalEndAt,
+    );
 
     const ownTeamNames = tournament.participants
       .filter((participant) => participant.kind === "TEAM")
@@ -425,18 +526,23 @@ async function findWeekplannerHomeTournaments(
       id: `tournament:${tournament.id}`,
       tenantId: tournament.tenantId,
       type: "TOURNAMENT",
-      startAt,
-      endAt,
+      startAt: time.startAt,
+      endAt: time.endAt,
+      canonicalStartAt: time.canonicalStartAt,
+      canonicalEndAt: time.canonicalEndAt,
+      timeOverridden: time.overridden,
       title: tournament.title,
       teamNames: ownTeamNames,
       homeAway: "HOME",
       eventId: tournament.id,
       pitchAllocations: pitch.allocations,
       dressingRoomAllocations: [],
+      canonicalPitchAllocations: standardplanPitch,
+      canonicalDressingRoomAllocations: [],
       pitchOverridden: pitch.overridden,
       dressingRoomOverridden: false,
       participantAllocations: tournament.participants.map((participant) => {
-        const standardplanDressingRoom = participant.dressingRoomAllocations.map((allocation) => ({
+        const standardplanParticipantDressingRoom = participant.dressingRoomAllocations.map((allocation) => ({
           facilityResourceId: allocation.facilityResourceId,
           code: allocation.facilityResourceCode,
           name: allocation.facilityResourceName,
@@ -445,13 +551,14 @@ async function findWeekplannerHomeTournaments(
         const dressingRoom = resolveEffectiveAllocation(
           overridesByKey,
           planOverrideKey("TOURNAMENT", tournament.id, "DRESSING_ROOM", participant.id),
-          standardplanDressingRoom,
+          standardplanParticipantDressingRoom,
         );
 
         return {
           participantId: participant.id,
           participantLabel: participant.displayName,
           dressingRoomAllocations: dressingRoom.allocations,
+          canonicalDressingRoomAllocations: standardplanParticipantDressingRoom,
           dressingRoomOverridden: dressingRoom.overridden,
         };
       }),
@@ -480,15 +587,16 @@ export async function getWeekplannerWeek(
   window: WeekplannerWindow,
   planId?: string,
 ): Promise<WeekplannerWeek> {
-  const [resourceByCode, overridesByKey] = await Promise.all([
+  const [resourceByCode, overridesByKey, timeOverridesByKey] = await Promise.all([
     findFacilityResourceCodeMap(tenantId),
     findWeekplannerPlanOverrides(tenantId, planId),
+    findWeekplannerPlanTimeOverrides(tenantId, planId),
   ]);
 
   const [trainingItems, matchItems, tournamentItems] = await Promise.all([
-    findWeekplannerTrainingItems(tenantId, window.days, overridesByKey),
-    findWeekplannerHomeMatches(tenantId, window.from, window.to, resourceByCode, overridesByKey),
-    findWeekplannerHomeTournaments(tenantId, window.from, window.to, overridesByKey),
+    findWeekplannerTrainingItems(tenantId, window.days, overridesByKey, timeOverridesByKey),
+    findWeekplannerHomeMatches(tenantId, window.from, window.to, resourceByCode, overridesByKey, timeOverridesByKey),
+    findWeekplannerHomeTournaments(tenantId, window.from, window.to, overridesByKey, timeOverridesByKey),
   ]);
 
   const items: WeekplannerItem[] = [...trainingItems, ...matchItems, ...tournamentItems];
