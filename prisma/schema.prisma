@@ -510,31 +510,36 @@ model Tenant {
 
   // SFV Integration — Slice: Tenant-Scoped SFV Configuration
   // One config per tenant (@@unique on tenantId). Null when not configured.
-  sfvConfig                  TenantSfvConfig?
-  teamExternalMappings       TeamExternalMapping[]
-  matchExternalMappings      MatchExternalMapping[]
+  sfvConfig                        TenantSfvConfig?
+  teamExternalMappings             TeamExternalMapping[]
+  matchExternalMappings            MatchExternalMapping[]
   // CLUB-DIRECTORY-01: canonical external club/team directory. Supersedes
   // the earlier "Opponent"/"OpponentExternalMapping" foundation (MC-04B),
   // which was never wired to any write path or UI and had no club/team split.
-  externalClubs              ExternalClub[]
-  externalClubProviderLinks  ExternalClubProviderMapping[]
-  externalTeams              ExternalTeam[]
-  externalTeamProviderLinks  ExternalTeamProviderMapping[]
+  externalClubs                    ExternalClub[]
+  externalClubProviderLinks        ExternalClubProviderMapping[]
+  externalTeams                    ExternalTeam[]
+  externalTeamProviderLinks        ExternalTeamProviderMapping[]
   // TEAM-CORE-02: canonical seasonal OrgUnit assignments
-  teamSeasonOrgUnits         TeamSeasonOrgUnit[]
+  teamSeasonOrgUnits               TeamSeasonOrgUnit[]
   // COMPETITION-01: canonical competition entities
-  competitions               Competition[]
+  competitions                     Competition[]
   // TRAINING-CORE-01: canonical recurring training series
-  trainingSeries             TrainingSeries[]
+  trainingSeries                   TrainingSeries[]
   // TRAINING-PLANS-01: tenant-defined training plans and assignments
-  trainingPlans              TrainingPlan[]
-  trainingPlanAssignments    TrainingPlanAssignment[]
+  trainingPlans                    TrainingPlan[]
+  trainingPlanAssignments          TrainingPlanAssignment[]
   // TRAINING-ALLOCATIONS-01: canonical facility resource allocations
-  trainingAllocations        TrainingAllocation[]
+  trainingAllocations              TrainingAllocation[]
   // TRAININGCENTER-02: canonical generated training sessions
-  trainingSessions           TrainingSession[]
+  trainingSessions                 TrainingSession[]
   // TRAININGCENTER-02: occurrence-level allocation overrides
-  trainingSessionAllocations TrainingSessionAllocation[]
+  trainingSessionAllocations       TrainingSessionAllocation[]
+  // TOURNAMENTCENTER-01B: canonical multi-team tournament participation and
+  // tournament-level / per-participant facility allocations
+  tournamentParticipants           TournamentParticipant[]
+  tournamentResourceAllocations    TournamentResourceAllocation[]
+  tournamentParticipantAllocations TournamentParticipantAllocation[]
 
   // RPERM-02
   tenantMemberships TenantMembership[]
@@ -1035,13 +1040,17 @@ model Team {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teamSeasons       TeamSeason[]
-  events            Event[]
-  eventImportRuns   EventImportRun[]
-  orgUnit           OrgUnit?               @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  externalMappings  TeamExternalMapping[]
-  homeMatchMappings MatchExternalMapping[] @relation("MatchHomeTeam")
-  awayMatchMappings MatchExternalMapping[] @relation("MatchAwayTeam")
+  teamSeasons              TeamSeason[]
+  events                   Event[]
+  eventImportRuns          EventImportRun[]
+  orgUnit                  OrgUnit?                @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  externalMappings         TeamExternalMapping[]
+  homeMatchMappings        MatchExternalMapping[]  @relation("MatchHomeTeam")
+  awayMatchMappings        MatchExternalMapping[]  @relation("MatchAwayTeam")
+  // TOURNAMENTCENTER-01B: canonical multi-team tournament participation —
+  // a Team may participate in many tournaments, and a tournament may have
+  // many Team participants (see TournamentParticipant below).
+  tournamentParticipations TournamentParticipant[]
 
   @@unique([tenantId, slug])
   @@index([category, sortOrder])
@@ -1336,6 +1345,13 @@ model Event {
   season               Season                @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   team                 Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   matchExternalMapping MatchExternalMapping?
+
+  // TOURNAMENTCENTER-01B: canonical multi-team participation and
+  // tournament-level facility allocations for Event rows with
+  // type=TOURNAMENT (see lib/tournaments/). Empty for every other Event
+  // type — never populated or read outside the TournamentCenter domain.
+  tournamentParticipants        TournamentParticipant[]
+  tournamentResourceAllocations TournamentResourceAllocation[]
 
   @@index([seasonId, type])
   @@index([teamId, type])
@@ -1834,8 +1850,13 @@ model FacilityResource {
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  trainingAllocations        TrainingAllocation[]
-  trainingSessionAllocations TrainingSessionAllocation[]
+  trainingAllocations              TrainingAllocation[]
+  trainingSessionAllocations       TrainingSessionAllocation[]
+  // TOURNAMENTCENTER-01B: tournament-level Spielfeld/Halle allocations and
+  // per-participant Garderobe allocations — same canonical FacilityResource,
+  // no parallel resource model.
+  tournamentResourceAllocations    TournamentResourceAllocation[]
+  tournamentParticipantAllocations TournamentParticipantAllocation[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3078,6 +3099,11 @@ model ExternalTeam {
   matchMappingsAsHome MatchExternalMapping[] @relation("MatchHomeExternalTeam")
   matchMappingsAsAway MatchExternalMapping[] @relation("MatchAwayExternalTeam")
 
+  // TOURNAMENTCENTER-01B: canonical multi-team tournament participation —
+  // an ExternalTeam (e.g. a guest club's team from the Club Directory) may
+  // participate in many tournaments alongside tenant-owned Teams.
+  tournamentParticipations TournamentParticipant[]
+
   @@index([tenantId])
   @@index([tenantId, archivedAt])
   @@index([externalClubId])
@@ -3749,4 +3775,148 @@ model TrainingSessionAllocation {
   @@index([trainingSessionId])
   @@index([facilityResourceId])
   @@index([tenantId, trainingSessionId])
+}
+
+// =============================================================================
+// TOURNAMENTCENTER-01B: Multi-Team Participation + Team Dressing-Room
+// Allocations
+//
+// TOURNAMENTCENTER-01 modelled a Tournament as the canonical Event
+// (type=TOURNAMENT) with AT MOST one Team and tournament-level
+// pitchCode/homeDressingRoomCode/awayDressingRoomCode string fields —
+// sufficient only for a two-side MatchCenter-shaped fixture, not for a
+// genuine multi-team tournament (typically 4+ participating teams, often
+// mixing tenant-owned Teams and Club-Directory ExternalTeams).
+//
+// This slice keeps Event(type=TOURNAMENT) as the single canonical
+// tournament entity (no new top-level "Tournament" model) and adds exactly
+// the three join/allocation tables needed to represent:
+//
+//   Event (TOURNAMENT) ─┬─< TournamentParticipant >─ Team | ExternalTeam
+//                       │         └─< TournamentParticipantAllocation >─ FacilityResource (Garderobe)
+//                       └─< TournamentResourceAllocation >─ FacilityResource (Spielfeld/Halle)
+//
+// Home/away follows the existing MatchCenter convention verbatim: the
+// existing Event.homeAway field ("HOME" | "AWAY" | null, null treated as
+// HOME — see lib/matchcenter/operational-state.ts) — no new field. Only HOME
+// tournaments require FCA pitch/hall + dressing-room allocation; AWAY
+// tournaments are NOT_APPLICABLE for all facility-related open actions (see
+// lib/tournaments/operational-state.ts).
+//
+// The legacy Event.pitchCode/homeDressingRoomCode/awayDressingRoomCode
+// fields are left untouched (still the canonical allocation model for
+// type=MATCH) and are no longer written for new/edited tournaments; a
+// one-time additive migration backfills pre-existing TOURNAMENT rows into
+// this model (see prisma/migrations/…_tournamentcenter_01b_multi_team_participation).
+// =============================================================================
+
+model TournamentParticipant {
+  id       String @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId String
+  /// The canonical tournament (Event, type=TOURNAMENT) this participant belongs to.
+  eventId  String
+
+  /// Canonical tenant-owned Team participant. Mutually exclusive with
+  /// externalTeamId/manualLabel — enforced by the service layer (see
+  /// lib/tournaments/participant-service.ts), not a DB constraint, mirroring
+  /// the existing MatchExternalMapping home/away-side pattern.
+  teamId         String?
+  /// Canonical Club-Directory ExternalTeam participant (guest club).
+  externalTeamId String?
+  /// Smallest clean fallback for a genuinely unknown/free-text participant
+  /// when no canonical Team or ExternalTeam exists yet for that club/team.
+  /// Only ever set when teamId AND externalTeamId are both null. Tenants are
+  /// expected to create a canonical ExternalTeam via the Club Directory as
+  /// soon as the participant's identity is known — this field exists only
+  /// so tournament creation is never blocked on that step, never as a
+  /// second/parallel team identity model.
+  manualLabel    String?
+
+  /// Display position within the tournament's participant list.
+  displayOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  externalTeam ExternalTeam? @relation(fields: [externalTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  dressingRoomAllocations TournamentParticipantAllocation[]
+
+  /// Prevent the same canonical Team from being added twice to the same tournament.
+  /// (Postgres unique indexes never compare NULLs as equal, so this is inert
+  /// for manual/external-only rows — duplicate ExternalTeam/manual guards
+  /// live below / in the service layer respectively.)
+  @@unique([eventId, teamId])
+  /// Prevent the same canonical ExternalTeam from being added twice to the same tournament.
+  @@unique([eventId, externalTeamId])
+  @@index([tenantId])
+  @@index([eventId])
+  @@index([teamId])
+  @@index([externalTeamId])
+  @@index([tenantId, eventId])
+}
+
+model TournamentResourceAllocation {
+  id                 String  @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId           String
+  /// The canonical tournament (Event, type=TOURNAMENT) this allocation belongs to.
+  eventId            String
+  /// The Spielfeld/Halle (or other) facility resource allocated to this tournament.
+  facilityResourceId String
+  /// Optional free-text note for this allocation.
+  notes              String?
+  /// Display position within the tournament's resource allocations.
+  displayOrder       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  event            Event            @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facilityResource FacilityResource @relation(fields: [facilityResourceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Prevent duplicate allocation of the same resource to the same tournament.
+  @@unique([eventId, facilityResourceId])
+  @@index([tenantId])
+  @@index([eventId])
+  @@index([facilityResourceId])
+  @@index([tenantId, eventId])
+}
+
+model TournamentParticipantAllocation {
+  id                      String  @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId                String
+  /// The tournament participant (Team/ExternalTeam/manual entry) this
+  /// dressing-room allocation belongs to.
+  tournamentParticipantId String
+  /// The Garderobe (or other) facility resource allocated to this participant.
+  facilityResourceId      String
+  /// Optional free-text note for this allocation.
+  notes                   String?
+  /// Display position within the participant's dressing-room allocations.
+  displayOrder            Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant                Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tournamentParticipant TournamentParticipant @relation(fields: [tournamentParticipantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  facilityResource      FacilityResource      @relation(fields: [facilityResourceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// Prevent duplicate allocation of the same resource to the same participant.
+  /// Deliberately NOT unique on facilityResourceId alone — multiple
+  /// participants (teams) MAY share the same dressing room when facility
+  /// rules allow it (see PRODUCT REQUIREMENT: "Multiple teams may share a
+  /// dressing room").
+  @@unique([tournamentParticipantId, facilityResourceId])
+  @@index([tenantId])
+  @@index([tournamentParticipantId])
+  @@index([facilityResourceId])
+  @@index([tenantId, tournamentParticipantId])
 }

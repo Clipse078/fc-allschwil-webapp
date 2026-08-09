@@ -311,6 +311,12 @@ export async function POST(request: NextRequest) {
       session?.user?.effectiveUserId ??
       session?.user?.id ??
       null;
+    // TOURNAMENTCENTER-01: previously omitted, leaving every manually created
+    // Event (including tournaments) with tenantId=null — a tenant-isolation
+    // gap that made new events invisible to tenant-scoped consumers such as
+    // TournamentCenter/Matchcenter (see lib/matchcenter/query-service.ts,
+    // lib/tournaments/queries.ts, both of which require a non-null tenantId).
+    const actorTenantId = session?.user?.activeTenantId ?? null;
 
     const hasLeadingEventCapability =
       hasPermission(session, PERMISSIONS.EVENTS_PUBLISH_WEBSITE) ||
@@ -373,6 +379,7 @@ export async function POST(request: NextRequest) {
           data: {
             seasonId,
             teamId,
+            tenantId: actorTenantId,
             type: type as AllowedEventType,
             source: source as AllowedEventSource,
             status: status as AllowedEventStatus,

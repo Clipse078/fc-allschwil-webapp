@@ -44,7 +44,17 @@ function formatTeamLabel(team: TeamItem) {
   return suffix ? team.name + " · " + suffix : team.name;
 }
 
-export default function TournamentEventCreateForm() {
+type TournamentEventCreateFormProps = {
+  /** Where to navigate after a successful submission. Defaults to the Veranstaltungen overview. */
+  redirectPath?: string;
+  /** Where the "Abbrechen" button navigates. Defaults to the Veranstaltungen overview. */
+  cancelPath?: string;
+};
+
+export default function TournamentEventCreateForm({
+  redirectPath = "/dashboard/events?submitted=1",
+  cancelPath = "/dashboard/events",
+}: TournamentEventCreateFormProps = {}) {
   const router = useRouter();
 
   const [seasonId, setSeasonId] = useState("");
@@ -57,6 +67,7 @@ export default function TournamentEventCreateForm() {
   const [meetingTime, setMeetingTime] = useState("");
   const [organizerName, setOrganizerName] = useState("");
   const [competitionLabel, setCompetitionLabel] = useState("");
+  const [homeAway, setHomeAway] = useState("HOME");
   const [resultLabel, setResultLabel] = useState("");
   const [remarks, setRemarks] = useState("");
 
@@ -214,6 +225,7 @@ export default function TournamentEventCreateForm() {
           meetingTime: meetingTime || null,
           organizerName: organizerName || null,
           competitionLabel: competitionLabel || null,
+          homeAway,
           resultLabel: resultLabel || null,
           remarks: remarks || null,
           websiteVisible,
@@ -231,8 +243,8 @@ export default function TournamentEventCreateForm() {
         throw new Error(data?.error ?? "Turnier konnte nicht zur Prüfung eingereicht werden.");
       }
 
-      setSuccessMessage("Turnier wurde zur Prüfung eingereicht. Du wirst zurück zur Event-Übersicht geleitet.");
-      router.push("/dashboard/events?submitted=1");
+      setSuccessMessage("Turnier wurde zur Prüfung eingereicht. Du wirst zurück zur Übersicht geleitet.");
+      router.push(redirectPath);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
@@ -250,6 +262,8 @@ export default function TournamentEventCreateForm() {
           </p>
           <p className="mt-2 text-sm text-amber-900">
             Neue Turniere werden zuerst zur Prüfung eingereicht. Die Veröffentlichung erfolgt erst nach Freigabe.
+            Teilnehmende Teams, Spielfeld/Halle-Zuweisungen und Garderoben werden anschliessend im TournamentCenter
+            beim Bearbeiten des Turniers erfasst.
           </p>
         </div>
 
@@ -338,6 +352,18 @@ export default function TournamentEventCreateForm() {
               className="fca-input"
               placeholder="z. B. Turnhalle Binningen"
             />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="fca-label">Heim / Auswärts</span>
+            <select
+              value={homeAway}
+              onChange={(event) => setHomeAway(event.target.value)}
+              className="fca-select"
+            >
+              <option value="HOME">Heim (FC Allschwil ausrichtend)</option>
+              <option value="AWAY">Auswärts (extern ausgerichtet)</option>
+            </select>
           </label>
 
           <label className="block space-y-2">
@@ -440,7 +466,7 @@ export default function TournamentEventCreateForm() {
 
           <button
             type="button"
-            onClick={() => router.push("/dashboard/events")}
+            onClick={() => router.push(cancelPath)}
             className="fca-button-secondary"
           >
             Abbrechen
