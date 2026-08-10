@@ -50,6 +50,22 @@ export type TemporalGroupingOptions = {
    * and then to `DEFAULT_EVENT_DURATIONS_MINUTES.DEFAULT` if absent.
    */
   defaultDurationsMinutes?: Readonly<Record<string, number>>;
+  /**
+   * Optional rolling look-ahead window, in milliseconds, applied to future
+   * events instead of the default "same tenant-local calendar day" rule.
+   *
+   * When supplied, a future event is eligible for `next`/`later` when
+   * `startAt.getTime() - now.getTime() <= horizonMs` (inclusive upper bound).
+   * The tenant-local calendar day is not considered, so the window correctly
+   * spans a local midnight boundary.
+   *
+   * When omitted, behaviour is unchanged: future events are eligible only
+   * when they fall on the same tenant-local calendar day as `now`.
+   *
+   * Never affects `current` (already-active) events, which are always
+   * included regardless of how long ago they started.
+   */
+  horizonMs?: number;
 };
 
 /** Output of `partitionByTemporalGroup`. */
@@ -165,12 +181,16 @@ export function getEffectiveEndAt(
  * calendar day of `now`:
  *
  * - **current** — started at or before `now`; effective end time is after `now`.
- * - **next** — all future events on today's local date that share the earliest
- *   upcoming `startAt`. Multiple simultaneous events are all included.
- * - **later** — all other future events on today's local date.
+ * - **next** — all future events sharing the earliest upcoming `startAt`
+ *   among the eligible future events. Multiple simultaneous events are all
+ *   included.
+ * - **later** — all other eligible future events.
+ *
+ * Future-event eligibility defaults to "same tenant-local calendar day as
+ * `now`". Passing `options.horizonMs` replaces this with a rolling
+ * look-ahead window measured from `now` (see `TemporalGroupingOptions`).
  *
  * Events whose effective end time is at or before `now` are excluded entirely.
- * Events whose local start date is not today are excluded entirely.
  * Overnight events (started on a prior local day, still running) appear in
  * `current` because `startAt <= now && effectiveEnd > now`.
  *
@@ -212,6 +232,12 @@ export function partitionByTemporalGroup<T extends TemporalEvent>(
     if (event.startAt.getTime() <= nowMs) {
       // Started in the past (or exactly now) and still running → current.
       current.push({ event, idx: i });
+    } else if (options?.horizonMs !== undefined) {
+      // Rolling look-ahead window: include only when the start time falls
+      // within horizonMs of now. Calendar-day boundaries are irrelevant here.
+      if (event.startAt.getTime() - nowMs <= options.horizonMs) {
+        futureCandidates.push({ event, idx: i });
+      }
     } else {
       // Future event: include only when it falls on today's local date.
       const eventDateKey = toLocalDateKey(event.startAt, timezone);

@@ -25,13 +25,15 @@
  *   - Inputs and loaded events are not mutated.
  *   - Result arrays are always new arrays.
  *
- * Selection algorithm (E2–E5):
+ * Selection algorithm — rolling operational window (INFOBOARD-INTEGRATION-01B-C1):
  *   - current  — all events whose display interval spans now (no cap).
- *   - next     — the first 2 upcoming events on today's local calendar day,
- *                ordered by startAt ascending; if there are fewer than 2, all
- *                remaining upcoming events are included.
- *   - later    — additional eligible events on today's local day beyond the
- *                2 selected for "next".
+ *   - next     — the eligible upcoming events sharing the earliest startAt
+ *                within the next SCREEN1_HORIZON_HOURS hours.
+ *   - later    — remaining eligible upcoming events within the same rolling
+ *                horizon, ordered by startAt ascending.
+ *   - Events starting beyond the rolling horizon are not included, however
+ *     many active events remain visible in "current" for their entire
+ *     duration regardless of when they started.
  *   - emptyStateReason — "DAY_COMPLETED" when events existed today but all
  *                ended; "NO_EVENTS_TODAY" when no eligible events exist for
  *                the evaluated local calendar day.
@@ -55,10 +57,18 @@ import type { Screen1SourceEvent } from "./screen1-event-mapper";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 /**
- * Maximum number of upcoming events placed in the "next" bucket.
- * Active events are always fully included (no cap on "current").
+ * Rolling operational look-ahead window, in hours, for upcoming ("next" /
+ * "later") activities. Screen 1 shows operational activity for approximately
+ * the next 3–4 hours; upcoming activities starting beyond this window are not
+ * shown. Active events ("current") are never subject to this cutoff — once
+ * visible, they remain visible until they end.
+ *
+ * This is a fixed operational constant, not a per-tenant setting.
  */
-const MAX_NEXT_COUNT = 2;
+const SCREEN1_HORIZON_HOURS = 4;
+
+/** SCREEN1_HORIZON_HOURS expressed in milliseconds for use with `Date` math. */
+const SCREEN1_HORIZON_MS = SCREEN1_HORIZON_HOURS * 60 * 60 * 1000;
 
 // ── Feed builder input ─────────────────────────────────────────────────────────
 
@@ -94,16 +104,21 @@ export type BuildScreen1FeedInput = {
  *     exactly once; this internally calls the injected loader exactly once.
  *  3. Discarding rejected events.
  *  4. Partitioning eligible events into temporal groups via
- *     partitionByTemporalGroup() — produces an initial current/next/later
- *     split where "next" contains all events at the earliest start time.
- *  5. Applying the Screen 1 selection cap: of all future-today events,
- *     the first MAX_NEXT_COUNT (2) become "next"; the rest become "later".
- *     All active events remain in "current" regardless of count.
- *  6. Determining the empty-state reason:
+ *     partitionByTemporalGroup(), bounded by a fixed SCREEN1_HORIZON_HOURS
+ *     (4 hour) rolling look-ahead window instead of the calendar-day default:
+ *       - "current" — active events (no cap, no cutoff).
+ *       - "next"    — upcoming eligible events sharing the earliest startAt
+ *                     within the rolling horizon.
+ *       - "later"   — remaining upcoming eligible events within the same
+ *                     rolling horizon.
+ *     Events starting beyond the horizon are excluded entirely; an event
+ *     already active when the horizon is computed remains visible in
+ *     "current" for its full duration, regardless of when it started.
+ *  5. Determining the empty-state reason:
  *     - DAY_COMPLETED when eligible events existed for today but all ended.
  *     - NO_EVENTS_TODAY when no eligible events exist for today at all.
- *  7. Mapping each event through mapScreen1Event().
- *  8. Assembling and returning the InfoboardScreen1Feed.
+ *  6. Mapping each event through mapScreen1Event().
+ *  7. Assembling and returning the InfoboardScreen1Feed.
  *
  * The loader receives: tenantId, dateFrom, dateTo, seasonKey, teamSlug.
  * The loader does NOT receive: channel, timezone, now, tenant display metadata.
@@ -134,33 +149,32 @@ export async function buildInfoboardScreen1Feed(
     teamSlug: input.teamSlug,
   });
 
-  // Step 3: Partition eligible events into temporal buckets.
-  // partitionByTemporalGroup produces:
-  //   grouped.current — active events (startAt <= now, effectiveEnd > now)
-  //   grouped.next    — all events at the earliest future-today start time
-  //   grouped.later   — remaining future events for today
+  // Step 3: Partition eligible events into temporal buckets, bounded by the
+  // fixed rolling operational horizon (SCREEN1_HORIZON_MS) instead of the
+  // calendar-day default. partitionByTemporalGroup produces:
+  //   grouped.current — active events (startAt <= now, effectiveEnd > now);
+  //                     never subject to the horizon cutoff.
+  //   grouped.next    — upcoming events at the earliest startAt within the
+  //                     horizon.
+  //   grouped.later   — remaining upcoming events within the same horizon.
+  // Events starting beyond the horizon are simply absent from every bucket.
   const grouped = partitionByTemporalGroup(
     selection.eligible,
     input.now,
     input.timeZone,
+    { horizonMs: SCREEN1_HORIZON_MS },
   );
 
-  // Step 4: Apply Screen 1 selection cap.
-  // Flatten all future-today events (already sorted by startAt asc, stable).
-  // Take the first MAX_NEXT_COUNT (2) as the "next" bucket; remainder is "later".
-  // This replaces the original "all events at earliest start time" rule with
-  // "the next 2 upcoming events, regardless of whether they share a start time."
-  const allFuture: Screen1SourceEvent[] = [...grouped.next, ...grouped.later];
-  const selectedNext: Screen1SourceEvent[] = allFuture.slice(0, MAX_NEXT_COUNT);
-  const remainingLater: Screen1SourceEvent[] = allFuture.slice(MAX_NEXT_COUNT);
-
-  // Step 5: Determine empty-state reason before mapping.
+  // Step 4: Determine empty-state reason before mapping.
   // Check whether any eligible event falls on today's local calendar day,
   // regardless of whether it has already ended (used for DAY_COMPLETED).
+  // This is independent of the rolling horizon — it only affects the
+  // human-readable reason shown for an empty board, never which events
+  // are displayed.
   const isEmpty =
     grouped.current.length === 0 &&
-    selectedNext.length === 0 &&
-    remainingLater.length === 0;
+    grouped.next.length === 0 &&
+    grouped.later.length === 0;
 
   let emptyStateReason: EmptyStateReason | null = null;
   if (isEmpty) {
@@ -170,20 +184,20 @@ export async function buildInfoboardScreen1Feed(
     emptyStateReason = hadEventsToday ? "DAY_COMPLETED" : "NO_EVENTS_TODAY";
   }
 
-  // Step 6: Map each bucket's events to DTOs.
+  // Step 5: Map each bucket's events to DTOs.
   const current: InfoboardScreen1Event[] = grouped.current.map((event) =>
     mapScreen1Event({ event, temporalBucket: "current" }),
   );
 
-  const next: InfoboardScreen1Event[] = selectedNext.map((event) =>
+  const next: InfoboardScreen1Event[] = grouped.next.map((event) =>
     mapScreen1Event({ event, temporalBucket: "next" }),
   );
 
-  const later: InfoboardScreen1Event[] = remainingLater.map((event) =>
+  const later: InfoboardScreen1Event[] = grouped.later.map((event) =>
     mapScreen1Event({ event, temporalBucket: "later" }),
   );
 
-  // Step 7: Assemble the feed.
+  // Step 6: Assemble the feed.
   return {
     generatedAt: input.now.toISOString(),
     tenant: input.tenant,
