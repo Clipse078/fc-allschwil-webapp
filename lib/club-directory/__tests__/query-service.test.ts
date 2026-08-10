@@ -163,6 +163,77 @@ describe("listExternalClubs", () => {
       listExternalClubs(database, { tenantId: "tenant-1", limit: CLUB_DIRECTORY_MAX_LIMIT + 1 }),
     ).rejects.toThrow(`Club directory limit must be between 1 and ${CLUB_DIRECTORY_MAX_LIMIT}.`);
   });
+
+  // MASTERDATA-SELECTOR-CONSISTENCY-03 (BUG 2) — TournamentCenter external
+  // club picker root-cause tests. The underlying query itself was already
+  // correct (queries ExternalClub directly, never via ExternalTeam); the
+  // defect was a client that always fetched with the un-searched default
+  // limit. These tests pin the query-service behavior the search-driven
+  // picker now relies on.
+
+  // 10. club with zero ExternalTeams is searchable
+  it("10. a club with zero ExternalTeams is still returned (never derived from/gated by ExternalTeam rows)", async () => {
+    const database = createDatabase({
+      clubList: [createClubListRecord({ id: "club-no-teams", _count: { externalTeams: 0, providerMappings: 0 } })],
+    });
+
+    const clubs = await listExternalClubs(database, { tenantId: "tenant-1", search: "Muttenz" });
+
+    expect(clubs).toHaveLength(1);
+    expect(clubs[0].id).toBe("club-no-teams");
+    expect(clubs[0].teamCount).toBe(0);
+  });
+
+  // 11. club with multiple ExternalTeams appears once
+  it("11. a club with multiple ExternalTeams still appears exactly once", async () => {
+    const database = createDatabase({
+      clubList: [createClubListRecord({ id: "club-many-teams", _count: { externalTeams: 12, providerMappings: 1 } })],
+    });
+
+    const clubs = await listExternalClubs(database, { tenantId: "tenant-1" });
+
+    expect(clubs).toHaveLength(1);
+    expect(clubs[0].id).toBe("club-many-teams");
+  });
+
+  // 9 / 14. eligible club beyond the previous 50-item default cap is
+  // retrievable, and passing an explicit higher (but still bounded) limit
+  // never throws or silently truncates further than requested.
+  it("9/14. an explicit limit up to the maximum retrieves clubs beyond the old un-searched default (50)", async () => {
+    const database = createDatabase();
+    await listExternalClubs(database, { tenantId: "tenant-1", limit: CLUB_DIRECTORY_MAX_LIMIT, skip: 0 });
+
+    expect(database.externalClub.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: CLUB_DIRECTORY_MAX_LIMIT, skip: 0 }),
+    );
+  });
+
+  // 15. tenant isolation
+  it("15. only queries the requesting tenant — cross-tenant clubs cannot leak into search results", async () => {
+    const database = createDatabase();
+    await listExternalClubs(database, { tenantId: "tenant-a", search: "ro" });
+
+    const args = database.externalClub.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(args.where.tenantId).toBe("tenant-a");
+  });
+
+  // 16. archived/ineligible club excluded
+  it("16. archived clubs are excluded from search results by default (same eligibility as /dashboard/vereine)", async () => {
+    const database = createDatabase();
+    await listExternalClubs(database, { tenantId: "tenant-1", search: "ro" });
+
+    const args = database.externalClub.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(args.where.archivedAt).toBeNull();
+  });
+
+  it("orders results alphabetically by name (sensible alphabetical order for the picker)", async () => {
+    const database = createDatabase();
+    await listExternalClubs(database, { tenantId: "tenant-1", search: "ro" });
+
+    expect(database.externalClub.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ name: "asc" }, { id: "asc" }] }),
+    );
+  });
 });
 
 describe("getExternalClubById — tenant isolation", () => {

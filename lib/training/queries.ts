@@ -13,6 +13,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
+import { syncSeasonActiveFlagsWithLifecycle } from "@/lib/seasons/queries";
 import type { TrainingSeriesStatus, TrainingSessionStatus, Weekday } from "./types";
 
 // ── Row shape returned by the DB ──────────────────────────────────────────────
@@ -144,10 +145,29 @@ export type TeamSeasonPickerRow = {
  * requires the TeamSeason to belong to the canonical current season, so
  * "Neue Trainingsserie" can never offer a choice that contradicts what
  * Teams/TeamCenter shows as the Team's current season.
+ *
+ * MASTERDATA-SELECTOR-CONSISTENCY-03 root-cause fix: this query is the ONLY
+ * canonical current-season consumer that both (a) starts from TeamSeason
+ * (not Team) and (b) has zero fallback when nothing matches
+ * `Season.isActive` (by design — see lib/teams/current-season.ts, and this
+ * must stay that way to preserve PR #342's "never substitute a stale
+ * season" protection). `Season.isActive` is otherwise only refreshed as a
+ * side effect of visiting a Seasons admin surface — nothing keeps it in
+ * sync on its own. Teams/TeamCenter and the TournamentCenter Team dropdown
+ * never went empty from the same staleness because they are Team-centric
+ * (a Team still renders even when its `teamSeasons` relation filter matches
+ * nothing) and/or fall back to an explicit season key. This picker has
+ * neither safety net, so a stale/absent `Season.isActive` flag alone made
+ * it render completely empty despite eligible Teams existing. Syncing the
+ * flag from the same canonical lifecycle rule the Seasons admin surface
+ * already uses (see lib/seasons/queries.ts) fixes the mismatch without
+ * adding any new fallback.
  */
 export async function findTeamSeasonsForTenant(
   tenantId: string,
 ): Promise<TeamSeasonPickerRow[]> {
+  await syncSeasonActiveFlagsWithLifecycle();
+
   const rows = await prisma.teamSeason.findMany({
     where: {
       status: "ACTIVE",

@@ -23,6 +23,7 @@ import type {
   TournamentParticipantDto,
 } from "@/lib/tournaments/types";
 import { FacilityResourceSelector, type FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import { ExternalClubPicker, type ExternalClubPickerResult } from "./ExternalClubPicker";
 
 type TeamOption = {
   id: string;
@@ -33,11 +34,7 @@ type TeamOption = {
 };
 
 /** TOURNAMENTCENTER-UX-03 — canonical external-participant club source, same eligible universe as /dashboard/vereine. */
-type ExternalClubOption = {
-  id: string;
-  name: string;
-  shortName: string | null;
-};
+type ExternalClubOption = ExternalClubPickerResult;
 
 type Props = {
   tournamentId: string;
@@ -89,12 +86,14 @@ export default function TournamentParticipantsEditor({
   const [error, setError] = useState<string | null>(null);
 
   const [teams, setTeams] = useState<TeamOption[]>([]);
-  const [clubs, setClubs] = useState<ExternalClubOption[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
-  const [clubsLoading, setClubsLoading] = useState(false);
 
   const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [selectedClubId, setSelectedClubId] = useState("");
+  // MASTERDATA-SELECTOR-CONSISTENCY-03 (BUG 2): the club itself is held
+  // directly (from ExternalClubPicker's search results) instead of an id
+  // looked up in a full, eagerly-fetched (and silently capped) club list —
+  // see ExternalClubPicker's module doc for the root cause this replaces.
+  const [selectedClub, setSelectedClub] = useState<ExternalClubOption | null>(null);
   const [manualLabel, setManualLabel] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
 
@@ -110,27 +109,15 @@ export default function TournamentParticipantsEditor({
 
     async function load() {
       setTeamsLoading(true);
-      setClubsLoading(true);
       try {
-        // TOURNAMENTCENTER-UX-03: same eligible tenant-scoped canonical
-        // ExternalClub universe as /dashboard/vereine — never derived from
-        // ExternalTeam rows.
-        const [teamsRes, clubsRes] = await Promise.all([
-          fetch("/api/teams", { cache: "no-store" }),
-          fetch("/api/club-directory/clubs", { cache: "no-store" }),
-        ]);
+        const teamsRes = await fetch("/api/teams", { cache: "no-store" });
         const teamsData = (await teamsRes.json().catch(() => null)) as TeamOption[] | null;
-        const clubsData = (await clubsRes.json().catch(() => null)) as {
-          clubs?: ExternalClubOption[];
-        } | null;
 
         if (!active) return;
         setTeams(Array.isArray(teamsData) ? teamsData.filter((t) => t.isActive) : []);
-        setClubs(clubsData?.clubs ?? []);
       } finally {
         if (active) {
           setTeamsLoading(false);
-          setClubsLoading(false);
         }
       }
     }
@@ -147,10 +134,6 @@ export default function TournamentParticipantsEditor({
   );
 
   const availableTeams = teams.filter((t) => !assignedTeamIds.has(t.id));
-  // Clubs are deliberately NOT filtered by prior selection — the same
-  // canonical club may be added multiple times with distinct Anzeigename
-  // values (e.g. "AC Rossoneri" + "Gelb" and "AC Rossoneri" + "E1").
-  const availableClubs = clubs;
 
   const addParticipant = useCallback(
     (body: { teamId?: string } | { externalClubId?: string; displayName?: string } | { manualLabel?: string }) => {
@@ -170,7 +153,7 @@ export default function TournamentParticipantsEditor({
           }
           setParticipants((prev) => [...prev, data.participant as TournamentParticipantDto]);
           setSelectedTeamId("");
-          setSelectedClubId("");
+          setSelectedClub(null);
           setManualLabel("");
         } catch (err) {
           setError(err instanceof Error ? err.message : "Teilnehmer konnte nicht hinzugefügt werden.");
@@ -463,25 +446,23 @@ export default function TournamentParticipantsEditor({
               </button>
             </div>
 
-            <div className="flex gap-2">
-              <select
-                value={selectedClubId}
-                onChange={(e) => setSelectedClubId(e.target.value)}
-                disabled={clubsLoading || isPending}
-                data-testid="tournament-participant-add-external-club-select"
-                className="fca-select flex-1"
-              >
-                <option value="">{clubsLoading ? "Vereine laden…" : "Verein auswählen…"}</option>
-                {availableClubs.map((club) => (
-                  <option key={club.id} value={club.id}>
-                    {club.name}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <ExternalClubPicker
+                  selected={selectedClub}
+                  onSelect={setSelectedClub}
+                  onClearSelected={() => setSelectedClub(null)}
+                  disabled={isPending}
+                  placeholder="Verein suchen…"
+                  testId="tournament-participant-add-external-club-search"
+                />
+              </div>
               <button
                 type="button"
-                onClick={() => selectedClubId && addParticipant({ externalClubId: selectedClubId, displayName: "" })}
-                disabled={!selectedClubId || isPending}
+                onClick={() =>
+                  selectedClub && addParticipant({ externalClubId: selectedClub.id, displayName: "" })
+                }
+                disabled={!selectedClub || isPending}
                 data-testid="tournament-participant-add-external-club-button"
                 className="fca-button-secondary shrink-0"
               >
