@@ -22,6 +22,7 @@
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts",
     "sync-workspace-permissions": "tsx scripts/sync-workspace-permissions.ts",
     "sync-training-permissions": "tsx scripts/sync-training-permissions.ts",
+    "sync-teams-delete-permission": "tsx scripts/sync-teams-delete-permission.ts",
     "check-user-permissions": "tsx scripts/check-user-permissions.ts",
     "stage-cleanup-01:inventory": "tsx scripts/stage-cleanup-01-fca-canonical-data.ts --inventory",
     "stage-cleanup-01:dry-run": "tsx scripts/stage-cleanup-01-fca-canonical-data.ts --dry-run",

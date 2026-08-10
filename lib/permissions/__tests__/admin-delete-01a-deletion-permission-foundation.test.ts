@@ -14,9 +14,16 @@
  * Covers:
  *   SA-01  SCE Super Admin: platform-held delete permission is a platform
  *          grant only — it does NOT, by itself, satisfy a tenant-scoped
- *          delete check (no automatic cross-tenant bypass; matches the
- *          existing RPERM-04 "platform roles never imply tenant operational
- *          access" rule documented in lib/tenants/README.md).
+ *          delete check via the generic `hasPermission()` (no automatic
+ *          cross-tenant bypass through that method; matches the existing
+ *          RPERM-04 "platform roles never imply tenant operational access"
+ *          rule documented in lib/tenants/README.md). This case, and this
+ *          method, are deliberately UNCHANGED by ADMIN-DELETE-01A-C1 — the
+ *          dedicated cross-tenant SCE Super Admin deletion authority added
+ *          by that correction lives in a separate, narrowly-scoped method
+ *          (`hasTenantDeletionAuthority()`), covered in
+ *          admin-delete-01a-c1-cross-tenant-super-admin-authority.test.ts,
+ *          never in this generic permission checker.
  *   SA-02  SCE Super Admin acting through a trusted tenant context (an
  *          active TenantMembership + tenant-scoped role granting the delete
  *          permission — the same trusted-context path any tenant operator

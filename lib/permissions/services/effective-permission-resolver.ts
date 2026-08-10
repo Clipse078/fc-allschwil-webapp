@@ -76,6 +76,23 @@
  *   • Permission caching infrastructure
  *   • Automatic operational role assignment
  *   • Org-unit / team / target-group permission inheritance
+ *
+ * ── ADMIN-DELETE-01A-C1 — SCE Super Admin cross-tenant deletion authority ────
+ * `hasPermission`/`hasAnyPermission`/`hasAllPermissions`/`getEffectivePermissions`
+ * above are UNCHANGED by this correction: a PLATFORM-held permission still
+ * never satisfies a TENANT-scoped check through those methods — that rule
+ * remains correct for every ordinary "view"/"manage" permission and is the
+ * exact bug RPERM-04 fixed.
+ *
+ * `hasTenantDeletionAuthority()` (below) is a separate, narrowly-scoped
+ * authorization primitive reserved for "<module>.delete"-convention
+ * permissions only. It adds exactly one additional grant path on top of the
+ * existing tenant-scoped one: a user holding the same permission key at
+ * PLATFORM scope (the SCE Super Admin's platform-wide grant) is authorized
+ * against an explicit tenant once that tenant is confirmed to be real and
+ * operationally ACTIVE — without requiring a TenantMembership or a
+ * tenant-scoped role grant in that tenant. See the method's own doc comment
+ * for the full contract and the caller obligations it depends on.
  */
 
 import type { PrismaClient } from "@prisma/client";
@@ -357,6 +374,88 @@ export class EffectivePermissionResolver {
 
     const keys = await resolvePlatformPermissions(this.prisma, userId);
     return permissions.every((p) => keys.has(p));
+  }
+
+  /**
+   * ADMIN-DELETE-01A-C1 — SCE Super Admin cross-tenant deletion authority.
+   *
+   * Reusable authorization primitive for every current and future
+   * "<module>.delete" permission (teams.delete is the first instance).
+   * Resolves whether `userId` may exercise `permission` against the
+   * EXPLICIT tenant identified by `tenantId`. Exactly two independent grant
+   * paths are evaluated — either is sufficient:
+   *
+   *   1. Tenant-scoped grant (Club Admin / delegated-user path) — identical
+   *      to `hasPermission({ tenantId })`: an active `TenantMembership` in
+   *      this exact tenant plus a `TENANT` role (owned by this tenant)
+   *      carrying the permission. Tenant isolation and role-ownership rules
+   *      are completely unchanged.
+   *
+   *   2. Platform SCE Super Admin cross-tenant authority — the caller holds
+   *      the SAME permission key at PLATFORM scope (no `TenantMembership`
+   *      or tenant role required), resolved against a tenant that is
+   *      confirmed to exist and be operationally ACTIVE. This is the
+   *      correction: an SCE Super Admin's platform-held deletion permission
+   *      is no longer required to be duplicated as a tenant-scoped grant
+   *      before it can be exercised in another tenant.
+   *
+   * `tenantId` is a REQUIRED, explicit parameter — there is no
+   * platform-only ("no tenant context") mode for this method, because
+   * deletion is always an operation against one specific tenant's data.
+   * Every grant path above still requires resolving that tenant's real,
+   * live `status` from the database on every call (never cached) — an
+   * unresolved, archived, or otherwise-invalid tenant id is denied even
+   * when the caller holds the platform-scoped permission.
+   *
+   * Caller obligation (never enforced by this method, and NOT satisfied by
+   * simply calling it): `tenantId` MUST be derived from a server-side
+   * lookup of the entity actually being deleted (e.g. the `tenantId` column
+   * on the `Team` row resolved by its own id), never taken directly from a
+   * client-supplied request field. Passing an unvalidated client tenantId
+   * straight through — even though this method independently checks that
+   * the tenant is real and ACTIVE — reintroduces exactly the "blindly trust
+   * the client" failure mode the policy forbids, because a malicious caller
+   * could simply supply any other real, active tenant's id. Confirming the
+   * tenant is real is a floor, not a substitute for resolving it from the
+   * target entity server-side.
+   *
+   * Restricted by convention to "<module>.delete" keys — enforced at
+   * runtime by throwing for any other key. This is deliberately NOT a
+   * general "platform role implies tenant access" bypass (that would
+   * reopen the exact gap RPERM-04 closed for every ordinary permission);
+   * only permanent-deletion permissions carry cross-tenant SCE authority.
+   * "manage"/"view" permissions continue to require real tenant membership
+   * via `hasPermission`, exactly as before.
+   */
+  async hasTenantDeletionAuthority(params: HasPermissionParams & { tenantId: string }): Promise<boolean> {
+    const { userId, permission, tenantId } = params;
+
+    if (!userId || !permission || !tenantId) return false;
+
+    if (!permission.endsWith(".delete")) {
+      throw new Error(
+        `hasTenantDeletionAuthority() is reserved for "<module>.delete"-convention permissions; ` +
+          `received "${permission}". Use hasPermission() for non-deletion permission checks.`,
+      );
+    }
+
+    // Path 1: existing tenant-scoped grant — Club Admin / delegated user.
+    const tenantKeys = await resolveTenantPermissions(this.prisma, userId, tenantId);
+    if (tenantKeys.has(permission)) return true;
+
+    // Path 2: platform SCE Super Admin cross-tenant authority. Only ever
+    // considered once a genuine, operationally ACTIVE tenant has been
+    // confirmed to exist for the supplied tenantId — an unresolved or
+    // forged tenant id is denied regardless of platform grants.
+    const platformKeys = await resolvePlatformPermissions(this.prisma, userId);
+    if (!platformKeys.has(permission)) return false;
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { status: true },
+    });
+
+    return tenant?.status === "ACTIVE";
   }
 
   /**
