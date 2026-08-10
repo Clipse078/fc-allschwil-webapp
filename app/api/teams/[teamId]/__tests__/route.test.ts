@@ -16,6 +16,10 @@
  *   5. alternativeName can be cleared by sending an empty string.
  *   6. Blank/whitespace-only shortName is normalized to null.
  *   7. audit log afterJson includes the new fields.
+ *
+ *   OrgUnit assignment (Organisationseinheit relationship)
+ *   16. A valid, same-tenant orgUnitId is persisted on team.update.
+ *   17. A cross-tenant orgUnitId is rejected with 403 and never persisted.
  */
 
 import { NextRequest } from "next/server";
@@ -32,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   archiveTeam: vi.fn(),
   restoreTeam: vi.fn(),
   deleteTeamSafely: vi.fn(),
+  orgUnitFindUnique: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-api-any-permission", () => ({
@@ -52,6 +57,9 @@ vi.mock("@/lib/db/prisma", () => ({
       findUnique: (...args: unknown[]) => mocks.teamFindUnique(...args),
       findFirst: (...args: unknown[]) => mocks.teamFindUnique(...args),
       update: (...args: unknown[]) => mocks.teamUpdate(...args),
+    },
+    orgUnit: {
+      findUnique: (...args: unknown[]) => mocks.orgUnitFindUnique(...args),
     },
   },
 }));
@@ -242,6 +250,28 @@ describe("PATCH /api/teams/[teamId] — TEAM-IDENTITY-01 naming fields", () => {
 
     const updateArgs = mocks.teamUpdate.mock.calls[0][0];
     expect(updateArgs.data).not.toHaveProperty("providerTeamName");
+  });
+
+  it("16 — a valid, same-tenant orgUnitId (Organisationseinheit) is persisted on team.update", async () => {
+    mocks.orgUnitFindUnique.mockResolvedValueOnce({ id: "ou-1", tenantId: "tenant-a" });
+    mocks.teamUpdate.mockResolvedValueOnce({ ...EXISTING_TEAM, orgUnitId: "ou-1", teamSeasons: [] });
+
+    const response = await PATCH(makeRequest({ ...BASE_BODY, orgUnitId: "ou-1" }), makeContext());
+
+    expect(response.status).toBe(200);
+    const updateArgs = mocks.teamUpdate.mock.calls[0][0];
+    expect(updateArgs.data.orgUnitId).toBe("ou-1");
+  });
+
+  it("17 — a cross-tenant orgUnitId is rejected with 403 and never persisted", async () => {
+    mocks.orgUnitFindUnique.mockResolvedValueOnce({ id: "ou-1", tenantId: "tenant-other" });
+
+    const response = await PATCH(makeRequest({ ...BASE_BODY, orgUnitId: "ou-1" }), makeContext());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/aktiven Mandanten/);
+    expect(mocks.teamUpdate).not.toHaveBeenCalled();
   });
 
   it("8 — omitting isActive preserves the existing archive state (no silent archive on plain save)", async () => {

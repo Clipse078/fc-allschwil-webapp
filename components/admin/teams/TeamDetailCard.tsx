@@ -60,9 +60,16 @@ type ProviderMappingInfo = {
 } | null;
 
 type CompetitionInfo = {
+  id: string;
   name: string | null;
   shortName: string | null;
 } | null;
+
+type CompetitionOption = {
+  id: string;
+  officialName: string;
+  shortName: string | null;
+};
 
 type Team = {
   id: string;
@@ -82,8 +89,17 @@ type Team = {
   orgUnit: OrgUnitOption | null;
   // TEAM-IDENTITY-01: read-only provider identity/name. Never edited here.
   providerMapping?: ProviderMappingInfo;
-  // TEAMCENTER-UX-01B: read-only Liga/Wettbewerb from TeamSeasonCompetition.
+  // TEAMCENTER-UX-01B: Liga/Wettbewerb, sourced from the canonical
+  // TeamSeasonCompetition -> Competition relation of the current season.
+  // TEAMCENTER-UX-01C: now editable via currentTeamSeasonId below — see
+  // TeamSettingsCard.
   competition?: CompetitionInfo;
+  // TEAMCENTER-UX-01C: the canonical current-season TeamSeason id (see
+  // lib/teams/current-season.ts). Null when this Team has no TeamSeason in
+  // the canonical current season — competition editing is disabled in that
+  // case rather than silently targeting a stale/historical TeamSeason.
+  currentTeamSeasonId?: string | null;
+  currentParticipationType?: string | null;
   teamSeasons: TeamSeasonItem[];
 };
 
@@ -91,11 +107,13 @@ type Props = {
   initialTeam: Team;
   canManage: boolean;
   availableOrgUnits: OrgUnitOption[];
+  availableCompetitions: CompetitionOption[];
 };
 
 export default function TeamDetailCard({
   initialTeam,
   availableOrgUnits,
+  availableCompetitions,
   canManage,
 }: Props) {
   const [team, setTeam] = useState<Team>(initialTeam);
@@ -148,6 +166,9 @@ export default function TeamDetailCard({
           competition: team.competition,
         }}
         availableOrgUnits={availableOrgUnits}
+        availableCompetitions={availableCompetitions}
+        currentTeamSeasonId={team.currentTeamSeasonId ?? null}
+        currentParticipationType={team.currentParticipationType ?? null}
         canManage={canManage}
         onSaved={handleTeamSaved}
       />

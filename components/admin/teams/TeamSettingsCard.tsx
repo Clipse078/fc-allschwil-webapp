@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SectionCard } from "@/components/ui/page";
 
 type OrgUnitOption = {
@@ -18,9 +19,16 @@ type ProviderMappingInfo = {
 } | null;
 
 type CompetitionInfo = {
+  id: string;
   name: string | null;
   shortName: string | null;
 } | null;
+
+type CompetitionOption = {
+  id: string;
+  officialName: string;
+  shortName: string | null;
+};
 
 type Team = {
   id: string;
@@ -40,14 +48,26 @@ type Team = {
   orgUnitId: string | null;
   // TEAM-IDENTITY-01: read-only provider identity/name. Never edited here.
   providerMapping?: ProviderMappingInfo;
-  // TEAMCENTER-UX-01B: read-only Liga/Wettbewerb, sourced strictly from
-  // TeamSeasonCompetition -> Competition. Never edited here.
+  // TEAMCENTER-UX-01B/C: Liga/Wettbewerb, sourced strictly from the
+  // canonical TeamSeasonCompetition -> Competition relation of the current
+  // season. Editable below via its own dedicated save action (competitionId
+  // lives on TeamSeason, not Team — see currentTeamSeasonId).
   competition?: CompetitionInfo;
 };
 
 type Props = {
   team: Team;
   availableOrgUnits: OrgUnitOption[];
+  availableCompetitions: CompetitionOption[];
+  /**
+   * The canonical current-season TeamSeason id (lib/teams/current-season.ts).
+   * Null when this Team has no TeamSeason in the canonical current season —
+   * competition editing is disabled in that case (TEAMCENTER-UX-01C: never
+   * target a stale/historical TeamSeason from this surface).
+   */
+  currentTeamSeasonId: string | null;
+  /** participationType of the current-season TeamSeason, if any. */
+  currentParticipationType: string | null;
   canManage: boolean;
   onSaved?: (team: Team) => void;
 };
@@ -98,13 +118,22 @@ function FormSection({
 export default function TeamSettingsCard({
   team,
   availableOrgUnits,
+  availableCompetitions,
+  currentTeamSeasonId,
+  currentParticipationType,
   canManage,
   onSaved,
 }: Props) {
+  const router = useRouter();
   const [form, setForm] = useState<Team>(team);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [competitionId, setCompetitionId] = useState<string>(team.competition?.id ?? "");
+  const [competitionSaving, setCompetitionSaving] = useState(false);
+  const [competitionMessage, setCompetitionMessage] = useState<string | null>(null);
+  const [competitionError, setCompetitionError] = useState<string | null>(null);
 
   const genderGroupOptions =
     form.genderGroup && !GENDER_GROUP_OPTIONS.includes(form.genderGroup)
@@ -113,6 +142,47 @@ export default function TeamSettingsCard({
 
   const competitionLabel =
     form.competition?.shortName ?? form.competition?.name ?? null;
+
+  const isCompetitionTeamSeason = currentParticipationType === "COMPETITION";
+
+  async function handleCompetitionChange(nextCompetitionId: string) {
+    if (!canManage || !currentTeamSeasonId) {
+      return;
+    }
+
+    const previousCompetitionId = competitionId;
+    setCompetitionId(nextCompetitionId);
+    setCompetitionSaving(true);
+    setCompetitionMessage(null);
+    setCompetitionError(null);
+
+    try {
+      const response = await fetch(
+        `/api/teams/${form.id}/team-seasons/${currentTeamSeasonId}/competition`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ competitionId: nextCompetitionId || null }),
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Wettbewerb konnte nicht zugeordnet werden.");
+      }
+
+      setCompetitionMessage(data?.message ?? "Wettbewerb erfolgreich gespeichert.");
+      router.refresh();
+    } catch (err) {
+      setCompetitionId(previousCompetitionId);
+      setCompetitionError(
+        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.",
+      );
+    } finally {
+      setCompetitionSaving(false);
+    }
+  }
 
   function updateField<K extends keyof Team>(field: K, value: Team[K]) {
     if (!canManage) {
@@ -326,17 +396,52 @@ export default function TeamSettingsCard({
           </label>
         </FormSection>
 
-        {/* TEAMCENTER-UX-01B (I): Liga/Wettbewerb — strictly sourced from
-            TeamSeasonCompetition -> Competition of the active season.
-            Read-only here; never a fabricated/manual duplicate field. */}
-        <FormSection title="Wettbewerb">
-          <div className="md:col-span-2">
-            <span className={labelClass}>Liga</span>
-            <p className="text-sm text-[var(--foreground)]">
-              {competitionLabel ?? (
-                <span className="text-[var(--muted)]">Kein Wettbewerb</span>
-              )}
-            </p>
+        {/* TEAMCENTER-UX-01B/C: Liga/Wettbewerb — strictly sourced from
+            TeamSeasonCompetition -> Competition of the current season. Never
+            a fabricated/manual duplicate field; saved via its own dedicated
+            action (lib/teams/team-season-service.ts#setTeamSeasonCompetition)
+            since it lives on TeamSeason, not Team. */}
+        <FormSection
+          title="Wettbewerb"
+          description={
+            !currentTeamSeasonId
+              ? "Keine aktuelle Saison — Wettbewerb kann erst nach Saisonzuordnung gepflegt werden."
+              : !isCompetitionTeamSeason
+                ? "Nur für Wettkampfteams verfügbar (Teilnahmetyp der aktuellen Saison)."
+                : undefined
+          }
+        >
+          <div className="md:col-span-2 space-y-1.5">
+            <span className={labelClass}>Liga / Wettkampf</span>
+            {canManage && currentTeamSeasonId && isCompetitionTeamSeason ? (
+              <>
+                <select
+                  value={competitionId}
+                  disabled={competitionSaving}
+                  onChange={(event) => handleCompetitionChange(event.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">— Kein Wettbewerb —</option>
+                  {availableCompetitions.map((competitionOption) => (
+                    <option key={competitionOption.id} value={competitionOption.id}>
+                      {competitionOption.shortName ?? competitionOption.officialName}
+                    </option>
+                  ))}
+                </select>
+                {competitionMessage ? (
+                  <p className="text-xs font-medium text-emerald-600">{competitionMessage}</p>
+                ) : null}
+                {competitionError ? (
+                  <p className="text-xs font-medium text-[var(--sce-danger)]">{competitionError}</p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-[var(--foreground)]">
+                {competitionLabel ?? (
+                  <span className="text-[var(--muted)]">Kein Wettbewerb</span>
+                )}
+              </p>
+            )}
           </div>
         </FormSection>
 
