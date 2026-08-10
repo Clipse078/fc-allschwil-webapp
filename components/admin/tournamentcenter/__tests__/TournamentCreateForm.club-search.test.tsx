@@ -155,4 +155,46 @@ describe("TournamentCreateForm — external club participant search (BUG 2 fix)"
 
     await waitFor(() => expect(screen.getAllByText("AC Rossoneri")).toHaveLength(2));
   });
+
+  // 1/7. MASTERDATA-SELECTOR-CONSISTENCY-03-C1 — end-to-end through the
+  // real form (not just the isolated picker component): a search matching
+  // more than one page's worth of clubs still exposes a club ranked past
+  // the previous 200-item cap, and TournamentCreateForm's add flow around
+  // the picker is otherwise unchanged.
+  it("1/7. exposes a club beyond the previous 200-item search cap through the real TournamentCreateForm add-participant flow", async () => {
+    const manyClubs = Array.from({ length: 210 }, (_, i) => ({
+      id: `club-many-${i}`,
+      name: `Testverein ${String(i).padStart(4, "0")}`,
+      shortName: null as string | null,
+    }));
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/seasons") {
+        return jsonResponse({ seasons: [{ id: "season-1", key: "2025-2026", name: "Saison 2025/2026", isActive: true }] });
+      }
+      if (url === "/api/teams") return jsonResponse([]);
+      if (url.startsWith("/api/club-directory/clubs")) {
+        const parsed = new URL(url, "http://localhost");
+        const limit = Number(parsed.searchParams.get("limit"));
+        const skip = Number(parsed.searchParams.get("skip") ?? "0");
+        return jsonResponse({ clubs: manyClubs.slice(skip, skip + limit) });
+      }
+      if (url.startsWith("/api/facilities/availability")) return jsonResponse({ availability: [] });
+      throw new Error(`Unexpected fetch call: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TournamentCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} />);
+
+    fireEvent.change(screen.getByTestId("tournament-create-add-external-club-search-input"), {
+      target: { value: "testverein" },
+    });
+
+    await screen.findByText("Testverein 0209");
+    fireEvent.mouseDown(screen.getByTestId("tournament-create-add-external-club-search-option-club-many-209"));
+    fireEvent.click(screen.getByTestId("tournament-create-add-external-club-button"));
+
+    const row = await screen.findByTestId(/tournament-create-participant-row-/);
+    expect(row).toHaveTextContent("Testverein 0209");
+  });
 });

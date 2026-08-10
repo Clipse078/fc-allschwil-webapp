@@ -33,10 +33,23 @@
  * generic combobox framework — this is the "smallest existing searchable
  * picker pattern already available in the repo", adapted for
  * ExternalClub instead of Person.
+ *
+ * MASTERDATA-SELECTOR-CONSISTENCY-03-C1: a single search request still
+ * couldn't return more than CLUB_DIRECTORY_MAX_LIMIT (200) clubs — an
+ * eligible club ranked past position 200 for a given (very broad) search
+ * term was still unreachable, just with a bigger cliff than before. The
+ * `GET /api/club-directory/clubs` limit/skip pair is a genuine pagination
+ * contract (lib/club-directory/query-service.ts), not a result cap, so
+ * this picker now transparently walks every page for the current search
+ * term (see fetchAllMatchingClubs below) instead of requesting a single
+ * page and treating it as the whole answer. The Club Directory query
+ * itself, and the endpoint's per-request page-size contract, are
+ * unchanged — only how many pages THIS consumer fetches.
  */
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Building2, Loader2, Search, X } from "lucide-react";
+import { CLUB_DIRECTORY_MAX_LIMIT } from "@/lib/club-directory/query-service";
 
 export type ExternalClubPickerResult = {
   id: string;
@@ -61,17 +74,69 @@ const SEARCH_MIN_CHARS = 2;
 const SEARCH_DEBOUNCE_MS = 300;
 
 /**
- * Passed explicitly as `limit` on every search request so this picker never
- * silently inherits GET /api/club-directory/clubs's un-searched default
- * (CLUB_DIRECTORY_DEFAULT_LIMIT = 50) — the exact defect this component
- * fixes. 200 is the endpoint's existing accepted maximum (the same value
- * /dashboard/vereine already requests); combined with a real `search` term
- * narrowing the match set at the database level, this is not "the cap that
- * hides valid matches" the way an un-searched full-directory fetch was —
- * a single tenant's Club Directory realistically never has 200+ distinct
- * clubs matching one 2+ character search term.
+ * Page size for each individual `GET /api/club-directory/clubs` request —
+ * the endpoint's own accepted per-request maximum (same value
+ * /dashboard/vereine already requests for its single, non-paged load).
+ * This is a transport-efficiency choice (fewest round trips per page),
+ * never a result cap: `fetchAllMatchingClubs` below keeps requesting
+ * further pages (via `skip`) until a page comes back with fewer than
+ * `SEARCH_PAGE_SIZE` clubs, so a search matching more than one page's
+ * worth of clubs still returns every eligible match.
  */
-const SEARCH_RESULT_LIMIT = 200;
+const SEARCH_PAGE_SIZE = CLUB_DIRECTORY_MAX_LIMIT;
+
+/**
+ * Defensive circuit breaker only — NOT a product-level result cap. Bounds
+ * how many pages a single search will ever walk (50 pages × 200 =
+ * 10 000 clubs) purely to guarantee this loop cannot spin forever against
+ * a genuinely corrupt/anomalous dataset (e.g. a pagination bug elsewhere
+ * returning a full page forever). No real tenant's Club Directory
+ * realistically has anywhere close to this many clubs matching one
+ * search term, so this never hides an eligible match in practice.
+ */
+const MAX_SEARCH_PAGES = 50;
+
+/**
+ * Walks every result page of `GET /api/club-directory/clubs` for
+ * `searchTerm` and returns the full, concatenated match set — the
+ * endpoint's limit/skip pair is a pagination contract (see
+ * lib/club-directory/query-service.ts), not a per-search result cap, so a
+ * search matching more clubs than one page can hold must not silently
+ * stop at the first page.
+ */
+async function fetchAllMatchingClubs(
+  searchTerm: string,
+  signal: AbortSignal,
+): Promise<ExternalClubPickerResult[]> {
+  const allClubs: ExternalClubPickerResult[] = [];
+  let skip = 0;
+
+  for (let page = 0; page < MAX_SEARCH_PAGES; page += 1) {
+    const params = new URLSearchParams({
+      search: searchTerm,
+      limit: String(SEARCH_PAGE_SIZE),
+      skip: String(skip),
+    });
+    const res = await fetch(`/api/club-directory/clubs?${params.toString()}`, {
+      cache: "no-store",
+      signal,
+    });
+    const data = (await res.json().catch(() => null)) as
+      | { clubs?: ExternalClubPickerResult[]; error?: string }
+      | null;
+    if (!res.ok) throw new Error(data?.error ?? "Vereinssuche fehlgeschlagen.");
+
+    const pageClubs = Array.isArray(data?.clubs) ? data.clubs : [];
+    allClubs.push(...pageClubs);
+
+    // A less-than-full page is always the last page — no further request
+    // needed (also correctly terminates on an empty first page).
+    if (pageClubs.length < SEARCH_PAGE_SIZE) break;
+    skip += SEARCH_PAGE_SIZE;
+  }
+
+  return allClubs;
+}
 
 function getClubLabel(club: ExternalClubPickerResult): string {
   return club.name;
@@ -109,33 +174,33 @@ export function ExternalClubPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Aborts a still-in-flight multi-page search when a newer search starts
+  // (or the component unmounts) — a full-directory-page walk takes longer
+  // than a single request did, widening the window for a stale response
+  // to otherwise land after a newer one.
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
     setError(null);
 
     if (query.trim().length < SEARCH_MIN_CHARS) {
+      abortRef.current?.abort();
       setResults([]);
       setOpen(false);
       return;
     }
 
     debounceRef.current = setTimeout(async () => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setLoading(true);
       try {
-        const params = new URLSearchParams({
-          search: query.trim(),
-          limit: String(SEARCH_RESULT_LIMIT),
-        });
-        const res = await fetch(`/api/club-directory/clubs?${params.toString()}`, {
-          cache: "no-store",
-        });
-        const data = (await res.json().catch(() => null)) as
-          | { clubs?: ExternalClubPickerResult[]; error?: string }
-          | null;
-        if (!res.ok) throw new Error(data?.error ?? "Vereinssuche fehlgeschlagen.");
+        const clubs = await fetchAllMatchingClubs(query.trim(), controller.signal);
+        if (controller.signal.aborted) return;
 
-        const clubs = Array.isArray(data?.clubs) ? data.clubs : [];
         setResults(clubs);
         // Only "open" the dropdown when there is something to show — a
         // zero-result search must surface the "Keine Vereine gefunden"
@@ -143,16 +208,21 @@ export function ExternalClubPicker({
         setOpen(clubs.length > 0);
         setFocusedIndex(0);
       } catch (err) {
+        if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "Fehler bei der Suche.");
         setResults([]);
         setOpen(false);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(debounceRef.current);
   }, [query]);
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
