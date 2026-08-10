@@ -77,9 +77,20 @@ async function callPatch(body: unknown) {
   return PATCH(makeRequest(body), { params: Promise.resolve({ eventId: EVENT_ID }) });
 }
 
+function makeEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: EVENT_ID,
+    tenantId: TENANT_A,
+    pitchCode: null,
+    homeDressingRoomCode: null,
+    awayDressingRoomCode: null,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.eventFindUnique.mockResolvedValue({ id: EVENT_ID, tenantId: TENANT_A });
+  mocks.eventFindUnique.mockResolvedValue(makeEvent());
   mocks.eventUpdate.mockResolvedValue({
     id: EVENT_ID,
     pitchCode: null,
@@ -253,5 +264,110 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — canonical resource vali
     const res = await callPatch({ pitchCode: 123, homeDressingRoomCode: null, awayDressingRoomCode: null });
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ── MASTERDATA-CONSISTENCY-02-C2 — unchanged historical-code write semantics ──
+
+describe("PATCH /api/wochenplan/[eventId]/allocation — unchanged historical archived code", () => {
+  it("allows an unchanged historical archived code to survive an update to a different field", async () => {
+    // Existing event: homeRoom = archived E9, awayRoom = active E2.
+    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
+    mocks.eventFindUnique.mockResolvedValue(
+      makeEvent({ homeDressingRoomCode: "E9", awayDressingRoomCode: "E2" }),
+    );
+    // E9 is archived — never resolved by the active-only query. Only the
+    // CHANGED code (E3) needs to resolve.
+    mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(
+      new Map([["E3", { name: "Garderobe E3", type: "DRESSING_ROOM" }]]),
+    );
+
+    // User changes awayRoom E2 -> E3, homeRoom is resent unchanged as "E9".
+    const res = await callPatch({ pitchCode: null, homeDressingRoomCode: "E9", awayDressingRoomCode: "E3" });
+
+    expect(res.status).toBe(200);
+    // Only the genuinely changed code is looked up — not the unchanged one.
+    expect(mocks.getActiveFacilityResourcesByCodesForTenant).toHaveBeenCalledWith(["E3"], TENANT_A);
+    expect(mocks.eventUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { pitchCode: null, homeDressingRoomCode: "E9", awayDressingRoomCode: "E3" },
+      }),
+    );
+  });
+
+  it("rejects newly assigning an archived code even when another field's historical archived code is unchanged", async () => {
+    // Existing event: homeRoom = archived E9, awayRoom = active E2.
+    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
+    mocks.eventFindUnique.mockResolvedValue(
+      makeEvent({ homeDressingRoomCode: "E9", awayDressingRoomCode: "E2" }),
+    );
+    // Neither the unchanged E9 nor the newly-attempted archived E8 resolve
+    // via the active-only query.
+    mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(new Map());
+
+    // User tries to change homeRoom from archived E9 to a DIFFERENT archived code E8.
+    const res = await callPatch({ pitchCode: null, homeDressingRoomCode: "E8", awayDressingRoomCode: "E2" });
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/homeDressingRoomCode/);
+    // The update must never have been persisted.
+    expect(mocks.eventUpdate).not.toHaveBeenCalled();
+  });
+
+  it("an unchanged historical archived pitchCode survives while a room field is updated", async () => {
+    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
+    mocks.eventFindUnique.mockResolvedValue(
+      makeEvent({ pitchCode: "ARCHIVED_PITCH", homeDressingRoomCode: null, awayDressingRoomCode: null }),
+    );
+    mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(
+      new Map([["E1", { name: "Garderobe E1", type: "DRESSING_ROOM" }]]),
+    );
+
+    const res = await callPatch({
+      pitchCode: "ARCHIVED_PITCH",
+      homeDressingRoomCode: "E1",
+      awayDressingRoomCode: null,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.getActiveFacilityResourcesByCodesForTenant).toHaveBeenCalledWith(["E1"], TENANT_A);
+  });
+
+  it("still rejects a brand-new archived code when there is no prior value at all", async () => {
+    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
+    mocks.eventFindUnique.mockResolvedValue(makeEvent());
+    mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(new Map());
+
+    const res = await callPatch({ pitchCode: null, homeDressingRoomCode: "E9", awayDressingRoomCode: null });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("a genuinely active new assignment still succeeds", async () => {
+    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
+    mocks.eventFindUnique.mockResolvedValue(makeEvent());
+    mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(
+      new Map([["E1", { name: "Garderobe E1", type: "DRESSING_ROOM" }]]),
+    );
+
+    const res = await callPatch({ pitchCode: null, homeDressingRoomCode: "E1", awayDressingRoomCode: null });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("cross-tenant validation remains rejected even for a resent value that differs from the current one", async () => {
+    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
+    mocks.eventFindUnique.mockResolvedValue(makeEvent({ homeDressingRoomCode: "E1" }));
+    // Tenant-scoped lookup never returns a tenant-B-only code when queried for tenant A.
+    mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(new Map());
+
+    const res = await callPatch({ pitchCode: null, homeDressingRoomCode: "TENANT_B_ONLY_ROOM", awayDressingRoomCode: null });
+
+    expect(res.status).toBe(400);
+    expect(mocks.getActiveFacilityResourcesByCodesForTenant).toHaveBeenCalledWith(
+      ["TENANT_B_ONLY_ROOM"],
+      TENANT_A,
+    );
   });
 });

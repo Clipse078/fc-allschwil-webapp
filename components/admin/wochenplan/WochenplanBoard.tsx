@@ -685,11 +685,21 @@ export default function WochenplanBoard({
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
 
-  /** Persist allocation for a single event immediately. */
-  async function persistAllocation(event: WochenplanBoardEvent) {
+  /**
+   * Persist allocation for a single event immediately.
+   *
+   * MASTERDATA-CONSISTENCY-02-C2 — the server is authoritative: a non-2xx
+   * response (e.g. a newly-selected but archived resource, or a rejected
+   * cross-tenant/wrong-type code) is no longer treated as a silent success.
+   * On rejection, the event is reverted to its prior (already-persisted)
+   * state and the existing saveError banner surfaces the server's message,
+   * reusing the same minimal error-feedback pattern already used by
+   * publishWeek() below — no new toast/notification framework.
+   */
+  async function persistAllocation(event: WochenplanBoardEvent, previousEvent: WochenplanBoardEvent) {
     const pitchCode = toPitchCode(event);
     try {
-      await fetch(`/api/wochenplan/${event.id}/allocation`, {
+      const res = await fetch(`/api/wochenplan/${event.id}/allocation`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -698,8 +708,18 @@ export default function WochenplanBoard({
           awayDressingRoomCode: event.allocation.awayDressingRoomCode,
         }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setSaveError(data?.error ?? "Zuteilung konnte nicht gespeichert werden.");
+        setEvents((current) => current.map((e) => (e.id === event.id ? previousEvent : e)));
+        return;
+      }
+
+      setSaveError(null);
     } catch {
-      // Silent: allocation is still shown in UI; next explicit save will retry.
+      setSaveError("Netzwerkfehler. Zuteilung konnte nicht gespeichert werden.");
+      setEvents((current) => current.map((e) => (e.id === event.id ? previousEvent : e)));
     }
   }
 
@@ -821,6 +841,8 @@ export default function WochenplanBoard({
     nextSlotKey: WochenplanBoardSlotKey,
   ) {
     setEvents((current) => {
+      const previous = current.find((e) => e.id === eventId) ?? null;
+
       const next = current.map((event) => {
         if (event.id !== eventId) return event;
 
@@ -843,15 +865,17 @@ export default function WochenplanBoard({
           location: resolvedLocation,
         };
       });
-      // Persist the updated event's allocation immediately.
+      // Persist the updated event's allocation immediately; reverts on rejection.
       const updated = next.find((e) => e.id === eventId);
-      if (updated) void persistAllocation(updated);
+      if (updated && previous) void persistAllocation(updated, previous);
       return next;
     });
   }
 
   function updateRoom(eventId: string, roomType: "home" | "away", roomCode: string | null) {
     setEvents((current) => {
+      const previous = current.find((e) => e.id === eventId) ?? null;
+
       const next = current.map((event) =>
         event.id === eventId
           ? {
@@ -866,9 +890,9 @@ export default function WochenplanBoard({
             }
           : event,
       );
-      // Persist room change immediately.
+      // Persist room change immediately; reverts on rejection.
       const updated = next.find((e) => e.id === eventId);
-      if (updated) void persistAllocation(updated);
+      if (updated && previous) void persistAllocation(updated, previous);
       return next;
     });
   }
