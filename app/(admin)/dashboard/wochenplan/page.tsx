@@ -6,13 +6,45 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenantId } from "@/lib/tenants/active-tenant";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import { getWeekWindow, getIsoWeekNumber, startOfIsoWeek } from "@/lib/planner/date-utils";
-import { getWochenplanPitchRowLabels } from "@/lib/facilities/queries";
+import {
+  getActiveResourceOptionsForTenant,
+  getFacilityResourcesByCodesForTenant,
+  getWochenplanPitchRowLabels,
+} from "@/lib/facilities/queries";
 import { getWochenplanPublication } from "@/lib/wochenplan/publication-queries";
-import type { WochenplanBoardPitchRowKey } from "@/lib/wochenplan/types";
+import type { WochenplanBoardPitchRowKey, WochenplanEventItem } from "@/lib/wochenplan/types";
 
 type PageProps = {
   searchParams: Promise<{ week?: string }>;
 };
+
+/**
+ * MASTERDATA-CONSISTENCY-02-C2 — resolves DISPLAY NAMES only (never
+ * availability) for every dressing-room code referenced by a placed event
+ * this week, including archived/renamed-away ones. This is a name lookup,
+ * not a selectable-options list: it must not be used to decide which rooms
+ * can be newly assigned anywhere.
+ *
+ * Historical-compatibility merging into an actual selectable `roomOptions`
+ * list happens at the narrow consumer boundary in WochenplanBoard.tsx —
+ * per-event for WochenplanRoomDrawer, per-day for
+ * WochenplanRoomDayPlannerDialog — using this name map plus the canonical
+ * active roomOptions below, so an archived room referenced only on one day
+ * never bleeds into another day's/event's choices.
+ */
+async function getWochenplanHistoricalRoomNames(
+  tenantId: string,
+  placedEvents: WochenplanEventItem[],
+): Promise<Record<string, string>> {
+  const referencedCodes = placedEvents
+    .flatMap((event) => [event.allocation.homeDressingRoomCode, event.allocation.awayDressingRoomCode])
+    .filter((code): code is string => Boolean(code));
+
+  if (referencedCodes.length === 0) return {};
+
+  const namesByCode = await getFacilityResourcesByCodesForTenant(referencedCodes, tenantId);
+  return Object.fromEntries(namesByCode);
+}
 
 export default async function WochenplanPage({ searchParams }: PageProps) {
   await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
@@ -34,6 +66,25 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
     { key: "KUNSTRASEN_3", label: "KR 3" },
   ];
   const pitchRows = await getWochenplanPitchRowLabels(tenantId, defaultPitchRows);
+
+  // MASTERDATA-CONSISTENCY-02 (C1) — canonical, tenant-scoped, active
+  // dressing-room options, loaded once and shared by WochenplanBoard,
+  // WochenplanRoomDrawer, and WochenplanRoomDayPlannerDialog (Schnellkorrektur
+  // + drag/drop). Replaces the previously hardcoded
+  // DRESSING_ROOMS = ["E1", ..., "O4"] array.
+  //
+  // MASTERDATA-CONSISTENCY-02-C2 — this active list is intentionally NOT
+  // pre-merged with historical/archived codes here. Only a name lookup
+  // (historicalRoomNamesByCode) is resolved at the page level; the actual
+  // per-event / per-day historical merge happens in WochenplanBoard.tsx so
+  // an archived room referenced on one day never bleeds into another
+  // day's/event's selectable options.
+  const [roomOptions, historicalRoomNamesByCode] = tenantId
+    ? await Promise.all([
+        getActiveResourceOptionsForTenant(tenantId, "DRESSING_ROOM"),
+        getWochenplanHistoricalRoomNames(tenantId, boardData.placed),
+      ])
+    : [undefined, undefined];
 
   const weekNumber = getIsoWeekNumber(start);
   const weekYear = startOfIsoWeek(start).getUTCFullYear();
@@ -132,6 +183,8 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         weekId={weekId}
         pitchRows={pitchRows}
         activeVariantLabel={publication?.isPublished ? publication.variantLabel : null}
+        roomOptions={roomOptions}
+        historicalRoomNamesByCode={historicalRoomNamesByCode}
       />
     </div>
   );

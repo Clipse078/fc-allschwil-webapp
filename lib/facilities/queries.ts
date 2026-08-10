@@ -9,8 +9,92 @@
 
 import { prisma } from "@/lib/db/prisma";
 import type { FacilityStatus, FacilityType, FacilityResourceType } from "@prisma/client";
+import {
+  withRequiredCodes,
+  type FacilityResourceOption,
+} from "@/lib/facilities/resource-options";
+
+// Re-exported so existing importers of lib/facilities/queries can keep using
+// a single import path for the canonical option type + compatibility helper,
+// even though the pure implementation lives in resource-options.ts (kept
+// Prisma-free so it is safe to import from "use client" components too).
+export { withRequiredCodes, type FacilityResourceOption };
 
 // ── Read queries ─────────────────────────────────────────────────────────────
+
+/**
+ * MASTERDATA-CONSISTENCY-02 — the two live operational allocation groups
+ * that used to be backed by static FCA registries (lib/facilities/pitches.ts
+ * / lib/facilities/dressing-rooms.ts). Mirrors the FacilityResourceType
+ * grouping already established by lib/training/allocation-groups.ts and
+ * lib/facilities/availability-service.ts, so "pitch" and "dressing room"
+ * mean the same thing everywhere in the app.
+ */
+export type FacilityResourceGroup = "PITCH_HALL" | "DRESSING_ROOM";
+
+const RESOURCE_TYPES_BY_GROUP: Record<FacilityResourceGroup, FacilityResourceType[]> = {
+  PITCH_HALL: ["FULL_PITCH", "HALF_PITCH"],
+  DRESSING_ROOM: ["DRESSING_ROOM"],
+};
+
+/**
+ * Canonical, tenant-scoped, active-only resource options for a live
+ * operational selector (MatchCenter pitch/dressing-room assignment,
+ * Wochenplan room allocation, Wochenplan Schnellkorrektur).
+ *
+ * Replaces the static FCA_PITCH_ALLOCATIONS / FCA_DRESSING_ROOMS registries
+ * as the source of truth for what can be newly assigned: only active
+ * FacilityResource rows belonging to a non-archived Facility are returned.
+ *
+ * Does NOT include historical/archived codes already referenced by an
+ * existing allocation — callers that need to keep an existing allocation
+ * visible/selectable should merge those back in via withRequiredCodes().
+ */
+export async function getActiveResourceOptionsForTenant(
+  tenantId: string,
+  group: FacilityResourceGroup,
+): Promise<FacilityResourceOption[]> {
+  const resources = await prisma.facilityResource.findMany({
+    where: {
+      tenantId,
+      type: { in: RESOURCE_TYPES_BY_GROUP[group] },
+      status: { not: "ARCHIVED" },
+      facility: { status: { not: "ARCHIVED" } },
+    },
+    select: { code: true, name: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+
+  return resources;
+}
+
+/**
+ * Batch-resolves active, tenant-scoped FacilityResource rows by allocation
+ * code — used to validate submitted codes against canonical master data
+ * (e.g. the Wochenplan allocation API) instead of a static FCA `Set`.
+ *
+ * Tenant-scoped and archived-excluded: a code belonging to a different
+ * tenant, or to an archived resource/facility, is never returned — so
+ * validation naturally rejects both cross-tenant and archived codes.
+ */
+export async function getActiveFacilityResourcesByCodesForTenant(
+  codes: string[],
+  tenantId: string,
+): Promise<Map<string, { name: string; type: FacilityResourceType }>> {
+  if (codes.length === 0) return new Map();
+
+  const resources = await prisma.facilityResource.findMany({
+    where: {
+      tenantId,
+      code: { in: codes },
+      status: { not: "ARCHIVED" },
+      facility: { status: { not: "ARCHIVED" } },
+    },
+    select: { code: true, name: true, type: true },
+  });
+
+  return new Map(resources.map((r) => [r.code, { name: r.name, type: r.type }]));
+}
 
 export async function getFacilitiesForTenant(tenantId: string) {
   return prisma.facility.findMany({

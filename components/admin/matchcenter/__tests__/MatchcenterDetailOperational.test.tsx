@@ -18,6 +18,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import {
   beforeEach,
@@ -387,6 +388,127 @@ describe("MatchcenterDetailOperational", () => {
       expect(
         screen.getByTestId("away-dressing-room-select"),
       ).toBeDisabled();
+    });
+  });
+});
+
+// ── MASTERDATA-CONSISTENCY-02: canonical FacilityResource selectors ──────────
+
+describe("MatchcenterDetailOperational — canonical pitch/dressing-room options", () => {
+  it("renders a pitch option for every canonical pitchOptions entry", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: "STADION",
+          pitchOptions: [
+            { code: "STADION", name: "Stadion" },
+            { code: "KUNSTRASEN_2", name: "Kunstrasen 2" },
+          ],
+        })}
+      />,
+    );
+
+    const select = await screen.findByTestId("pitch-assignment-select");
+    const options = within(select).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(
+      expect.arrayContaining(["Stadion", "Kunstrasen 2"]),
+    );
+  });
+
+  it("a renamed pitch resource shows its current canonical name, not a static label", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: "STADION",
+          pitchOptions: [{ code: "STADION", name: "Hauptplatz (umbenannt)" }],
+        })}
+      />,
+    );
+
+    const select = await screen.findByTestId("pitch-assignment-select");
+    expect(within(select).getByText("Hauptplatz (umbenannt)")).toBeInTheDocument();
+  });
+
+  it("an archived pitch resource absent from pitchOptions is excluded from new choices", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: null,
+          pitchOptions: [{ code: "KUNSTRASEN_2", name: "Kunstrasen 2" }],
+        })}
+      />,
+    );
+
+    const select = await screen.findByTestId("pitch-assignment-select");
+    const options = within(select).getAllByRole("option").map((o) => o.textContent);
+    expect(options).not.toContain("Stadion");
+  });
+
+  it("an existing allocation referencing an archived/renamed-away pitch remains readable via a historical fallback option", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: "STADION_OLD",
+          // STADION_OLD is no longer part of the active canonical options —
+          // simulating an archived/renamed-away resource.
+          pitchOptions: [{ code: "KUNSTRASEN_2", name: "Kunstrasen 2" }],
+        })}
+      />,
+    );
+
+    const select = (await screen.findByTestId(
+      "pitch-assignment-select",
+    )) as HTMLSelectElement;
+
+    // The historical code remains selected/selectable instead of being
+    // silently cleared to "— Kein Spielfeld zugeordnet —".
+    expect(select.value).toBe("STADION_OLD");
+    expect(within(select).getByText("STADION_OLD")).toBeInTheDocument();
+  });
+
+  it("renders home/away dressing-room options from the canonical dressingRoomOptions list", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentHomeDressingRoomCode: "E1",
+          currentAwayDressingRoomCode: "E2",
+          dressingRoomOptions: [
+            { code: "E1", name: "Garderobe E1" },
+            { code: "E2", name: "Garderobe E2" },
+          ],
+        })}
+      />,
+    );
+
+    const homeSelect = await screen.findByTestId("home-dressing-room-select");
+    const awaySelect = await screen.findByTestId("away-dressing-room-select");
+
+    expect(within(homeSelect).getByText("Garderobe E1")).toBeInTheDocument();
+    expect(within(awaySelect).getByText("Garderobe E2")).toBeInTheDocument();
+  });
+
+  it("a historical away dressing-room allocation is not silently cleared when absent from dressingRoomOptions", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentAwayDressingRoomCode: "O9_ARCHIVED",
+          dressingRoomOptions: [{ code: "E1", name: "Garderobe E1" }],
+        })}
+      />,
+    );
+
+    const awaySelect = (await screen.findByTestId(
+      "away-dressing-room-select",
+    )) as HTMLSelectElement;
+
+    expect(awaySelect.value).toBe("O9_ARCHIVED");
+  });
+
+  it("falls back to an empty canonical list without crashing when pitchOptions/dressingRoomOptions are omitted", async () => {
+    render(<MatchcenterDetailOperational {...createProps()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pitch-assignment-select")).toBeInTheDocument();
     });
   });
 });

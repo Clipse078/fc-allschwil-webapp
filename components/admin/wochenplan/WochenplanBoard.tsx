@@ -11,6 +11,7 @@ import WochenplanRoomDayPlannerDialog, {
 import WochenplanRoomDrawer from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 import { getWochenplanConflicts } from "@/lib/wochenplan/conflict-engine";
 import { parseIsoWeekId } from "@/lib/planner/date-utils";
+import { withRequiredCodes, type FacilityResourceOption } from "@/lib/facilities/resource-options";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -23,6 +24,24 @@ const DEFAULT_PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; label: string
   { key: "STADION", label: "Stadion" },
   { key: "KUNSTRASEN_2", label: "KR 2" },
   { key: "KUNSTRASEN_3", label: "KR 3" },
+];
+
+/**
+ * Fallback dressing-room options used only when no tenant-scoped
+ * `roomOptions` prop is supplied (e.g. the standalone demo-data mode below).
+ * Real usage (app/(admin)/dashboard/wochenplan/page.tsx) always resolves
+ * canonical options via getActiveResourceOptionsForTenant(tenantId,
+ * "DRESSING_ROOM"), mirroring the DEFAULT_PITCH_ROWS fallback pattern above.
+ */
+const DEFAULT_DRESSING_ROOMS: FacilityResourceOption[] = [
+  { code: "E1", name: "E1" },
+  { code: "E2", name: "E2" },
+  { code: "E3", name: "E3" },
+  { code: "E4", name: "E4" },
+  { code: "O1", name: "O1" },
+  { code: "O2", name: "O2" },
+  { code: "O3", name: "O3" },
+  { code: "O4", name: "O4" },
 ];
 
 const TIME_SLOTS: WochenplanBoardSlotKey[] = [
@@ -606,10 +625,45 @@ type WochenplanBoardProps = {
    * Shown in the publish bar as "KW N | Variantname aktiv".
    */
   activeVariantLabel?: string | null;
+  /**
+   * MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped, ACTIVE-ONLY
+   * dressing-room options resolved via getActiveResourceOptionsForTenant(
+   * tenantId, "DRESSING_ROOM"). Falls back to DEFAULT_DRESSING_ROOMS when
+   * not provided (demo-data mode).
+   *
+   * MASTERDATA-CONSISTENCY-02-C2 — this list is intentionally NOT
+   * pre-merged with historical/archived codes for the whole week anymore.
+   * Historical compatibility is derived narrowly below (per-event for the
+   * Room Drawer, per-day for the Day Planner dialog) using
+   * historicalRoomNamesByCode, so an archived room referenced on one day
+   * never bleeds into another day's/event's selectable options.
+   */
+  roomOptions?: FacilityResourceOption[];
+  /**
+   * MASTERDATA-CONSISTENCY-02-C2 — display names (resolved server-side,
+   * status-independent) for every dressing-room code referenced by any
+   * placed event this week, keyed by code. Used only to label a historical
+   * code when it is merged back into a narrowly-scoped options list below —
+   * never to decide availability. Falls back to the raw code when a code
+   * has no entry here (e.g. no DB resource can be resolved at all).
+   */
+  historicalRoomNamesByCode?: Record<string, string>;
 };
 
-export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitchRowsProp, activeVariantLabel }: WochenplanBoardProps) {
+export default function WochenplanBoard({
+  initialEvents,
+  weekId,
+  pitchRows: pitchRowsProp,
+  activeVariantLabel,
+  roomOptions: roomOptionsProp,
+  historicalRoomNamesByCode: historicalRoomNamesByCodeProp,
+}: WochenplanBoardProps) {
   const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
+  const ROOM_OPTIONS = roomOptionsProp ?? DEFAULT_DRESSING_ROOMS;
+  const historicalRoomNamesByCode = useMemo(
+    () => new Map(Object.entries(historicalRoomNamesByCodeProp ?? {})),
+    [historicalRoomNamesByCodeProp],
+  );
   const [publishedVariant, setPublishedVariant] = useState<string | null>(activeVariantLabel ?? null);
   const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
   const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
@@ -631,11 +685,21 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
   const currentSnapshot = useMemo(() => buildSnapshot(events), [events]);
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
 
-  /** Persist allocation for a single event immediately. */
-  async function persistAllocation(event: WochenplanBoardEvent) {
+  /**
+   * Persist allocation for a single event immediately.
+   *
+   * MASTERDATA-CONSISTENCY-02-C2 — the server is authoritative: a non-2xx
+   * response (e.g. a newly-selected but archived resource, or a rejected
+   * cross-tenant/wrong-type code) is no longer treated as a silent success.
+   * On rejection, the event is reverted to its prior (already-persisted)
+   * state and the existing saveError banner surfaces the server's message,
+   * reusing the same minimal error-feedback pattern already used by
+   * publishWeek() below — no new toast/notification framework.
+   */
+  async function persistAllocation(event: WochenplanBoardEvent, previousEvent: WochenplanBoardEvent) {
     const pitchCode = toPitchCode(event);
     try {
-      await fetch(`/api/wochenplan/${event.id}/allocation`, {
+      const res = await fetch(`/api/wochenplan/${event.id}/allocation`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -644,8 +708,18 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
           awayDressingRoomCode: event.allocation.awayDressingRoomCode,
         }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setSaveError(data?.error ?? "Zuteilung konnte nicht gespeichert werden.");
+        setEvents((current) => current.map((e) => (e.id === event.id ? previousEvent : e)));
+        return;
+      }
+
+      setSaveError(null);
     } catch {
-      // Silent: allocation is still shown in UI; next explicit save will retry.
+      setSaveError("Netzwerkfehler. Zuteilung konnte nicht gespeichert werden.");
+      setEvents((current) => current.map((e) => (e.id === event.id ? previousEvent : e)));
     }
   }
 
@@ -715,6 +789,44 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
     );
   }, [events, roomDrawerEvent]);
 
+  /**
+   * MASTERDATA-CONSISTENCY-02-C2 — event-scoped room options for the Room
+   * Drawer: canonical active rooms plus only the CURRENTLY OPENED event's
+   * own historical/archived codes (never another event's). Derived at this
+   * narrow consumer boundary using the existing withRequiredCodes() helper
+   * — no new abstraction, no additional query.
+   */
+  const drawerRoomOptions = useMemo(() => {
+    if (!roomDrawerEvent) {
+      return ROOM_OPTIONS;
+    }
+
+    const requiredCodesForEvent = [
+      roomDrawerEvent.allocation.homeDressingRoomCode,
+      roomDrawerEvent.allocation.awayDressingRoomCode,
+    ];
+
+    return withRequiredCodes(ROOM_OPTIONS, requiredCodesForEvent, historicalRoomNamesByCode);
+  }, [ROOM_OPTIONS, roomDrawerEvent, historicalRoomNamesByCode]);
+
+  /**
+   * MASTERDATA-CONSISTENCY-02-C2 — day-scoped room options for the Day
+   * Planner dialog: canonical active rooms plus only the historical/archived
+   * codes referenced by events on the CURRENTLY OPENED day (never another
+   * day's events).
+   */
+  const dayPlannerRoomOptions = useMemo(() => {
+    if (!dayPlannerState.dayKey) {
+      return ROOM_OPTIONS;
+    }
+
+    const requiredCodesForDay = events
+      .filter((event) => event.boardDayKey === dayPlannerState.dayKey)
+      .flatMap((event) => [event.allocation.homeDressingRoomCode, event.allocation.awayDressingRoomCode]);
+
+    return withRequiredCodes(ROOM_OPTIONS, requiredCodesForDay, historicalRoomNamesByCode);
+  }, [ROOM_OPTIONS, events, dayPlannerState.dayKey, historicalRoomNamesByCode]);
+
   function openDayPlanner(dayKey: WochenplanBoardDayKey, dayLabel: string) {
     setDayPlannerState({
       dayKey,
@@ -729,6 +841,8 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
     nextSlotKey: WochenplanBoardSlotKey,
   ) {
     setEvents((current) => {
+      const previous = current.find((e) => e.id === eventId) ?? null;
+
       const next = current.map((event) => {
         if (event.id !== eventId) return event;
 
@@ -751,15 +865,17 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
           location: resolvedLocation,
         };
       });
-      // Persist the updated event's allocation immediately.
+      // Persist the updated event's allocation immediately; reverts on rejection.
       const updated = next.find((e) => e.id === eventId);
-      if (updated) void persistAllocation(updated);
+      if (updated && previous) void persistAllocation(updated, previous);
       return next;
     });
   }
 
   function updateRoom(eventId: string, roomType: "home" | "away", roomCode: string | null) {
     setEvents((current) => {
+      const previous = current.find((e) => e.id === eventId) ?? null;
+
       const next = current.map((event) =>
         event.id === eventId
           ? {
@@ -774,9 +890,9 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
             }
           : event,
       );
-      // Persist room change immediately.
+      // Persist room change immediately; reverts on rejection.
       const updated = next.find((e) => e.id === eventId);
-      if (updated) void persistAllocation(updated);
+      if (updated && previous) void persistAllocation(updated, previous);
       return next;
     });
   }
@@ -837,11 +953,13 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
         roomConflicts={roomConflicts}
         onClose={() => setDayPlannerState({ dayKey: null, dayLabel: null })}
         onChangeRoom={updateRoom}
+        roomOptions={dayPlannerRoomOptions}
       />
 
       <WochenplanRoomDrawer
         event={roomDrawerEvent}
         occupiedRooms={occupiedRooms}
+        roomOptions={drawerRoomOptions}
         onClose={() => setRoomDrawerEventId(null)}
         onChangeHomeRoom={(roomCode) => {
           if (!roomDrawerEvent) {
