@@ -50,6 +50,8 @@ import {
   getFacilityById,
   getFacilityResourcesForFacility,
   getFacilityResourcesByCodesForTenant,
+  getActiveFacilityResourcesByCodesForTenant,
+  getActiveResourceOptionsForTenant,
   createFacility,
   createFacilityResource,
   updateFacilityResource,
@@ -570,5 +572,126 @@ describe("getFacilityResourcesByCodesForTenant", () => {
 
     expect(result.get("STADION_A")).toBe("Stadion A");
     expect(result.get("E1")).toBe("Garderobe E1");
+  });
+});
+
+// ── MASTERDATA-CONSISTENCY-02 — canonical write-path validation + operational selectors ──
+
+describe("getActiveFacilityResourcesByCodesForTenant", () => {
+  it("returns empty map when codes array is empty", async () => {
+    const result = await getActiveFacilityResourcesByCodesForTenant([], TENANT_A);
+
+    expect(result.size).toBe(0);
+    expect(mocks.facilityResourceFindMany).not.toHaveBeenCalled();
+  });
+
+  it("scopes the query to the given tenant and excludes archived resources", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([]);
+
+    await getActiveFacilityResourcesByCodesForTenant(["STADION"], TENANT_A);
+
+    expect(mocks.facilityResourceFindMany).toHaveBeenCalledWith({
+      where: { tenantId: TENANT_A, code: { in: ["STADION"] }, status: { not: "ARCHIVED" } },
+      select: { id: true, code: true, name: true, type: true },
+    });
+  });
+
+  it("resolves an active resource by code (accepted)", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([
+      { id: RESOURCE_1, code: "STADION_A", name: "Stadion A", type: "FULL_PITCH" },
+    ]);
+
+    const result = await getActiveFacilityResourcesByCodesForTenant(["STADION_A"], TENANT_A);
+
+    expect(result.get("STADION_A")).toEqual(
+      expect.objectContaining({ id: RESOURCE_1, type: "FULL_PITCH" }),
+    );
+  });
+
+  it("does not resolve an archived resource (query already filters status)", async () => {
+    // An archived resource never appears in the findMany result because the
+    // where-clause excludes it — simulated by resolving without it.
+    mocks.facilityResourceFindMany.mockResolvedValue([]);
+
+    const result = await getActiveFacilityResourcesByCodesForTenant(["ARCHIVED_CODE"], TENANT_A);
+
+    expect(result.has("ARCHIVED_CODE")).toBe(false);
+  });
+
+  it("does not resolve a resource belonging to a different tenant", async () => {
+    // Cross-tenant codes never appear in the tenant-scoped findMany result.
+    mocks.facilityResourceFindMany.mockResolvedValue([]);
+
+    const result = await getActiveFacilityResourcesByCodesForTenant(["STADION_A"], TENANT_B);
+
+    expect(result.has("STADION_A")).toBe(false);
+    expect(mocks.facilityResourceFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tenantId: TENANT_B }) }),
+    );
+  });
+});
+
+describe("getActiveResourceOptionsForTenant", () => {
+  it("returns only FULL_PITCH/HALF_PITCH resources for category 'PITCH'", async () => {
+    const pitchResource = makeResource({ id: "res-pitch", code: "STADION", type: "FULL_PITCH" });
+    const roomResource = makeResource({ id: "res-room", code: "E1", type: "DRESSING_ROOM" });
+    const facility = makeFacility({ resources: [pitchResource, roomResource] });
+    mocks.facilityFindMany.mockResolvedValue([facility]);
+
+    const result = await getActiveResourceOptionsForTenant(TENANT_A, "PITCH");
+
+    expect(result.map((r) => r.code)).toEqual(["STADION"]);
+  });
+
+  it("returns only DRESSING_ROOM resources for category 'DRESSING_ROOM'", async () => {
+    const pitchResource = makeResource({ id: "res-pitch", code: "STADION", type: "FULL_PITCH" });
+    const roomResource = makeResource({ id: "res-room", code: "E1", type: "DRESSING_ROOM" });
+    const facility = makeFacility({ resources: [pitchResource, roomResource] });
+    mocks.facilityFindMany.mockResolvedValue([facility]);
+
+    const result = await getActiveResourceOptionsForTenant(TENANT_A, "DRESSING_ROOM");
+
+    expect(result.map((r) => r.code)).toEqual(["E1"]);
+  });
+
+  it("includes a newly created resource without any static registry change", async () => {
+    const newResource = makeResource({ id: "res-new", code: "NEUE_HALLE", name: "Neue Halle", type: "FULL_PITCH" });
+    const facility = makeFacility({ resources: [newResource] });
+    mocks.facilityFindMany.mockResolvedValue([facility]);
+
+    const result = await getActiveResourceOptionsForTenant(TENANT_A, "PITCH");
+
+    expect(result.some((r) => r.code === "NEUE_HALLE")).toBe(true);
+  });
+
+  it("excludes archived resources (relies on getFacilitiesForTenant's active-only filter)", async () => {
+    // getFacilitiesForTenant already excludes archived facilities/resources at
+    // the query level (status: { not: "ARCHIVED" }) — simulate that here.
+    const facility = makeFacility({ resources: [] });
+    mocks.facilityFindMany.mockResolvedValue([facility]);
+
+    const result = await getActiveResourceOptionsForTenant(TENANT_A, "PITCH");
+
+    expect(result).toEqual([]);
+  });
+
+  it("reflects a rename immediately (name comes straight from the DB row)", async () => {
+    const renamed = makeResource({ id: RESOURCE_1, code: "STADION_A", name: "Neuer Name" });
+    const facility = makeFacility({ resources: [renamed] });
+    mocks.facilityFindMany.mockResolvedValue([facility]);
+
+    const result = await getActiveResourceOptionsForTenant(TENANT_A, "PITCH");
+
+    expect(result.find((r) => r.code === "STADION_A")?.name).toBe("Neuer Name");
+  });
+
+  it("scopes the underlying query to the given tenant", async () => {
+    mocks.facilityFindMany.mockResolvedValue([]);
+
+    await getActiveResourceOptionsForTenant(TENANT_A, "PITCH");
+
+    expect(mocks.facilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tenantId: TENANT_A }) }),
+    );
   });
 });

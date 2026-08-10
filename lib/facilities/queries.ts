@@ -95,6 +95,66 @@ export async function getFacilityResourcesByCodesForTenant(
   return new Map(resources.map((r) => [r.code, r.name]));
 }
 
+/**
+ * MASTERDATA-CONSISTENCY-02 — canonical write-path validation helper.
+ *
+ * Batch-loads *active* (non-archived) FacilityResource rows for a set of
+ * codes, scoped to a single tenant. Used by operational allocation
+ * endpoints (e.g. Wochenplan allocation PATCH) to validate a client-supplied
+ * resource code against the canonical DB state instead of a static
+ * registry — an archived resource, a resource from another tenant, or an
+ * unknown code all resolve to "not found" here.
+ */
+export async function getActiveFacilityResourcesByCodesForTenant(
+  codes: string[],
+  tenantId: string,
+): Promise<Map<string, { id: string; code: string; name: string; type: FacilityResourceType }>> {
+  if (codes.length === 0) return new Map();
+
+  const resources = await prisma.facilityResource.findMany({
+    where: {
+      tenantId,
+      code: { in: codes },
+      status: { not: "ARCHIVED" },
+    },
+    select: { id: true, code: true, name: true, type: true },
+  });
+
+  return new Map(resources.map((r) => [r.code, r]));
+}
+
+/**
+ * Canonical facility groups for a single allocation category, ready to
+ * render as grouped `<select>` options (facility → resources).
+ *
+ * `category` selects which FacilityResourceType(s) are included:
+ *   - "PITCH": FULL_PITCH + HALF_PITCH
+ *   - "DRESSING_ROOM": DRESSING_ROOM
+ *
+ * Only active (non-archived) facilities/resources are returned — this is
+ * the canonical source for live operational pitch/dressing-room selectors
+ * (MatchCenter, Wochenplan), replacing the static FCA_PITCH_ALLOCATIONS /
+ * FCA_DRESSING_ROOMS registries.
+ */
+export async function getActiveResourceOptionsForTenant(
+  tenantId: string,
+  category: "PITCH" | "DRESSING_ROOM",
+): Promise<Array<{ id: string; code: string; name: string; type: FacilityResourceType }>> {
+  const facilities = await getFacilitiesForTenant(tenantId);
+  const allowedTypes: FacilityResourceType[] =
+    category === "PITCH" ? ["FULL_PITCH", "HALF_PITCH"] : ["DRESSING_ROOM"];
+
+  return facilities
+    .flatMap((facility) => facility.resources)
+    .filter((resource) => allowedTypes.includes(resource.type))
+    .map((resource) => ({
+      id: resource.id,
+      code: resource.code,
+      name: resource.name,
+      type: resource.type,
+    }));
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type FacilityWithResources = Awaited<
