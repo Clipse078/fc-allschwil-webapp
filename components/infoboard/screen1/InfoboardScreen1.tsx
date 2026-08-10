@@ -43,6 +43,10 @@ import type {
   InfoboardTeamAllocationPresentation,
   InfoboardEventPresentationExtension,
 } from "./screen1-presentation-types";
+import {
+  DEFAULT_INFOBOARD_DISPLAY_THEME,
+  type InfoboardDisplayTheme,
+} from "@/lib/publishing/infoboard/display-theme";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -69,6 +73,14 @@ export type InfoboardScreen1Props = {
    * feed.displayDate. Never call new Date() without an argument.
    */
   currentTimeIso?: string | null;
+  /**
+   * Display theme (INFOBOARD-INTEGRATION-01B). Defaults to "DARK" — the
+   * existing premium stadium theme — when omitted, so every existing caller
+   * (previews, tests) is unaffected. Presentation only: never changes feed
+   * content, layout, or content hierarchy — only CSS custom-property values
+   * via the rendered `data-theme` attribute.
+   */
+  theme?: InfoboardDisplayTheme;
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -585,9 +597,11 @@ export function InfoboardScreen1({
   announcement,
   eventPresentation,
   currentTimeIso,
+  theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
 }: InfoboardScreen1Props): ReactElement {
   const { tenant, current, next, later } = feed;
   const timeZone = tenant.timezone;
+  const themeAttr = theme.toLowerCase();
 
   const flatList = buildFlatList(feed);
   const totalEvents = flatList.length;
@@ -619,7 +633,7 @@ export function InfoboardScreen1({
     <div
       className={styles.root}
       data-testid="infoboard-screen1-root"
-      data-theme="dark"
+      data-theme={themeAttr}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className={styles.header} data-testid="infoboard-header">

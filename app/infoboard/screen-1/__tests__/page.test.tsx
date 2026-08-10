@@ -70,6 +70,7 @@ const ACTIVE_TENANT = {
   name: "FC Allschwil",
   timezone: "Europe/Zurich",
   logoUrl: null,
+  infoboardDisplayTheme: null,
 };
 
 const NOW_ISO = "2026-07-24T16:00:00.000Z";
@@ -123,6 +124,7 @@ const MOCK_PAYLOAD = {
     productLogoSrc: "/images/branding/sportclubevo_logo.png",
   },
   currentTimeIso: NOW_ISO,
+  theme: "DARK" as const,
 };
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -266,6 +268,42 @@ describe("InfoboardScreen1Page (production route)", () => {
       // The page file is at app/infoboard/screen-1/page.tsx
       // This test confirms the file location is correct for the Next.js route
       expect(__filename).toMatch(/infoboard\/screen-1\/__tests__\/page\.test\.tsx$/);
+    });
+  });
+
+  describe("display theme (INFOBOARD-INTEGRATION-01B)", () => {
+    it("passes the resolved theme from the payload to the root data-theme attribute", async () => {
+      mocks.buildScreen1LivePayload.mockResolvedValue({ ...MOCK_PAYLOAD, theme: "LIGHT" });
+      const { default: Page } = await import("../page");
+      const { container } = render(await Page());
+
+      const root = container.querySelector('[data-testid="infoboard-screen1-root"]');
+      expect(root?.getAttribute("data-theme")).toBe("light");
+    });
+
+    it("defaults to dark theme when payload.theme is DARK", async () => {
+      const { default: Page } = await import("../page");
+      const { container } = render(await Page());
+
+      const root = container.querySelector('[data-testid="infoboard-screen1-root"]');
+      expect(root?.getAttribute("data-theme")).toBe("dark");
+    });
+
+    it("passes tenant.infoboardDisplayTheme through to the live service", async () => {
+      mocks.tenantFindFirst.mockResolvedValue({ ...ACTIVE_TENANT, infoboardDisplayTheme: "LIGHT" });
+      const { default: Page } = await import("../page");
+      await Page();
+
+      const serviceCall = mocks.buildScreen1LivePayload.mock.calls[0][0];
+      expect(serviceCall.tenant.infoboardDisplayTheme).toBe("LIGHT");
+    });
+
+    it("selects infoboardDisplayTheme in the tenant query", async () => {
+      const { default: Page } = await import("../page");
+      await Page();
+
+      const call = mocks.tenantFindFirst.mock.calls[0][0];
+      expect(call.select.infoboardDisplayTheme).toBe(true);
     });
   });
 });

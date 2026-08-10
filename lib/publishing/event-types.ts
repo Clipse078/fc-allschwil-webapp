@@ -110,14 +110,15 @@ export type InfoboardScreen1Feed = {
    */
   current: InfoboardScreen1Event[];
   /**
-   * The next 2 upcoming eligible events on today's local calendar day,
-   * ordered by startAt ascending. If fewer than 2 upcoming events exist,
-   * all remaining ones are included.
+   * Upcoming eligible events sharing the earliest startAt within the
+   * Screen 1 rolling operational horizon (next ~4 hours from now).
+   * Events starting beyond the horizon are excluded entirely.
    */
   next: InfoboardScreen1Event[];
   /**
-   * Additional eligible events on today's local calendar day beyond the
-   * first 2 upcoming events selected for the "next" bucket.
+   * Remaining eligible upcoming events within the same rolling operational
+   * horizon, ordered by startAt ascending, beyond the earliest group
+   * selected for the "next" bucket.
    */
   later: InfoboardScreen1Event[];
   /** True when all three buckets are empty. */

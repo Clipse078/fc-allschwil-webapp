@@ -43,6 +43,14 @@
   --ib-free:           #1A7A4A;
   --ib-warning:        #CC8B14;
 
+  /* Soft (muted) variants of the accent colors — event-type label tint */
+  --ib-match-soft:      rgba(216, 48, 51, 0.85);
+  --ib-training-soft:   rgba(30, 91, 198, 0.85);
+  --ib-tournament-soft: rgba(232, 124, 36, 0.85);
+
+  /* Secondary text — opponent name, slightly softer than primary text */
+  --ib-text-secondary: rgba(232, 238, 244, 0.7);
+
   /* Aliases */
   --ib-red:            var(--ib-match);
   --ib-blue:           var(--ib-training);
@@ -100,6 +108,44 @@
   --ib-card-gap:        clamp(6px, 0.8vh, 12px);
   --ib-card-pad-v:      clamp(10px, 1.4vh, 20px);
   --ib-card-pad-h:      clamp(16px, 1.8vw, 28px);
+}
+
+/* ─── Light theme palette (INFOBOARD-INTEGRATION-01B) ───────────────────────
+ * Warm/neutral bright daytime palette — same layout, same information
+ * hierarchy, same sizing tokens as dark. Only color tokens are redefined:
+ * no washed-out gray-on-gray, no "office dashboard" feel. Strong, calm
+ * contrast; accents stay identical to dark for immediate recognizability.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+.root[data-theme="light"] {
+  --ib-page-bg:        #F4EFE6;
+  --ib-card-bg:        #FFFFFF;
+  --ib-card-current:   #FFF8EC;
+  --ib-header-bg:      #FFFFFF;
+
+  --ib-border:         rgba(60, 48, 32, 0.10);
+  --ib-border-strong:  rgba(60, 48, 32, 0.20);
+  --ib-border-current: rgba(232, 124, 36, 0.35);
+
+  --ib-text:           #241C12;
+  --ib-text-muted:     #6B5F4E;
+  --ib-text-dim:       #8C8272;
+
+  --ib-match:          #C22A2D;
+  --ib-training:       #1849A6;
+  --ib-tournament:     #C2670F;
+  --ib-free:           #167A46;
+  --ib-warning:        #9A6300;
+
+  --ib-match-soft:      rgba(194, 42, 45, 0.88);
+  --ib-training-soft:   rgba(24, 73, 166, 0.88);
+  --ib-tournament-soft: rgba(194, 103, 15, 0.88);
+
+  --ib-text-secondary: rgba(36, 28, 18, 0.62);
+
+  --ib-red:            var(--ib-match);
+  --ib-blue:           var(--ib-training);
+  --ib-orange:         var(--ib-tournament);
 }
 
 /* ─── Root container ─────────────────────────────────────────────────────── */
@@ -379,9 +425,9 @@
   color: var(--ib-text-muted);
 }
 
-.eventTypeLabel[data-event-type="MATCH"]      { color: rgba(216, 48, 51, 0.85); }
-.eventTypeLabel[data-event-type="TOURNAMENT"] { color: rgba(232, 124, 36, 0.85); }
-.eventTypeLabel[data-event-type="TRAINING"]   { color: rgba(30, 91, 198, 0.85); }
+.eventTypeLabel[data-event-type="MATCH"]      { color: var(--ib-match-soft); }
+.eventTypeLabel[data-event-type="TOURNAMENT"] { color: var(--ib-tournament-soft); }
+.eventTypeLabel[data-event-type="TRAINING"]   { color: var(--ib-training-soft); }
 
 .matchIdentity {
   display: flex;
@@ -421,7 +467,7 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: rgba(232, 238, 244, 0.7);
+  color: var(--ib-text-secondary);
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;

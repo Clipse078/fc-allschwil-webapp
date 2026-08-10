@@ -1625,8 +1625,14 @@ describe("Purity", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Dark theme — INFOBOARD-04A", () => {
-  it("root element has data-theme='dark' attribute", () => {
+  it("root element has data-theme='dark' attribute by default", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("root element has data-theme='dark' attribute when theme='DARK' is explicit", () => {
+    render(<InfoboardScreen1 feed={makeFeed()} theme="DARK" />);
     const root = screen.getByTestId("infoboard-screen1-root");
     expect(root.getAttribute("data-theme")).toBe("dark");
   });
@@ -1651,6 +1657,107 @@ describe("Dark theme — INFOBOARD-04A", () => {
     );
     const root = screen.getByTestId("infoboard-screen1-root");
     expect(root.querySelector("table")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-INTEGRATION-01B: Light theme ───────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
+  it("root element has data-theme='light' attribute when theme='LIGHT'", () => {
+    render(<InfoboardScreen1 feed={makeFeed()} theme="LIGHT" />);
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.getAttribute("data-theme")).toBe("light");
+  });
+
+  it("light theme still renders the same layout structure (header, board title, footer)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+        theme="LIGHT"
+      />,
+    );
+    expect(screen.getByTestId("infoboard-header")).toBeTruthy();
+    expect(screen.getByTestId("board-title")).toBeTruthy();
+    expect(screen.getByTestId("infoboard-footer")).toBeTruthy();
+    expect(screen.getAllByTestId("event-row").length).toBeGreaterThan(0);
+  });
+
+  it("light theme renders event rows as <li> (card-based, same as dark)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
+        theme="LIGHT"
+      />,
+    );
+    const rows = screen.getAllByTestId("event-row");
+    for (const row of rows) {
+      expect(row.tagName.toLowerCase()).toBe("li");
+    }
+  });
+
+  it("light theme renders training/match/tournament content identically to dark theme", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          type: "MATCH",
+          teamDisplayName: "FC Test",
+          opponentDisplayName: "FC Other",
+          allocation: {
+            pitchLabel: "Stadion",
+            homeDressingRoomLabel: "Kabine E1",
+            awayDressingRoomLabel: "Kabine E2",
+            refereeDressingRoomLabel: null,
+          },
+        }),
+      ],
+      isEmpty: false,
+    });
+
+    const { container: darkContainer } = render(
+      <InfoboardScreen1 feed={feed} theme="DARK" />,
+    );
+    const darkText = darkContainer.textContent;
+
+    const { container: lightContainer } = render(
+      <InfoboardScreen1 feed={feed} theme="LIGHT" />,
+    );
+    const lightText = lightContainer.textContent;
+
+    // Same underlying content — only the data-theme attribute (and CSS) differs.
+    expect(darkText).toBe(lightText);
+  });
+
+  it("theme prop does not change which events are rendered", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ id: "c1" })],
+      next: [makeEvent({ id: "n1" })],
+      later: [makeEvent({ id: "l1" })],
+      isEmpty: false,
+    });
+
+    render(<InfoboardScreen1 feed={feed} theme="LIGHT" />);
+    expect(screen.getAllByTestId("event-row")).toHaveLength(3);
+  });
+
+  it("unassigned pitch/dressing-room warnings still render in light theme", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          allocation: {
+            pitchLabel: null,
+            homeDressingRoomLabel: null,
+            awayDressingRoomLabel: null,
+            refereeDressingRoomLabel: null,
+          },
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} theme="LIGHT" />);
+    expect(screen.getByTestId("pitch-unassigned-warning")).toBeTruthy();
+    expect(screen.getByTestId("dressing-room-unassigned-warning")).toBeTruthy();
   });
 });
 

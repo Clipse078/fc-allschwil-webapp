@@ -37,6 +37,10 @@ import { buildInfoboardScreen1Feed } from "./screen1-feed-builder";
 import type { InfoboardScreen1Feed, InfoboardTenantRef } from "../event-types";
 import type { PublicationEventLoader } from "../policy/event-selection";
 import type { Screen1SourceEvent } from "./screen1-event-mapper";
+import {
+  resolveInfoboardDisplayTheme,
+  type InfoboardDisplayTheme,
+} from "./display-theme";
 import type {
   InfoboardAnnouncementPresentation,
   InfoboardEventPresentationExtension,
@@ -76,6 +80,12 @@ const FC_ALLSCHWIL_TENANT_KEY = "fc-allschwil";
 export type Screen1TenantContext = InfoboardTenantRef & {
   /** Optional: tenant-configured club logo URL (Tenant.logoUrl). */
   readonly logoUrl?: string | null;
+  /**
+   * Optional: raw persisted display-theme preference (Tenant.infoboardDisplayTheme).
+   * Resolved via resolveInfoboardDisplayTheme() — presentation only, never
+   * affects planning data, publication policy, or resource allocation.
+   */
+  readonly infoboardDisplayTheme?: string | null;
 };
 
 /**
@@ -99,6 +109,11 @@ export type InfoboardScreen1LivePayload = {
   readonly announcement: InfoboardAnnouncementPresentation | null;
   readonly branding: InfoboardScreen1Branding;
   readonly currentTimeIso: string;
+  /**
+   * Resolved display theme (DARK default). Presentation only — does not
+   * influence feed content in any way; see resolveInfoboardDisplayTheme().
+   */
+  readonly theme: InfoboardDisplayTheme;
 };
 
 // ── Branding resolver ─────────────────────────────────────────────────────────
@@ -187,11 +202,17 @@ export async function buildScreen1LivePayload(params: {
     productLogoSrc: PRODUCT_LOGO_SRC,
   };
 
+  // ── Display theme ────────────────────────────────────────────────────────
+  // Presentation only — resolved from the persisted preference, defaulting
+  // to DARK. Never influences the feed built above.
+  const theme = resolveInfoboardDisplayTheme(tenant.infoboardDisplayTheme);
+
   return {
     feed,
     eventPresentation,
     announcement,
     branding,
     currentTimeIso: now.toISOString(),
+    theme,
   };
 }

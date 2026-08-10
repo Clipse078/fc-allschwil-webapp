@@ -38,6 +38,7 @@ import { InfoboardDisplayCard } from "@/components/infoboard/admin/InfoboardDisp
 import { InfoboardPublicationSummary } from "@/components/infoboard/admin/InfoboardPublicationSummary";
 import { InfoboardTodayList } from "@/components/infoboard/admin/InfoboardTodayList";
 import { InfoboardDateSelector } from "@/components/infoboard/admin/InfoboardDateSelector";
+import { InfoboardThemeToggle } from "@/components/infoboard/admin/InfoboardThemeToggle";
 import {
   buildScreen1LivePayload,
   type Screen1TenantContext,
@@ -48,6 +49,7 @@ import {
 } from "@/lib/publishing/infoboard/canonical-source-loader";
 import { buildScreen1AdminSummary } from "@/lib/publishing/infoboard/screen1-admin-summary";
 import { toLocalDateKey } from "@/lib/publishing/time/temporal-grouping";
+import { resolveInfoboardDisplayTheme } from "@/lib/publishing/infoboard/display-theme";
 
 // ── Page props ─────────────────────────────────────────────────────────────────
 
@@ -177,7 +179,12 @@ export default async function InfoboardAdminPage({
     name: tenantContext.name,
     timezone: tenantTimezone,
     logoUrl: tenantContext.logoUrl,
+    infoboardDisplayTheme: tenantContext.infoboardDisplayTheme,
   };
+
+  const currentDisplayTheme = resolveInfoboardDisplayTheme(
+    tenantContext.infoboardDisplayTheme,
+  );
 
   // ── Date resolution ─────────────────────────────────────────────────────────
   // Validate the date query parameter. Invalid values safely fall back to today.
@@ -280,6 +287,31 @@ export default async function InfoboardAdminPage({
           description="Zeigt die aktuelle Belegung der Plätze und die Sportanlagenübersicht."
           publicRoute="/infoboard/screen-2"
         />
+      </div>
+
+      {/* Display appearance — Dark/Light theme (INFOBOARD-INTEGRATION-01B) */}
+      <div className="sce-detail-section">
+        <div className="sce-detail-section-header">
+          <div className="flex min-w-0 items-center gap-3">
+            <Monitor className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+            <div>
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                Darstellung
+              </p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                Anzeige-Theme
+              </p>
+            </div>
+          </div>
+          <InfoboardThemeToggle initialTheme={currentDisplayTheme} />
+        </div>
+        <div className="sce-detail-section-body">
+          <p className="text-sm text-[var(--text-2)]">
+            Legt fest, ob Display 1 im dunklen (Standard) oder im hellen Theme
+            angezeigt wird. Betrifft ausschliesslich die Darstellung — Inhalte,
+            Zuteilungen und Sichtbarkeitsregeln bleiben unverändert.
+          </p>
+        </div>
       </div>
 
       {/* Publication state section */}

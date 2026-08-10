@@ -349,4 +349,70 @@ describe("buildScreen1LivePayload", () => {
       expect(p1.feed.tenant).toEqual(p2.feed.tenant);
     });
   });
+
+  // ── Display theme (INFOBOARD-INTEGRATION-01B) ───────────────────────────────
+  // Presentation only — theme resolution must never change feed content.
+
+  describe("theme", () => {
+    it("defaults to DARK when tenant.infoboardDisplayTheme is absent", async () => {
+      const loader = makeEmptyLoader();
+      const payload = await buildScreen1LivePayload({ tenant: TENANT_FCA, now: NOW, loader });
+
+      expect(payload.theme).toBe("DARK");
+    });
+
+    it("defaults to DARK when tenant.infoboardDisplayTheme is null", async () => {
+      const loader = makeEmptyLoader();
+      const tenant: Screen1TenantContext = { ...TENANT_FCA, infoboardDisplayTheme: null };
+      const payload = await buildScreen1LivePayload({ tenant, now: NOW, loader });
+
+      expect(payload.theme).toBe("DARK");
+    });
+
+    it("resolves LIGHT when tenant.infoboardDisplayTheme is 'LIGHT'", async () => {
+      const loader = makeEmptyLoader();
+      const tenant: Screen1TenantContext = { ...TENANT_FCA, infoboardDisplayTheme: "LIGHT" };
+      const payload = await buildScreen1LivePayload({ tenant, now: NOW, loader });
+
+      expect(payload.theme).toBe("LIGHT");
+    });
+
+    it("resolves DARK when tenant.infoboardDisplayTheme is 'DARK'", async () => {
+      const loader = makeEmptyLoader();
+      const tenant: Screen1TenantContext = { ...TENANT_FCA, infoboardDisplayTheme: "DARK" };
+      const payload = await buildScreen1LivePayload({ tenant, now: NOW, loader });
+
+      expect(payload.theme).toBe("DARK");
+    });
+
+    it("falls back to DARK for an unrecognised persisted value", async () => {
+      const loader = makeEmptyLoader();
+      const tenant: Screen1TenantContext = { ...TENANT_FCA, infoboardDisplayTheme: "NEON" };
+      const payload = await buildScreen1LivePayload({ tenant, now: NOW, loader });
+
+      expect(payload.theme).toBe("DARK");
+    });
+
+    it("does not change the resolved feed content when theme is LIGHT vs DARK", async () => {
+      const event = makeBaseEvent({ type: "TRAINING" });
+      const darkPayload = await buildScreen1LivePayload({
+        tenant: { ...TENANT_FCA, infoboardDisplayTheme: "DARK" },
+        now: NOW,
+        loader: makeLoader([event]),
+      });
+      const lightPayload = await buildScreen1LivePayload({
+        tenant: { ...TENANT_FCA, infoboardDisplayTheme: "LIGHT" },
+        now: NOW,
+        loader: makeLoader([event]),
+      });
+
+      expect(darkPayload.theme).toBe("DARK");
+      expect(lightPayload.theme).toBe("LIGHT");
+      // Same activity data regardless of theme — presentation only.
+      expect(darkPayload.feed.current).toEqual(lightPayload.feed.current);
+      expect(darkPayload.feed.next).toEqual(lightPayload.feed.next);
+      expect(darkPayload.feed.later).toEqual(lightPayload.feed.later);
+      expect(darkPayload.feed.isEmpty).toBe(lightPayload.feed.isEmpty);
+    });
+  });
 });

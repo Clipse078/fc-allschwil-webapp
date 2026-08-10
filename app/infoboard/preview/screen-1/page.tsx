@@ -10,6 +10,12 @@
  *   - Fixed current-time (17:35 Zurich; evt-2 at 18:00 shows ALS NÄCHSTES)
  *   - Tenant announcement matching the target image
  *
+ * Optional `?theme=dark|light` query param (INFOBOARD-INTEGRATION-01B):
+ * lets a reviewer manually verify both display themes against the same
+ * deterministic fixture. Defaults to "dark" when absent/invalid — this is a
+ * preview-only convenience, not the persisted tenant preference used by the
+ * production route.
+ *
  * Constraints:
  *   - No fetch, no API calls, no database access, no authentication change.
  *   - Production /infoboard route is not modified.
@@ -19,6 +25,10 @@
 
 import type { Metadata } from "next";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
+import {
+  resolveInfoboardDisplayTheme,
+  type InfoboardDisplayTheme,
+} from "@/lib/publishing/infoboard/display-theme";
 import {
   PREVIEW_FIXTURE,
   PREVIEW_CURRENT_TIME_ISO,
@@ -30,7 +40,16 @@ export const metadata: Metadata = {
   title: "Screen 1 Preview · Infoboard",
 };
 
-export default function InfoboardScreen1PreviewPage() {
+type PreviewPageProps = {
+  searchParams?: Promise<{ theme?: string }>;
+};
+
+export default async function InfoboardScreen1PreviewPage({
+  searchParams,
+}: PreviewPageProps) {
+  const params = (await searchParams) ?? {};
+  const theme: InfoboardDisplayTheme = resolveInfoboardDisplayTheme(params.theme);
+
   return (
     <InfoboardScreen1
       feed={PREVIEW_FIXTURE}
@@ -41,6 +60,7 @@ export default function InfoboardScreen1PreviewPage() {
       currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
       announcement={PREVIEW_ANNOUNCEMENT}
       eventPresentation={PREVIEW_TARGET_TOURNAMENT_EXTENSIONS}
+      theme={theme}
     />
   );
 }
