@@ -10,6 +10,11 @@ import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import MatchcenterDetail from "@/components/admin/matchcenter/MatchcenterDetail";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import {
+  getActiveResourceOptionsForTenant,
+  getFacilityResourcesByCodesForTenant,
+  withRequiredCodes,
+} from "@/lib/facilities/queries";
 
 type MatchcenterDetailPageProps = {
   params: Promise<{
@@ -60,6 +65,42 @@ export default async function MatchcenterDetailPage({
     PERMISSIONS.EVENTS_MANAGE,
   );
 
+  // MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped, active resource
+  // options for the operational pitch/dressing-room selectors, replacing the
+  // static FCA_PITCH_ALLOCATIONS / FCA_DRESSING_ROOMS registries. Any code
+  // already persisted on this match (even archived/renamed-away) is merged
+  // back in via withRequiredCodes() so existing allocations remain readable
+  // and are never silently cleared.
+  const [activePitchOptions, activeDressingRoomOptions] = await Promise.all([
+    getActiveResourceOptionsForTenant(tenantId, "PITCH_HALL"),
+    getActiveResourceOptionsForTenant(tenantId, "DRESSING_ROOM"),
+  ]);
+
+  const requiredPitchCodes = [match.operational.pitchCode];
+  const requiredRoomCodes = [
+    match.operational.homeDressingRoomCode,
+    match.operational.awayDressingRoomCode,
+  ];
+
+  const historicalCodes = [...requiredPitchCodes, ...requiredRoomCodes].filter(
+    (code): code is string => Boolean(code),
+  );
+  const historicalNamesByCode = await getFacilityResourcesByCodesForTenant(
+    historicalCodes,
+    tenantId,
+  );
+
+  const pitchOptions = withRequiredCodes(
+    activePitchOptions,
+    requiredPitchCodes,
+    historicalNamesByCode,
+  );
+  const dressingRoomOptions = withRequiredCodes(
+    activeDressingRoomOptions,
+    requiredRoomCodes,
+    historicalNamesByCode,
+  );
+
   return (
     <ToastProvider>
       <MatchcenterDetail
@@ -67,6 +108,8 @@ export default async function MatchcenterDetailPage({
         locale={tenantContext.locale ?? "de-CH"}
         timezone={tenantContext.timezone ?? "Europe/Zurich"}
         canManageMappings={canManageMappings}
+        pitchOptions={pitchOptions}
+        dressingRoomOptions={dressingRoomOptions}
       />
     </ToastProvider>
   );

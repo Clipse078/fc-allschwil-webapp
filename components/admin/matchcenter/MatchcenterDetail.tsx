@@ -31,12 +31,17 @@ import { SectionCard } from "@/components/ui/page/SectionCard";
 import { DetailPagePattern } from "@/components/ui/patterns/DetailPagePattern";
 import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMappingDialog";
 import MatchcenterDetailOperational from "@/components/admin/matchcenter/MatchcenterDetailOperational";
+import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
   locale?: string;
   timezone?: string;
   canManageMappings?: boolean;
+  /** MASTERDATA-CONSISTENCY-02 — canonical pitch/hall options for MatchcenterDetailOperational. */
+  pitchOptions?: FacilityResourceOption[];
+  /** MASTERDATA-CONSISTENCY-02 — canonical dressing-room options for MatchcenterDetailOperational. */
+  dressingRoomOptions?: FacilityResourceOption[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -172,6 +177,8 @@ export default function MatchcenterDetail({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   canManageMappings = false,
+  pitchOptions = [],
+  dressingRoomOptions = [],
 }: MatchcenterDetailProps) {
   const statusLabel =
     STATUS_LABELS[match.status] ?? match.status;
@@ -481,6 +488,8 @@ export default function MatchcenterDetail({
           currentInfoboardVisible={match.visibility.infoboardVisible}
           matchDateIso={matchDateIso}
           canManage={canManageMappings}
+          pitchOptions={pitchOptions}
+          dressingRoomOptions={dressingRoomOptions}
         />
 
         <SectionCard

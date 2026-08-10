@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -22,8 +23,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/page/SectionCard";
-import { getPitchOptionsForEventType } from "@/lib/facilities/pitches";
-import { FCA_DRESSING_ROOMS } from "@/lib/facilities/dressing-rooms";
+import {
+  withRequiredCodes,
+  type FacilityResourceOption,
+} from "@/lib/facilities/resource-options";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -58,11 +61,23 @@ export type MatchcenterDetailOperationalProps = {
   /** ISO date string for infoboard preview link */
   matchDateIso: string;
   canManage: boolean;
+  /**
+   * MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped, active pitch/hall
+   * FacilityResource options (PITCH_HALL group), resolved server-side via
+   * getActiveResourceOptionsForTenant(). Replaces the static
+   * FCA_PITCH_ALLOCATIONS registry as the source of truth for new
+   * assignments. Defaults to an empty list; the currently assigned code (if
+   * any) is always kept selectable via withRequiredCodes() below, even when
+   * it is archived/renamed and therefore absent from this list.
+   */
+  pitchOptions?: FacilityResourceOption[];
+  /**
+   * Canonical, tenant-scoped, active dressing-room FacilityResource options
+   * (DRESSING_ROOM type), shared by both the home and away selectors.
+   * Replaces the static FCA_DRESSING_ROOMS registry.
+   */
+  dressingRoomOptions?: FacilityResourceOption[];
 };
-
-// ── Pitch options for MATCH events (full pitches only) ────────────────────────
-
-const MATCH_PITCH_OPTIONS = getPitchOptionsForEventType("MATCH");
 
 // ── Readiness helpers ─────────────────────────────────────────────────────────
 
@@ -185,9 +200,28 @@ export default function MatchcenterDetailOperational({
   currentInfoboardVisible,
   matchDateIso,
   canManage,
+  pitchOptions = [],
+  dressingRoomOptions = [],
 }: MatchcenterDetailOperationalProps) {
   const router = useRouter();
   const { toast } = useToast();
+
+  // MASTERDATA-CONSISTENCY-02 — historical compatibility: keep the
+  // currently-persisted code selectable even if it no longer resolves to an
+  // active resource (archived or renamed-away), so existing allocations are
+  // never silently cleared by this selector.
+  const effectivePitchOptions = useMemo(
+    () => withRequiredCodes(pitchOptions, [currentPitchCode]),
+    [pitchOptions, currentPitchCode],
+  );
+  const effectiveDressingRoomOptions = useMemo(
+    () =>
+      withRequiredCodes(dressingRoomOptions, [
+        currentHomeDressingRoomCode,
+        currentAwayDressingRoomCode,
+      ]),
+    [dressingRoomOptions, currentHomeDressingRoomCode, currentAwayDressingRoomCode],
+  );
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [teamId, setTeamId] = useState(currentTeamId ?? "");
@@ -499,9 +533,9 @@ export default function MatchcenterDetailOperational({
             data-testid="pitch-assignment-select"
           >
             <option value="">— Kein Spielfeld zugeordnet —</option>
-            {MATCH_PITCH_OPTIONS.map((opt) => (
+            {effectivePitchOptions.map((opt) => (
               <option key={opt.code} value={opt.code}>
-                {opt.label}
+                {opt.name}
               </option>
             ))}
           </select>
@@ -534,9 +568,9 @@ export default function MatchcenterDetailOperational({
               data-testid="home-dressing-room-select"
             >
               <option value="">— Keine Garderobe zugeordnet —</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {effectiveDressingRoomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
-                  {room.label}
+                  {room.name}
                 </option>
               ))}
             </select>
@@ -562,9 +596,9 @@ export default function MatchcenterDetailOperational({
               data-testid="away-dressing-room-select"
             >
               <option value="">— Keine Garderobe zugeordnet —</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {effectiveDressingRoomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
-                  {room.label}
+                  {room.name}
                 </option>
               ))}
             </select>
