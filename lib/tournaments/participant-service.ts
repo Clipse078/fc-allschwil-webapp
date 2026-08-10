@@ -41,6 +41,12 @@ import {
   TournamentParticipantTenantMismatchError,
 } from "./errors";
 
+// TOURNAMENTCENTER-UX-03: canonical external-participant identity for NEW
+// participants is a Club-Directory ExternalClub (+ tournament-specific
+// Anzeigename), not an ExternalTeam. externalTeamId stays fully supported
+// for HISTORICAL rows only — see the mutual-exclusivity + toDto handling
+// below.
+
 // ── Row type + include (mirrors lib/tournaments/queries.ts's participant shape) ─
 
 const participantInclude = {
@@ -62,6 +68,9 @@ const participantInclude = {
       categoryLabel: true,
       externalClub: { select: { id: true, name: true, shortName: true } },
     },
+  },
+  externalClub: {
+    select: { id: true, name: true, shortName: true },
   },
   dressingRoomAllocations: {
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
@@ -91,6 +100,8 @@ type ParticipantRow = {
   eventId: string;
   teamId: string | null;
   externalTeamId: string | null;
+  externalClubId: string | null;
+  displayName: string | null;
   manualLabel: string | null;
   displayOrder: number;
   createdAt: Date;
@@ -110,6 +121,7 @@ type ParticipantRow = {
     categoryLabel: string | null;
     externalClub: { id: string; name: string; shortName: string | null };
   } | null;
+  externalClub: { id: string; name: string; shortName: string | null } | null;
   dressingRoomAllocations: Array<{
     id: string;
     notes: string | null;
@@ -146,6 +158,7 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
       displayName: row.team.name,
       team: row.team,
       externalTeam: null,
+      externalClub: null,
       manualLabel: null,
       displayOrder: row.displayOrder,
       dressingRoomAllocations,
@@ -154,6 +167,34 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
     };
   }
 
+  // TOURNAMENTCENTER-UX-03 — canonical NEW external-participant kind.
+  if (row.externalClub) {
+    const rawDisplayName = row.displayName?.trim() || null;
+    return {
+      id: row.id,
+      tournamentId: row.eventId,
+      kind: "EXTERNAL_CLUB",
+      displayName: rawDisplayName ?? row.externalClub.name,
+      team: null,
+      externalTeam: null,
+      externalClub: {
+        club: {
+          id: row.externalClub.id,
+          name: row.externalClub.name,
+          shortName: row.externalClub.shortName,
+        },
+        rawDisplayName,
+      },
+      manualLabel: null,
+      displayOrder: row.displayOrder,
+      dressingRoomAllocations,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  // HISTORICAL ONLY — rows created before TOURNAMENTCENTER-UX-03. Never
+  // written by new participant creation; remains fully readable here.
   if (row.externalTeam) {
     return {
       id: row.id,
@@ -168,6 +209,7 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
         categoryLabel: row.externalTeam.categoryLabel,
         club: row.externalTeam.externalClub,
       },
+      externalClub: null,
       manualLabel: null,
       displayOrder: row.displayOrder,
       dressingRoomAllocations,
@@ -183,6 +225,7 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
     displayName: row.manualLabel ?? "Unbenannt",
     team: null,
     externalTeam: null,
+    externalClub: null,
     manualLabel: row.manualLabel,
     displayOrder: row.displayOrder,
     dressingRoomAllocations,
@@ -236,14 +279,22 @@ export async function listTournamentParticipants(
 }
 
 /**
- * Adds a participant (Team, ExternalTeam, or manual fallback) to a
- * tournament.
+ * Adds a participant (Team, ExternalClub, ExternalTeam, or manual fallback)
+ * to a tournament.
  *
  * Validates:
  *   - Tournament must exist for the tenant and be type=TOURNAMENT.
- *   - Exactly one of teamId / externalTeamId / manualLabel must be set.
- *   - Team/ExternalTeam must belong to the same tenant as the tournament.
+ *   - Exactly one of teamId / externalTeamId / externalClubId / manualLabel
+ *     must be set. `externalTeamId` is HISTORICAL ONLY — new participants
+ *     should use `externalClubId` (+ optional `displayName`) instead.
+ *   - `displayName` is only valid together with `externalClubId`.
+ *   - Team/ExternalTeam/ExternalClub must belong to the same tenant as the
+ *     tournament, and an ExternalClub must not be archived.
  *   - No duplicate participation of the same Team/ExternalTeam.
+ *     `externalClubId` is deliberately NOT unique per tournament — the same
+ *     canonical club may participate multiple times with distinct
+ *     displayName values (e.g. "AC Rossoneri" + "Gelb" and "AC Rossoneri" +
+ *     "E1" as two separate participants).
  *
  * @throws {TournamentNotFoundError}
  * @throws {TournamentParticipantValidationError}
@@ -259,12 +310,20 @@ export async function addTournamentParticipant(
 
   const teamId = input.teamId?.trim() || undefined;
   const externalTeamId = input.externalTeamId?.trim() || undefined;
+  const externalClubId = input.externalClubId?.trim() || undefined;
   const manualLabel = input.manualLabel?.trim() || undefined;
+  const displayName = input.displayName?.trim() || undefined;
 
-  const providedCount = [teamId, externalTeamId, manualLabel].filter(Boolean).length;
+  const providedCount = [teamId, externalTeamId, externalClubId, manualLabel].filter(Boolean).length;
   if (providedCount !== 1) {
     throw new TournamentParticipantValidationError(
-      "Exactly one of teamId, externalTeamId, or manualLabel must be provided.",
+      "Exactly one of teamId, externalTeamId, externalClubId, or manualLabel must be provided.",
+    );
+  }
+
+  if (displayName !== undefined && !externalClubId) {
+    throw new TournamentParticipantValidationError(
+      "displayName is only valid together with externalClubId.",
     );
   }
 
@@ -287,6 +346,23 @@ export async function addTournamentParticipant(
     }
   }
 
+  if (externalClubId) {
+    const externalClub = await prisma.externalClub.findFirst({
+      where: { id: externalClubId, tenantId },
+      select: { id: true, archivedAt: true },
+    });
+    if (!externalClub) {
+      throw new TournamentParticipantTenantMismatchError(
+        "externalClubId does not belong to this tenant",
+      );
+    }
+    if (externalClub.archivedAt) {
+      throw new TournamentParticipantValidationError(
+        "externalClubId refers to an archived club and cannot be added as a new participant.",
+      );
+    }
+  }
+
   let displayOrder = input.displayOrder;
   if (displayOrder === undefined) {
     const maxRow = await prisma.tournamentParticipant.aggregate({
@@ -303,6 +379,8 @@ export async function addTournamentParticipant(
         eventId: tournamentId,
         teamId: teamId ?? null,
         externalTeamId: externalTeamId ?? null,
+        externalClubId: externalClubId ?? null,
+        displayName: displayName ?? null,
         manualLabel: manualLabel ?? null,
         displayOrder,
       },
@@ -321,6 +399,36 @@ export async function addTournamentParticipant(
     }
     throw err;
   }
+}
+
+/**
+ * Updates the tournament-specific Anzeigename ("displayName") of an
+ * EXTERNAL_CLUB participant. Never touches ExternalClub.name/ExternalTeam.name
+ * — this is purely the participant-level override.
+ *
+ * @throws {TournamentParticipantNotFoundError}
+ * @throws {TournamentParticipantValidationError} Participant is not an EXTERNAL_CLUB kind.
+ */
+export async function updateTournamentParticipantDisplayName(
+  tenantId: string,
+  participantId: string,
+  displayName: string | null,
+): Promise<TournamentParticipantDto> {
+  const existing = await requireParticipant(tenantId, participantId);
+
+  if (!existing.externalClubId) {
+    throw new TournamentParticipantValidationError(
+      "displayName can only be edited for an ExternalClub participant.",
+    );
+  }
+
+  const updated = await prisma.tournamentParticipant.update({
+    where: { id: participantId },
+    data: { displayName: displayName?.trim() || null },
+    include: participantInclude,
+  });
+
+  return toDto(updated as unknown as ParticipantRow);
 }
 
 /**

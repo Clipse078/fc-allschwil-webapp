@@ -6,11 +6,14 @@
  * TOURNAMENTCENTER-01B — "Teilnehmende Teams" editor.
  *
  * Supports a variable, unbounded number of participants mixing
- * tenant-owned canonical Teams and Club-Directory ExternalTeams (and, as a
- * smallest clean fallback, a free-text manual label for a genuinely
- * unknown team). Per-participant Garderobe allocation is only shown for
- * HOME tournaments (AWAY tournaments have no FCA dressing-room
- * requirement — see lib/tournaments/operational-state.ts).
+ * tenant-owned canonical Teams and (TOURNAMENTCENTER-UX-03) canonical
+ * Club-Directory ExternalClub participants — each with a tournament-specific
+ * "Anzeigename" — and, as a smallest clean fallback, a free-text manual
+ * label for a genuinely unknown team. HISTORICAL rows linked via
+ * externalTeamId (created before TOURNAMENTCENTER-UX-03) remain fully
+ * readable here, just not creatable anymore. Per-participant Garderobe
+ * allocation is only shown for HOME tournaments (AWAY tournaments have no
+ * FCA dressing-room requirement — see lib/tournaments/operational-state.ts).
  */
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
@@ -29,12 +32,11 @@ type TeamOption = {
   isActive: boolean;
 };
 
-type ExternalTeamOption = {
+/** TOURNAMENTCENTER-UX-03 — canonical external-participant club source, same eligible universe as /dashboard/vereine. */
+type ExternalClubOption = {
   id: string;
   name: string;
   shortName: string | null;
-  categoryLabel: string | null;
-  externalClub: { id: string; name: string; shortName: string | null };
 };
 
 type Props = {
@@ -46,10 +48,28 @@ type Props = {
   dressingRoomFacilityGroups: FacilityGroup[];
 };
 
+/**
+ * Preferred external-participant display (PART 5): canonical Club name as
+ * the prominent identity, tournament-specific Anzeigename below — e.g.
+ * "AC Rossoneri" / "Gelb". For every other kind, the DTO's resolved
+ * `displayName` is already the right main label.
+ */
+function participantMainLabel(participant: TournamentParticipantDto): string {
+  if (participant.kind === "EXTERNAL_CLUB" && participant.externalClub) {
+    return participant.externalClub.club.name;
+  }
+  return participant.displayName;
+}
+
 function participantSubLabel(participant: TournamentParticipantDto): string | null {
   if (participant.kind === "TEAM" && participant.team) {
     const suffix = [participant.team.ageGroup, participant.team.genderGroup].filter(Boolean).join(" / ");
     return suffix || null;
+  }
+  if (participant.kind === "EXTERNAL_CLUB" && participant.externalClub) {
+    // Blank Anzeigename already falls back to the club name as the main
+    // label above — no redundant second line in that case.
+    return participant.externalClub.rawDisplayName;
   }
   if (participant.kind === "EXTERNAL_TEAM" && participant.externalTeam) {
     const parts = [participant.externalTeam.club.name, participant.externalTeam.categoryLabel].filter(Boolean);
@@ -69,14 +89,18 @@ export default function TournamentParticipantsEditor({
   const [error, setError] = useState<string | null>(null);
 
   const [teams, setTeams] = useState<TeamOption[]>([]);
-  const [externalTeams, setExternalTeams] = useState<ExternalTeamOption[]>([]);
+  const [clubs, setClubs] = useState<ExternalClubOption[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
-  const [externalTeamsLoading, setExternalTeamsLoading] = useState(false);
+  const [clubsLoading, setClubsLoading] = useState(false);
 
   const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [selectedExternalTeamId, setSelectedExternalTeamId] = useState("");
+  const [selectedClubId, setSelectedClubId] = useState("");
   const [manualLabel, setManualLabel] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
+
+  // TOURNAMENTCENTER-UX-03: per-participant draft edit of the Anzeigename
+  // text input — keyed by participant.id, cleared once a save succeeds.
+  const [displayNameEdits, setDisplayNameEdits] = useState<Record<string, string>>({});
 
   const [isPending, startTransition] = useTransition();
 
@@ -86,24 +110,27 @@ export default function TournamentParticipantsEditor({
 
     async function load() {
       setTeamsLoading(true);
-      setExternalTeamsLoading(true);
+      setClubsLoading(true);
       try {
-        const [teamsRes, externalTeamsRes] = await Promise.all([
+        // TOURNAMENTCENTER-UX-03: same eligible tenant-scoped canonical
+        // ExternalClub universe as /dashboard/vereine — never derived from
+        // ExternalTeam rows.
+        const [teamsRes, clubsRes] = await Promise.all([
           fetch("/api/teams", { cache: "no-store" }),
-          fetch("/api/club-directory/teams", { cache: "no-store" }),
+          fetch("/api/club-directory/clubs", { cache: "no-store" }),
         ]);
         const teamsData = (await teamsRes.json().catch(() => null)) as TeamOption[] | null;
-        const externalTeamsData = (await externalTeamsRes.json().catch(() => null)) as {
-          teams?: ExternalTeamOption[];
+        const clubsData = (await clubsRes.json().catch(() => null)) as {
+          clubs?: ExternalClubOption[];
         } | null;
 
         if (!active) return;
         setTeams(Array.isArray(teamsData) ? teamsData.filter((t) => t.isActive) : []);
-        setExternalTeams(externalTeamsData?.teams ?? []);
+        setClubs(clubsData?.clubs ?? []);
       } finally {
         if (active) {
           setTeamsLoading(false);
-          setExternalTeamsLoading(false);
+          setClubsLoading(false);
         }
       }
     }
@@ -118,29 +145,15 @@ export default function TournamentParticipantsEditor({
     () => new Set(participants.map((p) => p.team?.id).filter((id): id is string => !!id)),
     [participants],
   );
-  const assignedExternalTeamIds = useMemo(
-    () => new Set(participants.map((p) => p.externalTeam?.id).filter((id): id is string => !!id)),
-    [participants],
-  );
 
   const availableTeams = teams.filter((t) => !assignedTeamIds.has(t.id));
-  const availableExternalTeams = externalTeams.filter((t) => !assignedExternalTeamIds.has(t.id));
-
-  const externalTeamsByClub = useMemo(() => {
-    const groups = new Map<string, { clubName: string; teams: ExternalTeamOption[] }>();
-    for (const team of availableExternalTeams) {
-      const group = groups.get(team.externalClub.id) ?? {
-        clubName: team.externalClub.name,
-        teams: [],
-      };
-      group.teams.push(team);
-      groups.set(team.externalClub.id, group);
-    }
-    return Array.from(groups.values());
-  }, [availableExternalTeams]);
+  // Clubs are deliberately NOT filtered by prior selection — the same
+  // canonical club may be added multiple times with distinct Anzeigename
+  // values (e.g. "AC Rossoneri" + "Gelb" and "AC Rossoneri" + "E1").
+  const availableClubs = clubs;
 
   const addParticipant = useCallback(
-    (body: { teamId?: string } | { externalTeamId?: string } | { manualLabel?: string }) => {
+    (body: { teamId?: string } | { externalClubId?: string; displayName?: string } | { manualLabel?: string }) => {
       setError(null);
       startTransition(async () => {
         try {
@@ -157,10 +170,41 @@ export default function TournamentParticipantsEditor({
           }
           setParticipants((prev) => [...prev, data.participant as TournamentParticipantDto]);
           setSelectedTeamId("");
-          setSelectedExternalTeamId("");
+          setSelectedClubId("");
           setManualLabel("");
         } catch (err) {
           setError(err instanceof Error ? err.message : "Teilnehmer konnte nicht hinzugefügt werden.");
+        }
+      });
+    },
+    [tournamentId],
+  );
+
+  const saveDisplayName = useCallback(
+    (participantId: string, value: string) => {
+      setError(null);
+      startTransition(async () => {
+        try {
+          const res = await fetch(`/api/tournaments/${tournamentId}/participants/${participantId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ displayName: value }),
+          });
+          const data = (await res.json().catch(() => null)) as
+            | { participant?: TournamentParticipantDto; error?: string }
+            | null;
+          if (!res.ok || !data?.participant) {
+            throw new Error(data?.error ?? "Anzeigename konnte nicht gespeichert werden.");
+          }
+          const updated = data.participant;
+          setParticipants((prev) => prev.map((p) => (p.id === participantId ? updated : p)));
+          setDisplayNameEdits((prev) => {
+            const next = { ...prev };
+            delete next[participantId];
+            return next;
+          });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Anzeigename konnte nicht gespeichert werden.");
         }
       });
     },
@@ -258,14 +302,14 @@ export default function TournamentParticipantsEditor({
                 <div className="flex min-w-0 items-start gap-2.5">
                   {participant.kind === "TEAM" ? (
                     <UsersRound className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sce-primary)]" aria-hidden />
-                  ) : participant.kind === "EXTERNAL_TEAM" ? (
+                  ) : participant.kind === "EXTERNAL_CLUB" || participant.kind === "EXTERNAL_TEAM" ? (
                     <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sce-info)]" aria-hidden />
                   ) : (
                     <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
                   )}
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                      {participant.displayName}
+                      {participantMainLabel(participant)}
                     </p>
                     {participantSubLabel(participant) ? (
                       <p className="mt-0.5 text-xs text-[var(--text-2)]">{participantSubLabel(participant)}</p>
@@ -286,6 +330,33 @@ export default function TournamentParticipantsEditor({
                   </button>
                 )}
               </div>
+
+              {participant.kind === "EXTERNAL_CLUB" && (
+                <div className="mt-3 border-t border-[var(--border)] pt-3">
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                      Anzeigename
+                    </span>
+                    <input
+                      type="text"
+                      value={displayNameEdits[participant.id] ?? participant.externalClub?.rawDisplayName ?? ""}
+                      onChange={(e) =>
+                        setDisplayNameEdits((prev) => ({ ...prev, [participant.id]: e.target.value }))
+                      }
+                      onBlur={(e) => {
+                        if (!canManage) return;
+                        const current = participant.externalClub?.rawDisplayName ?? "";
+                        if (e.target.value === current) return;
+                        saveDisplayName(participant.id, e.target.value);
+                      }}
+                      disabled={!canManage || isPending}
+                      placeholder={participant.externalClub?.club.name ?? "z. B. Gelb, E1"}
+                      data-testid={`tournament-participant-${participant.id}-display-name`}
+                      className="fca-input"
+                    />
+                  </label>
+                </div>
+              )}
 
               {homeAway === "HOME" && (
                 <div className="mt-3 border-t border-[var(--border)] pt-3">
@@ -394,32 +465,24 @@ export default function TournamentParticipantsEditor({
 
             <div className="flex gap-2">
               <select
-                value={selectedExternalTeamId}
-                onChange={(e) => setSelectedExternalTeamId(e.target.value)}
-                disabled={externalTeamsLoading || isPending}
-                data-testid="tournament-participant-add-external-team-select"
+                value={selectedClubId}
+                onChange={(e) => setSelectedClubId(e.target.value)}
+                disabled={clubsLoading || isPending}
+                data-testid="tournament-participant-add-external-club-select"
                 className="fca-select flex-1"
               >
-                <option value="">
-                  {externalTeamsLoading ? "Externe Teams laden…" : "Externes Team (Club Directory)…"}
-                </option>
-                {externalTeamsByClub.map((group) => (
-                  <optgroup key={group.clubName} label={group.clubName}>
-                    {group.teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </optgroup>
+                <option value="">{clubsLoading ? "Vereine laden…" : "Verein auswählen…"}</option>
+                {availableClubs.map((club) => (
+                  <option key={club.id} value={club.id}>
+                    {club.name}
+                  </option>
                 ))}
               </select>
               <button
                 type="button"
-                onClick={() =>
-                  selectedExternalTeamId && addParticipant({ externalTeamId: selectedExternalTeamId })
-                }
-                disabled={!selectedExternalTeamId || isPending}
-                data-testid="tournament-participant-add-external-team-button"
+                onClick={() => selectedClubId && addParticipant({ externalClubId: selectedClubId, displayName: "" })}
+                disabled={!selectedClubId || isPending}
+                data-testid="tournament-participant-add-external-club-button"
                 className="fca-button-secondary shrink-0"
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}

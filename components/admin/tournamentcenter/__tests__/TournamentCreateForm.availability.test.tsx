@@ -55,8 +55,8 @@ function installFetchMock() {
     if (url === "/api/teams") {
       return jsonResponse([{ id: "team-1", name: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }]);
     }
-    if (url === "/api/club-directory/teams") {
-      return jsonResponse({ teams: [] });
+    if (url === "/api/club-directory/clubs") {
+      return jsonResponse({ clubs: [] });
     }
     if (url.startsWith("/api/facilities/availability")) {
       availabilityCalls.push(url);

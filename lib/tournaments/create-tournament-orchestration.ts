@@ -27,7 +27,13 @@
  * new schema, a saga/job queue, or a bespoke multi-entity transaction.
  */
 
-export type TournamentParticipantDraftKind = "TEAM" | "EXTERNAL_TEAM" | "MANUAL";
+/**
+ * EXTERNAL_TEAM is HISTORICAL ONLY — kept so the orchestration type remains
+ * compatible with any pre-existing draft data shape; TournamentCreateForm no
+ * longer produces EXTERNAL_TEAM drafts (see TOURNAMENTCENTER-UX-03 — new
+ * external participants use EXTERNAL_CLUB + displayName instead).
+ */
+export type TournamentParticipantDraftKind = "TEAM" | "EXTERNAL_CLUB" | "EXTERNAL_TEAM" | "MANUAL";
 
 export type TournamentParticipantDraft = {
   /** Client-only correlation id — never sent to the server. */
@@ -35,6 +41,9 @@ export type TournamentParticipantDraft = {
   kind: TournamentParticipantDraftKind;
   teamId?: string;
   externalTeamId?: string;
+  externalClubId?: string;
+  /** Tournament-specific "Anzeigename" — only meaningful together with externalClubId. */
+  displayName?: string;
   manualLabel?: string;
 };
 

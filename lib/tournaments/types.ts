@@ -57,6 +57,20 @@ export type TournamentExternalTeamReference = {
 };
 
 /**
+ * TOURNAMENTCENTER-UX-03 — canonical external-participant identity for NEW
+ * participants: a Club-Directory ExternalClub plus a tournament-specific
+ * "Anzeigename" (rawDisplayName). rawDisplayName is the raw stored value
+ * (may be null/blank) — use the participant's top-level `displayName` for
+ * the resolved value (falls back to club.name when blank, see
+ * lib/tournaments/participant-service.ts). Never written back into
+ * ExternalClub.name.
+ */
+export type TournamentExternalClubParticipantReference = {
+  club: TournamentExternalClubReference;
+  rawDisplayName: string | null;
+};
+
+/**
  * Denormalised FacilityResource fields, mirroring the naming convention
  * used by TrainingAllocationDto (lib/training/types.ts) — always paired
  * with the allocation row's own `id` (never conflated with it).
@@ -71,8 +85,15 @@ export type TournamentFacilityResourceFields = {
   facilityName: string;
 };
 
-/** How a TournamentParticipant's identity is resolved. */
-export type TournamentParticipantKind = "TEAM" | "EXTERNAL_TEAM" | "MANUAL";
+/**
+ * How a TournamentParticipant's identity is resolved.
+ *
+ * EXTERNAL_CLUB is the canonical external-participant kind for NEW
+ * participants (TOURNAMENTCENTER-UX-03 — Club + Anzeigename).
+ * EXTERNAL_TEAM is HISTORICAL ONLY — rows created before this slice; never
+ * written by new participant creation, but remains fully readable/editable.
+ */
+export type TournamentParticipantKind = "TEAM" | "EXTERNAL_CLUB" | "EXTERNAL_TEAM" | "MANUAL";
 
 export type TournamentParticipantDressingRoomAllocationDto = TournamentFacilityResourceFields & {
   /** The allocation row's own id (for removal) — distinct from facilityResourceId. */
@@ -85,10 +106,17 @@ export type TournamentParticipantDto = {
   id: string;
   tournamentId: string;
   kind: TournamentParticipantKind;
-  /** Resolved display name regardless of kind — for UI/list convenience. */
+  /**
+   * Resolved display name regardless of kind — for UI/list convenience.
+   * For kind === "EXTERNAL_CLUB", this is externalClub.rawDisplayName
+   * (trimmed) when set, otherwise externalClub.club.name (clean fallback).
+   */
   displayName: string;
   team: TournamentTeamReference | null;
+  /** HISTORICAL ONLY — see TournamentParticipantKind. */
   externalTeam: TournamentExternalTeamReference | null;
+  /** Only set when kind === "EXTERNAL_CLUB" — the canonical NEW external-participant identity. */
+  externalClub: TournamentExternalClubParticipantReference | null;
   /** Only set when kind === "MANUAL" — see PRODUCT REQUIREMENT fallback note in schema.prisma. */
   manualLabel: string | null;
   displayOrder: number;
@@ -177,14 +205,27 @@ export type UpdateTournamentInput = {
 // ── TOURNAMENTCENTER-01B — participant + allocation service inputs ───────────
 
 /**
- * Exactly one of `teamId` / `externalTeamId` / `manualLabel` must be set —
- * validated by lib/tournaments/participant-service.ts, not by this type.
+ * Exactly one of `teamId` / `externalTeamId` / `externalClubId` /
+ * `manualLabel` must be set — validated by
+ * lib/tournaments/participant-service.ts, not by this type.
+ *
+ * `externalTeamId` is HISTORICAL ONLY — new participant creation should use
+ * `externalClubId` (+ optional `displayName`) instead (TOURNAMENTCENTER-UX-03).
+ * `displayName` is only meaningful together with `externalClubId`.
  */
 export type CreateTournamentParticipantInput = {
   teamId?: string;
   externalTeamId?: string;
+  externalClubId?: string;
+  displayName?: string;
   manualLabel?: string;
   displayOrder?: number;
+};
+
+/** Updates the tournament-specific Anzeigename of an EXTERNAL_CLUB participant. */
+export type UpdateTournamentParticipantDisplayNameInput = {
+  /** null/blank clears the override — display falls back to the canonical ExternalClub.name. */
+  displayName: string | null;
 };
 
 export type CreateTournamentResourceAllocationInput = {

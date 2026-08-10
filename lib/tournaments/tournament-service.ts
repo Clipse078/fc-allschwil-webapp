@@ -83,6 +83,7 @@ function toParticipantDto(
       displayName: row.team.name,
       team: row.team,
       externalTeam: null,
+      externalClub: null,
       manualLabel: null,
       displayOrder: row.displayOrder,
       dressingRoomAllocations,
@@ -91,6 +92,33 @@ function toParticipantDto(
     };
   }
 
+  // TOURNAMENTCENTER-UX-03 — canonical NEW external-participant kind.
+  if (row.externalClub) {
+    const rawDisplayName = row.displayName?.trim() || null;
+    return {
+      id: row.id,
+      tournamentId: row.eventId,
+      kind: "EXTERNAL_CLUB",
+      displayName: rawDisplayName ?? row.externalClub.name,
+      team: null,
+      externalTeam: null,
+      externalClub: {
+        club: {
+          id: row.externalClub.id,
+          name: row.externalClub.name,
+          shortName: row.externalClub.shortName,
+        },
+        rawDisplayName,
+      },
+      manualLabel: null,
+      displayOrder: row.displayOrder,
+      dressingRoomAllocations,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  // HISTORICAL ONLY — rows created before TOURNAMENTCENTER-UX-03.
   if (row.externalTeam) {
     return {
       id: row.id,
@@ -105,6 +133,7 @@ function toParticipantDto(
         categoryLabel: row.externalTeam.categoryLabel,
         club: row.externalTeam.externalClub,
       },
+      externalClub: null,
       manualLabel: null,
       displayOrder: row.displayOrder,
       dressingRoomAllocations,
@@ -120,6 +149,7 @@ function toParticipantDto(
     displayName: row.manualLabel ?? "Unbenannt",
     team: null,
     externalTeam: null,
+    externalClub: null,
     manualLabel: row.manualLabel,
     displayOrder: row.displayOrder,
     dressingRoomAllocations,
