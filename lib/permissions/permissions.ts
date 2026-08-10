@@ -10,6 +10,12 @@ export const PERMISSIONS = {
 
   TEAMS_VIEW: "teams.view",
   TEAMS_MANAGE: "teams.manage",
+  // ADMIN-DELETE-01A: canonical permanent-deletion permission. Deliberately
+  // separate from TEAMS_MANAGE — holding "manage" (create/edit/archive) must
+  // never implicitly grant permanent deletion. Module-scoped delete
+  // permissions follow this "<module>.delete" naming convention as
+  // permanent-deletion support is extended to other modules.
+  TEAMS_DELETE: "teams.delete",
 
   COMPETITIONS_VIEW: "competitions.view",
   COMPETITIONS_MANAGE: "competitions.manage",
