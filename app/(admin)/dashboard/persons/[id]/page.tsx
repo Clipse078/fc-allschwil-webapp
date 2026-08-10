@@ -53,11 +53,12 @@ export default async function PersonDetailPage({ params }: PageProps) {
   const initials = getInitials(person.firstName, person.lastName);
   const hasRoles = person.isPlayer || person.isTrainer;
 
-  // ADMIN-MASTERDATA-UX-01 — "Zugang & Rollen": null means "don't render
-  // the card at all" (caller lacks roles.view/roles.manage for a Person
-  // that DOES have a linked User — see PersonAccessRolesCard docstring).
-  // A Person with no linked User always renders the no-account state,
-  // regardless of the caller's roles permissions (non-sensitive).
+  // ADMIN-MASTERDATA-UX-01 / -C1 — "Zugang & Rollen": null means "don't
+  // render the card at all" (caller lacks roles.view/roles.manage for a
+  // Person that DOES have a linked User — see PersonAccessRolesCard
+  // docstring). A Person with no linked User always renders — either the
+  // "Benutzerkonto verknüpfen" picker (canAssign=true) or the static
+  // no-account state (canAssign=false), never hidden entirely.
   let accessRolesCard: {
     linkedUser: { id: string; email: string } | null;
     isActiveTenantMember: boolean;
@@ -67,12 +68,23 @@ export default async function PersonDetailPage({ params }: PageProps) {
   } | null = null;
 
   if (!person.user) {
+    const tenantId = await getActiveTenantId();
+    let canAssign = false;
+    if (tenantId) {
+      const resolver = createEffectivePermissionResolver(prisma);
+      const { platform, tenant } = await resolver.getEffectivePermissions({
+        userId: session.user.id,
+        tenantId,
+      });
+      canAssign = TENANT_ROLES_ASSIGN.some((key) => platform.includes(key) || tenant.includes(key));
+    }
+
     accessRolesCard = {
       linkedUser: null,
       isActiveTenantMember: false,
       roles: [],
       assignedRoleIds: [],
-      canAssign: false,
+      canAssign,
     };
   } else {
     const tenantId = await getActiveTenantId();
@@ -242,6 +254,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
             {accessRolesCard ? (
               <SectionCard title="Zugang & Rollen">
                 <PersonAccessRolesCard
+                  personId={person.id}
                   linkedUser={accessRolesCard.linkedUser}
                   isActiveTenantMember={accessRolesCard.isActiveTenantMember}
                   roles={accessRolesCard.roles}

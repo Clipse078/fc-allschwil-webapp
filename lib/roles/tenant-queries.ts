@@ -318,3 +318,38 @@ export async function getTenantRoleAssignmentForUser(
     roleIds: userRoles.map((ur) => ur.roleId),
   };
 }
+
+// ---------------------------------------------------------------------------
+// ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking eligible-user source
+// ---------------------------------------------------------------------------
+
+export type LinkableTenantUser = {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+/**
+ * The eligible universe for "Person -> User" linking: exactly the same
+ * canonical source as tenant role assignment (`getEligibleTenantMembers()`
+ * — active `TenantMembership` rows for this exact tenant, never
+ * `User.tenantId`), further filtered to Users not already linked to
+ * ANY Person (`Person.userId` is `@unique` — at most one Person per User).
+ * A cross-tenant User or a PLATFORM-only User with no membership in this
+ * tenant can never appear here.
+ */
+export async function getLinkableTenantUsersForPerson(tenantId: string): Promise<LinkableTenantUser[]> {
+  const members = await getEligibleTenantMembers(tenantId);
+  if (members.length === 0) return [];
+
+  const alreadyLinked = await prisma.person.findMany({
+    where: { userId: { in: members.map((m) => m.userId) } },
+    select: { userId: true },
+  });
+  const linkedUserIds = new Set(alreadyLinked.map((p) => p.userId as string));
+
+  return members
+    .filter((m) => !linkedUserIds.has(m.userId))
+    .map((m) => ({ userId: m.userId, firstName: m.firstName, lastName: m.lastName, email: m.email }));
+}
