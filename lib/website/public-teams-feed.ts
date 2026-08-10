@@ -22,6 +22,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 import type {
   PublicTeamListItem,
   PublicTeamDetail,
@@ -62,9 +63,10 @@ export type GetPublicTeamsInput = {
 export async function getPublicTeams(
   input: GetPublicTeamsInput,
 ): Promise<PublicTeamListItem[]> {
-  const seasonWhere = input.seasonKey
-    ? { season: { key: input.seasonKey } }
-    : { season: { isActive: true } };
+  // TEAMCENTER-UX-01C: canonical current-season resolution — see
+  // lib/teams/current-season.ts. Keeps the public website consistent with
+  // the admin Teams UI/TrainingCenter for the same Team.
+  const seasonWhere = currentTeamSeasonWhere(input.seasonKey);
 
   const teams = await prisma.team.findMany({
     where: {
@@ -156,9 +158,9 @@ export type GetPublicTeamDetailInput = {
 export async function getPublicTeamDetail(
   input: GetPublicTeamDetailInput,
 ): Promise<PublicTeamDetail | null> {
-  const seasonWhere = input.seasonKey
-    ? { season: { key: input.seasonKey } }
-    : { season: { isActive: true } };
+  // TEAMCENTER-UX-01C: canonical current-season resolution — see
+  // lib/teams/current-season.ts.
+  const seasonWhere = currentTeamSeasonWhere(input.seasonKey);
 
   // ── Phase 1: Team + TeamSeason metadata ─────────────────────────────────
   // Member relations (playerSquadMembers / trainerTeamMembers) are intentionally

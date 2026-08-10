@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 import type { TrainingSeriesStatus, TrainingSessionStatus, Weekday } from "./types";
 
 // ── Row shape returned by the DB ──────────────────────────────────────────────
@@ -129,7 +130,21 @@ export type TeamSeasonPickerRow = {
   trainers: { id: string; name: string; roleLabel: string | null }[];
 };
 
-/** Returns every active TeamSeason (of an active Team) for a tenant, for use in pickers. */
+/**
+ * Returns every eligible TeamSeason (of an active Team) for a tenant, for
+ * use in the "Neue Trainingsserie" / TrainingSeries create picker.
+ *
+ * TEAMCENTER-UX-01C root-cause fix: this previously filtered ONLY by
+ * `TeamSeason.status === "ACTIVE"`, with no season-currency constraint at
+ * all. Nothing ever flips a TeamSeason's status during a season rollover,
+ * so every historical season's TeamSeason for a Team accumulated in this
+ * picker forever — a fundamentally different (and staler) selection
+ * surface than what the Teams UI treats as canonical/current for that same
+ * Team (see lib/teams/current-season.ts). The picker now additionally
+ * requires the TeamSeason to belong to the canonical current season, so
+ * "Neue Trainingsserie" can never offer a choice that contradicts what
+ * Teams/TeamCenter shows as the Team's current season.
+ */
 export async function findTeamSeasonsForTenant(
   tenantId: string,
 ): Promise<TeamSeasonPickerRow[]> {
@@ -137,6 +152,7 @@ export async function findTeamSeasonsForTenant(
     where: {
       status: "ACTIVE",
       team: { tenantId, isActive: true },
+      ...currentTeamSeasonWhere(),
     },
     select: {
       id: true,
@@ -167,6 +183,58 @@ export async function findTeamSeasonsForTenant(
       roleLabel: t.roleLabel,
     })),
   }));
+}
+
+/**
+ * Returns a single TeamSeasonPickerRow by id, regardless of season currency
+ * or TeamSeason.status — for display on the TrainingSeries EDIT form, where
+ * the team/season assignment is immutable and must always be shown even if
+ * the series was created in a season that is no longer canonical/current
+ * (see findTeamSeasonsForTenant, which intentionally scopes to the current
+ * season only and is therefore not safe to reuse for this lookup).
+ *
+ * Returns null when the TeamSeason does not exist or belongs to another
+ * tenant.
+ */
+export async function findTeamSeasonPickerRow(
+  tenantId: string,
+  teamSeasonId: string,
+): Promise<TeamSeasonPickerRow | null> {
+  const row = await prisma.teamSeason.findFirst({
+    where: {
+      id: teamSeasonId,
+      team: { tenantId },
+    },
+    select: {
+      id: true,
+      teamId: true,
+      team: { select: { name: true } },
+      season: { select: { name: true } },
+      trainerTeamMembers: {
+        where: { status: "ACTIVE" },
+        orderBy: { sortOrder: "asc" },
+        select: {
+          id: true,
+          roleLabel: true,
+          person: { select: { firstName: true, lastName: true, displayName: true } },
+        },
+      },
+    },
+  });
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    teamId: row.teamId,
+    teamName: row.team.name,
+    seasonName: row.season.name,
+    trainers: row.trainerTeamMembers.map((t) => ({
+      id: t.id,
+      name: t.person.displayName || `${t.person.firstName} ${t.person.lastName}`,
+      roleLabel: t.roleLabel,
+    })),
+  };
 }
 
 // =============================================================================

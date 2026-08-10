@@ -64,10 +64,12 @@ export default async function TeamDetailPage({ params }: Props) {
   }
 
   const categoryLabel = CATEGORY_LABELS[team.category] ?? team.category;
+  // TEAMCENTER-UX-01C: consume the canonical current-season TeamSeason
+  // already resolved by getTeamDetailData — do not re-derive "which season
+  // is current" here (that duplication was the root cause of this page
+  // showing a different current season than the Teams list / TrainingCenter).
   const activeSeason =
-    team.teamSeasons.find((ts) => ts.season.isActive) ??
-    team.teamSeasons[0] ??
-    null;
+    team.teamSeasons.find((ts) => ts.id === team.currentTeamSeasonId) ?? null;
 
   // TEAM-IDENTITY-01: canonical long-name fallback (lib/teams/team-naming.ts),
   // already resolved by getTeamDetailData. Team.name is the primary Team

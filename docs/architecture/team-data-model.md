@@ -116,6 +116,41 @@ buildTeamSeasonDisplayName("E-Junioren 1", tenant.name)
 
 Cross-tenant Season access remains a known limitation until SEASON-01 is implemented.
 
+## Canonical "Current TeamSeason" Resolution (TEAMCENTER-UX-01C)
+
+`lib/teams/current-season.ts` is the single source of truth for "which
+TeamSeason is the Team's current one". Before this slice, that question was
+independently re-implemented (with different precedence/fallback rules) in
+`getTeamsListData`, `getTeamDetailData`, `GET /api/teams`,
+`findTeamSeasonsForTenant` (TrainingCenter's "Neue Trainingsserie" picker)
+and `getOrgUnitById` — which is why the Teams UI could show one
+canonical/current team-season while TrainingCenter exposed a stale/
+different one for the very same Team.
+
+```ts
+// Prisma query-level scoping (list/picker queries):
+const teams = await prisma.team.findMany({
+  ...
+  select: {
+    teamSeasons: { where: currentTeamSeasonWhere(explicitSeasonKey), take: 1 },
+  },
+});
+
+// In-memory pick from an already-fetched list (detail pages):
+const currentTeamSeason = pickCurrentTeamSeason(team.teamSeasons, explicitSeasonKey);
+```
+
+Rule: an explicit season key always wins; otherwise `Season.isActive` is
+canonical. There is deliberately **no** further fallback (e.g. "the most
+recently started season") — a Team with no TeamSeason in the canonical
+season has no current season, and every surface must render that as "none"
+rather than silently substituting a stale one.
+
+Any new read path that needs "the Team's current TeamSeason" — across
+TeamCenter, TrainingCenter, MatchCenter, TournamentCenter, Dayplanner,
+Weekplanner or Infoboard — must use this module instead of re-deriving the
+rule locally.
+
 ## Planned Follow-up Slices
 
 - **TEAM-CREATE-01**: Premium seasonal team registration flow using `createCanonicalTeamSeason()`.
