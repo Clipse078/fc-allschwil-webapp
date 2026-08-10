@@ -91,6 +91,11 @@ async function main() {
 
     { key: "teams.view", name: "View teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "teams.manage", name: "Manage teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-01A: canonical permanent-deletion permission foundation.
+    // Deliberately separate from "teams.manage" so permanent deletion is
+    // never implicitly granted by create/edit/archive access — it must be
+    // held (directly or delegated via a custom tenant role) on its own.
+    { key: "teams.delete", name: "Permanently delete teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "people.view", name: "View people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "people.manage", name: "Manage people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
