@@ -328,7 +328,7 @@ export default function TournamentEditForm({
 
       <SectionCard
         title="Teilnehmende Teams"
-        description="FC Allschwil Teams und externe Teams aus dem Vereinsverzeichnis — beliebig viele, in beliebiger Mischung."
+        description="FC Allschwil Teams und externe Vereine aus dem Vereinsverzeichnis — beliebig viele, in beliebiger Mischung."
       >
         <TournamentParticipantsEditor
           tournamentId={tournament.id}

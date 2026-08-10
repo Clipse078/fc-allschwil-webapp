@@ -49,6 +49,7 @@ function createTournament(overrides: Partial<TournamentDto> = {}): TournamentDto
           ageGroup: "E",
         },
         externalTeam: null,
+        externalClub: null,
         manualLabel: null,
         displayOrder: 0,
         dressingRoomAllocations: [

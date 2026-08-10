@@ -5,8 +5,13 @@
  * (Team | ExternalTeam | manual fallback) for a tenant-managed Tournament.
  *
  * POST body:
- *   { teamId: string }  |  { externalTeamId: string }  |  { manualLabel: string }
- *   Exactly one of these must be provided. Optional: displayOrder (number).
+ *   { teamId: string }  |  { externalClubId: string, displayName?: string }  |
+ *   { externalTeamId: string }  |  { manualLabel: string }
+ *   Exactly one of teamId/externalClubId/externalTeamId/manualLabel must be
+ *   provided. Optional: displayOrder (number). `displayName` is only valid
+ *   together with `externalClubId` (TOURNAMENTCENTER-UX-03 — tournament-
+ *   specific "Anzeigename"). `externalTeamId` is HISTORICAL ONLY — new
+ *   external participants should use `externalClubId` instead.
  *
  * Permission: EVENTS_VIEW (read) / EVENTS_MANAGE (write)
  * Tenant isolation: tenantId resolved from session, never from request body.
@@ -75,6 +80,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
   const teamId = typeof body.teamId === "string" ? body.teamId : undefined;
   const externalTeamId = typeof body.externalTeamId === "string" ? body.externalTeamId : undefined;
+  const externalClubId = typeof body.externalClubId === "string" ? body.externalClubId : undefined;
+  const displayName = typeof body.displayName === "string" ? body.displayName : undefined;
   const manualLabel = typeof body.manualLabel === "string" ? body.manualLabel : undefined;
   const displayOrder = typeof body.displayOrder === "number" ? body.displayOrder : undefined;
 
@@ -82,6 +89,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const participant = await addTournamentParticipant(tenantId, tournamentId, {
       teamId,
       externalTeamId,
+      externalClubId,
+      displayName,
       manualLabel,
       displayOrder,
     });

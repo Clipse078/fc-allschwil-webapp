@@ -274,6 +274,8 @@ async function findTournamentConflicts(
         select: {
           team: { select: { name: true } },
           externalTeam: { select: { name: true } },
+          externalClub: { select: { name: true } },
+          displayName: true,
           manualLabel: true,
           event: { select: { id: true, title: true, startAt: true, endAt: true } },
         },
@@ -291,7 +293,12 @@ async function findTournamentConflicts(
     })) {
       continue;
     }
-    const participantLabel = participant.team?.name ?? participant.externalTeam?.name ?? participant.manualLabel ?? participant.event.title;
+    const participantLabel =
+      participant.team?.name ??
+      participant.externalTeam?.name ??
+      (participant.displayName?.trim() || participant.externalClub?.name) ??
+      participant.manualLabel ??
+      participant.event.title;
     conflicts.push({
       resourceId: row.facilityResourceId,
       label: `Turnier ${participant.event.title} · ${participantLabel}`,

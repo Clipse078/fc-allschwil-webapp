@@ -3030,6 +3030,12 @@ model ExternalClub {
   providerMappings ExternalClubProviderMapping[]
   externalTeams    ExternalTeam[]
 
+  // TOURNAMENTCENTER-UX-03: canonical external-participant identity — a
+  // Tournament participant may reference this club directly (see
+  // TournamentParticipant.externalClubId above), independent of whether it
+  // has any ExternalTeam rows.
+  tournamentParticipations TournamentParticipant[]
+
   @@index([tenantId])
   @@index([tenantId, archivedAt])
 }
@@ -3813,7 +3819,7 @@ model TrainingSessionAllocation {
 // tournament entity (no new top-level "Tournament" model) and adds exactly
 // the three join/allocation tables needed to represent:
 //
-//   Event (TOURNAMENT) ─┬─< TournamentParticipant >─ Team | ExternalTeam
+//   Event (TOURNAMENT) ─┬─< TournamentParticipant >─ Team | ExternalTeam | ExternalClub
 //                       │         └─< TournamentParticipantAllocation >─ FacilityResource (Garderobe)
 //                       └─< TournamentResourceAllocation >─ FacilityResource (Spielfeld/Halle)
 //
@@ -3829,6 +3835,17 @@ model TrainingSessionAllocation {
 // type=MATCH) and are no longer written for new/edited tournaments; a
 // one-time additive migration backfills pre-existing TOURNAMENT rows into
 // this model (see prisma/migrations/…_tournamentcenter_01b_multi_team_participation).
+//
+// TOURNAMENTCENTER-UX-03: new external participants are created against the
+// canonical ExternalClub (externalClubId), not an ExternalTeam — the product
+// rule is "pick a Club, then type a tournament-specific Display Name" (e.g.
+// "AC Rossoneri" + "Gelb" and "AC Rossoneri" + "E1" as two distinct
+// participants of the same club). externalTeamId is kept, unmodified, purely
+// for historical rows created before this slice — it is never written by new
+// participant creation and remains readable/editable via the existing
+// externalTeam relation. displayName is the tournament-specific identity
+// (Anzeigename) and is only ever meaningful alongside externalClubId; it is
+// never written back into ExternalClub.name/ExternalTeam.name.
 // =============================================================================
 
 model TournamentParticipant {
@@ -3839,19 +3856,35 @@ model TournamentParticipant {
   eventId  String
 
   /// Canonical tenant-owned Team participant. Mutually exclusive with
-  /// externalTeamId/manualLabel — enforced by the service layer (see
-  /// lib/tournaments/participant-service.ts), not a DB constraint, mirroring
-  /// the existing MatchExternalMapping home/away-side pattern.
+  /// externalTeamId/externalClubId/manualLabel — enforced by the service
+  /// layer (see lib/tournaments/participant-service.ts), not a DB
+  /// constraint, mirroring the existing MatchExternalMapping home/away-side
+  /// pattern.
   teamId         String?
-  /// Canonical Club-Directory ExternalTeam participant (guest club).
+  /// HISTORICAL ONLY (TOURNAMENTCENTER-UX-03) — canonical Club-Directory
+  /// ExternalTeam participant. New participant creation never writes this
+  /// field anymore (see externalClubId below); existing rows remain
+  /// readable/editable and resolve their parent club via externalTeam.externalClub.
   externalTeamId String?
+  /// Canonical Club-Directory ExternalClub participant (guest club) — the
+  /// canonical external-participant identity going forward. The same
+  /// ExternalClub may appear on multiple TournamentParticipant rows of the
+  /// same tournament (see displayName below) — deliberately NOT unique
+  /// per [eventId, externalClubId].
+  externalClubId String?
+  /// Tournament-specific participant identity ("Anzeigename", e.g. "Gelb",
+  /// "E1") — only ever set together with externalClubId. Blank/null falls
+  /// back to the canonical ExternalClub.name for display (see
+  /// lib/tournaments/participant-service.ts). Never written back into
+  /// ExternalClub.name or ExternalTeam.name.
+  displayName    String?
   /// Smallest clean fallback for a genuinely unknown/free-text participant
-  /// when no canonical Team or ExternalTeam exists yet for that club/team.
-  /// Only ever set when teamId AND externalTeamId are both null. Tenants are
-  /// expected to create a canonical ExternalTeam via the Club Directory as
-  /// soon as the participant's identity is known — this field exists only
-  /// so tournament creation is never blocked on that step, never as a
-  /// second/parallel team identity model.
+  /// when no canonical Team or ExternalClub exists yet for that club/team.
+  /// Only ever set when teamId, externalTeamId AND externalClubId are all
+  /// null. Tenants are expected to create a canonical ExternalClub via the
+  /// Club Directory as soon as the participant's identity is known — this
+  /// field exists only so tournament creation is never blocked on that
+  /// step, never as a second/parallel team identity model.
   manualLabel    String?
 
   /// Display position within the tournament's participant list.
@@ -3864,20 +3897,22 @@ model TournamentParticipant {
   event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   externalTeam ExternalTeam? @relation(fields: [externalTeamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  externalClub ExternalClub? @relation(fields: [externalClubId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   dressingRoomAllocations TournamentParticipantAllocation[]
 
   /// Prevent the same canonical Team from being added twice to the same tournament.
   /// (Postgres unique indexes never compare NULLs as equal, so this is inert
-  /// for manual/external-only rows — duplicate ExternalTeam/manual guards
-  /// live below / in the service layer respectively.)
+  /// for manual/external-only rows — duplicate ExternalTeam guard lives
+  /// below; externalClubId is deliberately NOT unique — see above.)
   @@unique([eventId, teamId])
-  /// Prevent the same canonical ExternalTeam from being added twice to the same tournament.
+  /// Prevent the same canonical (historical) ExternalTeam from being added twice to the same tournament.
   @@unique([eventId, externalTeamId])
   @@index([tenantId])
   @@index([eventId])
   @@index([teamId])
   @@index([externalTeamId])
+  @@index([externalClubId])
   @@index([tenantId, eventId])
 }
 

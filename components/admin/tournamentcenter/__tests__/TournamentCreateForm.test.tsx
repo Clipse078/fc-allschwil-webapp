@@ -74,8 +74,8 @@ function installFetchMock(overrides: {
         { id: "team-2", name: "2. Mannschaft", ageGroup: null, genderGroup: null, isActive: true },
       ]);
     }
-    if (url === "/api/club-directory/teams") {
-      return jsonResponse({ teams: [] });
+    if (url === "/api/club-directory/clubs") {
+      return jsonResponse({ clubs: [] });
     }
     if (url === "/api/events" && method === "POST") {
       return overrides.createEventResponse

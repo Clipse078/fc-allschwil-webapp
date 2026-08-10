@@ -78,6 +78,8 @@ export const tournamentEventSelect = {
       eventId: true,
       teamId: true,
       externalTeamId: true,
+      externalClubId: true,
+      displayName: true,
       manualLabel: true,
       displayOrder: true,
       createdAt: true,
@@ -91,6 +93,9 @@ export const tournamentEventSelect = {
           categoryLabel: true,
           externalClub: { select: { id: true, name: true, shortName: true } },
         },
+      },
+      externalClub: {
+        select: { id: true, name: true, shortName: true },
       },
       dressingRoomAllocations: {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],

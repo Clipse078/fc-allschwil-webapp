@@ -21,6 +21,7 @@ function createParticipant(overrides: Partial<TournamentParticipantDto> = {}): T
       ageGroup: "E",
     },
     externalTeam: null,
+    externalClub: null,
     manualLabel: null,
     displayOrder: 0,
     dressingRoomAllocations: [

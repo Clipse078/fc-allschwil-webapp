@@ -61,18 +61,22 @@ type TeamOption = {
   isActive: boolean;
 };
 
-type ExternalTeamOption = {
+/** TOURNAMENTCENTER-UX-03 — canonical external-participant club source, same eligible universe as /dashboard/vereine. */
+type ExternalClubOption = {
   id: string;
   name: string;
-  categoryLabel: string | null;
-  externalClub: { id: string; name: string };
+  shortName: string | null;
 };
 
 type ParticipantDraftRow = {
   localId: string;
   kind: TournamentParticipantDraftKind;
   teamId?: string;
-  externalTeamId?: string;
+  externalClubId?: string;
+  /** Canonical club name — only set for kind === "EXTERNAL_CLUB" (fallback + subLabel source). */
+  clubName?: string;
+  /** Raw, editable "Anzeigename" input value — only meaningful for kind === "EXTERNAL_CLUB". */
+  externalClubDisplayName?: string;
   manualLabel?: string;
   displayName: string;
   subLabel: string | null;
@@ -149,15 +153,15 @@ export default function TournamentCreateForm({
   // ── Reference data ─────────────────────────────────────────────────────
   const [seasonOptions, setSeasonOptions] = useState<SeasonItem[]>([]);
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
-  const [externalTeamOptions, setExternalTeamOptions] = useState<ExternalTeamOption[]>([]);
+  const [clubOptions, setClubOptions] = useState<ExternalClubOption[]>([]);
   const [loadingSeasons, setLoadingSeasons] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
-  const [loadingExternalTeams, setLoadingExternalTeams] = useState(true);
+  const [loadingClubs, setLoadingClubs] = useState(true);
 
   // ── Teilnehmende Teams (draft, pre-creation) ──────────────────────────
   const [participants, setParticipants] = useState<ParticipantDraftRow[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [selectedExternalTeamId, setSelectedExternalTeamId] = useState("");
+  const [selectedClubId, setSelectedClubId] = useState("");
   const [manualLabel, setManualLabel] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
 
@@ -213,24 +217,28 @@ export default function TournamentCreateForm({
       }
     }
 
-    async function loadExternalTeams() {
-      setLoadingExternalTeams(true);
+    // TOURNAMENTCENTER-UX-03: same eligible tenant-scoped canonical
+    // ExternalClub universe as /dashboard/vereine (GET /api/club-directory/clubs)
+    // — never derived from ExternalTeam rows, so a club with zero teams
+    // still appears and a club with many teams appears exactly once.
+    async function loadClubs() {
+      setLoadingClubs(true);
       try {
-        const res = await fetch("/api/club-directory/teams", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as { teams?: ExternalTeamOption[] } | null;
-        if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? "Externe Teams konnten nicht geladen werden.");
+        const res = await fetch("/api/club-directory/clubs", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as { clubs?: ExternalClubOption[] } | null;
+        if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? "Vereine konnten nicht geladen werden.");
         if (!active) return;
-        setExternalTeamOptions(data?.teams ?? []);
+        setClubOptions(data?.clubs ?? []);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
       } finally {
-        if (active) setLoadingExternalTeams(false);
+        if (active) setLoadingClubs(false);
       }
     }
 
     loadSeasons();
     loadTeams();
-    loadExternalTeams();
+    loadClubs();
 
     return () => {
       active = false;
@@ -285,23 +293,12 @@ export default function TournamentCreateForm({
     () => new Set(participants.map((p) => p.teamId).filter((id): id is string => !!id)),
     [participants],
   );
-  const assignedExternalTeamIds = useMemo(
-    () => new Set(participants.map((p) => p.externalTeamId).filter((id): id is string => !!id)),
-    [participants],
-  );
 
   const availableTeams = teamOptions.filter((t) => !assignedTeamIds.has(t.id));
-  const availableExternalTeams = externalTeamOptions.filter((t) => !assignedExternalTeamIds.has(t.id));
-
-  const externalTeamsByClub = useMemo(() => {
-    const groups = new Map<string, { clubName: string; teams: ExternalTeamOption[] }>();
-    for (const t of availableExternalTeams) {
-      const group = groups.get(t.externalClub.id) ?? { clubName: t.externalClub.name, teams: [] };
-      group.teams.push(t);
-      groups.set(t.externalClub.id, group);
-    }
-    return Array.from(groups.values());
-  }, [availableExternalTeams]);
+  // Clubs are deliberately NOT filtered by prior selection — the same
+  // canonical club may be added multiple times with distinct Anzeigename
+  // values (e.g. "AC Rossoneri" + "Gelb" and "AC Rossoneri" + "E1").
+  const availableClubs = clubOptions;
 
   const addTeamParticipant = useCallback(() => {
     if (!selectedTeamId) return;
@@ -321,23 +318,40 @@ export default function TournamentCreateForm({
     setSelectedTeamId("");
   }, [selectedTeamId, teamOptions]);
 
-  const addExternalTeamParticipant = useCallback(() => {
-    if (!selectedExternalTeamId) return;
-    const externalTeam = externalTeamOptions.find((t) => t.id === selectedExternalTeamId);
-    if (!externalTeam) return;
+  const addExternalClubParticipant = useCallback(() => {
+    if (!selectedClubId) return;
+    const club = clubOptions.find((c) => c.id === selectedClubId);
+    if (!club) return;
     setParticipants((prev) => [
       ...prev,
       {
         localId: nextLocalId("participant"),
-        kind: "EXTERNAL_TEAM",
-        externalTeamId: externalTeam.id,
-        displayName: externalTeam.name,
-        subLabel: [externalTeam.externalClub.name, externalTeam.categoryLabel].filter(Boolean).join(" · ") || null,
+        kind: "EXTERNAL_CLUB",
+        externalClubId: club.id,
+        clubName: club.name,
+        externalClubDisplayName: "",
+        displayName: club.name,
+        subLabel: "Anzeigename noch nicht gesetzt — Klub wird angezeigt",
         dressingRooms: [],
       },
     ]);
-    setSelectedExternalTeamId("");
-  }, [selectedExternalTeamId, externalTeamOptions]);
+    setSelectedClubId("");
+  }, [selectedClubId, clubOptions]);
+
+  const updateExternalClubDisplayName = useCallback((localId: string, value: string) => {
+    setParticipants((prev) =>
+      prev.map((p) => {
+        if (p.localId !== localId) return p;
+        const trimmed = value.trim();
+        return {
+          ...p,
+          externalClubDisplayName: value,
+          displayName: p.clubName ?? p.displayName,
+          subLabel: trimmed ? trimmed : "Anzeigename noch nicht gesetzt — Klub wird angezeigt",
+        };
+      }),
+    );
+  }, []);
 
   const addManualParticipant = useCallback(() => {
     const trimmed = manualLabel.trim();
@@ -479,7 +493,8 @@ export default function TournamentCreateForm({
             localId: p.localId,
             kind: p.kind,
             teamId: p.teamId,
-            externalTeamId: p.externalTeamId,
+            externalClubId: p.externalClubId,
+            displayName: p.externalClubDisplayName,
             manualLabel: p.manualLabel,
           })),
           resourceAllocations: resources.map<TournamentResourceAllocationDraft>((r) => ({
@@ -533,9 +548,11 @@ export default function TournamentCreateForm({
             const body =
               draft.kind === "TEAM"
                 ? { teamId: draft.teamId }
-                : draft.kind === "EXTERNAL_TEAM"
-                  ? { externalTeamId: draft.externalTeamId }
-                  : { manualLabel: draft.manualLabel };
+                : draft.kind === "EXTERNAL_CLUB"
+                  ? { externalClubId: draft.externalClubId, displayName: draft.displayName ?? "" }
+                  : draft.kind === "EXTERNAL_TEAM"
+                    ? { externalTeamId: draft.externalTeamId }
+                    : { manualLabel: draft.manualLabel };
             const res = await fetch(`/api/tournaments/${tournamentId}/participants`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -759,7 +776,7 @@ export default function TournamentCreateForm({
 
       <SectionCard
         title="2 · Teilnehmende Teams"
-        description="Mindestens ein Team erforderlich — FC Allschwil Teams und externe Teams aus dem Vereinsverzeichnis, in beliebiger Mischung und Anzahl. Garderobenzuweisung (4 · Garderoben) erfolgt direkt pro Team."
+        description="Mindestens ein Team erforderlich — FC Allschwil Teams und externe Vereine aus dem Vereinsverzeichnis, in beliebiger Mischung und Anzahl. Garderobenzuweisung (4 · Garderoben) erfolgt direkt pro Team."
       >
         <div className="space-y-4">
           {participants.length === 0 ? (
@@ -779,7 +796,7 @@ export default function TournamentCreateForm({
                     <div className="flex min-w-0 items-start gap-2.5">
                       {participant.kind === "TEAM" ? (
                         <UsersRound className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sce-primary)]" aria-hidden />
-                      ) : participant.kind === "EXTERNAL_TEAM" ? (
+                      ) : participant.kind === "EXTERNAL_CLUB" || participant.kind === "EXTERNAL_TEAM" ? (
                         <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sce-info)]" aria-hidden />
                       ) : (
                         <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden />
@@ -802,6 +819,24 @@ export default function TournamentCreateForm({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
+
+                  {participant.kind === "EXTERNAL_CLUB" && (
+                    <div className="mt-3 border-t border-[var(--border)] pt-3">
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                          Anzeigename
+                        </span>
+                        <input
+                          type="text"
+                          value={participant.externalClubDisplayName ?? ""}
+                          onChange={(e) => updateExternalClubDisplayName(participant.localId, e.target.value)}
+                          placeholder={participant.clubName ?? "z. B. Gelb, E1"}
+                          data-testid={`tournament-create-participant-${participant.localId}-display-name`}
+                          className="fca-input"
+                        />
+                      </label>
+                    </div>
+                  )}
 
                   {homeAway === "HOME" && (
                     <div className="mt-3 border-t border-[var(--border)] pt-3">
@@ -879,28 +914,24 @@ export default function TournamentCreateForm({
 
               <div className="flex gap-2">
                 <select
-                  value={selectedExternalTeamId}
-                  onChange={(e) => setSelectedExternalTeamId(e.target.value)}
-                  disabled={loadingExternalTeams}
-                  data-testid="tournament-create-add-external-team-select"
+                  value={selectedClubId}
+                  onChange={(e) => setSelectedClubId(e.target.value)}
+                  disabled={loadingClubs}
+                  data-testid="tournament-create-add-external-club-select"
                   className="fca-select flex-1"
                 >
-                  <option value="">{loadingExternalTeams ? "Externe Teams laden…" : "Externes Team (Club Directory)…"}</option>
-                  {externalTeamsByClub.map((group) => (
-                    <optgroup key={group.clubName} label={group.clubName}>
-                      {group.teams.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </optgroup>
+                  <option value="">{loadingClubs ? "Vereine laden…" : "Verein auswählen…"}</option>
+                  {availableClubs.map((club) => (
+                    <option key={club.id} value={club.id}>
+                      {club.name}
+                    </option>
                   ))}
                 </select>
                 <button
                   type="button"
-                  onClick={addExternalTeamParticipant}
-                  disabled={!selectedExternalTeamId}
-                  data-testid="tournament-create-add-external-team-button"
+                  onClick={addExternalClubParticipant}
+                  disabled={!selectedClubId}
+                  data-testid="tournament-create-add-external-club-button"
                   className="fca-button-secondary shrink-0"
                 >
                   <Plus className="h-4 w-4" />
