@@ -137,6 +137,19 @@ export type Screen1SourceEvent = {
     readonly facilityName?: string | null;
   } | null;
 
+  /**
+   * Full ordered list of pitch/hall FacilityResource codes this activity
+   * occupies (INFOBOARD-INTEGRATION-01C). Populated by the canonical
+   * source loader from the complete Weekplanner pitchAllocations array —
+   * never truncated to a single resource — so a training split across two
+   * simultaneous half-pitch allocations is represented on both pitch cards
+   * rather than collapsed onto one. Screen 1 does not read this field (it
+   * continues to use the singular `pitch` candidate above for its one-line
+   * destination display). When absent or empty, Screen 2 falls back to
+   * `pitch.code` as a single-element list.
+   */
+  readonly pitchCodes?: readonly string[];
+
   // ── Dressing-room allocations ─────────────────────────────────────────────
   /**
    * Home / team dressing-room candidates.
@@ -149,6 +162,12 @@ export type Screen1SourceEvent = {
   } | null;
 
   /**
+   * Full ordered list of home-side dressing-room FacilityResource codes
+   * (INFOBOARD-INTEGRATION-01C). Same fallback contract as `pitchCodes`.
+   */
+  readonly homeDressingRoomCodes?: readonly string[];
+
+  /**
    * Away / opponent dressing-room candidates.
    * Resolution priority: label → code → name.
    */
@@ -157,6 +176,13 @@ export type Screen1SourceEvent = {
     readonly code?: string | null;
     readonly name?: string | null;
   } | null;
+
+  /**
+   * Full ordered list of away-side dressing-room FacilityResource codes
+   * (MATCH only; INFOBOARD-INTEGRATION-01C). Same fallback contract as
+   * `pitchCodes`.
+   */
+  readonly awayDressingRoomCodes?: readonly string[];
 
   /**
    * Referee dressing-room candidates.

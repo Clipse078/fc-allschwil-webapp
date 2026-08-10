@@ -21,8 +21,14 @@
  *   - Events: eligible events per INFOBOARD_SCREEN_2 publication policy.
  *   - Weather: MeteoSwiss Open Data (SwissMetNet VQHA80, station BAS
  *     Basel/Binningen, ≈3.8 km) for Sportanlage Im Brüel, Allschwil
- *     (server-side, no API key required, 10-minute cache).
- *   - Sponsors: no canonical sponsor source exists; empty array used.
+ *     (server-side, no API key required, 10-minute cache). Rendered
+ *     compactly in the header (INFOBOARD-INTEGRATION-01C-C1).
+ *
+ * Sponsors:
+ *   - FC Allschwil has no sponsors to display on the Infoboard. The
+ *     sponsor section/right-side column has been removed from Screen 2
+ *     (INFOBOARD-INTEGRATION-01C-C1) — not replaced with placeholders,
+ *     no sponsor administration added.
  *
  * Failure behaviour:
  *   - Tenant not found → notFound() (404).
@@ -97,6 +103,7 @@ export default async function InfoboardScreen2Page() {
       name: true,
       timezone: true,
       logoUrl: true,
+      infoboardDisplayTheme: true,
     },
   });
 
@@ -114,6 +121,7 @@ export default async function InfoboardScreen2Page() {
     name: tenantRow.name,
     timezone: tenantRow.timezone,
     logoUrl: tenantRow.logoUrl,
+    infoboardDisplayTheme: tenantRow.infoboardDisplayTheme,
   };
 
   // ── Request time ───────────────────────────────────────────────────────────
@@ -129,15 +137,14 @@ export default async function InfoboardScreen2Page() {
   const weather = await fetchCurrentWeather();
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  // Sponsors: no canonical sponsor source exists in this slice.
-  // The sponsor section renders with an empty array (no fake data).
+  // No sponsor section — see file header note (INFOBOARD-INTEGRATION-01C-C1).
   return (
     <InfoboardScreen2
       feed={payload.feed}
       branding={payload.branding}
       currentTimeIso={payload.currentTimeIso}
       weather={weather}
-      sponsors={[]}
+      theme={payload.theme}
     />
   );
 }

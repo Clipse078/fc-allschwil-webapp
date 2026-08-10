@@ -366,7 +366,12 @@ function mapTrainingItem(
     resultLabel: null,
     intermediateResultLabel: null,
     pitch: toAllocationCandidate(item.pitchAllocations[0]),
+    // INFOBOARD-INTEGRATION-01C: Screen 2 needs every occupied resource, not
+    // just the first — carried alongside the singular `pitch`/`homeDressingRoom`
+    // candidates Screen 1 already reads unchanged.
+    pitchCodes: item.pitchAllocations.map((ref) => ref.code),
     homeDressingRoom: toAllocationCandidate(item.dressingRoomAllocations[0]),
+    homeDressingRoomCodes: item.dressingRoomAllocations.map((ref) => ref.code),
     awayDressingRoom: null,
     refereeDressingRoom: null,
   };
@@ -406,8 +411,11 @@ function mapMatchItem(
     resultLabel: policy?.resultLabel ?? null,
     intermediateResultLabel: policy?.intermediateResultLabel ?? null,
     pitch: toAllocationCandidate(item.pitchAllocations[0]),
+    pitchCodes: item.pitchAllocations.map((ref) => ref.code),
     homeDressingRoom: toAllocationCandidate(item.dressingRoomAllocations[0]),
+    homeDressingRoomCodes: item.dressingRoomAllocations.map((ref) => ref.code),
     awayDressingRoom: toAllocationCandidate(item.awayDressingRoomAllocations[0]),
+    awayDressingRoomCodes: item.awayDressingRoomAllocations.map((ref) => ref.code),
     refereeDressingRoom: null,
   };
 }
@@ -438,11 +446,14 @@ function mapTournamentItem(
     resultLabel: policy?.resultLabel ?? null,
     intermediateResultLabel: policy?.intermediateResultLabel ?? null,
     pitch: toAllocationCandidate(item.pitchAllocations[0]),
+    pitchCodes: item.pitchAllocations.map((ref) => ref.code),
     // TOURNAMENTCENTER-01B participant Garderobe allocations have no
     // representation in the shared Screen1SourceEvent contract (single
     // home/away/referee slots) — same limitation the legacy Event-based
     // loader already had (no canonical TournamentParticipant model was
-    // ever wired into Screen 1). Not a regression introduced here.
+    // ever wired into Screen 1). Not a regression introduced here. Screen 2
+    // therefore cannot show per-participant dressing-room allocations for
+    // tournaments (known limitation — see final report).
     homeDressingRoom: null,
     awayDressingRoom: null,
     refereeDressingRoom: null,

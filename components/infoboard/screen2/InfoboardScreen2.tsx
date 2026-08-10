@@ -1,21 +1,38 @@
 /**
  * components/infoboard/screen2/InfoboardScreen2.tsx
  *
- * Infoboard Screen 2 — Facility orientation screen.
+ * Infoboard Screen 2 — FACILITY OVERVIEW.
  *
  * Purpose:
- *   "What is currently happening across the sports facility?"
+ *   "What is happening on each facility/resource now, and what is next?"
+ *   (Screen 1 answers the club-wide "what's happening now and in the next
+ *   few hours" question; Screen 2 is resource/facility-oriented and never
+ *   duplicates Screen 1's event-list presentation.)
  *
- * Design (INFOBOARD-04B — premium dark facility overview):
- *   - Full dark navy stadium palette, consistent with Screen 1.
- *   - Left section (~65% width, dominant): large pitch overview cards.
- *   - Right section (~35% width): weather panel + sponsor display.
- *   - Pitch cards fill the available facility area.
+ * Sections:
+ *   - HEADER — club branding, a reserved Alexa-integration zone, and a
+ *     compact weather indicator alongside the time/date block
+ *     (INFOBOARD-INTEGRATION-01C-C1).
+ *   - PITCHES — a card per configured pitch/hall, showing JETZT (current)
+ *     and DANACH (next-within-horizon) independently, or FREI when neither
+ *     exists. Uses the full content width — there is no sponsor/weather
+ *     sidebar (INFOBOARD-INTEGRATION-01C-C1).
+ *   - GARDEROBEN — a compact per-dressing-room allocation list.
+ *   - NICHT ZUGETEILT — a restrained, compact list of eligible activities
+ *     that could not be mapped to a configured pitch. Only rendered when
+ *     non-empty; never a warning banner.
  *
- * INFOBOARD-05 changes:
- *   - Dressing-room/cabin section removed from Screen 2.
- *     Cabin assignments belong exclusively on Screen 1.
- *   - Weather panel added to the right column (above sponsors).
+ * INFOBOARD-INTEGRATION-01C-C1 (layout correction to the accepted Screen 2
+ * facility integration):
+ *   - The standalone weather panel and the sponsor section/right-side
+ *     column have been removed from Screen 2. FC Allschwil has no sponsors
+ *     to display; weather now renders compactly in the header instead of
+ *     as a large content-area card. This does not change facility mapping,
+ *     publication logic, the 4-hour horizon, active-plan resolution, or
+ *     theme architecture.
+ *   - The header's reserved Alexa-integration zone is preserved exactly —
+ *     weather is placed with the time/date status group, never inside the
+ *     Alexa-reserved region.
  *
  * Invariants:
  *   - Pure presentational server component — no "use client", no effects,
@@ -24,9 +41,9 @@
  *   - Tenant timezone always taken from feed.tenant.timezone.
  *   - No new Date() without argument; no implicit timezone.
  *   - null / undefined values are never rendered as strings.
- *   - No "Next Events" panel — pitch occupancy only.
- *   - No dressing-room / cabin section.
  *   - No scrolling — content must fit within 100dvh.
+ *   - DARK/LIGHT themes are presentation only (data-theme attribute + CSS
+ *     custom properties) — never affect feed content or layout structure.
  */
 
 import type { ReactElement } from "react";
@@ -38,29 +55,21 @@ import {
   CloudSnow,
   Zap,
   CloudDrizzle,
-  Wind,
 } from "lucide-react";
 import type {
   InfoboardScreen2Feed,
   PitchOccupancy,
   PitchOccupancyState,
+  PitchEventSummary,
+  DressingRoomOccupancy,
   PublishingEventType,
 } from "@/lib/publishing/event-types";
 import type { WeatherResult } from "@/lib/weather/weather-types";
+import {
+  DEFAULT_INFOBOARD_DISPLAY_THEME,
+  type InfoboardDisplayTheme,
+} from "@/lib/publishing/infoboard/display-theme";
 import styles from "./InfoboardScreen2.module.css";
-
-// ── Public sponsor types ──────────────────────────────────────────────────────
-
-/**
- * A single sponsor for display purposes.
- * Tier determines visual prominence in the sponsor grid.
- */
-export type InfoboardSponsor = {
-  readonly id: string;
-  readonly name: string;
-  readonly logoSrc: string | null;
-  readonly tier: "gold" | "silver" | "partner";
-};
 
 // ── Public component props ────────────────────────────────────────────────────
 
@@ -72,10 +81,10 @@ export type InfoboardScreen2Branding = {
 export type InfoboardScreen2Props = {
   feed: InfoboardScreen2Feed;
   branding?: InfoboardScreen2Branding;
-  sponsors?: readonly InfoboardSponsor[];
   /**
-   * Current weather for the facility location.
-   * When absent or unavailable, renders the "WETTER NICHT VERFÜGBAR" fallback.
+   * Current weather for the facility location. Rendered compactly in the
+   * header next to the time/date block (INFOBOARD-INTEGRATION-01C-C1).
+   * When absent or unavailable, renders a compact "WETTER N/A" fallback.
    */
   weather?: WeatherResult | null;
   /**
@@ -83,6 +92,15 @@ export type InfoboardScreen2Props = {
    * When absent, the clock display falls back to feed.displayDate.
    */
   currentTimeIso?: string | null;
+  /**
+   * Display theme (INFOBOARD-INTEGRATION-01B/01C). Defaults to "DARK" — the
+   * existing premium stadium theme — when omitted, so every existing caller
+   * (previews, tests) is unaffected. Presentation only: never changes feed
+   * content, layout, or content hierarchy — only CSS custom-property values
+   * via the rendered `data-theme` attribute. Reuses the same
+   * Tenant.infoboardDisplayTheme → resolver pipeline as Screen 1.
+   */
+  theme?: InfoboardDisplayTheme;
 };
 
 // ── Time / date formatting ────────────────────────────────────────────────────
@@ -179,6 +197,58 @@ function getWeatherIcon(conditionCode: number): LucideIcon {
   return Cloud as LucideIcon;
 }
 
+// ── Pitch event block (JETZT / DANACH) ────────────────────────────────────────
+
+type PitchEventBlockProps = {
+  event: PitchEventSummary;
+  temporal: "current" | "next";
+  timeZone: string;
+};
+
+function PitchEventBlock({ event, temporal, timeZone }: PitchEventBlockProps): ReactElement {
+  const label = temporal === "current" ? "JETZT" : "DANACH";
+  return (
+    <div
+      className={
+        temporal === "current" ? styles.pitchCardEvent : styles.pitchCardNextEvent
+      }
+      data-testid={temporal === "current" ? "pitch-card-event" : "pitch-card-next-event"}
+    >
+      <div className={styles.pitchCardEventHeader}>
+        <span
+          className={styles.pitchCardTemporalLabel}
+          data-status={temporal}
+          data-testid={`pitch-card-temporal-${temporal}`}
+        >
+          {label}
+        </span>
+        <span className={styles.pitchCardEventTime}>
+          {formatTime(event.startAt, timeZone)}
+          {event.endAt !== null && (
+            <span className={styles.pitchCardEventEndTime}>
+              {" "}–{formatTime(event.endAt, timeZone)}
+            </span>
+          )}
+        </span>
+      </div>
+      <span
+        className={styles.pitchCardEventType}
+        data-event-type={eventTypeKey(event.type)}
+      >
+        {eventTypeLabel(event.type)}
+      </span>
+      <span className={styles.pitchCardEventTitle}>
+        {event.teamDisplayName ?? event.displayTitle}
+      </span>
+      {event.opponentDisplayName !== null && (
+        <span className={styles.pitchCardEventOpponent}>
+          vs. {event.opponentDisplayName}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Pitch card ────────────────────────────────────────────────────────────────
 
 type PitchCardProps = {
@@ -188,9 +258,10 @@ type PitchCardProps = {
 
 function PitchCard({ pitch, timeZone }: PitchCardProps): ReactElement {
   const state = pitch.state;
-  const event = pitch.currentEvent ?? pitch.nextEvent;
+  const primaryEvent = pitch.currentEvent ?? pitch.nextEvent;
   const stateKey = pitchStateKey(state);
-  const eventKey = event ? eventTypeKey(event.type) : null;
+  const eventKey = primaryEvent ? eventTypeKey(primaryEvent.type) : null;
+  const isFree = pitch.currentEvent === null && pitch.nextEvent === null;
 
   return (
     <div
@@ -213,213 +284,186 @@ function PitchCard({ pitch, timeZone }: PitchCardProps): ReactElement {
         {pitchStateLabel(state)}
       </div>
 
-      {/* Event summary when occupied or upcoming */}
-      {event !== null ? (
-        <div className={styles.pitchCardEvent} data-testid="pitch-card-event">
-          <span
-            className={styles.pitchCardEventType}
-            data-event-type={eventTypeKey(event.type)}
-          >
-            {eventTypeLabel(event.type)}
-          </span>
-          <span className={styles.pitchCardEventTitle}>
-            {event.teamDisplayName ?? event.displayTitle}
-          </span>
-          {event.opponentDisplayName !== null && (
-            <span className={styles.pitchCardEventOpponent}>
-              vs. {event.opponentDisplayName}
-            </span>
-          )}
-          <span className={styles.pitchCardEventTime}>
-            {formatTime(event.startAt, timeZone)}
-            {event.endAt !== null && (
-              <span className={styles.pitchCardEventEndTime}>
-                {" "}–{formatTime(event.endAt, timeZone)}
-              </span>
-            )}
-          </span>
-        </div>
-      ) : (
+      {pitch.currentEvent !== null && (
+        <PitchEventBlock event={pitch.currentEvent} temporal="current" timeZone={timeZone} />
+      )}
+      {pitch.nextEvent !== null && (
+        <PitchEventBlock event={pitch.nextEvent} temporal="next" timeZone={timeZone} />
+      )}
+      {isFree && (
         <div className={styles.pitchCardFree} data-testid="pitch-card-free">
-          <span className={styles.pitchCardFreeLine}>VERFÜGBAR</span>
+          <span className={styles.pitchCardFreeLine}>FREI</span>
         </div>
       )}
     </div>
   );
 }
 
-// ── Weather panel ─────────────────────────────────────────────────────────────
+// ── Dressing-room section ─────────────────────────────────────────────────────
 
-type WeatherPanelProps = {
-  weather: WeatherResult | null | undefined;
+type DressingRoomRowProps = {
+  room: DressingRoomOccupancy;
 };
 
-function WeatherPanel({ weather }: WeatherPanelProps): ReactElement {
-  const isAvailable = weather?.isAvailable === true;
+function DressingRoomRow({ room }: DressingRoomRowProps): ReactElement {
+  const stateKey =
+    room.state === "OCCUPIED_NOW" ? "occupied" : room.state === "UPCOMING" ? "upcoming" : "free";
 
-  if (!isAvailable || !weather) {
-    return (
-      <section
-        className={styles.weatherPanel}
-        data-testid="weather-panel"
-        aria-label="Wetter"
-      >
-        <div className={styles.weatherPanelHeader}>
-          <span className={styles.weatherPanelTitle}>WETTER</span>
-        </div>
-        <div
-          className={styles.weatherUnavailable}
-          data-testid="weather-unavailable"
-        >
-          <span>WETTER NICHT VERFÜGBAR</span>
-        </div>
-      </section>
-    );
+  return (
+    <div
+      className={styles.dressingRoomRow}
+      data-testid="dressing-room-row"
+      data-state={stateKey}
+    >
+      <span className={styles.dressingRoomCode} data-testid="dressing-room-code">
+        {room.displayLabel}
+      </span>
+      {room.current !== null ? (
+        <span className={styles.dressingRoomTeam} data-testid="dressing-room-occupant">
+          {room.current.assignedTo ?? "BELEGT"}
+        </span>
+      ) : room.next !== null ? (
+        <span className={styles.dressingRoomNext} data-testid="dressing-room-next">
+          DANACH: {room.next.assignedTo ?? "—"}
+        </span>
+      ) : (
+        <span className={styles.dressingRoomFreeLabel} data-testid="dressing-room-free">
+          FREI
+        </span>
+      )}
+    </div>
+  );
+}
+
+type DressingRoomSectionProps = {
+  rooms: readonly DressingRoomOccupancy[];
+};
+
+function DressingRoomSection({ rooms }: DressingRoomSectionProps): ReactElement | null {
+  if (rooms.length === 0) {
+    return null;
   }
-
-  const w = weather;
-  const IconComponent = getWeatherIcon(w.conditionCode);
 
   return (
     <section
-      className={styles.weatherPanel}
-      data-testid="weather-panel"
-      aria-label="Wetter"
+      className={styles.dressingRoomSection}
+      data-testid="dressing-room-section"
+      aria-label="Garderoben"
     >
-      <div className={styles.weatherPanelHeader}>
-        <span className={styles.weatherPanelTitle}>WETTER</span>
+      <div className={styles.dressingRoomHeader}>
+        <span className={styles.dressingRoomSectionTitle}>GARDEROBEN</span>
       </div>
-      <div className={styles.weatherBody} data-testid="weather-body">
-        <div className={styles.weatherTempBlock}>
-          <span className={styles.weatherTemp} data-testid="weather-temperature">
-            {w.temperatureC}
-            <span className={styles.weatherTempUnit}>&thinsp;°C</span>
-          </span>
-        </div>
-        <div className={styles.weatherDetails}>
-          <div className={styles.weatherIconCondition}>
-            <IconComponent
-              size={20}
-              strokeWidth={1.5}
-              aria-hidden={true}
-            />
-            <span
-              className={styles.weatherCondition}
-              data-testid="weather-condition"
-            >
-              {w.conditionLabel}
-            </span>
-          </div>
-          <div className={styles.weatherWindRow}>
-            <Wind size={14} strokeWidth={1.5} aria-hidden={true} />
-            <span
-              className={styles.weatherWind}
-              data-testid="weather-wind"
-            >
-              {w.windKmh}&thinsp;km/h
-            </span>
-          </div>
-        </div>
-      </div>
-      {/* Attribution required by MeteoSwiss OGD terms: "Source: MeteoSwiss" */}
-      <div
-        className={styles.weatherAttribution}
-        data-testid="weather-attribution"
-        aria-label="Wetterdaten-Quelle"
-      >
-        Quelle: MeteoSwiss
+      <div className={styles.dressingRoomList} data-testid="dressing-room-list">
+        {rooms.map((room) => (
+          <DressingRoomRow key={room.code} room={room} />
+        ))}
       </div>
     </section>
   );
 }
 
-// ── Sponsor section ───────────────────────────────────────────────────────────
+// ── Unallocated section ────────────────────────────────────────────────────────
 
-type SponsorSectionProps = {
-  sponsors: readonly InfoboardSponsor[];
+type UnallocatedSectionProps = {
+  activities: readonly PitchEventSummary[];
+  timeZone: string;
 };
 
-function SponsorSection({ sponsors }: SponsorSectionProps): ReactElement | null {
-  if (sponsors.length === 0) {
+/**
+ * Compact, restrained list of eligible current/upcoming activities that
+ * could not be mapped to a configured pitch. Only rendered when non-empty
+ * — never a warning banner, never shown to "fill space".
+ */
+function UnallocatedSection({ activities, timeZone }: UnallocatedSectionProps): ReactElement | null {
+  if (activities.length === 0) {
     return null;
   }
 
-  const goldSponsors = sponsors.filter((s) => s.tier === "gold");
-  const silverSponsors = sponsors.filter((s) => s.tier === "silver");
-  const partnerSponsors = sponsors.filter((s) => s.tier === "partner");
-
   return (
     <section
-      className={styles.sponsorSection}
-      data-testid="sponsor-section"
-      aria-label="Unsere Sponsoren"
+      className={styles.unallocatedSection}
+      data-testid="unallocated-section"
+      aria-label="Nicht zugeteilte Aktivitäten"
     >
-      <div className={styles.sponsorSectionHeader}>
-        <span className={styles.sponsorSectionTitle}>UNSERE SPONSOREN</span>
-      </div>
-
-      <div className={styles.sponsorGrid} data-testid="sponsor-grid">
-        {goldSponsors.map((sponsor) => (
-          <div
-            key={sponsor.id}
-            className={`${styles.sponsorCard} ${styles.sponsorCardGold}`}
-            data-testid="sponsor-card"
-            data-tier="gold"
-          >
-            {sponsor.logoSrc !== null ? (
-              <img
-                src={sponsor.logoSrc}
-                alt={sponsor.name}
-                className={styles.sponsorLogo}
-                data-testid="sponsor-logo"
-              />
-            ) : (
-              <span className={styles.sponsorName}>{sponsor.name}</span>
-            )}
-          </div>
+      <span className={styles.unallocatedTitle}>NICHT ZUGETEILT</span>
+      <ul className={styles.unallocatedList} data-testid="unallocated-list">
+        {activities.map((activity) => (
+          <li key={activity.eventId} className={styles.unallocatedItem} data-testid="unallocated-item">
+            <span className={styles.unallocatedTime}>{formatTime(activity.startAt, timeZone)}</span>
+            <span className={styles.unallocatedType}>{eventTypeLabel(activity.type)}</span>
+            <span className={styles.unallocatedName}>
+              {activity.teamDisplayName ?? activity.displayTitle}
+              {activity.opponentDisplayName !== null && ` – ${activity.opponentDisplayName}`}
+            </span>
+          </li>
         ))}
-
-        {silverSponsors.map((sponsor) => (
-          <div
-            key={sponsor.id}
-            className={`${styles.sponsorCard} ${styles.sponsorCardSilver}`}
-            data-testid="sponsor-card"
-            data-tier="silver"
-          >
-            {sponsor.logoSrc !== null ? (
-              <img
-                src={sponsor.logoSrc}
-                alt={sponsor.name}
-                className={styles.sponsorLogo}
-                data-testid="sponsor-logo"
-              />
-            ) : (
-              <span className={styles.sponsorName}>{sponsor.name}</span>
-            )}
-          </div>
-        ))}
-
-        {partnerSponsors.map((sponsor) => (
-          <div
-            key={sponsor.id}
-            className={`${styles.sponsorCard} ${styles.sponsorCardPartner}`}
-            data-testid="sponsor-card"
-            data-tier="partner"
-          >
-            {sponsor.logoSrc !== null ? (
-              <img
-                src={sponsor.logoSrc}
-                alt={sponsor.name}
-                className={styles.sponsorLogo}
-                data-testid="sponsor-logo"
-              />
-            ) : (
-              <span className={styles.sponsorName}>{sponsor.name}</span>
-            )}
-          </div>
-        ))}
-      </div>
+      </ul>
     </section>
+  );
+}
+
+// ── Header weather (compact — INFOBOARD-INTEGRATION-01C-C1) ──────────────────
+
+type HeaderWeatherProps = {
+  weather: WeatherResult | null | undefined;
+};
+
+/**
+ * Compact weather indicator for the Screen 2 header, placed next to the
+ * time/date block. Replaces the former standalone weather content-area
+ * panel. Intentionally minimal — icon, temperature, short condition text,
+ * and the MeteoSwiss attribution required by the OGD terms. No wind, no
+ * secondary panel; never a weather dashboard.
+ */
+function HeaderWeather({ weather }: HeaderWeatherProps): ReactElement {
+  const isAvailable = weather?.isAvailable === true;
+
+  if (!isAvailable || !weather) {
+    return (
+      <div
+        className={styles.headerWeather}
+        data-testid="header-weather"
+        aria-label="Wetter"
+      >
+        <span
+          className={styles.headerWeatherUnavailable}
+          data-testid="header-weather-unavailable"
+        >
+          WETTER N/A
+        </span>
+      </div>
+    );
+  }
+
+  const IconComponent = getWeatherIcon(weather.conditionCode);
+
+  return (
+    <div
+      className={styles.headerWeather}
+      data-testid="header-weather"
+      aria-label="Wetter"
+    >
+      <IconComponent size={26} strokeWidth={1.5} aria-hidden={true} />
+      <span className={styles.headerWeatherTemp} data-testid="header-weather-temperature">
+        {weather.temperatureC}
+        <span className={styles.headerWeatherTempUnit}>&thinsp;°C</span>
+      </span>
+      <div className={styles.headerWeatherMeta}>
+        <span
+          className={styles.headerWeatherCondition}
+          data-testid="header-weather-condition"
+        >
+          {weather.conditionLabel}
+        </span>
+        {/* Attribution required by MeteoSwiss OGD terms: "Source: MeteoSwiss" */}
+        <span
+          className={styles.headerWeatherAttribution}
+          data-testid="header-weather-attribution"
+        >
+          Quelle: MeteoSwiss
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -428,12 +472,13 @@ function SponsorSection({ sponsors }: SponsorSectionProps): ReactElement | null 
 export function InfoboardScreen2({
   feed,
   branding,
-  sponsors = [],
   weather,
   currentTimeIso,
+  theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
 }: InfoboardScreen2Props): ReactElement {
-  const { tenant, pitches } = feed;
+  const { tenant, pitches, dressingRooms, unallocated } = feed;
   const timeZone = tenant.timezone;
+  const themeAttr = theme.toLowerCase();
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
@@ -453,7 +498,7 @@ export function InfoboardScreen2({
     <div
       className={styles.root}
       data-testid="infoboard-screen2-root"
-      data-theme="dark"
+      data-theme={themeAttr}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className={styles.header} data-testid="infoboard-screen2-header">
@@ -479,39 +524,44 @@ export function InfoboardScreen2({
           </div>
         </div>
 
-        {/* Center: current time + date */}
-        <div className={styles.headerCenter} data-testid="screen2-header-center">
-          {currentTime !== null && headerWeekday !== null ? (
-            <div className={styles.headerTimeBlock}>
-              <time
-                className={styles.headerCurrentTime}
-                dateTime={currentTimeIso!}
-              >
-                {currentTime}
-              </time>
-              <span className={styles.headerTimeSeparator} aria-hidden="true">|</span>
-              <div className={styles.headerDateBlock}>
-                <span className={styles.headerWeekday}>{headerWeekday}</span>
-                <span className={styles.headerDateLine}>{headerDateLine}</span>
-              </div>
-            </div>
-          ) : (
-            <span className={styles.headerDateFallback}>{headerDateLine}</span>
-          )}
-        </div>
-
-        {/* Right: Alexa-safe zone — intentionally empty */}
+        {/* Reserved Alexa-integration zone — intentionally empty. Must stay
+            between branding and the weather/time/date status group; never
+            consumed by weather or any other content. */}
         <div
-          className={styles.headerRight}
+          className={styles.headerAlexaZone}
           data-testid="screen2-alexa-safe-zone"
           aria-hidden="true"
         />
+
+        {/* Right: compact weather + current time + date */}
+        <div className={styles.headerStatus} data-testid="screen2-header-status">
+          <HeaderWeather weather={weather} />
+          <div className={styles.headerCenter} data-testid="screen2-header-center">
+            {currentTime !== null && headerWeekday !== null ? (
+              <div className={styles.headerTimeBlock}>
+                <time
+                  className={styles.headerCurrentTime}
+                  dateTime={currentTimeIso!}
+                >
+                  {currentTime}
+                </time>
+                <span className={styles.headerTimeSeparator} aria-hidden="true">|</span>
+                <div className={styles.headerDateBlock}>
+                  <span className={styles.headerWeekday}>{headerWeekday}</span>
+                  <span className={styles.headerDateLine}>{headerDateLine}</span>
+                </div>
+              </div>
+            ) : (
+              <span className={styles.headerDateFallback}>{headerDateLine}</span>
+            )}
+          </div>
+        </div>
       </header>
 
-      {/* ── Main content: facility | weather + sponsors ───────────────────── */}
+      {/* ── Main content: facility overview (full width) ───────────────────
+          The sponsor/weather sidebar has been removed (INFOBOARD-INTEGRATION-
+          01C-C1) — the facility column now uses the full content width. */}
       <main className={styles.main}>
-
-        {/* Left column: pitch overview */}
         <div className={styles.facilityColumn}>
 
           {/* Pitch overview */}
@@ -546,13 +596,10 @@ export function InfoboardScreen2({
               </div>
             )}
           </section>
-        </div>
 
-        {/* Right column: weather + sponsors */}
-        <aside className={styles.sponsorAside} data-testid="sponsor-aside">
-          <WeatherPanel weather={weather} />
-          <SponsorSection sponsors={sponsors} />
-        </aside>
+          <DressingRoomSection rooms={dressingRooms} />
+          <UnallocatedSection activities={unallocated} timeZone={timeZone} />
+        </div>
       </main>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
