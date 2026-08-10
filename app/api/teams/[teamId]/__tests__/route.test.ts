@@ -6,6 +6,17 @@
  * genderGroup, ageGroup, sortOrder, orgUnitId, visibility flags) is
  * exercised only insofar as it interacts with the new fields.
  *
+ * ADMIN-DELETE-01B — Focused tests for the DELETE /api/teams/[teamId]
+ * permanent-delete authorization rewire (PERMISSIONS.TEAMS_DELETE via
+ * EffectivePermissionResolver.hasTenantDeletionAuthority(), never
+ * TEAMS_MANAGE). The resolver's own Club Admin / SCE Super Admin /
+ * delegated-user grant logic is exhaustively covered at the resolver level
+ * (lib/permissions/__tests__/admin-delete-01a-c1-cross-tenant-super-admin-
+ * authority.test.ts) — these tests instead verify the ROUTE wiring: the
+ * target Team's tenant is resolved server-side (never from the client), the
+ * resolver is invoked with that exact tenantId + PERMISSIONS.TEAMS_DELETE,
+ * and the route's response follows the resolver's decision.
+ *
  * All database and permission access is mocked. No live database access.
  *
  * TEST COVERAGE MAP:
@@ -20,6 +31,23 @@
  *   OrgUnit assignment (Organisationseinheit relationship)
  *   16. A valid, same-tenant orgUnitId is persisted on team.update.
  *   17. A cross-tenant orgUnitId is rejected with 403 and never persisted.
+ *
+ *   DELETE — ADMIN-DELETE-01B authorization rewire
+ *   18. Club Admin: allowed within their own tenant (resolver Path 1).
+ *   19. Club Admin: denied for a Team in another tenant (resolver Path 1 false).
+ *   20. SCE Super Admin: allowed for a Team in a different, ACTIVE tenant
+ *       (resolver Path 2) — the route never restricts the lookup to the
+ *       caller's own session tenant.
+ *   21. Delegated user holding only teams.delete: allowed within the tenant
+ *       where that permission was granted.
+ *   22. teams.manage-only (no teams.delete): denied — resolver returns false,
+ *       route never falls back to a TEAMS_MANAGE check.
+ *   23. A client-supplied tenantId (query string) is ignored — the resolver
+ *       is always called with the Team's own DB-resolved tenantId.
+ *   24. 409 with blockers when the Team has meaningful history (unchanged
+ *       deletion-safety behavior).
+ *   25. 404 when the Team does not exist.
+ *   26. 401 when there is no session.
  */
 
 import { NextRequest } from "next/server";
@@ -29,7 +57,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireApiAnyPermission: vi.fn(),
-  requireApiPermission: vi.fn(),
+  auth: vi.fn(),
+  hasTenantDeletionAuthority: vi.fn(),
   logAction: vi.fn(),
   teamFindUnique: vi.fn(),
   teamUpdate: vi.fn(),
@@ -43,8 +72,14 @@ vi.mock("@/lib/permissions/require-api-any-permission", () => ({
   requireApiAnyPermission: mocks.requireApiAnyPermission,
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/auth", () => ({
+  auth: mocks.auth,
+}));
+
+vi.mock("@/lib/permissions/services/effective-permission-resolver", () => ({
+  createEffectivePermissionResolver: () => ({
+    hasTenantDeletionAuthority: mocks.hasTenantDeletionAuthority,
+  }),
 }));
 
 vi.mock("@/lib/audit/log-action", () => ({
@@ -146,11 +181,16 @@ const BASE_BODY = {
   infoboardVisible: true,
 };
 
+function makeAuthSession(userId = "user-01", effectiveUserId?: string) {
+  return { user: { id: userId, effectiveUserId: effectiveUserId ?? userId } };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireApiAnyPermission.mockResolvedValue(makeSessionOk());
   mocks.teamFindUnique.mockResolvedValue(EXISTING_TEAM);
   mocks.logAction.mockResolvedValue(undefined);
+  mocks.auth.mockResolvedValue(makeAuthSession());
 });
 
 describe("PATCH /api/teams/[teamId] — TEAM-IDENTITY-01 naming fields", () => {
@@ -320,33 +360,113 @@ describe("PATCH /api/teams/[teamId] — cross-tenant mutation blocked", () => {
   });
 });
 
-describe("DELETE /api/teams/[teamId] — safe delete", () => {
-  it("12 — deletes an unused Team for TEAMS_MANAGE callers", async () => {
-    mocks.requireApiPermission.mockResolvedValueOnce(makeSessionOk());
+describe("DELETE /api/teams/[teamId] — ADMIN-DELETE-01B permanent-delete authorization", () => {
+  const TENANT_A = "tenant-a"; // the Team's own tenant, resolved server-side
+  const TENANT_B = "tenant-b"; // a different tenant
+
+  it("18 — Club Admin: allowed within their own tenant", async () => {
+    mocks.auth.mockResolvedValueOnce(makeAuthSession("club-admin-1"));
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_A });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
     mocks.deleteTeamSafely.mockResolvedValueOnce({ id: TEAM_ID });
 
     const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
 
     expect(response.status).toBe(200);
-    expect(mocks.deleteTeamSafely).toHaveBeenCalledWith("tenant-a", TEAM_ID);
+    expect(mocks.hasTenantDeletionAuthority).toHaveBeenCalledWith({
+      userId: "club-admin-1",
+      permission: "teams.delete",
+      tenantId: TENANT_A,
+    });
+    expect(mocks.deleteTeamSafely).toHaveBeenCalledWith(TENANT_A, TEAM_ID);
   });
 
-  it("13 — VIEW-only callers are rejected with 403 (VIEW vs MANAGE)", async () => {
-    mocks.requireApiPermission.mockResolvedValueOnce({
-      ok: false as const,
-      status: 403,
-      error: "Forbidden",
-      session: null,
-    });
+  it("19 — Club Admin: denied for a Team belonging to another tenant", async () => {
+    mocks.auth.mockResolvedValueOnce(makeAuthSession("club-admin-1"));
+    // The Team actually belongs to tenant-b — a Club Admin whose grant is
+    // scoped to tenant-a must not be authorized here.
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_B });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(false);
 
     const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
 
     expect(response.status).toBe(403);
+    expect(mocks.hasTenantDeletionAuthority).toHaveBeenCalledWith({
+      userId: "club-admin-1",
+      permission: "teams.delete",
+      tenantId: TENANT_B,
+    });
     expect(mocks.deleteTeamSafely).not.toHaveBeenCalled();
   });
 
-  it("14 — 409 with blockers when the Team has meaningful history (never deleted)", async () => {
-    mocks.requireApiPermission.mockResolvedValueOnce(makeSessionOk());
+  it("20 — SCE Super Admin: allowed for a Team in a different, ACTIVE tenant", async () => {
+    // The route never restricts the lookup to the caller's own session
+    // tenant — the resolver's platform cross-tenant path (already unit
+    // tested) is trusted via its return value here.
+    mocks.auth.mockResolvedValueOnce(makeAuthSession("sce-super-admin-1"));
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_B });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
+    mocks.deleteTeamSafely.mockResolvedValueOnce({ id: TEAM_ID });
+
+    const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
+
+    expect(response.status).toBe(200);
+    expect(mocks.hasTenantDeletionAuthority).toHaveBeenCalledWith({
+      userId: "sce-super-admin-1",
+      permission: "teams.delete",
+      tenantId: TENANT_B,
+    });
+    expect(mocks.deleteTeamSafely).toHaveBeenCalledWith(TENANT_B, TEAM_ID);
+  });
+
+  it("21 — delegated user holding only teams.delete: allowed within the granted tenant", async () => {
+    mocks.auth.mockResolvedValueOnce(makeAuthSession("delegated-user-1"));
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_A });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
+    mocks.deleteTeamSafely.mockResolvedValueOnce({ id: TEAM_ID });
+
+    const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
+
+    expect(response.status).toBe(200);
+    expect(mocks.deleteTeamSafely).toHaveBeenCalledWith(TENANT_A, TEAM_ID);
+  });
+
+  it("22 — teams.manage-only (no teams.delete): denied, never falls back to a MANAGE check", async () => {
+    mocks.auth.mockResolvedValueOnce(makeAuthSession("manage-only-user"));
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_A });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(false);
+
+    const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
+
+    expect(response.status).toBe(403);
+    expect(mocks.hasTenantDeletionAuthority).toHaveBeenCalledWith(
+      expect.objectContaining({ permission: "teams.delete" }),
+    );
+    expect(mocks.deleteTeamSafely).not.toHaveBeenCalled();
+  });
+
+  it("23 — a client-supplied tenantId (query string) is ignored; the Team's own DB tenantId is used", async () => {
+    mocks.auth.mockResolvedValueOnce(makeAuthSession("club-admin-1"));
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_A });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
+    mocks.deleteTeamSafely.mockResolvedValueOnce({ id: TEAM_ID });
+
+    // Attempt to smuggle a different tenantId via the query string.
+    const response = await DELETE(
+      new NextRequest(`http://localhost/api/teams/${TEAM_ID}?tenantId=${TENANT_B}`),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.hasTenantDeletionAuthority).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: TENANT_A }),
+    );
+    expect(mocks.deleteTeamSafely).toHaveBeenCalledWith(TENANT_A, TEAM_ID);
+  });
+
+  it("24 — 409 with blockers when the Team has meaningful history (deletion-safety unchanged)", async () => {
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_A });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
     mocks.deleteTeamSafely.mockRejectedValueOnce(
       new MockedTeamDeletionBlockedError([{ key: "squad", label: "Kadermitglieder", count: 14 }]),
     );
@@ -358,12 +478,43 @@ describe("DELETE /api/teams/[teamId] — safe delete", () => {
     expect(body.blockers).toEqual([{ key: "squad", label: "Kadermitglieder", count: 14 }]);
   });
 
-  it("15 — cross-tenant Team returns 404, never deleted", async () => {
-    mocks.requireApiPermission.mockResolvedValueOnce(makeSessionOk());
+  it("25 — 404 when the Team does not exist (never authorizes or deletes)", async () => {
+    mocks.teamFindUnique.mockResolvedValueOnce(null);
+
+    const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
+
+    expect(response.status).toBe(404);
+    expect(mocks.hasTenantDeletionAuthority).not.toHaveBeenCalled();
+    expect(mocks.deleteTeamSafely).not.toHaveBeenCalled();
+  });
+
+  it("25a — 404 when the Team has no owning tenant (Team.tenantId is nullable)", async () => {
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: null });
+
+    const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
+
+    expect(response.status).toBe(404);
+    expect(mocks.hasTenantDeletionAuthority).not.toHaveBeenCalled();
+    expect(mocks.deleteTeamSafely).not.toHaveBeenCalled();
+  });
+
+  it("25b — 404 when the Team is deleted concurrently between authorization and the delete itself", async () => {
+    mocks.teamFindUnique.mockResolvedValueOnce({ id: TEAM_ID, tenantId: TENANT_A });
+    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
     mocks.deleteTeamSafely.mockRejectedValueOnce(new MockedTeamNotFoundError());
 
     const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
 
     expect(response.status).toBe(404);
+  });
+
+  it("26 — 401 when there is no session", async () => {
+    mocks.auth.mockResolvedValueOnce(null);
+
+    const response = await DELETE(new NextRequest(`http://localhost/api/teams/${TEAM_ID}`), makeContext());
+
+    expect(response.status).toBe(401);
+    expect(mocks.teamFindUnique).not.toHaveBeenCalled();
+    expect(mocks.deleteTeamSafely).not.toHaveBeenCalled();
   });
 });

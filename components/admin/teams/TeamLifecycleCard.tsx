@@ -19,6 +19,13 @@ type Props = {
   teamName: string;
   isActive: boolean;
   canManage: boolean;
+  /**
+   * ADMIN-DELETE-01B: effective PERMISSIONS.TEAMS_DELETE authority, resolved
+   * by the caller (see app/(admin)/dashboard/teams/[teamId]/page.tsx).
+   * Deliberately separate from `canManage` — holding teams.manage alone
+   * (archive/restore/edit) must never surface the permanent-delete action.
+   */
+  canDelete: boolean;
 };
 
 /**
@@ -30,7 +37,7 @@ type Props = {
  * Delete is safe-by-default: the server blocks it and reports the concrete
  * dependencies whenever meaningful history exists, recommending archiving.
  */
-export default function TeamLifecycleCard({ teamId, teamName, isActive, canManage }: Props) {
+export default function TeamLifecycleCard({ teamId, teamName, isActive, canManage, canDelete }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +79,7 @@ export default function TeamLifecycleCard({ teamId, teamName, isActive, canManag
     }
   }
 
-  if (!canManage) {
+  if (!canManage && !canDelete) {
     return (
       <SectionCard title="Status">
         <Badge variant={isActive ? "success" : "outline"}>
@@ -102,35 +109,44 @@ export default function TeamLifecycleCard({ teamId, teamName, isActive, canManag
           )}
 
           <div className="flex flex-wrap gap-2">
-            {isActive ? (
+            {canManage &&
+              (isActive ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  iconLeft={<Archive className="h-3.5 w-3.5" />}
+                  onClick={() => setConfirmAction("archive")}
+                >
+                  Archivieren
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  iconLeft={<ArchiveRestore className="h-3.5 w-3.5" />}
+                  onClick={() => runAction("restore")}
+                  loading={busy}
+                >
+                  Wiederherstellen
+                </Button>
+              ))}
+
+            {/*
+              ADMIN-DELETE-01B: permanent delete requires effective
+              teams.delete authority, independent of teams.manage — a
+              delegated user may hold teams.delete without teams.manage
+              (or vice versa), so this button is gated on `canDelete` alone.
+            */}
+            {canDelete && (
               <Button
-                variant="secondary"
+                variant="danger"
                 size="sm"
-                iconLeft={<Archive className="h-3.5 w-3.5" />}
-                onClick={() => setConfirmAction("archive")}
+                iconLeft={<Trash2 className="h-3.5 w-3.5" />}
+                onClick={() => setConfirmAction("delete")}
               >
-                Archivieren
-              </Button>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                iconLeft={<ArchiveRestore className="h-3.5 w-3.5" />}
-                onClick={() => runAction("restore")}
-                loading={busy}
-              >
-                Wiederherstellen
+                Löschen
               </Button>
             )}
-
-            <Button
-              variant="danger"
-              size="sm"
-              iconLeft={<Trash2 className="h-3.5 w-3.5" />}
-              onClick={() => setConfirmAction("delete")}
-            >
-              Löschen
-            </Button>
           </div>
         </div>
       </SectionCard>

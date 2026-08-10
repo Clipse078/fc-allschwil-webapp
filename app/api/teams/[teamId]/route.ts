@@ -1,10 +1,11 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { Prisma, TeamCategory } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import { logAction } from "@/lib/audit/log-action";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import {
@@ -281,35 +282,71 @@ export async function PATCH(request: NextRequest, context: Context) {
 }
 
 /**
- * DELETE — safe hard delete. Requires TEAMS_MANAGE, strictly tenant-scoped.
+ * DELETE — permanent hard delete. Requires PERMISSIONS.TEAMS_DELETE
+ * (ADMIN-DELETE-01B) — deliberately NOT TEAMS_MANAGE, which authorizes
+ * create/edit/archive but must never imply permanent deletion on its own.
+ *
+ * Authorization model:
+ *   1. The target Team (and therefore its owning tenant) is resolved
+ *      strictly server-side from `teamId` — a client-supplied tenantId is
+ *      never read or trusted for this decision.
+ *   2. `EffectivePermissionResolver.hasTenantDeletionAuthority()` decides
+ *      whether the caller may delete within that exact tenant. This grants
+ *      access via either of its two independent paths: a tenant-scoped
+ *      teams.delete grant (Club Admin or a delegated user, in their own
+ *      tenant), or the SCE Super Admin's platform-held teams.delete grant
+ *      resolved against this tenant once it is confirmed to be a real,
+ *      operationally ACTIVE tenant. See
+ *      lib/permissions/services/effective-permission-resolver.ts for the
+ *      full contract.
  *
  * Refuses to delete when meaningful dependencies/history exist (roster,
  * training, matches, tournaments, provider mappings, multi-season history,
  * organisation assignments) — recommends archiving instead. Never
- * cascade-deletes sporting history just to remove a Team record.
+ * cascade-deletes sporting history just to remove a Team record. This
+ * safety logic (lib/teams/team-lifecycle-service.ts) is unchanged by
+ * ADMIN-DELETE-01B.
  */
 export async function DELETE(_request: NextRequest, context: Context) {
-  const access = await requireApiPermission(PERMISSIONS.TEAMS_MANAGE);
+  const session = await auth();
 
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { teamId } = await context.params;
 
-  const tenant = await getTenantFromSession(access.session.user?.activeTenantId);
-  if (!tenant) {
-    return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
+  // Resolve the target Team and its tenant strictly server-side — never
+  // trust a client-supplied tenantId for a permanent-deletion decision.
+  // Team.tenantId is nullable in the schema (SetNull on Tenant deletion); a
+  // Team with no owning tenant can never be authorized for deletion here.
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { id: true, tenantId: true },
+  });
+
+  if (!team || !team.tenantId) {
+    return NextResponse.json({ error: "Team nicht gefunden." }, { status: 404 });
+  }
+
+  const teamTenantId = team.tenantId;
+
+  const resolver = createEffectivePermissionResolver(prisma);
+  const authorized = await resolver.hasTenantDeletionAuthority({
+    userId: session.user.id,
+    permission: PERMISSIONS.TEAMS_DELETE,
+    tenantId: teamTenantId,
+  });
+
+  if (!authorized) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    const deleted = await deleteTeamSafely(tenant.id, teamId);
+    const deleted = await deleteTeamSafely(teamTenantId, teamId);
 
     await logAction({
-      actorUserId:
-        access.session?.user?.effectiveUserId ??
-        access.session?.user?.id ??
-        null,
+      actorUserId: session.user.effectiveUserId ?? session.user.id ?? null,
       moduleKey: "teams",
       entityType: "Team",
       entityId: teamId,

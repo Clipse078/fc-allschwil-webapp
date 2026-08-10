@@ -12,6 +12,12 @@
  *     grantableByAdmin=true)
  *   - `super_admin` (PLATFORM) holds it
  *   - every already-materialized per-tenant Club Admin role holds it
+ *   - ADMIN-DELETE-01B-C1: the narrow, already-known FC Allschwil legacy
+ *     Club Admin role (`club_admin_fc_allschwil`) holds it too, IF it exists
+ *     in this database with scope=TENANT and is owned by the real
+ *     fc-allschwil tenant (never touched otherwise) — see
+ *     lib/permissions/teams-delete-permission-reconciliation.ts's module doc
+ *     comment ("Step 4") for the full trusted-attribute rationale.
  *
  * Root cause this script fixes: prisma/seed.ts is not automatically re-run
  * after a deploy (see package.json's `build` script), so any STAGE/
@@ -87,7 +93,11 @@ async function main() {
   console.log(`  ${pMarker}  ${p.key} — ${pLabel}`);
 
   console.log("\n── Role assignments ────────────────────────────────────────────");
-  for (const outcome of [result.superAdmin, ...result.tenantClubAdminRoles]) {
+  const roleAssignmentOutcomes = [result.superAdmin, ...result.tenantClubAdminRoles];
+  if (result.fcAllschwilLegacyClubAdmin) {
+    roleAssignmentOutcomes.push(result.fcAllschwilLegacyClubAdmin);
+  }
+  for (const outcome of roleAssignmentOutcomes) {
     if (outcome.action === "role_not_found") {
       console.log(`  ?  Role not found: ${outcome.roleKey} — skipping`);
     } else if (outcome.action === "permission_not_in_db") {
@@ -101,6 +111,16 @@ async function main() {
 
   if (result.tenantClubAdminRoles.length === 0) {
     console.log("  (no already-materialized tenant Club Admin roles found)");
+  }
+
+  // ADMIN-DELETE-01B-C1: narrow FC Allschwil legacy Club Admin compatibility
+  // grant — reported separately since it is not covered by the canonical
+  // club_admin__ prefix search above, and `null` is an expected, benign
+  // outcome on any database where that specific legacy role doesn't exist.
+  if (!result.fcAllschwilLegacyClubAdmin) {
+    console.log(
+      "  (FC Allschwil legacy Club Admin role not recognized in this database — nothing to grant)"
+    );
   }
 
   if (DRY_RUN) {
