@@ -43,6 +43,7 @@ import {
   type TournamentParticipantDraftKind,
   type TournamentResourceAllocationDraft,
 } from "@/lib/tournaments/create-tournament-orchestration";
+import { ExternalClubPicker, type ExternalClubPickerResult } from "./ExternalClubPicker";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -62,11 +63,7 @@ type TeamOption = {
 };
 
 /** TOURNAMENTCENTER-UX-03 — canonical external-participant club source, same eligible universe as /dashboard/vereine. */
-type ExternalClubOption = {
-  id: string;
-  name: string;
-  shortName: string | null;
-};
+type ExternalClubOption = ExternalClubPickerResult;
 
 type ParticipantDraftRow = {
   localId: string;
@@ -153,15 +150,17 @@ export default function TournamentCreateForm({
   // ── Reference data ─────────────────────────────────────────────────────
   const [seasonOptions, setSeasonOptions] = useState<SeasonItem[]>([]);
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
-  const [clubOptions, setClubOptions] = useState<ExternalClubOption[]>([]);
   const [loadingSeasons, setLoadingSeasons] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
-  const [loadingClubs, setLoadingClubs] = useState(true);
 
   // ── Teilnehmende Teams (draft, pre-creation) ──────────────────────────
   const [participants, setParticipants] = useState<ParticipantDraftRow[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [selectedClubId, setSelectedClubId] = useState("");
+  // MASTERDATA-SELECTOR-CONSISTENCY-03 (BUG 2): the club itself is now held
+  // directly (from ExternalClubPicker's search results) instead of an id
+  // looked up in a full, eagerly-fetched (and silently capped) club list —
+  // see ExternalClubPicker's module doc for the root cause this replaces.
+  const [selectedClub, setSelectedClub] = useState<ExternalClubOption | null>(null);
   const [manualLabel, setManualLabel] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
 
@@ -217,28 +216,14 @@ export default function TournamentCreateForm({
       }
     }
 
-    // TOURNAMENTCENTER-UX-03: same eligible tenant-scoped canonical
-    // ExternalClub universe as /dashboard/vereine (GET /api/club-directory/clubs)
-    // — never derived from ExternalTeam rows, so a club with zero teams
-    // still appears and a club with many teams appears exactly once.
-    async function loadClubs() {
-      setLoadingClubs(true);
-      try {
-        const res = await fetch("/api/club-directory/clubs", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as { clubs?: ExternalClubOption[] } | null;
-        if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? "Vereine konnten nicht geladen werden.");
-        if (!active) return;
-        setClubOptions(data?.clubs ?? []);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
-      } finally {
-        if (active) setLoadingClubs(false);
-      }
-    }
+    // MASTERDATA-SELECTOR-CONSISTENCY-03 (BUG 2): the canonical ExternalClub
+    // universe is deliberately NOT eagerly fetched here — see
+    // ExternalClubPicker's module doc for why that was the root cause of
+    // the truncated club list this replaces. ExternalClubPicker searches
+    // GET /api/club-directory/clubs on demand instead.
 
     loadSeasons();
     loadTeams();
-    loadClubs();
 
     return () => {
       active = false;
@@ -295,10 +280,6 @@ export default function TournamentCreateForm({
   );
 
   const availableTeams = teamOptions.filter((t) => !assignedTeamIds.has(t.id));
-  // Clubs are deliberately NOT filtered by prior selection — the same
-  // canonical club may be added multiple times with distinct Anzeigename
-  // values (e.g. "AC Rossoneri" + "Gelb" and "AC Rossoneri" + "E1").
-  const availableClubs = clubOptions;
 
   const addTeamParticipant = useCallback(() => {
     if (!selectedTeamId) return;
@@ -319,24 +300,22 @@ export default function TournamentCreateForm({
   }, [selectedTeamId, teamOptions]);
 
   const addExternalClubParticipant = useCallback(() => {
-    if (!selectedClubId) return;
-    const club = clubOptions.find((c) => c.id === selectedClubId);
-    if (!club) return;
+    if (!selectedClub) return;
     setParticipants((prev) => [
       ...prev,
       {
         localId: nextLocalId("participant"),
         kind: "EXTERNAL_CLUB",
-        externalClubId: club.id,
-        clubName: club.name,
+        externalClubId: selectedClub.id,
+        clubName: selectedClub.name,
         externalClubDisplayName: "",
-        displayName: club.name,
+        displayName: selectedClub.name,
         subLabel: "Anzeigename noch nicht gesetzt — Klub wird angezeigt",
         dressingRooms: [],
       },
     ]);
-    setSelectedClubId("");
-  }, [selectedClubId, clubOptions]);
+    setSelectedClub(null);
+  }, [selectedClub]);
 
   const updateExternalClubDisplayName = useCallback((localId: string, value: string) => {
     setParticipants((prev) =>
@@ -912,25 +891,20 @@ export default function TournamentCreateForm({
                 </button>
               </div>
 
-              <div className="flex gap-2">
-                <select
-                  value={selectedClubId}
-                  onChange={(e) => setSelectedClubId(e.target.value)}
-                  disabled={loadingClubs}
-                  data-testid="tournament-create-add-external-club-select"
-                  className="fca-select flex-1"
-                >
-                  <option value="">{loadingClubs ? "Vereine laden…" : "Verein auswählen…"}</option>
-                  {availableClubs.map((club) => (
-                    <option key={club.id} value={club.id}>
-                      {club.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex items-start gap-2">
+                <div className="flex-1">
+                  <ExternalClubPicker
+                    selected={selectedClub}
+                    onSelect={setSelectedClub}
+                    onClearSelected={() => setSelectedClub(null)}
+                    placeholder="Verein suchen…"
+                    testId="tournament-create-add-external-club-search"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={addExternalClubParticipant}
-                  disabled={!selectedClubId}
+                  disabled={!selectedClub}
                   data-testid="tournament-create-add-external-club-button"
                   className="fca-button-secondary shrink-0"
                 >
