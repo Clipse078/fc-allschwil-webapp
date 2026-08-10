@@ -3,35 +3,33 @@
  */
 
 /**
- * Component tests for InfoboardScreen2 (INFOBOARD-05 live facility + weather).
+ * Component tests for InfoboardScreen2.
  *
  * Verifies:
  *   - Dark-theme root attribute
- *   - Facility/pitch overview present
+ *   - Facility/pitch overview present, using the full content width
  *   - Event-type statuses rendered
  *   - Free status rendered where applicable
- *   - Sponsor section present (not replaced by "Next Events")
- *   - Sponsor logos retain expected data rendering
  *   - No duplicate next-event list
- *   - Weather panel renders when data is available (INFOBOARD-05)
- *   - Temperature renders in °C
- *   - Wind renders in km/h
- *   - German condition text renders
- *   - Weather-unavailable fallback renders safely
+ *   - No sponsor section / column rendered (INFOBOARD-INTEGRATION-01C-C1)
+ *   - No standalone weather panel rendered; weather renders compactly in the
+ *     header instead (INFOBOARD-INTEGRATION-01C-C1)
+ *   - Header weather: temperature, condition text, MeteoSwiss attribution,
+ *     unavailable fallback
+ *   - Time/date remain rendered in the header
+ *   - Alexa-reserved header zone remains structurally preserved
  *   - Dressing-room section renders per-resource allocations (INFOBOARD-INTEGRATION-01C)
  *   - Unallocated activities render in a compact, restrained section
- *   - Alexa-safe zone present
+ *   - DARK/LIGHT themes render the same operational content
  */
 
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { InfoboardScreen2 } from "@/components/infoboard/screen2/InfoboardScreen2";
-import type { InfoboardSponsor } from "@/components/infoboard/screen2/InfoboardScreen2";
 import {
   PREVIEW_FIXTURE_SCREEN2,
   PREVIEW_FIXTURE_SCREEN2_ALL_FREE,
   PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED,
-  PREVIEW_SPONSORS,
   PREVIEW_CURRENT_TIME_ISO_S2,
   PREVIEW_WEATHER,
 } from "@/components/infoboard/screen2/screen2-preview-fixture";
@@ -142,7 +140,6 @@ describe("Theme", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
         theme="LIGHT"
       />,
@@ -150,6 +147,20 @@ describe("Theme", () => {
     expect(screen.getByTestId("infoboard-screen2-root").getAttribute("data-theme")).toBe("light");
     expect(screen.getAllByTestId("pitch-card").length).toBeGreaterThan(0);
     expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
+  });
+
+  it("16. header weather remains readable under LIGHT theme (same content as DARK)", () => {
+    const { unmount } = render(
+      <InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} theme="DARK" />,
+    );
+    const darkTemp = screen.getByTestId("header-weather-temperature").textContent;
+    unmount();
+
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} theme="LIGHT" />);
+    const lightTemp = screen.getByTestId("header-weather-temperature").textContent;
+
+    expect(darkTemp).toBe(lightTemp);
+    expect(screen.getByTestId("header-weather-condition").textContent).toBe("Teilweise bewölkt");
   });
 });
 
@@ -181,11 +192,48 @@ describe("Header", () => {
     expect(center.textContent).toContain("10:30");
   });
 
+  it("time/date block is rendered inside the header status group, alongside weather", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed()}
+        currentTimeIso="2026-09-12T08:30:00.000Z"
+        weather={SAMPLE_WEATHER}
+      />,
+    );
+    const status = screen.getByTestId("screen2-header-status");
+    expect(within(status).getByTestId("screen2-header-center")).toBeTruthy();
+    expect(within(status).getByTestId("header-weather")).toBeTruthy();
+  });
+
   it("Alexa-safe zone exists and is empty", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
     const safe = screen.getByTestId("screen2-alexa-safe-zone");
     expect(safe).toBeTruthy();
     expect(safe.textContent?.trim()).toBe("");
+  });
+
+  it("Alexa-safe zone is a direct header child, structurally separate from the weather/time/date status group", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed()}
+        currentTimeIso="2026-09-12T08:30:00.000Z"
+        weather={SAMPLE_WEATHER}
+      />,
+    );
+    const header = screen.getByTestId("infoboard-screen2-header");
+    const safe = screen.getByTestId("screen2-alexa-safe-zone");
+    const status = screen.getByTestId("screen2-header-status");
+
+    expect(safe.parentElement).toBe(header);
+    expect(within(status).queryByTestId("screen2-alexa-safe-zone")).toBeNull();
+    expect(within(safe).queryByTestId("header-weather")).toBeNull();
+  });
+
+  it("Alexa-safe zone remains empty even when weather content is present", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const safe = screen.getByTestId("screen2-alexa-safe-zone");
+    expect(safe.textContent?.trim()).toBe("");
+    expect(within(safe).queryByTestId("header-weather-temperature")).toBeNull();
   });
 
   it("renders club logo when branding.clubLogoSrc provided", () => {
@@ -458,7 +506,6 @@ describe("Pitch card — current and next together", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
@@ -530,192 +577,132 @@ describe("Free pitch status", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Weather panel (INFOBOARD-05) ──────────────────────────────────────────────
+// ── Header weather — compact (INFOBOARD-INTEGRATION-01C-C1) ─────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weather panel — available", () => {
-  it("2. renders weather panel when weather data is available", () => {
+describe("Header weather — available", () => {
+  it("2. renders compact weather in the header when weather data is available", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    expect(screen.getByTestId("weather-panel")).toBeTruthy();
+    const header = screen.getByTestId("infoboard-screen2-header");
+    expect(within(header).getByTestId("header-weather")).toBeTruthy();
   });
 
   it("3. temperature renders in °C", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const temp = screen.getByTestId("weather-temperature");
+    const temp = screen.getByTestId("header-weather-temperature");
     expect(temp.textContent).toContain("22");
     expect(temp.textContent).toContain("°C");
   });
 
-  it("5. wind renders in km/h", () => {
+  it("4. German condition text renders", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const wind = screen.getByTestId("weather-wind");
-    expect(wind.textContent).toContain("6");
-    expect(wind.textContent).toContain("km/h");
-  });
-
-  it("4 & 5. German condition text renders", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const condition = screen.getByTestId("weather-condition");
+    const condition = screen.getByTestId("header-weather-condition");
     expect(condition.textContent).toBe("Teilweise bewölkt");
   });
 
-  it("weather body is present when data is available", () => {
+  it("does not render header-weather-unavailable when data is available", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    expect(screen.getByTestId("weather-body")).toBeTruthy();
+    expect(screen.queryByTestId("header-weather-unavailable")).toBeNull();
   });
 
-  it("does not render weather-unavailable when data is available", () => {
+  it("weather icon is rendered alongside temperature", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    expect(screen.queryByTestId("weather-unavailable")).toBeNull();
+    const weather = screen.getByTestId("header-weather");
+    expect(weather.querySelector("svg")).toBeTruthy();
   });
 });
 
-describe("Weather panel — unavailable", () => {
-  it("6. renders fallback safely when weather is null", () => {
+describe("Header weather — unavailable", () => {
+  it("5. renders fallback safely when weather is null", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
-    expect(screen.getByTestId("weather-panel")).toBeTruthy();
-    expect(screen.getByTestId("weather-unavailable")).toBeTruthy();
+    expect(screen.getByTestId("header-weather")).toBeTruthy();
+    expect(screen.getByTestId("header-weather-unavailable")).toBeTruthy();
   });
 
-  it("6. renders fallback when weather is WEATHER_UNAVAILABLE", () => {
+  it("5. renders fallback when weather is WEATHER_UNAVAILABLE", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={WEATHER_UNAVAILABLE} />);
-    expect(screen.getByTestId("weather-unavailable")).toBeTruthy();
+    expect(screen.getByTestId("header-weather-unavailable")).toBeTruthy();
   });
 
-  it("6. fallback text is 'WETTER NICHT VERFÜGBAR'", () => {
+  it("5. fallback text indicates weather is unavailable", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
-    const fallback = screen.getByTestId("weather-unavailable");
-    expect(fallback.textContent?.toUpperCase()).toContain("WETTER NICHT VERFÜGBAR");
+    const fallback = screen.getByTestId("header-weather-unavailable");
+    expect(fallback.textContent?.toUpperCase()).toContain("WETTER");
   });
 
-  it("6. weather panel still renders (panel present even if unavailable)", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={WEATHER_UNAVAILABLE} />);
-    expect(screen.getByTestId("weather-panel")).toBeTruthy();
-  });
-
-  it("no weather-body when unavailable", () => {
+  it("no header-weather-temperature when unavailable", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
-    expect(screen.queryByTestId("weather-body")).toBeNull();
+    expect(screen.queryByTestId("header-weather-temperature")).toBeNull();
   });
 
   it("renders without crashing when weather prop is omitted", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
-    expect(screen.getByTestId("weather-panel")).toBeTruthy();
-    expect(screen.getByTestId("weather-unavailable")).toBeTruthy();
+    expect(screen.getByTestId("header-weather")).toBeTruthy();
+    expect(screen.getByTestId("header-weather-unavailable")).toBeTruthy();
   });
 });
 
-describe("Weather — MeteoSwiss OGD attribution (WEATHER-01)", () => {
-  it("renders weather-attribution when weather data is available", () => {
+describe("Header weather — MeteoSwiss OGD attribution (WEATHER-01)", () => {
+  it("renders header-weather-attribution when weather data is available", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    expect(screen.getByTestId("weather-attribution")).toBeTruthy();
+    expect(screen.getByTestId("header-weather-attribution")).toBeTruthy();
   });
 
   it("attribution text contains 'MeteoSwiss'", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const attribution = screen.getByTestId("weather-attribution");
+    const attribution = screen.getByTestId("header-weather-attribution");
     expect(attribution.textContent).toContain("MeteoSwiss");
   });
 
   it("attribution uses 'Quelle: MeteoSwiss' wording (OGD requirement)", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const attribution = screen.getByTestId("weather-attribution");
+    const attribution = screen.getByTestId("header-weather-attribution");
     expect(attribution.textContent).toContain("Quelle");
-  });
-
-  it("attribution does NOT contain 'Open-Meteo' (Open-Meteo is dormant)", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const attribution = screen.getByTestId("weather-attribution");
-    expect(attribution.textContent).not.toContain("Open-Meteo");
   });
 
   it("attribution is not shown when weather is unavailable", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
-    expect(screen.queryByTestId("weather-attribution")).toBeNull();
+    expect(screen.queryByTestId("header-weather-attribution")).toBeNull();
   });
 });
 
-describe("Weather — preview fixture", () => {
-  it("PREVIEW_WEATHER renders correctly in preview", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} weather={PREVIEW_WEATHER} sponsors={PREVIEW_SPONSORS} />);
-    const panel = screen.getByTestId("weather-panel");
-    expect(panel).toBeTruthy();
-    expect(screen.getByTestId("weather-body")).toBeTruthy();
+describe("Header weather — preview fixture", () => {
+  it("PREVIEW_WEATHER renders correctly in the header", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} weather={PREVIEW_WEATHER} />);
+    expect(screen.getByTestId("header-weather")).toBeTruthy();
+    expect(screen.getByTestId("header-weather-temperature")).toBeTruthy();
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Sponsor section ───────────────────────────────────────────────────────────
+// ── Sponsor section removed (INFOBOARD-INTEGRATION-01C-C1) ──────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Sponsor section", () => {
-  it("7. sponsor-section test id is present", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={PREVIEW_SPONSORS} />);
-    expect(screen.getByTestId("sponsor-section")).toBeTruthy();
-  });
-
-  it("7. sponsor-aside is rendered", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[]} />);
-    expect(screen.getByTestId("sponsor-aside")).toBeTruthy();
-  });
-
-  it("sponsor section is hidden when sponsors array is empty", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[]} />);
+describe("Sponsor section removed", () => {
+  it("does not render a sponsor-section test id", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
     expect(screen.queryByTestId("sponsor-section")).toBeNull();
   });
 
-  it("sponsor-grid renders within sponsor section", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={PREVIEW_SPONSORS} />);
-    const section = screen.getByTestId("sponsor-section");
-    expect(within(section).getByTestId("sponsor-grid")).toBeTruthy();
+  it("does not render a sponsor-aside test id", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
+    expect(screen.queryByTestId("sponsor-aside")).toBeNull();
   });
 
-  it("renders sponsor cards for each sponsor", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={PREVIEW_SPONSORS} />);
-    const cards = screen.getAllByTestId("sponsor-card");
-    expect(cards.length).toBe(PREVIEW_SPONSORS.length);
+  it("does not render any sponsor-card", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
+    expect(screen.queryAllByTestId("sponsor-card")).toHaveLength(0);
   });
 
-  it("renders gold sponsor card with data-tier='gold'", () => {
-    const goldSponsor: InfoboardSponsor = {
-      id: "g1",
-      name: "Gold Sponsor",
-      logoSrc: null,
-      tier: "gold",
-    };
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[goldSponsor]} />);
-    const card = screen.getByTestId("sponsor-card");
-    expect(card.getAttribute("data-tier")).toBe("gold");
+  it("does not render sponsor-related text anywhere on screen", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
+    const root = screen.getByTestId("infoboard-screen2-root");
+    expect(root.textContent?.toUpperCase()).not.toContain("SPONSOREN");
   });
 
-  it("renders sponsor name when logoSrc is null", () => {
-    const sponsor: InfoboardSponsor = {
-      id: "s1",
-      name: "Test Sponsor",
-      logoSrc: null,
-      tier: "silver",
-    };
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[sponsor]} />);
-    expect(screen.getByText("Test Sponsor")).toBeTruthy();
-  });
-
-  it("renders sponsor logo img when logoSrc is provided", () => {
-    const sponsor: InfoboardSponsor = {
-      id: "s1",
-      name: "Logo Sponsor",
-      logoSrc: "/sponsors/test.png",
-      tier: "silver",
-    };
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[sponsor]} />);
-    const logo = screen.getByTestId("sponsor-logo");
-    expect(logo.getAttribute("src")).toBe("/sponsors/test.png");
-    expect(logo.getAttribute("alt")).toBe("Logo Sponsor");
-  });
-
-  it("sponsor section title contains SPONSOREN text", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={PREVIEW_SPONSORS} />);
-    const section = screen.getByTestId("sponsor-section");
-    expect(section.textContent?.toUpperCase()).toContain("SPONSOREN");
+  it("does not render a standalone weather-panel test id", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} weather={PREVIEW_WEATHER} />);
+    expect(screen.queryByTestId("weather-panel")).toBeNull();
   });
 });
 
@@ -725,12 +712,7 @@ describe("Sponsor section", () => {
 
 describe("No Next Events panel", () => {
   it("10. does not render a 'next events' heading anywhere", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
-      />,
-    );
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
     const headings = screen.queryAllByRole("heading");
     for (const h of headings) {
       expect(h.textContent?.toLowerCase()).not.toContain("next events");
@@ -740,12 +722,12 @@ describe("No Next Events panel", () => {
   });
 
   it("10. does not render a test-id 'next-events-section'", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} sponsors={PREVIEW_SPONSORS} />);
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
     expect(screen.queryByTestId("next-events-section")).toBeNull();
   });
 
   it("does not contain 'next-events-list' test id", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} sponsors={PREVIEW_SPONSORS} />);
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
     expect(screen.queryByTestId("next-events-list")).toBeNull();
   });
 });
@@ -854,7 +836,6 @@ describe("Dressing-room section", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
@@ -862,12 +843,7 @@ describe("Dressing-room section", () => {
   });
 
   it("renders GARDEROBEN heading", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
-      />,
-    );
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
     expect(screen.getByText("GARDEROBEN")).toBeTruthy();
   });
 });
@@ -948,7 +924,6 @@ describe("Unallocated section", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
@@ -1011,7 +986,6 @@ describe("Full preview fixture", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
@@ -1023,37 +997,33 @@ describe("Full preview fixture", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
     expect(screen.getByText("Stadion")).toBeTruthy();
   });
 
-  it("all 5 preview sponsors render", () => {
+  it("no sponsor content renders alongside the full preview fixture", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
-    const cards = screen.getAllByTestId("sponsor-card");
-    expect(cards).toHaveLength(5);
+    expect(screen.queryAllByTestId("sponsor-card")).toHaveLength(0);
+    expect(screen.queryByTestId("sponsor-aside")).toBeNull();
   });
 
-  it("sponsor section is not replaced by any event-list content", () => {
+  it("facility overview is not replaced by any event-list content", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
-    const aside = screen.getByTestId("sponsor-aside");
-    const sponsorSection = within(aside).getByTestId("sponsor-section");
-    expect(sponsorSection).toBeTruthy();
-    expect(within(aside).queryByTestId("event-row")).toBeNull();
+    const facility = screen.getByTestId("facility-overview");
+    expect(facility).toBeTruthy();
+    expect(within(facility).queryByTestId("event-row")).toBeNull();
   });
 });
 
@@ -1062,7 +1032,7 @@ describe("Full preview fixture", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Missing optional data safety", () => {
-  it("renders without crashing when sponsors are absent (default empty)", () => {
+  it("renders without crashing when weather is absent (default)", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
     expect(screen.getByTestId("infoboard-screen2-root")).toBeTruthy();
   });
@@ -1076,7 +1046,6 @@ describe("Missing optional data safety", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [makePitch({ displayLabel: "Testfeld" })] })}
-        sponsors={[]}
       />,
     );
     expect(screen.queryByText("null")).toBeNull();
@@ -1093,7 +1062,6 @@ describe("All pitches occupied fixture", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
-        sponsors={PREVIEW_SPONSORS}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
@@ -1105,24 +1073,14 @@ describe("All pitches occupied fixture", () => {
     expect(occupiedCards.length).toBe(4);
   });
 
-  it("sponsor section present in all-occupied scenario", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
-        sponsors={PREVIEW_SPONSORS}
-      />,
-    );
-    expect(screen.getByTestId("sponsor-section")).toBeTruthy();
+  it("8. dressing-room-section still renders in all-occupied scenario", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED} />);
+    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
   });
 
-  it("8. dressing-room-section still renders in all-occupied scenario", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
-        sponsors={PREVIEW_SPONSORS}
-      />,
-    );
-    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
+  it("no sponsor content renders in all-occupied scenario", () => {
+    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED} />);
+    expect(screen.queryByTestId("sponsor-section")).toBeNull();
   });
 });
 
@@ -1160,54 +1118,19 @@ describe("Live route safety", () => {
     expect(screen.getByTestId("facility-overview")).toBeTruthy();
   });
 
-  it("sponsor section still renders in empty state", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({ pitches: [], dressingRooms: [] })}
-        sponsors={PREVIEW_SPONSORS}
-      />,
-    );
-    expect(screen.getByTestId("sponsor-section")).toBeTruthy();
+  it("no sponsor section renders in empty state", () => {
+    render(<InfoboardScreen2 feed={makeFeed({ pitches: [], dressingRooms: [] })} />);
+    expect(screen.queryByTestId("sponsor-section")).toBeNull();
   });
 
-  it("weather panel still renders in empty pitch state", () => {
+  it("header weather still renders in empty pitch state", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [], dressingRooms: [] })}
         weather={SAMPLE_WEATHER}
       />,
     );
-    expect(screen.getByTestId("weather-panel")).toBeTruthy();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Sponsor image presentation ────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("Sponsor image presentation", () => {
-  it("sponsor logo uses img element", () => {
-    const sponsor = {
-      id: "sp1",
-      name: "Test Sponsor",
-      logoSrc: "/sponsors/test.png",
-      tier: "gold" as const,
-    };
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[sponsor]} />);
-    const logo = screen.getByTestId("sponsor-logo");
-    expect(logo.tagName.toLowerCase()).toBe("img");
-    expect(logo.getAttribute("src")).toBe("/sponsors/test.png");
-  });
-
-  it("sponsor fallback name rendered when logoSrc is null", () => {
-    const sponsor = {
-      id: "sp2",
-      name: "Fallback Sponsor",
-      logoSrc: null,
-      tier: "silver" as const,
-    };
-    render(<InfoboardScreen2 feed={makeFeed()} sponsors={[sponsor]} />);
-    expect(screen.getByText("Fallback Sponsor")).toBeTruthy();
+    expect(screen.getByTestId("header-weather")).toBeTruthy();
   });
 });
 

@@ -23,13 +23,14 @@
  *   - one eligible training with no pitch allocation ("Nicht zugeteilt").
  *
  * Weather fixture data is non-production sample data for visual preview.
+ * Rendered compactly in the header (INFOBOARD-INTEGRATION-01C-C1) — there is
+ * no standalone weather panel or sponsor section in the current layout.
  */
 
 import type {
   InfoboardScreen2Feed,
   PitchEventSummary,
 } from "@/lib/publishing/event-types";
-import type { InfoboardSponsor } from "./InfoboardScreen2";
 import type { WeatherDto } from "@/lib/weather/weather-types";
 
 // ── Shared tenant reference ───────────────────────────────────────────────────
@@ -203,46 +204,6 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_FREE: InfoboardScreen2Feed = {
   })),
   unallocated: [],
 };
-
-// ── Sponsor placeholder data ──────────────────────────────────────────────────
-
-/**
- * Placeholder sponsors for preview rendering.
- * These represent the types of data the sponsor section accepts.
- * No production sponsor data is hardcoded here.
- */
-export const PREVIEW_SPONSORS: readonly InfoboardSponsor[] = [
-  {
-    id: "s1",
-    name: "Hauptsponsor",
-    logoSrc: null,
-    tier: "gold",
-  },
-  {
-    id: "s2",
-    name: "Sponsor B",
-    logoSrc: null,
-    tier: "silver",
-  },
-  {
-    id: "s3",
-    name: "Sponsor C",
-    logoSrc: null,
-    tier: "silver",
-  },
-  {
-    id: "s4",
-    name: "Partner D",
-    logoSrc: null,
-    tier: "partner",
-  },
-  {
-    id: "s5",
-    name: "Partner E",
-    logoSrc: null,
-    tier: "partner",
-  },
-];
 
 /** Current-time ISO for Screen 2 preview (same as Screen 1). */
 export const PREVIEW_CURRENT_TIME_ISO_S2 = "2026-09-12T15:35:00.000Z" as const;

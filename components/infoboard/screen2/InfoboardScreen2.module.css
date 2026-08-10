@@ -6,13 +6,13 @@
  * Design principles:
  *   - Full dark stadium palette — deep navy background, dark card surfaces.
  *   - Barlow Condensed for dominant headings and status labels.
- *   - Two-column layout: left ~65% (facility overview + dressing rooms),
- *     right ~35% (sponsors).
+ *   - Single-column layout — the facility overview uses the full content
+ *     width (INFOBOARD-INTEGRATION-01C-C1 removed the sponsor/weather
+ *     sidebar; weather now lives compactly in the header).
  *   - Pitch cards are substantially larger than 04A, filling the facility area.
- *   - Dressing-room section below pitch grid, integrated in the left column.
- *   - Sponsor section: right column, full height.
+ *   - Dressing-room section below pitch grid.
  *   - Status colors: SPIEL red, TRAINING blue, TURNIER orange, FREI green.
- *   - No Next Events panel.
+ *   - No Next Events panel. No sponsor section.
  *   - No scrolling — content must fit within 100dvh.
  *   - Values must be readable from TV distance (5–8 m).
  */
@@ -75,9 +75,6 @@
   --ib2-fs-dr-code:        clamp(0.95rem, 1.3vw, 1.7rem);
   --ib2-fs-dr-team:        clamp(0.85rem, 1.1vw, 1.45rem);
 
-  --ib2-fs-sponsor-title:  clamp(0.65rem, 0.8vw, 0.95rem);
-  --ib2-fs-sponsor-name:   clamp(0.9rem, 1.2vw, 1.6rem);
-
   --ib2-fs-footer:         clamp(0.75rem, 0.9vw, 1.05rem);
   --ib2-fs-powered-by:     clamp(0.5rem, 0.6vw, 0.72rem);
 
@@ -133,7 +130,8 @@
 
 .header {
   display: grid;
-  grid-template-columns: 1fr auto 15vw;
+  /* Left: branding | Middle: reserved Alexa zone | Right: weather + time/date */
+  grid-template-columns: 1fr 15vw auto;
   align-items: center;
   height: var(--ib2-header-height);
   padding: 0 var(--ib2-sp-8);
@@ -203,6 +201,15 @@
   white-space: nowrap;
 }
 
+.headerStatus {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ib2-sp-5);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
 .headerCenter {
   display: flex;
   flex-direction: column;
@@ -260,27 +267,96 @@
   color: var(--ib2-text-muted);
 }
 
-.headerRight {
-  /* intentionally empty — Alexa-safe zone */
+.headerAlexaZone {
+  /* Intentionally empty — reserved space for the planned Alexa integration.
+     Never consumed by weather or any other header content
+     (INFOBOARD-INTEGRATION-01C-C1). */
+  height: 100%;
+}
+
+/* ─── Header weather (compact — INFOBOARD-INTEGRATION-01C-C1) ────────────── */
+
+.headerWeather {
+  display: flex;
+  align-items: center;
+  gap: var(--ib2-sp-2);
+  padding-right: var(--ib2-sp-4);
+  border-right: 1px solid var(--ib2-border);
+  min-width: 0;
+  color: var(--ib2-text-muted);
+}
+
+.headerWeatherTemp {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: clamp(1.3rem, 1.8vw, 2.2rem);
+  font-weight: 700;
+  color: var(--ib2-text);
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.headerWeatherTempUnit {
+  font-size: 0.55em;
+  font-weight: 500;
+  color: var(--ib2-text-muted);
+}
+
+.headerWeatherMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.headerWeatherCondition {
+  font-size: clamp(0.65rem, 0.85vw, 1rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ib2-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 11vw;
+  line-height: 1.1;
+}
+
+.headerWeatherAttribution {
+  font-size: clamp(0.5rem, 0.6vw, 0.68rem);
+  color: var(--ib2-text-dim);
+  opacity: 0.75;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.headerWeatherUnavailable {
+  font-size: clamp(0.65rem, 0.82vw, 0.95rem);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
+  white-space: nowrap;
 }
 
 /* ─── Main layout ─────────────────────────────────────────────────────────── */
 
 .main {
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 34%;
-  gap: var(--ib2-sp-4);
+  display: flex;
+  flex-direction: column;
   padding: var(--ib2-sp-4) var(--ib2-sp-8);
   overflow: hidden;
   min-height: 0;
 }
 
-/* ─── Left column: facility + dressing rooms ─────────────────────────────── */
+/* ─── Facility column (full width — INFOBOARD-INTEGRATION-01C-C1) ────────── */
 
 .facilityColumn {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: var(--ib2-sp-3);
   min-height: 0;
   overflow: hidden;
@@ -723,99 +799,6 @@
   letter-spacing: 0.02em;
 }
 
-/* ─── Sponsor aside (right column) ──────────────────────────────────────── */
-
-.sponsorAside {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* ─── Sponsor section ────────────────────────────────────────────────────── */
-
-.sponsorSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ib2-sp-3);
-  flex: 1;
-  min-height: 0;
-  background: var(--ib2-card-bg);
-  border: 1px solid var(--ib2-border);
-  border-radius: var(--ib2-radius);
-  padding: clamp(14px, 2vh, 24px) clamp(14px, 1.8vw, 22px);
-  overflow: hidden;
-}
-
-.sponsorSectionHeader {
-  border-bottom: 1px solid var(--ib2-border);
-  padding-bottom: var(--ib2-sp-2);
-  flex-shrink: 0;
-}
-
-.sponsorSectionTitle {
-  font-size: var(--ib2-fs-sponsor-title);
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ib2-text-dim);
-}
-
-.sponsorGrid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ib2-sp-3);
-  flex: 1;
-  overflow: hidden;
-}
-
-.sponsorCard {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ib2-surface);
-  border: 1px solid var(--ib2-border);
-  border-radius: var(--ib2-radius-sm);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.sponsorCardGold {
-  flex: 2;
-  min-height: clamp(60px, 10vh, 100px);
-  border-color: rgba(232, 124, 36, 0.2);
-}
-
-.sponsorCardSilver {
-  flex: 1.4;
-  min-height: clamp(48px, 8vh, 80px);
-}
-
-.sponsorCardPartner {
-  flex: 1;
-  min-height: clamp(36px, 6vh, 60px);
-}
-
-.sponsorLogo {
-  max-width: 90%;
-  max-height: 90%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  display: block;
-}
-
-.sponsorName {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-sponsor-name);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ib2-text-muted);
-  text-align: center;
-  padding: var(--ib2-sp-2) var(--ib2-sp-3);
-}
-
 /* ─── Footer ─────────────────────────────────────────────────────────────── */
 
 .footer {
@@ -879,123 +862,20 @@
 
 @media (max-width: 1366px) {
   .main {
-    grid-template-columns: 1fr 32%;
-    gap: var(--ib2-sp-3);
     padding: var(--ib2-sp-3) var(--ib2-sp-5);
   }
 
   .pitchCard {
     padding: clamp(10px, 1.5vh, 18px) clamp(12px, 1.5vw, 18px);
   }
-}
 
-/* ─── Weather panel (INFOBOARD-05) ──────────────────────────────────────── */
+  /* Keep the header weather indicator compact at reduced widths — drop the
+     attribution line first, the condition text next if space is still tight. */
+  .headerWeatherAttribution {
+    display: none;
+  }
 
-.weatherPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ib2-sp-2);
-  background: var(--ib2-card-bg);
-  border: 1px solid var(--ib2-border);
-  border-radius: var(--ib2-radius);
-  padding: clamp(10px, 1.5vh, 18px) clamp(14px, 1.8vw, 22px);
-  flex-shrink: 0;
-  margin-bottom: var(--ib2-sp-3);
-}
-
-.weatherPanelHeader {
-  border-bottom: 1px solid var(--ib2-border);
-  padding-bottom: var(--ib2-sp-2);
-}
-
-.weatherPanelTitle {
-  font-size: var(--ib2-fs-section-label);
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--ib2-text-dim);
-}
-
-.weatherBody {
-  display: flex;
-  align-items: center;
-  gap: var(--ib2-sp-5);
-  padding-top: var(--ib2-sp-1);
-}
-
-.weatherTempBlock {
-  flex-shrink: 0;
-}
-
-.weatherTemp {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(2rem, 3.2vw, 4.2rem);
-  font-weight: 700;
-  color: var(--ib2-text);
-  line-height: 1;
-  display: flex;
-  align-items: baseline;
-}
-
-.weatherTempUnit {
-  font-size: clamp(1.1rem, 1.6vw, 2rem);
-  font-weight: 500;
-  color: var(--ib2-text-muted);
-}
-
-.weatherDetails {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ib2-sp-2);
-  min-width: 0;
-}
-
-.weatherIconCondition {
-  display: flex;
-  align-items: center;
-  gap: var(--ib2-sp-2);
-  color: var(--ib2-text-muted);
-}
-
-.weatherCondition {
-  font-size: clamp(0.75rem, 1vw, 1.3rem);
-  font-weight: 500;
-  color: var(--ib2-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.weatherWindRow {
-  display: flex;
-  align-items: center;
-  gap: var(--ib2-sp-1);
-  color: var(--ib2-text-dim);
-}
-
-.weatherWind {
-  font-size: clamp(0.65rem, 0.85vw, 1.05rem);
-  color: var(--ib2-text-dim);
-}
-
-.weatherUnavailable {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--ib2-sp-3) 0;
-  font-size: clamp(0.6rem, 0.78vw, 0.95rem);
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ib2-text-dim);
-}
-
-/* CC BY 4.0 attribution required by Open-Meteo terms */
-.weatherAttribution {
-  margin-top: var(--ib2-sp-2);
-  font-size: clamp(0.52rem, 0.65vw, 0.72rem);
-  color: var(--ib2-text-dim);
-  opacity: 0.7;
-  text-align: right;
-  letter-spacing: 0.01em;
+  .headerWeatherCondition {
+    max-width: 8vw;
+  }
 }

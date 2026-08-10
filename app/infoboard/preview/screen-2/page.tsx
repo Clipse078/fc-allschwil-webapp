@@ -6,8 +6,8 @@
  * Renders InfoboardScreen2 with:
  *   - Deterministic preview fixture (mixed pitch occupancy, dressing rooms,
  *     one unallocated activity — see screen2-preview-fixture.ts)
- *   - Sample weather data (non-production, clearly labelled in fixture)
- *   - Placeholder sponsor data
+ *   - Sample weather data (non-production, clearly labelled in fixture),
+ *     rendered compactly in the header (INFOBOARD-INTEGRATION-01C-C1)
  *   - Fixed current-time (17:35 Zurich)
  *   - Existing FC Allschwil branding assets
  *   - Optional `?theme=dark|light` query param for manual DARK/LIGHT
@@ -29,7 +29,6 @@ import {
 } from "@/lib/publishing/infoboard/display-theme";
 import {
   PREVIEW_FIXTURE_SCREEN2,
-  PREVIEW_SPONSORS,
   PREVIEW_CURRENT_TIME_ISO_S2,
   PREVIEW_WEATHER,
 } from "@/components/infoboard/screen2/screen2-preview-fixture";
@@ -57,7 +56,6 @@ export default async function InfoboardScreen2PreviewPage({
       }}
       currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       weather={PREVIEW_WEATHER}
-      sponsors={PREVIEW_SPONSORS}
       theme={theme}
     />
   );
