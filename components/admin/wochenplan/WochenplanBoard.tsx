@@ -852,6 +852,7 @@ export default function WochenplanBoard({
         roomConflicts={roomConflicts}
         onClose={() => setDayPlannerState({ dayKey: null, dayLabel: null })}
         onChangeRoom={updateRoom}
+        roomOptions={roomOptions}
       />
 
       <WochenplanRoomDrawer

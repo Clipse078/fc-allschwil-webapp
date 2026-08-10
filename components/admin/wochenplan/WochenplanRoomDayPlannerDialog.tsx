@@ -12,8 +12,11 @@ import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
 } from "@/lib/wochenplan/types";
+import {
+  withRequiredCodes,
+  type WochenplanRoomOption,
+} from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 
-const DRESSING_ROOMS = ["E1", "E2", "E3", "E4", "O1", "O2", "O3", "O4"] as const;
 const TIMELINE_HOURS = ["15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
 const DAY_START_MINUTES = 15 * 60;
 const DAY_END_MINUTES = 22 * 60;
@@ -39,6 +42,17 @@ type WochenplanRoomDayPlannerDialogProps = {
     roomType: RoomAssignmentType,
     roomCode: string | null,
   ) => void;
+  /**
+   * Canonical active dressing-room resources for this tenant (MASTERDATA-
+   * CONSISTENCY-02-C1) — replaces the previous locally hardcoded
+   * DRESSING_ROOMS registry as the source for both the drag & drop room
+   * rows and the "Schnellkorrektur" selects below. Newly created/restored
+   * rooms appear automatically; archived rooms are excluded from new
+   * choices; renamed rooms display their current canonical name. Defaults
+   * to an empty list so any code already assigned on this day's events
+   * still remains visible (see withRequiredCodes below).
+   */
+  roomOptions?: WochenplanRoomOption[];
 };
 
 type TimelineItem = {
@@ -275,6 +289,7 @@ export default function WochenplanRoomDayPlannerDialog({
   roomConflicts,
   onClose,
   onChangeRoom,
+  roomOptions = [],
 }: WochenplanRoomDayPlannerDialogProps) {
   const [draggingItem, setDraggingItem] = useState<DragPayload | null>(null);
   const [dropRoomCode, setDropRoomCode] = useState<string | null>(null);
@@ -318,11 +333,23 @@ export default function WochenplanRoomDayPlannerDialog({
     );
   }, [roomConflicts]);
 
+  // MASTERDATA-CONSISTENCY-02-C1: canonical active dressing rooms, plus any
+  // code already assigned on this day's events — so a historical allocation
+  // referencing an archived/renamed-away resource remains visible/readable
+  // instead of silently disappearing from the day view or Schnellkorrektur.
+  const displayRoomOptions = useMemo(() => {
+    const requiredCodes = eventsForDay.flatMap((event) => [
+      event.allocation.homeDressingRoomCode,
+      event.allocation.awayDressingRoomCode,
+    ]);
+    return withRequiredCodes(roomOptions, requiredCodes);
+  }, [roomOptions, eventsForDay]);
+
   const timelineItemsByRoom = useMemo(() => {
     const map = new Map<string, TimelineItem[]>();
 
-    for (const roomCode of DRESSING_ROOMS) {
-      map.set(roomCode, []);
+    for (const option of displayRoomOptions) {
+      map.set(option.code, []);
     }
 
     for (const event of eventsForDay) {
@@ -382,7 +409,7 @@ export default function WochenplanRoomDayPlannerDialog({
     }
 
     return map;
-  }, [eventsForDay, conflictLookup]);
+  }, [eventsForDay, conflictLookup, displayRoomOptions]);
 
   function handleDragStart(item: DragPayload) {
     setDraggingItem(item);
@@ -478,7 +505,8 @@ export default function WochenplanRoomDayPlannerDialog({
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="space-y-4">
-            {DRESSING_ROOMS.map((roomCode) => {
+            {displayRoomOptions.map((option) => {
+              const roomCode = option.code;
               const roomItems = timelineItemsByRoom.get(roomCode) ?? [];
               const roomHasConflict = roomItems.some((item) => item.hasConflict);
               const isActiveDropZone = draggingItem !== null && dropRoomCode === roomCode;
@@ -509,7 +537,7 @@ export default function WochenplanRoomDayPlannerDialog({
                         </span>
 
                         <p className={"mt-3 font-[var(--font-display)] text-[2rem] font-bold uppercase leading-none tracking-[-0.04em] " + roomTone.roomCodeClass}>
-                          {roomCode}
+                          {option.name}
                         </p>
                       </div>
                     </div>
@@ -667,9 +695,9 @@ export default function WochenplanRoomDayPlannerDialog({
                       className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[#0b4aa2]"
                     >
                       <option value="">Keine</option>
-                      {DRESSING_ROOMS.map((roomCode) => (
-                        <option key={roomCode} value={roomCode}>
-                          {roomCode}
+                      {displayRoomOptions.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.name}
                         </option>
                       ))}
                     </select>
@@ -691,9 +719,9 @@ export default function WochenplanRoomDayPlannerDialog({
                       className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[#0b4aa2]"
                     >
                       <option value="">Keine</option>
-                      {DRESSING_ROOMS.map((roomCode) => (
-                        <option key={roomCode} value={roomCode}>
-                          {roomCode}
+                      {displayRoomOptions.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.name}
                         </option>
                       ))}
                     </select>

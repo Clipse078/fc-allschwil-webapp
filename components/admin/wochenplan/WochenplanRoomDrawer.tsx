@@ -36,8 +36,12 @@ type WochenplanRoomDrawerProps = {
  * event's own current allocation and any other event's occupied room in
  * the same slot. This keeps historical/archived allocations readable
  * without offering them as new choices beyond what canonical data provides.
+ *
+ * Exported so other Wochenplan surfaces sharing the same canonical
+ * `WochenplanRoomOption` shape (e.g. WochenplanRoomDayPlannerDialog) can
+ * reuse this exact merge behavior instead of re-deriving it.
  */
-function withRequiredCodes(
+export function withRequiredCodes(
   options: WochenplanRoomOption[],
   requiredCodes: Array<string | null | undefined>,
 ): WochenplanRoomOption[] {
