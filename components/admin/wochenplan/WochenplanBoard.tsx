@@ -11,6 +11,7 @@ import WochenplanRoomDayPlannerDialog, {
 import WochenplanRoomDrawer from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 import { getWochenplanConflicts } from "@/lib/wochenplan/conflict-engine";
 import { parseIsoWeekId } from "@/lib/planner/date-utils";
+import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -23,6 +24,24 @@ const DEFAULT_PITCH_ROWS: Array<{ key: WochenplanBoardPitchRowKey; label: string
   { key: "STADION", label: "Stadion" },
   { key: "KUNSTRASEN_2", label: "KR 2" },
   { key: "KUNSTRASEN_3", label: "KR 3" },
+];
+
+/**
+ * Fallback dressing-room options used only when no tenant-scoped
+ * `roomOptions` prop is supplied (e.g. the standalone demo-data mode below).
+ * Real usage (app/(admin)/dashboard/wochenplan/page.tsx) always resolves
+ * canonical options via getActiveResourceOptionsForTenant(tenantId,
+ * "DRESSING_ROOM"), mirroring the DEFAULT_PITCH_ROWS fallback pattern above.
+ */
+const DEFAULT_DRESSING_ROOMS: FacilityResourceOption[] = [
+  { code: "E1", name: "E1" },
+  { code: "E2", name: "E2" },
+  { code: "E3", name: "E3" },
+  { code: "E4", name: "E4" },
+  { code: "O1", name: "O1" },
+  { code: "O2", name: "O2" },
+  { code: "O3", name: "O3" },
+  { code: "O4", name: "O4" },
 ];
 
 const TIME_SLOTS: WochenplanBoardSlotKey[] = [
@@ -606,10 +625,25 @@ type WochenplanBoardProps = {
    * Shown in the publish bar as "KW N | Variantname aktiv".
    */
   activeVariantLabel?: string | null;
+  /**
+   * MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped dressing-room
+   * options resolved via getActiveResourceOptionsForTenant(tenantId,
+   * "DRESSING_ROOM") and merged with any codes still referenced by existing
+   * allocations via withRequiredCodes(). Falls back to
+   * DEFAULT_DRESSING_ROOMS when not provided (demo-data mode).
+   */
+  roomOptions?: FacilityResourceOption[];
 };
 
-export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitchRowsProp, activeVariantLabel }: WochenplanBoardProps) {
+export default function WochenplanBoard({
+  initialEvents,
+  weekId,
+  pitchRows: pitchRowsProp,
+  activeVariantLabel,
+  roomOptions: roomOptionsProp,
+}: WochenplanBoardProps) {
   const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
+  const ROOM_OPTIONS = roomOptionsProp ?? DEFAULT_DRESSING_ROOMS;
   const [publishedVariant, setPublishedVariant] = useState<string | null>(activeVariantLabel ?? null);
   const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
   const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
@@ -837,11 +871,13 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
         roomConflicts={roomConflicts}
         onClose={() => setDayPlannerState({ dayKey: null, dayLabel: null })}
         onChangeRoom={updateRoom}
+        roomOptions={ROOM_OPTIONS}
       />
 
       <WochenplanRoomDrawer
         event={roomDrawerEvent}
         occupiedRooms={occupiedRooms}
+        roomOptions={ROOM_OPTIONS}
         onClose={() => setRoomDrawerEventId(null)}
         onChangeHomeRoom={(roomCode) => {
           if (!roomDrawerEvent) {

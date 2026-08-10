@@ -6,13 +6,46 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenantId } from "@/lib/tenants/active-tenant";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import { getWeekWindow, getIsoWeekNumber, startOfIsoWeek } from "@/lib/planner/date-utils";
-import { getWochenplanPitchRowLabels } from "@/lib/facilities/queries";
+import {
+  getActiveResourceOptionsForTenant,
+  getFacilityResourcesByCodesForTenant,
+  getWochenplanPitchRowLabels,
+  withRequiredCodes,
+} from "@/lib/facilities/queries";
 import { getWochenplanPublication } from "@/lib/wochenplan/publication-queries";
-import type { WochenplanBoardPitchRowKey } from "@/lib/wochenplan/types";
+import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
+import type { WochenplanBoardPitchRowKey, WochenplanEventItem } from "@/lib/wochenplan/types";
 
 type PageProps = {
   searchParams: Promise<{ week?: string }>;
 };
+
+/**
+ * MASTERDATA-CONSISTENCY-02 (C1) — canonical, tenant-scoped, active
+ * dressing-room options, loaded once and shared by WochenplanBoard,
+ * WochenplanRoomDrawer, and WochenplanRoomDayPlannerDialog (Schnellkorrektur
+ * + drag/drop). Replaces the previously hardcoded
+ * DRESSING_ROOMS = ["E1", ..., "O4"] array. Any dressing-room code still
+ * referenced by an existing placed event (even archived/renamed-away) is
+ * merged back in via withRequiredCodes() so historical assignments remain
+ * visible/selected rather than being silently reset.
+ */
+async function getWochenplanRoomOptions(
+  tenantId: string,
+  placedEvents: WochenplanEventItem[],
+): Promise<FacilityResourceOption[]> {
+  const activeRoomOptions = await getActiveResourceOptionsForTenant(tenantId, "DRESSING_ROOM");
+
+  const requiredRoomCodes = placedEvents.flatMap((event) => [
+    event.allocation.homeDressingRoomCode,
+    event.allocation.awayDressingRoomCode,
+  ]);
+
+  const historicalCodes = requiredRoomCodes.filter((code): code is string => Boolean(code));
+  const historicalNamesByCode = await getFacilityResourcesByCodesForTenant(historicalCodes, tenantId);
+
+  return withRequiredCodes(activeRoomOptions, requiredRoomCodes, historicalNamesByCode);
+}
 
 export default async function WochenplanPage({ searchParams }: PageProps) {
   await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
@@ -34,6 +67,16 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
     { key: "KUNSTRASEN_3", label: "KR 3" },
   ];
   const pitchRows = await getWochenplanPitchRowLabels(tenantId, defaultPitchRows);
+
+  // MASTERDATA-CONSISTENCY-02 (C1) — canonical, tenant-scoped, active
+  // dressing-room options, loaded once and shared by WochenplanBoard,
+  // WochenplanRoomDrawer, and WochenplanRoomDayPlannerDialog (Schnellkorrektur
+  // + drag/drop). Replaces the previously hardcoded
+  // DRESSING_ROOMS = ["E1", ..., "O4"] array. Any dressing-room code still
+  // referenced by an existing placed event (even archived/renamed-away) is
+  // merged back in via withRequiredCodes() so historical assignments remain
+  // visible/selected rather than being silently reset.
+  const roomOptions = tenantId ? await getWochenplanRoomOptions(tenantId, boardData.placed) : undefined;
 
   const weekNumber = getIsoWeekNumber(start);
   const weekYear = startOfIsoWeek(start).getUTCFullYear();
@@ -132,6 +175,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         weekId={weekId}
         pitchRows={pitchRows}
         activeVariantLabel={publication?.isPublished ? publication.variantLabel : null}
+        roomOptions={roomOptions}
       />
     </div>
   );

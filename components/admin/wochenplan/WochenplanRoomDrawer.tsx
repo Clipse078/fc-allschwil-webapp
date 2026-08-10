@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
-import { FCA_DRESSING_ROOMS } from "@/lib/facilities/dressing-rooms";
+import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
 import type { WochenplanBoardEvent } from "@/lib/wochenplan/types";
 
 type WochenplanRoomDrawerProps = {
@@ -11,13 +11,21 @@ type WochenplanRoomDrawerProps = {
   onClose: () => void;
   onChangeHomeRoom: (roomCode: string | null) => void;
   onChangeAwayRoom: (roomCode: string | null) => void;
+  /**
+   * MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped dressing-room
+   * options resolved via getActiveResourceOptionsForTenant(tenantId,
+   * "DRESSING_ROOM"), merged with any codes still referenced by existing
+   * allocations via withRequiredCodes(). Replaces the static
+   * FCA_DRESSING_ROOMS registry.
+   */
+  roomOptions: FacilityResourceOption[];
 };
 
 function RoomBadge({
-  roomCode,
+  roomName,
   occupied,
 }: {
-  roomCode: string;
+  roomName: string;
   occupied: boolean;
 }) {
   return (
@@ -28,7 +36,7 @@ function RoomBadge({
           : "rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"
       }
     >
-      {roomCode} {occupied ? "belegt" : "frei"}
+      {roomName} {occupied ? "belegt" : "frei"}
     </div>
   );
 }
@@ -39,6 +47,7 @@ export default function WochenplanRoomDrawer({
   onClose,
   onChangeHomeRoom,
   onChangeAwayRoom,
+  roomOptions,
 }: WochenplanRoomDrawerProps) {
   if (!event) {
     return null;
@@ -74,9 +83,9 @@ export default function WochenplanRoomDrawer({
               className="fca-select"
             >
               <option value="">Bitte wählen</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {roomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
-                  {room.code}
+                  {room.name}
                 </option>
               ))}
             </select>
@@ -90,9 +99,9 @@ export default function WochenplanRoomDrawer({
               className="fca-select"
             >
               <option value="">Bitte wählen</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {roomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
-                  {room.code}
+                  {room.name}
                 </option>
               ))}
             </select>
@@ -105,10 +114,10 @@ export default function WochenplanRoomDrawer({
           </p>
 
           <div className="mt-3 grid grid-cols-2 gap-3">
-            {FCA_DRESSING_ROOMS.map((room) => (
+            {roomOptions.map((room) => (
               <RoomBadge
                 key={room.code}
-                roomCode={room.code}
+                roomName={room.name}
                 occupied={occupiedRooms.includes(room.code)}
               />
             ))}
