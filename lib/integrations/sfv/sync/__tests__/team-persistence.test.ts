@@ -35,6 +35,12 @@
  *     11. No current-season mapping, but cross-season teamId known → relink.
  *     12. No current-season mapping and no cross-season teamId → create.
  *     13. Defaults crossSeasonTeamIds to an empty map when omitted (back-compat).
+ *
+ *   updateMappingFields — TEAM-IDENTITY-01 tenant-identity protection
+ *     14. Only writes to teamExternalMapping.update — never calls team.update.
+ *     15. Writes exclusively provider-owned fields (never name/shortName/
+ *         alternativeName/isActive), even when the provider payload contains
+ *         a changed team name.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -48,6 +54,7 @@ const mockTeamExternalMappingCreate = vi.fn();
 const mockTeamExternalMappingUpdate = vi.fn();
 const mockTeamFindUnique = vi.fn();
 const mockTeamFindFirst = vi.fn();
+const mockTeamUpdate = vi.fn();
 const mockTransaction = vi.fn();
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -60,6 +67,10 @@ vi.mock("@/lib/db/prisma", () => ({
     team: {
       findUnique: (...args: unknown[]) => mockTeamFindUnique(...args),
       findFirst: (...args: unknown[]) => mockTeamFindFirst(...args),
+      // TEAM-IDENTITY-01: kept as an explicit spy (not omitted) so the tests
+      // below can assert it is never called by the sync update path, rather
+      // than relying on an incidental TypeError if it ever were.
+      update: (...args: unknown[]) => mockTeamUpdate(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
@@ -69,6 +80,7 @@ const {
   loadCrossSeasonTeamIds,
   linkExistingTeamToNewSeason,
   processTeamDetail,
+  updateMappingFields,
 } = await import("../team-persistence");
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -295,5 +307,50 @@ describe("processTeamDetail — resolution order", () => {
     const outcome = await processTeamDetail(makeDetail(), CONTEXT_2027, new Map());
 
     expect(outcome).toEqual({ status: "created" });
+  });
+});
+
+// ── updateMappingFields — TEAM-IDENTITY-01 tenant-identity protection ───────
+
+describe("updateMappingFields — provider naming cannot overwrite tenant-managed identity", () => {
+  it("14 — only writes to teamExternalMapping.update, never team.update", async () => {
+    mockTeamExternalMappingUpdate.mockResolvedValueOnce({});
+
+    const outcome = await updateMappingFields(
+      "mapping-1",
+      makeDetail({ teamName: "FC Allschwil C1 (Renamed by SFV)" }),
+      CONTEXT_2027,
+    );
+
+    expect(outcome).toEqual({ status: "updated" });
+    expect(mockTeamExternalMappingUpdate).toHaveBeenCalledTimes(1);
+    expect(mockTeamUpdate).not.toHaveBeenCalled();
+  });
+
+  it("15 — writes exclusively provider-owned mapping fields, never Team.name/shortName/alternativeName/isActive", async () => {
+    mockTeamExternalMappingUpdate.mockResolvedValueOnce({});
+
+    await updateMappingFields(
+      "mapping-1",
+      makeDetail({ teamName: "A completely different provider name" }),
+      CONTEXT_2027,
+    );
+
+    const updateArgs = mockTeamExternalMappingUpdate.mock.calls[0][0];
+    expect(updateArgs.where).toEqual({ id: "mapping-1" });
+    expect(Object.keys(updateArgs.data).sort()).toEqual(
+      [
+        "providerTeamName",
+        "providerLeagueId",
+        "providerLeagueName",
+        "providerOrganisationId",
+        "providerIsActive",
+        "lastSyncedAt",
+      ].sort(),
+    );
+    expect(updateArgs.data).not.toHaveProperty("name");
+    expect(updateArgs.data).not.toHaveProperty("shortName");
+    expect(updateArgs.data).not.toHaveProperty("alternativeName");
+    expect(updateArgs.data).not.toHaveProperty("isActive");
   });
 });

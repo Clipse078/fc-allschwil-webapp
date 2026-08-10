@@ -372,7 +372,7 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
     const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
-    expect(result?.competition).toEqual({ name: "Liga 1", shortName: "L1" });
+    expect(result?.competition).toEqual({ id: "comp-01", name: "Liga 1", shortName: "L1" });
   });
 
   it("TEAMCENTER-UX-01B: competition is null (renders as 'Kein Wettbewerb') when no primary competition exists", async () => {

@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTeamDetailData } from "@/lib/teams/queries";
 import { getOrgUnits } from "@/lib/org/queries";
+import { getEligibleCompetitions } from "@/lib/competitions/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { PageShell } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
@@ -54,9 +55,10 @@ export default async function TeamDetailPage({ params }: Props) {
   }
   const tenantId = tenant.id;
 
-  const [team, availableOrgUnits] = await Promise.all([
+  const [team, availableOrgUnits, availableCompetitions] = await Promise.all([
     getTeamDetailData(tenantId, teamId),
     getOrgUnits(tenantId),
+    getEligibleCompetitions(tenantId),
   ]);
 
   if (!team) {
@@ -210,6 +212,11 @@ export default async function TeamDetailPage({ params }: Props) {
             name: ou.name,
             key: ou.key,
             type: ou.type,
+          }))}
+          availableCompetitions={availableCompetitions.map((c) => ({
+            id: c.id,
+            officialName: c.officialName,
+            shortName: c.shortName,
           }))}
           canManage={canManage}
         />

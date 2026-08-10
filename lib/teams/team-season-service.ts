@@ -364,6 +364,175 @@ export async function getEligibleOrgUnitsForTeamSeason(tenantId: string): Promis
 // TeamExternalMapping consistency helper
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// TeamSeasonCompetition — post-creation competition (re-)assignment
+// ---------------------------------------------------------------------------
+
+export type SetTeamSeasonCompetitionInput = {
+  /** Tenant context. Always sourced from the trusted session, never client input. */
+  tenantId: string;
+  /** The permanent Team identity that must own teamSeasonId. */
+  teamId: string;
+  /** The TeamSeason whose primary competition is being (re-)assigned. */
+  teamSeasonId: string;
+  /** New primary competition, or null to clear the assignment. */
+  competitionId: string | null;
+};
+
+export type SetTeamSeasonCompetitionResult =
+  | {
+      ok: true;
+      competition: { id: string; officialName: string; shortName: string | null } | null;
+    }
+  | { ok: false; code: SetTeamSeasonCompetitionErrorCode; message: string };
+
+export type SetTeamSeasonCompetitionErrorCode =
+  | "TEAM_SEASON_NOT_FOUND"
+  | "TEAM_SEASON_TENANT_MISMATCH"
+  | "COMPETITION_NOT_FOUND"
+  | "COMPETITION_TENANT_MISMATCH"
+  | "COMPETITION_ARCHIVED"
+  | "COMPETITION_NOT_ALLOWED"
+  | "UNKNOWN_ERROR";
+
+/**
+ * (Re-)assigns — or clears — the primary Competition for an existing
+ * TeamSeason after Team/TeamSeason creation.
+ *
+ * TEAMCENTER-UX-01C: registration (team-registration-service.ts) is the only
+ * place that could create a TeamSeasonCompetition — there was previously no
+ * way to add, change, or remove a competition assignment afterwards. This is
+ * the canonical (and only) write path for that follow-up edit, reusing the
+ * exact eligibility rules already enforced at registration time (tenant
+ * match, not archived, only for participationType = COMPETITION) so the two
+ * paths can never diverge.
+ *
+ * At most one TeamSeasonCompetition row is ever `isPrimary` per TeamSeason
+ * (see schema.prisma TeamSeasonCompetition). Passing `competitionId: null`
+ * clears the primary assignment; passing an id promotes/creates that row as
+ * primary and demotes any previous primary row. Non-primary rows (if any
+ * exist from other flows) are left untouched.
+ */
+export async function setTeamSeasonCompetition(
+  input: SetTeamSeasonCompetitionInput,
+): Promise<SetTeamSeasonCompetitionResult> {
+  const teamSeason = await prisma.teamSeason.findUnique({
+    where: { id: input.teamSeasonId },
+    select: {
+      id: true,
+      teamId: true,
+      participationType: true,
+      team: { select: { tenantId: true } },
+    },
+  });
+
+  if (!teamSeason || teamSeason.teamId !== input.teamId) {
+    return {
+      ok: false,
+      code: "TEAM_SEASON_NOT_FOUND",
+      message: "Team-Saison nicht gefunden.",
+    };
+  }
+
+  if (teamSeason.team.tenantId && teamSeason.team.tenantId !== input.tenantId) {
+    return {
+      ok: false,
+      code: "TEAM_SEASON_TENANT_MISMATCH",
+      message: "Die Team-Saison gehört nicht zum Mandanten.",
+    };
+  }
+
+  const competitionId = input.competitionId?.trim() || null;
+
+  if (competitionId && teamSeason.participationType !== ParticipationType.COMPETITION) {
+    return {
+      ok: false,
+      code: "COMPETITION_NOT_ALLOWED",
+      message: "Eine Wettkampfzuordnung ist nur für Wettkampfteams zulässig.",
+    };
+  }
+
+  let competition: { id: string; officialName: string; shortName: string | null } | null = null;
+
+  if (competitionId) {
+    const found = await prisma.competition.findFirst({
+      where: { id: competitionId, tenantId: input.tenantId },
+      select: { id: true, officialName: true, shortName: true, isArchived: true },
+    });
+
+    if (!found) {
+      const anyCompetition = await prisma.competition.findUnique({
+        where: { id: competitionId },
+        select: { id: true },
+      });
+
+      return anyCompetition
+        ? {
+            ok: false,
+            code: "COMPETITION_TENANT_MISMATCH",
+            message: "Der Wettkampf gehört nicht zum aktiven Mandanten.",
+          }
+        : { ok: false, code: "COMPETITION_NOT_FOUND", message: "Wettkampf nicht gefunden." };
+    }
+
+    if (found.isArchived) {
+      return {
+        ok: false,
+        code: "COMPETITION_ARCHIVED",
+        message:
+          "Archivierte Wettkämpfe können nicht zugeordnet werden. Bitte einen aktiven Wettkampf wählen.",
+      };
+    }
+
+    competition = { id: found.id, officialName: found.officialName, shortName: found.shortName };
+  }
+
+  try {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.teamSeasonCompetition.updateMany({
+        where: { teamSeasonId: input.teamSeasonId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+
+      if (competitionId) {
+        const existing = await tx.teamSeasonCompetition.findUnique({
+          where: {
+            teamSeasonId_competitionId: {
+              teamSeasonId: input.teamSeasonId,
+              competitionId,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (existing) {
+          await tx.teamSeasonCompetition.update({
+            where: { id: existing.id },
+            data: { isPrimary: true, displayOrder: 0 },
+          });
+        } else {
+          await tx.teamSeasonCompetition.create({
+            data: {
+              teamSeasonId: input.teamSeasonId,
+              competitionId,
+              isPrimary: true,
+              displayOrder: 0,
+            },
+          });
+        }
+      }
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      code: "UNKNOWN_ERROR",
+      message: err instanceof Error ? err.message : "Unbekannter Fehler.",
+    };
+  }
+
+  return { ok: true, competition };
+}
+
 /**
  * Validates that a TeamExternalMapping's teamSeasonId is consistent with
  * its teamId.

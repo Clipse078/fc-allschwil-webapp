@@ -307,8 +307,15 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     // `teamSeasons` rather than re-deriving "which season is current"
     // themselves — see lib/teams/current-season.ts.
     currentTeamSeasonId: activeSeasonEntry?.id ?? null,
+    // TEAMCENTER-UX-01C: current season's participation type, exposed so the
+    // edit UI can gate competition assignment the same way registration does
+    // (see lib/teams/team-season-service.ts#setTeamSeasonCompetition) — a
+    // TRAINING/DEVELOPMENT/... TeamSeason must not be offered a competition
+    // picker that silently no-ops or 400s on save.
+    currentParticipationType: activeSeasonEntry?.participationType ?? null,
     competition: primaryCompetition
       ? {
+          id: primaryCompetition.id,
           name: primaryCompetition.officialName,
           shortName: primaryCompetition.shortName,
         }
