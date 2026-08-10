@@ -8,7 +8,9 @@ import WochenplanPublishBar from "@/components/admin/wochenplan/WochenplanPublis
 import WochenplanRoomDayPlannerDialog, {
   type WochenplanRoomConflictPair,
 } from "@/components/admin/wochenplan/WochenplanRoomDayPlannerDialog";
-import WochenplanRoomDrawer from "@/components/admin/wochenplan/WochenplanRoomDrawer";
+import WochenplanRoomDrawer, {
+  type WochenplanRoomOption,
+} from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 import { getWochenplanConflicts } from "@/lib/wochenplan/conflict-engine";
 import { parseIsoWeekId } from "@/lib/planner/date-utils";
 import type {
@@ -606,9 +608,22 @@ type WochenplanBoardProps = {
    * Shown in the publish bar as "KW N | Variantname aktiv".
    */
   activeVariantLabel?: string | null;
+  /**
+   * Canonical active dressing-room resources for this tenant, sourced via
+   * getFacilitiesForTenant. Passed through to WochenplanRoomDrawer — see
+   * MASTERDATA-CONSISTENCY-02. Falls back to an empty list (drawer then
+   * falls back to whatever codes are already assigned/occupied).
+   */
+  roomOptions?: WochenplanRoomOption[];
 };
 
-export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitchRowsProp, activeVariantLabel }: WochenplanBoardProps) {
+export default function WochenplanBoard({
+  initialEvents,
+  weekId,
+  pitchRows: pitchRowsProp,
+  activeVariantLabel,
+  roomOptions,
+}: WochenplanBoardProps) {
   const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
   const [publishedVariant, setPublishedVariant] = useState<string | null>(activeVariantLabel ?? null);
   const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
@@ -842,6 +857,7 @@ export default function WochenplanBoard({ initialEvents, weekId, pitchRows: pitc
       <WochenplanRoomDrawer
         event={roomDrawerEvent}
         occupiedRooms={occupiedRooms}
+        roomOptions={roomOptions}
         onClose={() => setRoomDrawerEventId(null)}
         onChangeHomeRoom={(roomCode) => {
           if (!roomDrawerEvent) {

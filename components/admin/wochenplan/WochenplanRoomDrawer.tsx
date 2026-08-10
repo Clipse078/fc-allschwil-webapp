@@ -2,8 +2,17 @@
 
 import { X } from "lucide-react";
 import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
-import { FCA_DRESSING_ROOMS } from "@/lib/facilities/dressing-rooms";
 import type { WochenplanBoardEvent } from "@/lib/wochenplan/types";
+
+/**
+ * Canonical dressing-room option — sourced from Facility → FacilityResource
+ * (tenant-scoped, active/non-archived) rather than the static
+ * FCA_DRESSING_ROOMS registry. See MASTERDATA-CONSISTENCY-02.
+ */
+export type WochenplanRoomOption = {
+  code: string;
+  name: string;
+};
 
 type WochenplanRoomDrawerProps = {
   event: WochenplanBoardEvent | null;
@@ -11,13 +20,43 @@ type WochenplanRoomDrawerProps = {
   onClose: () => void;
   onChangeHomeRoom: (roomCode: string | null) => void;
   onChangeAwayRoom: (roomCode: string | null) => void;
+  /**
+   * Canonical active dressing-room resources for this tenant. Newly
+   * created/restored rooms appear automatically; archived rooms are
+   * excluded from new selections. Defaults to an empty list so a
+   * currently-assigned or occupied historical code still remains visible
+   * even when no canonical options were supplied.
+   */
+  roomOptions?: WochenplanRoomOption[];
 };
 
+/**
+ * Merges the canonical option list with any code that must remain visible
+ * even though it isn't part of the current canonical (active) set — the
+ * event's own current allocation and any other event's occupied room in
+ * the same slot. This keeps historical/archived allocations readable
+ * without offering them as new choices beyond what canonical data provides.
+ */
+function withRequiredCodes(
+  options: WochenplanRoomOption[],
+  requiredCodes: Array<string | null | undefined>,
+): WochenplanRoomOption[] {
+  const known = new Set(options.map((o) => o.code));
+  const merged = [...options];
+  for (const code of requiredCodes) {
+    if (code && !known.has(code)) {
+      known.add(code);
+      merged.push({ code, name: code });
+    }
+  }
+  return merged;
+}
+
 function RoomBadge({
-  roomCode,
+  label,
   occupied,
 }: {
-  roomCode: string;
+  label: string;
   occupied: boolean;
 }) {
   return (
@@ -28,7 +67,7 @@ function RoomBadge({
           : "rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"
       }
     >
-      {roomCode} {occupied ? "belegt" : "frei"}
+      {label} {occupied ? "belegt" : "frei"}
     </div>
   );
 }
@@ -39,10 +78,17 @@ export default function WochenplanRoomDrawer({
   onClose,
   onChangeHomeRoom,
   onChangeAwayRoom,
+  roomOptions = [],
 }: WochenplanRoomDrawerProps) {
   if (!event) {
     return null;
   }
+
+  const displayOptions = withRequiredCodes(roomOptions, [
+    event.allocation.homeDressingRoomCode,
+    event.allocation.awayDressingRoomCode,
+    ...occupiedRooms,
+  ]);
 
   return (
     <div className="fixed inset-y-0 right-0 z-40 w-full max-w-[420px] border-l border-slate-200 bg-white/95 p-4 backdrop-blur-xl">
@@ -74,9 +120,9 @@ export default function WochenplanRoomDrawer({
               className="fca-select"
             >
               <option value="">Bitte wählen</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {displayOptions.map((room) => (
                 <option key={room.code} value={room.code}>
-                  {room.code}
+                  {room.name}
                 </option>
               ))}
             </select>
@@ -90,9 +136,9 @@ export default function WochenplanRoomDrawer({
               className="fca-select"
             >
               <option value="">Bitte wählen</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {displayOptions.map((room) => (
                 <option key={room.code} value={room.code}>
-                  {room.code}
+                  {room.name}
                 </option>
               ))}
             </select>
@@ -105,10 +151,10 @@ export default function WochenplanRoomDrawer({
           </p>
 
           <div className="mt-3 grid grid-cols-2 gap-3">
-            {FCA_DRESSING_ROOMS.map((room) => (
+            {displayOptions.map((room) => (
               <RoomBadge
                 key={room.code}
-                roomCode={room.code}
+                label={room.name}
                 occupied={occupiedRooms.includes(room.code)}
               />
             ))}

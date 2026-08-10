@@ -6,7 +6,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenantId } from "@/lib/tenants/active-tenant";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
 import { getWeekWindow, getIsoWeekNumber, startOfIsoWeek } from "@/lib/planner/date-utils";
-import { getWochenplanPitchRowLabels } from "@/lib/facilities/queries";
+import { getWochenplanPitchRowLabels, getActiveResourceOptionsForTenant } from "@/lib/facilities/queries";
 import { getWochenplanPublication } from "@/lib/wochenplan/publication-queries";
 import type { WochenplanBoardPitchRowKey } from "@/lib/wochenplan/types";
 
@@ -34,6 +34,16 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
     { key: "KUNSTRASEN_3", label: "KR 3" },
   ];
   const pitchRows = await getWochenplanPitchRowLabels(tenantId, defaultPitchRows);
+
+  // MASTERDATA-CONSISTENCY-02: canonical, tenant-scoped, active dressing-room
+  // resources replace the static FCA_DRESSING_ROOMS registry as the source for
+  // WochenplanRoomDrawer's room selects. Runs on every request/navigation, so
+  // create/rename/archive/restore of a FacilityResource is reflected
+  // immediately — no extra cache layer needed.
+  const dressingRoomResources = tenantId
+    ? await getActiveResourceOptionsForTenant(tenantId, "DRESSING_ROOM")
+    : [];
+  const roomOptions = dressingRoomResources.map((r) => ({ code: r.code, name: r.name }));
 
   const weekNumber = getIsoWeekNumber(start);
   const weekYear = startOfIsoWeek(start).getUTCFullYear();
@@ -132,6 +142,7 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         weekId={weekId}
         pitchRows={pitchRows}
         activeVariantLabel={publication?.isPublished ? publication.variantLabel : null}
+        roomOptions={roomOptions}
       />
     </div>
   );
