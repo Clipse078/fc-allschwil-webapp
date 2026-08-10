@@ -93,7 +93,16 @@ export async function getOrgUnitById(id: string) {
       updatedAt: true,
       archivedAt: true,
       parent: { select: { id: true, name: true, key: true } },
-      children: { select: { id: true, name: true, key: true, type: true, status: true }, orderBy: { sortOrder: "asc" } },
+      // MASTERDATA-CONSISTENCY-02: an archived child OrgUnit must not remain
+      // visible in the active parent hierarchy. Historical data is not
+      // deleted — it is simply excluded from this list, mirroring the
+      // archived-status filter already applied to Facility/FacilityResource
+      // reads elsewhere (see lib/facilities/queries.ts).
+      children: {
+        where: { status: { not: "ARCHIVED" } },
+        select: { id: true, name: true, key: true, type: true, status: true },
+        orderBy: { sortOrder: "asc" },
+      },
       // Slice 11.3: linked teams via Team.orgUnitId bridge.
       teams: {
         where: { isActive: true },
