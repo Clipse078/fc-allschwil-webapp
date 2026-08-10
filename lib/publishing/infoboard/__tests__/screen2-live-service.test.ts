@@ -5,6 +5,7 @@
  *
  * Covers:
  *   - Pitch inventory loaded with correct tenant + type + status filter
+ *   - Dressing-room inventory loaded with correct tenant + type + status filter (INFOBOARD-INTEGRATION-01C)
  *   - Active pitches included in feed
  *   - Feed facilityName derived from DB facility name
  *   - Branding resolved correctly (FC Allschwil key → known logo)
@@ -12,7 +13,9 @@
  *   - Branding: null clubLogoSrc for unknown tenant without logoUrl
  *   - currentTimeIso matches now.toISOString()
  *   - Feed generatedAt matches now.toISOString()
- *   - dressingRooms is always empty (Screen 2)
+ *   - dressingRooms is empty when no dressing rooms are configured
+ *   - Theme resolves to DARK by default and reuses resolveInfoboardDisplayTheme
+ *     for an explicit LIGHT preference (INFOBOARD-INTEGRATION-01B/01C)
  *   - Tenant ref populated correctly
  *   - RangeError from invalid timezone propagates
  *   - Pitch inventory query uses ACTIVE status filter
@@ -40,7 +43,7 @@ import {
   type Screen2TenantContext,
 } from "../screen2-live-service";
 import type { CanonicalEventPolicyRow } from "../canonical-source-loader";
-import type { Screen2PitchRow } from "../screen2-live-service";
+import type { Screen2PitchRow, Screen2DressingRoomRow } from "../screen2-live-service";
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -71,10 +74,20 @@ function makePitchRow(code: string, name: string, facilityName = "Brüelstadion"
   } as Screen2PitchRow & { facility: { name: string } };
 }
 
+function makeDressingRoomRow(code: string, name: string): Screen2DressingRoomRow {
+  return { code, name, sortOrder: 0 };
+}
+
 function makeDatabase(
   pitchRows: Screen2PitchRow[],
   eventRows: CanonicalEventPolicyRow[] = [],
+  dressingRoomRows: Screen2DressingRoomRow[] = [],
 ): Screen2SourceDatabase {
+  const facilityResourceFindMany = vi.fn().mockImplementation((args: { where?: { type?: unknown } }) => {
+    const type = args?.where?.type;
+    if (type === "DRESSING_ROOM") return Promise.resolve(dressingRoomRows);
+    return Promise.resolve(pitchRows);
+  });
   return {
     event: {
       findMany: vi.fn().mockResolvedValue(eventRows),
@@ -83,7 +96,7 @@ function makeDatabase(
       findMany: vi.fn().mockResolvedValue([]),
     },
     facilityResource: {
-      findMany: vi.fn().mockResolvedValue(pitchRows),
+      findMany: facilityResourceFindMany,
     },
   };
 }
@@ -258,11 +271,11 @@ describe("currentTimeIso", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── dressingRooms ─────────────────────────────────────────────────────────────
+// ── dressingRooms (INFOBOARD-INTEGRATION-01C) ────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("dressingRooms", () => {
-  it("feed.dressingRooms is always empty (Screen 2 does not render cabins)", async () => {
+  it("feed.dressingRooms is empty when no dressing rooms are configured", async () => {
     const database = makeDatabase([]);
     const payload = await buildScreen2LivePayload({
       tenant: FC_ALLSCHWIL_TENANT,
@@ -270,6 +283,69 @@ describe("dressingRooms", () => {
       database,
     });
     expect(payload.feed.dressingRooms).toEqual([]);
+  });
+
+  it("feed contains one dressing-room entry per DB dressing-room row", async () => {
+    const database = makeDatabase(
+      [],
+      [],
+      [makeDressingRoomRow("G1", "Kabine 1"), makeDressingRoomRow("G2", "Kabine 2")],
+    );
+    const payload = await buildScreen2LivePayload({
+      tenant: FC_ALLSCHWIL_TENANT,
+      now: NOW,
+      database,
+    });
+    expect(payload.feed.dressingRooms).toHaveLength(2);
+    expect(payload.feed.dressingRooms.map((r) => r.code)).toEqual(["G1", "G2"]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Dressing-room inventory query ────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Dressing-room inventory query", () => {
+  it("queries facilityResource with type DRESSING_ROOM", async () => {
+    const database = makeDatabase([]);
+    await buildScreen2LivePayload({ tenant: FC_ALLSCHWIL_TENANT, now: NOW, database });
+    const calls = (database.facilityResource.findMany as ReturnType<typeof vi.fn>).mock.calls;
+    const dressingRoomCall = calls.find((c) => c[0].where.type === "DRESSING_ROOM");
+    expect(dressingRoomCall).toBeDefined();
+    expect(dressingRoomCall![0].where.tenantId).toBe("tenant-fca");
+    expect(dressingRoomCall![0].where.status).toBe("ACTIVE");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Theme (reuses Tenant.infoboardDisplayTheme, INFOBOARD-INTEGRATION-01B/01C) ─
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Theme", () => {
+  it("defaults to DARK when tenant.infoboardDisplayTheme is absent", async () => {
+    const database = makeDatabase([]);
+    const payload = await buildScreen2LivePayload({ tenant: FC_ALLSCHWIL_TENANT, now: NOW, database });
+    expect(payload.theme).toBe("DARK");
+  });
+
+  it("resolves to LIGHT when tenant.infoboardDisplayTheme is 'LIGHT'", async () => {
+    const database = makeDatabase([]);
+    const payload = await buildScreen2LivePayload({
+      tenant: { ...FC_ALLSCHWIL_TENANT, infoboardDisplayTheme: "LIGHT" },
+      now: NOW,
+      database,
+    });
+    expect(payload.theme).toBe("LIGHT");
+  });
+
+  it("falls back to DARK for an unrecognised persisted value (fail-safe default)", async () => {
+    const database = makeDatabase([]);
+    const payload = await buildScreen2LivePayload({
+      tenant: { ...FC_ALLSCHWIL_TENANT, infoboardDisplayTheme: "not-a-theme" },
+      now: NOW,
+      database,
+    });
+    expect(payload.theme).toBe("DARK");
   });
 });
 
