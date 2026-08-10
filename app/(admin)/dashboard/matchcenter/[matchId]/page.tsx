@@ -10,6 +10,7 @@ import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import MatchcenterDetail from "@/components/admin/matchcenter/MatchcenterDetail";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { getActiveResourceOptionsForTenant } from "@/lib/facilities/queries";
 
 type MatchcenterDetailPageProps = {
   params: Promise<{
@@ -60,6 +61,23 @@ export default async function MatchcenterDetailPage({
     PERMISSIONS.EVENTS_MANAGE,
   );
 
+  // MASTERDATA-CONSISTENCY-02: canonical, tenant-scoped, active FacilityResource
+  // options replace the static FCA_PITCH_ALLOCATIONS / FCA_DRESSING_ROOMS
+  // registries as the source for the pitch/dressing-room selects below. This
+  // query runs on every request/navigation, so create/rename/archive/restore
+  // of a FacilityResource is reflected immediately — no extra cache layer.
+  const [pitchResources, dressingRoomResources] = await Promise.all([
+    getActiveResourceOptionsForTenant(tenantId, "PITCH"),
+    getActiveResourceOptionsForTenant(tenantId, "DRESSING_ROOM"),
+  ]);
+
+  // Matches (unlike training) only ever assign a full pitch, mirroring the
+  // previous static getPitchOptionsForEventType("MATCH") behaviour.
+  const pitchOptions = pitchResources
+    .filter((r) => r.type === "FULL_PITCH")
+    .map((r) => ({ code: r.code, label: r.name }));
+  const dressingRoomOptions = dressingRoomResources.map((r) => ({ code: r.code, label: r.name }));
+
   return (
     <ToastProvider>
       <MatchcenterDetail
@@ -67,6 +85,8 @@ export default async function MatchcenterDetailPage({
         locale={tenantContext.locale ?? "de-CH"}
         timezone={tenantContext.timezone ?? "Europe/Zurich"}
         canManageMappings={canManageMappings}
+        pitchOptions={pitchOptions}
+        dressingRoomOptions={dressingRoomOptions}
       />
     </ToastProvider>
   );

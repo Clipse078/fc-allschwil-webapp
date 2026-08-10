@@ -30,13 +30,19 @@ import { PageShell } from "@/components/ui/page/PageShell";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import { DetailPagePattern } from "@/components/ui/patterns/DetailPagePattern";
 import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMappingDialog";
-import MatchcenterDetailOperational from "@/components/admin/matchcenter/MatchcenterDetailOperational";
+import MatchcenterDetailOperational, {
+  type ResourceSelectOption,
+} from "@/components/admin/matchcenter/MatchcenterDetailOperational";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
   locale?: string;
   timezone?: string;
   canManageMappings?: boolean;
+  /** Canonical active FULL_PITCH resources for this tenant — see MASTERDATA-CONSISTENCY-02. */
+  pitchOptions?: ResourceSelectOption[];
+  /** Canonical active DRESSING_ROOM resources for this tenant. */
+  dressingRoomOptions?: ResourceSelectOption[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -172,6 +178,8 @@ export default function MatchcenterDetail({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   canManageMappings = false,
+  pitchOptions,
+  dressingRoomOptions,
 }: MatchcenterDetailProps) {
   const statusLabel =
     STATUS_LABELS[match.status] ?? match.status;
@@ -481,6 +489,8 @@ export default function MatchcenterDetail({
           currentInfoboardVisible={match.visibility.infoboardVisible}
           matchDateIso={matchDateIso}
           canManage={canManageMappings}
+          pitchOptions={pitchOptions}
+          dressingRoomOptions={dressingRoomOptions}
         />
 
         <SectionCard

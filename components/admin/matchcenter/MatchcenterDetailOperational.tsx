@@ -22,8 +22,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/page/SectionCard";
-import { getPitchOptionsForEventType } from "@/lib/facilities/pitches";
-import { FCA_DRESSING_ROOMS } from "@/lib/facilities/dressing-rooms";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,6 +32,16 @@ type TeamItem = {
   genderGroup: string | null;
   ageGroup: string | null;
   isActive: boolean;
+};
+
+/**
+ * Canonical resource option — sourced from Facility → FacilityResource
+ * (tenant-scoped, active/non-archived) rather than a static registry.
+ * See MASTERDATA-CONSISTENCY-02.
+ */
+export type ResourceSelectOption = {
+  code: string;
+  label: string;
 };
 
 export type MatchcenterDetailOperationalProps = {
@@ -58,11 +66,33 @@ export type MatchcenterDetailOperationalProps = {
   /** ISO date string for infoboard preview link */
   matchDateIso: string;
   canManage: boolean;
+  /**
+   * Canonical active pitch resources (FULL_PITCH) for this tenant, sourced
+   * via getFacilitiesForTenant. Newly created resources appear automatically;
+   * archived resources disappear from new selections. Defaults to an empty
+   * list so a currently-assigned historical code still remains selectable
+   * even when no canonical options were supplied.
+   */
+  pitchOptions?: ResourceSelectOption[];
+  /** Canonical active dressing-room resources (DRESSING_ROOM) for this tenant. */
+  dressingRoomOptions?: ResourceSelectOption[];
 };
 
-// ── Pitch options for MATCH events (full pitches only) ────────────────────────
-
-const MATCH_PITCH_OPTIONS = getPitchOptionsForEventType("MATCH");
+/**
+ * Merges the canonical option list with the currently-assigned code so that
+ * a historical allocation referencing an archived/renamed-away resource
+ * remains visible and readable in the select — it just won't be offered for
+ * *new* selections beyond what canonical data provides.
+ */
+function withHistoricalFallback(
+  options: ResourceSelectOption[],
+  currentCode: string | null,
+): ResourceSelectOption[] {
+  if (!currentCode || options.some((opt) => opt.code === currentCode)) {
+    return options;
+  }
+  return [...options, { code: currentCode, label: currentCode }];
+}
 
 // ── Readiness helpers ─────────────────────────────────────────────────────────
 
@@ -185,6 +215,8 @@ export default function MatchcenterDetailOperational({
   currentInfoboardVisible,
   matchDateIso,
   canManage,
+  pitchOptions = [],
+  dressingRoomOptions = [],
 }: MatchcenterDetailOperationalProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -318,6 +350,19 @@ export default function MatchcenterDetailOperational({
 
   const previewDate = matchDateIso.split("T")[0] ?? matchDateIso;
   const previewHref = `/dashboard/infoboard?date=${previewDate}`;
+
+  // Canonical selectable options, plus the currently-assigned code so a
+  // historical allocation referencing an archived/renamed resource stays
+  // visible and readable even if it is no longer offered for new selections.
+  const availablePitchOptions = withHistoricalFallback(pitchOptions, currentPitchCode);
+  const availableHomeRoomOptions = withHistoricalFallback(
+    dressingRoomOptions,
+    currentHomeDressingRoomCode,
+  );
+  const availableAwayRoomOptions = withHistoricalFallback(
+    dressingRoomOptions,
+    currentAwayDressingRoomCode,
+  );
 
   // ── Own-side context ───────────────────────────────────────────────────────
   // For FC Allschwil, the "own team" side is home when isOwnTeam is true for home,
@@ -499,7 +544,7 @@ export default function MatchcenterDetailOperational({
             data-testid="pitch-assignment-select"
           >
             <option value="">— Kein Spielfeld zugeordnet —</option>
-            {MATCH_PITCH_OPTIONS.map((opt) => (
+            {availablePitchOptions.map((opt) => (
               <option key={opt.code} value={opt.code}>
                 {opt.label}
               </option>
@@ -534,7 +579,7 @@ export default function MatchcenterDetailOperational({
               data-testid="home-dressing-room-select"
             >
               <option value="">— Keine Garderobe zugeordnet —</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {availableHomeRoomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
                   {room.label}
                 </option>
@@ -562,7 +607,7 @@ export default function MatchcenterDetailOperational({
               data-testid="away-dressing-room-select"
             >
               <option value="">— Keine Garderobe zugeordnet —</option>
-              {FCA_DRESSING_ROOMS.map((room) => (
+              {availableAwayRoomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
                   {room.label}
                 </option>

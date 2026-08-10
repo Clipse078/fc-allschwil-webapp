@@ -391,6 +391,145 @@ describe("MatchcenterDetailOperational", () => {
   });
 });
 
+// ── MASTERDATA-CONSISTENCY-02: canonical FacilityResource options ─────────────
+
+describe("MatchcenterDetailOperational — canonical resource options", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupTeamsFetch();
+  });
+
+  it("shows canonical active pitch options in the pitch select", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: "STADION",
+          pitchOptions: [
+            { code: "STADION", label: "Stadion" },
+            { code: "KUNSTRASEN_2", label: "Kunstrasen 2" },
+          ],
+        })}
+      />,
+    );
+
+    const select = await screen.findByTestId("pitch-assignment-select");
+    const optionValues = Array.from(select.querySelectorAll("option")).map(
+      (o) => (o as HTMLOptionElement).value,
+    );
+    expect(optionValues).toContain("STADION");
+    expect(optionValues).toContain("KUNSTRASEN_2");
+  });
+
+  it("a newly added pitch resource becomes selectable without any static registry change", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: null,
+          pitchOptions: [{ code: "NEUER_PLATZ", label: "Neuer Platz" }],
+        })}
+      />,
+    );
+
+    const select = await screen.findByTestId("pitch-assignment-select");
+    expect(
+      screen.getByRole("option", { name: "Neuer Platz" }),
+    ).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: "NEUER_PLATZ" } });
+    expect((select as HTMLSelectElement).value).toBe("NEUER_PLATZ");
+  });
+
+  it("an archived pitch is excluded from new choices (not present in pitchOptions)", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: null,
+          pitchOptions: [{ code: "STADION", label: "Stadion" }],
+        })}
+      />,
+    );
+
+    await screen.findByTestId("pitch-assignment-select");
+    expect(
+      screen.queryByRole("option", { name: "Archiviertes Feld" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows canonical active dressing-room options in both room selects", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentHomeDressingRoomCode: "E1",
+          currentAwayDressingRoomCode: "E2",
+          dressingRoomOptions: [
+            { code: "E1", label: "Garderobe E1" },
+            { code: "E2", label: "Garderobe E2" },
+          ],
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("option", { name: "Garderobe E1" }).length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByRole("option", { name: "Garderobe E2" }).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it("an archived dressing room is excluded from new choices (not present in dressingRoomOptions)", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentHomeDressingRoomCode: null,
+          currentAwayDressingRoomCode: null,
+          dressingRoomOptions: [{ code: "E1", label: "Garderobe E1" }],
+        })}
+      />,
+    );
+
+    await screen.findByTestId("home-dressing-room-select");
+    expect(
+      screen.queryByRole("option", { name: "Archivierte Garderobe" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("a renamed resource displays its current canonical label, not the raw code", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: "STADION",
+          pitchOptions: [{ code: "STADION", label: "Neuer Name Hauptplatz" }],
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("option", { name: "Neuer Name Hauptplatz" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("a historical allocation referencing a resource absent from canonical options remains selected (readable) rather than reset", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: "ARCHIVED_PLATZ",
+          // Canonical options no longer include the archived resource.
+          pitchOptions: [{ code: "STADION", label: "Stadion" }],
+        })}
+      />,
+    );
+
+    const select = (await screen.findByTestId(
+      "pitch-assignment-select",
+    )) as HTMLSelectElement;
+    expect(select.value).toBe("ARCHIVED_PLATZ");
+  });
+});
+
 // ── PUB-02: computeAllocationWarning unit tests ────────────────────────────────
 
 describe("PUB-02 — computeAllocationWarning", () => {
