@@ -34,6 +34,8 @@
   --ib2-text:           #E8EEF4;
   --ib2-text-muted:     #6E87A0;
   --ib2-text-dim:       #4A6078;
+  /* Secondary text — opponent name, slightly softer than primary text (theme-aware). */
+  --ib2-text-secondary: rgba(232, 238, 244, 0.7);
 
   /* Status colors */
   --ib2-match:          #D83033;
@@ -83,6 +85,34 @@
   --ib2-radius:            8px;
   --ib2-radius-sm:         4px;
   --ib2-radius-xs:         3px;
+}
+
+/* ─── Light theme palette (INFOBOARD-INTEGRATION-01C) ───────────────────────
+ * Same warm/neutral bright daytime palette introduced for Screen 1
+ * (INFOBOARD-INTEGRATION-01B) — identical layout, identical information
+ * hierarchy, only color tokens are redefined. No second theme system.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+.root[data-theme="light"] {
+  --ib2-page-bg:        #F4EFE6;
+  --ib2-card-bg:        #FFFFFF;
+  --ib2-header-bg:      #FFFFFF;
+  --ib2-surface:        #FBF8F2;
+
+  --ib2-border:         rgba(60, 48, 32, 0.10);
+  --ib2-border-strong:  rgba(60, 48, 32, 0.20);
+
+  --ib2-text:           #241C12;
+  --ib2-text-muted:     #6B5F4E;
+  --ib2-text-dim:       #8C8272;
+  --ib2-text-secondary: rgba(36, 28, 18, 0.62);
+
+  --ib2-match:          #C22A2D;
+  --ib2-training:       #1849A6;
+  --ib2-tournament:     #C2670F;
+  --ib2-free:           #167A46;
+  --ib2-upcoming:       #1849A6;
+  --ib2-warning:        #9A6300;
 }
 
 /* ─── Root container ─────────────────────────────────────────────────────── */
@@ -427,6 +457,42 @@
   margin-top: auto;
 }
 
+/* Second (DANACH) block — same structure, visually subdued relative to JETZT. */
+.pitchCardNextEvent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  padding-top: var(--ib2-sp-2);
+  margin-top: var(--ib2-sp-1);
+  border-top: 1px solid var(--ib2-border);
+  opacity: 0.82;
+}
+
+.pitchCardEventHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ib2-sp-2);
+}
+
+.pitchCardTemporalLabel {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib2-fs-pitch-type);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pitchCardTemporalLabel[data-status="current"] {
+  color: var(--ib2-match);
+}
+
+.pitchCardTemporalLabel[data-status="next"] {
+  color: var(--ib2-training);
+}
+
 .pitchCardEventType {
   font-size: var(--ib2-fs-pitch-type);
   font-weight: 700;
@@ -455,7 +521,7 @@
 .pitchCardEventOpponent {
   font-size: var(--ib2-fs-pitch-opponent);
   font-weight: 500;
-  color: rgba(232, 238, 244, 0.65);
+  color: var(--ib2-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   line-height: 1.1;
@@ -549,9 +615,31 @@
 .dressingRoomTeam {
   font-size: var(--ib2-fs-dr-team);
   font-weight: 500;
-  color: var(--ib2-text-muted);
+  color: var(--ib2-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
+}
+
+.dressingRoomRow[data-state="free"] .dressingRoomTeam,
+.dressingRoomFreeLabel {
+  font-size: var(--ib2-fs-dr-team);
+  font-weight: 600;
+  color: var(--ib2-free);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+.dressingRoomNext {
+  font-size: var(--ib2-fs-dr-team);
+  font-weight: 500;
+  color: var(--ib2-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -571,6 +659,68 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ib2-text-dim);
+}
+
+/* ─── Unallocated section (restrained — never a warning banner) ─────────── */
+
+.unallocatedSection {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--ib2-sp-2) var(--ib2-sp-4);
+  flex-shrink: 0;
+  padding: clamp(6px, 1vh, 10px) clamp(14px, 1.8vw, 22px);
+  border: 1px dashed var(--ib2-warning);
+  border-radius: var(--ib2-radius-sm);
+  background: rgba(204, 139, 20, 0.08);
+}
+
+.unallocatedTitle {
+  font-size: var(--ib2-fs-dr-title);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ib2-warning);
+  flex-shrink: 0;
+}
+
+.unallocatedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ib2-sp-1) var(--ib2-sp-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.unallocatedItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ib2-sp-2);
+  font-size: clamp(0.75rem, 0.95vw, 1.15rem);
+  color: var(--ib2-text-muted);
+  white-space: nowrap;
+}
+
+.unallocatedTime {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-weight: 700;
+  color: var(--ib2-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.unallocatedType {
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
+}
+
+.unallocatedName {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 /* ─── Sponsor aside (right column) ──────────────────────────────────────── */

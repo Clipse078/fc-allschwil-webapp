@@ -6,19 +6,29 @@
  * PREVIEW-ONLY — must never be imported by production feed builders or
  * API routes.
  *
- * Scenario: Same display date as Screen 1 preview (2026-09-12).
- * The Brüelstadion facility has 4 pitches:
- *   - Stadion: OCCUPIED (Match FC Allschwil E1 – JETZT)
- *   - Kunstrasen 1: UPCOMING (Training Juniorinnen FF-14 – in 25 min)
+ * Scenario (INFOBOARD-INTEGRATION-01C): Same display date as Screen 1
+ * preview (2026-09-12). The Brüelstadion facility has 4 pitches:
+ *   - Stadion: OCCUPIED (HOME match FC Allschwil E1 – JETZT)
+ *   - Kunstrasen 1: OCCUPIED (Training Juniorinnen FF-14 JETZT) + DANACH
+ *     (FC Allschwil D1 Training) — demonstrates current + next together.
  *   - Kunstrasen 2: FREE
- *   - Kunstrasen 3: OCCUPIED (Tournament Sommer-Cup Junioren E)
+ *   - Kunstrasen 3: UPCOMING (Tournament Sommer-Cup Junioren E, DANACH only)
  *
- * INFOBOARD-05: dressingRooms retained in feed for type compatibility only.
- * Screen 2 no longer renders cabin assignments.
+ * Dressing rooms:
+ *   - Kabine E1: FC Allschwil E1 (home side of the Stadion match)
+ *   - Kabine E2: FC Binningen E1 (away side of the Stadion match)
+ *   - Kabine E3: FREI
+ *
+ * Unallocated:
+ *   - one eligible training with no pitch allocation ("Nicht zugeteilt").
+ *
  * Weather fixture data is non-production sample data for visual preview.
  */
 
-import type { InfoboardScreen2Feed } from "@/lib/publishing/event-types";
+import type {
+  InfoboardScreen2Feed,
+  PitchEventSummary,
+} from "@/lib/publishing/event-types";
 import type { InfoboardSponsor } from "./InfoboardScreen2";
 import type { WeatherDto } from "@/lib/weather/weather-types";
 
@@ -30,6 +40,19 @@ const PREVIEW_TENANT_S2 = {
   name: "FC Allschwil",
   timezone: "Europe/Zurich",
 } as const;
+
+const UNALLOCATED_ACTIVITY: PitchEventSummary = {
+  eventId: "evt-unallocated-1",
+  displayTitle: "Aktive Herren",
+  teamDisplayName: "Aktive Herren",
+  opponentDisplayName: null,
+  startAt: "2026-09-12T18:00:00.000Z",
+  endAt: "2026-09-12T19:30:00.000Z",
+  status: "SCHEDULED",
+  type: "TRAINING",
+  temporalRelation: "next",
+  dressingRooms: [],
+};
 
 // ── Main Screen 2 preview fixture ─────────────────────────────────────────────
 
@@ -57,22 +80,7 @@ export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
         status: "LIVE",
         type: "MATCH",
         temporalRelation: "current",
-        dressingRooms: [
-          {
-            code: "DR-E1",
-            displayLabel: "Kabine E1",
-            role: "HOME",
-            assignedTo: "FC Allschwil E1",
-            eventId: "evt-1",
-          },
-          {
-            code: "DR-E2",
-            displayLabel: "Kabine E2",
-            role: "AWAY",
-            assignedTo: "FC Binningen E1",
-            eventId: "evt-1",
-          },
-        ],
+        dressingRooms: [],
       },
       nextEvent: null,
     },
@@ -80,28 +88,31 @@ export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
       code: "P-KR1",
       displayLabel: "Kunstrasen 1",
       facilityName: "Brüelstadion",
-      state: "UPCOMING",
+      state: "OCCUPIED_NOW",
       hasAllocationConflict: false,
-      currentEvent: null,
-      nextEvent: {
+      currentEvent: {
         eventId: "evt-2",
         displayTitle: "Juniorinnen FF-14",
         teamDisplayName: "Juniorinnen FF-14",
         opponentDisplayName: null,
-        startAt: "2026-09-12T16:00:00.000Z",
-        endAt: null,
+        startAt: "2026-09-12T15:00:00.000Z",
+        endAt: "2026-09-12T16:00:00.000Z",
+        status: "LIVE",
+        type: "TRAINING",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: {
+        eventId: "evt-2b",
+        displayTitle: "FC Allschwil D1",
+        teamDisplayName: "FC Allschwil D1",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T16:30:00.000Z",
+        endAt: "2026-09-12T18:00:00.000Z",
         status: "SCHEDULED",
         type: "TRAINING",
         temporalRelation: "next",
-        dressingRooms: [
-          {
-            code: "DR-04",
-            displayLabel: "Kabine 04",
-            role: "TRAINING",
-            assignedTo: "Juniorinnen FF-14",
-            eventId: "evt-2",
-          },
-        ],
+        dressingRooms: [],
       },
     },
     {
@@ -139,25 +150,39 @@ export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
     {
       code: "DR-E1",
       displayLabel: "Kabine E1",
-      role: "HOME",
-      assignedTo: "FC Allschwil E1",
-      eventId: "evt-1",
+      state: "OCCUPIED_NOW",
+      current: {
+        code: "DR-E1",
+        displayLabel: "Kabine E1",
+        role: "HOME",
+        assignedTo: "FC Allschwil E1",
+        eventId: "evt-1",
+      },
+      next: null,
     },
     {
       code: "DR-E2",
       displayLabel: "Kabine E2",
-      role: "AWAY",
-      assignedTo: "FC Binningen E1",
-      eventId: "evt-1",
+      state: "OCCUPIED_NOW",
+      current: {
+        code: "DR-E2",
+        displayLabel: "Kabine E2",
+        role: "AWAY",
+        assignedTo: "FC Binningen E1",
+        eventId: "evt-1",
+      },
+      next: null,
     },
     {
-      code: "DR-04",
-      displayLabel: "Kabine 04",
-      role: "TRAINING",
-      assignedTo: "Juniorinnen FF-14",
-      eventId: "evt-2",
+      code: "DR-E3",
+      displayLabel: "Kabine E3",
+      state: "FREE_NOW",
+      current: null,
+      next: null,
     },
   ],
+
+  unallocated: [UNALLOCATED_ACTIVITY],
 };
 
 // ── All-free fixture ──────────────────────────────────────────────────────────
@@ -170,7 +195,13 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_FREE: InfoboardScreen2Feed = {
     currentEvent: null,
     nextEvent: null,
   })),
-  dressingRooms: [],
+  dressingRooms: PREVIEW_FIXTURE_SCREEN2.dressingRooms.map((r) => ({
+    ...r,
+    state: "FREE_NOW" as const,
+    current: null,
+    next: null,
+  })),
+  unallocated: [],
 };
 
 // ── Sponsor placeholder data ──────────────────────────────────────────────────
@@ -322,30 +353,42 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED: InfoboardScreen2Feed = {
     {
       code: "DR-E1",
       displayLabel: "Kabine E1",
-      role: "HOME",
-      assignedTo: "FC Allschwil E1",
-      eventId: "evt-ao-1",
+      state: "OCCUPIED_NOW",
+      current: {
+        code: "DR-E1",
+        displayLabel: "Kabine E1",
+        role: "HOME",
+        assignedTo: "FC Allschwil E1",
+        eventId: "evt-ao-1",
+      },
+      next: null,
     },
     {
       code: "DR-E2",
       displayLabel: "Kabine E2",
-      role: "AWAY",
-      assignedTo: "FC Binningen E1",
-      eventId: "evt-ao-1",
+      state: "OCCUPIED_NOW",
+      current: {
+        code: "DR-E2",
+        displayLabel: "Kabine E2",
+        role: "AWAY",
+        assignedTo: "FC Binningen E1",
+        eventId: "evt-ao-1",
+      },
+      next: null,
     },
     {
-      code: "DR-04",
-      displayLabel: "Kabine 04",
-      role: "TRAINING",
-      assignedTo: "Juniorinnen FF-14",
-      eventId: "evt-ao-2",
-    },
-    {
-      code: "DR-A",
-      displayLabel: "Kabine A",
-      role: "TRAINING",
-      assignedTo: "Aktive Herren",
-      eventId: "evt-ao-4",
+      code: "DR-E3",
+      displayLabel: "Kabine E3",
+      state: "OCCUPIED_NOW",
+      current: {
+        code: "DR-E3",
+        displayLabel: "Kabine E3",
+        role: "TRAINING",
+        assignedTo: "Aktive Herren",
+        eventId: "evt-ao-4",
+      },
+      next: null,
     },
   ],
+  unallocated: [],
 };

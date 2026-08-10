@@ -1,21 +1,23 @@
 /**
  * components/infoboard/screen2/InfoboardScreen2.tsx
  *
- * Infoboard Screen 2 — Facility orientation screen.
+ * Infoboard Screen 2 — FACILITY OVERVIEW.
  *
  * Purpose:
- *   "What is currently happening across the sports facility?"
+ *   "What is happening on each facility/resource now, and what is next?"
+ *   (Screen 1 answers the club-wide "what's happening now and in the next
+ *   few hours" question; Screen 2 is resource/facility-oriented and never
+ *   duplicates Screen 1's event-list presentation.)
  *
- * Design (INFOBOARD-04B — premium dark facility overview):
- *   - Full dark navy stadium palette, consistent with Screen 1.
- *   - Left section (~65% width, dominant): large pitch overview cards.
- *   - Right section (~35% width): weather panel + sponsor display.
- *   - Pitch cards fill the available facility area.
- *
- * INFOBOARD-05 changes:
- *   - Dressing-room/cabin section removed from Screen 2.
- *     Cabin assignments belong exclusively on Screen 1.
- *   - Weather panel added to the right column (above sponsors).
+ * Sections:
+ *   - PITCHES — a card per configured pitch/hall, showing JETZT (current)
+ *     and DANACH (next-within-horizon) independently, or FREI when neither
+ *     exists.
+ *   - GARDEROBEN — a compact per-dressing-room allocation list.
+ *   - NICHT ZUGETEILT — a restrained, compact list of eligible activities
+ *     that could not be mapped to a configured pitch. Only rendered when
+ *     non-empty; never a warning banner.
+ *   - Weather panel + sponsors (right column, unchanged from INFOBOARD-05).
  *
  * Invariants:
  *   - Pure presentational server component — no "use client", no effects,
@@ -24,9 +26,9 @@
  *   - Tenant timezone always taken from feed.tenant.timezone.
  *   - No new Date() without argument; no implicit timezone.
  *   - null / undefined values are never rendered as strings.
- *   - No "Next Events" panel — pitch occupancy only.
- *   - No dressing-room / cabin section.
  *   - No scrolling — content must fit within 100dvh.
+ *   - DARK/LIGHT themes are presentation only (data-theme attribute + CSS
+ *     custom properties) — never affect feed content or layout structure.
  */
 
 import type { ReactElement } from "react";
@@ -44,9 +46,15 @@ import type {
   InfoboardScreen2Feed,
   PitchOccupancy,
   PitchOccupancyState,
+  PitchEventSummary,
+  DressingRoomOccupancy,
   PublishingEventType,
 } from "@/lib/publishing/event-types";
 import type { WeatherResult } from "@/lib/weather/weather-types";
+import {
+  DEFAULT_INFOBOARD_DISPLAY_THEME,
+  type InfoboardDisplayTheme,
+} from "@/lib/publishing/infoboard/display-theme";
 import styles from "./InfoboardScreen2.module.css";
 
 // ── Public sponsor types ──────────────────────────────────────────────────────
@@ -83,6 +91,15 @@ export type InfoboardScreen2Props = {
    * When absent, the clock display falls back to feed.displayDate.
    */
   currentTimeIso?: string | null;
+  /**
+   * Display theme (INFOBOARD-INTEGRATION-01B/01C). Defaults to "DARK" — the
+   * existing premium stadium theme — when omitted, so every existing caller
+   * (previews, tests) is unaffected. Presentation only: never changes feed
+   * content, layout, or content hierarchy — only CSS custom-property values
+   * via the rendered `data-theme` attribute. Reuses the same
+   * Tenant.infoboardDisplayTheme → resolver pipeline as Screen 1.
+   */
+  theme?: InfoboardDisplayTheme;
 };
 
 // ── Time / date formatting ────────────────────────────────────────────────────
@@ -179,6 +196,58 @@ function getWeatherIcon(conditionCode: number): LucideIcon {
   return Cloud as LucideIcon;
 }
 
+// ── Pitch event block (JETZT / DANACH) ────────────────────────────────────────
+
+type PitchEventBlockProps = {
+  event: PitchEventSummary;
+  temporal: "current" | "next";
+  timeZone: string;
+};
+
+function PitchEventBlock({ event, temporal, timeZone }: PitchEventBlockProps): ReactElement {
+  const label = temporal === "current" ? "JETZT" : "DANACH";
+  return (
+    <div
+      className={
+        temporal === "current" ? styles.pitchCardEvent : styles.pitchCardNextEvent
+      }
+      data-testid={temporal === "current" ? "pitch-card-event" : "pitch-card-next-event"}
+    >
+      <div className={styles.pitchCardEventHeader}>
+        <span
+          className={styles.pitchCardTemporalLabel}
+          data-status={temporal}
+          data-testid={`pitch-card-temporal-${temporal}`}
+        >
+          {label}
+        </span>
+        <span className={styles.pitchCardEventTime}>
+          {formatTime(event.startAt, timeZone)}
+          {event.endAt !== null && (
+            <span className={styles.pitchCardEventEndTime}>
+              {" "}–{formatTime(event.endAt, timeZone)}
+            </span>
+          )}
+        </span>
+      </div>
+      <span
+        className={styles.pitchCardEventType}
+        data-event-type={eventTypeKey(event.type)}
+      >
+        {eventTypeLabel(event.type)}
+      </span>
+      <span className={styles.pitchCardEventTitle}>
+        {event.teamDisplayName ?? event.displayTitle}
+      </span>
+      {event.opponentDisplayName !== null && (
+        <span className={styles.pitchCardEventOpponent}>
+          vs. {event.opponentDisplayName}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Pitch card ────────────────────────────────────────────────────────────────
 
 type PitchCardProps = {
@@ -188,9 +257,10 @@ type PitchCardProps = {
 
 function PitchCard({ pitch, timeZone }: PitchCardProps): ReactElement {
   const state = pitch.state;
-  const event = pitch.currentEvent ?? pitch.nextEvent;
+  const primaryEvent = pitch.currentEvent ?? pitch.nextEvent;
   const stateKey = pitchStateKey(state);
-  const eventKey = event ? eventTypeKey(event.type) : null;
+  const eventKey = primaryEvent ? eventTypeKey(primaryEvent.type) : null;
+  const isFree = pitch.currentEvent === null && pitch.nextEvent === null;
 
   return (
     <div
@@ -213,38 +283,121 @@ function PitchCard({ pitch, timeZone }: PitchCardProps): ReactElement {
         {pitchStateLabel(state)}
       </div>
 
-      {/* Event summary when occupied or upcoming */}
-      {event !== null ? (
-        <div className={styles.pitchCardEvent} data-testid="pitch-card-event">
-          <span
-            className={styles.pitchCardEventType}
-            data-event-type={eventTypeKey(event.type)}
-          >
-            {eventTypeLabel(event.type)}
-          </span>
-          <span className={styles.pitchCardEventTitle}>
-            {event.teamDisplayName ?? event.displayTitle}
-          </span>
-          {event.opponentDisplayName !== null && (
-            <span className={styles.pitchCardEventOpponent}>
-              vs. {event.opponentDisplayName}
-            </span>
-          )}
-          <span className={styles.pitchCardEventTime}>
-            {formatTime(event.startAt, timeZone)}
-            {event.endAt !== null && (
-              <span className={styles.pitchCardEventEndTime}>
-                {" "}–{formatTime(event.endAt, timeZone)}
-              </span>
-            )}
-          </span>
-        </div>
-      ) : (
+      {pitch.currentEvent !== null && (
+        <PitchEventBlock event={pitch.currentEvent} temporal="current" timeZone={timeZone} />
+      )}
+      {pitch.nextEvent !== null && (
+        <PitchEventBlock event={pitch.nextEvent} temporal="next" timeZone={timeZone} />
+      )}
+      {isFree && (
         <div className={styles.pitchCardFree} data-testid="pitch-card-free">
-          <span className={styles.pitchCardFreeLine}>VERFÜGBAR</span>
+          <span className={styles.pitchCardFreeLine}>FREI</span>
         </div>
       )}
     </div>
+  );
+}
+
+// ── Dressing-room section ─────────────────────────────────────────────────────
+
+type DressingRoomRowProps = {
+  room: DressingRoomOccupancy;
+};
+
+function DressingRoomRow({ room }: DressingRoomRowProps): ReactElement {
+  const stateKey =
+    room.state === "OCCUPIED_NOW" ? "occupied" : room.state === "UPCOMING" ? "upcoming" : "free";
+
+  return (
+    <div
+      className={styles.dressingRoomRow}
+      data-testid="dressing-room-row"
+      data-state={stateKey}
+    >
+      <span className={styles.dressingRoomCode} data-testid="dressing-room-code">
+        {room.displayLabel}
+      </span>
+      {room.current !== null ? (
+        <span className={styles.dressingRoomTeam} data-testid="dressing-room-occupant">
+          {room.current.assignedTo ?? "BELEGT"}
+        </span>
+      ) : room.next !== null ? (
+        <span className={styles.dressingRoomNext} data-testid="dressing-room-next">
+          DANACH: {room.next.assignedTo ?? "—"}
+        </span>
+      ) : (
+        <span className={styles.dressingRoomFreeLabel} data-testid="dressing-room-free">
+          FREI
+        </span>
+      )}
+    </div>
+  );
+}
+
+type DressingRoomSectionProps = {
+  rooms: readonly DressingRoomOccupancy[];
+};
+
+function DressingRoomSection({ rooms }: DressingRoomSectionProps): ReactElement | null {
+  if (rooms.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      className={styles.dressingRoomSection}
+      data-testid="dressing-room-section"
+      aria-label="Garderoben"
+    >
+      <div className={styles.dressingRoomHeader}>
+        <span className={styles.dressingRoomSectionTitle}>GARDEROBEN</span>
+      </div>
+      <div className={styles.dressingRoomList} data-testid="dressing-room-list">
+        {rooms.map((room) => (
+          <DressingRoomRow key={room.code} room={room} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Unallocated section ────────────────────────────────────────────────────────
+
+type UnallocatedSectionProps = {
+  activities: readonly PitchEventSummary[];
+  timeZone: string;
+};
+
+/**
+ * Compact, restrained list of eligible current/upcoming activities that
+ * could not be mapped to a configured pitch. Only rendered when non-empty
+ * — never a warning banner, never shown to "fill space".
+ */
+function UnallocatedSection({ activities, timeZone }: UnallocatedSectionProps): ReactElement | null {
+  if (activities.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      className={styles.unallocatedSection}
+      data-testid="unallocated-section"
+      aria-label="Nicht zugeteilte Aktivitäten"
+    >
+      <span className={styles.unallocatedTitle}>NICHT ZUGETEILT</span>
+      <ul className={styles.unallocatedList} data-testid="unallocated-list">
+        {activities.map((activity) => (
+          <li key={activity.eventId} className={styles.unallocatedItem} data-testid="unallocated-item">
+            <span className={styles.unallocatedTime}>{formatTime(activity.startAt, timeZone)}</span>
+            <span className={styles.unallocatedType}>{eventTypeLabel(activity.type)}</span>
+            <span className={styles.unallocatedName}>
+              {activity.teamDisplayName ?? activity.displayTitle}
+              {activity.opponentDisplayName !== null && ` – ${activity.opponentDisplayName}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -431,9 +584,11 @@ export function InfoboardScreen2({
   sponsors = [],
   weather,
   currentTimeIso,
+  theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
 }: InfoboardScreen2Props): ReactElement {
-  const { tenant, pitches } = feed;
+  const { tenant, pitches, dressingRooms, unallocated } = feed;
   const timeZone = tenant.timezone;
+  const themeAttr = theme.toLowerCase();
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
@@ -453,7 +608,7 @@ export function InfoboardScreen2({
     <div
       className={styles.root}
       data-testid="infoboard-screen2-root"
-      data-theme="dark"
+      data-theme={themeAttr}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className={styles.header} data-testid="infoboard-screen2-header">
@@ -511,7 +666,7 @@ export function InfoboardScreen2({
       {/* ── Main content: facility | weather + sponsors ───────────────────── */}
       <main className={styles.main}>
 
-        {/* Left column: pitch overview */}
+        {/* Left column: pitch overview + dressing rooms + unallocated */}
         <div className={styles.facilityColumn}>
 
           {/* Pitch overview */}
@@ -546,6 +701,9 @@ export function InfoboardScreen2({
               </div>
             )}
           </section>
+
+          <DressingRoomSection rooms={dressingRooms} />
+          <UnallocatedSection activities={unallocated} timeZone={timeZone} />
         </div>
 
         {/* Right column: weather + sponsors */}

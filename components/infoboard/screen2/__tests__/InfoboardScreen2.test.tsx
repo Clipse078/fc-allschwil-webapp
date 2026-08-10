@@ -18,8 +18,8 @@
  *   - Wind renders in km/h
  *   - German condition text renders
  *   - Weather-unavailable fallback renders safely
- *   - No cabin section renders (INFOBOARD-05)
- *   - No dressing-room assignment renders (INFOBOARD-05)
+ *   - Dressing-room section renders per-resource allocations (INFOBOARD-INTEGRATION-01C)
+ *   - Unallocated activities render in a compact, restrained section
  *   - Alexa-safe zone present
  */
 
@@ -60,6 +60,7 @@ function makeFeed(
     facilityName: "Test Facility",
     pitches: [],
     dressingRooms: [],
+    unallocated: [],
     ...overrides,
   };
 }
@@ -92,7 +93,7 @@ const SAMPLE_WEATHER: WeatherDto = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Dark theme", () => {
-  it("root element has data-theme='dark' attribute", () => {
+  it("root element has data-theme='dark' attribute by default", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
     const root = screen.getByTestId("infoboard-screen2-root");
     expect(root.getAttribute("data-theme")).toBe("dark");
@@ -101,6 +102,54 @@ describe("Dark theme", () => {
   it("renders infoboard-screen2-root test id", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
     expect(screen.getByTestId("infoboard-screen2-root")).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Theme (INFOBOARD-INTEGRATION-01C — reuses Tenant.infoboardDisplayTheme) ──
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Theme", () => {
+  it("14. root element has data-theme='dark' when theme='DARK'", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} theme="DARK" />);
+    expect(screen.getByTestId("infoboard-screen2-root").getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("14. root element has data-theme='light' when theme='LIGHT'", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} theme="LIGHT" />);
+    expect(screen.getByTestId("infoboard-screen2-root").getAttribute("data-theme")).toBe("light");
+  });
+
+  it("14. DARK/LIGHT content parity — same pitch, header and dressing-room text renders under both themes", () => {
+    const feed = makeFeed({
+      pitches: [makePitch({ code: "P-ST", displayLabel: "Stadion" })],
+      dressingRooms: [
+        { code: "DR-E1", displayLabel: "Kabine E1", state: "OCCUPIED_NOW", current: { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "FC Test", eventId: "e1" }, next: null },
+      ],
+    });
+
+    const { unmount } = render(<InfoboardScreen2 feed={feed} theme="DARK" />);
+    const darkText = screen.getByTestId("infoboard-screen2-root").textContent;
+    unmount();
+
+    render(<InfoboardScreen2 feed={feed} theme="LIGHT" />);
+    const lightText = screen.getByTestId("infoboard-screen2-root").textContent;
+
+    expect(darkText).toBe(lightText);
+  });
+
+  it("15. renders the full preview fixture under the LIGHT theme without crashing", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2}
+        sponsors={PREVIEW_SPONSORS}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
+        theme="LIGHT"
+      />,
+    );
+    expect(screen.getByTestId("infoboard-screen2-root").getAttribute("data-theme")).toBe("light");
+    expect(screen.getAllByTestId("pitch-card").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
   });
 });
 
@@ -327,6 +376,100 @@ describe("Pitch card — event-type statuses", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ── Current + next together (JETZT / DANACH, INFOBOARD-INTEGRATION-01C) ─────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Pitch card — current and next together", () => {
+  it("renders both JETZT and DANACH blocks when a pitch has current and next events", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          pitches: [
+            makePitch({
+              code: "P-KR2",
+              displayLabel: "KR2",
+              state: "OCCUPIED_NOW",
+              currentEvent: {
+                eventId: "e1",
+                displayTitle: "Juniorinnen FF-14",
+                teamDisplayName: "Juniorinnen FF-14",
+                opponentDisplayName: null,
+                startAt: "2026-09-12T17:00:00.000Z",
+                endAt: "2026-09-12T18:00:00.000Z",
+                status: "LIVE",
+                type: "TRAINING",
+                temporalRelation: "current",
+                dressingRooms: [],
+              },
+              nextEvent: {
+                eventId: "e2",
+                displayTitle: "FC Allschwil D1",
+                teamDisplayName: "FC Allschwil D1",
+                opponentDisplayName: null,
+                startAt: "2026-09-12T18:30:00.000Z",
+                endAt: "2026-09-12T20:00:00.000Z",
+                status: "SCHEDULED",
+                type: "TRAINING",
+                temporalRelation: "next",
+                dressingRooms: [],
+              },
+            }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("pitch-card-temporal-current").textContent).toBe("JETZT");
+    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("DANACH");
+    expect(screen.getByText("Juniorinnen FF-14")).toBeTruthy();
+    expect(screen.getByText("FC Allschwil D1")).toBeTruthy();
+  });
+
+  it("renders only DANACH when a pitch has only a next event", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          pitches: [
+            makePitch({
+              code: "P-KR3",
+              state: "UPCOMING",
+              currentEvent: null,
+              nextEvent: {
+                eventId: "e3",
+                displayTitle: "Sommer-Cup",
+                teamDisplayName: "FC Allschwil Junioren",
+                opponentDisplayName: null,
+                startAt: "2026-09-12T19:00:00.000Z",
+                endAt: null,
+                status: "SCHEDULED",
+                type: "TOURNAMENT",
+                temporalRelation: "next",
+                dressingRooms: [],
+              },
+            }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("pitch-card-temporal-current")).toBeNull();
+    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("DANACH");
+  });
+
+  it("preview fixture KR1 pitch shows both JETZT and DANACH", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2}
+        sponsors={PREVIEW_SPONSORS}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
+      />,
+    );
+    const jetztLabels = screen.getAllByTestId("pitch-card-temporal-current");
+    const danachLabels = screen.getAllByTestId("pitch-card-temporal-next");
+    expect(jetztLabels.length).toBeGreaterThan(0);
+    expect(danachLabels.length).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ── Free pitch status ─────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -351,14 +494,14 @@ describe("Free pitch status", () => {
     expect(status.textContent).toContain("FREI");
   });
 
-  it("free pitch card shows VERFÜGBAR text", () => {
+  it("free pitch card shows FREI text", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({ pitches: [makePitch({ state: "FREE_NOW" })] })}
       />,
     );
     const freeArea = screen.getByTestId("pitch-card-free");
-    expect(freeArea).toBeTruthy();
+    expect(freeArea.textContent).toContain("FREI");
   });
 
   it("all pitches free scenario renders all pitch cards", () => {
@@ -608,11 +751,11 @@ describe("No Next Events panel", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── No cabin / dressing-room section (INFOBOARD-05) ──────────────────────────
+// ── Dressing-room section (INFOBOARD-INTEGRATION-01C) ────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("No cabin section (INFOBOARD-05)", () => {
-  it("8. does not render dressing-room-section even when dressingRooms present in feed", () => {
+describe("Dressing-room section", () => {
+  it("8. renders dressing-room-section when dressingRooms are present in the feed", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -620,45 +763,94 @@ describe("No cabin section (INFOBOARD-05)", () => {
             {
               code: "DR-E1",
               displayLabel: "Kabine E1",
-              role: "HOME",
-              assignedTo: "FC Allschwil E1",
-              eventId: "evt-1",
+              state: "OCCUPIED_NOW",
+              current: {
+                code: "DR-E1",
+                displayLabel: "Kabine E1",
+                role: "HOME",
+                assignedTo: "FC Allschwil E1",
+                eventId: "evt-1",
+              },
+              next: null,
             },
           ],
         })}
       />,
     );
+    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
+  });
+
+  it("does not render dressing-room-section when dressingRooms is empty", () => {
+    render(<InfoboardScreen2 feed={makeFeed({ dressingRooms: [] })} />);
     expect(screen.queryByTestId("dressing-room-section")).toBeNull();
   });
 
-  it("9. does not render dressing-room-list", () => {
+  it("9. renders dressing-room-list", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
           dressingRooms: [
-            { code: "DR-E2", displayLabel: "Kabine E2", role: "AWAY", assignedTo: "Team B", eventId: "e1" },
+            {
+              code: "DR-E2",
+              displayLabel: "Kabine E2",
+              state: "OCCUPIED_NOW",
+              current: { code: "DR-E2", displayLabel: "Kabine E2", role: "AWAY", assignedTo: "Team B", eventId: "e1" },
+              next: null,
+            },
           ],
         })}
       />,
     );
-    expect(screen.queryByTestId("dressing-room-list")).toBeNull();
+    expect(screen.getByTestId("dressing-room-list")).toBeTruthy();
   });
 
-  it("9. does not render any cabin assignment text", () => {
+  it("9. renders the assigned team name for an occupied dressing room", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
           dressingRooms: [
-            { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "FC Test Team", eventId: "e1" },
+            {
+              code: "DR-E1",
+              displayLabel: "Kabine E1",
+              state: "OCCUPIED_NOW",
+              current: { code: "DR-E1", displayLabel: "Kabine E1", role: "HOME", assignedTo: "FC Test Team", eventId: "e1" },
+              next: null,
+            },
           ],
         })}
       />,
     );
-    expect(screen.queryByText("FC Test Team")).toBeNull();
-    expect(screen.queryByText("Kabine E1")).toBeNull();
+    expect(screen.getByText("FC Test Team")).toBeTruthy();
+    expect(screen.getByText("Kabine E1")).toBeTruthy();
   });
 
-  it("8. full preview fixture does NOT render dressing-room-section", () => {
+  it("renders FREI for a dressing room with no current or next assignment", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            { code: "DR-E3", displayLabel: "Kabine E3", state: "FREE_NOW", current: null, next: null },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("dressing-room-free")).toBeTruthy();
+  });
+
+  it("does not invent an assignment for a free dressing room", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          dressingRooms: [
+            { code: "DR-E3", displayLabel: "Kabine E3", state: "FREE_NOW", current: null, next: null },
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("dressing-room-occupant")).toBeNull();
+  });
+
+  it("8. full preview fixture renders dressing-room-section", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
@@ -666,17 +858,101 @@ describe("No cabin section (INFOBOARD-05)", () => {
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
-    expect(screen.queryByTestId("dressing-room-section")).toBeNull();
+    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
   });
 
-  it("does not render KABINEN heading", () => {
+  it("renders GARDEROBEN heading", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
         sponsors={PREVIEW_SPONSORS}
       />,
     );
-    expect(screen.queryByText("KABINEN")).toBeNull();
+    expect(screen.getByText("GARDEROBEN")).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Unallocated section (restrained, INFOBOARD-INTEGRATION-01C) ─────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Unallocated section", () => {
+  it("does not render unallocated-section when unallocated is empty", () => {
+    render(<InfoboardScreen2 feed={makeFeed({ unallocated: [] })} />);
+    expect(screen.queryByTestId("unallocated-section")).toBeNull();
+  });
+
+  it("renders unallocated-section when an activity has no facility mapping", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          unallocated: [
+            {
+              eventId: "evt-u1",
+              displayTitle: "Aktive Herren",
+              teamDisplayName: "Aktive Herren",
+              opponentDisplayName: null,
+              startAt: "2026-09-12T18:00:00.000Z",
+              endAt: null,
+              status: "SCHEDULED",
+              type: "TRAINING",
+              temporalRelation: "next",
+              dressingRooms: [],
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("unallocated-section")).toBeTruthy();
+    expect(screen.getByText("NICHT ZUGETEILT")).toBeTruthy();
+    expect(screen.getByText("Aktive Herren")).toBeTruthy();
+  });
+
+  it("renders one unallocated-item per unmapped activity", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          unallocated: [
+            {
+              eventId: "evt-u1",
+              displayTitle: "Team A",
+              teamDisplayName: "Team A",
+              opponentDisplayName: null,
+              startAt: "2026-09-12T18:00:00.000Z",
+              endAt: null,
+              status: "SCHEDULED",
+              type: "TRAINING",
+              temporalRelation: "next",
+              dressingRooms: [],
+            },
+            {
+              eventId: "evt-u2",
+              displayTitle: "Team B",
+              teamDisplayName: "Team B",
+              opponentDisplayName: null,
+              startAt: "2026-09-12T19:00:00.000Z",
+              endAt: null,
+              status: "SCHEDULED",
+              type: "TRAINING",
+              temporalRelation: "next",
+              dressingRooms: [],
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getAllByTestId("unallocated-item")).toHaveLength(2);
+  });
+
+  it("full preview fixture renders the unallocated section", () => {
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2}
+        sponsors={PREVIEW_SPONSORS}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
+      />,
+    );
+    expect(screen.getByTestId("unallocated-section")).toBeTruthy();
   });
 });
 
@@ -839,14 +1115,14 @@ describe("All pitches occupied fixture", () => {
     expect(screen.getByTestId("sponsor-section")).toBeTruthy();
   });
 
-  it("8. no dressing-room-section in all-occupied scenario (INFOBOARD-05)", () => {
+  it("8. dressing-room-section still renders in all-occupied scenario", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED}
         sponsors={PREVIEW_SPONSORS}
       />,
     );
-    expect(screen.queryByTestId("dressing-room-section")).toBeNull();
+    expect(screen.getByTestId("dressing-room-section")).toBeTruthy();
   });
 });
 
