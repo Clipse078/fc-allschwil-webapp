@@ -11,7 +11,7 @@ import WochenplanRoomDayPlannerDialog, {
 import WochenplanRoomDrawer from "@/components/admin/wochenplan/WochenplanRoomDrawer";
 import { getWochenplanConflicts } from "@/lib/wochenplan/conflict-engine";
 import { parseIsoWeekId } from "@/lib/planner/date-utils";
-import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
+import { withRequiredCodes, type FacilityResourceOption } from "@/lib/facilities/resource-options";
 import type {
   WochenplanBoardDayKey,
   WochenplanBoardEvent,
@@ -626,13 +626,28 @@ type WochenplanBoardProps = {
    */
   activeVariantLabel?: string | null;
   /**
-   * MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped dressing-room
-   * options resolved via getActiveResourceOptionsForTenant(tenantId,
-   * "DRESSING_ROOM") and merged with any codes still referenced by existing
-   * allocations via withRequiredCodes(). Falls back to
-   * DEFAULT_DRESSING_ROOMS when not provided (demo-data mode).
+   * MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped, ACTIVE-ONLY
+   * dressing-room options resolved via getActiveResourceOptionsForTenant(
+   * tenantId, "DRESSING_ROOM"). Falls back to DEFAULT_DRESSING_ROOMS when
+   * not provided (demo-data mode).
+   *
+   * MASTERDATA-CONSISTENCY-02-C2 — this list is intentionally NOT
+   * pre-merged with historical/archived codes for the whole week anymore.
+   * Historical compatibility is derived narrowly below (per-event for the
+   * Room Drawer, per-day for the Day Planner dialog) using
+   * historicalRoomNamesByCode, so an archived room referenced on one day
+   * never bleeds into another day's/event's selectable options.
    */
   roomOptions?: FacilityResourceOption[];
+  /**
+   * MASTERDATA-CONSISTENCY-02-C2 — display names (resolved server-side,
+   * status-independent) for every dressing-room code referenced by any
+   * placed event this week, keyed by code. Used only to label a historical
+   * code when it is merged back into a narrowly-scoped options list below —
+   * never to decide availability. Falls back to the raw code when a code
+   * has no entry here (e.g. no DB resource can be resolved at all).
+   */
+  historicalRoomNamesByCode?: Record<string, string>;
 };
 
 export default function WochenplanBoard({
@@ -641,9 +656,14 @@ export default function WochenplanBoard({
   pitchRows: pitchRowsProp,
   activeVariantLabel,
   roomOptions: roomOptionsProp,
+  historicalRoomNamesByCode: historicalRoomNamesByCodeProp,
 }: WochenplanBoardProps) {
   const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
   const ROOM_OPTIONS = roomOptionsProp ?? DEFAULT_DRESSING_ROOMS;
+  const historicalRoomNamesByCode = useMemo(
+    () => new Map(Object.entries(historicalRoomNamesByCodeProp ?? {})),
+    [historicalRoomNamesByCodeProp],
+  );
   const [publishedVariant, setPublishedVariant] = useState<string | null>(activeVariantLabel ?? null);
   const weekStart = useMemo(() => (weekId ? parseIsoWeekId(weekId) : null), [weekId]);
   const seedEvents = initialEvents && initialEvents.length > 0 ? initialEvents : buildDemoEvents();
@@ -748,6 +768,44 @@ export default function WochenplanBoard({
       ),
     );
   }, [events, roomDrawerEvent]);
+
+  /**
+   * MASTERDATA-CONSISTENCY-02-C2 — event-scoped room options for the Room
+   * Drawer: canonical active rooms plus only the CURRENTLY OPENED event's
+   * own historical/archived codes (never another event's). Derived at this
+   * narrow consumer boundary using the existing withRequiredCodes() helper
+   * — no new abstraction, no additional query.
+   */
+  const drawerRoomOptions = useMemo(() => {
+    if (!roomDrawerEvent) {
+      return ROOM_OPTIONS;
+    }
+
+    const requiredCodesForEvent = [
+      roomDrawerEvent.allocation.homeDressingRoomCode,
+      roomDrawerEvent.allocation.awayDressingRoomCode,
+    ];
+
+    return withRequiredCodes(ROOM_OPTIONS, requiredCodesForEvent, historicalRoomNamesByCode);
+  }, [ROOM_OPTIONS, roomDrawerEvent, historicalRoomNamesByCode]);
+
+  /**
+   * MASTERDATA-CONSISTENCY-02-C2 — day-scoped room options for the Day
+   * Planner dialog: canonical active rooms plus only the historical/archived
+   * codes referenced by events on the CURRENTLY OPENED day (never another
+   * day's events).
+   */
+  const dayPlannerRoomOptions = useMemo(() => {
+    if (!dayPlannerState.dayKey) {
+      return ROOM_OPTIONS;
+    }
+
+    const requiredCodesForDay = events
+      .filter((event) => event.boardDayKey === dayPlannerState.dayKey)
+      .flatMap((event) => [event.allocation.homeDressingRoomCode, event.allocation.awayDressingRoomCode]);
+
+    return withRequiredCodes(ROOM_OPTIONS, requiredCodesForDay, historicalRoomNamesByCode);
+  }, [ROOM_OPTIONS, events, dayPlannerState.dayKey, historicalRoomNamesByCode]);
 
   function openDayPlanner(dayKey: WochenplanBoardDayKey, dayLabel: string) {
     setDayPlannerState({
@@ -871,13 +929,13 @@ export default function WochenplanBoard({
         roomConflicts={roomConflicts}
         onClose={() => setDayPlannerState({ dayKey: null, dayLabel: null })}
         onChangeRoom={updateRoom}
-        roomOptions={ROOM_OPTIONS}
+        roomOptions={dayPlannerRoomOptions}
       />
 
       <WochenplanRoomDrawer
         event={roomDrawerEvent}
         occupiedRooms={occupiedRooms}
-        roomOptions={ROOM_OPTIONS}
+        roomOptions={drawerRoomOptions}
         onClose={() => setRoomDrawerEventId(null)}
         onChangeHomeRoom={(roomCode) => {
           if (!roomDrawerEvent) {
