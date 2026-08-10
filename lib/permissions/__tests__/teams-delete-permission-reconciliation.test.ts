@@ -24,6 +24,8 @@ import {
   TEAMS_DELETE_PERMISSION_DEF,
   TEAMS_DELETE_SUPER_ADMIN_ROLE_KEY,
   TENANT_CLUB_ADMIN_ROLE_KEY_PREFIX,
+  FC_ALLSCHWIL_TENANT_KEY,
+  FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY,
 } from "../teams-delete-permission-reconciliation";
 import type { PrismaClient } from "@prisma/client";
 
@@ -36,6 +38,7 @@ function makeMockPrisma(overrides: {
   roleFindMany?: ReturnType<typeof vi.fn>;
   rolePermissionFindUnique?: ReturnType<typeof vi.fn>;
   rolePermissionUpsert?: ReturnType<typeof vi.fn>;
+  tenantFindUnique?: ReturnType<typeof vi.fn>;
 } = {}): PrismaClient {
   return {
     permission: {
@@ -50,6 +53,9 @@ function makeMockPrisma(overrides: {
       findUnique: overrides.rolePermissionFindUnique ?? vi.fn().mockResolvedValue(null),
       upsert: overrides.rolePermissionUpsert ?? vi.fn().mockResolvedValue({}),
     },
+    tenant: {
+      findUnique: overrides.tenantFindUnique ?? vi.fn().mockResolvedValue(null),
+    },
   } as unknown as PrismaClient;
 }
 
@@ -57,6 +63,13 @@ const SUPER_ADMIN_ROLE = { id: "role-super-admin" };
 const FCA_CLUB_ADMIN_ROLE = { id: "role-club-admin-fca", key: "club_admin__fc-allschwil" };
 const OTHER_CLUB_ADMIN_ROLE = { id: "role-club-admin-other", key: "club_admin__other-tenant" };
 const TEAMS_DELETE_PERM = { id: "perm-teams-delete" };
+const FCA_TENANT = { id: "tenant-fc-allschwil" };
+const FCA_LEGACY_CLUB_ADMIN_ROLE = {
+  id: "role-club-admin-fca-legacy",
+  key: FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY,
+  scope: "TENANT",
+  tenantId: FCA_TENANT.id,
+};
 
 // ── A. Constant definitions ────────────────────────────────────────────────────
 
@@ -133,6 +146,17 @@ describe("reconcileTeamsDeletePermission — first execution (all new)", () => {
     ]);
   });
 
+  it("does not touch the FC Allschwil legacy compatibility path when the fc-allschwil tenant does not exist in this database", async () => {
+    // tenantFindUnique defaults to null (not provided in this suite's setup)
+    // — the legacy check must short-circuit and never call role.findUnique
+    // for the legacy key.
+    const result = await reconcileTeamsDeletePermission(prisma, false);
+    expect(result.fcAllschwilLegacyClubAdmin).toBeNull();
+    expect(prisma.role.findUnique).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { key: FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY } }),
+    );
+  });
+
   it("only queries roles matching the club_admin__ prefix + isSystem TENANT filter", async () => {
     await reconcileTeamsDeletePermission(prisma, false);
     expect(prisma.role.findMany).toHaveBeenCalledWith({
@@ -191,6 +215,7 @@ describe("reconcileTeamsDeletePermission — idempotency (already synced)", () =
     expect(result.tenantClubAdminRoles).toEqual([
       { action: "already_assigned", roleKey: FCA_CLUB_ADMIN_ROLE.key, permissionKey: "teams.delete" },
     ]);
+    expect(result.fcAllschwilLegacyClubAdmin).toBeNull();
 
     // Upserts are still safe/idempotent even though nothing changed.
     expect(prisma.permission.upsert).toHaveBeenCalledTimes(1);
@@ -325,5 +350,178 @@ describe("reconcileTeamsDeletePermission — multiple tenant Club Admin roles", 
     const roleKeys = result.tenantClubAdminRoles.map((o) => o.roleKey);
     expect(roleKeys).toEqual([FCA_CLUB_ADMIN_ROLE.key]);
     expect(roleKeys).not.toContain("some_custom_delegated_role");
+  });
+});
+
+// ── H. ADMIN-DELETE-01B-C1 — FC Allschwil legacy Club Admin compatibility ────────
+//
+// Reproduces the exact STAGE finding: the actually-assigned FC Allschwil Club
+// Admin role is `club_admin_fc_allschwil` (scope=TENANT, isSystem=false),
+// which never matches Step 3's `club_admin__` canonical-prefix search.
+
+function makeLegacyFcaMockPrisma(overrides: {
+  tenantFindUnique?: ReturnType<typeof vi.fn>;
+  roleFindUnique?: ReturnType<typeof vi.fn>;
+  rolePermissionFindUnique?: ReturnType<typeof vi.fn>;
+  permissionFindUnique?: ReturnType<typeof vi.fn>;
+} = {}): PrismaClient {
+  return makeMockPrisma({
+    permissionFindUnique: overrides.permissionFindUnique ?? vi.fn().mockResolvedValue(TEAMS_DELETE_PERM),
+    permissionUpsert: vi.fn().mockResolvedValue(TEAMS_DELETE_PERM),
+    roleFindUnique:
+      overrides.roleFindUnique ??
+      vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        if (where.key === "super_admin") return Promise.resolve(SUPER_ADMIN_ROLE);
+        if (where.key === FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY) {
+          return Promise.resolve(FCA_LEGACY_CLUB_ADMIN_ROLE);
+        }
+        return Promise.resolve(null);
+      }),
+    roleFindMany: vi.fn().mockResolvedValue([]),
+    rolePermissionFindUnique: overrides.rolePermissionFindUnique ?? vi.fn().mockResolvedValue(null),
+    rolePermissionUpsert: vi.fn().mockResolvedValue({}),
+    tenantFindUnique:
+      overrides.tenantFindUnique ??
+      vi.fn().mockImplementation(({ where }: { where: { key: string } }) =>
+        Promise.resolve(where.key === FC_ALLSCHWIL_TENANT_KEY ? FCA_TENANT : null),
+      ),
+  });
+}
+
+describe("reconcileTeamsDeletePermission — FC Allschwil legacy Club Admin recognition", () => {
+  it("assigns teams.delete to club_admin_fc_allschwil when it is scope=TENANT and owned by the real fc-allschwil tenant", async () => {
+    const prisma = makeLegacyFcaMockPrisma();
+
+    const result = await reconcileTeamsDeletePermission(prisma, false);
+
+    expect(result.fcAllschwilLegacyClubAdmin).toEqual({
+      action: "assigned",
+      roleKey: FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY,
+      permissionKey: "teams.delete",
+    });
+  });
+
+  it("looks up the fc-allschwil tenant by its known key before trusting the legacy role", async () => {
+    const prisma = makeLegacyFcaMockPrisma();
+    await reconcileTeamsDeletePermission(prisma, false);
+    expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
+      where: { key: FC_ALLSCHWIL_TENANT_KEY },
+      select: { id: true },
+    });
+  });
+
+  it("is idempotent — reports already_assigned on a second run without duplicate writes", async () => {
+    const prisma = makeLegacyFcaMockPrisma({
+      rolePermissionFindUnique: vi.fn().mockResolvedValue({ roleId: "some-role-id" }),
+    });
+
+    const first = await reconcileTeamsDeletePermission(prisma, false);
+    const second = await reconcileTeamsDeletePermission(prisma, false);
+
+    expect(first.fcAllschwilLegacyClubAdmin).toEqual({
+      action: "already_assigned",
+      roleKey: FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY,
+      permissionKey: "teams.delete",
+    });
+    expect(second.fcAllschwilLegacyClubAdmin).toEqual(first.fcAllschwilLegacyClubAdmin);
+  });
+
+  it("dry-run mode reports the pending grant without writing", async () => {
+    const prisma = makeLegacyFcaMockPrisma();
+
+    const result = await reconcileTeamsDeletePermission(prisma, true);
+
+    expect(result.fcAllschwilLegacyClubAdmin).toEqual({
+      action: "assigned",
+      roleKey: FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY,
+      permissionKey: "teams.delete",
+    });
+    expect(prisma.rolePermission.upsert).not.toHaveBeenCalled();
+  });
+
+  it("never touches the legacy role when the fc-allschwil tenant does not exist in this database", async () => {
+    const prisma = makeLegacyFcaMockPrisma({
+      tenantFindUnique: vi.fn().mockResolvedValue(null),
+    });
+
+    const result = await reconcileTeamsDeletePermission(prisma, false);
+
+    expect(result.fcAllschwilLegacyClubAdmin).toBeNull();
+  });
+
+  it("never grants when the role key exists but its scope is not TENANT", async () => {
+    const platformScopedImposter = { ...FCA_LEGACY_CLUB_ADMIN_ROLE, scope: "PLATFORM" };
+    const prisma = makeLegacyFcaMockPrisma({
+      roleFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        if (where.key === "super_admin") return Promise.resolve(SUPER_ADMIN_ROLE);
+        if (where.key === FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY) {
+          return Promise.resolve(platformScopedImposter);
+        }
+        return Promise.resolve(null);
+      }),
+    });
+
+    const result = await reconcileTeamsDeletePermission(prisma, false);
+
+    expect(result.fcAllschwilLegacyClubAdmin).toBeNull();
+  });
+
+  it("never grants when the role key exists but belongs to a different tenant", async () => {
+    const wrongTenantImposter = { ...FCA_LEGACY_CLUB_ADMIN_ROLE, tenantId: "tenant-someone-else" };
+    const prisma = makeLegacyFcaMockPrisma({
+      roleFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        if (where.key === "super_admin") return Promise.resolve(SUPER_ADMIN_ROLE);
+        if (where.key === FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY) {
+          return Promise.resolve(wrongTenantImposter);
+        }
+        return Promise.resolve(null);
+      }),
+    });
+
+    const result = await reconcileTeamsDeletePermission(prisma, false);
+
+    expect(result.fcAllschwilLegacyClubAdmin).toBeNull();
+  });
+
+  it("never grants when no role exists at the exact legacy key", async () => {
+    const prisma = makeLegacyFcaMockPrisma({
+      roleFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) =>
+        Promise.resolve(where.key === "super_admin" ? SUPER_ADMIN_ROLE : null),
+      ),
+    });
+
+    const result = await reconcileTeamsDeletePermission(prisma, false);
+
+    expect(result.fcAllschwilLegacyClubAdmin).toBeNull();
+  });
+
+  it("never widens the match to an unrelated custom role with a merely similar key", async () => {
+    // A custom/delegated role such as "club_admin_fc_allschwil_readonly" or
+    // "club_admin_other_club" must NEVER be recognized — the lookup is an
+    // exact-literal `Role.key` equality check, not a prefix/pattern match.
+    const unrelatedCustomRole = {
+      id: "role-custom-imposter",
+      key: "club_admin_fc_allschwil_readonly",
+      scope: "TENANT",
+      tenantId: FCA_TENANT.id,
+    };
+    const prisma = makeLegacyFcaMockPrisma({
+      roleFindUnique: vi.fn().mockImplementation(({ where }: { where: { key: string } }) => {
+        if (where.key === "super_admin") return Promise.resolve(SUPER_ADMIN_ROLE);
+        // The reconciliation only ever queries the exact literal key — a
+        // mock that also (incorrectly) matched a near-miss key would mean
+        // this test's own setup is broken, not the implementation, so we
+        // deliberately return null for anything but the exact literal.
+        if (where.key === FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY) return Promise.resolve(null);
+        return Promise.resolve(unrelatedCustomRole.key === where.key ? unrelatedCustomRole : null);
+      }),
+    });
+
+    const result = await reconcileTeamsDeletePermission(prisma, false);
+
+    expect(result.fcAllschwilLegacyClubAdmin).toBeNull();
+    expect(prisma.role.findUnique).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { key: unrelatedCustomRole.key } }),
+    );
   });
 });

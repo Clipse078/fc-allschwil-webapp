@@ -44,6 +44,41 @@
  * only receive teams.delete through the existing Roles & Permissions
  * delegation UI (grantableByAdmin: true), never automatically here.
  *
+ * ── ADMIN-DELETE-01B-C1 — FC Allschwil legacy Club Admin compatibility ─────
+ * ADMIN-DELETE-01B found (read-only, on STAGE) that the actually-assigned FC
+ * Allschwil Club Admin role is `Role.key = "club_admin_fc_allschwil"`
+ * (single-underscore, `isSystem: false`) — the second, divergent identity
+ * documented in docs/RPERM_05_DISCOVERY.md §7 / docs/RPERM_05_C1_CORRECTIONS.md
+ * Finding 1, produced by the (now-fixed) role-key duplication between
+ * prisma/seed.ts and scripts/rperm-03b-bootstrap-admin-separation.ts. Step 3
+ * above only ever matches the canonical `club_admin__<tenantKey>` prefix, so
+ * it legitimately finds zero rows on any database where this specific legacy
+ * row is the one actually in use — it@fcallschwil.ch's Club Admin never
+ * received teams.delete.
+ *
+ * Step 4 below adds exactly one, narrowly-targeted compatibility rule for
+ * this single already-known role identity — it does NOT generalize to any
+ * other legacy-keyed or custom role. A role only qualifies when ALL of the
+ * following independently-verified, trusted attributes hold simultaneously:
+ *   - `Role.key` is the exact literal `club_admin_fc_allschwil` (no prefix or
+ *     pattern match — a coincidentally-similar custom role key never
+ *     matches).
+ *   - `Role.scope === "TENANT"` (known Club Admin role semantics — a
+ *     PLATFORM role can never qualify).
+ *   - `Role.tenantId` equals the real `Tenant.id` looked up by the
+ *     already-known FC Allschwil tenant key (`fc-allschwil`) — trusted
+ *     tenant identity, resolved fresh from the database on every run, never
+ *     assumed or hardcoded as an id literal.
+ * Any role failing even one of these checks (wrong scope, wrong/missing
+ * tenant, or simply a different key) is left completely untouched — this is
+ * NOT a general legacy-role-normalization mechanism, does not rename or
+ * archive anything, and does not touch the user's assignment. This is a
+ * disposable compatibility shim: it becomes a permanent no-op the moment
+ * `scripts/rperm-05c1-consolidate-club-admin-roles.ts` is ever run against
+ * this environment (the legacy row is archived, never deleted, by that
+ * script) — this reconciliation is safe to keep running indefinitely either
+ * way.
+ *
  * All writes use upsert — safe to re-run any number of times. No deletes.
  *
  * After applying, affected users must log out and log back in for the new
@@ -81,6 +116,23 @@ export const TEAMS_DELETE_SUPER_ADMIN_ROLE_KEY = "super_admin";
 /** Prefix identifying an already-materialized per-tenant Club Admin role (lib/roles/tenant-role-keys.ts). */
 export const TENANT_CLUB_ADMIN_ROLE_KEY_PREFIX = `${CLUB_ADMIN_TEMPLATE_KEY}__`;
 
+/**
+ * ADMIN-DELETE-01B-C1 — the single, already-known FC Allschwil tenant key
+ * (matches `TENANT_KEY` in scripts/rperm-03b-bootstrap-admin-separation.ts).
+ * Used only to resolve the trusted tenant identity for the narrow legacy
+ * compatibility check below — never to construct or guess a role key.
+ */
+export const FC_ALLSCHWIL_TENANT_KEY = "fc-allschwil";
+
+/**
+ * ADMIN-DELETE-01B-C1 — the single, already-known, actually-assigned legacy
+ * FC Allschwil Club Admin `Role.key` (single-underscore — distinct from the
+ * canonical `club_admin__fc-allschwil`). This is an EXACT literal, not a
+ * pattern: it identifies exactly one specific pre-existing role row and
+ * never matches any other role, canonical or custom.
+ */
+export const FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY = "club_admin_fc_allschwil";
+
 // ── Result types ───────────────────────────────────────────────────────────────
 
 export type PermissionSyncOutcome =
@@ -98,6 +150,16 @@ export type TeamsDeleteReconciliationResult = {
   permission: PermissionSyncOutcome;
   superAdmin: RolePermissionSyncOutcome;
   tenantClubAdminRoles: RolePermissionSyncOutcome[];
+  /**
+   * ADMIN-DELETE-01B-C1 — outcome of the narrow FC Allschwil legacy Club
+   * Admin compatibility check (see module doc comment, "Step 4"). `null`
+   * means the trusted-attribute check did not recognize any role in this
+   * database as the legacy FC Allschwil Club Admin (e.g. the FC Allschwil
+   * tenant does not exist here, the legacy role key is absent, or an
+   * existing role at that key does not match the required scope/tenant) —
+   * nothing was touched in that case.
+   */
+  fcAllschwilLegacyClubAdmin: RolePermissionSyncOutcome | null;
 };
 
 // ── Reconciliation ─────────────────────────────────────────────────────────────
@@ -169,11 +231,45 @@ export async function reconcileTeamsDeletePermission(
     );
   }
 
+  // ── Step 4: Narrow FC Allschwil legacy Club Admin compatibility grant ──────
+  const fcAllschwilLegacyRoleKey = await resolveFcAllschwilLegacyClubAdminRoleKey(prisma);
+  const fcAllschwilLegacyClubAdminOutcome = fcAllschwilLegacyRoleKey
+    ? await assignPermissionToRole(prisma, fcAllschwilLegacyRoleKey, def.key, dryRun)
+    : null;
+
   return {
     permission: permissionOutcome,
     superAdmin: superAdminOutcome,
     tenantClubAdminRoles: tenantClubAdminOutcomes,
+    fcAllschwilLegacyClubAdmin: fcAllschwilLegacyClubAdminOutcome,
   };
+}
+
+/**
+ * ADMIN-DELETE-01B-C1 — resolves the legacy FC Allschwil Club Admin role key
+ * ONLY when every trusted attribute independently matches (see module doc
+ * comment, "Step 4"). Returns `null` (never touches anything) the moment any
+ * single check fails — this function never widens its match beyond the one
+ * already-known role identity.
+ */
+async function resolveFcAllschwilLegacyClubAdminRoleKey(
+  prisma: PrismaClient,
+): Promise<string | null> {
+  const tenant = await prisma.tenant.findUnique({
+    where: { key: FC_ALLSCHWIL_TENANT_KEY },
+    select: { id: true },
+  });
+  if (!tenant) return null;
+
+  const role = await prisma.role.findUnique({
+    where: { key: FC_ALLSCHWIL_LEGACY_CLUB_ADMIN_ROLE_KEY },
+    select: { key: true, scope: true, tenantId: true },
+  });
+  if (!role) return null;
+  if (role.scope !== "TENANT") return null;
+  if (role.tenantId !== tenant.id) return null;
+
+  return role.key;
 }
 
 async function assignPermissionToRole(
