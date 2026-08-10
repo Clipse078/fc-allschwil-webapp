@@ -87,12 +87,23 @@
  * `hasTenantDeletionAuthority()` (below) is a separate, narrowly-scoped
  * authorization primitive reserved for "<module>.delete"-convention
  * permissions only. It adds exactly one additional grant path on top of the
- * existing tenant-scoped one: a user holding the same permission key at
- * PLATFORM scope (the SCE Super Admin's platform-wide grant) is authorized
- * against an explicit tenant once that tenant is confirmed to be real and
- * operationally ACTIVE — without requiring a TenantMembership or a
+ * existing tenant-scoped one: a user holding a PLATFORM role that carries
+ * the same permission key (the SCE Super Admin's platform-wide grant) is
+ * authorized against an explicit tenant once that tenant is confirmed to be
+ * real and operationally ACTIVE — without requiring a TenantMembership or a
  * tenant-scoped role grant in that tenant. See the method's own doc comment
  * for the full contract and the caller obligations it depends on.
+ *
+ * ADMIN-DELETE-01A-C2 correction: that platform grant path is resolved via
+ * the dedicated {@link resolvePlatformRolePermissionKeys} helper, NOT
+ * {@link resolvePlatformPermissions} — every "<module>.delete" Permission
+ * row (e.g. teams.delete) is correctly `scope: TENANT` in the database even
+ * when attached to the PLATFORM super_admin role, so requiring
+ * `permission.scope === "PLATFORM"` (what resolvePlatformPermissions()
+ * checks, correctly, for every other permission) made this path permanently
+ * unreachable for its own target permission. resolvePlatformPermissions()
+ * itself is unchanged and still used, unmodified, by hasPermission()/
+ * hasAnyPermission()/hasAllPermissions()/getEffectivePermissions().
  */
 
 import type { PrismaClient } from "@prisma/client";
@@ -204,6 +215,76 @@ async function resolvePlatformPermissions(
       if (rp.permission.scope === "PLATFORM") {
         keys.add(rp.permission.key);
       }
+    }
+  }
+  return keys;
+}
+
+/**
+ * ADMIN-DELETE-01A-C2 — dedicated platform-role-held permission-key check
+ * for `hasTenantDeletionAuthority()` ONLY. Never used by `hasPermission()`/
+ * `hasAnyPermission()`/`hasAllPermissions()`/`getEffectivePermissions()`.
+ *
+ * Deliberately distinct from {@link resolvePlatformPermissions}: that
+ * function intentionally filters to `permission.scope === "PLATFORM"`,
+ * which is correct for generic platform-scoped permission resolution (a
+ * PLATFORM role's `rolePermissions` must never leak a TENANT-scoped key
+ * like `teams.manage` into the platform bucket — that is the exact
+ * accidental-inheritance bug RPERM-04 fixed).
+ *
+ * Module `.delete` permissions are a deliberate exception: `teams.delete`
+ * is correctly `scope: TENANT` in the database (deletion is inherently a
+ * per-tenant operation) yet is legitimately attached to the PLATFORM
+ * `super_admin` role via `RolePermission` (see prisma/seed.ts — super_admin
+ * owns every permission key regardless of scope). This helper answers
+ * "does userId hold a PLATFORM role (no tenant ownership, not archived)
+ * whose `RolePermission` set includes this exact permission key?" without
+ * requiring the `Permission` row itself to also be `scope: PLATFORM`.
+ *
+ * Filters applied at database level:
+ *   • userId = <userId>
+ *   • UserRole.tenantId IS NULL   (platform assignment, not tenant-specific)
+ *   • role.scope = PLATFORM
+ *   • role.tenantId IS NULL       (platform roles must not be tenant-owned)
+ *   • role.isArchived = false
+ *
+ * No `permission.scope` filter — that is the entire point of this helper.
+ */
+async function resolvePlatformRolePermissionKeys(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<Set<string>> {
+  const userRoles = await prisma.userRole.findMany({
+    where: {
+      userId,
+      tenantId: null,
+      role: {
+        scope: "PLATFORM",
+        tenantId: null,
+        isArchived: false,
+      },
+    },
+    select: {
+      role: {
+        select: {
+          rolePermissions: {
+            select: {
+              permission: {
+                select: {
+                  key: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const keys = new Set<string>();
+  for (const ur of userRoles) {
+    for (const rp of ur.role.rolePermissions) {
+      keys.add(rp.permission.key);
     }
   }
   return keys;
@@ -392,12 +473,21 @@ export class EffectivePermissionResolver {
    *      are completely unchanged.
    *
    *   2. Platform SCE Super Admin cross-tenant authority — the caller holds
-   *      the SAME permission key at PLATFORM scope (no `TenantMembership`
-   *      or tenant role required), resolved against a tenant that is
-   *      confirmed to exist and be operationally ACTIVE. This is the
-   *      correction: an SCE Super Admin's platform-held deletion permission
-   *      is no longer required to be duplicated as a tenant-scoped grant
-   *      before it can be exercised in another tenant.
+   *      a PLATFORM role (not tenant-owned, not archived) whose
+   *      `RolePermission` set includes this SAME permission key — resolved
+   *      via {@link resolvePlatformRolePermissionKeys}, NOT
+   *      {@link resolvePlatformPermissions} (ADMIN-DELETE-01A-C2: the
+   *      permission row itself is correctly `scope: TENANT` for every
+   *      `<module>.delete` key, e.g. `teams.delete` — requiring it to also
+   *      be `scope: PLATFORM` would be a data-model contradiction that can
+   *      never be satisfied; see prisma/seed.ts, where `teams.delete` is
+   *      `scope: TENANT` yet is legitimately attached to the PLATFORM
+   *      `super_admin` role). No `TenantMembership` or tenant role is
+   *      required — resolved against a tenant that is confirmed to exist
+   *      and be operationally ACTIVE. This is the correction: an SCE Super
+   *      Admin's platform-held deletion permission is no longer required to
+   *      be duplicated as a tenant-scoped grant before it can be exercised
+   *      in another tenant.
    *
    * `tenantId` is a REQUIRED, explicit parameter — there is no
    * platform-only ("no tenant context") mode for this method, because
@@ -443,12 +533,17 @@ export class EffectivePermissionResolver {
     const tenantKeys = await resolveTenantPermissions(this.prisma, userId, tenantId);
     if (tenantKeys.has(permission)) return true;
 
-    // Path 2: platform SCE Super Admin cross-tenant authority. Only ever
+    // Path 2: platform SCE Super Admin cross-tenant authority. Deliberately
+    // uses resolvePlatformRolePermissionKeys() — NOT resolvePlatformPermissions()
+    // — because teams.delete (and every "<module>.delete" key) is correctly
+    // scope=TENANT in the database; requiring it to also be scope=PLATFORM
+    // (what resolvePlatformPermissions() checks) can never be satisfied and
+    // would silently make this path permanently unreachable. Only ever
     // considered once a genuine, operationally ACTIVE tenant has been
     // confirmed to exist for the supplied tenantId — an unresolved or
     // forged tenant id is denied regardless of platform grants.
-    const platformKeys = await resolvePlatformPermissions(this.prisma, userId);
-    if (!platformKeys.has(permission)) return false;
+    const platformRoleKeys = await resolvePlatformRolePermissionKeys(this.prisma, userId);
+    if (!platformRoleKeys.has(permission)) return false;
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
