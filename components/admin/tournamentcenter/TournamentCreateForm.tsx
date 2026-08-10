@@ -776,7 +776,7 @@ export default function TournamentCreateForm({
 
       <SectionCard
         title="2 · Teilnehmende Teams"
-        description="Mindestens ein Team erforderlich — FC Allschwil Teams und externe Teams aus dem Vereinsverzeichnis, in beliebiger Mischung und Anzahl. Garderobenzuweisung (4 · Garderoben) erfolgt direkt pro Team."
+        description="Mindestens ein Team erforderlich — FC Allschwil Teams und externe Vereine aus dem Vereinsverzeichnis, in beliebiger Mischung und Anzahl. Garderobenzuweisung (4 · Garderoben) erfolgt direkt pro Team."
       >
         <div className="space-y-4">
           {participants.length === 0 ? (
