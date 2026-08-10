@@ -186,9 +186,39 @@ export type PitchOccupancy = {
   facilityName: string;
   state: PitchOccupancyState;
   currentEvent: PitchEventSummary | null;
+  /**
+   * Next scheduled activity within the shared Screen 1 4-hour rolling
+   * operational horizon. Populated alongside `currentEvent` when both
+   * exist — Screen 2 shows "JETZT" and "DANACH" for the same resource
+   * simultaneously, never only one or the other.
+   */
   nextEvent: PitchEventSummary | null;
   /** True when two or more events overlap on this pitch in the display window. */
   hasAllocationConflict: boolean;
+};
+
+/** Occupancy state of a dressing room at the moment the feed was assembled. */
+export type DressingRoomOccupancyState =
+  | "OCCUPIED_NOW"
+  | "FREE_NOW"
+  | "UPCOMING"
+  | "UNKNOWN";
+
+/** Per-resource occupancy entry for Screen 2's compact dressing-room section. */
+export type DressingRoomOccupancy = {
+  /** Raw facility-resource code, e.g. "G3". */
+  code: string;
+  /** Human-readable label, e.g. "Kabine 3". */
+  displayLabel: string;
+  state: DressingRoomOccupancyState;
+  /** Current occupant, or null when the room is genuinely free right now. */
+  current: DressingRoomAssignment | null;
+  /**
+   * Next scheduled occupant within the rolling operational horizon, or null.
+   * Only meaningful when `current` is null (a room is never "next" while
+   * already occupied — see resolveDressingRoomOccupancy).
+   */
+  next: DressingRoomAssignment | null;
 };
 
 /** Complete payload for Infoboard Screen 2. */
@@ -203,5 +233,13 @@ export type InfoboardScreen2Feed = {
   /** Display name of the facility (e.g. "Brüelstadion"). */
   facilityName: string;
   pitches: PitchOccupancy[];
-  dressingRooms: DressingRoomAssignment[];
+  /** Per-resource dressing-room occupancy (compact section, canonical allocation data only). */
+  dressingRooms: DressingRoomOccupancy[];
+  /**
+   * Eligible current/upcoming activities (within the rolling horizon) that
+   * could not be mapped to any configured pitch — either no pitch
+   * allocation exists, or the allocated resource is not in the configured
+   * pitch inventory. Never fabricated; empty when everything is mapped.
+   */
+  unallocated: PitchEventSummary[];
 };

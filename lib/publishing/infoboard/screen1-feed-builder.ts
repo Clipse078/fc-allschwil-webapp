@@ -64,11 +64,15 @@ import type { Screen1SourceEvent } from "./screen1-event-mapper";
  * visible, they remain visible until they end.
  *
  * This is a fixed operational constant, not a per-tenant setting.
+ *
+ * Exported so Infoboard Screen 2 (INFOBOARD-INTEGRATION-01C) reuses the
+ * exact same rolling operational horizon for its per-facility current/next
+ * resolution instead of defining a second, divergent window.
  */
-const SCREEN1_HORIZON_HOURS = 4;
+export const SCREEN1_HORIZON_HOURS = 4;
 
 /** SCREEN1_HORIZON_HOURS expressed in milliseconds for use with `Date` math. */
-const SCREEN1_HORIZON_MS = SCREEN1_HORIZON_HOURS * 60 * 60 * 1000;
+export const SCREEN1_HORIZON_MS = SCREEN1_HORIZON_HOURS * 60 * 60 * 1000;
 
 // ── Feed builder input ─────────────────────────────────────────────────────────
 
