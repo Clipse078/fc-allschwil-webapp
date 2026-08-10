@@ -6,7 +6,23 @@ import {
 } from "@/lib/seasons/season-logic";
 import { getSeasonLifecycleStatusLabel } from "@/lib/seasons/status";
 
-async function syncSeasonActiveFlagsWithLifecycle() {
+/**
+ * MASTERDATA-SELECTOR-CONSISTENCY-03: exported so canonical current-season
+ * consumers outside the Seasons admin surface (e.g.
+ * lib/training/queries.ts#findTeamSeasonsForTenant) can refresh
+ * `Season.isActive` from the same single lifecycle rule before relying on
+ * it, instead of re-implementing this sync locally (which is exactly the
+ * kind of duplication lib/teams/current-season.ts was introduced to stop).
+ *
+ * `Season.isActive` is otherwise only ever refreshed as a side effect of
+ * visiting a Seasons admin surface (this module) or explicitly calling
+ * POST /api/seasons/:id/activate — nothing re-syncs it on a schedule. A
+ * tenant that hasn't opened /dashboard/seasons since the last season
+ * boundary can have a stale (or entirely absent) `Season.isActive` flag
+ * while still having perfectly legitimate, eligible Teams — see the
+ * TrainingCenter root-cause fix this call site fixes.
+ */
+export async function syncSeasonActiveFlagsWithLifecycle() {
   const seasons = await prisma.season.findMany({
     select: {
       id: true,
