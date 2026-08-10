@@ -44,9 +44,17 @@ export default async function TeamDetailPage({ params }: Props) {
   const session = await requireAnyPermission([
     PERMISSIONS.TEAMS_VIEW,
     PERMISSIONS.TEAMS_MANAGE,
+    // ADMIN-DELETE-01B: a delegated user may hold teams.delete without
+    // teams.view/teams.manage — they must still be able to reach this page
+    // to exercise the permanent-delete action gated below.
+    PERMISSIONS.TEAMS_DELETE,
   ]);
 
   const canManage = hasPermission(session, PERMISSIONS.TEAMS_MANAGE);
+  // ADMIN-DELETE-01B: permanent "Löschen" gating — deliberately independent
+  // of canManage (teams.manage alone must never authorize deletion, and a
+  // delegated teams.delete-only grant must not require teams.manage either).
+  const canDelete = hasPermission(session, PERMISSIONS.TEAMS_DELETE);
   const { teamId } = await params;
 
   const tenant = await getActiveTenant();
@@ -163,6 +171,7 @@ export default async function TeamDetailPage({ params }: Props) {
               teamName={displayTitle}
               isActive={team.isActive}
               canManage={canManage}
+              canDelete={canDelete}
             />
 
             {activeSeason ? (
