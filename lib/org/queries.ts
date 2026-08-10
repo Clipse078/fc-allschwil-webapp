@@ -93,7 +93,18 @@ export async function getOrgUnitById(id: string) {
       updatedAt: true,
       archivedAt: true,
       parent: { select: { id: true, name: true, key: true } },
-      children: { select: { id: true, name: true, key: true, type: true, status: true }, orderBy: { sortOrder: "asc" } },
+      // MASTERDATA-CONSISTENCY-02: the active parent detail hierarchy must only
+      // surface current children. Archived children are excluded here — they
+      // remain fully readable via their own detail page (still reachable by id)
+      // and via the tenant-wide archived-units view (getArchivedOrgUnits), so no
+      // historical record is lost, but they must not reappear under an active
+      // parent's "Untereinheiten" list. A child that is later restored becomes
+      // non-ARCHIVED again and is therefore picked back up automatically.
+      children: {
+        where: { status: { not: "ARCHIVED" } },
+        select: { id: true, name: true, key: true, type: true, status: true },
+        orderBy: { sortOrder: "asc" },
+      },
       // Slice 11.3: linked teams via Team.orgUnitId bridge.
       teams: {
         where: { isActive: true },
