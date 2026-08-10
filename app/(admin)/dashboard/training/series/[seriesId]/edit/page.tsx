@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTrainingSeries } from "@/lib/training/training-service";
-import { findTeamSeasonsForTenant } from "@/lib/training/queries";
+import { findTeamSeasonPickerRow } from "@/lib/training/queries";
 import { TrainingSeriesNotFoundError } from "@/lib/training/errors";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TrainingSeriesForm from "@/components/admin/training/TrainingSeriesForm";
@@ -31,7 +31,11 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
     throw err;
   }
 
-  const teamSeasons = await findTeamSeasonsForTenant(tenantId);
+  // TEAMCENTER-UX-01C: the team/season assignment is immutable on edit, and
+  // findTeamSeasonsForTenant now intentionally scopes to the current season
+  // only (see lib/training/queries.ts) — so a series created in a prior
+  // season must still resolve its own TeamSeason for display here.
+  const teamSeasonRow = await findTeamSeasonPickerRow(tenantId, series.teamSeasonId);
 
   return (
     <div className="space-y-6">
@@ -44,7 +48,7 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
       <TrainingSeriesForm
         mode="edit"
         seriesId={series.id}
-        teamSeasons={teamSeasons}
+        teamSeasons={teamSeasonRow ? [teamSeasonRow] : []}
         defaultValues={{
           teamSeasonId: series.teamSeasonId,
           title: series.title,

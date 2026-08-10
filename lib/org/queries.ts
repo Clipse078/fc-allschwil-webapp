@@ -23,6 +23,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 
 export async function getOrgUnits(tenantId?: string) {
   return prisma.orgUnit.findMany({
@@ -103,8 +104,10 @@ export async function getOrgUnitById(id: string) {
           slug: true,
           category: true,
           ageGroup: true,
+          // TEAMCENTER-UX-01C: canonical current-season resolution, shared
+          // with the Teams UI/TrainingCenter — see lib/teams/current-season.ts.
           teamSeasons: {
-            where: { season: { isActive: true } },
+            where: currentTeamSeasonWhere(),
             take: 1,
             select: {
               displayName: true,

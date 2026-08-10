@@ -1,6 +1,6 @@
 ﻿import { prisma } from "@/lib/db/prisma";
-import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 import { resolveLongTeamName, resolveCompactTeamName } from "@/lib/teams/team-naming";
+import { currentTeamSeasonWhere, pickCurrentTeamSeason } from "@/lib/teams/current-season";
 
 export async function getAvailableTeamSeasons() {
   const seasons = await prisma.season.findMany({
@@ -26,24 +26,9 @@ export async function getAvailableTeamSeasons() {
  * app/(admin)/dashboard/teams/page.tsx and app/api/teams/route.ts.
  */
 export async function getTeamsListData(tenantId: string, selectedSeasonKey?: string) {
-  const currentSeason = getCurrentSwissFootballSeason();
-
-  const resolvedSeasonKey =
-    selectedSeasonKey && selectedSeasonKey.trim().length > 0
-      ? selectedSeasonKey
-      : currentSeason?.key ?? null;
-
-  const currentSeasonWhere = resolvedSeasonKey
-    ? {
-        season: {
-          key: resolvedSeasonKey,
-        },
-      }
-    : {
-        season: {
-          isActive: true,
-        },
-      };
+  // TEAMCENTER-UX-01C: canonical current-season resolution — see
+  // lib/teams/current-season.ts for why this must not be re-derived locally.
+  const currentSeasonWhere = currentTeamSeasonWhere(selectedSeasonKey);
 
   const teams = await prisma.team.findMany({
     where: { tenantId },
@@ -275,10 +260,14 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     return null;
   }
 
-  const activeSeasonEntry =
-    team.teamSeasons.find((entry) => entry.season.isActive) ??
-    team.teamSeasons[0] ??
-    null;
+  // TEAMCENTER-UX-01C: canonical current-season resolution, shared with
+  // getTeamsListData. Deliberately does NOT fall back to
+  // `team.teamSeasons[0]` — a Team with no TeamSeason in the canonical
+  // current season has no current season, full stop. Falling back to
+  // "whatever season this Team most recently started" is exactly what
+  // made the Team detail page show a different "current" season than the
+  // Teams list for the same Team.
+  const activeSeasonEntry = pickCurrentTeamSeason(team.teamSeasons);
   const latestMapping = team.externalMappings?.[0] ?? null;
 
   // TEAM-SFV-MAPPING-01 / TEAMCENTER-UX-01B: Liga/Wettbewerb for the Team
@@ -313,6 +302,11 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     orgUnit: team.orgUnit,
     displayName: resolveLongTeamName(namingInput),
     compactName: resolveCompactTeamName(namingInput),
+    // TEAMCENTER-UX-01C: the canonical current-season TeamSeason's id (or
+    // null when this Team has none). Callers must look this id up in
+    // `teamSeasons` rather than re-deriving "which season is current"
+    // themselves — see lib/teams/current-season.ts.
+    currentTeamSeasonId: activeSeasonEntry?.id ?? null,
     competition: primaryCompetition
       ? {
           name: primaryCompetition.officialName,

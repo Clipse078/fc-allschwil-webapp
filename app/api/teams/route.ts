@@ -6,7 +6,7 @@ import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import { logAction } from "@/lib/audit/log-action";
-import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
+import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 import {
   buildTeamSeasonDisplayName,
   buildTeamSeasonShortName,
@@ -39,18 +39,10 @@ export async function GET() {
     return NextResponse.json({ error: "Standard-Tenant nicht gefunden." }, { status: 500 });
   }
 
-  const currentSeason = getCurrentSwissFootballSeason();
-  const currentSeasonWhere = currentSeason
-    ? {
-        season: {
-          key: currentSeason.key,
-        },
-      }
-    : {
-        season: {
-          isActive: true,
-        },
-      };
+  // TEAMCENTER-UX-01C: canonical current-season resolution — see
+  // lib/teams/current-season.ts. Must match getTeamsListData /
+  // getTeamDetailData so this API never diverges from the Teams UI.
+  const currentSeasonWhere = currentTeamSeasonWhere();
 
   const teams = await prisma.team.findMany({
     where: { tenantId: tenant.id },
