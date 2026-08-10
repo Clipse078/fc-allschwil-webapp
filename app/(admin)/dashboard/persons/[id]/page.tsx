@@ -13,7 +13,13 @@ import {
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getPersonById } from "@/lib/people/queries";
+import { getActiveTenantId } from "@/lib/tenants/active-tenant";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
+import { TENANT_ROLES_ASSIGN, TENANT_ROLES_VIEW } from "@/lib/roles/access";
+import { getTenantRoleAssignmentForUser, getTenantRolesOverview } from "@/lib/roles/tenant-queries";
 import PersonRoleBadge from "@/components/admin/shared/PersonRoleBadge";
+import PersonAccessRolesCard from "@/components/admin/persons/PersonAccessRolesCard";
 import { PageShell, SectionCard } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
 import { Badge, StatusIndicator } from "@/components/ui";
@@ -36,7 +42,7 @@ function getInitials(firstName: string, lastName: string): string {
 }
 
 export default async function PersonDetailPage({ params }: PageProps) {
-  await requirePermission(PERMISSIONS.PEOPLE_VIEW);
+  const session = await requirePermission(PERMISSIONS.PEOPLE_VIEW);
 
   const { id } = await params;
   const person = await getPersonById(id);
@@ -46,6 +52,60 @@ export default async function PersonDetailPage({ params }: PageProps) {
     person.displayName || `${person.firstName} ${person.lastName}`;
   const initials = getInitials(person.firstName, person.lastName);
   const hasRoles = person.isPlayer || person.isTrainer;
+
+  // ADMIN-MASTERDATA-UX-01 — "Zugang & Rollen": null means "don't render
+  // the card at all" (caller lacks roles.view/roles.manage for a Person
+  // that DOES have a linked User — see PersonAccessRolesCard docstring).
+  // A Person with no linked User always renders the no-account state,
+  // regardless of the caller's roles permissions (non-sensitive).
+  let accessRolesCard: {
+    linkedUser: { id: string; email: string } | null;
+    isActiveTenantMember: boolean;
+    roles: { id: string; name: string; isSystem: boolean; isArchived: boolean }[];
+    assignedRoleIds: string[];
+    canAssign: boolean;
+  } | null = null;
+
+  if (!person.user) {
+    accessRolesCard = {
+      linkedUser: null,
+      isActiveTenantMember: false,
+      roles: [],
+      assignedRoleIds: [],
+      canAssign: false,
+    };
+  } else {
+    const tenantId = await getActiveTenantId();
+    if (tenantId) {
+      const resolver = createEffectivePermissionResolver(prisma);
+      const { platform, tenant } = await resolver.getEffectivePermissions({
+        userId: session.user.id,
+        tenantId,
+      });
+      const canView = TENANT_ROLES_VIEW.some((key) => platform.includes(key) || tenant.includes(key));
+      const canAssign = TENANT_ROLES_ASSIGN.some((key) => platform.includes(key) || tenant.includes(key));
+
+      if (canView) {
+        const [roles, assignment] = await Promise.all([
+          getTenantRolesOverview(tenantId),
+          getTenantRoleAssignmentForUser(tenantId, person.user.id),
+        ]);
+
+        accessRolesCard = {
+          linkedUser: { id: person.user.id, email: person.user.email },
+          isActiveTenantMember: assignment?.isActiveMember ?? false,
+          roles: roles.map((r) => ({
+            id: r.id,
+            name: r.name,
+            isSystem: r.isSystem,
+            isArchived: r.isArchived,
+          })),
+          assignedRoleIds: assignment?.roleIds ?? [],
+          canAssign,
+        };
+      }
+    }
+  }
 
   return (
     <PageShell fullWidth>
@@ -177,6 +237,19 @@ export default async function PersonDetailPage({ params }: PageProps) {
                 />
               </div>
             </SectionCard>
+
+            {/* ADMIN-MASTERDATA-UX-01: Person <-> tenant-role assignment */}
+            {accessRolesCard ? (
+              <SectionCard title="Zugang & Rollen">
+                <PersonAccessRolesCard
+                  linkedUser={accessRolesCard.linkedUser}
+                  isActiveTenantMember={accessRolesCard.isActiveTenantMember}
+                  roles={accessRolesCard.roles}
+                  assignedRoleIds={accessRolesCard.assignedRoleIds}
+                  canAssign={accessRolesCard.canAssign}
+                />
+              </SectionCard>
+            ) : null}
 
             {/* System metadata */}
             <MetadataCard

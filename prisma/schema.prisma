@@ -611,6 +611,10 @@ model User {
   updatedWorkspaceDocuments        WorkspaceDocument[]        @relation("WorkspaceDocumentUpdatedBy")
   createdWorkspaceDocumentVersions WorkspaceDocumentVersion[] @relation("WorkspaceDocumentVersionCreatedBy")
 
+  /// ADMIN-MASTERDATA-UX-01 — opposite side of Person.userId (1:1). Null for
+  /// every User that isn't the linked application account of a Person.
+  person Person?
+
   @@index([isActive])
   @@index([tenantId])
 }
@@ -960,6 +964,17 @@ model Person {
   isTrainer   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  /// ADMIN-MASTERDATA-UX-01 — the canonical, explicit Person ↔ User link.
+  /// Nullable: most Persons (e.g. players, guardians) never get an
+  /// application account. Unique: at most one Person may point at a given
+  /// User (a 1:1 relation), so tenant-role-assignment UX can resolve
+  /// unambiguously from a Person to "the" User it represents. Deliberately
+  /// NOT derived from email-string matching — this FK is the sole
+  /// canonical source. onDelete: SetNull — deleting the User un-links the
+  /// Person but never deletes Person master data.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   // REGISTRATION-01F — Goal 3: fields copied verbatim from a registration
   // when a Person is created through the "Create Person" workflow action.

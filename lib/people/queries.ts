@@ -48,6 +48,12 @@ export async function getPersonById(id: string) {
       isTrainer: true,
       createdAt: true,
       updatedAt: true,
+      // ADMIN-MASTERDATA-UX-01: canonical, explicit Person <-> User link
+      // (Person.userId). Never resolved via email-string matching.
+      userId: true,
+      user: {
+        select: { id: true, email: true, isActive: true },
+      },
     },
   });
 }

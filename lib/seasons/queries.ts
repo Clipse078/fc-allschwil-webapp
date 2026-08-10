@@ -4,75 +4,30 @@ import {
   getNextSwissFootballSeason,
   getSeasonLifecycleStatus,
 } from "@/lib/seasons/season-logic";
-import { getSeasonLifecycleStatusLabel } from "@/lib/seasons/status";
+import { getSeasonCurrentStatus, getSeasonCurrentStatusLabel, getSeasonLifecycleStatusLabel } from "@/lib/seasons/status";
 
 /**
- * MASTERDATA-SELECTOR-CONSISTENCY-03: exported so canonical current-season
- * consumers outside the Seasons admin surface (e.g.
- * lib/training/queries.ts#findTeamSeasonsForTenant) can refresh
- * `Season.isActive` from the same single lifecycle rule before relying on
- * it, instead of re-implementing this sync locally (which is exactly the
- * kind of duplication lib/teams/current-season.ts was introduced to stop).
+ * SEASON-01 root-cause fix.
  *
- * `Season.isActive` is otherwise only ever refreshed as a side effect of
- * visiting a Seasons admin surface (this module) or explicitly calling
- * POST /api/seasons/:id/activate — nothing re-syncs it on a schedule. A
- * tenant that hasn't opened /dashboard/seasons since the last season
- * boundary can have a stale (or entirely absent) `Season.isActive` flag
- * while still having perfectly legitimate, eligible Teams — see the
- * TrainingCenter root-cause fix this call site fixes.
+ * Previously, every read here (`getSeasonOptionsData`, `getCurrentSeasonOptionData`,
+ * `getNextSeasonOptionData`, `getSeasonsOverviewData`) called a
+ * `syncSeasonActiveFlagsWithLifecycle()` side effect that recomputed
+ * `Season.isActive` from calendar dates on every page load. That is the
+ * documented root cause of two STAGE symptoms: (1) visiting an unrelated
+ * page could silently flip which Season is "current", overriding an
+ * explicit admin choice; and (2) when no Season's date range covers
+ * "today" (e.g. the actual current season was never created), the sync
+ * cleared every Season's `isActive` flag, leaving nothing marked AKTUELL.
+ *
+ * `Season.isActive` is now updated in exactly one place — the transactional
+ * "Aktuell setzen" action (POST /api/seasons/[seasonId]/activate,
+ * lib/seasons/mutations.ts) — and every read below simply consumes the
+ * persisted flag. No read path may resurrect a lifecycle-based auto-sync;
+ * see the module doc in lib/teams/current-season.ts for the single
+ * canonical "current TeamSeason" resolution rule this flag feeds.
  */
-export async function syncSeasonActiveFlagsWithLifecycle() {
-  const seasons = await prisma.season.findMany({
-    select: {
-      id: true,
-      startDate: true,
-      endDate: true,
-      isActive: true,
-    },
-  });
-
-  if (seasons.length === 0) {
-    return;
-  }
-
-  const ongoingSeasonIds = seasons
-    .filter((season) => {
-      const lifecycleStatus = getSeasonLifecycleStatus({
-        startDate: season.startDate,
-        endDate: season.endDate,
-      });
-
-      return lifecycleStatus === "ONGOING";
-    })
-    .map((season) => season.id);
-
-  await prisma.$transaction([
-    prisma.season.updateMany({
-      data: {
-        isActive: false,
-      },
-    }),
-    ...(ongoingSeasonIds.length > 0
-      ? [
-          prisma.season.updateMany({
-            where: {
-              id: {
-                in: ongoingSeasonIds,
-              },
-            },
-            data: {
-              isActive: true,
-            },
-          }),
-        ]
-      : []),
-  ]);
-}
 
 export async function getSeasonOptionsData() {
-  await syncSeasonActiveFlagsWithLifecycle();
-
   const seasons = await prisma.season.findMany({
     orderBy: [{ startDate: "desc" }],
     select: {
@@ -102,8 +57,6 @@ export async function getSeasonOptionsData() {
 }
 
 export async function getCurrentSeasonOptionData() {
-  await syncSeasonActiveFlagsWithLifecycle();
-
   const current = getCurrentSwissFootballSeason();
 
   if (!current) {
@@ -143,8 +96,6 @@ export async function getCurrentSeasonOptionData() {
 }
 
 export async function getNextSeasonOptionData() {
-  await syncSeasonActiveFlagsWithLifecycle();
-
   const next = getNextSwissFootballSeason();
 
   if (!next) {
@@ -184,8 +135,6 @@ export async function getNextSeasonOptionData() {
 }
 
 export async function getSeasonsOverviewData() {
-  await syncSeasonActiveFlagsWithLifecycle();
-
   const seasons = await prisma.season.findMany({
     orderBy: [{ startDate: "desc" }],
     select: {
@@ -211,6 +160,11 @@ export async function getSeasonsOverviewData() {
         endDate: season.endDate,
       }) ?? "PLANNING";
 
+    const currentStatus = getSeasonCurrentStatus({
+      isActive: season.isActive,
+      endDate: season.endDate,
+    });
+
     return {
       id: season.id,
       key: season.key,
@@ -221,8 +175,50 @@ export async function getSeasonsOverviewData() {
       lifecycleStatus,
       lifecycleStatusLabel: getSeasonLifecycleStatusLabel(lifecycleStatus),
       shouldBeActive: lifecycleStatus === "ONGOING",
+      currentStatus,
+      currentStatusLabel: getSeasonCurrentStatusLabel(currentStatus),
       teamSeasonCount: season._count.teamSeasons,
       eventCount: season._count.events,
     };
   });
+}
+
+export type SeasonDependencyCounts = {
+  teamSeasons: number;
+  events: number;
+  eventImportRuns: number;
+  trainingPlans: number;
+  orgUnitMemberships: number;
+};
+
+/**
+ * Every relation that references a Season, for the delete-dependency
+ * blocker (SEASON-01: "receive dependency blockers for a referenced
+ * Season", "do not automatically destroy Team/Event history"). Deleting a
+ * Season CASCADEs TeamSeason/Event/TrainingPlan rows at the database level
+ * (see prisma/schema.prisma), so any of those being non-zero must block
+ * deletion outright — this is the superset check the previous
+ * PLANNING-lifecycle-only delete guard was missing (it never counted
+ * TrainingPlan or OrgUnitMembership at all).
+ */
+export async function getSeasonDependencyCounts(seasonId: string): Promise<SeasonDependencyCounts> {
+  const [teamSeasons, events, eventImportRuns, trainingPlans, orgUnitMemberships] = await Promise.all([
+    prisma.teamSeason.count({ where: { seasonId } }),
+    prisma.event.count({ where: { seasonId } }),
+    prisma.eventImportRun.count({ where: { seasonId } }),
+    prisma.trainingPlan.count({ where: { seasonId } }),
+    prisma.orgUnitMembership.count({ where: { seasonId } }),
+  ]);
+
+  return { teamSeasons, events, eventImportRuns, trainingPlans, orgUnitMemberships };
+}
+
+export function hasSeasonDependencies(counts: SeasonDependencyCounts): boolean {
+  return (
+    counts.teamSeasons > 0 ||
+    counts.events > 0 ||
+    counts.eventImportRuns > 0 ||
+    counts.trainingPlans > 0 ||
+    counts.orgUnitMemberships > 0
+  );
 }

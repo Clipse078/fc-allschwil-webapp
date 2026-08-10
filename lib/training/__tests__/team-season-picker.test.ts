@@ -14,20 +14,17 @@
  * Team (see lib/teams/current-season.ts). The picker must now additionally
  * scope to the canonical current season.
  *
- * MASTERDATA-SELECTOR-CONSISTENCY-03 root-cause fix (BUG 1 — empty
- * selector regression): scoping to `Season.isActive` (above) introduced a
- * NEW failure mode — `Season.isActive` is only ever refreshed as a side
- * effect of visiting a Seasons admin surface (lib/seasons/queries.ts), so a
- * tenant that hasn't opened /dashboard/seasons since the last season
- * boundary can have a stale/absent `Season.isActive` flag while still
- * having perfectly eligible Teams. Team-centric surfaces (Teams overview,
- * GET /api/teams — TournamentCenter's Team dropdown) never went empty from
- * this because a Team still renders even when its `teamSeasons` relation
- * filter matches nothing. This TeamSeason-centric picker has no such
- * safety net, so it silently rendered completely empty. The fix syncs
- * `Season.isActive` from the same canonical lifecycle rule before querying
- * — without adding any new fallback to a stale/historical season (PR #342
- * protection preserved).
+ * SEASON-01 root-cause fix (STAGE symptom — empty TrainingCenter selector,
+ * "no season shown as LÄUFT"): scoping to `Season.isActive` (above)
+ * previously depended on a `syncSeasonActiveFlagsWithLifecycle()` side
+ * effect that resynced the flag from calendar dates on every call here.
+ * That was itself a defect: it could clear every Season's `isActive` flag
+ * (when no Season's date range covers "today") or silently override an
+ * admin's explicit "Aktuell setzen" choice on an unrelated page load. This
+ * picker now reads the persisted flag directly, with no auto-sync — see
+ * lib/seasons/mutations.ts#activateSeason(), the only remaining writer of
+ * `Season.isActive`. No new fallback to a stale/historical season is
+ * introduced (PR #342 protection preserved).
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -41,12 +38,7 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/seasons/queries", () => ({
-  syncSeasonActiveFlagsWithLifecycle: vi.fn(),
-}));
-
 import { prisma } from "@/lib/db/prisma";
-import { syncSeasonActiveFlagsWithLifecycle } from "@/lib/seasons/queries";
 import { findTeamSeasonsForTenant, findTeamSeasonPickerRow } from "../queries";
 
 const mockPrisma = prisma as unknown as {
@@ -55,8 +47,6 @@ const mockPrisma = prisma as unknown as {
     findFirst: ReturnType<typeof vi.fn>;
   };
 };
-
-const mockSync = syncSeasonActiveFlagsWithLifecycle as ReturnType<typeof vi.fn>;
 
 const TENANT_A = "tenant-a";
 const TENANT_B = "tenant-b";
@@ -209,21 +199,21 @@ describe("findTeamSeasonsForTenant — MASTERDATA-SELECTOR-CONSISTENCY-03 focuse
     expect(callArgs.where.team.tenantId).not.toBe(TENANT_A);
   });
 
-  // 8. reproduce/fix current empty-selector regression
-  it("8. root-cause fix: syncs Season.isActive from the canonical lifecycle rule before querying, so a stale flag never yields an incorrectly empty picker", async () => {
+  // 8. SEASON-01: no automatic lifecycle side effect on this read path
+  it("8. SEASON-01 root-cause fix: never auto-syncs Season.isActive from calendar dates — reads the persisted, explicitly-set flag as-is", async () => {
     mockPrisma.teamSeason.findMany.mockResolvedValue([
       teamSeasonRow({ id: "ts-1", teamId: "team-1", teamName: "FC Allschwil E1", seasonName: "2026/2027" }),
     ]);
 
-    await findTeamSeasonsForTenant(TENANT_A);
+    const rows = await findTeamSeasonsForTenant(TENANT_A);
 
-    expect(mockSync).toHaveBeenCalledTimes(1);
-
-    // The sync must run BEFORE the TeamSeason query executes — otherwise a
-    // stale isActive flag would still be in effect for this exact call.
-    const syncOrder = mockSync.mock.invocationCallOrder[0];
-    const queryOrder = mockPrisma.teamSeason.findMany.mock.invocationCallOrder[0];
-    expect(syncOrder).toBeLessThan(queryOrder);
+    // No lifecycle-sync side effect exists anymore: the query goes straight
+    // to TeamSeason.findMany with season.isActive as the sole scoping
+    // condition (asserted in test 6 above) and returns whatever Teams are
+    // eligible under the persisted flag — immediately, without depending
+    // on visiting the Seasons admin page first.
+    expect(mockPrisma.teamSeason.findMany).toHaveBeenCalledTimes(1);
+    expect(rows).toHaveLength(1);
   });
 });
 
