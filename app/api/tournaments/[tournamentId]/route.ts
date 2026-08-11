@@ -29,10 +29,11 @@
  * Permission: EVENTS_MANAGE
  * Tenant isolation: tenantId resolved from session, never from request body.
  *
- * DELETE /api/tournaments/[tournamentId] — ADMIN-DELETE-02A permanent hard
- * delete. Requires PERMISSIONS.TOURNAMENTS_DELETE — deliberately NOT
- * EVENTS_MANAGE, which authorizes the PATCH above (including cancel/
- * restore) but must never imply permanent deletion on its own.
+ * DELETE /api/tournaments/[tournamentId] — ADMIN-DELETE-02A /
+ * ADMIN-DELETE-02A-C1 permanent hard delete. Requires
+ * PERMISSIONS.TOURNAMENTS_DELETE — deliberately NOT EVENTS_MANAGE, which
+ * authorizes the PATCH above (including cancel/restore) but must never
+ * imply permanent deletion on its own.
  *
  * Authorization model (mirrors app/api/teams/[teamId]/route.ts DELETE,
  * ADMIN-DELETE-01B):
@@ -43,9 +44,26 @@
  *   2. EffectivePermissionResolver.hasTenantDeletionAuthority() decides
  *      whether the caller may delete within that exact tenant.
  *
- * Refuses to delete when participants, resource allocations, Weekplanner
- * references, or completed/archived history exist — see
- * lib/tournaments/tournament-lifecycle-service.ts.
+ * CORE PRODUCT RULE (ADMIN-DELETE-02A-C1): a tournaments.delete holder is
+ * NEVER blocked from permanently deleting a tournament merely because
+ * participants, resource allocations, Weekplanner references, or
+ * completed/archived history exist. Instead, this route implements a
+ * two-step "inspect impact → explicit confirmation → atomic cleanup +
+ * delete" flow on the SAME endpoint, driven by the `confirm` query
+ * parameter:
+ *
+ *   DELETE .../[tournamentId]            → PREVIEW: returns 200 with the
+ *                                           impact (dependency counts) and
+ *                                           requiresConfirmation: true.
+ *                                           Deletes nothing.
+ *   DELETE .../[tournamentId]?confirm=true → PERFORM: atomically cleans up
+ *                                             owned/reference data and
+ *                                             permanently deletes the
+ *                                             tournament. See
+ *                                             lib/tournaments/tournament-lifecycle-service.ts.
+ *
+ * Both steps require the same authorization check — the impact preview
+ * never leaks dependency information to an unauthorized caller.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -62,8 +80,8 @@ import {
   restoreTournament,
 } from "@/lib/tournaments/tournament-service";
 import {
-  TournamentDeletionBlockedError,
-  deleteTournamentSafely,
+  deleteTournamentPermanently,
+  getTournamentDeletionImpact,
 } from "@/lib/tournaments/tournament-lifecycle-service";
 import {
   TournamentNotFoundError,
@@ -246,7 +264,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const session = await auth();
 
   if (!session?.user) {
@@ -281,8 +299,23 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const confirmed = request.nextUrl.searchParams.get("confirm") === "true";
+
+  if (!confirmed) {
+    const impact = await getTournamentDeletionImpact(tournamentTenantId, tournamentId);
+
+    if (impact === null) {
+      return NextResponse.json({ error: "Turnier nicht gefunden." }, { status: 404 });
+    }
+
+    return NextResponse.json({ impact, requiresConfirmation: true });
+  }
+
   try {
-    const deleted = await deleteTournamentSafely(tournamentTenantId, tournamentId);
+    const { deleted, impact } = await deleteTournamentPermanently(
+      tournamentTenantId,
+      tournamentId,
+    );
 
     await logAction({
       actorUserId: session.user.effectiveUserId ?? session.user.id ?? null,
@@ -290,25 +323,15 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       entityType: "Tournament",
       entityId: tournamentId,
       action: "DELETE",
-      beforeJson: deleted,
+      beforeJson: { ...deleted, impact },
     });
 
     revalidatePath("/dashboard/tournamentcenter");
 
-    return NextResponse.json({ message: "Turnier wurde endgültig gelöscht." });
+    return NextResponse.json({ message: "Turnier wurde endgültig gelöscht.", impact });
   } catch (error) {
     if (error instanceof TournamentNotFoundError) {
       return NextResponse.json({ error: "Turnier nicht gefunden." }, { status: 404 });
-    }
-
-    if (error instanceof TournamentDeletionBlockedError) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          blockers: error.blockers,
-        },
-        { status: 409 },
-      );
     }
 
     console.error("Delete tournament failed:", error);
