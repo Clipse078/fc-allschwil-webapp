@@ -2,14 +2,31 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, KeyRound, Link2, Loader2, Mail, Search, Unlink } from "lucide-react";
+import { AlertTriangle, Check, KeyRound, Link2, Loader2, Lock, Mail, Search, Unlink } from "lucide-react";
 import ProtectedRoleBadge from "@/components/admin/roles/ProtectedRoleBadge";
+
+/**
+ * ACCESS-REGRESSION-01-R — shown when this checkbox is locked because
+ * removing it would leave the tenant with zero active holders of a
+ * protected (isSystem) role. Mirrors the backend's
+ * `LastRequiredAdminError` message (lib/roles/errors.ts) without depending
+ * on a person's name/email — purely role/assignee-count driven.
+ */
+export const LAST_REQUIRED_ADMIN_MESSAGE =
+  "Mindestens ein Club Admin muss dem Verein zugewiesen bleiben.";
 
 export type PersonAccessRole = {
   id: string;
   name: string;
   isSystem: boolean;
   isArchived: boolean;
+  /** Count of active tenant members currently holding this role (RPERM-05's
+   * `getTenantRolesOverview().userCount` — active `TenantMembership` +
+   * `UserRole`, the exact same population `removeTenantRoleAssignment()`
+   * counts server-side for its last-required-admin guard). Used only to
+   * decide whether THIS card's checkbox should be locked; the backend
+   * remains the sole authority that actually blocks the removal. */
+  activeAssigneeCount: number;
 };
 
 export type PersonAccessLinkedUser = {
@@ -80,8 +97,23 @@ export default function PersonAccessRolesCard({
 
   const assignableRoles = useMemo(() => roles.filter((r) => !r.isArchived), [roles]);
 
+  /**
+   * ACCESS-REGRESSION-01-R — mirrors the backend's last-required-admin rule
+   * (`isProtectedRole` + the active-assignee count in
+   * `removeTenantRoleAssignment()`, lib/roles/mutations.ts) so the UI never
+   * offers to remove a protected role's sole remaining active holder. This
+   * is UX-only: the backend stays authoritative and re-validates on every
+   * call — a stale `activeAssigneeCount` can only ever make the checkbox
+   * unnecessarily disabled, never bypass the server-side guard.
+   */
+  function isLastRequiredAdmin(role: PersonAccessRole, isAssigned: boolean): boolean {
+    return role.isSystem && isAssigned && role.activeAssigneeCount <= 1;
+  }
+
   async function toggleRole(roleId: string, currentlyAssigned: boolean) {
     if (!linkedUser || !canAssign) return;
+    const role = roles.find((r) => r.id === roleId);
+    if (role && isLastRequiredAdmin(role, currentlyAssigned)) return;
     setPendingRoleId(roleId);
     setError(null);
 
@@ -191,6 +223,7 @@ export default function PersonAccessRolesCard({
               {assignableRoles.map((role) => {
                 const isAssigned = roleIds.includes(role.id);
                 const isPending = pendingRoleId === role.id;
+                const isLocked = isLastRequiredAdmin(role, isAssigned);
 
                 if (!canAssign) {
                   return (
@@ -208,28 +241,39 @@ export default function PersonAccessRolesCard({
                 }
 
                 return (
-                  <label
-                    key={role.id}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 transition hover:border-[var(--blue)] hover:bg-[var(--blue-light)]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isAssigned}
-                      disabled={isPending}
-                      onChange={() => toggleRole(role.id, isAssigned)}
-                      className="h-4 w-4 shrink-0 cursor-pointer rounded accent-[var(--blue)]"
-                      aria-label={`Rolle ${role.name} ${isAssigned ? "entziehen" : "zuweisen"}`}
-                    />
-                    <span className="flex-1 text-[0.82rem] font-medium text-[var(--foreground)]">
-                      {role.name}
-                      {role.isSystem ? <span className="ml-1.5 inline-block"><ProtectedRoleBadge /></span> : null}
-                    </span>
-                    {isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--muted)]" />
-                    ) : isAssigned ? (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  <div key={role.id} className="space-y-1">
+                    <label
+                      className={`flex items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 transition ${
+                        isLocked
+                          ? "cursor-not-allowed opacity-90"
+                          : "cursor-pointer hover:border-[var(--blue)] hover:bg-[var(--blue-light)]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAssigned}
+                        disabled={isPending || isLocked}
+                        onChange={() => toggleRole(role.id, isAssigned)}
+                        className="h-4 w-4 shrink-0 cursor-pointer rounded accent-[var(--blue)] disabled:cursor-not-allowed"
+                        aria-label={`Rolle ${role.name} ${isAssigned ? "entziehen" : "zuweisen"}`}
+                        title={isLocked ? LAST_REQUIRED_ADMIN_MESSAGE : undefined}
+                      />
+                      <span className="flex-1 text-[0.82rem] font-medium text-[var(--foreground)]">
+                        {role.name}
+                        {role.isSystem ? <span className="ml-1.5 inline-block"><ProtectedRoleBadge /></span> : null}
+                      </span>
+                      {isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--muted)]" />
+                      ) : isLocked ? (
+                        <Lock className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden="true" />
+                      ) : isAssigned ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                      ) : null}
+                    </label>
+                    {isLocked ? (
+                      <p className="px-1 text-[0.7rem] font-medium text-amber-700">{LAST_REQUIRED_ADMIN_MESSAGE}</p>
                     ) : null}
-                  </label>
+                  </div>
                 );
               })}
             </div>

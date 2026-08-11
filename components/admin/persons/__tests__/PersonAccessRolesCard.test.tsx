@@ -26,7 +26,9 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import PersonAccessRolesCard from "@/components/admin/persons/PersonAccessRolesCard";
+import PersonAccessRolesCard, {
+  LAST_REQUIRED_ADMIN_MESSAGE,
+} from "@/components/admin/persons/PersonAccessRolesCard";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -35,9 +37,9 @@ vi.mock("next/navigation", () => ({
 const PERSON_ID = "person-1";
 const LINKED_USER = { id: "user-1", email: "trainer@example.test" };
 const ROLES = [
-  { id: "role-trainer", name: "Trainer", isSystem: false, isArchived: false },
-  { id: "role-admin", name: "Club Admin", isSystem: true, isArchived: false },
-  { id: "role-archived", name: "Alt-Rolle", isSystem: false, isArchived: true },
+  { id: "role-trainer", name: "Trainer", isSystem: false, isArchived: false, activeAssigneeCount: 3 },
+  { id: "role-admin", name: "Club Admin", isSystem: true, isArchived: false, activeAssigneeCount: 2 },
+  { id: "role-archived", name: "Alt-Rolle", isSystem: false, isArchived: true, activeAssigneeCount: 0 },
 ];
 
 afterEach(() => {
@@ -198,6 +200,128 @@ describe("PersonAccessRolesCard — assign / remove reuse the canonical roles.as
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.getByText("Trainer")).toBeTruthy();
     expect(screen.getByText(/Keine Berechtigung zum Zuweisen von Rollen/)).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("last required admin: a sole active Club Admin holder's checkbox is locked with the German explanation", () => {
+    const roles = [
+      { id: "role-admin", name: "Club Admin", isSystem: true, isArchived: false, activeAssigneeCount: 1 },
+    ];
+
+    render(
+      <PersonAccessRolesCard
+        personId={PERSON_ID}
+        linkedUser={LINKED_USER}
+        isActiveTenantMember={true}
+        roles={roles}
+        assignedRoleIds={["role-admin"]}
+        canAssign={true}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: /Club Admin entziehen/ });
+    expect((checkbox as HTMLInputElement).checked).toBe(true);
+    expect((checkbox as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText(LAST_REQUIRED_ADMIN_MESSAGE)).toBeTruthy();
+  });
+
+  it("a second Club Admin's checkbox stays enabled and removal succeeds normally", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ removed: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const roles = [
+      { id: "role-admin", name: "Club Admin", isSystem: true, isArchived: false, activeAssigneeCount: 2 },
+    ];
+
+    render(
+      <PersonAccessRolesCard
+        personId={PERSON_ID}
+        linkedUser={LINKED_USER}
+        isActiveTenantMember={true}
+        roles={roles}
+        assignedRoleIds={["role-admin"]}
+        canAssign={true}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: /Club Admin entziehen/ });
+    expect((checkbox as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByText(LAST_REQUIRED_ADMIN_MESSAGE)).toBeNull();
+
+    fireEvent.click(checkbox);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/tenant/roles/role-admin/members?userId=${encodeURIComponent(LINKED_USER.id)}`,
+        expect.objectContaining({ method: "DELETE" }),
+      ),
+    );
+  });
+
+  it("custom/non-system tenant roles are never locked, regardless of assignee count", () => {
+    const roles = [
+      { id: "role-trainer", name: "Trainer", isSystem: false, isArchived: false, activeAssigneeCount: 1 },
+    ];
+
+    render(
+      <PersonAccessRolesCard
+        personId={PERSON_ID}
+        linkedUser={LINKED_USER}
+        isActiveTenantMember={true}
+        roles={roles}
+        assignedRoleIds={["role-trainer"]}
+        canAssign={true}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: /Trainer entziehen/ });
+    expect((checkbox as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByText(LAST_REQUIRED_ADMIN_MESSAGE)).toBeNull();
+  });
+
+  it("assigning the last-required-admin role to an unassigned person is never locked", () => {
+    const roles = [
+      { id: "role-admin", name: "Club Admin", isSystem: true, isArchived: false, activeAssigneeCount: 1 },
+    ];
+
+    render(
+      <PersonAccessRolesCard
+        personId={PERSON_ID}
+        linkedUser={LINKED_USER}
+        isActiveTenantMember={true}
+        roles={roles}
+        assignedRoleIds={[]}
+        canAssign={true}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: /Club Admin zuweisen/ });
+    expect((checkbox as HTMLInputElement).disabled).toBe(false);
+    expect(screen.queryByText(LAST_REQUIRED_ADMIN_MESSAGE)).toBeNull();
+  });
+
+  it("clicking a locked checkbox never issues a fetch (defense in depth beyond the disabled attribute)", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const roles = [
+      { id: "role-admin", name: "Club Admin", isSystem: true, isArchived: false, activeAssigneeCount: 1 },
+    ];
+
+    render(
+      <PersonAccessRolesCard
+        personId={PERSON_ID}
+        linkedUser={LINKED_USER}
+        isActiveTenantMember={true}
+        roles={roles}
+        assignedRoleIds={["role-admin"]}
+        canAssign={true}
+      />,
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: /Club Admin entziehen/ });
+    fireEvent.click(checkbox);
+
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

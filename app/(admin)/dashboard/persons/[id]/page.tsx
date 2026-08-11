@@ -62,7 +62,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
   let accessRolesCard: {
     linkedUser: { id: string; email: string } | null;
     isActiveTenantMember: boolean;
-    roles: { id: string; name: string; isSystem: boolean; isArchived: boolean }[];
+    roles: { id: string; name: string; isSystem: boolean; isArchived: boolean; activeAssigneeCount: number }[];
     assignedRoleIds: string[];
     canAssign: boolean;
   } | null = null;
@@ -111,6 +111,12 @@ export default async function PersonDetailPage({ params }: PageProps) {
             name: r.name,
             isSystem: r.isSystem,
             isArchived: r.isArchived,
+            // ACCESS-REGRESSION-01-R: active-membership-scoped assignee
+            // count — the same population removeTenantRoleAssignment()'s
+            // last-required-admin guard counts server-side (see
+            // getTenantRolesOverview()). Drives PersonAccessRolesCard's
+            // client-side lock only; the backend re-validates regardless.
+            activeAssigneeCount: r.userCount,
           })),
           assignedRoleIds: assignment?.roleIds ?? [],
           canAssign,
