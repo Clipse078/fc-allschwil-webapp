@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { DashboardWelcome } from "./DashboardWelcome";
 
 export type DashboardHeroProps = {
-  /** Personalised greeting (e.g. "Good morning, Admin 👋"). */
+  /** Personalised greeting (e.g. "Guten Morgen, Michael 👋"). */
   greeting: string;
   /** Supporting subtitle below the greeting. */
   subtitle?: string;
@@ -32,11 +32,10 @@ export type DashboardHeroProps = {
  * Usage:
  *   <DashboardHero
  *     greeting={greeting}
- *     subtitle="Hier ist, was heute in deinem Verein ansteht."
+ *     subtitle="Schön, dich wiederzusehen."
  *     clubName="FC Allschwil"
  *     activeSeason="2025/26"
  *     date="Di, 1. Jul 2026"
- *     actions={<Button variant="primary">Neue News</Button>}
  *   />
  */
 export function DashboardHero({

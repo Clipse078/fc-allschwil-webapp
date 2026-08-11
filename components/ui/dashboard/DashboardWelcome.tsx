@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 
 export type DashboardWelcomeProps = {
-  /** Personalised greeting line (e.g. "Good morning, Alex"). */
+  /** Personalised greeting line (e.g. "Guten Morgen, Michael"). */
   greeting: string;
   /** Optional supporting subtitle below the greeting. */
   subtitle?: string;
@@ -17,8 +17,8 @@ export type DashboardWelcomeProps = {
  *
  * Usage:
  *   <DashboardWelcome
- *     greeting="Good morning, Alex 👋"
- *     subtitle="Hier ist, was heute in deinem Verein ansteht."
+ *     greeting="Guten Morgen, Michael 👋"
+ *     subtitle="Schön, dich wiederzusehen."
  *   />
  */
 export function DashboardWelcome({
