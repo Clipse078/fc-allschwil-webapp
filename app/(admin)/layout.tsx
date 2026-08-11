@@ -8,6 +8,8 @@ import AppTopNav from "@/components/admin/layout/AppTopNav";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { generateTenantCssVars } from "@/lib/tenant-runtime/theme";
+import { getPersonNameByUserId } from "@/lib/people/queries";
+import { resolveAccountIdentityName } from "@/lib/people/identity";
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -28,6 +30,22 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   const ctx = await getActiveTenant();
   const tenantCssVars = generateTenantCssVars(ctx);
 
+  // DASHBOARD-SHELL-UX-01-C2: the sidebar footer identity (directly above
+  // "Abmelden") must render the authenticated human person's name, not the
+  // raw User.firstName/lastName columns — for some bootstrapped tenant
+  // accounts those hold the club name and role label instead (e.g. "FC
+  // Allschwil" / "Club Admin"). Prefer the canonically linked Person's name
+  // (Person.userId, ADMIN-MASTERDATA-UX-01), same relationship already used
+  // for the dashboard greeting. See lib/people/identity.ts for the fallback
+  // rule.
+  const linkedPersonName = await getPersonNameByUserId(session.user.id);
+  const sidebarIdentity = resolveAccountIdentityName({
+    linkedPerson: linkedPersonName,
+    sessionFirstName: session.user.firstName,
+    sessionLastName: session.user.lastName,
+    tenantName: ctx?.name,
+  });
+
   return (
     <div
       className="flex min-h-screen bg-[var(--background)]"
@@ -36,8 +54,8 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
       {/* Fixed sidebar */}
       <Suspense fallback={null}>
         <AdminSidebar
-          firstName={session.user.firstName}
-          lastName={session.user.lastName}
+          firstName={sidebarIdentity.firstName}
+          lastName={sidebarIdentity.lastName}
           email={session.user.email}
           permissionKeys={session.user.permissionKeys}
           clubName={ctx?.name}
