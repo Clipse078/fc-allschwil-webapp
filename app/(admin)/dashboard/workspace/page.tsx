@@ -125,6 +125,7 @@ export default async function WorkspacePage({
   const params = (await searchParams) ?? {};
   const selectedFolderId = params.folder?.trim() || null;
   const canManage = hasPermission(session, PERMISSIONS.WORKSPACE_MANAGE);
+  const canDelete = hasPermission(session, PERMISSIONS.WORKSPACE_DELETE);
 
   const [folders, selectedFolder, archivedFolders] = await Promise.all([
     getWorkspaceFolderTree(tenantId),
@@ -209,6 +210,7 @@ export default async function WorkspacePage({
             folderUpdatedAt={selectedFolder.updatedAt}
             folderPath={folderPath}
             canManage={canManage}
+            canDelete={canDelete}
             folderManagementSlot={
               canManage ? (
                 <div className="space-y-3">
