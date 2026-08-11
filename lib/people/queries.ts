@@ -74,5 +74,27 @@ export async function getPersonFirstNameByUserId(userId: string): Promise<string
   return person?.firstName?.trim() || null;
 }
 
+/**
+ * DASHBOARD-SHELL-UX-01-C2 — resolves the full name (firstName + lastName) of
+ * the Person canonically linked to a User (Person.userId, see
+ * ADMIN-MASTERDATA-UX-01), for display purposes (e.g. the sidebar footer
+ * identity). Returns null when the User has no linked Person, or the linked
+ * Person has no usable first name. Never derives a name from email, tenant,
+ * or role data.
+ */
+export async function getPersonNameByUserId(
+  userId: string,
+): Promise<{ firstName: string; lastName: string } | null> {
+  const person = await prisma.person.findUnique({
+    where: { userId },
+    select: { firstName: true, lastName: true },
+  });
+
+  const firstName = person?.firstName?.trim();
+  if (!firstName) return null;
+
+  return { firstName, lastName: person?.lastName?.trim() || "" };
+}
+
 export type PersonListItem = Awaited<ReturnType<typeof getPersons>>[number];
 export type PersonDetail = NonNullable<Awaited<ReturnType<typeof getPersonById>>>;
