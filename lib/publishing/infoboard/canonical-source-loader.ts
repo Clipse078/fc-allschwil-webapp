@@ -122,7 +122,9 @@ export type CanonicalEventPolicyRow = {
   readonly meetingTime: Date | null;
   readonly resultLabel: string | null;
   readonly intermediateResultLabel: string | null;
-  readonly season: { readonly key: string };
+  // INFOBOARD-C1: nullable after ADMIN-DELETE-SEASON-01-C1 (Event.seasonId uses
+  // onDelete: SetNull — permanently deleting a Season sets Event.seasonId to null).
+  readonly season: { readonly key: string } | null;
 };
 
 /** Publication-policy / display metadata for a canonical TRAINING (TrainingSession-backed). */
@@ -401,7 +403,7 @@ function mapMatchItem(
     endAt: item.endAt,
     id: item.id,
     title: item.title,
-    seasonKey: policy?.season.key ?? "",
+    seasonKey: policy?.season?.key ?? "",
     team: { name: item.teamNames[0] ?? null },
     opponent: null,
     opponentFallbackName: item.opponentName,
@@ -436,7 +438,7 @@ function mapTournamentItem(
     endAt: item.endAt,
     id: item.id,
     title: item.title,
-    seasonKey: policy?.season.key ?? "",
+    seasonKey: policy?.season?.key ?? "",
     team: { name: item.teamNames[0] ?? null },
     opponent: null,
     opponentFallbackName: null,

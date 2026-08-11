@@ -490,6 +490,82 @@ describe("16. existing conflict annotations do not block mapping", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-C1: null-season regression (Event.season nullable after
+//    ADMIN-DELETE-SEASON-01-C1 permanent Season deletion) ────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("INFOBOARD-C1 — Event with season=null does not crash the loader", () => {
+  it("MATCH with season=null in policy row: maps without error, seasonKey defaults to empty string", async () => {
+    const item = matchItem({ eventId: "event-null-season" });
+    mocks.getWeekplannerDay.mockResolvedValue(makeDay([item], "2026-08-15"));
+
+    const policyWithNullSeason = eventPolicyRow({
+      id: "event-null-season",
+      season: null,
+    });
+    const database = makeDatabase([policyWithNullSeason]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+
+    let events: Awaited<ReturnType<typeof loader>>;
+    expect(
+      () =>
+        (events = [] as typeof events),
+    ).not.toThrow();
+
+    events = await loader({
+      tenantId: TENANT_A,
+      dateFrom: new Date("2026-08-15T00:00:00.000Z"),
+      dateTo: new Date("2026-08-15T00:00:00.000Z"),
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].seasonKey).toBe("");
+  });
+
+  it("TOURNAMENT with season=null in policy row: maps without error, seasonKey defaults to empty string", async () => {
+    const item = tournamentItem({ eventId: "event-null-season-t" });
+    mocks.getWeekplannerDay.mockResolvedValue(makeDay([item], "2026-08-15"));
+
+    const policyWithNullSeason = eventPolicyRow({
+      id: "event-null-season-t",
+      season: null,
+    });
+    const database = makeDatabase([policyWithNullSeason]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+
+    const events = await loader({
+      tenantId: TENANT_A,
+      dateFrom: new Date("2026-08-15T00:00:00.000Z"),
+      dateTo: new Date("2026-08-15T00:00:00.000Z"),
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].seasonKey).toBe("");
+  });
+
+  it("MATCH with season present: seasonKey is preserved unchanged (non-regression)", async () => {
+    const item = matchItem({ eventId: "event-with-season" });
+    mocks.getWeekplannerDay.mockResolvedValue(makeDay([item], "2026-08-15"));
+
+    const policyWithSeason = eventPolicyRow({
+      id: "event-with-season",
+      season: { key: "2026-2027" },
+    });
+    const database = makeDatabase([policyWithSeason]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+
+    const events = await loader({
+      tenantId: TENANT_A,
+      dateFrom: new Date("2026-08-15T00:00:00.000Z"),
+      dateTo: new Date("2026-08-15T00:00:00.000Z"),
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].seasonKey).toBe("2026-2027");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ── Europe/Zurich day enumeration ─────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
