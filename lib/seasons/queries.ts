@@ -148,6 +148,7 @@ export async function getSeasonsOverviewData() {
         select: {
           teamSeasons: true,
           events: true,
+          trainingPlans: true,
         },
       },
     },
@@ -179,6 +180,7 @@ export async function getSeasonsOverviewData() {
       currentStatusLabel: getSeasonCurrentStatusLabel(currentStatus),
       teamSeasonCount: season._count.teamSeasons,
       eventCount: season._count.events,
+      trainingPlanCount: season._count.trainingPlans,
     };
   });
 }
@@ -200,6 +202,14 @@ export type SeasonDependencyCounts = {
  * deletion outright — this is the superset check the previous
  * PLANNING-lifecycle-only delete guard was missing (it never counted
  * TrainingPlan or OrgUnitMembership at all).
+ *
+ * ADMIN-DELETE-SEASON-01: EventImportRun and OrgUnitMembership both use
+ * `onDelete: SetNull` (optional seasonId) — those records survive deletion
+ * with seasonId set to NULL, so they are counted for display/audit purposes
+ * but do NOT block deletion. Only cascade-delete relations (TeamSeason,
+ * Event, TrainingPlan) block, because destroying those records would silently
+ * remove canonical data (team participation history, match records, training
+ * plans) that must survive independently.
  */
 export async function getSeasonDependencyCounts(seasonId: string): Promise<SeasonDependencyCounts> {
   const [teamSeasons, events, eventImportRuns, trainingPlans, orgUnitMemberships] = await Promise.all([
@@ -213,12 +223,13 @@ export async function getSeasonDependencyCounts(seasonId: string): Promise<Seaso
   return { teamSeasons, events, eventImportRuns, trainingPlans, orgUnitMemberships };
 }
 
+/**
+ * Returns true only when cascade-delete relations are non-zero — i.e.
+ * deleting the Season would irrecoverably destroy canonical records.
+ * SetNull relations (EventImportRun, OrgUnitMembership) are counted for
+ * display but do NOT block: the DB sets their seasonId to NULL and the
+ * records survive intact.
+ */
 export function hasSeasonDependencies(counts: SeasonDependencyCounts): boolean {
-  return (
-    counts.teamSeasons > 0 ||
-    counts.events > 0 ||
-    counts.eventImportRuns > 0 ||
-    counts.trainingPlans > 0 ||
-    counts.orgUnitMemberships > 0
-  );
+  return counts.teamSeasons > 0 || counts.events > 0 || counts.trainingPlans > 0;
 }

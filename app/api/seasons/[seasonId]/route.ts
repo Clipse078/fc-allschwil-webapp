@@ -4,10 +4,14 @@
  * PATCH  → update name / startDate / endDate ("Bearbeiten"). Never touches
  *          `key` or `isActive` — activation stays exclusively at
  *          POST /api/seasons/[seasonId]/activate.
- * DELETE → deletes the Season only when nothing references it
- *          (TeamSeason/Event/EventImportRun/TrainingPlan/OrgUnitMembership
- *          all zero). Otherwise returns 409 with the exact blocking
- *          counts — Team/Event history is never silently destroyed.
+ * DELETE → ADMIN-DELETE-SEASON-01: permanently deletes the Season only when
+ *          nothing with a cascade-delete relation references it
+ *          (TeamSeason/Event/TrainingPlan non-zero → 409). SetNull relations
+ *          (EventImportRun/OrgUnitMembership) are resolved automatically by
+ *          the DB and do not block. Requires seasons.delete permission —
+ *          deliberately separate from seasons.manage.
+ *          Returns 409 with exact blocking counts — canonical records are
+ *          never silently destroyed.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -55,7 +59,7 @@ export async function PATCH(request: NextRequest, context: Context) {
 }
 
 export async function DELETE(_: NextRequest, context: Context) {
-  const access = await requireApiPermission(PERMISSIONS.SEASONS_MANAGE);
+  const access = await requireApiPermission(PERMISSIONS.SEASONS_DELETE);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
