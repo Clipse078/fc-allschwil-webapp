@@ -169,6 +169,10 @@ async function main() {
     // permission" seeding policy — no new automatic-assignment policy.
     { key: "workspace.view", name: "View workspace", module: PermissionModule.WORKSPACE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "workspace.manage", name: "Manage workspace", module: PermissionModule.WORKSPACE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-03A: canonical permanent-deletion permission for Workspace
+    // Documents. Deliberately separate from workspace.manage. Follows the
+    // "<module>.delete" convention established by TEAMS_DELETE (ADMIN-DELETE-01A).
+    { key: "workspace.delete", name: "Permanently delete documents", module: PermissionModule.WORKSPACE, scope: PermissionScope.TENANT, grantableByAdmin: true },
   ] as const;
 
   for (const permission of permissions) {

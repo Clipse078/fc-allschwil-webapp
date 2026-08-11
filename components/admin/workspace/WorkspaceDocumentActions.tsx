@@ -18,11 +18,14 @@ import { useTranslations } from "next-intl";
 
 import type { WorkspaceDocumentListItemDto } from "@/lib/workspace/document-dto";
 
+import { WorkspaceDocumentDeleteControl } from "./WorkspaceDocumentDeleteControl";
 import { WorkspaceDocumentVersionHistoryDialog } from "./WorkspaceDocumentVersionHistoryDialog";
 
 type WorkspaceDocumentActionsProps = {
   document: WorkspaceDocumentListItemDto;
   onSelect?: () => void;
+  /** ADMIN-DELETE-03A: resolved server-side from PERMISSIONS.WORKSPACE_DELETE. */
+  canDelete?: boolean;
 };
 
 type ActionButtonProps = {
@@ -69,6 +72,7 @@ function ActionButton({
 export function WorkspaceDocumentActions({
   document: workspaceDocument,
   onSelect,
+  canDelete = false,
 }: WorkspaceDocumentActionsProps) {
   const t = useTranslations("Workspace.actions");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -177,6 +181,17 @@ export function WorkspaceDocumentActions({
               disabled
               comingSoonLabel={t("comingSoon")}
             />
+
+            {canDelete ? (
+              <>
+                <div className="my-1 border-t border-[var(--border)]" role="separator" />
+                <WorkspaceDocumentDeleteControl
+                  documentId={workspaceDocument.id}
+                  documentName={workspaceDocument.name}
+                  canDelete={canDelete}
+                />
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>

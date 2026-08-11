@@ -10,12 +10,15 @@ type WorkspaceDocumentTableProps = {
   documents: WorkspaceDocumentListItemDto[];
   selectedDocumentId?: string | null;
   onSelectDocument?: (id: string) => void;
+  /** ADMIN-DELETE-03A: resolved server-side from PERMISSIONS.WORKSPACE_DELETE. */
+  canDelete?: boolean;
 };
 
 export function WorkspaceDocumentTable({
   documents,
   selectedDocumentId,
   onSelectDocument,
+  canDelete = false,
 }: WorkspaceDocumentTableProps) {
   const t = useTranslations("Workspace.table");
 
@@ -54,6 +57,7 @@ export function WorkspaceDocumentTable({
               document={document}
               isSelected={selectedDocumentId === document.id}
               onSelect={onSelectDocument}
+              canDelete={canDelete}
             />
           ))}
         </tbody>

@@ -16,12 +16,15 @@ type WorkspaceDocumentRowProps = {
   document: WorkspaceDocumentListItemDto;
   isSelected?: boolean;
   onSelect?: (id: string) => void;
+  /** ADMIN-DELETE-03A: resolved server-side from PERMISSIONS.WORKSPACE_DELETE. */
+  canDelete?: boolean;
 };
 
 export function WorkspaceDocumentRow({
   document,
   isSelected = false,
   onSelect,
+  canDelete = false,
 }: WorkspaceDocumentRowProps) {
   const ft = useTranslations("Workspace.fileTypes");
   const currentVersion = document.currentVersion;
@@ -120,6 +123,7 @@ export function WorkspaceDocumentRow({
         <WorkspaceDocumentActions
           document={document}
           onSelect={() => onSelect?.(document.id)}
+          canDelete={canDelete}
         />
       </td>
     </tr>

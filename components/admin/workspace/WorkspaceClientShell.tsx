@@ -24,6 +24,8 @@ type WorkspaceClientShellProps = {
   folderUpdatedAt: string;
   folderPath: BreadcrumbItem[];
   canManage: boolean;
+  /** ADMIN-DELETE-03A: resolved server-side from PERMISSIONS.WORKSPACE_DELETE. */
+  canDelete?: boolean;
   folderManagementSlot?: React.ReactNode;
 };
 
@@ -43,6 +45,7 @@ export function WorkspaceClientShell({
   folderUpdatedAt,
   folderPath,
   canManage,
+  canDelete = false,
   folderManagementSlot,
 }: WorkspaceClientShellProps) {
   const t = useTranslations("Workspace");
@@ -136,6 +139,7 @@ export function WorkspaceClientShell({
                 documents={documents}
                 selectedDocumentId={selectedDocumentId}
                 onSelectDocument={handleSelectDocument}
+                canDelete={canDelete}
               />
             </div>
           ) : (
