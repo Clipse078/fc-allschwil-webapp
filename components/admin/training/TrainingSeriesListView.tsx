@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { TrainingSeriesDto, TrainingSeriesStatus, Weekday } from "@/lib/training/types";
 import TrainingSeriesArchiveButton from "./TrainingSeriesArchiveButton";
+import TrainingSeriesDeleteControl from "./TrainingSeriesDeleteControl";
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   MONDAY: "Mo",
@@ -53,6 +54,14 @@ type Props = {
   allSeries: TrainingSeriesDto[];
   showArchived: boolean;
   canManage: boolean;
+  /**
+   * ADMIN-DELETE-02A-C1: effective PERMISSIONS.TRAININGS_DELETE authority.
+   * Deliberately independent of canManage/trainings.manage — permanent
+   * deletion is a separate authority from create/edit/archive, and must
+   * render here (the actual Serien-Verwaltung admins use day to day), not
+   * only on the deeper per-series edit page.
+   */
+  canDelete?: boolean;
   basePath?: string;
 };
 
@@ -68,6 +77,7 @@ export default function TrainingSeriesListView({
   allSeries,
   showArchived,
   canManage,
+  canDelete = false,
   basePath = "/dashboard/training",
 }: Props) {
   const activeSeries = allSeries.filter((s) => s.status !== "ARCHIVED");
@@ -143,23 +153,39 @@ export default function TrainingSeriesListView({
                     </div>
                   </div>
 
-                  {canManage && series.status !== "ARCHIVED" && (
+                  {(canManage || canDelete) && (
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <Link
-                        href={`/dashboard/training/series/${series.id}/allocations`}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)]"
-                      >
-                        <Layers className="h-3.5 w-3.5 text-[var(--blue)]" />
-                        Ressourcen
-                      </Link>
-                      <Link
-                        href={`/dashboard/training/series/${series.id}/edit`}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)]"
-                      >
-                        <Pencil className="h-3.5 w-3.5 text-[var(--blue)]" />
-                        Bearbeiten
-                      </Link>
-                      <TrainingSeriesArchiveButton seriesId={series.id} seriesTitle={series.title} />
+                      {canManage && series.status !== "ARCHIVED" && (
+                        <>
+                          <Link
+                            href={`/dashboard/training/series/${series.id}/allocations`}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)]"
+                          >
+                            <Layers className="h-3.5 w-3.5 text-[var(--blue)]" />
+                            Ressourcen
+                          </Link>
+                          <Link
+                            href={`/dashboard/training/series/${series.id}/edit`}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)]"
+                          >
+                            <Pencil className="h-3.5 w-3.5 text-[var(--blue)]" />
+                            Bearbeiten
+                          </Link>
+                          <TrainingSeriesArchiveButton seriesId={series.id} seriesTitle={series.title} />
+                        </>
+                      )}
+                      {/*
+                        ADMIN-DELETE-02A-C1: permanent delete requires effective
+                        trainings.delete authority, independent of canManage and
+                        of archive status — dependencies/history are impact, not
+                        blockers, so this must reach even an archived series.
+                      */}
+                      <TrainingSeriesDeleteControl
+                        seriesId={series.id}
+                        seriesTitle={series.title}
+                        canDelete={canDelete}
+                        variant="inline"
+                      />
                     </div>
                   )}
                 </div>
