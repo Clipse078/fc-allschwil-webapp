@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell, HelpCircle, Menu, Search, Settings } from "lucide-react";
+import { Bell, HelpCircle, Menu, Settings } from "lucide-react";
 import { Suspense } from "react";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 
@@ -13,7 +13,7 @@ type AppTopNavProps = {
 type PageMeta = { eyebrow: string; title: string };
 
 function getPageMeta(pathname: string): PageMeta {
-  if (pathname === "/dashboard") return { eyebrow: "Home", title: "Dashboard" };
+  if (pathname === "/dashboard") return { eyebrow: "Start", title: "Dashboard" };
   if (pathname.startsWith("/admin")) return { eyebrow: "Platform", title: "Admin" };
   if (pathname.startsWith("/dashboard/planner/week")) return { eyebrow: "Planner", title: "Wochenplanner" };
   if (pathname.startsWith("/dashboard/planner/day")) return { eyebrow: "Planner", title: "Tagesplanner" };
@@ -35,7 +35,7 @@ function getPageMeta(pathname: string): PageMeta {
   if (pathname.startsWith("/vereinsleitung/targets")) return { eyebrow: "Vereinsleitung", title: "Ziele" };
   if (pathname.startsWith("/vereinsleitung/templates")) return { eyebrow: "Vereinsleitung", title: "Vorlagen" };
   if (pathname.startsWith("/vereinsleitung")) return { eyebrow: "Vereinsleitung", title: "Übersicht" };
-  return { eyebrow: "SportClubEvo", title: "WebApp" };
+  return { eyebrow: "SportClubEvo", title: "Übersicht" };
 }
 
 export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
@@ -63,22 +63,6 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
           <span className="text-[var(--muted)] text-[0.8rem]">›</span>
           <span className="text-[0.8rem] font-semibold text-[var(--foreground)]">{title}</span>
         </nav>
-      </div>
-
-      {/* Center: search */}
-      <div className="hidden md:flex flex-1 max-w-xs justify-center">
-        <button
-          type="button"
-          className="sce-search-slot w-full flex items-center gap-2"
-          aria-label="Suche"
-          disabled
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1 text-left text-[var(--muted)]">Suche…</span>
-          <kbd className="shrink-0 rounded px-1.5 py-0.5 text-[0.65rem] font-medium text-[var(--muted)] border border-[var(--border)] bg-[var(--surface-2)]">
-            ⌘K
-          </kbd>
-        </button>
       </div>
 
       {/* Right: page actions + icons */}

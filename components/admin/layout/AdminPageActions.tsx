@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Pencil,
   Plus,
-  Settings2,
   ShieldPlus,
   Trophy,
   Users,
@@ -38,27 +37,10 @@ export default function AdminPageActions() {
     ? `/dashboard/planner/new?season=${encodeURIComponent(selectedSeason)}`
     : "/dashboard/planner/new";
 
-  if (pathname === "/dashboard") {
-    return (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Link
-          href={plannerHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:bg-slate-50"
-        >
-          <CalendarPlus className="h-4 w-4" />
-          Planner öffnen
-        </Link>
-
-        <Link
-          href={seasonsHref}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
-        >
-          <Settings2 className="h-4 w-4" />
-          Saisons verwalten
-        </Link>
-      </div>
-    );
-  }
+  // DASHBOARD-SHELL-UX-01: the tenant dashboard itself no longer surfaces
+  // global "Planner öffnen" / "Saisons verwalten" shortcuts in the top bar —
+  // they duplicated the sidebar navigation and added noise without extra
+  // value. Season/planner pages below keep their own contextual actions.
 
   if (pathname === "/dashboard/seasons" || pathname.startsWith("/dashboard/seasons/")) {
     return (
