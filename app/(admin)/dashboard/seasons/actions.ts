@@ -24,6 +24,27 @@ async function requireSeasonManagePermission() {
   return session;
 }
 
+/**
+ * ADMIN-DELETE-SEASON-01 — gate for permanent Season deletion. Requires
+ * seasons.delete (deliberately separate from seasons.manage — see
+ * PERMISSIONS.SEASONS_DELETE doc comment in lib/permissions/permissions.ts).
+ */
+async function requireSeasonDeletePermission() {
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const permissionKeys = session.user.permissionKeys ?? [];
+
+  if (!permissionKeys.includes(PERMISSIONS.SEASONS_DELETE)) {
+    redirect("/dashboard/seasons?status=forbidden");
+  }
+
+  return session;
+}
+
 function actorUserIdFromSession(session: Session | null): string | null {
   return session?.user?.effectiveUserId ?? session?.user?.id ?? null;
 }
@@ -107,14 +128,15 @@ export async function updateSeasonDetailsAction(formData: FormData) {
 }
 
 /**
- * SEASON-01 — deletes an unused Season. Blocked whenever the Season is
- * referenced anywhere (TeamSeason/Event/EventImportRun/TrainingPlan/
- * OrgUnitMembership) — never restricted by lifecycle status alone, so a
- * past or future Season with zero dependents can be deleted just as
- * easily as a "planning" one. See lib/seasons/mutations.ts#deleteSeason().
+ * ADMIN-DELETE-SEASON-01 — permanently deletes a Season. Blocked when cascade-
+ * delete relations are non-zero (TeamSeason/Event/TrainingPlan) — never
+ * restricted by lifecycle status or active-season state alone. SetNull relations
+ * (EventImportRun/OrgUnitMembership) are resolved automatically by the DB and
+ * do not block. Requires seasons.delete — deliberately separate from
+ * seasons.manage. See lib/seasons/mutations.ts#deleteSeason().
  */
 export async function deleteSeasonAction(formData: FormData) {
-  const session = await requireSeasonManagePermission();
+  const session = await requireSeasonDeletePermission();
 
   const seasonIdValue = formData.get("seasonId");
   const seasonId = typeof seasonIdValue === "string" ? seasonIdValue.trim() : "";
