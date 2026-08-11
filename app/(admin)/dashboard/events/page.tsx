@@ -128,7 +128,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
 
   // Event counts for the selected season
   const seasonEvents = allEvents.filter(
-    (e) => e.season.key === selectedSeasonKey,
+    (e) => e.season?.key === selectedSeasonKey,
   );
   const matchCount = seasonEvents.filter((e) => e.type === "MATCH").length;
   const tournamentCount = seasonEvents.filter(

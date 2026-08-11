@@ -48,9 +48,9 @@ export function toPublicWebsiteEvent(event: PublicEventItem): PublicWebsiteEvent
           ageGroup: event.team.ageGroup,
         }
       : null,
-    season: {
-      key: event.season.key,
-      name: event.season.name,
-    },
+    // season may be null when Event.seasonId was set null by Season deletion.
+    season: event.season
+      ? { key: event.season.key, name: event.season.name }
+      : null,
   };
 }

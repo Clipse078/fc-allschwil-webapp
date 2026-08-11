@@ -74,6 +74,8 @@ export type Screen1DbEventRow = {
   readonly startAt: Date;
   readonly endAt: Date | null;
   readonly seasonId: string | null;
+  /** Null when Event.seasonId was set to null by Season deletion (ADMIN-DELETE-SEASON-01-C1). */
+  readonly season: { readonly key: string } | null;
   readonly infoboardVisible: boolean;
   readonly websiteVisible: boolean;
   readonly trainingsplanVisible: boolean;
@@ -87,7 +89,6 @@ export type Screen1DbEventRow = {
   readonly pitchCode: string | null;
   readonly homeDressingRoomCode: string | null;
   readonly awayDressingRoomCode: string | null;
-  readonly season: { readonly key: string };
   readonly team: Screen1TeamRow | null;
 };
 
@@ -287,7 +288,9 @@ function mapRowToSourceEvent(
     id: row.id,
     // ── Display ───────────────────────────────────────────────────────────
     title: row.title,
-    seasonKey: row.season.key,
+    // season may be null when Event.seasonId was set null by Season deletion.
+    // Fall back to empty string — seasonless events have no season context for display.
+    seasonKey: row.season?.key ?? "",
     // ── Team naming ───────────────────────────────────────────────────────
     team,
     // ── Opponent naming ───────────────────────────────────────────────────
