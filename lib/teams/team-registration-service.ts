@@ -6,7 +6,9 @@
  * TEAM-CREATE-01: Implements the full seasonal Team registration:
  *   1. Permission context is validated by the caller (API route).
  *   2. Season validity is validated.
- *   3. OrgUnit eligibility is validated (≥1 required, active, tenant-scoped).
+ *   3. OrgUnit eligibility is validated (active, tenant-scoped; ≥1 required
+ *      unless the caller opts in to `allowEmptyOrgUnits` — SEASON-01-C3
+ *      bulk rollover use case, see RegisterTeamInput).
  *   4. Team identity is either created fresh or an explicit existing Team is reused.
  *   5. TeamSeason + TeamSeasonOrgUnit are written via writeTeamSeasonInTx().
  *   6. Optional TeamExternalMapping is created/claimed (guarded against races).
@@ -56,10 +58,26 @@ export type RegisterTeamInput = {
   /** Season to register the team for. */
   seasonId: string;
   /**
-   * Ordered list of OrgUnit IDs. At least one is required.
+   * Ordered list of OrgUnit IDs. At least one is required, unless
+   * `allowEmptyOrgUnits` is set (SEASON-01-C3).
    * First ID becomes the primary OrgUnit.
    */
   orgUnitIds: string[];
+  /**
+   * SEASON-01-C3: when true, permits registering the TeamSeason with zero
+   * OrgUnit assignments (no TeamSeasonOrgUnit rows are created). OrgUnit
+   * carry-over is best-effort only — Season membership must never be
+   * blocked by missing/invalid historical OrgUnit data.
+   *
+   * Only the bulk rollover path (bulkRegisterExistingTeamsForSeason) sets
+   * this. The single-Team registration wizard (POST /api/teams/register)
+   * never sets it and keeps requiring >=1 OrgUnit, unchanged.
+   *
+   * Has no effect on OrgUnit validation when OrgUnit IDs ARE supplied —
+   * every supplied OrgUnit must still exist, be active, and belong to the
+   * same tenant, exactly as before.
+   */
+  allowEmptyOrgUnits?: boolean;
   /**
    * When provided, reuse this existing Team identity instead of creating one.
    * The Team must belong to tenantId.
@@ -205,7 +223,7 @@ export async function registerTeamSeason(
   }
 
   const uniqueOrgUnitIds = [...new Set(input.orgUnitIds.filter(Boolean))];
-  if (uniqueOrgUnitIds.length === 0) {
+  if (uniqueOrgUnitIds.length === 0 && !input.allowEmptyOrgUnits) {
     return {
       ok: false,
       code: "ORG_UNIT_REQUIRED",
@@ -633,7 +651,8 @@ export async function getExistingTeamsForTenant(
 }
 
 // ---------------------------------------------------------------------------
-// ADMIN-MASTERDATA-UX-01-C2 — Bulk Season Team rollover ("Teams übernehmen")
+// ADMIN-MASTERDATA-UX-01-C2 / SEASON-01-C3 — Bulk Season Team rollover
+// ("Teams übernehmen")
 // ---------------------------------------------------------------------------
 //
 // C1 already proved that registerTeamSeason() with `existingTeamId` set has
@@ -648,28 +667,40 @@ export async function getExistingTeamsForTenant(
 // OrgUnit assignment: the bulk action never asks the admin to re-pick
 // OrgUnits. Each selected Team's OrgUnit assignment is carried over from
 // that Team's own most recent TeamSeason (any season, most recently started
-// first), restricted to currently ACTIVE OrgUnits. A Team with no such
-// history (never registered before, or its OrgUnits are now archived) is
-// reported as skipped rather than guessed at — the single-Team wizard
-// remains the path for that case.
+// first), restricted to currently ACTIVE, same-tenant OrgUnits.
+//
+// SEASON-01-C3: Season membership and OrgUnit assignment are NOT tightly
+// coupled. OrgUnit carry-over is best-effort only — a Team with no such
+// history (never registered before, its OrgUnits are now archived, or only
+// reachable via drifted cross-tenant historical data) is still registered
+// for the target Season, simply with zero TeamSeasonOrgUnit rows. The Team
+// is never skipped/omitted from the Season on account of missing or invalid
+// OrgUnit history; OrgUnit assignment can be added later via the Team
+// settings page.
 
 /**
  * Resolves the OrgUnit IDs to carry over for an existing Team's bulk Season
  * rollover, sourced from that Team's own most recently started TeamSeason.
- * Only currently ACTIVE OrgUnits are carried forward (archived OrgUnits are
- * never (re-)assigned to a new TeamSeason — same rule as the wizard).
+ * Only currently ACTIVE OrgUnits belonging to `tenantId` are carried
+ * forward (archived OrgUnits are never (re-)assigned to a new TeamSeason —
+ * same rule as the wizard — and any OrgUnit only reachable via drifted
+ * cross-tenant historical data is likewise excluded, never copied).
  *
  * Returns an empty array when the Team has no prior TeamSeason, or none of
- * its OrgUnits are still active — callers must treat that as "not
- * carry-over eligible", never fall back to a guessed OrgUnit.
+ * its OrgUnits are still active/same-tenant — callers must treat that as
+ * "not carry-over eligible" and register the Team with zero OrgUnits
+ * (SEASON-01-C3), never fall back to a guessed OrgUnit.
  */
-async function resolveCarryOverOrgUnitIds(teamId: string): Promise<string[]> {
+async function resolveCarryOverOrgUnitIds(
+  teamId: string,
+  tenantId: string,
+): Promise<string[]> {
   const latestTeamSeason = await prisma.teamSeason.findFirst({
     where: { teamId },
     orderBy: [{ season: { startDate: "desc" } }, { createdAt: "desc" }],
     select: {
       orgUnits: {
-        where: { orgUnit: { status: "ACTIVE" } },
+        where: { orgUnit: { status: "ACTIVE", tenantId } },
         orderBy: [{ displayOrder: "asc" }],
         select: { orgUnitId: true },
       },
@@ -683,7 +714,12 @@ export type BulkRolloverCandidateTeam = {
   id: string;
   name: string;
   slug: string;
-  /** Whether an OrgUnit assignment can be carried over automatically. */
+  /**
+   * Informational only (SEASON-01-C3): whether an OrgUnit assignment can be
+   * carried over automatically. This never gates eligibility — a Team with
+   * `hasOrgUnitHistory: false` is still a fully valid bulk-rollover
+   * candidate and is registered with zero OrgUnits when selected.
+   */
   hasOrgUnitHistory: boolean;
 };
 
@@ -691,11 +727,14 @@ export type BulkRolloverCandidateTeam = {
  * Returns the default candidate Teams for the "Teams übernehmen" bulk
  * action on a given target Season.
  *
- * Eligibility (per ADMIN-MASTERDATA-UX-01-C2):
+ * Eligibility (per ADMIN-MASTERDATA-UX-01-C2, unchanged by SEASON-01-C3):
  *   - Team.isActive = true (archived/inactive Teams are never offered).
  *   - Team belongs to tenantId (tenant isolation).
  *   - Team does not already have a TeamSeason for seasonId (no duplicates
  *     offered — already-registered Teams are simply absent from the list).
+ *
+ * OrgUnit history is NOT an eligibility criterion (SEASON-01-C3) — it is
+ * surfaced only via `hasOrgUnitHistory` for informational UI purposes.
  *
  * Deliberately does NOT depend on Season.isActive — this list must work for
  * an arbitrary target Season regardless of which one is currently "AKTUELL".
@@ -722,7 +761,8 @@ export async function getBulkRolloverCandidateTeams(
   return Promise.all(
     candidates.map(async (team) => ({
       ...team,
-      hasOrgUnitHistory: (await resolveCarryOverOrgUnitIds(team.id)).length > 0,
+      hasOrgUnitHistory:
+        (await resolveCarryOverOrgUnitIds(team.id, tenantId)).length > 0,
     })),
   );
 }
@@ -730,7 +770,6 @@ export async function getBulkRolloverCandidateTeams(
 export type BulkRolloverOutcomeStatus =
   | "CREATED"
   | "ALREADY_PRESENT"
-  | "SKIPPED_NO_ORG_UNIT_HISTORY"
   | "REJECTED_NOT_FOUND"
   | "REJECTED_TENANT_MISMATCH"
   | "REJECTED_INACTIVE"
@@ -741,6 +780,8 @@ export type BulkRolloverOutcome = {
   teamName: string;
   status: BulkRolloverOutcomeStatus;
   teamSeasonId?: string;
+  /** Whether the created/existing TeamSeason carried over any OrgUnit. */
+  hasOrgUnit?: boolean;
   message: string;
 };
 
@@ -749,7 +790,6 @@ export type BulkRolloverResult = {
   outcomes: BulkRolloverOutcome[];
   createdCount: number;
   alreadyPresentCount: number;
-  skippedCount: number;
   rejectedCount: number;
 };
 
@@ -773,6 +813,15 @@ export type BulkRegisterExistingTeamsInput = {
  * stays atomic via registerTeamSeason()'s own transaction; this loop adds no
  * second write path and no job framework — it purely orchestrates repeated,
  * independently-transactional calls to the existing single-Team primitive.
+ *
+ * SEASON-01-C3: Season membership and OrgUnit assignment are NOT tightly
+ * coupled. A valid active same-tenant Team not yet registered for `seasonId`
+ * is ALWAYS registered (CREATED), regardless of whether it has any
+ * carry-over-eligible OrgUnit history — OrgUnit carry-over
+ * (resolveCarryOverOrgUnitIds) is attempted best-effort and passed to
+ * registerTeamSeason() with `allowEmptyOrgUnits: true`; when no valid
+ * historical OrgUnit exists, the TeamSeason is still created with zero
+ * TeamSeasonOrgUnit rows. The Team is never skipped for this reason.
  *
  * Idempotent: a Team already registered for seasonId is reported as
  * ALREADY_PRESENT (registerTeamSeason's own authoritative in-transaction
@@ -833,22 +882,16 @@ export async function bulkRegisterExistingTeamsForSeason(
       continue;
     }
 
-    const orgUnitIds = await resolveCarryOverOrgUnitIds(teamId);
-    if (orgUnitIds.length === 0) {
-      outcomes.push({
-        teamId,
-        teamName: team.name,
-        status: "SKIPPED_NO_ORG_UNIT_HISTORY",
-        message:
-          "Keine übernehmbare Organisationseinheit aus bisherigen Saisons gefunden. Bitte über die Team-Registrierung anlegen.",
-      });
-      continue;
-    }
+    // Best-effort OrgUnit carry-over — never blocks Team registration
+    // (SEASON-01-C3). An empty result simply means the TeamSeason is
+    // created with zero TeamSeasonOrgUnit rows.
+    const orgUnitIds = await resolveCarryOverOrgUnitIds(teamId, input.tenantId);
 
     const result = await registerTeamSeason({
       tenantId: input.tenantId,
       seasonId: input.seasonId,
       orgUnitIds,
+      allowEmptyOrgUnits: true,
       existingTeamId: teamId,
       team: { name: team.name },
       participationType: ParticipationType.TRAINING,
@@ -862,7 +905,11 @@ export async function bulkRegisterExistingTeamsForSeason(
         teamName: team.name,
         status: "CREATED",
         teamSeasonId: result.teamSeasonId,
-        message: "Team-Saison erstellt.",
+        hasOrgUnit: orgUnitIds.length > 0,
+        message:
+          orgUnitIds.length > 0
+            ? "Team-Saison erstellt."
+            : "Team-Saison erstellt (ohne Organisationseinheit — kann später ergänzt werden).",
       });
     } else if (result.code === "TEAM_SEASON_ALREADY_EXISTS") {
       outcomes.push({
@@ -886,7 +933,6 @@ export async function bulkRegisterExistingTeamsForSeason(
     outcomes,
     createdCount: outcomes.filter((o) => o.status === "CREATED").length,
     alreadyPresentCount: outcomes.filter((o) => o.status === "ALREADY_PRESENT").length,
-    skippedCount: outcomes.filter((o) => o.status === "SKIPPED_NO_ORG_UNIT_HISTORY").length,
     rejectedCount: outcomes.filter((o) => o.status.startsWith("REJECTED")).length,
   };
 }

@@ -401,6 +401,84 @@ describe("registerTeamSeason — OrgUnit validation", () => {
     }
   });
 
+  it("SEASON-01-C3: allowEmptyOrgUnits permits empty orgUnitIds, creating the TeamSeason with zero TeamSeasonOrgUnit rows", async () => {
+    vi.mocked(prisma.team.findUnique).mockResolvedValue({
+      id: TEAM_ID,
+      tenantId: TENANT_A,
+    } as never);
+
+    let capturedOrgUnitData: unknown = "not-called";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
+      const tx = {
+        teamSeason: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: TEAM_SEASON_ID }),
+        },
+        teamSeasonOrgUnit: {
+          createMany: vi.fn().mockImplementation((args: { data: unknown }) => {
+            capturedOrgUnitData = args.data;
+            return Promise.resolve({ count: 0 });
+          }),
+        },
+        teamSeasonCompetition: { create: vi.fn().mockResolvedValue({ id: "tsc-01" }) },
+        teamExternalMapping: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          update: vi.fn(),
+          create: vi.fn(),
+        },
+      };
+      return fn(tx);
+    });
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      orgUnitIds: [],
+      allowEmptyOrgUnits: true,
+      existingTeamId: TEAM_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.teamSeasonId).toBe(TEAM_SEASON_ID);
+    }
+    expect(capturedOrgUnitData).toEqual([]);
+  });
+
+  it("SEASON-01-C3: allowEmptyOrgUnits does NOT weaken validation when an OrgUnit IS supplied — cross-tenant still rejected", async () => {
+    vi.mocked(prisma.orgUnit.findMany).mockResolvedValue([
+      { id: ORG_UNIT_ID_1, tenantId: TENANT_B, status: "ACTIVE", name: "Fremd" },
+    ] as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      allowEmptyOrgUnits: true,
+      orgUnitIds: [ORG_UNIT_ID_1],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ORG_UNIT_TENANT_MISMATCH");
+    }
+  });
+
+  it("SEASON-01-C3: allowEmptyOrgUnits does NOT weaken validation when an OrgUnit IS supplied — archived still rejected", async () => {
+    vi.mocked(prisma.orgUnit.findMany).mockResolvedValue([
+      { id: ORG_UNIT_ID_1, tenantId: TENANT_A, status: "ARCHIVED", name: "Archiviert" },
+    ] as never);
+
+    const result = await registerTeamSeason({
+      ...baseInput,
+      allowEmptyOrgUnits: true,
+      orgUnitIds: [ORG_UNIT_ID_1],
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ORG_UNIT_NOT_ACTIVE");
+    }
+  });
+
   it("rejects archived OrgUnit", async () => {
     vi.mocked(prisma.orgUnit.findMany).mockResolvedValue([
       {
