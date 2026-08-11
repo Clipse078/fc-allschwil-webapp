@@ -10,12 +10,14 @@
  *   B. Body validation (teamSeasonId, title, validFrom/validUntil, weekdaySchedules)
  *   C. Success path — creates the series, generates sessions, returns both
  *   D. Domain error mapping
- *   E. RESOURCE-AVAILABILITY-UX-01-C1 — atomic default-allocation propagation:
- *      facilityResourceIds are persisted as TrainingAllocation rows in THIS
- *      same request (no separate client follow-up request required), a
- *      failed individual resource is collected as `allocationErrors` without
- *      aborting series/session creation, and omitting the field entirely
- *      remains fully backward compatible (resources stay optional).
+ *   E. RESOURCE-AVAILABILITY-UX-01-C1 / -C1-V — atomic default-allocation
+ *      propagation: facilityResourceIds are persisted as TrainingAllocation
+ *      rows in THIS same request (no separate client follow-up request
+ *      required), a failed individual resource ROLLS BACK the newly created
+ *      series/sessions (deleteTrainingSeriesPermanently) and fails the
+ *      whole request instead of returning a partially-configured 201, and
+ *      omitting the field entirely remains fully backward compatible
+ *      (resources stay optional).
  */
 
 import { NextRequest } from "next/server";
@@ -29,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   getTrainingSeries: vi.fn(),
   generateTrainingSessions: vi.fn(),
   createTrainingAllocation: vi.fn(),
+  deleteTrainingSeriesPermanently: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-api-any-permission", () => ({
@@ -46,6 +49,10 @@ vi.mock("@/lib/training/session-generation-service", () => ({
 
 vi.mock("@/lib/training/training-allocation-service", () => ({
   createTrainingAllocation: mocks.createTrainingAllocation,
+}));
+
+vi.mock("@/lib/training/training-lifecycle-service", () => ({
+  deleteTrainingSeriesPermanently: mocks.deleteTrainingSeriesPermanently,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
@@ -135,6 +142,7 @@ beforeEach(() => {
   });
   mocks.getTrainingSeries.mockResolvedValue(makeSeriesDto({ sessionCount: 9 }));
   mocks.createTrainingAllocation.mockResolvedValue({ id: "allocation-01" });
+  mocks.deleteTrainingSeriesPermanently.mockResolvedValue({ deleted: { id: SERIES_ID }, impact: [] });
 });
 
 // ── A. Auth / permission gating ──────────────────────────────────────────────
@@ -323,7 +331,8 @@ describe("D. POST /api/training-series — domain error mapping", () => {
   });
 });
 
-// ── E. RESOURCE-AVAILABILITY-UX-01-C1 — atomic default-allocation propagation ─
+// ── E. RESOURCE-AVAILABILITY-UX-01-C1 / -C1-V — atomic default-allocation ───
+//     propagation (create + generate + allocate succeed or fail together)
 
 describe("E. POST /api/training-series — facilityResourceIds (atomic default allocations)", () => {
   it("E1. persists each facilityResourceId as a TrainingAllocation for the newly created series, in this same request", async () => {
@@ -341,9 +350,11 @@ describe("E. POST /api/training-series — facilityResourceIds (atomic default a
       trainingSeriesId: SERIES_ID,
       facilityResourceId: "res-dressing-1",
     });
+    expect(mocks.deleteTrainingSeriesPermanently).not.toHaveBeenCalled();
 
     const body = await res.json();
-    expect(body.allocationErrors).toEqual([]);
+    expect(body.series.id).toBe(SERIES_ID);
+    expect(body.error).toBeUndefined();
 
     // The allocation attempts happen strictly AFTER the series (and its
     // sessions) already exist — proving there is no window in which the
@@ -358,8 +369,9 @@ describe("E. POST /api/training-series — facilityResourceIds (atomic default a
 
     expect(res.status).toBe(201);
     expect(mocks.createTrainingAllocation).not.toHaveBeenCalled();
+    expect(mocks.deleteTrainingSeriesPermanently).not.toHaveBeenCalled();
     const body = await res.json();
-    expect(body.allocationErrors).toEqual([]);
+    expect(body.series.id).toBe(SERIES_ID);
   });
 
   it("E3. an empty facilityResourceIds array behaves like omitting the field", async () => {
@@ -375,24 +387,42 @@ describe("E. POST /api/training-series — facilityResourceIds (atomic default a
     expect(mocks.createTrainingAllocation).toHaveBeenCalledTimes(1);
   });
 
-  it("E5. a failed individual resource (e.g. archived) is collected as allocationErrors, but the series/sessions are still created (no rollback)", async () => {
-    mocks.createTrainingAllocation
-      .mockRejectedValueOnce(new Error("FacilityResource is archived and cannot receive new allocations"))
-      .mockResolvedValueOnce({ id: "allocation-ok" });
+  it("E5. a failed individual resource (e.g. archived) rolls back the newly created series/sessions instead of returning a partial 201", async () => {
+    mocks.createTrainingAllocation.mockRejectedValueOnce(
+      new Error("FacilityResource is archived and cannot receive new allocations"),
+    );
 
     const res = await POST(
       makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-archived", "res-dressing-1"] }),
     );
 
-    expect(res.status).toBe(201);
+    // The whole request fails — never a 201 for a series missing a
+    // requested default allocation.
+    expect(res.status).not.toBe(201);
     const body = await res.json();
-    expect(body.series.id).toBe(SERIES_ID);
-    expect(body.generation).toBeTruthy();
-    expect(body.allocationErrors).toEqual([
-      { facilityResourceId: "res-archived", error: "FacilityResource is archived and cannot receive new allocations" },
-    ]);
-    // the second (valid) resource is still attempted despite the first failing.
-    expect(mocks.createTrainingAllocation).toHaveBeenCalledTimes(2);
+    expect(body.error).toBe("FacilityResource is archived and cannot receive new allocations");
+    expect(body.series).toBeUndefined();
+
+    // The already-created series is rolled back via the SAME hard-delete
+    // service ADMIN-DELETE-02A already uses (cascades sessions + any
+    // allocations already attached).
+    expect(mocks.deleteTrainingSeriesPermanently).toHaveBeenCalledWith(TENANT_A, SERIES_ID);
+
+    // Stops at the first failure — the second resource is never attempted
+    // once rollback is inevitable.
+    expect(mocks.createTrainingAllocation).toHaveBeenCalledTimes(1);
+  });
+
+  it("E5a. maps the underlying allocation error type to the same HTTP status the standalone allocations endpoint uses", async () => {
+    const { TrainingAllocationResourceNotFoundError } = await import("@/lib/training/errors");
+    mocks.createTrainingAllocation.mockRejectedValueOnce(
+      new TrainingAllocationResourceNotFoundError("res-missing"),
+    );
+
+    const res = await POST(makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-missing"] }));
+
+    expect(res.status).toBe(404);
+    expect(mocks.deleteTrainingSeriesPermanently).toHaveBeenCalledWith(TENANT_A, SERIES_ID);
   });
 
   it("E6. returns 400 when facilityResourceIds is not an array", async () => {
@@ -407,14 +437,14 @@ describe("E. POST /api/training-series — facilityResourceIds (atomic default a
     expect(mocks.createTrainingSeries).not.toHaveBeenCalled();
   });
 
-  it("E8. uses a fallback error message when an allocation rejection carries no message", async () => {
+  it("E8. uses a fallback error message + still rolls back when an allocation rejection carries no message", async () => {
     mocks.createTrainingAllocation.mockRejectedValueOnce("boom");
 
     const res = await POST(makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-pitch-1"] }));
 
+    expect(res.status).not.toBe(201);
     const body = await res.json();
-    expect(body.allocationErrors).toEqual([
-      { facilityResourceId: "res-pitch-1", error: "Ressource konnte nicht zugewiesen werden." },
-    ]);
+    expect(body.error).toBe("Ressource konnte nicht zugewiesen werden.");
+    expect(mocks.deleteTrainingSeriesPermanently).toHaveBeenCalledWith(TENANT_A, SERIES_ID);
   });
 });

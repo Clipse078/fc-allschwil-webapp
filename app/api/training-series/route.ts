@@ -6,11 +6,12 @@
  * service) across [validFrom, validUntil] — "Save" always produces the
  * concrete, dated occurrences the rest of the TrainingCenter reads from.
  *
- * RESOURCE-AVAILABILITY-UX-01-C1: also accepts the series' initial
+ * RESOURCE-AVAILABILITY-UX-01-C1 / -C1-V: also accepts the series' initial
  * Spielfeld/Halle + Garderobe default allocations (`facilityResourceIds`)
  * and persists them as TrainingAllocation rows in THIS SAME request/server
- * invocation — see the module doc comment below for why this must not be a
- * separate client-driven follow-up request.
+ * invocation — see below for why this must not be a separate client-driven
+ * follow-up request, and why a failed allocation must roll back the
+ * series/sessions rather than leave them behind.
  *
  * Body:
  *   teamSeasonId        string, required
@@ -32,10 +33,28 @@
  * TrainingSessions permanently allocation-less — reproducing exactly as
  * "Spielfeld/Halle: Keine Ressource zugewiesen" / "Garderobe: Keine
  * Ressource zugewiesen" on every generated occurrence, with no error ever
- * surfaced (the interruption happens on the client, outside any try/catch
- * this route or the orchestration helper controls). Every generated
- * TrainingSession already resolves its EFFECTIVE allocation from its parent
- * TrainingSeries' TrainingAllocation rows at read time (see
+ * surfaced.
+ *
+ * RESOURCE-AVAILABILITY-UX-01-C1-V correctness fix: creating the series,
+ * generating its sessions, and persisting the requested default
+ * allocations are three separate Prisma call sites (createTrainingSeries,
+ * generateTrainingSessions, createTrainingAllocation per resource) — this
+ * request is NOT one Prisma transaction. The original fix merely collected
+ * a failed facilityResourceId into an `allocationErrors` array while still
+ * returning 201 with the already-created series/sessions — exactly the
+ * "successful but partially configured series" this endpoint exists to
+ * prevent. Now: if ANY requested facilityResourceId fails to allocate, the
+ * just-created TrainingSeries is rolled back via the EXISTING
+ * deleteTrainingSeriesPermanently() (lib/training/training-lifecycle-
+ * service.ts) — itself a single Prisma transaction whose FK cascades
+ * remove the series' TrainingSessions and any TrainingAllocation rows
+ * already attached — and the request fails instead of returning 201. This
+ * guarantees a 201 response never refers to a series missing a requested
+ * default allocation, with no schema change and no redesign of the
+ * generation/allocation services themselves.
+ *
+ * Every generated TrainingSession already resolves its EFFECTIVE allocation
+ * from its parent TrainingSeries' TrainingAllocation rows at read time (see
  * lib/training/operational-state.ts, view-model.ts,
  * session-allocation-service.ts, lib/facilities/availability-service.ts,
  * lib/weekplanner/queries.ts) — so once the default allocations exist here,
@@ -52,11 +71,17 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { createTrainingSeries, getTrainingSeries } from "@/lib/training/training-service";
 import { generateTrainingSessions } from "@/lib/training/session-generation-service";
 import { createTrainingAllocation } from "@/lib/training/training-allocation-service";
+import { deleteTrainingSeriesPermanently } from "@/lib/training/training-lifecycle-service";
 import {
   TrainingSeriesValidationError,
   TrainingSeriesConflictError,
   TrainingSeriesTeamSeasonNotFoundError,
   TrainingSeriesArchivedTeamError,
+  TrainingAllocationResourceNotFoundError,
+  TrainingAllocationArchivedResourceError,
+  TrainingAllocationArchivedFacilityError,
+  TrainingAllocationDuplicateError,
+  TrainingAllocationTenantMismatchError,
 } from "@/lib/training/errors";
 import {
   parseWeekdaySchedules,
@@ -64,8 +89,20 @@ import {
   parseFacilityResourceIds,
 } from "@/lib/training/series-request-helpers";
 
-/** One failed default-allocation attempt, reported back to the client (never aborts series creation). */
-type AllocationError = { facilityResourceId: string; error: string };
+/**
+ * Maps an allocation-validation error to the HTTP status the standalone
+ * POST /api/training-series/:id/allocations endpoint already uses for the
+ * same error type, so a resource rejected during series creation and a
+ * resource rejected via the standalone allocations page fail the same way.
+ */
+function allocationErrorStatus(err: unknown): number {
+  if (err instanceof TrainingAllocationResourceNotFoundError) return 404;
+  if (err instanceof TrainingAllocationArchivedResourceError) return 422;
+  if (err instanceof TrainingAllocationArchivedFacilityError) return 422;
+  if (err instanceof TrainingAllocationDuplicateError) return 409;
+  if (err instanceof TrainingAllocationTenantMismatchError) return 409;
+  return 422;
+}
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiAnyPermission([PERMISSIONS.TRAININGS_MANAGE]);
@@ -126,18 +163,15 @@ export async function POST(request: NextRequest) {
       to: validUntil.value,
     });
 
-    // RESOURCE-AVAILABILITY-UX-01-C1: persist the series' default
+    // RESOURCE-AVAILABILITY-UX-01-C1-V: persist the series' default
     // allocations HERE — same request, same server-side invocation as the
     // series + session generation above, so there is no client-observable
-    // gap in which the series can exist without them. Mirrors the
-    // partial-failure philosophy already established by
-    // create-training-series-orchestration.ts: a resource that fails
-    // validation (archived, not found, already allocated, cross-tenant) is
-    // collected as an error and reported back, but never aborts the
-    // already-successful series/session creation above — the admin can
-    // still fix individual resources afterwards via the existing
-    // allocations page.
-    const allocationErrors: AllocationError[] = [];
+    // gap in which the series can exist without them. Unlike the earlier
+    // partial-failure design, a resource that fails validation (archived,
+    // not found, already allocated, cross-tenant) now rolls back the
+    // just-created series/sessions and fails the WHOLE request — a 201
+    // response must never refer to a series missing a requested default
+    // allocation.
     for (const facilityResourceId of facilityResourceIds.value) {
       try {
         await createTrainingAllocation(tenantId, {
@@ -145,19 +179,18 @@ export async function POST(request: NextRequest) {
           facilityResourceId,
         });
       } catch (allocationErr) {
-        allocationErrors.push({
-          facilityResourceId,
-          error:
-            allocationErr instanceof Error
-              ? allocationErr.message
-              : "Ressource konnte nicht zugewiesen werden.",
-        });
+        await deleteTrainingSeriesPermanently(tenantId, created.id);
+        const message =
+          allocationErr instanceof Error
+            ? allocationErr.message
+            : "Ressource konnte nicht zugewiesen werden.";
+        return NextResponse.json({ error: message }, { status: allocationErrorStatus(allocationErr) });
       }
     }
 
     const series = await getTrainingSeries(tenantId, created.id);
 
-    return NextResponse.json({ series, generation, allocationErrors }, { status: 201 });
+    return NextResponse.json({ series, generation }, { status: 201 });
   } catch (err) {
     if (err instanceof TrainingSeriesValidationError) {
       return NextResponse.json({ error: err.message }, { status: 400 });

@@ -129,14 +129,20 @@ function makeFakeDb() {
   }
 
   function seriesInclude(series: AnyRow) {
+    const ownSessions = trainingSessions.filter((s) => s.trainingSeriesId === series.id);
     return {
       ...series,
       recurrenceDays: recurrenceDays
         .filter((d) => d.trainingSeriesId === series.id)
         .sort((a, b) => String(a.weekday).localeCompare(String(b.weekday)))
         .map((d) => ({ weekday: d.weekday, startsAt: d.startsAt, endsAt: d.endsAt })),
+      // Present so deleteTrainingSeriesPermanently()'s select shape resolves too
+      // (it selects `sessions: { select: { id: true } }` inside its transaction).
+      sessions: ownSessions.map((s) => ({ id: s.id })),
       _count: {
-        sessions: trainingSessions.filter((s) => s.trainingSeriesId === series.id).length,
+        sessions: ownSessions.length,
+        allocations: trainingAllocations.filter((a) => a.trainingSeriesId === series.id).length,
+        planAssignments: 0,
       },
     };
   }
@@ -250,7 +256,48 @@ function makeFakeDb() {
         }
         return seriesInclude(series);
       }),
+      /**
+       * Mirrors deleteTrainingSeriesPermanently()'s `tx.trainingSeries.delete()`
+       * — schema FK cascades remove recurrenceDays, sessions, that series'
+       * TrainingAllocation rows, and each session's own
+       * TrainingSessionAllocation rows. Used by the RESOURCE-AVAILABILITY-
+       * UX-01-C1-V rollback-on-allocation-failure regression test below.
+       */
+      delete: vi.fn(async ({ where }: { where: AnyRow }) => {
+        const idx = trainingSeriesRows.findIndex((s) => s.id === where.id);
+        if (idx < 0) throw new Error("series not found");
+        const [deleted] = trainingSeriesRows.splice(idx, 1);
+        for (let i = recurrenceDays.length - 1; i >= 0; i -= 1) {
+          if (recurrenceDays[i].trainingSeriesId === deleted.id) recurrenceDays.splice(i, 1);
+        }
+        for (let i = trainingAllocations.length - 1; i >= 0; i -= 1) {
+          if (trainingAllocations[i].trainingSeriesId === deleted.id) trainingAllocations.splice(i, 1);
+        }
+        const sessionIdsToRemove = trainingSessions
+          .filter((s) => s.trainingSeriesId === deleted.id)
+          .map((s) => s.id as string);
+        for (let i = trainingSessions.length - 1; i >= 0; i -= 1) {
+          if (trainingSessions[i].trainingSeriesId === deleted.id) trainingSessions.splice(i, 1);
+        }
+        for (let i = trainingSessionAllocations.length - 1; i >= 0; i -= 1) {
+          if (sessionIdsToRemove.includes(trainingSessionAllocations[i].trainingSessionId as string)) {
+            trainingSessionAllocations.splice(i, 1);
+          }
+        }
+        return { id: deleted.id };
+      }),
     },
+    weekplannerPlanAllocation: {
+      deleteMany: vi.fn(async () => ({ count: 0 })),
+    },
+    weekplannerPlanActivityOverride: {
+      deleteMany: vi.fn(async () => ({ count: 0 })),
+    },
+    $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
+      // In-memory fake — no real isolation needed; the transaction callback
+      // just runs against the SAME tables the rest of this fake operates on.
+      return callback(prisma);
+    }),
     trainingSession: {
       createMany: vi.fn(async ({ data }: { data: AnyRow[] }) => {
         const now = new Date();
@@ -471,6 +518,7 @@ const {
   listSessionAllocationSummaryByTenant,
 } = await import("../session-allocation-service");
 const { assessTrainingOperationalState } = await import("../operational-state");
+const { deleteTrainingSeriesPermanently } = await import("../training-lifecycle-service");
 
 // ── Test setup ────────────────────────────────────────────────────────────────
 
@@ -483,9 +531,13 @@ async function seedTeamSeason(tenantId = TENANT_A) {
   return teamSeason.id as string;
 }
 
-async function seedResource(type: "FULL_PITCH" | "DRESSING_ROOM", tenantId = TENANT_A) {
+async function seedResource(
+  type: "FULL_PITCH" | "DRESSING_ROOM",
+  tenantId = TENANT_A,
+  overrides: Partial<{ status: string }> = {},
+) {
   const facility = fakeDb.fixtures.addFacility();
-  return fakeDb.fixtures.addFacilityResource(facility.id as string, { tenantId, type }).id as string;
+  return fakeDb.fixtures.addFacilityResource(facility.id as string, { tenantId, type, ...overrides }).id as string;
 }
 
 beforeEach(() => {
@@ -847,5 +899,70 @@ describe("E. tenant isolation", () => {
     await expect(
       createTrainingAllocation(TENANT_A, { trainingSeriesId: seriesA.id, facilityResourceId: pitchResourceIdB }),
     ).rejects.toThrow(TrainingAllocationResourceNotFoundError);
+  });
+});
+
+// ── F. RESOURCE-AVAILABILITY-UX-01-C1-V — atomic creation, real rollback ────
+
+describe("F. atomic creation: a failed default allocation leaves NO trace of the series/sessions", () => {
+  it("F1. simulating the POST /api/training-series rollback sequence (create -> generate -> allocation fails -> deleteTrainingSeriesPermanently) leaves zero series, sessions, or allocations behind", async () => {
+    const teamSeasonId = await seedTeamSeason();
+    const validPitchId = await seedResource("FULL_PITCH");
+    const archivedDressingRoomId = await seedResource("DRESSING_ROOM", TENANT_A, { status: "ARCHIVED" });
+
+    const series = await createTrainingSeries(TENANT_A, {
+      teamSeasonId,
+      title: "F1 Montagstraining",
+      startsAt: "17:15",
+      endsAt: "18:45",
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-10"),
+      validUntil: new Date("2026-09-07"), // 4 occurrences
+    });
+    const generation = await generateTrainingSessions(TENANT_A, series.id, {
+      from: new Date("2026-08-10"),
+      to: new Date("2026-09-07"),
+    });
+    expect(generation.created).toBeGreaterThan(0);
+
+    // First resource succeeds, second (archived) fails — exactly the
+    // sequence app/api/training-series/route.ts runs.
+    await createTrainingAllocation(TENANT_A, { trainingSeriesId: series.id, facilityResourceId: validPitchId });
+
+    const { TrainingAllocationArchivedResourceError } = await import("../errors");
+    await expect(
+      createTrainingAllocation(TENANT_A, {
+        trainingSeriesId: series.id,
+        facilityResourceId: archivedDressingRoomId,
+      }),
+    ).rejects.toThrow(TrainingAllocationArchivedResourceError);
+
+    // Pre-rollback sanity check: the series, its sessions, and the ONE
+    // successful allocation all genuinely exist before rollback runs.
+    expect(fakeDb.tables.trainingSeriesRows.some((s) => s.id === series.id)).toBe(true);
+    expect(fakeDb.tables.trainingSessions.some((s) => s.trainingSeriesId === series.id)).toBe(true);
+    expect(fakeDb.tables.trainingAllocations.some((a) => a.trainingSeriesId === series.id)).toBe(true);
+
+    // The route rolls back via the EXISTING deleteTrainingSeriesPermanently()
+    // service on any allocation failure — reuse the REAL service here too.
+    await deleteTrainingSeriesPermanently(TENANT_A, series.id);
+
+    expect(fakeDb.tables.trainingSeriesRows.some((s) => s.id === series.id)).toBe(false);
+    expect(fakeDb.tables.trainingSessions.some((s) => s.trainingSeriesId === series.id)).toBe(false);
+    expect(fakeDb.tables.trainingAllocations.some((a) => a.trainingSeriesId === series.id)).toBe(false);
+
+    // The series is genuinely gone, not just archived/hidden — a fresh
+    // create attempt reusing the exact same title succeeds. Note: no
+    // duplicate-title conflict remains, proving zero orphaned trace.
+    const recreated = await createTrainingSeries(TENANT_A, {
+      teamSeasonId,
+      title: "F1 Montagstraining",
+      startsAt: "17:15",
+      endsAt: "18:45",
+      weekdays: ["MONDAY"],
+      validFrom: new Date("2026-08-10"),
+      validUntil: new Date("2026-08-11"),
+    });
+    expect(recreated.id).not.toBe(series.id);
   });
 });
