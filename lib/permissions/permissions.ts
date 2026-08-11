@@ -7,6 +7,11 @@ export const PERMISSIONS = {
 
   SEASONS_VIEW: "seasons.view",
   SEASONS_MANAGE: "seasons.manage",
+  // ADMIN-DELETE-SEASON-01: canonical permanent-deletion permission. Deliberately
+  // separate from SEASONS_MANAGE — holding "manage" (create/edit) must never
+  // implicitly grant permanent deletion. Follows the "<module>.delete" convention
+  // established by TEAMS_DELETE (ADMIN-DELETE-01A) and extended by ADMIN-DELETE-02A.
+  SEASONS_DELETE: "seasons.delete",
 
   TEAMS_VIEW: "teams.view",
   TEAMS_MANAGE: "teams.manage",

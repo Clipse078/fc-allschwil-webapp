@@ -88,6 +88,9 @@ async function main() {
     // ── TENANT-scoped permissions ─────────────────────────────────────────
     { key: "seasons.view", name: "View seasons", module: PermissionModule.SEASONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "seasons.manage", name: "Manage seasons", module: PermissionModule.SEASONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-SEASON-01: canonical permanent-deletion permission. Deliberately
+    // separate from seasons.manage. Mirrors teams.delete (ADMIN-DELETE-01A).
+    { key: "seasons.delete", name: "Permanently delete seasons", module: PermissionModule.SEASONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "teams.view", name: "View teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "teams.manage", name: "Manage teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
