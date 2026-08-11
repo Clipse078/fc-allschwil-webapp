@@ -63,20 +63,12 @@ export default function AdminPageActions() {
   if (pathname === "/dashboard/seasons" || pathname.startsWith("/dashboard/seasons/")) {
     return (
       <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-rose-200 bg-white px-4 text-sm font-medium text-rose-600 shadow-sm transition hover:-translate-y-[1px] hover:bg-rose-50"
-        >
-          <Settings2 className="h-4 w-4" />
-          Saison löschen
-        </button>
-
         <Link
           href="/dashboard/seasons#create-season"
           className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b4aa2] px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-[#08357a]"
         >
           <Plus className="h-4 w-4" />
-          Neue Saison planen
+          Neue Saison
         </Link>
       </div>
     );

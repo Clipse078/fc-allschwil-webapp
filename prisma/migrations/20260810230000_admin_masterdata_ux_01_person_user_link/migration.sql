@@ -1,0 +1,12 @@
+-- ADMIN-MASTERDATA-UX-01: canonical, explicit Person <-> User link.
+-- Additive only: nullable column + unique index + FK. No data changes,
+-- no destructive operations, no ALTER TYPE.
+
+-- AlterTable
+ALTER TABLE "Person" ADD COLUMN "userId" TEXT;
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Person_userId_key" ON "Person"("userId");
+
+-- AddForeignKey
+ALTER TABLE "Person" ADD CONSTRAINT "Person_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

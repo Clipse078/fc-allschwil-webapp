@@ -263,3 +263,93 @@ export async function getEligibleTenantMembers(tenantId: string): Promise<Eligib
 
 /** Re-exported for UI badge rendering without importing lib/roles/protected directly. */
 export { isProtectedRole };
+
+// ---------------------------------------------------------------------------
+// ADMIN-MASTERDATA-UX-01 — Person ↔ tenant-role assignment (Person detail
+// "Zugang & Rollen" card)
+// ---------------------------------------------------------------------------
+
+export type PersonLinkedUserRoleAssignment = {
+  userId: string;
+  /** Active TenantMembership in `tenantId` — the same eligibility source as
+   * getEligibleTenantMembers(). False (not absent) when the linked User
+   * exists but its membership in this exact tenant is inactive. */
+  isActiveMember: boolean;
+  /** TENANT-scoped role ids currently assigned to this user in `tenantId`. */
+  roleIds: string[];
+};
+
+/**
+ * Resolves a single already-known `userId` (from `Person.userId`) to its
+ * tenant-role assignment state within `tenantId` — the read side of the
+ * Person detail "Zugang & Rollen" card.
+ *
+ * Returns `null` when the user has no `TenantMembership` row for
+ * `tenantId` at all (never a member of this tenant — e.g. the Person's
+ * linked User belongs to a different tenant). This is the same tenant
+ * isolation boundary `assignTenantRoleToUser`/`removeTenantRoleAssignment`
+ * (lib/roles/mutations.ts) already enforce server-side: a caller cannot
+ * assign/remove a tenant role for a user with no active membership in that
+ * tenant, so this read-side helper mirrors that exactly rather than
+ * inventing a second eligibility rule.
+ *
+ * `roleIds` only ever contains TENANT-scoped roles owned by this exact
+ * tenant (`role: { scope: "TENANT", tenantId }`) — a PLATFORM role, or a
+ * TENANT role owned by a different tenant, can never appear here.
+ */
+export async function getTenantRoleAssignmentForUser(
+  tenantId: string,
+  userId: string,
+): Promise<PersonLinkedUserRoleAssignment | null> {
+  const membership = await prisma.tenantMembership.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { isActive: true },
+  });
+  if (!membership) return null;
+
+  const userRoles = await prisma.userRole.findMany({
+    where: { tenantId, userId, role: { scope: "TENANT", tenantId } },
+    select: { roleId: true },
+  });
+
+  return {
+    userId,
+    isActiveMember: membership.isActive,
+    roleIds: userRoles.map((ur) => ur.roleId),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking eligible-user source
+// ---------------------------------------------------------------------------
+
+export type LinkableTenantUser = {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+/**
+ * The eligible universe for "Person -> User" linking: exactly the same
+ * canonical source as tenant role assignment (`getEligibleTenantMembers()`
+ * — active `TenantMembership` rows for this exact tenant, never
+ * `User.tenantId`), further filtered to Users not already linked to
+ * ANY Person (`Person.userId` is `@unique` — at most one Person per User).
+ * A cross-tenant User or a PLATFORM-only User with no membership in this
+ * tenant can never appear here.
+ */
+export async function getLinkableTenantUsersForPerson(tenantId: string): Promise<LinkableTenantUser[]> {
+  const members = await getEligibleTenantMembers(tenantId);
+  if (members.length === 0) return [];
+
+  const alreadyLinked = await prisma.person.findMany({
+    where: { userId: { in: members.map((m) => m.userId) } },
+    select: { userId: true },
+  });
+  const linkedUserIds = new Set(alreadyLinked.map((p) => p.userId as string));
+
+  return members
+    .filter((m) => !linkedUserIds.has(m.userId))
+    .map((m) => ({ userId: m.userId, firstName: m.firstName, lastName: m.lastName, email: m.email }));
+}
