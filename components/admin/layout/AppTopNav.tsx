@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell, HelpCircle, Menu, Settings } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Suspense } from "react";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 
@@ -65,25 +65,13 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
         </nav>
       </div>
 
-      {/* Right: page actions + icons */}
+      {/* Right: page actions + user identity */}
       <div className="flex shrink-0 items-center gap-1">
         <div className="hidden xl:flex items-center gap-1">
           <Suspense fallback={null}>
             <AdminPageActions />
           </Suspense>
         </div>
-
-        <button type="button" className="sce-icon-button" aria-label="Benachrichtigungen" disabled>
-          <Bell className="h-4 w-4" />
-        </button>
-
-        <button type="button" className="sce-icon-button" aria-label="Hilfe" disabled>
-          <HelpCircle className="h-4 w-4" />
-        </button>
-
-        <button type="button" className="sce-icon-button" aria-label="Einstellungen" disabled>
-          <Settings className="h-4 w-4" />
-        </button>
 
         {/* User avatar */}
         <div
