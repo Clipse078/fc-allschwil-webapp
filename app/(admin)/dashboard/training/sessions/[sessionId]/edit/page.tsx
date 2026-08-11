@@ -120,6 +120,8 @@ export default async function TrainingSessionEditPage({ params }: Props) {
             seriesAllocations={seriesAllocations}
             facilityGroups={facilityGroups}
             canManage={canManage}
+            sessionStartAt={trainingSession.startAt}
+            sessionEndAt={trainingSession.endAt}
           />
         </div>
       </div>
