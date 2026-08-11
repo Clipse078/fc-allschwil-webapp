@@ -42,7 +42,8 @@ import {
   Volleyball,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
-import SceWordmark from "@/components/admin/branding/SceWordmark";
+import SidebarBrandHeader from "@/components/admin/branding/SidebarBrandHeader";
+import PoweredByBadge from "@/components/admin/branding/PoweredByBadge";
 import { getVisibleNavSections } from "@/lib/nav/nav-config";
 import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
@@ -74,7 +75,7 @@ function getNavIcon(label: string) {
     case "Meetings":                    return ScrollText;
     case "Initiativen":                 return Flag;
     case "Infoboard":                   return Monitor;
-    case "Matchcenter":                 return Volleyball;
+    case "MatchCenter":                 return Volleyball;
     case "Administration":              return Settings2;
     // Organisation children
     case "Organisationseinheiten":      return Building2;
@@ -189,10 +190,9 @@ export default function AdminSidebar({
         isCollapsed && "collapsed",
       )}
     >
-      {/* Brand header */}
+      {/* Brand header — tenant identity is dominant (DASHBOARD-SHELL-UX-01) */}
       <div className="sce-sidebar-brand">
-        <SceWordmark
-          size={isCollapsed ? 28 : 32}
+        <SidebarBrandHeader
           tenantName={displayClubName}
           logoUrl={logoUrl}
           collapsed={isCollapsed}
@@ -314,6 +314,9 @@ export default function AdminSidebar({
         )}
 
         <SignOutButton collapsed={isCollapsed} />
+
+        {/* SportClubEvo platform attribution — subtle, secondary to the tenant brand */}
+        <PoweredByBadge collapsed={isCollapsed} />
       </div>
     </aside>
   );
