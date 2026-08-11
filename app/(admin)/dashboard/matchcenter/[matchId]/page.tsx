@@ -25,9 +25,14 @@ type MatchcenterDetailPageProps = {
 export default async function MatchcenterDetailPage({
   params,
 }: MatchcenterDetailPageProps) {
+  // ADMIN-DELETE-02A: a delegated user may hold matches.delete without
+  // events.view/events.manage — they must still be able to reach this page
+  // to exercise the permanent-delete action gated below (mirrors
+  // app/(admin)/dashboard/teams/[teamId]/page.tsx, ADMIN-DELETE-01B).
   const session = await requireAnyPermission([
     PERMISSIONS.EVENTS_VIEW,
     PERMISSIONS.EVENTS_MANAGE,
+    PERMISSIONS.MATCHES_DELETE,
   ]);
 
   const tenantContext = await getActiveTenant();
@@ -64,6 +69,10 @@ export default async function MatchcenterDetailPage({
     session,
     PERMISSIONS.EVENTS_MANAGE,
   );
+
+  // ADMIN-DELETE-02A: permanent "Löschen" gating — deliberately independent
+  // of events.manage (manage alone must never authorize deletion).
+  const canDelete = hasPermission(session, PERMISSIONS.MATCHES_DELETE);
 
   // MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped, active resource
   // options for the operational pitch/dressing-room selectors, replacing the
@@ -108,6 +117,7 @@ export default async function MatchcenterDetailPage({
         locale={tenantContext.locale ?? "de-CH"}
         timezone={tenantContext.timezone ?? "Europe/Zurich"}
         canManageMappings={canManageMappings}
+        canDelete={canDelete}
         pitchOptions={pitchOptions}
         dressingRoomOptions={dressingRoomOptions}
       />

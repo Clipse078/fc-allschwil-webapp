@@ -31,6 +31,7 @@ import { SectionCard } from "@/components/ui/page/SectionCard";
 import { DetailPagePattern } from "@/components/ui/patterns/DetailPagePattern";
 import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMappingDialog";
 import MatchcenterDetailOperational from "@/components/admin/matchcenter/MatchcenterDetailOperational";
+import MatchLifecycleCard from "@/components/admin/matchcenter/MatchLifecycleCard";
 import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
 
 type MatchcenterDetailProps = {
@@ -38,6 +39,11 @@ type MatchcenterDetailProps = {
   locale?: string;
   timezone?: string;
   canManageMappings?: boolean;
+  /**
+   * ADMIN-DELETE-02A: effective PERMISSIONS.MATCHES_DELETE authority.
+   * Deliberately independent of canManageMappings/events.manage.
+   */
+  canDelete?: boolean;
   /** MASTERDATA-CONSISTENCY-02 — canonical pitch/hall options for MatchcenterDetailOperational. */
   pitchOptions?: FacilityResourceOption[];
   /** MASTERDATA-CONSISTENCY-02 — canonical dressing-room options for MatchcenterDetailOperational. */
@@ -177,6 +183,7 @@ export default function MatchcenterDetail({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   canManageMappings = false,
+  canDelete = false,
   pitchOptions = [],
   dressingRoomOptions = [],
 }: MatchcenterDetailProps) {
@@ -406,6 +413,12 @@ export default function MatchcenterDetail({
         }
         sidebar={
           <>
+            <MatchLifecycleCard
+              matchId={match.id}
+              matchTitle={match.title}
+              canDelete={canDelete}
+            />
+
             <SectionCard
               title="Sichtbarkeit"
               description="Aktive Ausgabekanäle"

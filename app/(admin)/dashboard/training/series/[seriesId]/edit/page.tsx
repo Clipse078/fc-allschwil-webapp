@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
+import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTrainingSeries } from "@/lib/training/training-service";
 import { findTeamSeasonPickerRow } from "@/lib/training/queries";
 import { TrainingSeriesNotFoundError } from "@/lib/training/errors";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TrainingSeriesForm from "@/components/admin/training/TrainingSeriesForm";
+import TrainingSeriesDeleteControl from "@/components/admin/training/TrainingSeriesDeleteControl";
 
 type Props = { params: Promise<{ seriesId: string }> };
 
@@ -16,7 +18,18 @@ function toDateInputValue(iso: string | null): string | null {
 }
 
 export default async function EditTrainingSeriesPage({ params }: Props) {
-  const session = await requireAnyPermission([PERMISSIONS.TRAININGS_MANAGE]);
+  // ADMIN-DELETE-02A: a delegated user may hold trainings.delete without
+  // trainings.manage — they must still be able to reach this page to
+  // exercise the permanent-delete action gated below (mirrors
+  // app/(admin)/dashboard/teams/[teamId]/page.tsx, ADMIN-DELETE-01B).
+  const session = await requireAnyPermission([
+    PERMISSIONS.TRAININGS_MANAGE,
+    PERMISSIONS.TRAININGS_DELETE,
+  ]);
+
+  // ADMIN-DELETE-02A: permanent "Löschen" gating — deliberately independent
+  // of trainings.manage (manage alone must never authorize deletion).
+  const canDelete = hasPermission(session, PERMISSIONS.TRAININGS_DELETE);
 
   const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
@@ -58,6 +71,12 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
           validUntil: toDateInputValue(series.validUntil),
           weekdaySchedules: series.weekdaySchedules,
         }}
+      />
+
+      <TrainingSeriesDeleteControl
+        seriesId={series.id}
+        seriesTitle={series.title}
+        canDelete={canDelete}
       />
     </div>
   );

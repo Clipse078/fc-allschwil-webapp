@@ -28,6 +28,15 @@ export const PERMISSIONS = {
   EVENTS_IMPORT: "events.import",
   EVENTS_PUBLISH_WEBSITE: "events.publish_website",
   EVENTS_PUBLISH_INFOBOARD: "events.publish_infoboard",
+  // ADMIN-DELETE-02A: canonical permanent-deletion permissions for the
+  // MatchCenter/TournamentCenter modules, following the "<module>.delete"
+  // convention established by TEAMS_DELETE (ADMIN-DELETE-01A/01B). Both
+  // target the canonical Event model (type=MATCH / type=TOURNAMENT — see
+  // prisma/schema.prisma) and are deliberately separate from EVENTS_MANAGE —
+  // archive/cancel/edit access must never implicitly grant permanent
+  // deletion.
+  MATCHES_DELETE: "matches.delete",
+  TOURNAMENTS_DELETE: "tournaments.delete",
 
   FIXTURES_VIEW: "fixtures.view",
   FIXTURES_CREATE: "fixtures.create",
@@ -72,6 +81,12 @@ export const PERMISSIONS = {
 
   TRAININGS_VIEW: "trainings.view",
   TRAININGS_MANAGE: "trainings.manage",
+  // ADMIN-DELETE-02A: canonical permanent-deletion permission, following the
+  // "<module>.delete" convention established by TEAMS_DELETE (ADMIN-DELETE-
+  // 01A/01B). Deliberately separate from TRAININGS_MANAGE — archive/edit
+  // access must never implicitly grant permanent deletion of a
+  // TrainingSeries.
+  TRAININGS_DELETE: "trainings.delete",
 
   // RPERM-02: role management permissions — defined here, not yet used in guards
   ROLES_VIEW: "roles.view",

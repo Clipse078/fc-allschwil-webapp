@@ -16,12 +16,23 @@ import type { FacilityGroup } from "@/components/admin/training/FacilityResource
 type Props = { params: Promise<{ tournamentId: string }> };
 
 export default async function TournamentEditPage({ params }: Props) {
-  const session = await requireAnyPermission([PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE]);
+  // ADMIN-DELETE-02A: a delegated user may hold tournaments.delete without
+  // events.view/events.manage — they must still be able to reach this page
+  // to exercise the permanent-delete action gated below (mirrors
+  // app/(admin)/dashboard/teams/[teamId]/page.tsx, ADMIN-DELETE-01B).
+  const session = await requireAnyPermission([
+    PERMISSIONS.EVENTS_VIEW,
+    PERMISSIONS.EVENTS_MANAGE,
+    PERMISSIONS.TOURNAMENTS_DELETE,
+  ]);
 
   const tenantContext = await getActiveTenant();
   if (!tenantContext) notFound();
 
   const canManage = hasPermission(session, PERMISSIONS.EVENTS_MANAGE);
+  // ADMIN-DELETE-02A: permanent "Löschen" gating — deliberately independent
+  // of canManage/events.manage.
+  const canDelete = hasPermission(session, PERMISSIONS.TOURNAMENTS_DELETE);
   const { tournamentId } = await params;
 
   let tournament;
@@ -78,6 +89,7 @@ export default async function TournamentEditPage({ params }: Props) {
           <TournamentEditForm
             tournament={tournament}
             canManage={canManage}
+            canDelete={canDelete}
             pitchHallFacilityGroups={pitchHallFacilityGroups}
             dressingRoomFacilityGroups={dressingRoomFacilityGroups}
           />
