@@ -54,6 +54,13 @@ export type SfvScheduleSyncResult = {
   /** Number of individual match records that failed to persist. */
   failed: number;
   /**
+   * ADMIN-DELETE-02A-C1: number of provider fixtures skipped because an
+   * admin permanently deleted them (matches.delete) and they carry an
+   * SfvMatchDeletionTombstone — never recreated. Zero unless a deletion of
+   * this kind has occurred.
+   */
+  suppressed: number;
+  /**
    * Number of matches whose score changed (scoreHome or scoreAway updated).
    * Subset of updated.
    */

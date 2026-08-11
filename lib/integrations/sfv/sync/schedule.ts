@@ -65,6 +65,7 @@ import {
 import {
   loadExistingMatchMappings,
   loadTeamMappings,
+  loadTombstonedExternalMatchIds,
   resolveActiveSeason,
   processScheduleEntry,
 } from "./schedule-persistence";
@@ -132,6 +133,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
         updated: 0,
         unchanged: 0,
         failed: 1,
+        suppressed: 0,
         scoresUpdated: 0,
         kickoffChanges: 0,
         statusChanges: 0,
@@ -181,6 +183,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
       updated: 0,
       unchanged: 0,
       failed: 1,
+      suppressed: 0,
       scoresUpdated: 0,
       kickoffChanges: 0,
       statusChanges: 0,
@@ -197,9 +200,10 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
 
   // ── Load existing data ───────────────────────────────────────────────────
 
-  const [existingMappings, seasonId] = await Promise.all([
+  const [existingMappings, seasonId, tombstonedExternalMatchIds] = await Promise.all([
     loadExistingMatchMappings(tenantId, PROVIDER, context.seasonId),
     resolveActiveSeason(tenantId),
+    loadTombstonedExternalMatchIds(tenantId, PROVIDER),
   ]);
 
   let teamMappings = await loadTeamMappings(tenantId, PROVIDER, context.seasonId);
@@ -402,6 +406,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
   let updated = 0;
   let unchanged = 0;
   let failed = 0;
+  let suppressed = 0;
   let scoresUpdated = 0;
   let kickoffChanges = 0;
   let statusChanges = 0;
@@ -418,6 +423,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
       teamMappings,
       clubOwnedSfvTeamIds,
       resolveExternalTeamId,
+      tombstonedExternalMatchIds,
     );
 
     unresolvedLocalTeamRefs += participantCounts.unresolvedLocalTeamRefs;
@@ -439,6 +445,9 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
         break;
       case "unchanged":
         unchanged++;
+        break;
+      case "suppressed":
+        suppressed++;
         break;
       case "failed":
         failed++;
@@ -462,6 +471,7 @@ export async function syncSfvSchedule(tenantId: string): Promise<SfvScheduleSync
     updated,
     unchanged,
     failed,
+    suppressed,
     scoresUpdated,
     kickoffChanges,
     statusChanges,
@@ -488,6 +498,7 @@ type CountFields = Pick<
   | "updated"
   | "unchanged"
   | "failed"
+  | "suppressed"
   | "scoresUpdated"
   | "kickoffChanges"
   | "statusChanges"

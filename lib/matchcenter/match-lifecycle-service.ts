@@ -1,26 +1,44 @@
 /**
  * lib/matchcenter/match-lifecycle-service.ts
  *
- * ADMIN-DELETE-02A — MatchCenter permanent-deletion safety.
+ * ADMIN-DELETE-02A / ADMIN-DELETE-02A-C1 — MatchCenter permanent-deletion.
  *
  * A "Match" is not a dedicated model — it is the canonical `Event` row with
- * `type: "MATCH"` (see prisma/schema.prisma). This mirrors
- * lib/teams/team-lifecycle-service.ts's getTeamDeletionBlockers() /
- * deleteTeamSafely() pattern (ADMIN-DELETE-01A/01B) for that entity.
+ * `type: "MATCH"` (see prisma/schema.prisma).
  *
- * Import/provider safety (product requirement): a match carrying a
- * `MatchExternalMapping` (SFV-imported) is NEVER permanently deletable here —
- * SFV sync upserts by (tenantId, provider, externalMatchId) and never
- * deletes provider-absent fixtures (see lib/integrations/sfv/sync/), so a
- * hard-deleted imported match would simply reappear (and lose its local
- * operational history — pitch/dressing-room codes, visibility) on the next
- * sync. Deletion is blocked whenever the provider mapping exists, or the
- * match has reached a completed/live sporting state, or any operational
- * reference (Weekplanner override) still points at it. A newly-created,
- * unused MANUAL match with none of these remains permanently deletable.
+ * CORE PRODUCT RULE (ADMIN-DELETE-02A-C1): for a caller holding
+ * matches.delete, permanent deletion is NEVER blocked merely because an
+ * SFV/provider mapping, a live/completed sporting state, or Weekplanner
+ * references exist. Those are reported as IMPACT (a warning shown before
+ * the user's explicit confirmation), never as a hard blocker. Cancel/
+ * postpone (the existing Event status lifecycle) remains a completely
+ * separate, unaffected action for a match a caller wants to retire without
+ * a permanent, irreversible delete.
  *
- * SFV sync itself is completely unmodified by this file.
+ * SFV re-creation safety (product requirement): SFV sync upserts by
+ * (tenantId, provider, externalMatchId) and never deletes provider-absent
+ * fixtures (see lib/integrations/sfv/sync/) — so permanently deleting an
+ * SFV-imported match would, on its own, simply reappear on the next sync.
+ * This is solved with a durable suppression record rather than by blocking
+ * deletion: deleting a match that carries a MatchExternalMapping writes an
+ * SfvMatchDeletionTombstone row (same tenantId/provider/externalMatchId
+ * identity) in the SAME transaction as the delete, and
+ * lib/integrations/sfv/sync/schedule-persistence.ts's create path checks
+ * that table first and skips (never recreates) a tombstoned fixture. SFV
+ * sync itself is otherwise completely unmodified by this file.
+ *
+ * MatchExternalMapping cascades automatically on Event delete (schema
+ * `onDelete: Cascade`) — no explicit cleanup needed for it. The one
+ * dependency that does NOT cascade is Weekplanner:
+ * WeekplannerPlanAllocation / WeekplannerPlanActivityOverride reference a
+ * MATCH activity by `activityId` = Event.id, a deliberately-not-a-DB-relation
+ * string field — those rows are explicitly deleted in the same transaction.
+ *
+ * Canonical master data (Team, ExternalTeam/ExternalClub, FacilityResource,
+ * Season) is never touched here — Team/ExternalTeam references on the
+ * mapping are already `onDelete: SetNull`, never cascade-deleted.
  */
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 
 export class MatchNotFoundError extends Error {
@@ -30,36 +48,26 @@ export class MatchNotFoundError extends Error {
   }
 }
 
-export type MatchDeletionBlocker = {
+export type MatchDeletionImpact = {
   key: string;
   label: string;
   count: number;
 };
 
-export class MatchDeletionBlockedError extends Error {
-  blockers: MatchDeletionBlocker[];
-
-  constructor(blockers: MatchDeletionBlocker[]) {
-    super(
-      "Match kann nicht gelöscht werden, da Anbieter-Zuordnungen, Spielstand oder Betriebsdaten bestehen. Bitte stattdessen absagen/verschieben.",
-    );
-    this.name = "MatchDeletionBlockedError";
-    this.blockers = blockers;
-  }
-}
-
-/** Sporting states that represent history/operational-in-progress and must never be silently deleted. */
-const NON_DELETABLE_STATUSES = new Set(["LIVE", "COMPLETED"]);
+/** Sporting states that represent history/operational-in-progress — reported as impact, never blocked. */
+const HISTORY_STATUSES = new Set(["LIVE", "COMPLETED"]);
 
 /**
- * Computes the deletion blockers for a Match (Event, type=MATCH), strictly
- * scoped to `tenantId`. Returns null when the match does not exist, belongs
- * to another tenant, or is not a MATCH-type Event.
+ * Computes the deletion IMPACT for a Match (Event, type=MATCH), strictly
+ * scoped to `tenantId` — informational counts to show the caller before
+ * they confirm permanent deletion, never a reason to refuse it. Returns
+ * null when the match does not exist, belongs to another tenant, or is not
+ * a MATCH-type Event.
  */
-export async function getMatchDeletionBlockers(
+export async function getMatchDeletionImpact(
   tenantId: string,
   matchId: string,
-): Promise<MatchDeletionBlocker[] | null> {
+): Promise<MatchDeletionImpact[] | null> {
   const match = await prisma.event.findFirst({
     where: { id: matchId, tenantId, type: "MATCH" },
     select: {
@@ -81,36 +89,120 @@ export async function getMatchDeletionBlockers(
     }),
   ]);
 
-  const blockers: MatchDeletionBlocker[] = [];
+  const impact: MatchDeletionImpact[] = [];
 
   const push = (key: string, label: string, count: number) => {
-    if (count > 0) blockers.push({ key, label, count });
+    if (count > 0) impact.push({ key, label, count });
   };
 
   push("providerMapping", "Anbieter-/SFV-Zuordnung", match.matchExternalMapping ? 1 : 0);
   push(
     "sportingHistory",
     "Spiel ist live oder abgeschlossen",
-    NON_DELETABLE_STATUSES.has(match.status) ? 1 : 0,
+    HISTORY_STATUSES.has(match.status) ? 1 : 0,
   );
   push("weekplannerAllocations", "Wochenplan-Ressourcen-Zuordnungen", weekplannerAllocations);
   push("weekplannerOverrides", "Wochenplan-Zeit-Überschreibungen", weekplannerOverrides);
 
-  return blockers;
+  return impact;
 }
 
 /**
- * Hard-deletes a Match (Event, type=MATCH) only when no meaningful
- * dependency/history exists. Throws MatchNotFoundError or
- * MatchDeletionBlockedError otherwise. Strictly tenant-scoped.
+ * Permanently deletes a Match (Event, type=MATCH), atomically cleaning up
+ * its owned/reference data first. Throws MatchNotFoundError when the match
+ * does not exist (or belongs to another tenant, or is not type=MATCH) —
+ * never a "blocked" error, since dependencies never block a
+ * matches.delete-authorized caller.
+ *
+ * Steps (single Prisma transaction — all-or-nothing):
+ *   1. Re-resolve the match (tenant-scoped, type=MATCH) together with its
+ *      MatchExternalMapping (if any), and compute the final impact snapshot
+ *      for the audit log / response.
+ *   2. If a provider mapping exists, write an SfvMatchDeletionTombstone row
+ *      for the exact same (tenantId, provider, externalMatchId) identity —
+ *      the durable suppression record that stops the next SFV sync from
+ *      recreating this match.
+ *   3. Delete every WeekplannerPlanAllocation / WeekplannerPlanActivity
+ *      Override row referencing this match's activityId.
+ *   4. Delete the Event itself. The schema's FK cascade removes the
+ *      MatchExternalMapping; Team/ExternalTeam references on it are
+ *      `onDelete: SetNull` and are therefore never touched.
+ *
+ * If any step fails, the whole transaction rolls back — no tombstone
+ * without a delete, no orphaned Weekplanner references, and the match is
+ * not deleted.
  */
-export async function deleteMatchSafely(tenantId: string, matchId: string) {
-  const blockers = await getMatchDeletionBlockers(tenantId, matchId);
-  if (blockers === null) throw new MatchNotFoundError(matchId);
-  if (blockers.length > 0) throw new MatchDeletionBlockedError(blockers);
+export async function deleteMatchPermanently(
+  tenantId: string,
+  matchId: string,
+  deletedByUserId?: string | null,
+): Promise<{ deleted: { id: string }; impact: MatchDeletionImpact[] }> {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const match = await tx.event.findFirst({
+      where: { id: matchId, tenantId, type: "MATCH" },
+      select: {
+        id: true,
+        status: true,
+        matchExternalMapping: {
+          select: { provider: true, externalMatchId: true, externalSeasonId: true },
+        },
+      },
+    });
 
-  // No provider mapping, no live/completed sporting state, no Weekplanner
-  // references — safe to delete. MatchExternalMapping cascades automatically
-  // (schema onDelete: Cascade) but is already confirmed absent above.
-  return prisma.event.delete({ where: { id: matchId } });
+    if (!match) {
+      throw new MatchNotFoundError(matchId);
+    }
+
+    const [weekplannerAllocations, weekplannerOverrides] = await Promise.all([
+      tx.weekplannerPlanAllocation.count({
+        where: { tenantId, activityType: "MATCH", activityId: matchId },
+      }),
+      tx.weekplannerPlanActivityOverride.count({
+        where: { tenantId, activityType: "MATCH", activityId: matchId },
+      }),
+    ]);
+
+    const impact: MatchDeletionImpact[] = [];
+    const push = (key: string, label: string, count: number) => {
+      if (count > 0) impact.push({ key, label, count });
+    };
+    push("providerMapping", "Anbieter-/SFV-Zuordnung", match.matchExternalMapping ? 1 : 0);
+    push(
+      "sportingHistory",
+      "Spiel ist live oder abgeschlossen",
+      HISTORY_STATUSES.has(match.status) ? 1 : 0,
+    );
+    push("weekplannerAllocations", "Wochenplan-Ressourcen-Zuordnungen", weekplannerAllocations);
+    push("weekplannerOverrides", "Wochenplan-Zeit-Überschreibungen", weekplannerOverrides);
+
+    if (match.matchExternalMapping) {
+      const { provider, externalMatchId, externalSeasonId } = match.matchExternalMapping;
+      await tx.sfvMatchDeletionTombstone.upsert({
+        where: { tenantId_provider_externalMatchId: { tenantId, provider, externalMatchId } },
+        create: {
+          tenantId,
+          provider,
+          externalMatchId,
+          externalSeasonId,
+          deletedByUserId: deletedByUserId ?? null,
+        },
+        update: {
+          externalSeasonId,
+          deletedAt: new Date(),
+          deletedByUserId: deletedByUserId ?? null,
+        },
+      });
+    }
+
+    await tx.weekplannerPlanAllocation.deleteMany({
+      where: { tenantId, activityType: "MATCH", activityId: matchId },
+    });
+    await tx.weekplannerPlanActivityOverride.deleteMany({
+      where: { tenantId, activityType: "MATCH", activityId: matchId },
+    });
+
+    const deleted = await tx.event.delete({ where: { id: matchId } });
+
+    return { deleted, impact };
+  });
 }

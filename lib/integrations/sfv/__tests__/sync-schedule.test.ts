@@ -102,12 +102,15 @@ vi.mock("../tenant-config-repository", () => ({
 
 const mockLoadExistingMatchMappings = vi.fn();
 const mockLoadTeamMappings = vi.fn();
+const mockLoadTombstonedExternalMatchIds = vi.fn();
 const mockResolveActiveSeason = vi.fn();
 const mockProcessScheduleEntry = vi.fn();
 
 vi.mock("../sync/schedule-persistence", () => ({
   loadExistingMatchMappings: (...args: unknown[]) => mockLoadExistingMatchMappings(...args),
   loadTeamMappings: (...args: unknown[]) => mockLoadTeamMappings(...args),
+  loadTombstonedExternalMatchIds: (...args: unknown[]) =>
+    mockLoadTombstonedExternalMatchIds(...args),
   resolveActiveSeason: (...args: unknown[]) => mockResolveActiveSeason(...args),
   processScheduleEntry: (...args: unknown[]) => mockProcessScheduleEntry(...args),
 }));
@@ -271,6 +274,7 @@ beforeEach(() => {
   mockRequireEnabledSfvConfigForTenant.mockResolvedValue(makeTenantConfig());
   mockLoadExistingMatchMappings.mockResolvedValue(makeEmptyMappings());
   mockLoadTeamMappings.mockResolvedValue(makeTeamMappingWithEntry());
+  mockLoadTombstonedExternalMatchIds.mockResolvedValue(new Set());
   mockResolveActiveSeason.mockResolvedValue(SEASON_ID);
   // Default: team list returns our single club team (teamAId=31927)
   mockFetchTeamList.mockResolvedValue([
@@ -412,6 +416,7 @@ describe("Idempotency and identity", () => {
       expect.anything(),
       expect.any(Set), // clubOwnedSfvTeamIds
       expect.any(Function), // CLUB-DIRECTORY-02 external opponent resolver
+      expect.any(Set), // ADMIN-DELETE-02A-C1 tombstonedExternalMatchIds
     );
   });
 });
@@ -676,6 +681,54 @@ describe("Tenant isolation", () => {
   });
 });
 
+// ── ADMIN-DELETE-02A-C1: SFV deletion-suppression (tombstone) wiring ─────────
+
+describe("Tombstone suppression (ADMIN-DELETE-02A-C1)", () => {
+  it("29 — loads tombstoned externalMatchIds for this tenant/provider and forwards them to processScheduleEntry", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ matchId: 99001 })]);
+    mockLoadTombstonedExternalMatchIds.mockResolvedValueOnce(new Set([99001]));
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "suppressed" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 0 },
+    });
+
+    await syncSfvSchedule(TENANT_A);
+
+    expect(mockLoadTombstonedExternalMatchIds).toHaveBeenCalledWith(TENANT_A, "SFV");
+    const call = mockProcessScheduleEntry.mock.calls[0];
+    // tombstonedExternalMatchIds is the LAST positional argument.
+    expect(call[call.length - 1]).toEqual(new Set([99001]));
+  });
+
+  it("30 — a suppressed outcome increments `suppressed` and never `created`", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ matchId: 99001 })]);
+    mockLoadTombstonedExternalMatchIds.mockResolvedValueOnce(new Set([99001]));
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "suppressed" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 0 },
+    });
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    expect(result.suppressed).toBe(1);
+    expect(result.created).toBe(0);
+  });
+
+  it("31 — a non-tombstoned fixture is created normally (suppressed stays 0)", async () => {
+    mockFetchClubSchedule.mockResolvedValueOnce([makeScheduleEntry({ matchId: 12345 })]);
+    mockLoadTombstonedExternalMatchIds.mockResolvedValueOnce(new Set([99001]));
+    mockProcessScheduleEntry.mockResolvedValueOnce({
+      outcome: { status: "created" },
+      participantCounts: { unresolvedLocalTeamRefs: 0, externalOpponents: 1 },
+    });
+
+    const result = await syncSfvSchedule(TENANT_A);
+
+    expect(result.suppressed).toBe(0);
+    expect(result.created).toBe(1);
+  });
+});
+
 // ── 20-22: Opponent strategy and team resolution ──────────────────────────────
 
 describe("Opponent strategy and team resolution", () => {
@@ -740,6 +793,7 @@ describe("Opponent strategy and team resolution", () => {
       expect.objectContaining({ get: expect.any(Function) }),
       expect.any(Set), // clubOwnedSfvTeamIds
       expect.any(Function), // CLUB-DIRECTORY-02 external opponent resolver
+      expect.any(Set), // ADMIN-DELETE-02A-C1 tombstonedExternalMatchIds
     );
     expect(result.unresolvedLocalTeamRefs).toBe(0);
   });
@@ -1137,6 +1191,7 @@ describe("Participant classification (Step 9)", () => {
       expect.anything(), expect.anything(),
       expect.objectContaining({ has: expect.any(Function) }),
       expect.any(Function), // CLUB-DIRECTORY-02 external opponent resolver
+      expect.any(Set), // ADMIN-DELETE-02A-C1 tombstonedExternalMatchIds
     );
     expect(result.unresolvedLocalTeamRefs).toBe(0);
   });

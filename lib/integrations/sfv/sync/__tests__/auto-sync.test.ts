@@ -63,6 +63,7 @@ function makeScheduleResult(tenantId: string, overrides: Partial<SfvScheduleSync
     updated: 1,
     unchanged: 0,
     failed: 0,
+    suppressed: 0,
     scoresUpdated: 0,
     kickoffChanges: 1,
     statusChanges: 0,

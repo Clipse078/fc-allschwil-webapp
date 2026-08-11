@@ -5,7 +5,10 @@
  *
  * Responsibilities:
  *   - Load existing MatchExternalMapping rows and TeamExternalMapping rows.
- *   - Create new Event + MatchExternalMapping atomically on first import.
+ *   - Load SfvMatchDeletionTombstone rows — provider matches an admin
+ *     permanently deleted (ADMIN-DELETE-02A-C1) that must NEVER be recreated.
+ *   - Create new Event + MatchExternalMapping atomically on first import,
+ *     unless the fixture is tombstoned — see `processScheduleEntry`.
  *   - Update existing Event + MatchExternalMapping when provider data changes.
  *   - Resolve the canonical Season for an event from tenant+seasonId context.
  *
@@ -18,6 +21,8 @@
  *   - Transactions used when creating both an Event and a mapping atomically.
  *   - No deletion: records are retained even when cancelled/postponed.
  *   - Opponent teams are NEVER created as tenant-owned Teams.
+ *   - A tombstoned fixture (ADMIN-DELETE-02A-C1) is permanently skipped —
+ *     never (re)created — until its tombstone row is removed.
  *
  * Security invariants:
  *   - tenantId always originates from a trusted session context.
@@ -58,7 +63,13 @@ export type SchedulePersistenceOutcome =
       statusChanged: boolean;
     }
   | { status: "unchanged" }
-  | { status: "failed"; code: string; message: string };
+  | { status: "failed"; code: string; message: string }
+  /**
+   * ADMIN-DELETE-02A-C1: no prior mapping exists AND this exact provider
+   * matchId carries an SfvMatchDeletionTombstone — an admin intentionally,
+   * permanently deleted this match. Never recreated.
+   */
+  | { status: "suppressed" };
 
 // ── Existing mapping shape ─────────────────────────────────────────────────────
 
@@ -168,6 +179,27 @@ export async function loadTeamMappings(
     map.set(row.externalTeamId, row.teamId);
   }
   return map;
+}
+
+/**
+ * ADMIN-DELETE-02A-C1: loads every SfvMatchDeletionTombstone externalMatchId
+ * for this tenant/provider — provider fixtures an admin permanently deleted
+ * (via matches.delete) that must never be recreated by sync. A provider
+ * matchId is never reused across seasons, so this is deliberately not
+ * scoped by seasonId (unlike loadExistingMatchMappings).
+ *
+ * Returns a Set for O(1) lookup during the sync loop.
+ */
+export async function loadTombstonedExternalMatchIds(
+  tenantId: string,
+  provider: string,
+): Promise<ReadonlySet<number>> {
+  const rows = await prisma.sfvMatchDeletionTombstone.findMany({
+    where: { tenantId, provider },
+    select: { externalMatchId: true },
+  });
+
+  return new Set(rows.map((row) => row.externalMatchId));
 }
 
 /**
@@ -440,6 +472,13 @@ export async function processScheduleEntry(
     sfvTeamId: number,
     sfvTeamName: string | null,
   ) => Promise<string | null> = async () => null,
+  /**
+   * ADMIN-DELETE-02A-C1: externalMatchId values an admin permanently
+   * deleted (matches.delete) — never recreated. Defaults to an empty set
+   * so every pre-existing caller/test continues to compile and behave
+   * exactly as before.
+   */
+  tombstonedExternalMatchIds: ReadonlySet<number> = new Set(),
 ): Promise<{ outcome: SchedulePersistenceOutcome; participantCounts: ParticipantCounts }> {
   // Classify both participants using confirmed club ownership + TeamExternalMapping
   const homeClassification = classifyParticipant(
@@ -489,6 +528,15 @@ export async function processScheduleEntry(
   const existing = existingMappings.get(entry.matchId);
 
   if (existing === undefined) {
+    // ADMIN-DELETE-02A-C1: an admin intentionally, permanently deleted this
+    // exact provider match. It carries no local mapping (deletion cascaded
+    // it away) — without this check, sync would treat it as brand new and
+    // recreate it on every run. Never touches the tombstone itself; only
+    // the (already-confirmed-deleted) local Event/mapping stay absent.
+    if (tombstonedExternalMatchIds.has(entry.matchId)) {
+      return { outcome: { status: "suppressed" }, participantCounts };
+    }
+
     const outcome = await createMatchWithMapping(
       entry,
       context,
