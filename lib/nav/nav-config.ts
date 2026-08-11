@@ -51,6 +51,13 @@ export type ModuleDefinition = {
 //
 // Vereinsleitung, Wochenplaner, and Tagesplaner are NOT top-level modules.
 // Their routes remain intact — only the sidebar presentation changes.
+//
+// DASHBOARD-SHELL-UX-01: "Planung" (inside Betrieb) groups the three
+// canonical operational modules in this exact order — TrainingCenter,
+// MatchCenter, TournamentCenter — followed by Veranstaltungen and
+// Wochenplanner. MatchCenter previously lived as a standalone Betrieb
+// entry; only its nav placement/label changed, its route and permissions
+// did not.
 
 export const NAV_SECTIONS: NavSection[] = [
   // ── Dashboard ──────────────────────────────────────────────────────────────
@@ -115,16 +122,16 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE],
           },
           {
-            key: "competitions",
-            label: "Wettkämpfe",
-            href: "/dashboard/competitions",
-            permissionKeys: [PERMISSIONS.COMPETITIONS_VIEW, PERMISSIONS.COMPETITIONS_MANAGE],
-          },
-          {
             key: "personen",
             label: "Personen",
             href: "/dashboard/persons",
             permissionKeys: [PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_MANAGE],
+          },
+          {
+            key: "competitions",
+            label: "Wettkämpfe",
+            href: "/dashboard/competitions",
+            permissionKeys: [PERMISSIONS.COMPETITIONS_VIEW, PERMISSIONS.COMPETITIONS_MANAGE],
           },
         ],
       },
@@ -228,6 +235,15 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.TRAININGS_VIEW, PERMISSIONS.TRAININGS_MANAGE],
           },
           {
+            // DASHBOARD-SHELL-UX-01: MatchCenter moved from a standalone
+            // Betrieb entry into Planung, alongside the other two canonical
+            // operational modules. Route/permissions unchanged.
+            key: "matchcenter",
+            label: "MatchCenter",
+            href: "/dashboard/matchcenter",
+            permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
+          },
+          {
             // TOURNAMENTCENTER-01: canonical Tournament Management MVP.
             // Reuses Event.type=TOURNAMENT + events.view/events.manage —
             // no dedicated tournaments.* permission was introduced.
@@ -257,15 +273,6 @@ export const NAV_SECTIONS: NavSection[] = [
               PERMISSIONS.EVENTS_MANAGE,
             ],
           },
-        ],
-      },
-      {
-        key: "matchcenter",
-        label: "Matchcenter",
-        href: "/dashboard/matchcenter",
-        permissionKeys: [
-          PERMISSIONS.EVENTS_VIEW,
-          PERMISSIONS.EVENTS_MANAGE,
         ],
       },
       {
@@ -333,24 +340,6 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
         children: [
           {
-            key: "admin-branding",
-            label: "Darstellung",
-            href: "/dashboard/admin/branding",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
-          },
-          {
-            key: "admin-users",
-            label: "Benutzer",
-            href: "/dashboard/users",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
-          },
-          {
-            key: "admin-roles",
-            label: "Rollen",
-            href: "/dashboard/roles",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
-          },
-          {
             // RPERM-05: tenant-facing Roles & Permissions module. Gated by
             // TENANT-scope roles.view/roles.manage only — a platform Super
             // Admin without a tenant membership never satisfies these, so
@@ -373,6 +362,24 @@ export const NAV_SECTIONS: NavSection[] = [
             label: "Anlagen & Ressourcen",
             href: "/dashboard/admin/facilities",
             permissionKeys: [PERMISSIONS.FACILITIES_VIEW, PERMISSIONS.FACILITIES_MANAGE],
+          },
+          {
+            key: "admin-branding",
+            label: "Darstellung",
+            href: "/dashboard/admin/branding",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+          {
+            key: "admin-users",
+            label: "Benutzer",
+            href: "/dashboard/users",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+          {
+            key: "admin-roles",
+            label: "Rollen",
+            href: "/dashboard/roles",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
           {
             key: "admin-tenants",
