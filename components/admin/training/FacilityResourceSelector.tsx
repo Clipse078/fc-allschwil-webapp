@@ -65,7 +65,13 @@ function formatClockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatAvailabilitySuffix(annotation: ResourceAvailabilityAnnotation | undefined): string {
+/**
+ * RESOURCE-AVAILABILITY-UX-01 — exported so native <select> surfaces that
+ * cannot use this component directly (e.g. MatchcenterDetailOperational's
+ * legacy code-based selects) still render the exact same Frei/Belegt
+ * wording, instead of inventing a second phrasing.
+ */
+export function formatAvailabilitySuffix(annotation: ResourceAvailabilityAnnotation | undefined): string {
   if (!annotation) return "";
   if (annotation.status === "FREE") return " — Frei";
   const timeRange =
