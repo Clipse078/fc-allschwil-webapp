@@ -406,9 +406,17 @@ async function main() {
     }
   }
 
-  await prisma.season.updateMany({
-    data: { isActive: false },
-  });
+  // SEASON-01-C4: Do NOT call updateMany({ isActive: false }) here.
+  // Season.isActive is exclusive tenant/domain configuration, set only by the
+  // explicit "Als aktiv setzen" admin action (activateSeason() mutation). The
+  // seed must never reset or overwrite an explicitly selected active season —
+  // doing so would silently clear the admin's choice every time the seed runs
+  // (e.g. during environment setup, `prisma migrate reset`, or `npm run db:seed`).
+  //
+  // On a fresh database the create block below sets the initial isActive value
+  // for each seed season. On re-seeding (update path) isActive is intentionally
+  // omitted so the persisted admin selection is preserved across any number of
+  // seed runs.
 
   const seasons = [
     {
@@ -438,10 +446,13 @@ async function main() {
     await prisma.season.upsert({
       where: { key: seasonData.key },
       update: {
+        // SEASON-01-C4: isActive intentionally excluded — never overwrite an
+        // admin-selected active season on re-seed. Only structural fields
+        // (name, dates) are refreshed; the tenant's active-season selection
+        // belongs to the domain and must survive any number of seed runs.
         name: seasonData.name,
         startDate: seasonData.startDate,
         endDate: seasonData.endDate,
-        isActive: seasonData.isActive,
       },
       create: {
         key: seasonData.key,
