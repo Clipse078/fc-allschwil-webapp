@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Loader2, RotateCcw, Save } from "lucide-react";
+import { Ban, Loader2, RotateCcw, Save, ShieldAlert, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import type { TournamentDto } from "@/lib/tournaments/types";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import TournamentParticipantsEditor from "@/components/admin/tournamentcenter/TournamentParticipantsEditor";
 import TournamentResourceAllocationEditor from "@/components/admin/tournamentcenter/TournamentResourceAllocationEditor";
+
+type DeletionBlocker = { key: string; label: string; count: number };
 
 type TeamItem = {
   id: string;
@@ -31,6 +35,12 @@ function formatTeamLabel(team: TeamItem): string {
 type TournamentEditFormProps = {
   tournament: TournamentDto;
   canManage: boolean;
+  /**
+   * ADMIN-DELETE-02A: effective PERMISSIONS.TOURNAMENTS_DELETE authority.
+   * Deliberately independent of canManage/events.manage — permanent
+   * deletion is a separate authority from cancel/restore/edit.
+   */
+  canDelete?: boolean;
   /** Non-archived FULL_PITCH/HALF_PITCH resources, grouped by facility — for the tournament-level Spielfeld/Halle editor. */
   pitchHallFacilityGroups: FacilityGroup[];
   /** Non-archived DRESSING_ROOM resources, grouped by facility — for the per-participant Garderobe editor. */
@@ -40,6 +50,7 @@ type TournamentEditFormProps = {
 export default function TournamentEditForm({
   tournament,
   canManage,
+  canDelete = false,
   pitchHallFacilityGroups,
   dressingRoomFacilityGroups,
 }: TournamentEditFormProps) {
@@ -69,6 +80,10 @@ export default function TournamentEditForm({
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteBlockers, setDeleteBlockers] = useState<DeletionBlocker[] | null>(null);
 
   const isCancelled = tournament.status === "CANCELLED";
   const isEditable = canManage && tournament.status !== "ARCHIVED" && tournament.status !== "COMPLETED";
@@ -170,6 +185,36 @@ export default function TournamentEditForm({
       toast.danger(err instanceof Error ? err.message : "Aktion fehlgeschlagen.", { duration: 6000 });
     } finally {
       setLifecycleLoading(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleteBusy(true);
+    setDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/tournaments/${tournament.id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => null)) as
+        | { error?: string; blockers?: DeletionBlocker[] }
+        | null;
+
+      if (!res.ok) {
+        if (res.status === 409 && Array.isArray(data?.blockers)) {
+          setDeleteBlockers(data.blockers);
+          setDeleteError(data?.error ?? "Löschen nicht möglich.");
+          return;
+        }
+        throw new Error(data?.error ?? "Löschen fehlgeschlagen.");
+      }
+
+      setDeleteConfirming(false);
+      setDeleteBlockers(null);
+      toast.success("Turnier endgültig gelöscht.");
+      router.push("/dashboard/tournamentcenter");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -410,7 +455,77 @@ export default function TournamentEditForm({
             {isCancelled ? "Turnier wiederherstellen" : "Turnier absagen"}
           </button>
         )}
+
+        {/*
+          ADMIN-DELETE-02A: permanent delete requires effective
+          tournaments.delete authority, independent of canManage/
+          events.manage — this button is gated on `canDelete` alone.
+        */}
+        {canDelete && (
+          <Button
+            variant="danger"
+            size="sm"
+            iconLeft={<Trash2 className="h-4 w-4" />}
+            onClick={() => setDeleteConfirming(true)}
+            data-testid="tournament-delete-button"
+          >
+            Endgültig löschen
+          </Button>
+        )}
       </div>
+
+      <Dialog
+        open={deleteConfirming}
+        onClose={() => {
+          setDeleteConfirming(false);
+          setDeleteBlockers(null);
+          setDeleteError(null);
+        }}
+        title={`„${tournament.title}" endgültig löschen?`}
+        description={
+          deleteBlockers
+            ? undefined
+            : "Diese Aktion kann nicht rückgängig gemacht werden. Nur möglich, wenn keine Teilnehmer, Ressourcen-Zuordnungen oder Ergebnis-Historie bestehen."
+        }
+        footer={
+          deleteBlockers ? (
+            <Button variant="secondary" onClick={() => setDeleteConfirming(false)}>
+              Schließen
+            </Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={() => setDeleteConfirming(false)}>
+                Abbrechen
+              </Button>
+              <Button variant="danger" loading={deleteBusy} onClick={handleDelete}>
+                Endgültig löschen
+              </Button>
+            </>
+          )
+        }
+      >
+        {deleteError && !deleteBlockers ? (
+          <p className="text-sm font-medium text-[var(--sce-danger)]">{deleteError}</p>
+        ) : null}
+        {deleteBlockers ? (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-lg border border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] p-3 text-[var(--sce-warning)]">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p className="text-sm">
+                Löschen blockiert — Teilnehmer, Ressourcen-Zuordnungen oder Historie bestehen.
+                Bitte stattdessen absagen.
+              </p>
+            </div>
+            <ul className="list-inside list-disc space-y-1 text-sm text-[var(--text-2)]">
+              {deleteBlockers.map((blocker) => (
+                <li key={blocker.key}>
+                  {blocker.label}: {blocker.count}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </Dialog>
     </div>
   );
 }

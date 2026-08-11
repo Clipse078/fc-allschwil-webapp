@@ -105,6 +105,14 @@ async function main() {
     { key: "events.import", name: "Import events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "events.publish_website", name: "Publish events to website", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "events.publish_infoboard", name: "Publish events to infoboard", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-02A: canonical permanent-deletion permissions for the
+    // MatchCenter/TournamentCenter modules — both operate on the canonical
+    // Event model (type=MATCH / type=TOURNAMENT), so they use the EVENTS
+    // module like the other events.* keys. Deliberately separate from
+    // events.manage: create/edit/cancel access must never implicitly grant
+    // permanent deletion. Mirrors teams.delete (ADMIN-DELETE-01A).
+    { key: "matches.delete", name: "Permanently delete matches", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "tournaments.delete", name: "Permanently delete tournaments", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "fixtures.view", name: "View fixtures", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "fixtures.create", name: "Create fixtures", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
@@ -142,6 +150,10 @@ async function main() {
 
     { key: "trainings.view", name: "View training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "trainings.manage", name: "Manage training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-02A: canonical permanent-deletion permission for the
+    // TrainingCenter module (canonical TrainingSeries entity). Deliberately
+    // separate from trainings.manage. Mirrors teams.delete (ADMIN-DELETE-01A).
+    { key: "trainings.delete", name: "Permanently delete trainings", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     // ── RPERM-05: Workspace/Documents permissions ─────────────────────────
     // Previously only created out-of-band by scripts/sync-workspace-permissions.ts

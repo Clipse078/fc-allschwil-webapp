@@ -28,17 +28,43 @@
  *
  * Permission: EVENTS_MANAGE
  * Tenant isolation: tenantId resolved from session, never from request body.
+ *
+ * DELETE /api/tournaments/[tournamentId] — ADMIN-DELETE-02A permanent hard
+ * delete. Requires PERMISSIONS.TOURNAMENTS_DELETE — deliberately NOT
+ * EVENTS_MANAGE, which authorizes the PATCH above (including cancel/
+ * restore) but must never imply permanent deletion on its own.
+ *
+ * Authorization model (mirrors app/api/teams/[teamId]/route.ts DELETE,
+ * ADMIN-DELETE-01B):
+ *   1. The target tournament (Event, type=TOURNAMENT) and therefore its
+ *      owning tenant is resolved strictly server-side from
+ *      `tournamentId` — a client-supplied tenantId is never read or
+ *      trusted for this decision.
+ *   2. EffectivePermissionResolver.hasTenantDeletionAuthority() decides
+ *      whether the caller may delete within that exact tenant.
+ *
+ * Refuses to delete when participants, resource allocations, Weekplanner
+ * references, or completed/archived history exist — see
+ * lib/tournaments/tournament-lifecycle-service.ts.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { logAction } from "@/lib/audit/log-action";
 import {
   updateTournament,
   cancelTournament,
   restoreTournament,
 } from "@/lib/tournaments/tournament-service";
+import {
+  TournamentDeletionBlockedError,
+  deleteTournamentSafely,
+} from "@/lib/tournaments/tournament-lifecycle-service";
 import {
   TournamentNotFoundError,
   TournamentValidationError,
@@ -217,5 +243,75 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: err.message }, { status: 422 });
     }
     throw err;
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  const session = await auth();
+
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { tournamentId } = await params;
+
+  // Resolve the target tournament and its tenant strictly server-side —
+  // never trust a client-supplied tenantId for a permanent-deletion
+  // decision. Scoped to type: "TOURNAMENT" so this route can never delete a
+  // MATCH/TRAINING/OTHER Event.
+  const tournament = await prisma.event.findFirst({
+    where: { id: tournamentId, type: "TOURNAMENT" },
+    select: { id: true, tenantId: true },
+  });
+
+  if (!tournament || !tournament.tenantId) {
+    return NextResponse.json({ error: "Turnier nicht gefunden." }, { status: 404 });
+  }
+
+  const tournamentTenantId = tournament.tenantId;
+
+  const resolver = createEffectivePermissionResolver(prisma);
+  const authorized = await resolver.hasTenantDeletionAuthority({
+    userId: session.user.id,
+    permission: PERMISSIONS.TOURNAMENTS_DELETE,
+    tenantId: tournamentTenantId,
+  });
+
+  if (!authorized) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const deleted = await deleteTournamentSafely(tournamentTenantId, tournamentId);
+
+    await logAction({
+      actorUserId: session.user.effectiveUserId ?? session.user.id ?? null,
+      moduleKey: "tournaments",
+      entityType: "Tournament",
+      entityId: tournamentId,
+      action: "DELETE",
+      beforeJson: deleted,
+    });
+
+    revalidatePath("/dashboard/tournamentcenter");
+
+    return NextResponse.json({ message: "Turnier wurde endgültig gelöscht." });
+  } catch (error) {
+    if (error instanceof TournamentNotFoundError) {
+      return NextResponse.json({ error: "Turnier nicht gefunden." }, { status: 404 });
+    }
+
+    if (error instanceof TournamentDeletionBlockedError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          blockers: error.blockers,
+        },
+        { status: 409 },
+      );
+    }
+
+    console.error("Delete tournament failed:", error);
+    return NextResponse.json({ error: "Turnier konnte nicht gelöscht werden." }, { status: 500 });
   }
 }

@@ -24,6 +24,15 @@ vi.mock("@/lib/permissions/require-api-any-permission", () => ({
   requireApiAnyPermission: mocks.requireApiAnyPermission,
 }));
 
+// ADMIN-DELETE-02A: route.ts now also exports a DELETE handler that imports
+// "@/auth" at module scope. This suite only exercises PATCH, but the mock
+// is still required so importing the route module doesn't pull in the real
+// next-auth initialization (see app/api/tournaments/[tournamentId]/
+// __tests__/admin-delete-02a-route.test.ts for the DELETE-specific suite).
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+
 vi.mock("@/lib/tournaments/tournament-service", () => ({
   updateTournament: mocks.updateTournament,
   cancelTournament: mocks.cancelTournament,

@@ -7,6 +7,13 @@ import { describe, expect, it, vi } from "vitest";
 import MatchcenterDetail from "@/components/admin/matchcenter/MatchcenterDetail";
 import type { MatchcenterMatchDetail } from "@/lib/matchcenter/types";
 
+// ADMIN-DELETE-02A: MatchcenterDetail now always renders MatchLifecycleCard
+// (hidden internally when canDelete is false), which calls useRouter() —
+// required so this suite doesn't need a mounted Next.js app router.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 vi.mock(
   "@/components/admin/matchcenter/MatchTeamMappingDialog",
   () => ({

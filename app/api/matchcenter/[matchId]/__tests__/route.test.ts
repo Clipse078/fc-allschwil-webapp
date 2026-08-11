@@ -36,6 +36,15 @@ vi.mock(
   }),
 );
 
+// ADMIN-DELETE-02A: route.ts now also exports a DELETE handler that imports
+// "@/auth" at module scope. This suite only exercises PATCH, but the mock
+// is still required so importing the route module doesn't pull in the real
+// next-auth initialization (see app/api/matchcenter/[matchId]/__tests__/
+// admin-delete-02a-route.test.ts for the DELETE-specific test suite).
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     event: {
