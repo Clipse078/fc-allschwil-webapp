@@ -158,10 +158,11 @@ export type PublicWebsiteEventItem = {
     genderGroup: string | null;
     ageGroup: string | null;
   } | null;
+  /** Null when the event's Season was deleted (ADMIN-DELETE-SEASON-01-C1). */
   season: {
     key: string;
     name: string;
-  };
+  } | null;
 };
 
 export type EventsData = {

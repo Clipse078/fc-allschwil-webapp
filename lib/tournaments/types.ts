@@ -147,7 +147,8 @@ export type TournamentDto = {
   competitionLabel: string | null;
   resultLabel: string | null;
   remarks: string | null;
-  season: TournamentSeasonReference;
+  /** Null when the tournament Event's Season was deleted (ADMIN-DELETE-SEASON-01-C1). */
+  season: TournamentSeasonReference | null;
   /**
    * Legacy single-team reference (Event.teamId). Preserved for backward
    * compatibility with existing generic Event consumers (team-page

@@ -232,6 +232,13 @@ export async function getPlannerEditFormData(
     return null;
   }
 
+  // event.season may be null when the Season was deleted (ADMIN-DELETE-SEASON-01-C1).
+  // Treat a season-less event like a "not found" for the edit-planner form —
+  // the form cannot meaningfully pre-fill a season selector with no season.
+  if (!event.season) {
+    return null;
+  }
+
   const selectedType =
     args?.selectedType &&
     Object.values(EventType).includes(args.selectedType as EventType)
@@ -246,7 +253,7 @@ export async function getPlannerEditFormData(
   return {
     ...base,
     eventId: event.id,
-    selectedSeasonId: event.seasonId,
+    selectedSeasonId: event.seasonId ?? "",
     selectedSeasonKey: event.season.key,
     selectedType,
     defaults: {

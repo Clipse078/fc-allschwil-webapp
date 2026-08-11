@@ -194,22 +194,17 @@ export type SeasonDependencyCounts = {
 };
 
 /**
- * Every relation that references a Season, for the delete-dependency
- * blocker (SEASON-01: "receive dependency blockers for a referenced
- * Season", "do not automatically destroy Team/Event history"). Deleting a
- * Season CASCADEs TeamSeason/Event/TrainingPlan rows at the database level
- * (see prisma/schema.prisma), so any of those being non-zero must block
- * deletion outright — this is the superset check the previous
- * PLANNING-lifecycle-only delete guard was missing (it never counted
- * TrainingPlan or OrgUnitMembership at all).
+ * ADMIN-DELETE-SEASON-01-C1: All Season-referencing relations counted for
+ * display/audit. None block deletion outright:
  *
- * ADMIN-DELETE-SEASON-01: EventImportRun and OrgUnitMembership both use
- * `onDelete: SetNull` (optional seasonId) — those records survive deletion
- * with seasonId set to NULL, so they are counted for display/audit purposes
- * but do NOT block deletion. Only cascade-delete relations (TeamSeason,
- * Event, TrainingPlan) block, because destroying those records would silently
- * remove canonical data (team participation history, match records, training
- * plans) that must survive independently.
+ *   TeamSeason          — onDelete: Cascade → rows removed (Team survives)
+ *   Event.seasonId      — onDelete: SetNull → Event preserved, seasonId → null
+ *   TrainingPlan.seasonId — onDelete: SetNull → plan preserved, seasonId → null
+ *   EventImportRun      — onDelete: SetNull (unchanged, already optional)
+ *   OrgUnitMembership   — onDelete: SetNull (unchanged, already optional)
+ *
+ * Counts are shown in the impact dialog so the admin understands what will
+ * happen, but none of them block the delete operation.
  */
 export async function getSeasonDependencyCounts(seasonId: string): Promise<SeasonDependencyCounts> {
   const [teamSeasons, events, eventImportRuns, trainingPlans, orgUnitMemberships] = await Promise.all([
@@ -224,12 +219,14 @@ export async function getSeasonDependencyCounts(seasonId: string): Promise<Seaso
 }
 
 /**
- * Returns true only when cascade-delete relations are non-zero — i.e.
- * deleting the Season would irrecoverably destroy canonical records.
- * SetNull relations (EventImportRun, OrgUnitMembership) are counted for
- * display but do NOT block: the DB sets their seasonId to NULL and the
- * records survive intact.
+ * ADMIN-DELETE-SEASON-01-C1: Season deletion is never blocked by dependency
+ * counts. All relations are either Cascade (TeamSeason — desired cleanup) or
+ * SetNull (Event, TrainingPlan, EventImportRun, OrgUnitMembership — records
+ * survive). This function is preserved for backward-compat test references
+ * but always returns false.
+ *
+ * @deprecated No longer used in the delete path. Kept for test coverage only.
  */
-export function hasSeasonDependencies(counts: SeasonDependencyCounts): boolean {
-  return counts.teamSeasons > 0 || counts.events > 0 || counts.trainingPlans > 0;
+export function hasSeasonDependencies(_counts: SeasonDependencyCounts): boolean {
+  return false;
 }

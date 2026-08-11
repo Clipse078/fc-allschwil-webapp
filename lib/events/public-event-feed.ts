@@ -94,6 +94,7 @@ export type PublicEventItem = {
   pitchCode: string | null;
   homeDressingRoomCode: string | null;
   awayDressingRoomCode: string | null;
+  /** Null when the event's Season was deleted (ADMIN-DELETE-SEASON-01-C1). */
   season: {
     id: string;
     key: string;
@@ -101,7 +102,7 @@ export type PublicEventItem = {
     startDate: Date;
     endDate: Date;
     isActive: boolean;
-  };
+  } | null;
   team: {
     id: string;
     name: string;
@@ -139,6 +140,7 @@ type PublicEventQueryRow = {
   pitchCode: string | null;
   homeDressingRoomCode: string | null;
   awayDressingRoomCode: string | null;
+  /** Null when Event.seasonId was set null by Season deletion (ADMIN-DELETE-SEASON-01-C1). */
   season: {
     id: string;
     key: string;
@@ -146,7 +148,7 @@ type PublicEventQueryRow = {
     startDate: Date;
     endDate: Date;
     isActive: boolean;
-  };
+  } | null;
   team: {
     id: string;
     name: string;
@@ -426,8 +428,8 @@ export async function getInfoboardFeed(input: GetInfoboardFeedInput) {
       meetingTime: event.meetingTime,
       resultLabel: event.resultLabel,
       status: event.status,
-      seasonKey: event.season.key,
-      seasonName: event.season.name,
+      seasonKey: event.season?.key ?? null,
+      seasonName: event.season?.name ?? null,
       pitchLabel: allocation.pitchLabel,
       homeDressingRoomLabel: allocation.homeDressingRoomLabel,
       awayDressingRoomLabel: allocation.awayDressingRoomLabel,

@@ -121,7 +121,10 @@ describe("DELETE /api/seasons/[seasonId]", () => {
     expect(body.message).toContain("gelöscht");
   });
 
-  it("maps SeasonHasDependenciesError to 409 with dependency counts, never destroying history", async () => {
+  // toSeasonApiErrorResponse still maps SeasonHasDependenciesError → 409 for
+  // any caller that might throw it. deleteSeason itself no longer throws it
+  // (C1: deps are decoupled, not blocking), but the mapping is kept for safety.
+  it("toSeasonApiErrorResponse maps SeasonHasDependenciesError to 409 with counts (error-mapper regression)", async () => {
     mockAuthorized();
     mocks.deleteSeason.mockRejectedValue(
       new SeasonHasDependenciesError({

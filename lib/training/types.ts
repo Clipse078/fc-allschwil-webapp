@@ -82,7 +82,8 @@ export interface TrainingSeriesDto {
 export interface TrainingPlanDto {
   id: string;
   tenantId: string;
-  seasonId: string;
+  /** Null when the owning Season was deleted (ADMIN-DELETE-SEASON-01-C1). */
+  seasonId: string | null;
   name: string;
   description: string | null;
   status: TrainingPlanStatus;

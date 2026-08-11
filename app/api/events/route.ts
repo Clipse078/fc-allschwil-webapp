@@ -357,7 +357,7 @@ export async function POST(request: NextRequest) {
         reviewStage: string;
         reviewRequestedAt: Date | null;
         reviewedAt: Date | null;
-        seasonId: string;
+        seasonId: string | null;
         teamId: string | null;
         startAt: Date;
         endAt: Date | null;
