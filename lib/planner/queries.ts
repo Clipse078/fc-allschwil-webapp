@@ -253,7 +253,7 @@ export async function getPlannerEditFormData(
   return {
     ...base,
     eventId: event.id,
-    selectedSeasonId: event.seasonId,
+    selectedSeasonId: event.seasonId ?? "",
     selectedSeasonKey: event.season.key,
     selectedType,
     defaults: {
