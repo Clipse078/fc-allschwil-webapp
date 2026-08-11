@@ -233,6 +233,9 @@ export default function MatchcenterDetail({
 
   // ISO date string for the operational workspace (serializable to client)
   const matchDateIso = match.startAt.toISOString();
+  // RESOURCE-AVAILABILITY-UX-01 — same start/end passed to the live
+  // Frei/Belegt availability lookup in MatchcenterDetailOperational.
+  const matchEndAtIso = match.endAt ? match.endAt.toISOString() : null;
 
   return (
     <PageShell fullWidth>
@@ -500,6 +503,7 @@ export default function MatchcenterDetail({
           currentWebsiteVisible={match.visibility.websiteVisible}
           currentInfoboardVisible={match.visibility.infoboardVisible}
           matchDateIso={matchDateIso}
+          matchEndAtIso={matchEndAtIso}
           canManage={canManageMappings}
           pitchOptions={pitchOptions}
           dressingRoomOptions={dressingRoomOptions}
