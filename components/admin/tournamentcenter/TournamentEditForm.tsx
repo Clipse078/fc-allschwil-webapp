@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Loader2, RotateCcw, Save, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, Ban, Loader2, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -12,7 +12,7 @@ import type { FacilityGroup } from "@/components/admin/training/FacilityResource
 import TournamentParticipantsEditor from "@/components/admin/tournamentcenter/TournamentParticipantsEditor";
 import TournamentResourceAllocationEditor from "@/components/admin/tournamentcenter/TournamentResourceAllocationEditor";
 
-type DeletionBlocker = { key: string; label: string; count: number };
+type DeletionImpact = { key: string; label: string; count: number };
 
 type TeamItem = {
   id: string;
@@ -81,9 +81,10 @@ export default function TournamentEditForm({
   const [saving, setSaving] = useState(false);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [deleteBlockers, setDeleteBlockers] = useState<DeletionBlocker[] | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<DeletionImpact[] | null>(null);
 
   const isCancelled = tournament.status === "CANCELLED";
   const isEditable = canManage && tournament.status !== "ARCHIVED" && tournament.status !== "COMPLETED";
@@ -188,27 +189,46 @@ export default function TournamentEditForm({
     }
   }
 
+  async function openDeleteConfirmation() {
+    setDeleteConfirming(true);
+    setDeleteError(null);
+    setDeleteImpact(null);
+    setDeleteImpactLoading(true);
+
+    try {
+      const res = await fetch(`/api/tournaments/${tournament.id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => null)) as
+        | { error?: string; impact?: DeletionImpact[] }
+        | null;
+
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Löschen nicht möglich.");
+      }
+
+      setDeleteImpact(Array.isArray(data?.impact) ? data.impact : []);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
+    } finally {
+      setDeleteImpactLoading(false);
+    }
+  }
+
   async function handleDelete() {
     setDeleteBusy(true);
     setDeleteError(null);
 
     try {
-      const res = await fetch(`/api/tournaments/${tournament.id}`, { method: "DELETE" });
-      const data = (await res.json().catch(() => null)) as
-        | { error?: string; blockers?: DeletionBlocker[] }
-        | null;
+      const res = await fetch(`/api/tournaments/${tournament.id}?confirm=true`, {
+        method: "DELETE",
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
 
       if (!res.ok) {
-        if (res.status === 409 && Array.isArray(data?.blockers)) {
-          setDeleteBlockers(data.blockers);
-          setDeleteError(data?.error ?? "Löschen nicht möglich.");
-          return;
-        }
         throw new Error(data?.error ?? "Löschen fehlgeschlagen.");
       }
 
       setDeleteConfirming(false);
-      setDeleteBlockers(null);
+      setDeleteImpact(null);
       toast.success("Turnier endgültig gelöscht.");
       router.push("/dashboard/tournamentcenter");
     } catch (err) {
@@ -466,7 +486,7 @@ export default function TournamentEditForm({
             variant="danger"
             size="sm"
             iconLeft={<Trash2 className="h-4 w-4" />}
-            onClick={() => setDeleteConfirming(true)}
+            onClick={openDeleteConfirmation}
             data-testid="tournament-delete-button"
           >
             Endgültig löschen
@@ -478,53 +498,65 @@ export default function TournamentEditForm({
         open={deleteConfirming}
         onClose={() => {
           setDeleteConfirming(false);
-          setDeleteBlockers(null);
+          setDeleteImpact(null);
           setDeleteError(null);
         }}
         title={`„${tournament.title}" endgültig löschen?`}
-        description={
-          deleteBlockers
-            ? undefined
-            : "Diese Aktion kann nicht rückgängig gemacht werden. Nur möglich, wenn keine Teilnehmer, Ressourcen-Zuordnungen oder Ergebnis-Historie bestehen."
-        }
+        description="Diese Aktion ist endgültig und kann nicht rückgängig gemacht werden."
         footer={
-          deleteBlockers ? (
-            <Button variant="secondary" onClick={() => setDeleteConfirming(false)}>
-              Schließen
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setDeleteConfirming(false);
+                setDeleteImpact(null);
+                setDeleteError(null);
+              }}
+            >
+              Abbrechen
             </Button>
-          ) : (
-            <>
-              <Button variant="secondary" onClick={() => setDeleteConfirming(false)}>
-                Abbrechen
-              </Button>
-              <Button variant="danger" loading={deleteBusy} onClick={handleDelete}>
-                Endgültig löschen
-              </Button>
-            </>
-          )
+            <Button
+              variant="danger"
+              loading={deleteBusy}
+              disabled={deleteImpactLoading}
+              onClick={handleDelete}
+              data-testid="tournament-delete-confirm"
+            >
+              Endgültig löschen
+            </Button>
+          </>
         }
       >
-        {deleteError && !deleteBlockers ? (
-          <p className="text-sm font-medium text-[var(--sce-danger)]">{deleteError}</p>
-        ) : null}
-        {deleteBlockers ? (
-          <div className="space-y-3">
-            <div className="flex items-start gap-2 rounded-lg border border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] p-3 text-[var(--sce-warning)]">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <p className="text-sm">
-                Löschen blockiert — Teilnehmer, Ressourcen-Zuordnungen oder Historie bestehen.
-                Bitte stattdessen absagen.
-              </p>
+        <div className="space-y-3">
+          {deleteError ? (
+            <p className="text-sm font-medium text-[var(--sce-danger)]">{deleteError}</p>
+          ) : null}
+
+          {deleteImpactLoading ? (
+            <p className="text-sm text-[var(--text-2)]">Auswirkungen werden geprüft…</p>
+          ) : deleteImpact && deleteImpact.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 rounded-lg border border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] p-3 text-[var(--sce-warning)]">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <p className="text-sm">
+                  Folgende verknüpfte Daten werden ebenfalls unwiderruflich entfernt. Teilnehmende
+                  Vereine, Teams und Ressourcen selbst bleiben erhalten.
+                </p>
+              </div>
+              <ul className="list-inside list-disc space-y-1 text-sm text-[var(--text-2)]">
+                {deleteImpact.map((item) => (
+                  <li key={item.key}>
+                    {item.label}: {item.count}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="list-inside list-disc space-y-1 text-sm text-[var(--text-2)]">
-              {deleteBlockers.map((blocker) => (
-                <li key={blocker.key}>
-                  {blocker.label}: {blocker.count}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+          ) : deleteImpact ? (
+            <p className="text-sm text-[var(--text-2)]">
+              Keine Teilnehmer, Ressourcen-Zuordnungen oder Historie vorhanden.
+            </p>
+          ) : null}
+        </div>
       </Dialog>
     </div>
   );
