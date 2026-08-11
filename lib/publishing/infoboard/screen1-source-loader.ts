@@ -73,7 +73,7 @@ export type Screen1DbEventRow = {
   readonly title: string;
   readonly startAt: Date;
   readonly endAt: Date | null;
-  readonly seasonId: string;
+  readonly seasonId: string | null;
   readonly infoboardVisible: boolean;
   readonly websiteVisible: boolean;
   readonly trainingsplanVisible: boolean;

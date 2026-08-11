@@ -128,12 +128,11 @@ export async function updateSeasonDetailsAction(formData: FormData) {
 }
 
 /**
- * ADMIN-DELETE-SEASON-01 — permanently deletes a Season. Blocked when cascade-
- * delete relations are non-zero (TeamSeason/Event/TrainingPlan) — never
- * restricted by lifecycle status or active-season state alone. SetNull relations
- * (EventImportRun/OrgUnitMembership) are resolved automatically by the DB and
- * do not block. Requires seasons.delete — deliberately separate from
- * seasons.manage. See lib/seasons/mutations.ts#deleteSeason().
+ * ADMIN-DELETE-SEASON-01-C1 — permanently deletes a Season regardless of
+ * dependency counts. TeamSeason links are removed; Events and TrainingPlans
+ * survive with seasonId → null (SetNull FK). SetNull relations
+ * (EventImportRun/OrgUnitMembership) remain unchanged. Requires seasons.delete —
+ * deliberately separate from seasons.manage.
  */
 export async function deleteSeasonAction(formData: FormData) {
   const session = await requireSeasonDeletePermission();
@@ -148,15 +147,10 @@ export async function deleteSeasonAction(formData: FormData) {
   try {
     await deleteSeason(seasonId, actorUserIdFromSession(session));
   } catch (error) {
-    if (error instanceof SeasonDomainError) {
-      if (error.code === "SEASON_NOT_FOUND") {
-        redirect("/dashboard/seasons?status=delete-not-found");
-      }
-      if (error.code === "HAS_DEPENDENCIES") {
-        redirect("/dashboard/seasons?status=delete-has-dependencies");
-      }
+    if (error instanceof SeasonDomainError && error.code === "SEASON_NOT_FOUND") {
+      redirect("/dashboard/seasons?status=delete-not-found");
     }
-    redirect("/dashboard/seasons?status=delete-not-found");
+    redirect("/dashboard/seasons?status=delete-error");
   }
 
   revalidateSeasonSurfaces();

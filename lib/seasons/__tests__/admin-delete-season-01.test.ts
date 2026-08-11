@@ -1,13 +1,16 @@
 /**
  * ADMIN-DELETE-SEASON-01 — focused Season delete tests.
  *
+ * Updated for C1 (force/decouple): deletion is no longer blocked by deps.
+ *
  * Covers the task-required test list items that need live DB validation:
  *   1. authorized user can permanently delete an unreferenced Season
  *   4. active Season can be deleted safely when otherwise deletable
  *   5. deleting active Season does not implicitly activate another
- *   3. dependency/integrity protection: cascade blockers prevent deletion
- *   8. SetNull relations (EventImportRun, OrgUnitMembership) do NOT block deletion
- *   hasSeasonDependencies: only blocks on cascade-delete relations
+ *   hasSeasonDependencies: always returns false after C1
+ *
+ * See lib/seasons/__tests__/admin-delete-season-01-c1.test.ts for the full
+ * C1 test suite (TeamSeason survival, Event/TrainingPlan SetNull, mixed deps).
  *
  * Requires a live PostgreSQL database (DATABASE_URL). Run against a
  * disposable database — never STAGE.
@@ -17,7 +20,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import { activateSeason, createSeason, deleteSeason } from "@/lib/seasons/mutations";
 import { getSeasonDependencyCounts, hasSeasonDependencies } from "@/lib/seasons/queries";
-import { SeasonHasDependenciesError } from "@/lib/seasons/errors";
 
 function randomBand(): number {
   return 5000 + Math.floor(Math.random() * 900) * 3;
@@ -91,8 +93,8 @@ describe("ADMIN-DELETE-SEASON-01 — Season delete (live DB)", () => {
     createdSeasonIds.push(otherSeason.id);
   });
 
-  // Test 3: cascade-delete blockers prevent deletion
-  it("3. deletion blocked when TeamSeason references exist (cascade-delete blocker)", async () => {
+  // Test 3 (C1 updated): TeamSeason references no longer block deletion
+  it("3. Season with TeamSeason links can now be deleted — TeamSeason removed, Team survives (C1)", async () => {
     const base = randomBand();
     const season = await createSeason({ startYear: base });
     createdSeasonIds.push(season.id);
@@ -110,43 +112,29 @@ describe("ADMIN-DELETE-SEASON-01 — Season delete (live DB)", () => {
       data: { teamId: team.id, seasonId: season.id, displayName: team.name },
     });
 
-    await expect(deleteSeason(season.id)).rejects.toBeInstanceOf(SeasonHasDependenciesError);
+    // C1: deletion succeeds even with TeamSeason links
+    const result = await deleteSeason(season.id);
+    expect(result.id).toBe(season.id);
+    createdSeasonIds.length = 0;
 
-    // Season still exists — not silently destroyed
-    const stillExists = await prisma.season.findUnique({ where: { id: season.id } });
-    expect(stillExists).not.toBeNull();
+    // Season is gone
+    expect(await prisma.season.findUnique({ where: { id: season.id } })).toBeNull();
 
-    // TeamSeason/Team still exist — canonical data preserved
-    const teamStillExists = await prisma.team.findUnique({ where: { id: team.id } });
-    expect(teamStillExists).not.toBeNull();
+    // Team survives — canonical data preserved
+    const teamAfter = await prisma.team.findUnique({ where: { id: team.id } });
+    expect(teamAfter).not.toBeNull();
+
+    // TeamSeason link was removed
+    const tsAfter = await prisma.teamSeason.findFirst({ where: { teamId: team.id } });
+    expect(tsAfter).toBeNull();
   });
 
-  // hasSeasonDependencies: SetNull relations do NOT block
-  it("hasSeasonDependencies: returns false when only SetNull relations (EventImportRun, OrgUnitMembership) are present", () => {
-    // Direct unit test — no DB needed for this assertion
-    const countsWithOnlySetNullDeps = {
-      teamSeasons: 0,
-      events: 0,
-      eventImportRuns: 5,
-      trainingPlans: 0,
-      orgUnitMemberships: 3,
-    };
-    expect(hasSeasonDependencies(countsWithOnlySetNullDeps)).toBe(false);
-  });
-
-  it("hasSeasonDependencies: returns true when cascade-delete relations are non-zero (teamSeasons)", () => {
-    expect(hasSeasonDependencies({ teamSeasons: 1, events: 0, eventImportRuns: 0, trainingPlans: 0, orgUnitMemberships: 0 })).toBe(true);
-  });
-
-  it("hasSeasonDependencies: returns true when cascade-delete relations are non-zero (events)", () => {
-    expect(hasSeasonDependencies({ teamSeasons: 0, events: 2, eventImportRuns: 0, trainingPlans: 0, orgUnitMemberships: 0 })).toBe(true);
-  });
-
-  it("hasSeasonDependencies: returns true when cascade-delete relations are non-zero (trainingPlans)", () => {
-    expect(hasSeasonDependencies({ teamSeasons: 0, events: 0, eventImportRuns: 0, trainingPlans: 1, orgUnitMemberships: 0 })).toBe(true);
-  });
-
-  it("hasSeasonDependencies: returns false when all counts are zero", () => {
+  // hasSeasonDependencies: C1 — always returns false (no deps block deletion)
+  it("hasSeasonDependencies: returns false for any counts (C1: all deps are safe-decouple)", () => {
+    expect(hasSeasonDependencies({ teamSeasons: 3, events: 47, eventImportRuns: 5, trainingPlans: 2, orgUnitMemberships: 3 })).toBe(false);
+    expect(hasSeasonDependencies({ teamSeasons: 1, events: 0, eventImportRuns: 0, trainingPlans: 0, orgUnitMemberships: 0 })).toBe(false);
+    expect(hasSeasonDependencies({ teamSeasons: 0, events: 2, eventImportRuns: 0, trainingPlans: 0, orgUnitMemberships: 0 })).toBe(false);
+    expect(hasSeasonDependencies({ teamSeasons: 0, events: 0, eventImportRuns: 0, trainingPlans: 1, orgUnitMemberships: 0 })).toBe(false);
     expect(hasSeasonDependencies({ teamSeasons: 0, events: 0, eventImportRuns: 0, trainingPlans: 0, orgUnitMemberships: 0 })).toBe(false);
   });
 

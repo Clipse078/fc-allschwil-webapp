@@ -1316,7 +1316,9 @@ model TrainerTeamMember {
 
 model Event {
   id       String      @id @default(cuid())
-  seasonId String
+  /// Nullable since ADMIN-DELETE-SEASON-01-C1: Season deletion sets this to
+  /// null rather than cascade-deleting canonical Event/Match/Tournament records.
+  seasonId String?
   teamId   String?
   type     EventType
   source   EventSource
@@ -1378,7 +1380,7 @@ model Event {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  season               Season                @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  season               Season?               @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   team                 Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   matchExternalMapping MatchExternalMapping?
 
@@ -3496,8 +3498,9 @@ model TrainingPlan {
   id                        String                    @id @default(cuid())
   /// Owning tenant. All queries must be scoped by tenantId.
   tenantId                  String
-  /// Owning season. A plan is always season-specific.
-  seasonId                  String
+  /// Season this plan was created for. Nullable since ADMIN-DELETE-SEASON-01-C1:
+  /// Season deletion sets this to null rather than destroying the plan record.
+  seasonId                  String?
   /// Tenant-defined plan name (e.g. "Standard-Wochenplan", "Ferienplan").
   name                      String
   description               String?
@@ -3515,7 +3518,7 @@ model TrainingPlan {
   archivedAt                DateTime?
 
   tenant      Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  season      Season                   @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  season      Season?                  @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   assignments TrainingPlanAssignment[]
 
   @@index([tenantId])

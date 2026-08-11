@@ -36,7 +36,7 @@ vi.mock("next/cache", () => ({
 }));
 
 import { DELETE } from "@/app/api/seasons/[seasonId]/route";
-import { SeasonHasDependenciesError, SeasonNotFoundError } from "@/lib/seasons/errors";
+import { SeasonNotFoundError } from "@/lib/seasons/errors";
 import { NextRequest } from "next/server";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 
@@ -116,28 +116,21 @@ describe("ADMIN-DELETE-SEASON-01 — DELETE /api/seasons/[seasonId]", () => {
     expect(mocks.requireApiPermission).toHaveBeenCalledWith(PERMISSIONS.SEASONS_DELETE);
   });
 
-  // Test 3: dependency/integrity protection — cascade-delete blockers
-  it("3. deletion is blocked (409) when TeamSeason/Event/TrainingPlan references exist", async () => {
+  // Test 3 (C1): deletion succeeds even when TeamSeason/Event/TrainingPlan references exist
+  it("3. deletion succeeds (200) when TeamSeason/Event/TrainingPlan references exist — C1 decouple", async () => {
     mockAuthorizedWithDelete();
-    mocks.deleteSeason.mockRejectedValue(
-      new SeasonHasDependenciesError({
-        teamSeasons: 3,
-        events: 5,
-        eventImportRuns: 0,
-        trainingPlans: 2,
-        orgUnitMemberships: 0,
-      }),
-    );
+    // C1: deleteSeason now returns counts in the result, never throws SeasonHasDependenciesError
+    mocks.deleteSeason.mockResolvedValue({
+      id: SEASON_ID,
+      name: "Season 2030/2031",
+      counts: { teamSeasons: 3, events: 5, eventImportRuns: 0, trainingPlans: 2, orgUnitMemberships: 0 },
+    });
 
     const res = await DELETE(deleteRequest(), ctx());
     const body = await res.json();
 
-    expect(res.status).toBe(409);
-    expect(body.code).toBe("HAS_DEPENDENCIES");
-    expect(body.counts.teamSeasons).toBe(3);
-    expect(body.counts.events).toBe(5);
-    expect(body.counts.trainingPlans).toBe(2);
-    // DB integrity never bypassed — deleteSeason was called but rejected
+    expect(res.status).toBe(200);
+    expect(body.message).toContain("gelöscht");
     expect(mocks.deleteSeason).toHaveBeenCalledTimes(1);
   });
 

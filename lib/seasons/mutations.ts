@@ -24,10 +24,9 @@ import {
   getSwissFootballSeasonKeyFromStartYear,
   getSwissFootballSeasonLabelFromStartYear,
 } from "@/lib/seasons/season-logic";
-import { getSeasonDependencyCounts, hasSeasonDependencies } from "@/lib/seasons/queries";
+import { getSeasonDependencyCounts } from "@/lib/seasons/queries";
 import {
   DuplicateSeasonError,
-  SeasonHasDependenciesError,
   SeasonNotFoundError,
   SeasonValidationError,
 } from "@/lib/seasons/errors";
@@ -215,21 +214,33 @@ export async function activateSeason(
 }
 
 // ---------------------------------------------------------------------------
-// Delete — dependency-checked, never destroys Team/Event history
+// Delete — ADMIN-DELETE-SEASON-01-C1: force-decouple, never destroys canonical
+// Event/Match/Tournament or TrainingPlan history.
+//
+// Semantics after C1:
+//   TeamSeason rows     → deleted (Season-scoped join table, Team survives)
+//   Event.seasonId      → set NULL by onDelete: SetNull FK (Event survives)
+//   TrainingPlan.seasonId → set NULL by onDelete: SetNull FK (plan survives)
+//   EventImportRun, OrgUnitMembership → already SetNull, unchanged
+//
+// The Season is deleted unconditionally (for authorized callers). Impact
+// counts are fetched immediately before deletion for the audit log only.
 // ---------------------------------------------------------------------------
 
 export async function deleteSeason(
   seasonId: string,
   actorUserId?: string | null,
-): Promise<{ id: string; name: string }> {
+): Promise<{ id: string; name: string; counts: import("@/lib/seasons/queries").SeasonDependencyCounts }> {
   const season = await prisma.season.findUnique({ where: { id: seasonId }, select: SEASON_SELECT });
   if (!season) throw new SeasonNotFoundError();
 
+  // Recompute impact immediately before deletion for audit accuracy.
   const counts = await getSeasonDependencyCounts(seasonId);
-  if (hasSeasonDependencies(counts)) {
-    throw new SeasonHasDependenciesError(counts);
-  }
 
+  // Single delete: DB FK actions handle the rest —
+  //   TeamSeason: onDelete Cascade  → rows removed
+  //   Event.seasonId: onDelete SetNull → seasonId set to null, Event preserved
+  //   TrainingPlan.seasonId: onDelete SetNull → seasonId set to null, plan preserved
   await prisma.season.delete({ where: { id: seasonId } });
 
   await logAction({
@@ -238,8 +249,15 @@ export async function deleteSeason(
     entityType: "Season",
     entityId: season.id,
     action: "DELETE",
-    beforeJson: { key: season.key, name: season.name, wasActive: season.isActive },
+    beforeJson: {
+      key: season.key,
+      name: season.name,
+      wasActive: season.isActive,
+      teamSeasonCount: counts.teamSeasons,
+      eventCount: counts.events,
+      trainingPlanCount: counts.trainingPlans,
+    },
   });
 
-  return { id: season.id, name: season.name };
+  return { id: season.id, name: season.name, counts };
 }

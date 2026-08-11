@@ -18,14 +18,14 @@
  *   7. a newly created Season never becomes current automatically
  *   8. a read (getSeasonsOverviewData) never mutates Season.isActive
  *   13. unused Season deletion works
- *   14. referenced Season deletion returns dependency blockers
+ *   14. referenced Season (TeamSeason) can now be deleted — C1 decouple
  */
 
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import { activateSeason, createSeason, deleteSeason, updateSeasonDetails } from "@/lib/seasons/mutations";
 import { getSeasonsOverviewData } from "@/lib/seasons/queries";
-import { DuplicateSeasonError, SeasonHasDependenciesError, SeasonNotFoundError } from "@/lib/seasons/errors";
+import { DuplicateSeasonError, SeasonNotFoundError } from "@/lib/seasons/errors";
 
 function randomFutureStartYearBand(): number {
   // Far enough in the future that no real/seeded Season can ever collide,
@@ -154,7 +154,7 @@ describe("SEASON-01 — Season mutations (live DB)", () => {
     createdSeasonIds.length = 0; // already deleted — nothing left for afterEach to clean up
   });
 
-  it("14. a referenced Season (has a TeamSeason) cannot be deleted and returns dependency blockers", async () => {
+  it("14. a referenced Season (has a TeamSeason) can now be deleted — C1 decouple: TeamSeason removed, Team survives", async () => {
     const base = randomFutureStartYearBand();
     const season = await createSeason({ startYear: base });
     createdSeasonIds.push(season.id);
@@ -172,18 +172,20 @@ describe("SEASON-01 — Season mutations (live DB)", () => {
       data: { teamId: team.id, seasonId: season.id, displayName: team.name },
     });
 
-    try {
-      await deleteSeason(season.id);
-      throw new Error("expected deleteSeason to reject");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SeasonHasDependenciesError);
-      const depError = error as SeasonHasDependenciesError;
-      expect(depError.counts.teamSeasons).toBe(1);
-    }
+    // C1: deletion succeeds even with TeamSeason references
+    const result = await deleteSeason(season.id);
+    expect(result.id).toBe(season.id);
+    expect(result.counts.teamSeasons).toBe(1);
+    createdSeasonIds.length = 0;
 
-    // Never destroyed the referencing TeamSeason/Team as a side effect.
-    const stillThere = await prisma.teamSeason.findFirst({ where: { seasonId: season.id } });
-    expect(stillThere).not.toBeNull();
+    // Season is gone
+    expect(await prisma.season.findUnique({ where: { id: season.id } })).toBeNull();
+
+    // Team canonical record survives
+    expect(await prisma.team.findUnique({ where: { id: team.id } })).not.toBeNull();
+
+    // TeamSeason link was removed
+    expect(await prisma.teamSeason.findFirst({ where: { teamId: team.id } })).toBeNull();
   });
 
   it("updateSeasonDetails: edits label/dates without touching key or isActive", async () => {

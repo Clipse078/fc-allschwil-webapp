@@ -142,7 +142,7 @@ function validatePlanName(name: string): string {
 type PlanRow = {
   id: string;
   tenantId: string;
-  seasonId: string;
+  seasonId: string | null;
   name: string;
   description: string | null;
   status: string;
@@ -249,7 +249,7 @@ async function requireSeason(seasonId: string): Promise<void> {
 /** Checks case-insensitive name uniqueness among non-archived plans. */
 async function checkNameUniqueness(
   tenantId: string,
-  seasonId: string,
+  seasonId: string | null,
   name: string,
   excludePlanId?: string,
 ): Promise<void> {

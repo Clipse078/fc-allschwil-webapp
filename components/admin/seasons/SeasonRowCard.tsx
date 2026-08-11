@@ -84,10 +84,9 @@ export default function SeasonRowCard({
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  // Cascade-delete blockers: these records would be irrecoverably destroyed.
-  // SetNull relations (EventImportRun, OrgUnitMembership) are intentionally
-  // excluded — those records survive with seasonId → NULL.
-  const hasBlockingDeps = teamSeasonCount > 0 || eventCount > 0 || trainingPlanCount > 0;
+  // ADMIN-DELETE-SEASON-01-C1: no deps block deletion anymore.
+  // TeamSeason links are removed; Events and TrainingPlans survive (seasonId → null).
+  const hasAnyDeps = teamSeasonCount > 0 || eventCount > 0 || trainingPlanCount > 0;
 
   return (
     <div className="sce-detail-section">
@@ -206,11 +205,11 @@ export default function SeasonRowCard({
           </div>
         )}
 
-        {/* Dependency hint — shown when deletion is blocked */}
-        {canDelete && hasBlockingDeps ? (
+        {/* Consequence hint — shown when deps exist (informational only, never blocking) */}
+        {canDelete && hasAnyDeps ? (
           <p className="mt-4 flex items-center gap-1.5 text-xs text-[var(--muted)]">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-            Löschen nicht möglich: Saison wird noch referenziert (Teams, Events oder Trainingspläne müssen zuerst entfernt werden).
+            Beim Löschen werden Team-Zuordnungen entfernt. Events und Trainingspläne bleiben erhalten.
           </p>
         ) : null}
 
@@ -254,26 +253,16 @@ export default function SeasonRowCard({
             >
               Abbrechen
             </button>
-            {hasBlockingDeps ? (
+            <form action={deleteSeasonAction} onSubmit={() => setDeleteDialogOpen(false)}>
+              <input type="hidden" name="seasonId" value={id} />
               <button
-                type="button"
-                disabled
-                className="inline-flex h-9 cursor-not-allowed items-center rounded-lg bg-rose-300 px-4 text-sm font-medium text-white opacity-60"
+                type="submit"
+                className="inline-flex h-9 items-center rounded-lg bg-rose-600 px-4 text-sm font-medium text-white transition hover:bg-rose-700"
               >
-                Löschen nicht möglich
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Endgültig löschen
               </button>
-            ) : (
-              <form action={deleteSeasonAction} onSubmit={() => setDeleteDialogOpen(false)}>
-                <input type="hidden" name="seasonId" value={id} />
-                <button
-                  type="submit"
-                  className="inline-flex h-9 items-center rounded-lg bg-rose-600 px-4 text-sm font-medium text-white transition hover:bg-rose-700"
-                >
-                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                  Saison endgültig löschen
-                </button>
-              </form>
-            )}
+            </form>
           </div>
         }
       >
@@ -292,35 +281,30 @@ export default function SeasonRowCard({
             ) : null}
           </div>
 
-          {/* Dependency impact */}
+          {/* Dependency impact — consequence-based, never blocking */}
           <div>
-            <p className="mb-2 text-sm font-medium text-[var(--foreground)]">Abhängigkeiten</p>
+            <p className="mb-2 text-sm font-medium text-[var(--foreground)]">Was passiert beim Löschen</p>
             <div className="space-y-1.5 text-sm">
-              <DependencyRow
-                label="Zugewiesene Teams (TeamSeason)"
+              <ImpactRow
+                label="Team-Zuordnungen"
                 count={teamSeasonCount}
-                blocking
+                consequence={teamSeasonCount > 0 ? "werden entfernt" : undefined}
+                destructive
               />
-              <DependencyRow
+              <ImpactRow
                 label="Events / Spiele"
                 count={eventCount}
-                blocking
+                consequence={eventCount > 0 ? "bleiben erhalten, Saison-Zuordnung wird entfernt" : undefined}
               />
-              <DependencyRow
+              <ImpactRow
                 label="Trainingspläne"
                 count={trainingPlanCount}
-                blocking
+                consequence={trainingPlanCount > 0 ? "bleiben erhalten, Saison-Zuordnung wird entfernt" : undefined}
               />
             </div>
-            {hasBlockingDeps ? (
-              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Die Löschung ist blockiert. Entferne zuerst alle referenzierten Daten und versuche es erneut.
-              </p>
-            ) : (
-              <p className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--muted)]">
-                Keine blockierenden Abhängigkeiten. Die Saison kann endgültig gelöscht werden.
-              </p>
-            )}
+            <p className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--muted)]">
+              Die Saison wird permanent gelöscht. Verknüpfte Inhalte bleiben erhalten, soweit sie eigenständige Datensätze sind.
+            </p>
           </div>
 
           {/* Permanent deletion warning */}
@@ -334,28 +318,25 @@ export default function SeasonRowCard({
   );
 }
 
-function DependencyRow({
+function ImpactRow({
   label,
   count,
-  blocking,
+  consequence,
+  destructive = false,
 }: {
   label: string;
   count: number;
-  blocking: boolean;
+  consequence?: string;
+  destructive?: boolean;
 }) {
-  const hasItems = count > 0;
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3">
       <span className="text-[var(--muted)]">{label}</span>
-      <span
-        className={
-          hasItems && blocking
-            ? "font-semibold text-rose-600"
-            : "font-medium text-[var(--foreground)]"
-        }
-      >
+      <span className={`text-right font-medium ${destructive && count > 0 ? "text-rose-600" : "text-[var(--foreground)]"}`}>
         {count}
-        {hasItems && blocking ? " (blockiert)" : ""}
+        {consequence ? (
+          <span className="ml-1 font-normal text-[var(--muted)]">({consequence})</span>
+        ) : null}
       </span>
     </div>
   );
