@@ -525,6 +525,9 @@ model Tenant {
   sfvConfig                        TenantSfvConfig?
   teamExternalMappings             TeamExternalMapping[]
   matchExternalMappings            MatchExternalMapping[]
+  // ADMIN-DELETE-02A-C1: intentionally-deleted SFV match suppression — see
+  // SfvMatchDeletionTombstone doc comment.
+  sfvMatchDeletionTombstones       SfvMatchDeletionTombstone[]
   // CLUB-DIRECTORY-01: canonical external club/team directory. Supersedes
   // the earlier "Opponent"/"OpponentExternalMapping" foundation (MC-04B),
   // which was never wired to any write path or UI and had no club/team split.
@@ -2936,6 +2939,52 @@ model MatchExternalMapping {
   @@index([awayTeamId])
   @@index([homeExternalTeamId])
   @@index([awayExternalTeamId])
+}
+
+// ---------------------------------------------------------------------------
+// SfvMatchDeletionTombstone — ADMIN-DELETE-02A-C1.
+//
+// A club admin holding matches.delete may permanently delete an SFV-imported
+// Match at any time (dependencies are impact/warnings, never blockers — see
+// lib/matchcenter/match-lifecycle-service.ts). Deleting the Match cascades
+// away its MatchExternalMapping (the (tenantId, provider, externalMatchId)
+// identity SFV sync upserts by), so without this row the very next schedule
+// sync would treat the fixture as brand new and simply recreate it — sync
+// itself is completely unmodified (see lib/integrations/sfv/sync/) and never
+// deletes/deactivates provider-absent fixtures.
+//
+// One tombstone row is written per intentionally-deleted SFV match, keyed by
+// the exact same (tenantId, provider, externalMatchId) identity the mapping
+// used. lib/integrations/sfv/sync/schedule-persistence.ts's create path
+// checks this table first and silently skips (never recreates) any fixture
+// with a matching tombstone. Deliberately NOT a generic/reusable "ignore any
+// provider entity" mechanism — scoped to exactly this one, already-diagnosed
+// re-creation risk.
+// ---------------------------------------------------------------------------
+model SfvMatchDeletionTombstone {
+  id       String @id @default(cuid())
+  /// Owning tenant. All queries must be scoped by tenantId.
+  tenantId String
+  /// External provider identifier, e.g. "SFV". Matches MatchExternalMapping.provider.
+  provider String
+  /// The provider's matchId that was intentionally, permanently deleted.
+  /// Matches MatchExternalMapping.externalMatchId — never reused for a
+  /// different local Match.
+  externalMatchId  Int
+  /// SFV seasonId at time of deletion — informational only, not part of the
+  /// suppression identity (a provider matchId is never reused across seasons).
+  externalSeasonId Int
+  /// When the permanent deletion (and this suppression) occurred.
+  deletedAt DateTime @default(now())
+  /// The user who performed the permanent deletion, if resolvable. Never a
+  /// hard dependency — deletion must never fail because this is unknown.
+  deletedByUserId String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// One tombstone per intentionally-deleted provider match.
+  @@unique([tenantId, provider, externalMatchId])
+  @@index([tenantId])
 }
 
 model TenantSfvConfig {

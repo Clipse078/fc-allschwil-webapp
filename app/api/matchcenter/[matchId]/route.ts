@@ -17,9 +17,9 @@
  * Permission: EVENTS_MANAGE
  * Tenant isolation: tenantId resolved from session, never from request body.
  *
- * DELETE /api/matchcenter/[matchId] — ADMIN-DELETE-02A permanent hard
- * delete. Requires PERMISSIONS.MATCHES_DELETE — deliberately NOT
- * EVENTS_MANAGE, which authorizes the PATCH above but must never imply
+ * DELETE /api/matchcenter/[matchId] — ADMIN-DELETE-02A / ADMIN-DELETE-02A-C1
+ * permanent hard delete. Requires PERMISSIONS.MATCHES_DELETE — deliberately
+ * NOT EVENTS_MANAGE, which authorizes the PATCH above but must never imply
  * permanent deletion on its own.
  *
  * Authorization model (mirrors app/api/teams/[teamId]/route.ts DELETE,
@@ -30,9 +30,28 @@
  *   2. EffectivePermissionResolver.hasTenantDeletionAuthority() decides
  *      whether the caller may delete within that exact tenant.
  *
- * Refuses to delete when the match carries an SFV/provider mapping, is
- * live/completed, or has Weekplanner operational references — see
- * lib/matchcenter/match-lifecycle-service.ts. SFV sync is unmodified.
+ * CORE PRODUCT RULE (ADMIN-DELETE-02A-C1): a matches.delete holder is NEVER
+ * blocked from permanently deleting a match merely because an SFV/provider
+ * mapping, a live/completed sporting state, or Weekplanner references
+ * exist. Instead, this route implements a two-step "inspect impact →
+ * explicit confirmation → atomic cleanup + delete" flow on the SAME
+ * endpoint, driven by the `confirm` query parameter:
+ *
+ *   DELETE .../[matchId]            → PREVIEW: returns 200 with the impact
+ *                                      (dependency counts) and
+ *                                      requiresConfirmation: true. Deletes
+ *                                      nothing.
+ *   DELETE .../[matchId]?confirm=true → PERFORM: atomically cleans up owned/
+ *                                        reference data, writes an
+ *                                        SfvMatchDeletionTombstone when a
+ *                                        provider mapping exists (so the
+ *                                        next SFV sync never recreates it —
+ *                                        SFV sync itself is unmodified), and
+ *                                        permanently deletes the match. See
+ *                                        lib/matchcenter/match-lifecycle-service.ts.
+ *
+ * Both steps require the same authorization check — the impact preview
+ * never leaks dependency information to an unauthorized caller.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -44,9 +63,9 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import { logAction } from "@/lib/audit/log-action";
 import {
-  MatchDeletionBlockedError,
   MatchNotFoundError,
-  deleteMatchSafely,
+  deleteMatchPermanently,
+  getMatchDeletionImpact,
 } from "@/lib/matchcenter/match-lifecycle-service";
 
 type RouteContext = { params: Promise<{ matchId: string }> };
@@ -185,7 +204,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+export async function DELETE(req: NextRequest, { params }: RouteContext) {
   const session = await auth();
 
   if (!session?.user) {
@@ -220,34 +239,41 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const confirmed = req.nextUrl.searchParams.get("confirm") === "true";
+
+  if (!confirmed) {
+    const impact = await getMatchDeletionImpact(matchTenantId, matchId);
+
+    if (impact === null) {
+      return NextResponse.json({ error: "Match nicht gefunden." }, { status: 404 });
+    }
+
+    return NextResponse.json({ impact, requiresConfirmation: true });
+  }
+
   try {
-    const deleted = await deleteMatchSafely(matchTenantId, matchId);
+    const deletedByUserId = session.user.effectiveUserId ?? session.user.id ?? null;
+    const { deleted, impact } = await deleteMatchPermanently(
+      matchTenantId,
+      matchId,
+      deletedByUserId,
+    );
 
     await logAction({
-      actorUserId: session.user.effectiveUserId ?? session.user.id ?? null,
+      actorUserId: deletedByUserId,
       moduleKey: "matchcenter",
       entityType: "Match",
       entityId: matchId,
       action: "DELETE",
-      beforeJson: deleted,
+      beforeJson: { ...deleted, impact },
     });
 
     revalidatePath("/dashboard/matchcenter");
 
-    return NextResponse.json({ message: "Match wurde endgültig gelöscht." });
+    return NextResponse.json({ message: "Match wurde endgültig gelöscht.", impact });
   } catch (error) {
     if (error instanceof MatchNotFoundError) {
       return NextResponse.json({ error: "Match nicht gefunden." }, { status: 404 });
-    }
-
-    if (error instanceof MatchDeletionBlockedError) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          blockers: error.blockers,
-        },
-        { status: 409 },
-      );
     }
 
     console.error("Delete match failed:", error);

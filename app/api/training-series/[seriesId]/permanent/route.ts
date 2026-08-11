@@ -1,8 +1,8 @@
 /**
  * DELETE /api/training-series/[seriesId]/permanent — permanent hard delete.
  *
- * ADMIN-DELETE-02A. Requires PERMISSIONS.TRAININGS_DELETE — deliberately NOT
- * TRAININGS_MANAGE, which authorizes create/edit/archive
+ * ADMIN-DELETE-02A / ADMIN-DELETE-02A-C1. Requires PERMISSIONS.TRAININGS_DELETE
+ * — deliberately NOT TRAININGS_MANAGE, which authorizes create/edit/archive
  * (DELETE /api/training-series/[seriesId], unchanged by this file) but must
  * never imply permanent deletion on its own. A dedicated `/permanent`
  * sub-route is used rather than repurposing the existing DELETE
@@ -16,14 +16,26 @@
  *      resolved strictly server-side from `seriesId` — a client-supplied
  *      tenantId is never read or trusted for this decision.
  *   2. EffectivePermissionResolver.hasTenantDeletionAuthority() decides
- *      whether the caller may delete within that exact tenant (tenant-scoped
- *      trainings.delete grant, or the SCE Super Admin's platform-held
- *      trainings.delete grant resolved against this tenant once confirmed
- *      real and operationally ACTIVE).
+ *      whether the caller may delete within that exact tenant.
  *
- * Refuses to delete when meaningful dependencies/history exist (generated
- * sessions, facility allocations, training-plan assignments) — recommends
- * archiving instead. See lib/training/training-lifecycle-service.ts.
+ * CORE PRODUCT RULE (ADMIN-DELETE-02A-C1): a trainings.delete holder is
+ * NEVER blocked from permanently deleting a series merely because generated
+ * sessions, facility allocations, or plan assignments exist. Instead, this
+ * route implements a two-step "inspect impact → explicit confirmation →
+ * atomic cleanup + delete" flow on the SAME endpoint, driven by the
+ * `confirm` query parameter:
+ *
+ *   DELETE .../permanent            → PREVIEW: returns 200 with the impact
+ *                                      (dependency counts) and
+ *                                      requiresConfirmation: true. Deletes
+ *                                      nothing.
+ *   DELETE .../permanent?confirm=true → PERFORM: atomically cleans up owned/
+ *                                        reference data and permanently
+ *                                        deletes the series. See
+ *                                        lib/training/training-lifecycle-service.ts.
+ *
+ * Both steps require the same authorization check — the impact preview
+ * never leaks dependency information to an unauthorized caller.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -34,14 +46,14 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import { logAction } from "@/lib/audit/log-action";
 import {
-  TrainingSeriesDeletionBlockedError,
-  deleteTrainingSeriesSafely,
+  deleteTrainingSeriesPermanently,
+  getTrainingSeriesDeletionImpact,
 } from "@/lib/training/training-lifecycle-service";
 import { TrainingSeriesNotFoundError } from "@/lib/training/errors";
 
 type Params = { params: Promise<{ seriesId: string }> };
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   const session = await auth();
 
   if (!session?.user) {
@@ -74,8 +86,20 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const confirmed = request.nextUrl.searchParams.get("confirm") === "true";
+
+  if (!confirmed) {
+    const impact = await getTrainingSeriesDeletionImpact(seriesTenantId, seriesId);
+
+    if (impact === null) {
+      return NextResponse.json({ error: "Trainingsserie nicht gefunden." }, { status: 404 });
+    }
+
+    return NextResponse.json({ impact, requiresConfirmation: true });
+  }
+
   try {
-    const deleted = await deleteTrainingSeriesSafely(seriesTenantId, seriesId);
+    const { deleted, impact } = await deleteTrainingSeriesPermanently(seriesTenantId, seriesId);
 
     await logAction({
       actorUserId: session.user.effectiveUserId ?? session.user.id ?? null,
@@ -83,25 +107,15 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       entityType: "TrainingSeries",
       entityId: seriesId,
       action: "DELETE",
-      beforeJson: deleted,
+      beforeJson: { ...deleted, impact },
     });
 
     revalidatePath("/dashboard/training");
 
-    return NextResponse.json({ message: "Trainingsserie wurde endgültig gelöscht." });
+    return NextResponse.json({ message: "Trainingsserie wurde endgültig gelöscht.", impact });
   } catch (error) {
     if (error instanceof TrainingSeriesNotFoundError) {
       return NextResponse.json({ error: "Trainingsserie nicht gefunden." }, { status: 404 });
-    }
-
-    if (error instanceof TrainingSeriesDeletionBlockedError) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          blockers: error.blockers,
-        },
-        { status: 409 },
-      );
     }
 
     console.error("Delete training series failed:", error);

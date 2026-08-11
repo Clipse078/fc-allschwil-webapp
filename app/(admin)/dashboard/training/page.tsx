@@ -45,12 +45,25 @@ const TOP_TABS: { key: "kalender" | "serien"; label: string }[] = [
 ];
 
 export default async function TrainingCenterPage({ searchParams }: Props) {
-  const session = await requireAnyPermission([PERMISSIONS.TRAININGS_VIEW, PERMISSIONS.TRAININGS_MANAGE]);
+  // ADMIN-DELETE-02A-C1: a delegated user may hold trainings.delete without
+  // trainings.view/trainings.manage — they must still be able to reach the
+  // actual Serien-Verwaltung list to exercise the permanent-delete action
+  // gated below (mirrors app/(admin)/dashboard/training/series/[seriesId]/
+  // edit/page.tsx, ADMIN-DELETE-02A).
+  const session = await requireAnyPermission([
+    PERMISSIONS.TRAININGS_VIEW,
+    PERMISSIONS.TRAININGS_MANAGE,
+    PERMISSIONS.TRAININGS_DELETE,
+  ]);
 
   const tenantContext = await getActiveTenant();
   if (!tenantContext) notFound();
 
   const canManage = hasPermission(session, PERMISSIONS.TRAININGS_MANAGE);
+  // ADMIN-DELETE-02A-C1: permanent "Endgültig löschen" gating in the actual
+  // Serien-Verwaltung list — deliberately independent of trainings.manage
+  // (manage alone must never authorize permanent deletion).
+  const canDelete = hasPermission(session, PERMISSIONS.TRAININGS_DELETE);
   const params: TrainingPageSearchParams = searchParams ? await searchParams : {};
   const tab = params.tab === "serien" ? "serien" : "kalender";
   const timezone = tenantContext.timezone ?? TRAINING_DEFAULT_TIMEZONE;
@@ -80,6 +93,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
           allSeries={allSeries}
           showArchived={showArchived}
           canManage={canManage}
+          canDelete={canDelete}
         />
       </div>
     );

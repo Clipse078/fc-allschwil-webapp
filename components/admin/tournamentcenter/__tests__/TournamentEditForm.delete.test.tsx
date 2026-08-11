@@ -10,7 +10,7 @@
  * only renders when the caller holds tournaments.delete.
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TournamentEditForm from "@/components/admin/tournamentcenter/TournamentEditForm";
 import type { TournamentDto } from "@/lib/tournaments/types";
@@ -104,5 +104,77 @@ describe("TournamentEditForm — ADMIN-DELETE-02A permission gating", () => {
 
     expect(screen.getByTestId("tournament-lifecycle-toggle")).toBeTruthy();
     expect(screen.getByTestId("tournament-delete-button")).toBeTruthy();
+  });
+});
+
+describe("TournamentEditForm — ADMIN-DELETE-02A-C1 impact never blocks", () => {
+  it("shows participants/resources as impact (warning), and the confirm button stays enabled", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          impact: [{ key: "participants", label: "Teilnehmende Teams/Vereine", count: 4 }],
+          requiresConfirmation: true,
+        }),
+      }),
+    );
+
+    render(
+      <TournamentEditForm
+        tournament={TOURNAMENT}
+        canManage={false}
+        canDelete={true}
+        pitchHallFacilityGroups={[]}
+        dressingRoomFacilityGroups={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("tournament-delete-button"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Teilnehmende Teams\/Vereine: 4/)).toBeTruthy();
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/tournaments/tournament-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+
+    const confirmButton = screen.getByTestId("tournament-delete-confirm");
+    expect(confirmButton).not.toBeDisabled();
+  });
+
+  it("confirming calls the permanent-delete endpoint with ?confirm=true", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ impact: [] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ message: "ok", impact: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <TournamentEditForm
+        tournament={TOURNAMENT}
+        canManage={false}
+        canDelete={true}
+        pitchHallFacilityGroups={[]}
+        dressingRoomFacilityGroups={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("tournament-delete-button"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Keine Teilnehmer, Ressourcen-Zuordnungen/)).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByTestId("tournament-delete-confirm"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/tournaments/tournament-1?confirm=true",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
   });
 });

@@ -54,10 +54,14 @@ const mockEventUpdate = vi.fn();
 const mockMappingCreate = vi.fn();
 const mockMappingUpdate = vi.fn();
 const mockTransaction = vi.fn();
+const mockTombstoneFindMany = vi.fn();
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
+    sfvMatchDeletionTombstone: {
+      findMany: (...args: unknown[]) => mockTombstoneFindMany(...args),
+    },
   },
 }));
 
@@ -66,6 +70,8 @@ vi.mock("@/lib/db/prisma", () => ({
 const {
   createMatchWithMapping,
   updateMatchRecord,
+  loadTombstonedExternalMatchIds,
+  processScheduleEntry,
 } = await import("../sync/schedule-persistence");
 
 const {
@@ -188,6 +194,7 @@ beforeEach(() => {
     mockMappingUpdate.mockResolvedValue({});
     return fn(tx);
   });
+  mockTombstoneFindMany.mockResolvedValue([]);
 });
 
 // ── C1–C5: Create path ────────────────────────────────────────────────────────
@@ -553,5 +560,134 @@ describe("detectChanges — homeAway correction", () => {
     expect(result.scoreChanged).toBe(false);
     expect(result.kickoffChanged).toBe(false);
     expect(result.statusChanged).toBe(false);
+  });
+});
+
+// ── ADMIN-DELETE-02A-C1: SFV deletion-suppression (tombstone) ───────────────
+
+describe("loadTombstonedExternalMatchIds", () => {
+  it("T1: returns a Set of externalMatchId values for this tenant/provider", async () => {
+    mockTombstoneFindMany.mockResolvedValueOnce([
+      { externalMatchId: 99001 },
+      { externalMatchId: 99002 },
+    ]);
+
+    const ids = await loadTombstonedExternalMatchIds("tenant-test", "SFV");
+
+    expect(ids.has(99001)).toBe(true);
+    expect(ids.has(99002)).toBe(true);
+    expect(ids.has(1)).toBe(false);
+    expect(mockTombstoneFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: "tenant-test", provider: "SFV" } }),
+    );
+  });
+
+  it("T2: returns an empty Set when no match has ever been tombstoned", async () => {
+    mockTombstoneFindMany.mockResolvedValueOnce([]);
+
+    const ids = await loadTombstonedExternalMatchIds("tenant-test", "SFV");
+
+    expect(ids.size).toBe(0);
+  });
+});
+
+describe("processScheduleEntry — ADMIN-DELETE-02A-C1 tombstone suppression", () => {
+  it("T3: a tombstoned fixture with no prior mapping is suppressed — never (re)created", async () => {
+    const result = await processScheduleEntry(
+      makeEntry({ matchId: 99001 }),
+      makeContext(),
+      "season-1",
+      new Map(), // no existing mapping — this is exactly the post-delete state
+      new Map([[31927, "team-1"]]),
+      new Set([31927]),
+      undefined,
+      new Set([99001]), // tombstoned
+    );
+
+    expect(result.outcome).toEqual({ status: "suppressed" });
+    expect(mockEventCreate).not.toHaveBeenCalled();
+    expect(mockMappingCreate).not.toHaveBeenCalled();
+  });
+
+  it("T4: a non-tombstoned fixture with no prior mapping is still created normally", async () => {
+    const result = await processScheduleEntry(
+      makeEntry({ matchId: 12345 }),
+      makeContext(),
+      "season-1",
+      new Map(),
+      new Map([[31927, "team-1"]]),
+      new Set([31927]),
+      undefined,
+      new Set([99001]), // a different match is tombstoned
+    );
+
+    expect(result.outcome.status).toBe("created");
+    expect(mockEventCreate).toHaveBeenCalledOnce();
+  });
+
+  it("T5: defaults to an empty tombstone set when none is supplied (backward compatible)", async () => {
+    const result = await processScheduleEntry(
+      makeEntry({ matchId: 99001 }),
+      makeContext(),
+      "season-1",
+      new Map(),
+      new Map([[31927, "team-1"]]),
+      new Set([31927]),
+    );
+
+    expect(result.outcome.status).toBe("created");
+  });
+
+  it("T6: an EXISTING mapping is still updated/reconciled normally even if the matchId also carries a stale tombstone row", async () => {
+    // Defensive: a tombstone should only ever suppress a CREATE for an
+    // absent mapping. If a mapping somehow exists again (e.g. a manual
+    // re-import), normal update/unchanged handling still applies.
+    const existing = new Map([
+      [
+        99001,
+        {
+          id: "mapping-1",
+          eventId: "event-1",
+          providerMatchState: 0,
+          providerMatchStateName: "angesetzt",
+          scoreHome: 0,
+          scoreAway: 0,
+          providerLeagueId: 17131,
+          providerLeagueName: "4. Liga",
+          providerDivisionId: 999,
+          providerDivisionName: "Gruppe 1",
+          providerRoundNbr: 3,
+          providerVenueName: "Testzentrum",
+          providerHomeTeamName: "FC Local A",
+          providerAwayTeamName: "FC Opponent B",
+          homeTeamId: "team-1",
+          awayTeamId: null,
+          homeExternalTeamId: null,
+          awayExternalTeamId: null,
+          event: {
+            startAt: new Date("2026-09-13T15:00:00.000Z"),
+            status: "SCHEDULED",
+            teamId: "team-1",
+            homeAway: "HOME",
+          },
+        },
+      ],
+    ]);
+
+    const result = await processScheduleEntry(
+      makeEntry({ matchId: 99001 }),
+      makeContext(),
+      "season-1",
+      existing,
+      new Map([[31927, "team-1"]]),
+      new Set([31927]),
+      undefined,
+      new Set([99001]),
+    );
+
+    // Never suppressed and never a create — a tombstone only ever gates the
+    // CREATE branch for an absent mapping.
+    expect(result.outcome.status).not.toBe("suppressed");
+    expect(mockEventCreate).not.toHaveBeenCalled();
   });
 });
