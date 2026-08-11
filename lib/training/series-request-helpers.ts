@@ -108,6 +108,46 @@ export function parseWeekdaySchedules(
   return { ok: true, value: { weekdays, weekdayTimes, startsAt, endsAt } };
 }
 
+/**
+ * RESOURCE-AVAILABILITY-UX-01-C1: parses the optional `facilityResourceIds`
+ * field of the TrainingSeries create request body — the Spielfeld/Halle +
+ * Garderobe resources selected during guided creation, persisted as the
+ * series' default TrainingAllocation rows in the SAME request that creates
+ * the series (see app/api/training-series/route.ts). Deduplicated and
+ * order-preserving; absent/empty input is valid (resources are optional at
+ * creation — see TrainingSeriesCreateForm).
+ *
+ * Pure validation only — does not check tenant ownership, archival status,
+ * or resource existence; those remain the responsibility of
+ * createTrainingAllocation() (lib/training/training-allocation-service.ts),
+ * which the route calls per id.
+ */
+export function parseFacilityResourceIds(
+  raw: unknown,
+): { ok: true; value: string[] } | { ok: false; error: string } {
+  if (raw === undefined || raw === null) {
+    return { ok: true, value: [] };
+  }
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "facilityResourceIds must be an array of strings" };
+  }
+
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "string" || !entry.trim()) {
+      return { ok: false, error: "Each facilityResourceIds entry must be a non-empty string" };
+    }
+    const id = entry.trim();
+    if (!seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+
+  return { ok: true, value: ids };
+}
+
 /** Parses a required "YYYY-MM-DD" (or full ISO) date string from a request body field. */
 export function parseRequiredDate(
   value: unknown,

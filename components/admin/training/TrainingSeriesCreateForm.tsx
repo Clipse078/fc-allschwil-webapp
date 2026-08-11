@@ -35,11 +35,24 @@
  *     simply derives ONE weekday from the chosen date rather than exposing
  *     the full multi-weekday picker during creation. Additional weekdays
  *     can still be added afterwards via the existing edit form.
- *   - Resource allocation still goes through the EXISTING
- *     POST /api/training-series/:id/allocations endpoint (same one
- *     TrainingAllocationEditor already uses), sequenced by
- *     lib/training/create-training-series-orchestration.ts so the series
- *     always exists before allocations are attempted.
+ *   - RESOURCE-AVAILABILITY-UX-01-C1 / -C1-V root-cause fix: the selected
+ *     Spielfeld/Halle + Garderobe resources are submitted as PART OF the
+ *     SAME POST /api/training-series request (`facilityResourceIds`),
+ *     which persists them as TrainingAllocation rows server-side in the
+ *     same invocation that creates the series and generates its
+ *     TrainingSessions, and rolls the WHOLE series back if any requested
+ *     resource cannot be allocated — see that route's doc comment for the
+ *     full root-cause writeup. Previously this used two-phase client-driven
+ *     requests (lib/training/create-training-series-orchestration.ts:
+ *     create the series, THEN a separate follow-up request per resource),
+ *     which left the series permanently resource-less whenever anything
+ *     interrupted the client between requests, or reported it as
+ *     "created" even when a resource failed to attach. This request now
+ *     either fully succeeds or fully fails — a resubmission after failure
+ *     never risks a duplicate series, so no special partial-failure UI
+ *     state is needed here. The standalone allocations page
+ *     (TrainingAllocationEditor, for series that already exist) is
+ *     untouched and still uses the per-resource endpoint directly.
  *   - Availability is read from the EXISTING PLANNING-CREATION-UX-01A
  *     GET /api/facilities/availability endpoint for the initial occurrence
  *     only — no recurring-series-wide conflict analysis is introduced here.
@@ -64,10 +77,6 @@ import {
 } from "@/components/admin/training/FacilityResourceSelector";
 import { weekdayFromDate, zonedTimeToUtc } from "@/lib/training/recurrence";
 import type { Weekday } from "@/lib/training/types";
-import {
-  orchestrateTrainingSeriesCreation,
-  type TrainingSeriesAllocationDraft,
-} from "@/lib/training/create-training-series-orchestration";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -421,14 +430,6 @@ export default function TrainingSeriesCreateForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ seriesId: string; generation: GenerationResult } | null>(null);
-  const [partialErrors, setPartialErrors] = useState<{ resource: string; error: string }[]>([]);
-
-  // PLANNING-CREATION-UX-01B: once a submission has partially failed, the
-  // TrainingSeries (and whatever allocations succeeded) already exists —
-  // resubmitting would call POST /api/training-series again and create a
-  // second, duplicate series. The only safe way to finish an incomplete
-  // creation is the existing allocations page (linked in the banner below).
-  const hasUnresolvedPartialFailure = !!result && partialErrors.length > 0;
 
   // PLANNING-CREATION-UX-01B: compact, always-visible "Noch N Angaben
   // fehlen" nudge — not a wizard/gate, every section stays reachable and
@@ -450,21 +451,16 @@ export default function TrainingSeriesCreateForm({
   // Spielfeld/Halle and Garderobe are nudged (see missingItems above) but —
   // consistent with TournamentCreateForm — not required to submit: an admin
   // may finish resource assignment afterwards via the existing allocations
-  // page, same fallback the partial-failure banner below already offers.
+  // page.
   const hasRequiredFields =
     !!teamSeasonId && !!title.trim() && !!date && timesValid && !!derivedWeekday && (!isRecurring || !!validUntil);
 
-  const canSubmit = !submitting && !hasUnresolvedPartialFailure && canValidateDirectly && hasRequiredFields;
+  const canSubmit = !submitting && canValidateDirectly && hasRequiredFields;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
 
-    if (hasUnresolvedPartialFailure) {
-      // Defense in depth — the button is disabled for this case, but a
-      // native form submit (e.g. pressing Enter) still calls this handler.
-      return;
-    }
     if (!canValidateDirectly) {
       return;
     }
@@ -474,66 +470,44 @@ export default function TrainingSeriesCreateForm({
     }
 
     setSubmitting(true);
-    setPartialErrors([]);
 
-    const plan = {
-      pitchHallAllocations: resources.map<TrainingSeriesAllocationDraft>((r) => ({
-        facilityResourceId: r.facilityResourceId,
-        facilityResourceName: r.facilityResourceName,
-      })),
-      dressingRoomAllocations: dressingRooms.map<TrainingSeriesAllocationDraft>((r) => ({
-        facilityResourceId: r.facilityResourceId,
-        facilityResourceName: r.facilityResourceName,
-      })),
-    };
+    // RESOURCE-AVAILABILITY-UX-01-C1 / -C1-V root-cause fix: the selected
+    // Spielfeld/Halle + Garderobe resources are sent as PART OF this single
+    // request — POST /api/training-series persists the series' default
+    // TrainingAllocation rows itself, in the same server-side invocation
+    // that creates the series and generates its TrainingSessions, and rolls
+    // the whole series back if any requested resource cannot be allocated
+    // (see the route's doc comment). Previously these resources were
+    // submitted via SEPARATE, sequential follow-up requests (one per
+    // resource, after this one already succeeded), which could either be
+    // interrupted mid-flight (leaving the series without any resources) or
+    // fail individually while still reporting the series as "created" —
+    // this endpoint now either fully succeeds or fully fails, so a
+    // resubmission after a failure here is always safe (no partially
+    // created series is ever left behind to duplicate).
+    const facilityResourceIds = [...resources, ...dressingRooms].map((r) => r.facilityResourceId);
 
     try {
-      const orchestration = await orchestrateTrainingSeriesCreation(plan, {
-        createSeries: async () => {
-          const res = await fetch("/api/training-series", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              teamSeasonId,
-              title: title.trim(),
-              validFrom: date,
-              validUntil: effectiveValidUntil,
-              weekdaySchedules: [{ weekday: derivedWeekday, startsAt, endsAt }],
-            }),
-          });
-          const data = (await res.json().catch(() => null)) as
-            | { series?: { id: string }; generation?: GenerationResult; error?: string }
-            | null;
-          if (!res.ok || !data?.series) {
-            throw new Error(data?.error ?? "Trainingsserie konnte nicht erstellt werden.");
-          }
-          return { seriesId: data.series.id, generation: data.generation as GenerationResult };
-        },
-        addAllocation: async (seriesId, draft) => {
-          const res = await fetch(`/api/training-series/${seriesId}/allocations`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ facilityResourceId: draft.facilityResourceId }),
-          });
-          const data = (await res.json().catch(() => null)) as { allocation?: unknown; error?: string } | null;
-          if (!res.ok || !data?.allocation) {
-            throw new Error(data?.error ?? "Ressource konnte nicht zugewiesen werden.");
-          }
-        },
+      const res = await fetch("/api/training-series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamSeasonId,
+          title: title.trim(),
+          validFrom: date,
+          validUntil: effectiveValidUntil,
+          weekdaySchedules: [{ weekday: derivedWeekday, startsAt, endsAt }],
+          facilityResourceIds,
+        }),
       });
-
-      setResult({ seriesId: orchestration.seriesId, generation: orchestration.generation });
-
-      const combinedErrors = [
-        ...orchestration.resourceAllocationErrors.map((e) => ({ resource: e.draft.facilityResourceName, error: e.error })),
-        ...orchestration.dressingRoomAllocationErrors.map((e) => ({ resource: e.draft.facilityResourceName, error: e.error })),
-      ];
-
-      if (combinedErrors.length > 0) {
-        setPartialErrors(combinedErrors);
-        return;
+      const data = (await res.json().catch(() => null)) as
+        | { series?: { id: string }; generation?: GenerationResult; error?: string }
+        | null;
+      if (!res.ok || !data?.series) {
+        throw new Error(data?.error ?? "Trainingsserie konnte nicht erstellt werden.");
       }
 
+      setResult({ seriesId: data.series.id, generation: data.generation as GenerationResult });
       router.push(`/dashboard/training?submitted=1`);
       router.refresh();
     } catch (err) {
@@ -884,35 +858,7 @@ export default function TrainingSeriesCreateForm({
         </div>
       </div>
 
-      {result && partialErrors.length > 0 ? (
-        <div className="fca-status-box fca-status-box-warn text-sm" data-testid="training-create-partial-warning">
-          <p className="font-semibold">
-            Trainingsserie wurde erstellt, {partialErrors.length === 1 ? "aber eine Ressource" : `aber ${partialErrors.length} Ressourcen`}{" "}
-            konnte{partialErrors.length === 1 ? "" : "n"} nicht zugewiesen werden.
-          </p>
-          <ul className="mt-1.5 list-inside list-disc space-y-0.5">
-            {partialErrors.map((e, i) => (
-              <li key={i}>
-                {e.resource}: {e.error}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-[var(--text-2)]">
-            „{submitLabel}“ ist deaktiviert, um eine doppelte Serie zu vermeiden — bitte die fehlenden Ressourcen
-            direkt an der bereits angelegten Serie nachtragen.
-          </p>
-          <button
-            type="button"
-            onClick={() => router.push(`/dashboard/training/series/${result.seriesId}/allocations`)}
-            className="fca-button-secondary mt-3"
-            data-testid="training-create-goto-allocations"
-          >
-            Zu den Ressourcen wechseln und korrigieren
-          </button>
-        </div>
-      ) : null}
-
-      {result && partialErrors.length === 0 ? (
+      {result ? (
         <div className="fca-status-box fca-status-box-success text-sm" data-testid="training-create-success">
           Trainingsserie erstellt — {result.generation.occurrencesInWindow} Termin
           {result.generation.occurrencesInWindow === 1 ? "" : "e"} generiert.
@@ -926,13 +872,7 @@ export default function TrainingSeriesCreateForm({
           type="submit"
           disabled={!canSubmit}
           data-testid="training-create-submit"
-          title={
-            hasUnresolvedPartialFailure
-              ? 'Trainingsserie wurde bereits angelegt — bitte über "Zu den Ressourcen wechseln und korrigieren" fortsetzen.'
-              : !canValidateDirectly
-                ? "Berechtigung „Trainings verwalten“ erforderlich."
-                : undefined
-          }
+          title={!canValidateDirectly ? "Berechtigung „Trainings verwalten“ erforderlich." : undefined}
           className="fca-button-primary"
         >
           {submitting ? (
