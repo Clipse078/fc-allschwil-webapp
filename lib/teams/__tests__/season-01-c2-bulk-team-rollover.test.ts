@@ -208,6 +208,127 @@ describe("ADMIN-MASTERDATA-UX-01-C2 — bulk Season Team rollover (live DB)", ()
     expect(picker.find((p) => p.teamId === teamB.id)?.id).toBe(newTeamSeasonB?.id);
   }, 30000);
 
+  it("OrgUnit carry-over: only ACTIVE OrgUnits from the Team's own latest historical TeamSeason are copied — archived ones are excluded, multiple legitimate OrgUnits are preserved", async () => {
+    const base = randomFutureStartYearBand();
+    const suffix = `${base}-orgunit`;
+
+    const tenant = await prisma.tenant.create({
+      data: { key: `c2-orgunit-${suffix}`, name: `C2 OrgUnit Tenant ${suffix}` },
+    });
+    tenantIds.push(tenant.id);
+
+    const activeOrgUnitOne = await prisma.orgUnit.create({
+      data: { tenantId: tenant.id, key: `c2-ou-active-1-${suffix}`, name: `Active OrgUnit 1 ${suffix}`, status: "ACTIVE" },
+    });
+    const activeOrgUnitTwo = await prisma.orgUnit.create({
+      data: { tenantId: tenant.id, key: `c2-ou-active-2-${suffix}`, name: `Active OrgUnit 2 ${suffix}`, status: "ACTIVE" },
+    });
+    const archivedOrgUnit = await prisma.orgUnit.create({
+      data: { tenantId: tenant.id, key: `c2-ou-archived-${suffix}`, name: `Archived OrgUnit ${suffix}`, status: "ARCHIVED" },
+    });
+
+    const historicalSeason = await createSeason({ startYear: base - 1 });
+    seasonIds.push(historicalSeason.id);
+
+    const team = await prisma.team.create({
+      data: { name: `C2 OrgUnit Team ${suffix}`, slug: `c2-ou-team-${suffix}`, category: "AKTIVE", tenantId: tenant.id, isActive: true },
+    });
+    teamIds.push(team.id);
+
+    const historicalTeamSeason = await prisma.teamSeason.create({
+      data: { teamId: team.id, seasonId: historicalSeason.id, displayName: team.name, status: "ACTIVE" },
+    });
+    // Two legitimate active OrgUnits + one archived one on the SAME historical TeamSeason.
+    await prisma.teamSeasonOrgUnit.createMany({
+      data: [
+        { tenantId: tenant.id, teamSeasonId: historicalTeamSeason.id, orgUnitId: activeOrgUnitOne.id, isPrimary: true, displayOrder: 0 },
+        { tenantId: tenant.id, teamSeasonId: historicalTeamSeason.id, orgUnitId: activeOrgUnitTwo.id, isPrimary: false, displayOrder: 1 },
+        { tenantId: tenant.id, teamSeasonId: historicalTeamSeason.id, orgUnitId: archivedOrgUnit.id, isPrimary: false, displayOrder: 2 },
+      ],
+    });
+
+    const targetSeason = await createSeason({ startYear: base });
+    seasonIds.push(targetSeason.id);
+
+    const bulkResult = await bulkRegisterExistingTeamsForSeason({
+      tenantId: tenant.id,
+      seasonId: targetSeason.id,
+      teamIds: [team.id],
+    });
+
+    expect(bulkResult.outcomes[0].status).toBe("CREATED");
+    const newTeamSeasonId = bulkResult.outcomes[0].teamSeasonId!;
+
+    const carriedOrgUnits = await prisma.teamSeasonOrgUnit.findMany({
+      where: { teamSeasonId: newTeamSeasonId },
+      select: { orgUnitId: true },
+    });
+    const carriedOrgUnitIds = carriedOrgUnits.map((o) => o.orgUnitId);
+
+    // Both active OrgUnits carried — multi-OrgUnit assignment preserved.
+    expect(carriedOrgUnitIds).toContain(activeOrgUnitOne.id);
+    expect(carriedOrgUnitIds).toContain(activeOrgUnitTwo.id);
+    // Archived OrgUnit never copied.
+    expect(carriedOrgUnitIds).not.toContain(archivedOrgUnit.id);
+    expect(carriedOrgUnitIds).toHaveLength(2);
+  });
+
+  it("OrgUnit carry-over: a cross-tenant OrgUnit reachable only via drifted historical data is rejected downstream, never persisted", async () => {
+    const base = randomFutureStartYearBand();
+    const suffix = `${base}-crossou`;
+
+    const tenant = await prisma.tenant.create({
+      data: { key: `c2-crossou-${suffix}`, name: `C2 CrossOU Tenant ${suffix}` },
+    });
+    tenantIds.push(tenant.id);
+
+    const otherTenant = await prisma.tenant.create({
+      data: { key: `c2-crossou-other-${suffix}`, name: `C2 CrossOU Other Tenant ${suffix}` },
+    });
+    tenantIds.push(otherTenant.id);
+
+    // An OrgUnit that belongs to a DIFFERENT tenant than the Team below —
+    // only reachable here by directly inserting a TeamSeasonOrgUnit row,
+    // simulating drifted/legacy data. The canonical write path
+    // (registerTeamSeason/writeTeamSeasonInTx) can never create this by
+    // itself, since it always validates orgUnit.tenantId === tenantId first.
+    const crossTenantOrgUnit = await prisma.orgUnit.create({
+      data: { tenantId: otherTenant.id, key: `c2-crossou-ou-${suffix}`, name: `Cross Tenant OrgUnit ${suffix}`, status: "ACTIVE" },
+    });
+
+    const historicalSeason = await createSeason({ startYear: base - 1 });
+    seasonIds.push(historicalSeason.id);
+
+    const team = await prisma.team.create({
+      data: { name: `C2 CrossOU Team ${suffix}`, slug: `c2-crossou-team-${suffix}`, category: "AKTIVE", tenantId: tenant.id, isActive: true },
+    });
+    teamIds.push(team.id);
+
+    const historicalTeamSeason = await prisma.teamSeason.create({
+      data: { teamId: team.id, seasonId: historicalSeason.id, displayName: team.name, status: "ACTIVE" },
+    });
+    await prisma.teamSeasonOrgUnit.create({
+      data: { tenantId: tenant.id, teamSeasonId: historicalTeamSeason.id, orgUnitId: crossTenantOrgUnit.id, isPrimary: true },
+    });
+
+    const targetSeason = await createSeason({ startYear: base });
+    seasonIds.push(targetSeason.id);
+
+    const bulkResult = await bulkRegisterExistingTeamsForSeason({
+      tenantId: tenant.id,
+      seasonId: targetSeason.id,
+      teamIds: [team.id],
+    });
+
+    // registerTeamSeason()'s own ORG_UNIT_TENANT_MISMATCH pre-check rejects
+    // the drifted cross-tenant OrgUnit before any write — never silently
+    // persisted, never a REJECTED_TENANT_MISMATCH-for-Team false positive.
+    expect(bulkResult.outcomes[0].status).toBe("REJECTED_ERROR");
+    expect(
+      await prisma.teamSeason.count({ where: { teamId: team.id, seasonId: targetSeason.id } }),
+    ).toBe(0);
+  });
+
   it("11. existing single-Team registration (registerTeamSeason) remains fully functional after the bulk addition", async () => {
     const base = randomFutureStartYearBand();
     const suffix = `${base}-single`;
