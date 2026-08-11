@@ -14,7 +14,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { formatTime } from "@/lib/tenant-runtime/formatters";
-import { getPersonalizedGreeting } from "@/lib/dashboard/greeting";
+import { getPersonalizedGreeting, resolveDashboardFirstName } from "@/lib/dashboard/greeting";
+import { getPersonFirstNameByUserId } from "@/lib/people/queries";
 import {
   DashboardHero,
   DashboardKpiCard,
@@ -202,9 +203,21 @@ function EventItem({ day, month, title, location, time }: EventItemProps) {
 
 export default async function DashboardPage({ searchParams: _sp }: DashboardPageProps) {
   const session = await auth();
-  const firstName = session?.user?.firstName;
-
   const ctx = await getActiveTenant();
+
+  // DASHBOARD-SHELL-UX-01-C1: prefer the canonically linked Person's first
+  // name over session.user.firstName (the raw User.firstName column), which
+  // for some bootstrapped tenant accounts holds the club name instead of a
+  // person's name. See lib/dashboard/greeting.ts for the resolution rule.
+  const linkedPersonFirstName = session?.user?.id
+    ? await getPersonFirstNameByUserId(session.user.id)
+    : null;
+  const firstName = resolveDashboardFirstName({
+    linkedPersonFirstName,
+    sessionFirstName: session?.user?.firstName,
+    tenantName: ctx?.name,
+  });
+
   const dash = await getDashboardData(ctx?.id ?? null);
 
   const fmtCfg = { locale: ctx?.locale ?? "de-CH", timezone: ctx?.timezone ?? undefined };
