@@ -146,10 +146,20 @@ describe("TournamentEditForm — ADMIN-DELETE-02A-C1 impact never blocks", () =>
   });
 
   it("confirming calls the permanent-delete endpoint with ?confirm=true", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ impact: [] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ message: "ok", impact: [] }) });
+    // RESOURCE-AVAILABILITY-UX-01: TournamentEditForm now also fires a live
+    // Frei/Belegt availability lookup on mount (this tournament is HOME with
+    // a startAt) — keyed by URL rather than positional mockResolvedValueOnce
+    // so that unrelated fetch doesn't consume the two delete-flow responses
+    // this test actually asserts on.
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/tournaments/tournament-1") {
+        return Promise.resolve({ ok: true, json: async () => ({ impact: [] }) });
+      }
+      if (url === "/api/tournaments/tournament-1?confirm=true") {
+        return Promise.resolve({ ok: true, json: async () => ({ message: "ok", impact: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(

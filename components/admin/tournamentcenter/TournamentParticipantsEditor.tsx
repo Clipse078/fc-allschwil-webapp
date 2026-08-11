@@ -22,7 +22,11 @@ import type {
   TournamentHomeAway,
   TournamentParticipantDto,
 } from "@/lib/tournaments/types";
-import { FacilityResourceSelector, type FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import {
+  FacilityResourceSelector,
+  type FacilityGroup,
+  type ResourceAvailabilityAnnotation,
+} from "@/components/admin/training/FacilityResourceSelector";
 import { ExternalClubPicker, type ExternalClubPickerResult } from "./ExternalClubPicker";
 
 type TeamOption = {
@@ -43,6 +47,13 @@ type Props = {
   initialParticipants: TournamentParticipantDto[];
   /** Non-archived DRESSING_ROOM resources, grouped by facility — only relevant for HOME tournaments. */
   dressingRoomFacilityGroups: FacilityGroup[];
+  /**
+   * RESOURCE-AVAILABILITY-UX-01 — live Frei/Belegt Garderobe availability
+   * for the tournament's current Start/Ende, keyed by resource id, shared
+   * across every participant's dressing-room selector below (a single
+   * fetch, never one per participant). Purely additive.
+   */
+  dressingRoomAvailability?: Map<string, ResourceAvailabilityAnnotation>;
 };
 
 /**
@@ -81,6 +92,7 @@ export default function TournamentParticipantsEditor({
   homeAway,
   initialParticipants,
   dressingRoomFacilityGroups,
+  dressingRoomAvailability,
 }: Props) {
   const [participants, setParticipants] = useState<TournamentParticipantDto[]>(initialParticipants);
   const [error, setError] = useState<string | null>(null);
@@ -394,6 +406,7 @@ export default function TournamentParticipantsEditor({
                       onAdd={(resourceId) => addDressingRoom(participant.id, resourceId)}
                       placeholder="Garderobe auswählen…"
                       addButtonLabel="Zuweisen"
+                      availabilityByResourceId={dressingRoomAvailability}
                       testId={`tournament-participant-${participant.id}-dressing-room`}
                     />
                   )}
