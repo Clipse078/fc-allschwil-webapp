@@ -5,10 +5,8 @@ import {
   CheckSquare,
   FileText,
   Globe,
-  LayoutDashboard,
   Monitor,
   Newspaper,
-  Plus,
   ScrollText,
   Users,
 } from "lucide-react";
@@ -16,19 +14,17 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { formatTime } from "@/lib/tenant-runtime/formatters";
+import { getPersonalizedGreeting } from "@/lib/dashboard/greeting";
 import {
   DashboardHero,
   DashboardKpiCard,
   DashboardQuickActions,
   DashboardActivityFeed,
   DashboardActivityItem,
-  DashboardSmartNudges,
   DashboardSection,
   DashboardGrid,
   DashboardEmptyState,
 } from "@/components/ui/dashboard";
-import { Button } from "@/components/ui";
-import { cn } from "@/lib/cn";
 import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -36,15 +32,6 @@ import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
 type DashboardPageProps = {
   searchParams?: Promise<{ season?: string }>;
 };
-
-// ── Greeting ──────────────────────────────────────────────────────────────────
-
-function getGreeting(firstName: string): string {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return `Good morning, ${firstName} 👋`;
-  if (hour >= 12 && hour < 18) return `Good afternoon, ${firstName} 👋`;
-  return `Good evening, ${firstName} 👋`;
-}
 
 // ── Activity helpers ──────────────────────────────────────────────────────────
 
@@ -215,7 +202,7 @@ function EventItem({ day, month, title, location, time }: EventItemProps) {
 
 export default async function DashboardPage({ searchParams: _sp }: DashboardPageProps) {
   const session = await auth();
-  const firstName = session?.user?.firstName ?? "Admin";
+  const firstName = session?.user?.firstName;
 
   const ctx = await getActiveTenant();
   const dash = await getDashboardData(ctx?.id ?? null);
@@ -390,7 +377,7 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
     })
     .slice(0, 4);
 
-  const greeting = getGreeting(firstName);
+  const greeting = getPersonalizedGreeting(firstName);
 
   return (
     <div className="flex flex-col gap-6">
@@ -398,34 +385,10 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <DashboardHero
         greeting={greeting}
-        subtitle="Hier ist, was heute in deinem Verein ansteht."
+        subtitle="Schön, dich wiederzusehen."
         clubName={ctx?.name ?? undefined}
         activeSeason={activeSeason}
         date={todayFormatted}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="default"
-              iconLeft={<LayoutDashboard className="h-4 w-4" />}
-            >
-              Dashboard anpassen
-            </Button>
-            <Link
-              href="/dashboard/website/news/new"
-              className={cn(
-                "inline-flex items-center justify-center gap-1.5",
-                "h-9 rounded-lg border border-transparent px-3.5 text-sm font-semibold",
-                "bg-[var(--sce-primary)] text-white",
-                "transition-all duration-[120ms] hover:bg-[var(--sce-primary-hover)]",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
-              )}
-            >
-              <Plus className="h-4 w-4" />
-              Schnellaktion
-            </Link>
-          </div>
-        }
       />
 
       {/* ── KPI Strip ────────────────────────────────────────────────────── */}
@@ -585,10 +548,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
           </div>
         </DashboardSection>
       </DashboardGrid>
-
-      {/* ── Smart Suggestions Placeholder ────────────────────────────────── */}
-      <DashboardSmartNudges />
-
     </div>
   );
 }

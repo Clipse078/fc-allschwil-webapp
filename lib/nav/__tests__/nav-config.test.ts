@@ -41,7 +41,7 @@ function findItemByKey(
 // ── Static structure tests ────────────────────────────────────────────────────
 
 describe("NAV_SECTIONS static structure", () => {
-  it("Planung section contains exactly TrainingCenter, TournamentCenter, Veranstaltungen and Wochenplanner", () => {
+  it("Planung section contains exactly TrainingCenter, MatchCenter, TournamentCenter, Veranstaltungen and Wochenplanner in that order", () => {
     const betrieb = findSection("Betrieb");
     expect(betrieb).toBeDefined();
 
@@ -49,7 +49,28 @@ describe("NAV_SECTIONS static structure", () => {
     expect(planung).toBeDefined();
 
     const childKeys = planung!.children?.map((c) => c.key) ?? [];
-    expect(childKeys).toEqual(["trainingcenter", "tournamentcenter", "veranstaltungen", "wochenplanner"]);
+    expect(childKeys).toEqual([
+      "trainingcenter",
+      "matchcenter",
+      "tournamentcenter",
+      "veranstaltungen",
+      "wochenplanner",
+    ]);
+  });
+
+  it("MatchCenter is nested under Planung, labelled exactly 'MatchCenter', pointing to /dashboard/matchcenter", () => {
+    const betrieb = findSection("Betrieb");
+    const planung = betrieb!.items.find((i) => i.key === "planung");
+    const matchcenter = planung!.children?.find((c) => c.key === "matchcenter");
+    expect(matchcenter).toBeDefined();
+    expect(matchcenter?.label).toBe("MatchCenter");
+    expect(matchcenter?.href).toBe("/dashboard/matchcenter");
+  });
+
+  it("MatchCenter is no longer a standalone top-level Betrieb entry", () => {
+    const betrieb = findSection("Betrieb");
+    const topLevelMatchcenter = betrieb!.items.find((i) => i.key === "matchcenter");
+    expect(topLevelMatchcenter).toBeUndefined();
   });
 
   it("Wochenplanner (WEEKPLANNER-01A/01B) points to /dashboard/planner/week", () => {
@@ -135,11 +156,32 @@ describe("NAV_SECTIONS static structure", () => {
     expect(saisons?.href).toBe("/dashboard/seasons");
   });
 
-  it("Matchcenter remains a separate top-level Betrieb entry", () => {
-    const betrieb = findSection("Betrieb");
-    const matchcenter = betrieb!.items.find((i) => i.key === "matchcenter");
-    expect(matchcenter).toBeDefined();
-    expect(matchcenter?.href).toBe("/dashboard/matchcenter");
+  it("Organisation lists children in the canonical order ending with Personen, then Wettkämpfe", () => {
+    const coreSection = NAV_SECTIONS.find((s) =>
+      s.items.some((i) => i.key === "organisation"),
+    );
+    const organisation = coreSection!.items.find((i) => i.key === "organisation");
+    const childKeys = organisation!.children?.map((c) => c.key) ?? [];
+    expect(childKeys).toEqual([
+      "org-units",
+      "target-groups",
+      "teams",
+      "provider-mapping",
+      "vereine",
+      "personen",
+      "competitions",
+    ]);
+  });
+
+  it("Administration lists Rollen & Berechtigungen, Saisons, Anlagen & Ressourcen first", () => {
+    const system = findSection("System");
+    const admin = system!.items.find((i) => i.key === "administration");
+    const childKeys = admin!.children?.map((c) => c.key) ?? [];
+    expect(childKeys.slice(0, 3)).toEqual([
+      "admin-tenant-roles",
+      "admin-seasons",
+      "admin-facilities",
+    ]);
   });
 });
 
@@ -186,6 +228,23 @@ describe("getVisibleNavSections permission filtering", () => {
     const sections = getVisibleNavSections([PERMISSIONS.EVENTS_VIEW]);
     const item = findItemByKey(sections, "veranstaltungen");
     expect(item).not.toBeNull();
+  });
+
+  it("events-view user sees MatchCenter nested under Planung", () => {
+    const sections = getVisibleNavSections([PERMISSIONS.EVENTS_VIEW]);
+    const item = findItemByKey(sections, "matchcenter");
+    expect(item).not.toBeNull();
+    expect(item?.label).toBe("MatchCenter");
+    expect(item?.href).toBe("/dashboard/matchcenter");
+  });
+
+  it("user without events permissions does not see MatchCenter", () => {
+    const noEventsPermissions = allPermissions.filter(
+      (p) => p !== PERMISSIONS.EVENTS_VIEW && p !== PERMISSIONS.EVENTS_MANAGE,
+    );
+    const sections = getVisibleNavSections(noEventsPermissions);
+    const item = findItemByKey(sections, "matchcenter");
+    expect(item).toBeNull();
   });
 
   it("facilities-view user sees Anlagen & Ressourcen under Administration", () => {

@@ -750,28 +750,6 @@ button {
   -webkit-backdrop-filter: blur(12px);
 }
 
-.sce-search-slot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  max-width: 320px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: 0.8125rem;
-  cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
-}
-
-.sce-search-slot:hover {
-  border-color: var(--border-strong);
-  background: var(--surface);
-}
-
 .sce-icon-button {
   display: flex;
   align-items: center;
