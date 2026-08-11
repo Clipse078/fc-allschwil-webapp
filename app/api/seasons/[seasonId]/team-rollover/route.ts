@@ -126,7 +126,6 @@ export async function POST(request: NextRequest, context: Context) {
       requestedTeamIds: teamIds,
       createdCount: result.createdCount,
       alreadyPresentCount: result.alreadyPresentCount,
-      skippedCount: result.skippedCount,
       rejectedCount: result.rejectedCount,
     },
   });

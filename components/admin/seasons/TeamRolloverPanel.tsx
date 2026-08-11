@@ -17,11 +17,11 @@ type BulkRolloverOutcome = {
   status:
     | "CREATED"
     | "ALREADY_PRESENT"
-    | "SKIPPED_NO_ORG_UNIT_HISTORY"
     | "REJECTED_NOT_FOUND"
     | "REJECTED_TENANT_MISMATCH"
     | "REJECTED_INACTIVE"
     | "REJECTED_ERROR";
+  hasOrgUnit?: boolean;
   message: string;
 };
 
@@ -29,7 +29,6 @@ type BulkRolloverResult = {
   outcomes: BulkRolloverOutcome[];
   createdCount: number;
   alreadyPresentCount: number;
-  skippedCount: number;
   rejectedCount: number;
 };
 
@@ -41,7 +40,6 @@ type TeamRolloverPanelProps = {
 const outcomeLabel: Record<BulkRolloverOutcome["status"], string> = {
   CREATED: "übernommen",
   ALREADY_PRESENT: "bereits registriert",
-  SKIPPED_NO_ORG_UNIT_HISTORY: "übersprungen",
   REJECTED_NOT_FOUND: "abgelehnt",
   REJECTED_TENANT_MISMATCH: "abgelehnt",
   REJECTED_INACTIVE: "abgelehnt",
@@ -51,7 +49,6 @@ const outcomeLabel: Record<BulkRolloverOutcome["status"], string> = {
 const outcomeTone: Record<BulkRolloverOutcome["status"], string> = {
   CREATED: "text-emerald-600",
   ALREADY_PRESENT: "text-[var(--muted)]",
-  SKIPPED_NO_ORG_UNIT_HISTORY: "text-amber-600",
   REJECTED_NOT_FOUND: "text-rose-600",
   REJECTED_TENANT_MISMATCH: "text-rose-600",
   REJECTED_INACTIVE: "text-rose-600",
@@ -97,9 +94,11 @@ export default function TeamRolloverPanel({ seasonId, seasonName }: TeamRollover
 
       const loaded: CandidateTeam[] = data?.candidates ?? [];
       setCandidates(loaded);
-      // Preselect sensible candidates: active Teams not yet registered
-      // whose OrgUnit assignment can be carried over automatically.
-      setSelectedIds(new Set(loaded.filter((t) => t.hasOrgUnitHistory).map((t) => t.id)));
+      // SEASON-01-C3: Season membership and OrgUnit assignment are not
+      // coupled — every active, not-yet-registered Team is preselected.
+      // Missing OrgUnit history is never a reason to omit a Team; it is
+      // only surfaced below as a neutral, non-blocking hint.
+      setSelectedIds(new Set(loaded.map((t) => t.id)));
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Ein Fehler ist aufgetreten.");
     } finally {
@@ -198,8 +197,9 @@ export default function TeamRolloverPanel({ seasonId, seasonName }: TeamRollover
       {!loading && !result && candidates.length > 0 ? (
         <>
           <p className="mt-2 text-xs text-[var(--muted)]">
-            Aktive Teams, die noch nicht für diese Saison registriert sind. Vorausgewählt sind Teams mit
-            übernehmbarer Organisationseinheit aus einer bisherigen Saison.
+            Aktive Teams, die noch nicht für diese Saison registriert sind. Alle Teams sind vorausgewählt —
+            eine Organisationseinheit wird übernommen, sofern eine passende aus einer bisherigen Saison
+            vorliegt.
           </p>
           <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto">
             {candidates.map((team) => (
@@ -213,8 +213,8 @@ export default function TeamRolloverPanel({ seasonId, seasonName }: TeamRollover
                   />
                   <span className="flex-1 truncate">{team.name}</span>
                   {!team.hasOrgUnitHistory ? (
-                    <span className="shrink-0 text-[0.65rem] text-amber-600">
-                      keine Organisationseinheit übernehmbar
+                    <span className="shrink-0 text-[0.65rem] text-[var(--muted)]">
+                      Keine Organisationseinheit wird übernommen
                     </span>
                   ) : null}
                 </label>
@@ -239,12 +239,19 @@ export default function TeamRolloverPanel({ seasonId, seasonName }: TeamRollover
         <div className="mt-3 space-y-2">
           <p className="text-xs font-medium text-[var(--foreground)]">
             {result.createdCount} übernommen · {result.alreadyPresentCount} bereits registriert ·{" "}
-            {result.skippedCount} übersprungen · {result.rejectedCount} abgelehnt
+            {result.rejectedCount} abgelehnt
           </p>
           <ul className="max-h-56 space-y-1 overflow-y-auto text-xs">
             {result.outcomes.map((outcome) => (
               <li key={outcome.teamId} className="flex items-center justify-between gap-2">
-                <span className="truncate">{outcome.teamName}</span>
+                <span className="truncate">
+                  {outcome.teamName}
+                  {outcome.status === "CREATED" && outcome.hasOrgUnit === false ? (
+                    <span className="ml-1.5 text-[0.65rem] text-[var(--muted)]">
+                      (ohne Organisationseinheit)
+                    </span>
+                  ) : null}
+                </span>
                 <span className={`shrink-0 font-medium ${outcomeTone[outcome.status]}`}>
                   {outcomeLabel[outcome.status]}
                 </span>

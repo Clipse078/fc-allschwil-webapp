@@ -273,7 +273,7 @@ describe("ADMIN-MASTERDATA-UX-01-C2 — bulk Season Team rollover (live DB)", ()
     expect(carriedOrgUnitIds).toHaveLength(2);
   });
 
-  it("OrgUnit carry-over: a cross-tenant OrgUnit reachable only via drifted historical data is rejected downstream, never persisted", async () => {
+  it("OrgUnit carry-over: a cross-tenant OrgUnit reachable only via drifted historical data is never copied, but the Team is still registered (SEASON-01-C3 best-effort carry-over)", async () => {
     const base = randomFutureStartYearBand();
     const suffix = `${base}-crossou`;
 
@@ -320,14 +320,102 @@ describe("ADMIN-MASTERDATA-UX-01-C2 — bulk Season Team rollover (live DB)", ()
       teamIds: [team.id],
     });
 
-    // registerTeamSeason()'s own ORG_UNIT_TENANT_MISMATCH pre-check rejects
-    // the drifted cross-tenant OrgUnit before any write — never silently
-    // persisted, never a REJECTED_TENANT_MISMATCH-for-Team false positive.
-    expect(bulkResult.outcomes[0].status).toBe("REJECTED_ERROR");
+    // SEASON-01-C3: resolveCarryOverOrgUnitIds() is tenant-scoped, so the
+    // drifted cross-tenant OrgUnit is never even offered to
+    // registerTeamSeason() — it is simply excluded from carry-over, never
+    // copied. The Team itself is still registered (best-effort OrgUnit
+    // carry-over must never block a valid Team from joining the Season).
+    expect(bulkResult.outcomes[0].status).toBe("CREATED");
+    expect(bulkResult.outcomes[0].hasOrgUnit).toBe(false);
+    const newTeamSeason = await prisma.teamSeason.findUnique({
+      where: { teamId_seasonId: { teamId: team.id, seasonId: targetSeason.id } },
+    });
+    expect(newTeamSeason).not.toBeNull();
+
+    // The cross-tenant OrgUnit is never persisted onto the new TeamSeason.
+    const carriedOrgUnits = await prisma.teamSeasonOrgUnit.findMany({
+      where: { teamSeasonId: newTeamSeason!.id },
+    });
+    expect(carriedOrgUnits).toHaveLength(0);
+  });
+
+  it("SEASON-01-C3: an active same-tenant Team with NO OrgUnit history at all is still registered (CREATED) with zero TeamSeasonOrgUnit rows, and is idempotent + visible in TrainingCenter once the Season is current", async () => {
+    const base = randomFutureStartYearBand();
+    const suffix = `${base}-noou`;
+
+    const tenant = await prisma.tenant.create({
+      data: { key: `c3-noou-${suffix}`, name: `C3 NoOrgUnit Tenant ${suffix}` },
+    });
+    tenantIds.push(tenant.id);
+
+    // Never registered for any Season before — genuinely no OrgUnit history,
+    // reproducing the exact STAGE defect (FCA Teams with
+    // "keine Organisationseinheit übernehmbar").
+    const team = await prisma.team.create({
+      data: {
+        name: `C3 No OrgUnit Team ${suffix}`,
+        slug: `c3-no-ou-team-${suffix}`,
+        category: "AKTIVE",
+        tenantId: tenant.id,
+        isActive: true,
+      },
+    });
+    teamIds.push(team.id);
+
+    const targetSeason = await createSeason({ startYear: base });
+    seasonIds.push(targetSeason.id);
+
+    // Candidate list still offers the Team (OrgUnit history is informational
+    // only, never an eligibility gate — SEASON-01-C3).
+    const candidates = await getBulkRolloverCandidateTeams(tenant.id, targetSeason.id);
+    const candidate = candidates.find((c) => c.id === team.id);
+    expect(candidate).toBeDefined();
+    expect(candidate?.hasOrgUnitHistory).toBe(false);
+
+    const bulkResult = await bulkRegisterExistingTeamsForSeason({
+      tenantId: tenant.id,
+      seasonId: targetSeason.id,
+      teamIds: [team.id],
+    });
+
+    // 1. The Team is CREATED, never skipped, despite zero OrgUnit history.
+    expect(bulkResult.createdCount).toBe(1);
+    expect(bulkResult.outcomes[0].status).toBe("CREATED");
+    expect(bulkResult.outcomes[0].hasOrgUnit).toBe(false);
+    const teamSeasonId = bulkResult.outcomes[0].teamSeasonId!;
+    expect(teamSeasonId).toBeTruthy();
+
+    const teamSeason = await prisma.teamSeason.findUnique({ where: { id: teamSeasonId } });
+    expect(teamSeason).not.toBeNull();
+    expect(teamSeason?.teamId).toBe(team.id);
+    expect(teamSeason?.seasonId).toBe(targetSeason.id);
+
+    // 2. Zero TeamSeasonOrgUnit rows are created for this TeamSeason.
+    const orgUnitRows = await prisma.teamSeasonOrgUnit.findMany({ where: { teamSeasonId } });
+    expect(orgUnitRows).toHaveLength(0);
+
+    // 10. Existing Team identity unchanged — no new Team created.
+    expect(await prisma.team.count({ where: { id: team.id } })).toBe(1);
+
+    // 9. Repeated bulk run creates no duplicate TeamSeason — idempotent.
+    const repeatResult = await bulkRegisterExistingTeamsForSeason({
+      tenantId: tenant.id,
+      seasonId: targetSeason.id,
+      teamIds: [team.id],
+    });
+    expect(repeatResult.outcomes[0].status).toBe("ALREADY_PRESENT");
     expect(
       await prisma.teamSeason.count({ where: { teamId: team.id, seasonId: targetSeason.id } }),
-    ).toBe(0);
-  });
+    ).toBe(1);
+
+    // 12. TrainingCenter picker includes the no-OrgUnit Team once the target
+    //     Season becomes current — no logout/login, no fallback, no fake
+    //     OrgUnit assignment.
+    await activateSeason(targetSeason.id);
+    const picker = await findTeamSeasonsForTenant(tenant.id);
+    expect(picker.map((p) => p.teamId)).toContain(team.id);
+    expect(picker.find((p) => p.teamId === team.id)?.id).toBe(teamSeasonId);
+  }, 20000);
 
   it("11. existing single-Team registration (registerTeamSeason) remains fully functional after the bulk addition", async () => {
     const base = randomFutureStartYearBand();
