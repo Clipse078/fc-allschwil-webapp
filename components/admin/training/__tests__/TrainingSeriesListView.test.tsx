@@ -96,6 +96,30 @@ describe("TrainingSeriesListView — ADMIN-DELETE-02A-C1 root-cause fix", () => 
     expect(screen.getByTestId("training-series-delete-inline")).toBeTruthy();
   });
 
+  it("ADMIN-DELETE-02A-C2: surfaces 'Archiv anzeigen' when there are zero active series and one archived series", () => {
+    // Root-cause regression: with 0 active series, the series list would
+    // otherwise show only the empty state — the archived series must still
+    // be reachable via the toggle, for a trainings.delete-only caller too.
+    render(
+      <TrainingSeriesListView
+        allSeries={[makeSeries({ status: "ARCHIVED" })]}
+        showArchived={false}
+        canManage={false}
+        canDelete={true}
+      />,
+    );
+
+    expect(screen.getByText("Keine aktiven Trainingsserien")).toBeTruthy();
+    const archiveToggles = screen.getAllByText("Archiv anzeigen");
+    expect(archiveToggles.length).toBeGreaterThan(0);
+    for (const toggle of archiveToggles) {
+      expect(toggle.closest("a")).toHaveAttribute(
+        "href",
+        "/dashboard/training?tab=serien&archived=1",
+      );
+    }
+  });
+
   it("renders no action row at all when the caller holds neither authority", () => {
     render(
       <TrainingSeriesListView allSeries={[makeSeries()]} showArchived={false} canManage={false} canDelete={false} />,
