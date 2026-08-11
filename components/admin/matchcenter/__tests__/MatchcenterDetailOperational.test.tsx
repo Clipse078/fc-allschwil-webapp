@@ -513,6 +513,91 @@ describe("MatchcenterDetailOperational — canonical pitch/dressing-room options
   });
 });
 
+// ── RESOURCE-AVAILABILITY-UX-01: live Frei/Belegt availability (edit mode) ────
+
+describe("MatchcenterDetailOperational — RESOURCE-AVAILABILITY-UX-01 availability", () => {
+  function installAvailabilityFetchMock() {
+    const availabilityCalls: string[] = [];
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/teams") {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      if (url.startsWith("/api/facilities/availability")) {
+        availabilityCalls.push(url);
+        if (url.includes("group=PITCH_HALL")) {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                availability: [
+                  { resourceId: "res-1", resourceCode: "STADION", status: "FREE", conflictLabel: null, conflictStartAt: null, conflictEndAt: null },
+                  {
+                    resourceId: "res-2",
+                    resourceCode: "KUNSTRASEN_2",
+                    status: "OCCUPIED",
+                    conflictLabel: "Training E2",
+                    conflictStartAt: "2026-07-25T17:00:00.000Z",
+                    conflictEndAt: "2026-07-25T18:00:00.000Z",
+                  },
+                ],
+              }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ availability: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+    return availabilityCalls;
+  }
+
+  it("annotates the pitch select's options with live Frei/Belegt status for a HOME match", async () => {
+    installAvailabilityFetchMock();
+
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          currentPitchCode: "STADION",
+          pitchOptions: [
+            { code: "STADION", name: "Stadion" },
+            { code: "KUNSTRASEN_2", name: "Kunstrasen 2" },
+          ],
+        })}
+      />,
+    );
+
+    const select = await screen.findByTestId("pitch-assignment-select");
+    await waitFor(() => {
+      const optionTexts = within(select).getAllByRole("option").map((o) => o.textContent);
+      expect(optionTexts.some((t) => t?.includes("Stadion") && t?.includes("Frei"))).toBe(true);
+      expect(optionTexts.some((t) => t?.includes("Kunstrasen 2") && t?.includes("Belegt") && t?.includes("Training E2"))).toBe(true);
+    });
+  });
+
+  it("requests availability excluding this match's own id (self-exclusion in edit mode)", async () => {
+    const availabilityCalls = installAvailabilityFetchMock();
+
+    render(<MatchcenterDetailOperational {...createProps({ matchId: "match-test-1" })} />);
+
+    await waitFor(() => expect(availabilityCalls.length).toBeGreaterThan(0));
+    expect(availabilityCalls.every((url) => url.includes("excludeEventId=match-test-1"))).toBe(true);
+  });
+
+  it("never requests availability for an AWAY match", async () => {
+    const availabilityCalls = installAvailabilityFetchMock();
+
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({ homeAway: "AWAY", homeIsOwnTeam: false, awayIsOwnTeam: true })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("infoboard-readiness-not-relevant")).toBeInTheDocument();
+    });
+    expect(availabilityCalls).toHaveLength(0);
+  });
+});
+
 // ── PUB-02: computeAllocationWarning unit tests ────────────────────────────────
 
 describe("PUB-02 — computeAllocationWarning", () => {

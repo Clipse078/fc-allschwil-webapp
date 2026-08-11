@@ -27,6 +27,8 @@ import {
   withRequiredCodes,
   type FacilityResourceOption,
 } from "@/lib/facilities/resource-options";
+import { useFacilityAvailability } from "@/hooks/use-facility-availability";
+import { formatAvailabilitySuffix } from "@/components/admin/training/FacilityResourceSelector";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -60,6 +62,14 @@ export type MatchcenterDetailOperationalProps = {
   currentInfoboardVisible: boolean;
   /** ISO date string for infoboard preview link */
   matchDateIso: string;
+  /**
+   * RESOURCE-AVAILABILITY-UX-01 — the match's own end (ISO), used together
+   * with matchDateIso (start) to show live Frei/Belegt availability for
+   * the pitch/dressing-room selectors below. This match's own existing
+   * allocation is excluded server-side (excludeEventId=matchId) so editing
+   * a match never flags its own booking as a conflict with itself.
+   */
+  matchEndAtIso?: string | null;
   canManage: boolean;
   /**
    * MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped, active pitch/hall
@@ -199,12 +209,30 @@ export default function MatchcenterDetailOperational({
   currentWebsiteVisible,
   currentInfoboardVisible,
   matchDateIso,
+  matchEndAtIso,
   canManage,
   pitchOptions = [],
   dressingRoomOptions = [],
 }: MatchcenterDetailOperationalProps) {
   const router = useRouter();
   const { toast } = useToast();
+
+  // RESOURCE-AVAILABILITY-UX-01 — same live availability foundation as the
+  // guided create forms (lib/facilities/availability-service.ts via
+  // GET /api/facilities/availability), keyed by resource `code` here
+  // because this legacy operational view still uses the FCA_PITCH_ALLOCATIONS
+  // -era code-based native <select>s (see module doc above), not
+  // FacilityResourceSelector. Only relevant for HOME matches, mirroring the
+  // existing readiness/allocation-warning gating on this same page.
+  const isHomeForAvailability = homeAway?.trim().toUpperCase() === "HOME";
+  const { pitchAvailability: pitchAvailabilityByCode, dressingRoomAvailability: dressingRoomAvailabilityByCode } =
+    useFacilityAvailability({
+      enabled: isHomeForAvailability,
+      startAt: matchDateIso,
+      endAt: matchEndAtIso,
+      excludeEventId: matchId,
+      keyBy: "code",
+    });
 
   // MASTERDATA-CONSISTENCY-02 — historical compatibility: keep the
   // currently-persisted code selectable even if it no longer resolves to an
@@ -536,6 +564,7 @@ export default function MatchcenterDetailOperational({
             {effectivePitchOptions.map((opt) => (
               <option key={opt.code} value={opt.code}>
                 {opt.name}
+                {formatAvailabilitySuffix(pitchAvailabilityByCode.get(opt.code))}
               </option>
             ))}
           </select>
@@ -571,6 +600,7 @@ export default function MatchcenterDetailOperational({
               {effectiveDressingRoomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
                   {room.name}
+                  {formatAvailabilitySuffix(dressingRoomAvailabilityByCode.get(room.code))}
                 </option>
               ))}
             </select>
@@ -599,6 +629,7 @@ export default function MatchcenterDetailOperational({
               {effectiveDressingRoomOptions.map((room) => (
                 <option key={room.code} value={room.code}>
                   {room.name}
+                  {formatAvailabilitySuffix(dressingRoomAvailabilityByCode.get(room.code))}
                 </option>
               ))}
             </select>

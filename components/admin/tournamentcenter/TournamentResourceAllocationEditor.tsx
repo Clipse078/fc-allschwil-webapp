@@ -12,7 +12,11 @@
 import { useCallback, useState, useTransition } from "react";
 import { Building2, MapPin, X } from "lucide-react";
 import type { TournamentResourceAllocationDto } from "@/lib/tournaments/types";
-import { FacilityResourceSelector, type FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import {
+  FacilityResourceSelector,
+  type FacilityGroup,
+  type ResourceAvailabilityAnnotation,
+} from "@/components/admin/training/FacilityResourceSelector";
 
 type Props = {
   tournamentId: string;
@@ -20,6 +24,12 @@ type Props = {
   initialAllocations: TournamentResourceAllocationDto[];
   /** Non-archived FULL_PITCH/HALF_PITCH (or other) resources, grouped by facility. */
   facilityGroups: FacilityGroup[];
+  /**
+   * RESOURCE-AVAILABILITY-UX-01 — live Frei/Belegt availability for the
+   * tournament's current Start/Ende, keyed by resource id. Purely additive:
+   * omitted, the selector renders exactly as before.
+   */
+  availabilityByResourceId?: Map<string, ResourceAvailabilityAnnotation>;
 };
 
 export default function TournamentResourceAllocationEditor({
@@ -27,6 +37,7 @@ export default function TournamentResourceAllocationEditor({
   canManage,
   initialAllocations,
   facilityGroups,
+  availabilityByResourceId,
 }: Props) {
   const [allocations, setAllocations] = useState<TournamentResourceAllocationDto[]>(initialAllocations);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +138,7 @@ export default function TournamentResourceAllocationEditor({
           onAdd={handleAdd}
           placeholder="Spielfeld / Halle auswählen…"
           addButtonLabel="Zuweisen"
+          availabilityByResourceId={availabilityByResourceId}
           testId="tournament-resource-allocation-add"
         />
       )}

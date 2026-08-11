@@ -11,6 +11,7 @@ import type { TournamentDto } from "@/lib/tournaments/types";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import TournamentParticipantsEditor from "@/components/admin/tournamentcenter/TournamentParticipantsEditor";
 import TournamentResourceAllocationEditor from "@/components/admin/tournamentcenter/TournamentResourceAllocationEditor";
+import { useFacilityAvailability } from "@/hooks/use-facility-availability";
 
 type DeletionImpact = { key: string; label: string; count: number };
 
@@ -88,6 +89,19 @@ export default function TournamentEditForm({
 
   const isCancelled = tournament.status === "CANCELLED";
   const isEditable = canManage && tournament.status !== "ARCHIVED" && tournament.status !== "COMPLETED";
+
+  // RESOURCE-AVAILABILITY-UX-01 — live Frei/Belegt availability for the
+  // CURRENT (possibly unsaved) Start/Ende form values, reusing the EXISTING
+  // PLANNING-CREATION-UX-01A foundation. HOME-only, mirroring the Spielfeld/
+  // Halle section's own visibility below. This tournament's own existing
+  // allocations are excluded server-side (excludeEventId) so editing never
+  // flags its own resources as a conflict with itself.
+  const { pitchAvailability, dressingRoomAvailability } = useFacilityAvailability({
+    enabled: homeAway === "HOME" && !!startAt,
+    startAt,
+    endAt,
+    excludeEventId: tournament.id,
+  });
 
   useEffect(() => {
     let active = true;
@@ -401,19 +415,21 @@ export default function TournamentEditForm({
           homeAway={homeAway}
           initialParticipants={tournament.participants}
           dressingRoomFacilityGroups={dressingRoomFacilityGroups}
+          dressingRoomAvailability={dressingRoomAvailability}
         />
       </SectionCard>
 
       {homeAway === "HOME" && (
         <SectionCard
           title="Ressourcen · Spielfeld / Halle"
-          description="Ein Heimturnier kann mehr als ein Spielfeld bzw. mehr als eine Halle belegen."
+          description="Ein Heimturnier kann mehr als ein Spielfeld bzw. mehr als eine Halle belegen. Verfügbarkeit wird live für Start–Ende angezeigt."
         >
           <TournamentResourceAllocationEditor
             tournamentId={tournament.id}
             canManage={isEditable}
             initialAllocations={tournament.resourceAllocations}
             facilityGroups={pitchHallFacilityGroups}
+            availabilityByResourceId={pitchAvailability}
           />
         </SectionCard>
       )}

@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 import { Building2, GripVertical, Loader2, MapPin, RotateCcw, X } from "lucide-react";
 import type { TrainingAllocationDto, TrainingSessionAllocationDto } from "@/lib/training/types";
-import type { FacilityGroup } from "./FacilityResourceSelector";
+import type { FacilityGroup, ResourceAvailabilityAnnotation } from "./FacilityResourceSelector";
 import { FacilityResourceSelector } from "./FacilityResourceSelector";
 import type { FacilityResourceType } from "@prisma/client";
 import {
@@ -12,6 +12,7 @@ import {
   TRAINING_ALLOCATION_GROUP_LABELS,
   type TrainingAllocationGroupKey,
 } from "@/lib/training/allocation-groups";
+import { useFacilityAvailability } from "@/hooks/use-facility-availability";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,15 @@ type Props = {
   facilityGroups: FacilityGroup[];
   /** Whether the current user can manage (add/remove) overrides. */
   canManage: boolean;
+  /**
+   * RESOURCE-AVAILABILITY-UX-01 — the session's own EFFECTIVE start/end
+   * (ISO), used to show live Frei/Belegt availability for its resource
+   * selectors. This occurrence's own allocation is excluded server-side
+   * (excludeTrainingSessionId) so it is never flagged as a conflict with
+   * itself in edit mode.
+   */
+  sessionStartAt: string;
+  sessionEndAt: string;
 };
 
 const RESOURCE_TYPE_LABELS: Record<FacilityResourceType, string> = {
@@ -123,6 +133,7 @@ function GroupSection({
   onRemove,
   onUseSeriesDefault,
   canManage,
+  availabilityByResourceId,
 }: {
   groupKey: TrainingAllocationGroupKey;
   overrideRows: TrainingSessionAllocationDto[];
@@ -132,6 +143,7 @@ function GroupSection({
   onRemove: (id: string) => Promise<void>;
   onUseSeriesDefault: () => Promise<void>;
   canManage: boolean;
+  availabilityByResourceId?: Map<string, ResourceAvailabilityAnnotation>;
 }) {
   const isOverridden = overrideRows.length > 0;
   const rowsToShow: AllocationLike[] = isOverridden ? overrideRows : seriesRows;
@@ -187,6 +199,7 @@ function GroupSection({
             testId={`training-session-allocation-add-${testIdSuffix}`}
             placeholder="Für dieses Training auswählen…"
             addButtonLabel="Für dieses Training zuweisen"
+            availabilityByResourceId={availabilityByResourceId}
           />
           {isOverridden && (
             <button
@@ -214,8 +227,20 @@ export function TrainingSessionAllocationEditor({
   seriesAllocations,
   facilityGroups,
   canManage,
+  sessionStartAt,
+  sessionEndAt,
 }: Props) {
   const [allocations, setAllocations] = useState<TrainingSessionAllocationDto[]>(initialAllocations);
+
+  // RESOURCE-AVAILABILITY-UX-01 — this occurrence's own allocations are
+  // excluded server-side via excludeTrainingSessionId, so the session's
+  // pre-existing resource(s) never show up as "belegt durch sich selbst".
+  const { pitchAvailability, dressingRoomAvailability } = useFacilityAvailability({
+    enabled: true,
+    startAt: sessionStartAt,
+    endAt: sessionEndAt,
+    excludeTrainingSessionId: sessionId,
+  });
 
   const overridesByGroup = groupAllocationsByAllocationGroup(allocations);
   const seriesByGroup = groupAllocationsByAllocationGroup(seriesAllocations);
@@ -291,6 +316,7 @@ export function TrainingSessionAllocationEditor({
           onRemove={handleRemove}
           onUseSeriesDefault={() => handleUseSeriesDefaultForGroup("PITCH_HALL")}
           canManage={canManage}
+          availabilityByResourceId={pitchAvailability}
         />
         <GroupSection
           groupKey="DRESSING_ROOM"
@@ -301,6 +327,7 @@ export function TrainingSessionAllocationEditor({
           onRemove={handleRemove}
           onUseSeriesDefault={() => handleUseSeriesDefaultForGroup("DRESSING_ROOM")}
           canManage={canManage}
+          availabilityByResourceId={dressingRoomAvailability}
         />
         {hasOtherResources && (
           <GroupSection

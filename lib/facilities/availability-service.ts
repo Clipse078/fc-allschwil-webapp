@@ -46,6 +46,8 @@ export type ResourceAvailabilityConflictSource = "TRAINING" | "MATCH" | "TOURNAM
 export type ResourceAvailability = {
   resourceId: string;
   resourceName: string;
+  /** RESOURCE-AVAILABILITY-UX-01 — the resource's canonical code, so callers that only carry legacy `code` values (e.g. MatchCenter's Event.pitchCode) can match rows without a second lookup. */
+  resourceCode: string;
   facilityId: string;
   facilityName: string;
   status: ResourceAvailabilityStatus;
@@ -61,8 +63,16 @@ export type GetResourceAvailabilityInput = {
   startAt: Date | string;
   endAt: Date | string | null;
   group: AvailabilityResourceGroup;
-  /** Excludes bookings belonging to this Event (e.g. the tournament being edited). */
+  /** Excludes bookings belonging to this Event (e.g. the Match/Tournament being edited). */
   excludeEventId?: string;
+  /**
+   * RESOURCE-AVAILABILITY-UX-01 — excludes this TrainingSession's OWN
+   * occurrence (and its allocations/overrides) from conflict detection, so
+   * editing a session's resources never flags its own existing booking as
+   * a conflict with itself. TrainingSession is not an Event, so this is a
+   * separate exclusion key from `excludeEventId`.
+   */
+  excludeTrainingSessionId?: string;
 };
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
@@ -95,11 +105,13 @@ async function findTrainingConflicts(
   startAt: Date,
   endAt: Date,
   group: AvailabilityResourceGroup,
+  excludeTrainingSessionId: string | undefined,
 ): Promise<ConflictWindow[]> {
   const sessions = await prisma.trainingSession.findMany({
     where: {
       tenantId,
       status: "SCHEDULED",
+      id: excludeTrainingSessionId ? { not: excludeTrainingSessionId } : undefined,
       OR: [
         { overrideStartAt: null, startAt: { lt: endAt }, endAt: { gt: startAt } },
         {
@@ -326,7 +338,7 @@ async function findTournamentConflicts(
 export async function getResourceAvailability(
   input: GetResourceAvailabilityInput,
 ): Promise<ResourceAvailability[]> {
-  const { tenantId, group, excludeEventId } = input;
+  const { tenantId, group, excludeEventId, excludeTrainingSessionId } = input;
   const startAt = toDate(input.startAt);
   const endAt = input.endAt ? toDate(input.endAt) : startAt;
 
@@ -353,7 +365,7 @@ export async function getResourceAvailability(
   const resourceIds = resources.map((r) => r.id);
 
   const [trainingConflicts, matchConflicts, tournamentConflicts] = await Promise.all([
-    findTrainingConflicts(tenantId, startAt, endAt, group),
+    findTrainingConflicts(tenantId, startAt, endAt, group, excludeTrainingSessionId),
     findMatchConflicts(tenantId, startAt, endAt, group, resourcesByCode, excludeEventId),
     findTournamentConflicts(tenantId, startAt, endAt, group, resourceIds, excludeEventId),
   ]);
@@ -371,6 +383,7 @@ export async function getResourceAvailability(
     return {
       resourceId: resource.id,
       resourceName: resource.name,
+      resourceCode: resource.code,
       facilityId: resource.facilityId,
       facilityName: resource.facility.name,
       status: conflict ? "OCCUPIED" : "FREE",
