@@ -59,6 +59,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
     PERMISSIONS.SEASONS_MANAGE,
   ]);
   const canManage = hasPermission(session, PERMISSIONS.SEASONS_MANAGE);
+  const canRegisterTeams = hasPermission(session, PERMISSIONS.TEAMS_MANAGE);
 
   const params = (await searchParams) ?? {};
   const seasons = await getSeasonsOverviewData();
@@ -144,6 +145,7 @@ export default async function SeasonsPage({ searchParams }: SeasonsPageProps) {
           teamSeasonCount={season.teamSeasonCount}
           eventCount={season.eventCount}
           canManage={canManage}
+          canRegisterTeams={canRegisterTeams}
         />
       ))}
     </div>

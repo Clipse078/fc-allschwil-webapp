@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Flag, Layers3, Pencil, Trash2, X } from "lucide-react";
 import ActivateSeasonButton from "@/components/admin/seasons/ActivateSeasonButton";
+import TeamRolloverPanel from "@/components/admin/seasons/TeamRolloverPanel";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import {
   deleteSeasonAction,
@@ -23,6 +24,8 @@ export type SeasonRowCardProps = {
   teamSeasonCount: number;
   eventCount: number;
   canManage: boolean;
+  /** teams.manage — gates the "Teams übernehmen" bulk rollover action. */
+  canRegisterTeams: boolean;
 };
 
 function toDateInputValue(value: string | Date): string {
@@ -64,6 +67,7 @@ export default function SeasonRowCard({
   teamSeasonCount,
   eventCount,
   canManage,
+  canRegisterTeams,
 }: SeasonRowCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const canDelete = teamSeasonCount === 0 && eventCount === 0;
@@ -188,6 +192,16 @@ export default function SeasonRowCard({
         )}
 
         {!canDelete ? <p className="mt-4 text-xs text-[var(--muted)]">{canDeleteHint}</p> : null}
+
+        {/* ADMIN-MASTERDATA-UX-01-C2: bulk "Teams übernehmen" — establishes
+            the TeamSeason relationship for many existing active tenant
+            Teams in one operation, reusing the exact same canonical
+            registerTeamSeason() materialization as the single-Team wizard.
+            Deliberately available regardless of currentStatus — this
+            action must never require the target Season to be AKTUELL. */}
+        {!isEditing && canRegisterTeams ? (
+          <TeamRolloverPanel seasonId={id} seasonName={name} />
+        ) : null}
 
         {/* ADMIN-MASTERDATA-UX-01-C1: make the canonical Team-season
             rollover path obvious for the current Season — reuses the
