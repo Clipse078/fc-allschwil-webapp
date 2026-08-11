@@ -243,6 +243,103 @@ describe("getResourceAvailability — occupied by tournament", () => {
   });
 });
 
+describe("getResourceAvailability — resourceCode passthrough", () => {
+  it("includes each resource's canonical code in the output, for legacy code-based selectors", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([PITCH_1]);
+
+    const result = await getResourceAvailability({
+      tenantId: TENANT_A,
+      startAt: START,
+      endAt: END,
+      group: "PITCH_HALL",
+    });
+
+    expect(result[0]).toMatchObject({ resourceId: "res-1", resourceCode: "KUNSTRASEN_2" });
+  });
+});
+
+describe("getResourceAvailability — current-entity exclusion / edit mode", () => {
+  it("excludes the session's own occurrence when excludeTrainingSessionId is set (TrainingSession edit mode)", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([PITCH_1]);
+
+    await getResourceAvailability({
+      tenantId: TENANT_A,
+      startAt: START,
+      endAt: END,
+      group: "PITCH_HALL",
+      excludeTrainingSessionId: "session-1",
+    });
+
+    expect(mocks.trainingSessionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: { not: "session-1" } }) }),
+    );
+  });
+
+  it("does not filter by session id when excludeTrainingSessionId is omitted", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([PITCH_1]);
+
+    await getResourceAvailability({ tenantId: TENANT_A, startAt: START, endAt: END, group: "PITCH_HALL" });
+
+    expect(mocks.trainingSessionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: undefined }) }),
+    );
+  });
+
+  it("excludes the Match's own booking when excludeEventId matches it (Match edit mode)", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([PITCH_3]);
+
+    await getResourceAvailability({
+      tenantId: TENANT_A,
+      startAt: START,
+      endAt: END,
+      group: "PITCH_HALL",
+      excludeEventId: "event-1",
+    });
+
+    expect(mocks.eventFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: { not: "event-1" } }) }),
+    );
+  });
+
+  it("excludes the Tournament's own resource allocation when excludeEventId matches it (Tournament edit mode)", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([PITCH_1]);
+
+    await getResourceAvailability({
+      tenantId: TENANT_A,
+      startAt: START,
+      endAt: END,
+      group: "PITCH_HALL",
+      excludeEventId: "tournament-1",
+    });
+
+    expect(mocks.tournamentResourceAllocationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ event: { id: { not: "tournament-1" } } }),
+      }),
+    );
+  });
+
+  it("excludes the Tournament's own participant dressing-room allocation when excludeEventId matches it", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([ROOM_1]);
+
+    await getResourceAvailability({
+      tenantId: TENANT_A,
+      startAt: START,
+      endAt: END,
+      group: "DRESSING_ROOM",
+      excludeEventId: "tournament-1",
+    });
+
+    expect(mocks.tournamentParticipantAllocationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tournamentParticipant: { event: { id: { not: "tournament-1" } } },
+        }),
+      }),
+    );
+  });
+});
+
 describe("getResourceAvailability — tenant isolation", () => {
   it("scopes the FacilityResource query by tenantId", async () => {
     mocks.facilityResourceFindMany.mockResolvedValue([]);

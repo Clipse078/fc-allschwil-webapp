@@ -7,13 +7,20 @@
  * FacilityResource of that group belonging to the caller's tenant.
  *
  * Query params:
- *   startAt        ISO datetime (required)
- *   endAt          ISO datetime (optional — defaults to startAt)
- *   group          "PITCH_HALL" | "DRESSING_ROOM" (required)
- *   excludeEventId string (optional — excludes bookings of this Event, e.g.
- *                  when editing a tournament that already holds allocations)
+ *   startAt                    ISO datetime (required)
+ *   endAt                      ISO datetime (optional — defaults to startAt)
+ *   group                      "PITCH_HALL" | "DRESSING_ROOM" (required)
+ *   excludeEventId             string (optional — excludes bookings of this
+ *                              Event, e.g. when editing a Match/Tournament
+ *                              that already holds allocations)
+ *   excludeTrainingSessionId   string (optional — RESOURCE-AVAILABILITY-UX-01,
+ *                              excludes this TrainingSession's own occurrence,
+ *                              e.g. when editing its resource overrides)
  *
- * Permission: EVENTS_VIEW / EVENTS_MANAGE (same gate as tournament reads).
+ * Permission: EVENTS_VIEW / EVENTS_MANAGE OR TRAININGS_VIEW / TRAININGS_MANAGE
+ * — every operational Center (TrainingCenter/MatchCenter/TournamentCenter)
+ * wiring this into its own selectors reaches this endpoint under its own
+ * existing module permission; this never introduces a new permission.
  * Tenant isolation: tenantId resolved from session, never from request query.
  */
 
@@ -25,7 +32,12 @@ import { getResourceAvailability, type AvailabilityResourceGroup } from "@/lib/f
 const VALID_GROUPS: readonly AvailabilityResourceGroup[] = ["PITCH_HALL", "DRESSING_ROOM"];
 
 export async function GET(request: NextRequest) {
-  const access = await requireApiAnyPermission([PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE]);
+  const access = await requireApiAnyPermission([
+    PERMISSIONS.EVENTS_VIEW,
+    PERMISSIONS.EVENTS_MANAGE,
+    PERMISSIONS.TRAININGS_VIEW,
+    PERMISSIONS.TRAININGS_MANAGE,
+  ]);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -40,6 +52,7 @@ export async function GET(request: NextRequest) {
   const endAtRaw = searchParams.get("endAt");
   const groupRaw = searchParams.get("group");
   const excludeEventId = searchParams.get("excludeEventId") ?? undefined;
+  const excludeTrainingSessionId = searchParams.get("excludeTrainingSessionId") ?? undefined;
 
   if (!startAtRaw || Number.isNaN(new Date(startAtRaw).getTime())) {
     return NextResponse.json({ error: "startAt is required and must be a valid date." }, { status: 400 });
@@ -57,6 +70,7 @@ export async function GET(request: NextRequest) {
     endAt: endAtRaw || null,
     group: groupRaw as AvailabilityResourceGroup,
     excludeEventId,
+    excludeTrainingSessionId,
   });
 
   return NextResponse.json({ availability });
