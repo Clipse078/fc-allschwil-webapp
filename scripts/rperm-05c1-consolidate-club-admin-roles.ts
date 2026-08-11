@@ -68,6 +68,16 @@ import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 export const DEFAULT_ROLE_NAME = "Club Admin";
 export const EXECUTE_CONFIRMATION = "CONSOLIDATE-CLUB-ADMIN-ROLES";
 
+/**
+ * The merge transaction issues one query per RolePermission/UserRole row
+ * being copied — a role with dozens of permissions can exceed Prisma's 5s
+ * interactive-transaction default over a higher-latency DB connection.
+ * `maxWait`/`timeout` only bound how long the transaction is allowed to
+ * take; they do not weaken atomicity — any failure still rolls back every
+ * write made so far in the same transaction.
+ */
+export const TRANSACTION_OPTIONS = { maxWait: 30_000, timeout: 30_000 } as const;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -589,7 +599,13 @@ export async function runConsolidation(
         const details = failed.map((pc) => `  FAILED: ${pc.check} (${pc.detail})`).join("\n");
         throw new Error(`Postcondition failure — rolling back consolidation transaction:\n${details}`);
       }
-    });
+      // A permission/role set can require many sequential round trips (one
+      // findUnique + one create per merged RolePermission/UserRole) — the
+      // Prisma interactive-transaction default (5s) is too tight over a
+      // higher-latency connection to the database. Extending it changes no
+      // safety property: the transaction is still all-or-nothing, still
+      // rolls back completely on any failure/timeout.
+    }, TRANSACTION_OPTIONS);
   }
 
   const afterInspection = await inspect(prisma, { tenantKey: params.tenantKey, roleName });
