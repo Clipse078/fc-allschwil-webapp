@@ -145,15 +145,34 @@ describe("STAGE-OPS-01 — Training Planner navigation regression", () => {
   });
 
   it("TrainingCenter route and direct-route /dashboard/training require the same permissions", () => {
-    // TrainingCenter in nav uses TRAININGS_VIEW | TRAININGS_MANAGE.
-    // Direct route /dashboard/training requires the same (documented in page.tsx).
-    // This test guards that the nav and route-level auth are aligned.
+    // TrainingCenter in nav uses TRAININGS_VIEW | TRAININGS_MANAGE |
+    // TRAININGS_DELETE. Direct route /dashboard/training requires the same
+    // set (documented in page.tsx via requireAnyPermission). This test
+    // guards that the nav and route-level auth stay aligned.
     const withView = getVisibleNavSections([PERMISSIONS.TRAININGS_VIEW]);
     const withManage = getVisibleNavSections([PERMISSIONS.TRAININGS_MANAGE]);
+    const withDelete = getVisibleNavSections([PERMISSIONS.TRAININGS_DELETE]);
     const withNeither = getVisibleNavSections([PERMISSIONS.EVENTS_VIEW]);
 
     expect(findNavItem(withView, "trainingcenter")).not.toBeNull();
     expect(findNavItem(withManage, "trainingcenter")).not.toBeNull();
+    expect(findNavItem(withDelete, "trainingcenter")).not.toBeNull();
     expect(findNavItem(withNeither, "trainingcenter")).toBeNull();
+  });
+
+  it("ADMIN-DELETE-02A-C2: a trainings.delete-only caller sees Planung and TrainingCenter in nav", () => {
+    // Root-cause regression: page.tsx already allowed a trainings.delete-only
+    // caller into /dashboard/training?tab=serien (to reach an archived
+    // TrainingSeries' permanent-delete action), but the sidebar nav did not
+    // include TRAININGS_DELETE, so that caller had no visible path to the
+    // route at all — the only "normal TrainingCenter UI" gap for ADMIN-
+    // DELETE-02A-C2.
+    const sections = getVisibleNavSections([PERMISSIONS.TRAININGS_DELETE]);
+    const trainingcenter = findNavItem(sections, "trainingcenter");
+    const planungItem = sections.flatMap((s) => s.items).find((i) => i.key === "planung");
+
+    expect(planungItem).toBeDefined();
+    expect(trainingcenter).not.toBeNull();
+    expect(trainingcenter?.href).toBe("/dashboard/training");
   });
 });

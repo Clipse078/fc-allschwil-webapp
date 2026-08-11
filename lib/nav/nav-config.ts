@@ -224,6 +224,14 @@ export const NAV_SECTIONS: NavSection[] = [
         permissionKeys: [
           PERMISSIONS.TRAININGS_VIEW,
           PERMISSIONS.TRAININGS_MANAGE,
+          // ADMIN-DELETE-02A-C2: a caller whose only training authority is
+          // trainings.delete (see app/(admin)/dashboard/training/page.tsx,
+          // requireAnyPermission) must still be able to reach Planung ->
+          // TrainingCenter -> Serien verwalten to exercise permanent
+          // deletion of an archived TrainingSeries. Without this, the
+          // route-level guard already allowed access but the sidebar nav
+          // hid the only path to it.
+          PERMISSIONS.TRAININGS_DELETE,
           PERMISSIONS.EVENTS_VIEW,
           PERMISSIONS.EVENTS_MANAGE,
         ],
@@ -232,7 +240,15 @@ export const NAV_SECTIONS: NavSection[] = [
             key: "trainingcenter",
             label: "TrainingCenter",
             href: "/dashboard/training",
-            permissionKeys: [PERMISSIONS.TRAININGS_VIEW, PERMISSIONS.TRAININGS_MANAGE],
+            // ADMIN-DELETE-02A-C2: keep in sync with the page-level guard's
+            // permission set (TRAININGS_VIEW | TRAININGS_MANAGE |
+            // TRAININGS_DELETE) so a trainings.delete-only caller can reach
+            // this nav entry.
+            permissionKeys: [
+              PERMISSIONS.TRAININGS_VIEW,
+              PERMISSIONS.TRAININGS_MANAGE,
+              PERMISSIONS.TRAININGS_DELETE,
+            ],
           },
           {
             // DASHBOARD-SHELL-UX-01: MatchCenter moved from a standalone
