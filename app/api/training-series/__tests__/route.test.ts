@@ -10,6 +10,12 @@
  *   B. Body validation (teamSeasonId, title, validFrom/validUntil, weekdaySchedules)
  *   C. Success path — creates the series, generates sessions, returns both
  *   D. Domain error mapping
+ *   E. RESOURCE-AVAILABILITY-UX-01-C1 — atomic default-allocation propagation:
+ *      facilityResourceIds are persisted as TrainingAllocation rows in THIS
+ *      same request (no separate client follow-up request required), a
+ *      failed individual resource is collected as `allocationErrors` without
+ *      aborting series/session creation, and omitting the field entirely
+ *      remains fully backward compatible (resources stay optional).
  */
 
 import { NextRequest } from "next/server";
@@ -22,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   createTrainingSeries: vi.fn(),
   getTrainingSeries: vi.fn(),
   generateTrainingSessions: vi.fn(),
+  createTrainingAllocation: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-api-any-permission", () => ({
@@ -35,6 +42,10 @@ vi.mock("@/lib/training/training-service", () => ({
 
 vi.mock("@/lib/training/session-generation-service", () => ({
   generateTrainingSessions: mocks.generateTrainingSessions,
+}));
+
+vi.mock("@/lib/training/training-allocation-service", () => ({
+  createTrainingAllocation: mocks.createTrainingAllocation,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
@@ -123,6 +134,7 @@ beforeEach(() => {
     unchanged: 0,
   });
   mocks.getTrainingSeries.mockResolvedValue(makeSeriesDto({ sessionCount: 9 }));
+  mocks.createTrainingAllocation.mockResolvedValue({ id: "allocation-01" });
 });
 
 // ── A. Auth / permission gating ──────────────────────────────────────────────
@@ -308,5 +320,101 @@ describe("D. POST /api/training-series — domain error mapping", () => {
     mocks.createTrainingSeries.mockRejectedValue(new TrainingSeriesConflictError("duplicate"));
     const res = await POST(makePostRequest(VALID_BODY));
     expect(res.status).toBe(409);
+  });
+});
+
+// ── E. RESOURCE-AVAILABILITY-UX-01-C1 — atomic default-allocation propagation ─
+
+describe("E. POST /api/training-series — facilityResourceIds (atomic default allocations)", () => {
+  it("E1. persists each facilityResourceId as a TrainingAllocation for the newly created series, in this same request", async () => {
+    const res = await POST(
+      makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-pitch-1", "res-dressing-1"] }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(mocks.createTrainingAllocation).toHaveBeenCalledTimes(2);
+    expect(mocks.createTrainingAllocation).toHaveBeenNthCalledWith(1, TENANT_A, {
+      trainingSeriesId: SERIES_ID,
+      facilityResourceId: "res-pitch-1",
+    });
+    expect(mocks.createTrainingAllocation).toHaveBeenNthCalledWith(2, TENANT_A, {
+      trainingSeriesId: SERIES_ID,
+      facilityResourceId: "res-dressing-1",
+    });
+
+    const body = await res.json();
+    expect(body.allocationErrors).toEqual([]);
+
+    // The allocation attempts happen strictly AFTER the series (and its
+    // sessions) already exist — proving there is no window in which the
+    // series exists without its sessions ready to receive the allocation.
+    const seriesCallOrder = mocks.createTrainingSeries.mock.invocationCallOrder[0];
+    const allocationCallOrder = mocks.createTrainingAllocation.mock.invocationCallOrder[0];
+    expect(seriesCallOrder).toBeLessThan(allocationCallOrder);
+  });
+
+  it("E2. omitting facilityResourceIds entirely creates zero allocations (backward compatible — resources stay optional)", async () => {
+    const res = await POST(makePostRequest(VALID_BODY));
+
+    expect(res.status).toBe(201);
+    expect(mocks.createTrainingAllocation).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.allocationErrors).toEqual([]);
+  });
+
+  it("E3. an empty facilityResourceIds array behaves like omitting the field", async () => {
+    const res = await POST(makePostRequest({ ...VALID_BODY, facilityResourceIds: [] }));
+
+    expect(res.status).toBe(201);
+    expect(mocks.createTrainingAllocation).not.toHaveBeenCalled();
+  });
+
+  it("E4. deduplicates repeated facilityResourceIds before attempting allocation", async () => {
+    await POST(makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-pitch-1", "res-pitch-1"] }));
+
+    expect(mocks.createTrainingAllocation).toHaveBeenCalledTimes(1);
+  });
+
+  it("E5. a failed individual resource (e.g. archived) is collected as allocationErrors, but the series/sessions are still created (no rollback)", async () => {
+    mocks.createTrainingAllocation
+      .mockRejectedValueOnce(new Error("FacilityResource is archived and cannot receive new allocations"))
+      .mockResolvedValueOnce({ id: "allocation-ok" });
+
+    const res = await POST(
+      makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-archived", "res-dressing-1"] }),
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.series.id).toBe(SERIES_ID);
+    expect(body.generation).toBeTruthy();
+    expect(body.allocationErrors).toEqual([
+      { facilityResourceId: "res-archived", error: "FacilityResource is archived and cannot receive new allocations" },
+    ]);
+    // the second (valid) resource is still attempted despite the first failing.
+    expect(mocks.createTrainingAllocation).toHaveBeenCalledTimes(2);
+  });
+
+  it("E6. returns 400 when facilityResourceIds is not an array", async () => {
+    const res = await POST(makePostRequest({ ...VALID_BODY, facilityResourceIds: "not-an-array" }));
+    expect(res.status).toBe(400);
+    expect(mocks.createTrainingSeries).not.toHaveBeenCalled();
+  });
+
+  it("E7. returns 400 when a facilityResourceIds entry is not a non-empty string", async () => {
+    const res = await POST(makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-1", ""] }));
+    expect(res.status).toBe(400);
+    expect(mocks.createTrainingSeries).not.toHaveBeenCalled();
+  });
+
+  it("E8. uses a fallback error message when an allocation rejection carries no message", async () => {
+    mocks.createTrainingAllocation.mockRejectedValueOnce("boom");
+
+    const res = await POST(makePostRequest({ ...VALID_BODY, facilityResourceIds: ["res-pitch-1"] }));
+
+    const body = await res.json();
+    expect(body.allocationErrors).toEqual([
+      { facilityResourceId: "res-pitch-1", error: "Ressource konnte nicht zugewiesen werden." },
+    ]);
   });
 });

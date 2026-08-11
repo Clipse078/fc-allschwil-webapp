@@ -35,11 +35,19 @@
  *     simply derives ONE weekday from the chosen date rather than exposing
  *     the full multi-weekday picker during creation. Additional weekdays
  *     can still be added afterwards via the existing edit form.
- *   - Resource allocation still goes through the EXISTING
- *     POST /api/training-series/:id/allocations endpoint (same one
- *     TrainingAllocationEditor already uses), sequenced by
- *     lib/training/create-training-series-orchestration.ts so the series
- *     always exists before allocations are attempted.
+ *   - RESOURCE-AVAILABILITY-UX-01-C1 root-cause fix: the selected
+ *     Spielfeld/Halle + Garderobe resources are submitted as PART OF the
+ *     SAME POST /api/training-series request (`facilityResourceIds`),
+ *     which persists them as TrainingAllocation rows server-side in the
+ *     same invocation that creates the series and generates its
+ *     TrainingSessions — see that route's doc comment for the full
+ *     root-cause writeup. Previously this used two-phase client-driven
+ *     requests (lib/training/create-training-series-orchestration.ts:
+ *     create the series, THEN a separate follow-up request per resource),
+ *     which left the series permanently resource-less whenever anything
+ *     interrupted the client between requests. The standalone allocations
+ *     page (TrainingAllocationEditor, for series that already exist) is
+ *     untouched and still uses the per-resource endpoint directly.
  *   - Availability is read from the EXISTING PLANNING-CREATION-UX-01A
  *     GET /api/facilities/availability endpoint for the initial occurrence
  *     only — no recurring-series-wide conflict analysis is introduced here.
@@ -64,10 +72,6 @@ import {
 } from "@/components/admin/training/FacilityResourceSelector";
 import { weekdayFromDate, zonedTimeToUtc } from "@/lib/training/recurrence";
 import type { Weekday } from "@/lib/training/types";
-import {
-  orchestrateTrainingSeriesCreation,
-  type TrainingSeriesAllocationDraft,
-} from "@/lib/training/create-training-series-orchestration";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -476,61 +480,59 @@ export default function TrainingSeriesCreateForm({
     setSubmitting(true);
     setPartialErrors([]);
 
-    const plan = {
-      pitchHallAllocations: resources.map<TrainingSeriesAllocationDraft>((r) => ({
-        facilityResourceId: r.facilityResourceId,
-        facilityResourceName: r.facilityResourceName,
-      })),
-      dressingRoomAllocations: dressingRooms.map<TrainingSeriesAllocationDraft>((r) => ({
-        facilityResourceId: r.facilityResourceId,
-        facilityResourceName: r.facilityResourceName,
-      })),
-    };
+    // RESOURCE-AVAILABILITY-UX-01-C1 root-cause fix: the selected Spielfeld/
+    // Halle + Garderobe resources are sent as PART OF this single request —
+    // POST /api/training-series now persists the series' default
+    // TrainingAllocation rows itself, in the same server-side invocation
+    // that creates the series and generates its TrainingSessions (see the
+    // route's doc comment). Previously these resources were submitted via
+    // SEPARATE, sequential follow-up requests (one per resource, after this
+    // one already succeeded) — closing the tab, navigating away, or losing
+    // the connection between requests silently left the series without any
+    // resources, with no error ever shown. A single request cannot be
+    // interrupted "in the middle" from the browser's perspective.
+    const facilityResourceIds = [...resources, ...dressingRooms].map((r) => r.facilityResourceId);
+    const resourceNameById = new Map(
+      [...resources, ...dressingRooms].map((r) => [r.facilityResourceId, r.facilityResourceName]),
+    );
 
     try {
-      const orchestration = await orchestrateTrainingSeriesCreation(plan, {
-        createSeries: async () => {
-          const res = await fetch("/api/training-series", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              teamSeasonId,
-              title: title.trim(),
-              validFrom: date,
-              validUntil: effectiveValidUntil,
-              weekdaySchedules: [{ weekday: derivedWeekday, startsAt, endsAt }],
-            }),
-          });
-          const data = (await res.json().catch(() => null)) as
-            | { series?: { id: string }; generation?: GenerationResult; error?: string }
-            | null;
-          if (!res.ok || !data?.series) {
-            throw new Error(data?.error ?? "Trainingsserie konnte nicht erstellt werden.");
-          }
-          return { seriesId: data.series.id, generation: data.generation as GenerationResult };
-        },
-        addAllocation: async (seriesId, draft) => {
-          const res = await fetch(`/api/training-series/${seriesId}/allocations`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ facilityResourceId: draft.facilityResourceId }),
-          });
-          const data = (await res.json().catch(() => null)) as { allocation?: unknown; error?: string } | null;
-          if (!res.ok || !data?.allocation) {
-            throw new Error(data?.error ?? "Ressource konnte nicht zugewiesen werden.");
-          }
-        },
+      const res = await fetch("/api/training-series", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamSeasonId,
+          title: title.trim(),
+          validFrom: date,
+          validUntil: effectiveValidUntil,
+          weekdaySchedules: [{ weekday: derivedWeekday, startsAt, endsAt }],
+          facilityResourceIds,
+        }),
       });
+      const data = (await res.json().catch(() => null)) as
+        | {
+            series?: { id: string };
+            generation?: GenerationResult;
+            allocationErrors?: { facilityResourceId: string; error: string }[];
+            error?: string;
+          }
+        | null;
+      if (!res.ok || !data?.series) {
+        throw new Error(data?.error ?? "Trainingsserie konnte nicht erstellt werden.");
+      }
 
-      setResult({ seriesId: orchestration.seriesId, generation: orchestration.generation });
+      const seriesId = data.series.id;
+      const generation = data.generation as GenerationResult;
+      setResult({ seriesId, generation });
 
-      const combinedErrors = [
-        ...orchestration.resourceAllocationErrors.map((e) => ({ resource: e.draft.facilityResourceName, error: e.error })),
-        ...orchestration.dressingRoomAllocationErrors.map((e) => ({ resource: e.draft.facilityResourceName, error: e.error })),
-      ];
-
-      if (combinedErrors.length > 0) {
-        setPartialErrors(combinedErrors);
+      const allocationErrors = data.allocationErrors ?? [];
+      if (allocationErrors.length > 0) {
+        setPartialErrors(
+          allocationErrors.map((e) => ({
+            resource: resourceNameById.get(e.facilityResourceId) ?? e.facilityResourceId,
+            error: e.error,
+          })),
+        );
         return;
       }
 
