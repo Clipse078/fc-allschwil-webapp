@@ -268,3 +268,123 @@ export function validateLayout(layout: InboardLayout): string | null {
   }
   return null;
 }
+
+// ── Designer-02: grid / placement helpers ─────────────────────────────────────
+
+/** Default total rows for the 3-widget Screen-1 layout (rows 0..9). */
+export const GRID_ROWS_DEFAULT = 10;
+
+/**
+ * Per-widget-type movement and resize constraints for the canvas editor.
+ *
+ *   fixedWidth  — width is always GRID_COLUMNS; cannot be changed
+ *   fixedCol    — column is always 0; cannot be changed
+ *   canResize   — whether the resize handle is shown
+ *   minWidth/maxWidth  — allowed width range in grid columns
+ *   minHeight/maxHeight — allowed height range in grid rows
+ */
+export const WIDGET_CONSTRAINTS: Record<
+  WidgetType,
+  {
+    fixedWidth: boolean;
+    fixedCol: boolean;
+    canResize: boolean;
+    minWidth: number;
+    maxWidth: number;
+    minHeight: number;
+    maxHeight: number;
+  }
+> = {
+  HEADER: {
+    fixedWidth: true,
+    fixedCol: true,
+    canResize: false,
+    minWidth: GRID_COLUMNS,
+    maxWidth: GRID_COLUMNS,
+    minHeight: 1,
+    maxHeight: 2,
+  },
+  ACTIVITIES: {
+    fixedWidth: false,
+    fixedCol: false,
+    canResize: true,
+    minWidth: 4,
+    maxWidth: GRID_COLUMNS,
+    minHeight: 3,
+    maxHeight: 9,
+  },
+  ANNOUNCEMENT: {
+    fixedWidth: false,
+    fixedCol: false,
+    canResize: true,
+    minWidth: 6,
+    maxWidth: GRID_COLUMNS,
+    minHeight: 1,
+    maxHeight: 2,
+  },
+};
+
+/**
+ * Default grid placement for each widget type.
+ * Used when restoring a widget that was disabled and re-enabled.
+ */
+export const DEFAULT_WIDGET_POSITIONS: Record<
+  WidgetType,
+  { col: number; row: number; width: number; height: number }
+> = {
+  HEADER: { col: 0, row: 0, width: 12, height: 1 },
+  ACTIVITIES: { col: 0, row: 1, width: 12, height: 8 },
+  ANNOUNCEMENT: { col: 0, row: 9, width: 12, height: 1 },
+};
+
+/**
+ * Returns true if widget `a` and widget `b` occupy overlapping grid cells.
+ * Disabled widgets are still checked — callers should filter by `.enabled`.
+ */
+export function widgetsOverlap(a: WidgetInstance, b: WidgetInstance): boolean {
+  const aR = a.position.col + a.width;
+  const aB = a.position.row + a.height;
+  const bR = b.position.col + b.width;
+  const bB = b.position.row + b.height;
+  return (
+    a.position.col < bR &&
+    aR > b.position.col &&
+    a.position.row < bB &&
+    aB > b.position.row
+  );
+}
+
+/**
+ * Returns true if placing `widget` at `newPos` with `newWidth`×`newHeight`
+ * would overlap any *other* enabled widget in `allWidgets`.
+ */
+export function hasOverlapWithOthers(
+  widget: WidgetInstance,
+  newPos: WidgetPosition,
+  newWidth: number,
+  newHeight: number,
+  allWidgets: WidgetInstance[],
+): boolean {
+  const proposed: WidgetInstance = {
+    ...widget,
+    position: newPos,
+    width: newWidth,
+    height: newHeight,
+  };
+  return allWidgets
+    .filter((w) => w.id !== widget.id && w.enabled)
+    .some((w) => widgetsOverlap(proposed, w));
+}
+
+/**
+ * Computes the total number of rows used by the layout (for canvas scaling).
+ * Never returns less than GRID_ROWS_DEFAULT.
+ */
+export function getLayoutTotalRows(layout: InboardLayout): number {
+  const enabled = layout.widgets.filter((w) => w.enabled);
+  if (enabled.length === 0) return GRID_ROWS_DEFAULT;
+  return Math.max(
+    GRID_ROWS_DEFAULT,
+    ...enabled.map((w) => w.position.row + w.height),
+  );
+}
