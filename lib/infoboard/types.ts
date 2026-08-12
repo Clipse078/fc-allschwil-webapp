@@ -28,6 +28,8 @@ export type InboardRow = {
   announcementText: string | null;
   announcementBgColor: string | null;
   announcementTextColor: string | null;
+  /** Designer layout JSON (InboardLayout v1). null = use default derived from flat fields. */
+  layoutJson: string | null;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -81,6 +83,8 @@ export type UpdateInfoboardInput = {
   announcementText?: string | null;
   announcementBgColor?: string | null;
   announcementTextColor?: string | null;
+  /** Designer layout JSON (InboardLayout v1). */
+  layoutJson?: string | null;
   sortOrder?: number;
 };
 

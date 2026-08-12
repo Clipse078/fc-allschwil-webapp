@@ -3,7 +3,8 @@
 /**
  * components/infoboard/v2/InboardCard.tsx
  *
- * Premium overview card for a single Infoboard in the management grid.
+ * Premium overview card for a single Infoboard.
+ * Features a live mini-preview using the same renderer as the kiosk.
  */
 
 import { useState } from "react";
@@ -15,7 +16,6 @@ import {
   MoreHorizontal,
   Copy,
   Trash2,
-  Monitor,
   Power,
   PowerOff,
   Megaphone,
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type { InfoboardListItem } from "@/lib/infoboard/types";
 import { STATUS_META, TEMPLATE_LABELS, infoboardKioskUrl } from "@/lib/infoboard/types";
+import { InboardMiniPreview } from "./InboardMiniPreview";
 
 type InboardCardProps = {
   board: InfoboardListItem;
@@ -72,19 +73,22 @@ export function InboardCard({
 
   return (
     <div className="relative flex flex-col rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden transition-shadow hover:shadow-md">
-      {/* Thumbnail placeholder */}
-      <div className="relative h-[110px] bg-gradient-to-br from-[var(--surface-3)] to-[var(--surface)] border-b border-[var(--border)] flex items-center justify-center overflow-hidden shrink-0">
-        <Monitor className="h-10 w-10 text-[var(--border)]" aria-hidden="true" />
+      {/* ── Mini preview thumbnail ────────────────────────────────────── */}
+      <div className="relative shrink-0 overflow-hidden" style={{ aspectRatio: "16 / 5" }}>
+        <InboardMiniPreview
+          theme={board.displayTheme as "DARK" | "LIGHT" | null}
+          className="absolute inset-0 w-full h-full"
+        />
         {/* Status badge overlay */}
-        <div className="absolute top-2.5 right-2.5">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold ${statusBadgeClass}`}>
+        <div className="absolute top-2 right-2 z-10">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold backdrop-blur-sm ${statusBadgeClass}`}>
             <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${statusDotClass}`} />
             {statusMeta.label}
           </span>
         </div>
         {/* Template label overlay */}
-        <div className="absolute bottom-2 left-2.5">
-          <span className="text-[0.65rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)] bg-[var(--surface)]/80 backdrop-blur-sm px-1.5 py-0.5 rounded">
+        <div className="absolute bottom-2 left-2 z-10">
+          <span className="text-[0.65rem] font-semibold uppercase tracking-[0.10em] text-white/80 bg-black/30 backdrop-blur-sm px-1.5 py-0.5 rounded">
             {templateLabel}
           </span>
         </div>
@@ -100,7 +104,6 @@ export function InboardCard({
         {/* Meta row */}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-1 text-[0.7rem] text-[var(--text-2)]">
-            <Monitor className="h-3 w-3 text-[var(--muted)]" aria-hidden="true" />
             {board.displayTheme === "LIGHT" ? "Hell" : "Dunkel"}
           </span>
           <span className="flex items-center gap-1 text-[0.7rem] text-[var(--text-2)]">
@@ -120,7 +123,6 @@ export function InboardCard({
           </code>
         </div>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
         {/* Actions */}
@@ -154,10 +156,7 @@ export function InboardCard({
 
             {menuOpen && (
               <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setMenuOpen(false)}
-                />
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-8 z-20 min-w-[190px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] shadow-lg py-1">
                   <button
                     onClick={() => { void handleCopyUrl(); }}
