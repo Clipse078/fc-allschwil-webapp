@@ -29,8 +29,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
-import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
+import { resolveKioskTenantKey } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
@@ -73,7 +73,7 @@ export default async function InfoboardScreen1Page() {
   // Future: resolve from subdomain/custom domain once the domain→tenant
   // mapping table is introduced (see resolveTenantFromRequest TODO).
   const tenantRow = await prisma.tenant.findFirst({
-    where: { key: DEFAULT_TENANT_KEY, status: "ACTIVE" },
+    where: { key: resolveKioskTenantKey(), status: "ACTIVE" },
     select: {
       id: true,
       key: true,

@@ -23,8 +23,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
-import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
+import { resolveKioskTenantKey } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
@@ -67,9 +67,9 @@ function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
 export default async function InfoboardSlugPage({ params }: PageProps) {
   const { slug } = await params;
 
-  // Resolve tenant
+  // Resolve tenant from kiosk tenant key (env-configurable, defaults to platform default)
   const tenantRow = await prisma.tenant.findFirst({
-    where: { key: DEFAULT_TENANT_KEY, status: "ACTIVE" },
+    where: { key: resolveKioskTenantKey(), status: "ACTIVE" },
     select: {
       id: true,
       key: true,
@@ -87,8 +87,10 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
   // Load the specific Infoboard by slug
   const board = await getInfoboardBySlug(slug, tenantRow.id);
 
-  // DISABLED boards are not publicly accessible
-  if (!board || board.status === "DISABLED") {
+  // Only ACTIVE boards are publicly accessible.
+  // DISABLED and DRAFT boards return 404 — kiosk devices must not show
+  // configuration work-in-progress or decommissioned displays.
+  if (!board || board.status !== "ACTIVE") {
     notFound();
   }
 

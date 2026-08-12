@@ -39,7 +39,8 @@ export function InboardDetailClient({ board: initialBoard, tenantName }: Inboard
   const [headerSubtitleText, setHeaderSubtitleText] = useState(board.headerSubtitleText ?? "");
   const [headerShowTime, setHeaderShowTime] = useState(board.headerShowTime);
   const [headerShowDate, setHeaderShowDate] = useState(board.headerShowDate);
-  const [headerShowWeather, setHeaderShowWeather] = useState(board.headerShowWeather);
+  // headerShowWeather is stored in the DB but the weather widget is not yet rendered.
+  // The toggle is intentionally hidden from the UI until the widget is implemented.
   const [announcementEnabled, setAnnouncementEnabled] = useState(board.announcementEnabled);
   const [announcementText, setAnnouncementText] = useState(board.announcementText ?? "");
   const [announcementBgColor, setAnnouncementBgColor] = useState(board.announcementBgColor ?? "#1e3a5f");
@@ -64,7 +65,7 @@ export function InboardDetailClient({ board: initialBoard, tenantName }: Inboard
       payload.headerSubtitleText = headerSubtitleEnabled ? (headerSubtitleText || null) : null;
       payload.headerShowTime = headerShowTime;
       payload.headerShowDate = headerShowDate;
-      payload.headerShowWeather = headerShowWeather;
+      // headerShowWeather not sent — widget not yet implemented
       payload.announcementEnabled = announcementEnabled;
       payload.announcementText = announcementEnabled ? announcementText : null;
       payload.announcementBgColor = announcementEnabled ? announcementBgColor : null;
@@ -263,7 +264,6 @@ export function InboardDetailClient({ board: initialBoard, tenantName }: Inboard
                   className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
                 >
                   <option value="TAGESUEBERSICHT">Tagesübersicht</option>
-                  <option value="ANLAGENUEBERSICHT">Anlagenübersicht</option>
                 </select>
               </div>
             </div>
@@ -305,11 +305,7 @@ export function InboardDetailClient({ board: initialBoard, tenantName }: Inboard
                 checked={headerShowDate}
                 onChange={setHeaderShowDate}
               />
-              <Toggle
-                label="Wetter anzeigen"
-                checked={headerShowWeather}
-                onChange={setHeaderShowWeather}
-              />
+              {/* Weather toggle deferred — widget not yet implemented */}
             </div>
           </div>
 

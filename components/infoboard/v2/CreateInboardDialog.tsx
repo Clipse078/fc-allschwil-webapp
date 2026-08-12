@@ -13,9 +13,10 @@ import { X, Monitor } from "lucide-react";
 import { generateInfoboardSlug } from "@/lib/infoboard/slug";
 import { infoboardKioskUrl, TEMPLATE_LABELS } from "@/lib/infoboard/types";
 
+// Only Tagesübersicht is currently rendered for dynamic [slug] boards.
+// Anlagenübersicht is deferred until its template is implemented.
 const TEMPLATES = [
   { value: "TAGESUEBERSICHT", label: "Tagesübersicht" },
-  { value: "ANLAGENUEBERSICHT", label: "Anlagenübersicht" },
 ];
 
 type CreateInboardDialogProps = {
