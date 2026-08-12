@@ -51,6 +51,8 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
   ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
+  // ADMIN-DELETE-03B: separate delete authority — never implied by canEdit.
+  const canDelete = hasPermission(session, PERMISSIONS.REGISTRATIONS_DELETE);
 
   if (!registration) {
     notFound();
@@ -61,6 +63,7 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
       tenantSlug={tenantSlug}
       initialRegistration={registration}
       canEdit={canEdit}
+      canDelete={canDelete}
       locale={tenantContext.locale ?? undefined}
       timezone={tenantContext.timezone ?? undefined}
       assignableUsers={users}

@@ -144,6 +144,10 @@ async function main() {
 
     { key: "registrations.view", name: "View registrations", module: PermissionModule.REGISTRATIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "registrations.edit", name: "Edit registrations", module: PermissionModule.REGISTRATIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-03B: canonical permanent-deletion permission. Deliberately
+    // separate from registrations.edit — managing/archiving must never imply
+    // permanent deletion. Mirrors teams.delete (ADMIN-DELETE-01A).
+    { key: "registrations.delete", name: "Permanently delete registrations", module: PermissionModule.REGISTRATIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "org.view", name: "View organisations", module: PermissionModule.ORG, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "org.manage", name: "Manage organisations", module: PermissionModule.ORG, scope: PermissionScope.TENANT, grantableByAdmin: true },

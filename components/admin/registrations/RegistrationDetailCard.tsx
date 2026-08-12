@@ -56,6 +56,7 @@ import {
 } from "@/lib/registrations/status";
 import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
+import RegistrationDeleteControl from "./RegistrationDeleteControl";
 
 // Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
 // only, ingestion is untouched (see lib/registrations/source.ts).
@@ -74,6 +75,11 @@ type RegistrationDetailCardProps = {
   tenantSlug: string;
   initialRegistration: RegistrationDetail;
   canEdit: boolean;
+  /**
+   * ADMIN-DELETE-03B: effective PERMISSIONS.REGISTRATIONS_DELETE authority.
+   * When false/absent the delete control is hidden entirely.
+   */
+  canDelete?: boolean;
   /** Tenant locale (e.g. "de-CH"). Falls back to "de-CH" when absent. */
   locale?: string;
   /** Tenant timezone (e.g. "Europe/Zurich"). Falls back to "Europe/Zurich" when absent. */
@@ -231,6 +237,7 @@ export default function RegistrationDetailCard({
   tenantSlug,
   initialRegistration,
   canEdit,
+  canDelete = false,
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers = [],
@@ -760,6 +767,17 @@ export default function RegistrationDetailCard({
               <DataField label="Sprache" value={fields.technical.locale} />
             </div>
           </div>
+
+          {/* ADMIN-DELETE-03B: permanent deletion — only shown when the caller
+              holds registrations.delete for this tenant. Renders below
+              Systemdaten in the sidebar so it stays out of the main workflow
+              path while remaining accessible for authorized users. */}
+          <RegistrationDeleteControl
+            tenantSlug={tenantSlug}
+            registrationId={registration.id}
+            registrationLabel={`${registration.firstName} ${registration.lastName}`}
+            canDelete={canDelete}
+          />
         </div>
       </div>
     </div>
