@@ -47,6 +47,7 @@ import {
   DEFAULT_INFOBOARD_DISPLAY_THEME,
   type InfoboardDisplayTheme,
 } from "@/lib/publishing/infoboard/display-theme";
+import { AnnouncementTicker } from "./AnnouncementTicker";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -781,8 +782,11 @@ type FooterProps = {
 
 /**
  * Dark navy footer.
- * Left: tenant-configurable announcement text (when enabled and non-blank).
+ * Left: fixed announcement icon + ticker text (when announcement enabled and non-blank).
  * Right: "POWERED BY" + SportClubEvo product logo.
+ *
+ * The announcement text scrolls horizontally when it overflows (AnnouncementTicker).
+ * Short messages that fit remain static. The icon stays fixed regardless.
  */
 function Footer({ announcement, productLogoSrc }: FooterProps): ReactElement {
   const announcementEnabled =
@@ -811,7 +815,32 @@ function Footer({ announcement, productLogoSrc }: FooterProps): ReactElement {
     >
       <div className={styles.footerLeft}>
         {announcementEnabled && announcement !== undefined && (
-          <span className={styles.footerAnnouncementText}>{announcement.text}</span>
+          <>
+            {/* Fixed icon — never scrolls */}
+            <span
+              className={styles.footerAnnouncementIcon}
+              data-testid="announcement-icon"
+              aria-hidden="true"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+            </span>
+            {/* Scrolling text — AnnouncementTicker detects overflow and animates */}
+            <AnnouncementTicker text={announcement.text!} />
+          </>
         )}
       </div>
       <div className={styles.footerRight} data-testid="product-branding">

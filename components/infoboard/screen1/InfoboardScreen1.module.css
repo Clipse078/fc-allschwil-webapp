@@ -689,18 +689,59 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--ib-sp-2);
 }
 
-.footerAnnouncementText {
+.footerAnnouncementIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0.9;
+  line-height: 1;
+}
+
+/* ─── Announcement ticker ─────────────────────────────────────────────────── */
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(var(--ticker-dist, -100%)); }
+}
+
+.tickerViewport {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.tickerTrackStatic,
+.tickerTrackAnimated {
+  display: inline-flex;
+  gap: 96px;
+  white-space: nowrap;
+  align-items: center;
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-footer);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ib-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: inherit;
+}
+
+.tickerTrackAnimated {
+  animation-name: ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-duration: var(--ticker-duration, 20s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tickerTrackAnimated {
+    animation: none;
+  }
 }
 
 .footerRight {

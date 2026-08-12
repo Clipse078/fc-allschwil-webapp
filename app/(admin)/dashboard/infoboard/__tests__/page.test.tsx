@@ -95,7 +95,7 @@ beforeEach(async () => {
   mocks.requireAnyPermission.mockResolvedValue(undefined);
   mocks.getActiveTenant.mockResolvedValue(ACTIVE_TENANT);
   mocks.listInfoboards.mockResolvedValue([]);
-  mocks.countInfoboards.mockResolvedValue({ total: 0, active: 0 });
+  mocks.countInfoboards.mockResolvedValue({ total: 0, active: 0, draft: 0, disabled: 0 });
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ describe("InfoboardAdminPage V2 — page structure", () => {
 
   it("renders the management subtitle", async () => {
     await renderPage();
-    expect(screen.getByText("Verwalte deine Displays, Inhalte und Darstellung.")).toBeTruthy();
+    expect(screen.getByText("Verwalte alle Infoboards, deren Inhalte, Layouts und Geräte.")).toBeTruthy();
   });
 
   it("does not render hard-coded Display 1 or Display 2", async () => {
@@ -127,9 +127,9 @@ describe("InfoboardAdminPage V2 — page structure", () => {
 });
 
 describe("InfoboardAdminPage V2 — empty state", () => {
-  it("renders summary showing 0 Infoboards", async () => {
+  it("renders empty state when no boards exist", async () => {
     await renderPage();
-    expect(screen.getByText("Keine Infoboards")).toBeTruthy();
+    expect(screen.getByText("Noch keine Infoboards")).toBeTruthy();
   });
 });
 
@@ -140,13 +140,13 @@ describe("InfoboardAdminPage V2 — with boards", () => {
     mocks.requireAnyPermission.mockResolvedValue(undefined);
     mocks.getActiveTenant.mockResolvedValue(ACTIVE_TENANT);
     mocks.listInfoboards.mockResolvedValue([SAMPLE_BOARD]);
-    mocks.countInfoboards.mockResolvedValue({ total: 1, active: 1 });
+    mocks.countInfoboards.mockResolvedValue({ total: 1, active: 1, draft: 0, disabled: 0 });
   });
 
-  it("renders the Infoboard count summary", async () => {
+  it("renders status filter chips", async () => {
     await renderPage();
-    const root = document.body;
-    expect(root.textContent).toContain("1 Infoboard");
+    expect(screen.getByText("Alle")).toBeTruthy();
+    expect(screen.getAllByText("Aktiv").length).toBeGreaterThan(0);
   });
 
   it("renders a card for each Infoboard (board name visible)", async () => {

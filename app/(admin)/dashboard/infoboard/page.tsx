@@ -39,13 +39,15 @@ export default async function InfoboardAdminPage() {
       <AdminSectionHeader
         eyebrow="Spielbetrieb"
         title="Infoboards"
-        description="Verwalte deine Displays, Inhalte und Darstellung."
+        description="Verwalte alle Infoboards, deren Inhalte, Layouts und Geräte."
       />
 
       <InboardOverview
         boards={boards}
         totalCount={counts.total}
         activeCount={counts.active}
+        draftCount={counts.draft}
+        disabledCount={counts.disabled}
       />
     </div>
   );
