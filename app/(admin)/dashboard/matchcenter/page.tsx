@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
+import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
@@ -17,6 +18,7 @@ import {
 import {
   normalizeMatchcenterActionFilter,
   normalizeMatchcenterTab,
+  normalizeMatchcenterWochenplanFilter,
 } from "@/lib/matchcenter/view-model";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
@@ -26,13 +28,14 @@ type MatchcenterPageProps = {
     tab?: string;
     month?: string;
     filter?: string;
+    wochenplan?: string;
   }>;
 };
 
 export default async function MatchcenterPage({
   searchParams,
 }: MatchcenterPageProps) {
-  await requireAnyPermission([
+  const session = await requireAnyPermission([
     PERMISSIONS.EVENTS_VIEW,
     PERMISSIONS.EVENTS_MANAGE,
   ]);
@@ -50,6 +53,8 @@ export default async function MatchcenterPage({
   const params = (await searchParams) ?? {};
   const tab = normalizeMatchcenterTab(params.tab);
   const actionFilter = normalizeMatchcenterActionFilter(params.filter);
+  const wochenplanFilter = normalizeMatchcenterWochenplanFilter(params.wochenplan);
+  const canManage = hasPermission(session, PERMISSIONS.EVENTS_MANAGE);
   const resolvedMonth = resolveMatchcenterMonthWindow({
     monthParam: params.month,
     timeZone: timezone,
@@ -106,9 +111,11 @@ export default async function MatchcenterPage({
         matches={matches}
         tab={tab}
         actionFilter={actionFilter}
+        wochenplanFilter={wochenplanFilter}
         monthWindow={monthWindow}
         timezone={timezone}
         locale={locale}
+        canManage={canManage}
       />
     </div>
   );

@@ -5,12 +5,13 @@ import {
   buildMatchcenterViewModel,
   type MatchcenterActionFilter,
   type MatchcenterTab,
+  type MatchcenterWochenplanFilter,
 } from "@/lib/matchcenter/view-model";
 import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/ui/page/EmptyState";
 import { SectionCard } from "@/components/ui/page/SectionCard";
-import MatchcenterSpielplanungRow from "./MatchcenterSpielplanungRow";
 import MatchcenterResultRow from "./MatchcenterResultRow";
+import MatchcenterWochenplanBulkPanel from "./MatchcenterWochenplanBulkPanel";
 
 export type MatchcenterMonthWindowLike = {
   param: string;
@@ -23,10 +24,12 @@ type MatchcenterOverviewProps = {
   matches: MatchcenterMatchSummary[];
   tab: MatchcenterTab;
   actionFilter: MatchcenterActionFilter;
+  wochenplanFilter: MatchcenterWochenplanFilter;
   monthWindow: MatchcenterMonthWindowLike;
   basePath?: string;
   timezone?: string;
   locale?: string;
+  canManage?: boolean;
 };
 
 const TABS: { key: MatchcenterTab; label: string }[] = [
@@ -40,15 +43,32 @@ const ACTION_FILTERS: { key: MatchcenterActionFilter; label: string }[] = [
   { key: "ERLEDIGT", label: "Erledigt" },
 ];
 
+const WOCHENPLAN_FILTERS: {
+  key: MatchcenterWochenplanFilter;
+  label: string;
+}[] = [
+  { key: "ALLE", label: "Alle" },
+  { key: "IM_WOCHENPLAN", label: "Im Wochenplan" },
+  { key: "NICHT_IM_WOCHENPLAN", label: "Nicht im Wochenplan" },
+];
+
 function buildHref(
   basePath: string,
-  params: { tab: MatchcenterTab; month: string; actionFilter: MatchcenterActionFilter },
+  params: {
+    tab: MatchcenterTab;
+    month: string;
+    actionFilter: MatchcenterActionFilter;
+    wochenplanFilter: MatchcenterWochenplanFilter;
+  },
 ): string {
   const search = new URLSearchParams();
   search.set("tab", params.tab.toLowerCase());
   search.set("month", params.month);
   if (params.tab === "SPIELPLANUNG") {
     search.set("filter", params.actionFilter.toLowerCase());
+  }
+  if (params.wochenplanFilter !== "ALLE") {
+    search.set("wochenplan", params.wochenplanFilter.toLowerCase());
   }
   return `${basePath}?${search.toString()}`;
 }
@@ -57,12 +77,17 @@ export default function MatchcenterOverview({
   matches,
   tab,
   actionFilter,
+  wochenplanFilter,
   monthWindow,
   basePath = "/dashboard/matchcenter",
   timezone = "Europe/Zurich",
   locale = "de-CH",
+  canManage = false,
 }: MatchcenterOverviewProps) {
-  const viewModel = buildMatchcenterViewModel(matches, { actionFilter });
+  const viewModel = buildMatchcenterViewModel(matches, {
+    actionFilter,
+    wochenplanFilter,
+  });
 
   return (
     <div className="space-y-5">
@@ -81,6 +106,7 @@ export default function MatchcenterOverview({
                 tab: item.key,
                 month: monthWindow.param,
                 actionFilter,
+                wochenplanFilter,
               })}
               role="tab"
               aria-selected={isActive}
@@ -105,6 +131,7 @@ export default function MatchcenterOverview({
             tab,
             month: monthWindow.previousParam,
             actionFilter,
+            wochenplanFilter,
           })}
           aria-label="Vorheriger Monat"
           data-testid="matchcenter-month-previous"
@@ -125,6 +152,7 @@ export default function MatchcenterOverview({
             tab,
             month: monthWindow.nextParam,
             actionFilter,
+            wochenplanFilter,
           })}
           aria-label="Nächster Monat"
           data-testid="matchcenter-month-next"
@@ -144,7 +172,7 @@ export default function MatchcenterOverview({
 
       {tab === "SPIELPLANUNG" ? (
         <>
-          {/* Alle / Offen / Erledigt ─────────────────────────────────────── */}
+          {/* Operational action filter ───────────────────────────────────── */}
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Aktionsfilter">
             {ACTION_FILTERS.map((item) => {
               const isActive = item.key === actionFilter;
@@ -155,6 +183,7 @@ export default function MatchcenterOverview({
                     tab,
                     month: monthWindow.param,
                     actionFilter: item.key,
+                    wochenplanFilter,
                   })}
                   data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
                   className={cn(
@@ -170,6 +199,35 @@ export default function MatchcenterOverview({
             })}
           </div>
 
+          {/* Wochenplan publication filter ───────────────────────────────── */}
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Wochenplan-Filter">
+            <span className="text-xs font-medium text-[var(--muted)]">Wochenplan:</span>
+            {WOCHENPLAN_FILTERS.map((item) => {
+              const isActive = item.key === wochenplanFilter;
+              return (
+                <Link
+                  key={item.key}
+                  href={buildHref(basePath, {
+                    tab,
+                    month: monthWindow.param,
+                    actionFilter,
+                    wochenplanFilter: item.key,
+                  })}
+                  data-testid={`matchcenter-wochenplan-filter-${item.key.toLowerCase()}`}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
+                    isActive
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Spielplanung list with bulk wochenplan management ───────────── */}
           {viewModel.spielplanung.length === 0 ? (
             <SectionCard noPadding>
               <EmptyState
@@ -185,23 +243,44 @@ export default function MatchcenterOverview({
               />
             </SectionCard>
           ) : (
-            <SectionCard noPadding>
-              <div className="divide-y divide-[var(--border)]" data-testid="matchcenter-spielplanung-list">
-                {viewModel.spielplanung.map((row) => (
-                  <MatchcenterSpielplanungRow
-                    key={row.match.id}
-                    match={row.match}
-                    assessment={row.assessment}
-                    locale={locale}
-                    timezone={timezone}
-                  />
-                ))}
-              </div>
-            </SectionCard>
+            <MatchcenterWochenplanBulkPanel
+              rows={viewModel.spielplanung}
+              locale={locale}
+              timezone={timezone}
+              canManage={canManage}
+            />
           )}
         </>
       ) : (
         <>
+          {/* Wochenplan publication filter for Resultate ─────────────────── */}
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Wochenplan-Filter">
+            <span className="text-xs font-medium text-[var(--muted)]">Wochenplan:</span>
+            {WOCHENPLAN_FILTERS.map((item) => {
+              const isActive = item.key === wochenplanFilter;
+              return (
+                <Link
+                  key={item.key}
+                  href={buildHref(basePath, {
+                    tab,
+                    month: monthWindow.param,
+                    actionFilter,
+                    wochenplanFilter: item.key,
+                  })}
+                  data-testid={`matchcenter-wochenplan-filter-resultate-${item.key.toLowerCase()}`}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
+                    isActive
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
           {viewModel.resultate.length === 0 ? (
             <SectionCard noPadding>
               <EmptyState
