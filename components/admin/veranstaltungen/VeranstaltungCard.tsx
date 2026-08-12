@@ -40,6 +40,8 @@ type VeranstaltungCardEvent = {
 type VeranstaltungCardProps = {
   event: VeranstaltungCardEvent;
   canManage: boolean;
+  /** events.delete authority — required for permanent deletion. */
+  canDelete: boolean;
 };
 
 function formatDateTime(value: Date | string) {
@@ -116,6 +118,7 @@ function PublicationTargets({ event }: { event: VeranstaltungCardEvent }) {
 export default function VeranstaltungCard({
   event,
   canManage,
+  canDelete,
 }: VeranstaltungCardProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -276,16 +279,18 @@ export default function VeranstaltungCard({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
-              title="Dauerhaft löschen"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {busy === "delete" ? "..." : "Löschen"}
-            </button>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                title="Endgültig löschen"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {busy === "delete" ? "..." : "Endgültig löschen"}
+              </button>
+            )}
           </div>
         )}
       </div>

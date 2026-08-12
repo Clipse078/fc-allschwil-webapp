@@ -33,6 +33,12 @@ export const PERMISSIONS = {
   EVENTS_IMPORT: "events.import",
   EVENTS_PUBLISH_WEBSITE: "events.publish_website",
   EVENTS_PUBLISH_INFOBOARD: "events.publish_infoboard",
+  // CLUB-EVENTS-01-C1: canonical permanent-deletion permission for tenant-managed
+  // Veranstaltungen (EventType.OTHER). Deliberately separate from EVENTS_MANAGE —
+  // create/edit/archive/restore access must never implicitly grant permanent
+  // deletion. Follows the "<module>.delete" convention established by
+  // TEAMS_DELETE (ADMIN-DELETE-01A) and extended through ADMIN-DELETE-02A.
+  EVENTS_DELETE: "events.delete",
   // ADMIN-DELETE-02A: canonical permanent-deletion permissions for the
   // MatchCenter/TournamentCenter modules, following the "<module>.delete"
   // convention established by TEAMS_DELETE (ADMIN-DELETE-01A/01B). Both

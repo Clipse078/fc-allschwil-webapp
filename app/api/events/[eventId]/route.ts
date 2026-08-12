@@ -2,17 +2,32 @@
  * CLUB-EVENTS-01: Individual event operations (Veranstaltungen / type=OTHER).
  *
  * GET    /api/events/[eventId]  — Fetch a single event (tenant-scoped).
- * PATCH  /api/events/[eventId]  — Update a Veranstaltung.
+ * PATCH  /api/events/[eventId]  — Update a Veranstaltung (archive/restore/edit).
  * DELETE /api/events/[eventId]  — Archive (soft-delete) or permanently delete.
  *
- * Tenant isolation: tenantId always from session — never from URL or body.
- * All operations are restricted to type=OTHER events owned by the session tenant.
+ * Authorization:
+ *   GET                         — EVENTS_VIEW or EVENTS_MANAGE
+ *   PATCH (edit / archive /restore) — EVENTS_MANAGE
+ *   DELETE (archive, no ?permanent) — EVENTS_MANAGE
+ *   DELETE ?permanent=true      — EVENTS_DELETE (via hasTenantDeletionAuthority,
+ *                                  NOT EVENTS_MANAGE — follows ADMIN-DELETE-02A pattern)
+ *
+ * CLUB-EVENTS-01-C1: permanent deletion requires the explicit events.delete
+ * permission resolved against the event's own DB-stored tenantId. The
+ * session's activeTenantId is never used as the authorization target for
+ * this path — the event's real owning tenant is always resolved from the DB.
+ *
+ * Tenant isolation: enforced at every layer; type=OTHER restriction prevents
+ * this route from operating on Matches, Tournaments, or Trainings.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import { logAction } from "@/lib/audit/log-action";
 import {
   getClubEvent,
@@ -103,7 +118,7 @@ export async function PATCH(
 
   const raw = body as Record<string, unknown>;
 
-  // Handle archive/restore action
+  // Handle archive/restore action — both remain under EVENTS_MANAGE
   if (raw.action === "archive") {
     try {
       const event = await archiveClubEvent(tenantId, eventId);
@@ -155,7 +170,7 @@ export async function PATCH(
     }
   }
 
-  // Core field update
+  // Core field update — remains under EVENTS_MANAGE
   const startAtRaw =
     raw.startAt !== undefined && raw.startAt !== null && raw.startAt !== ""
       ? String(raw.startAt)
@@ -226,11 +241,88 @@ export async function PATCH(
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
+//
+// CLUB-EVENTS-01-C1 authorization split:
+//   ?permanent=true  → requires events.delete via hasTenantDeletionAuthority,
+//                       resolved against the event's own DB tenantId.
+//   (no ?permanent)  → archive (soft-delete), requires events.manage.
+//
+// The permanent path intentionally does NOT call requireApiPermission first —
+// a caller holding only events.delete (without events.manage) must still be
+// able to permanently delete. The archive path uses requireApiPermission
+// (events.manage) independently.
 
 export async function DELETE(
   request: NextRequest,
   { params }: RouteParams,
 ): Promise<NextResponse> {
+  const url = new URL(request.url);
+  const permanent = url.searchParams.get("permanent") === "true";
+  const { eventId } = await params;
+
+  // ── Permanent delete path: events.delete required ─────────────────────────
+  if (permanent) {
+    const session = await auth();
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Resolve the event and its tenantId strictly from DB — never from the
+    // client or from session.activeTenantId. Scoped to type=OTHER so this
+    // path can never permanently delete a Match/Tournament/Training.
+    const eventRow = await prisma.event.findFirst({
+      where: { id: eventId, type: "OTHER" },
+      select: { id: true, tenantId: true },
+    });
+
+    if (!eventRow || !eventRow.tenantId) {
+      return NextResponse.json(
+        { error: "Veranstaltung nicht gefunden." },
+        { status: 404 },
+      );
+    }
+
+    const eventTenantId = eventRow.tenantId;
+
+    const resolver = createEffectivePermissionResolver(prisma);
+    const authorized = await resolver.hasTenantDeletionAuthority({
+      userId: session.user.id,
+      permission: PERMISSIONS.EVENTS_DELETE,
+      tenantId: eventTenantId,
+    });
+
+    if (!authorized) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const actorUserId =
+      session.user.effectiveUserId ?? session.user.id ?? null;
+
+    try {
+      await deleteClubEvent(eventTenantId, eventId);
+      await logAction({
+        actorUserId,
+        moduleKey: "veranstaltungen",
+        entityType: "Event",
+        entityId: eventId,
+        action: "DELETE_PERMANENT",
+        afterJson: { tenantId: eventTenantId },
+      });
+      return NextResponse.json({ deleted: true });
+    } catch (err) {
+      if (err instanceof ClubEventNotFoundError) {
+        return NextResponse.json(
+          { error: "Veranstaltung nicht gefunden." },
+          { status: 404 },
+        );
+      }
+      console.error("[veranstaltungen] DELETE permanent error:", err);
+      return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
+    }
+  }
+
+  // ── Archive (soft-delete) path: events.manage required ───────────────────
   const access = await requireApiPermission(PERMISSIONS.EVENTS_MANAGE);
 
   if (!access.ok) {
@@ -250,25 +342,8 @@ export async function DELETE(
 
   const actorUserId =
     access.session.user.effectiveUserId ?? access.session.user.id ?? null;
-  const { eventId } = await params;
-
-  // Check for ?permanent=true query param for hard delete
-  const url = new URL(request.url);
-  const permanent = url.searchParams.get("permanent") === "true";
 
   try {
-    if (permanent) {
-      await deleteClubEvent(tenantId, eventId);
-      await logAction({
-        actorUserId,
-        moduleKey: "veranstaltungen",
-        entityType: "Event",
-        entityId: eventId,
-        action: "DELETE_PERMANENT",
-      });
-      return NextResponse.json({ deleted: true });
-    }
-
     const event = await archiveClubEvent(tenantId, eventId);
     await logAction({
       actorUserId,
@@ -289,7 +364,7 @@ export async function DELETE(
     if (err instanceof ClubEventValidationError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
-    console.error("[veranstaltungen] DELETE error:", err);
+    console.error("[veranstaltungen] DELETE archive error:", err);
     return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
   }
 }

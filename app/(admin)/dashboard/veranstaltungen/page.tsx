@@ -33,6 +33,7 @@ export default async function VeranstaltungenPage({
   }
 
   const canManage = hasPermission(session, PERMISSIONS.EVENTS_MANAGE);
+  const canDelete = hasPermission(session, PERMISSIONS.EVENTS_DELETE);
   const params = (await searchParams) ?? {};
   const showUpdated = params.updated === "1";
   const showSubmitted = params.submitted === "1";
@@ -223,6 +224,7 @@ export default async function VeranstaltungenPage({
               key={event.id}
               event={event}
               canManage={canManage}
+              canDelete={canDelete}
             />
           ))}
         </div>

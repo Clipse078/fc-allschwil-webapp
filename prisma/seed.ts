@@ -116,6 +116,9 @@ async function main() {
     // permanent deletion. Mirrors teams.delete (ADMIN-DELETE-01A).
     { key: "matches.delete", name: "Permanently delete matches", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "tournaments.delete", name: "Permanently delete tournaments", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // CLUB-EVENTS-01-C1: canonical permanent-deletion permission for tenant-managed
+    // Veranstaltungen (EventType.OTHER). Deliberately separate from events.manage.
+    { key: "events.delete", name: "Permanently delete Veranstaltungen", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "fixtures.view", name: "View fixtures", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "fixtures.create", name: "Create fixtures", module: PermissionModule.FIXTURES, scope: PermissionScope.TENANT, grantableByAdmin: true },
