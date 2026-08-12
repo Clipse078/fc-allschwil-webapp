@@ -71,6 +71,13 @@ export const PERMISSIONS = {
 
   REGISTRATIONS_VIEW: "registrations.view",
   REGISTRATIONS_EDIT: "registrations.edit",
+  // ADMIN-DELETE-03B: canonical permanent-deletion permission for
+  // Registrations (Anmeldungen). Deliberately separate from
+  // REGISTRATIONS_EDIT — managing/archiving a registration must never
+  // implicitly grant permanent deletion. Follows the "<module>.delete"
+  // convention established by TEAMS_DELETE (ADMIN-DELETE-01A) and
+  // extended through all subsequent ADMIN-DELETE slices.
+  REGISTRATIONS_DELETE: "registrations.delete",
 
   TENANTS_VIEW: "tenants.view",
   TENANTS_MANAGE: "tenants.manage",
