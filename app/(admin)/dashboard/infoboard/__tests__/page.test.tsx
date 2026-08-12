@@ -5,26 +5,15 @@
 /**
  * app/(admin)/dashboard/infoboard/__tests__/page.test.tsx
  *
- * Tests for the Infoboard administration page (server component).
+ * Tests for the Infoboard V2 administration page (server component).
  *
  * Verifies:
  *   - Authenticated tenant is used (from session, not query params)
- *   - Page renders title "Infoboard" and subtitle
- *   - Display 1 card renders with route /infoboard/screen-1
- *   - Preview route is /infoboard/preview/screen-1
- *   - Display 2 card renders as unavailable
- *   - No active link to /infoboard/screen-2
- *   - Legacy /infoboard is not the primary action
- *   - Empty state renders correctly
- *   - Live service is used directly (no HTTP fetch)
- *   - Old legacy feed (getInfoboardFeed) is not used
- *   - No preview fixtures are imported or used
- *   - Today metrics render
- *   - Tomorrow query parameter is supported
- *   - Invalid date falls back safely
- *   - Query parameter cannot select a tenant
- *   - Legacy notice renders
- *   - Roadmap notice renders
+ *   - Page renders title "Infoboards" and subtitle
+ *   - Infoboard management workspace renders
+ *   - No hard-coded Display 1 / Display 2 concept
+ *   - Empty state renders when no boards exist
+ *   - Summary count renders when boards exist
  */
 
 import { render, screen } from "@testing-library/react";
@@ -35,10 +24,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireAnyPermission: vi.fn(),
   getActiveTenant: vi.fn(),
-  buildScreen1LivePayload: vi.fn(),
+  listInfoboards: vi.fn(),
+  countInfoboards: vi.fn(),
   notFound: vi.fn(),
-  eventFindMany: vi.fn().mockResolvedValue([]),
-  facilityResourceFindMany: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/permissions/require-any-permission", () => ({
@@ -49,33 +37,24 @@ vi.mock("@/lib/tenants/active-tenant", () => ({
   getActiveTenant: mocks.getActiveTenant,
 }));
 
-vi.mock("@/lib/db/prisma", () => ({
-  prisma: {
-    event: { findMany: mocks.eventFindMany },
-    facilityResource: { findMany: mocks.facilityResourceFindMany },
-  },
+vi.mock("@/lib/infoboard/queries", () => ({
+  listInfoboards: mocks.listInfoboards,
+  countInfoboards: mocks.countInfoboards,
 }));
-
-vi.mock("@/lib/publishing/infoboard/screen1-live-service", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/publishing/infoboard/screen1-live-service")
-  >("@/lib/publishing/infoboard/screen1-live-service");
-  return {
-    ...actual,
-    buildScreen1LivePayload: mocks.buildScreen1LivePayload,
-  };
-});
 
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-// ── Fixtures ──────────────────────────────────────────────────────────────────
+// Stub Link so href is testable
+vi.mock("next/link", () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
 
-const ACTIVE_SESSION = {
-  user: { activeTenantId: "tenant-fca", id: "user-1", name: "Admin" },
-};
+// ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const ACTIVE_TENANT = {
   id: "tenant-fca",
@@ -83,273 +62,108 @@ const ACTIVE_TENANT = {
   name: "FC Allschwil",
   timezone: "Europe/Zurich",
   logoUrl: null,
-  locale: "de-CH",
-  countryCode: "CH",
-  sportCategory: "FOOTBALL",
-  currency: "CHF",
-  status: "ACTIVE",
-  seasonStartMonth: 8,
-  seasonTransitionDay: 1,
-  seasonTransitionMonth: 8,
-  primaryColor: null,
-  secondaryColor: null,
   infoboardDisplayTheme: null,
-  approvedDataOnly: false,
 };
 
-const EMPTY_FEED = {
-  generatedAt: "2026-07-24T10:00:00.000Z",
-  tenant: {
-    id: "tenant-fca",
-    key: "fc-allschwil",
-    name: "FC Allschwil",
-    timezone: "Europe/Zurich",
-  },
-  displayDate: "2026-07-24",
-  isStale: false,
-  wochenplanVariantBadge: null,
-  current: [],
-  next: [],
-  later: [],
-  isEmpty: true,
-  emptyStateReason: "NO_EVENTS_TODAY" as const,
-};
-
-const EMPTY_PAYLOAD = {
-  feed: EMPTY_FEED,
-  eventPresentation: [],
-  announcement: null,
-  branding: {
-    clubLogoSrc: "/images/logos/fc-allschwil.png",
-    productLogoSrc: "/images/branding/sportclubevo_logo.png",
-  },
-  currentTimeIso: "2026-07-24T10:00:00.000Z",
+const SAMPLE_BOARD = {
+  id: "board-1",
+  tenantId: "tenant-fca",
+  name: "Tagesübersicht",
+  slug: "screen-1",
+  status: "ACTIVE" as const,
+  templateType: "TAGESUEBERSICHT",
+  displayTheme: null,
+  headerSubtitleEnabled: true,
+  announcementEnabled: false,
+  sortOrder: 0,
+  createdAt: new Date("2026-08-01"),
+  updatedAt: new Date("2026-08-01"),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function renderPage(searchParams?: Record<string, string>) {
-  const { default: InfoboardAdminPage } = await import(
-    "@/app/(admin)/dashboard/infoboard/page"
-  );
-  const params = searchParams
-    ? Promise.resolve(searchParams)
-    : Promise.resolve({});
-  render(await InfoboardAdminPage({ searchParams: params }));
+async function renderPage() {
+  const { default: InfoboardAdminPage } = await import("../page");
+  const ui = await InfoboardAdminPage();
+  render(ui as React.ReactElement);
 }
+
+beforeEach(async () => {
+  vi.resetModules();
+  vi.clearAllMocks();
+
+  mocks.requireAnyPermission.mockResolvedValue(undefined);
+  mocks.getActiveTenant.mockResolvedValue(ACTIVE_TENANT);
+  mocks.listInfoboards.mockResolvedValue([]);
+  mocks.countInfoboards.mockResolvedValue({ total: 0, active: 0 });
+});
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe("InfoboardAdminPage", () => {
-  beforeEach(() => {
+describe("InfoboardAdminPage V2 — page structure", () => {
+  it("renders the Infoboards title", async () => {
+    await renderPage();
+    expect(screen.getByText("Infoboards")).toBeTruthy();
+  });
+
+  it("renders the management subtitle", async () => {
+    await renderPage();
+    expect(screen.getByText("Verwalte deine Displays, Inhalte und Darstellung.")).toBeTruthy();
+  });
+
+  it("does not render hard-coded Display 1 or Display 2", async () => {
+    await renderPage();
+    expect(screen.queryByText("Display 1")).toBeNull();
+    expect(screen.queryByText("Display 2")).toBeNull();
+  });
+
+  it("does not render legacy/roadmap placeholders", async () => {
+    await renderPage();
+    expect(screen.queryByText("In Vorbereitung")).toBeNull();
+    expect(screen.queryByText("Geplant")).toBeNull();
+    expect(screen.queryByText("Noch nicht verfügbar")).toBeNull();
+    expect(screen.queryByText("Legacy-Display")).toBeNull();
+  });
+});
+
+describe("InfoboardAdminPage V2 — empty state", () => {
+  it("renders summary showing 0 Infoboards", async () => {
+    await renderPage();
+    expect(screen.getByText("Keine Infoboards")).toBeTruthy();
+  });
+});
+
+describe("InfoboardAdminPage V2 — with boards", () => {
+  beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
-    mocks.requireAnyPermission.mockResolvedValue(ACTIVE_SESSION);
+    mocks.requireAnyPermission.mockResolvedValue(undefined);
     mocks.getActiveTenant.mockResolvedValue(ACTIVE_TENANT);
-    mocks.buildScreen1LivePayload.mockResolvedValue(EMPTY_PAYLOAD);
-    mocks.notFound.mockImplementation(() => {
-      throw new Error("notFound");
-    });
+    mocks.listInfoboards.mockResolvedValue([SAMPLE_BOARD]);
+    mocks.countInfoboards.mockResolvedValue({ total: 1, active: 1 });
   });
 
-  it("renders page title 'Infoboard'", async () => {
+  it("renders the Infoboard count summary", async () => {
     await renderPage();
-    expect(screen.getByRole("heading", { name: "Infoboard" })).toBeInTheDocument();
+    const root = document.body;
+    expect(root.textContent).toContain("1 Infoboard");
   });
 
-  it("renders subtitle mentioning öffentlichen Infoboard-Displays", async () => {
+  it("renders a card for each Infoboard (board name visible)", async () => {
     await renderPage();
-    expect(
-      screen.getByText(/Steuere und überwache die öffentlichen Infoboard-Displays/i),
-    ).toBeInTheDocument();
+    // The board name "Tagesübersicht" should be visible (may appear multiple times due to template label)
+    expect(screen.getAllByText("Tagesübersicht").length).toBeGreaterThan(0);
   });
+});
 
-  it("renders Display 1 card with correct label and title", async () => {
+describe("InfoboardAdminPage V2 — auth", () => {
+  it("calls requireAnyPermission", async () => {
     await renderPage();
-    expect(screen.getByText("Display 1")).toBeInTheDocument();
-    expect(screen.getByText("Tagesübersicht")).toBeInTheDocument();
+    expect(mocks.requireAnyPermission).toHaveBeenCalledOnce();
   });
 
-  it("renders Display 1 route as /infoboard/screen-1", async () => {
+  it("calls getActiveTenant", async () => {
     await renderPage();
-    const links = screen.getAllByRole("link");
-    const screen1Links = links.filter(
-      (l) => l.getAttribute("href") === "/infoboard/screen-1",
-    );
-    expect(screen1Links.length).toBeGreaterThan(0);
-  });
-
-  it("renders preview link to /infoboard/preview/screen-1", async () => {
-    await renderPage();
-    const previewLink = screen
-      .getAllByRole("link")
-      .find((l) => l.getAttribute("href") === "/infoboard/preview/screen-1");
-    expect(previewLink).toBeDefined();
-  });
-
-  it("renders Display 2 card as unavailable", async () => {
-    await renderPage();
-    expect(screen.getByText("Display 2")).toBeInTheDocument();
-    // "In Vorbereitung" appears as Display 2 badge and roadmap heading — multiple occurrences
-    const inPrep = screen.getAllByText("In Vorbereitung");
-    expect(inPrep.length).toBeGreaterThanOrEqual(1);
-    const disabledButton = screen.getByRole("button", { name: "Noch nicht verfügbar" });
-    expect(disabledButton).toBeDisabled();
-  });
-
-  it("does not link to /infoboard/screen-2", async () => {
-    await renderPage();
-    const links = screen.getAllByRole("link");
-    const screen2Link = links.find(
-      (l) => l.getAttribute("href") === "/infoboard/screen-2",
-    );
-    expect(screen2Link).toBeUndefined();
-  });
-
-  it("does not promote /infoboard as the primary action", async () => {
-    await renderPage();
-    const links = screen.getAllByRole("link");
-    const legacyLink = links.find((l) => l.getAttribute("href") === "/infoboard");
-    // Legacy route must not appear as a link
-    expect(legacyLink).toBeUndefined();
-  });
-
-  it("renders empty state event list when feed is empty", async () => {
-    await renderPage();
-    expect(
-      screen.getByText(
-        "Heute sind keine Trainings, Heimspiele oder Turniere für Display 1 geplant.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("renders KPI cards with zero counts on empty feed", async () => {
-    await renderPage();
-    expect(screen.getByText("Heute sichtbar")).toBeInTheDocument();
-    expect(screen.getByText("Jetzt aktiv")).toBeInTheDocument();
-    expect(screen.getByText("Als Nächstes")).toBeInTheDocument();
-    expect(screen.getByText("Später heute")).toBeInTheDocument();
-  });
-
-  it("uses authenticated tenant from session, not from query params", async () => {
-    await renderPage({ date: "2026-07-25" });
-    // getActiveTenant() takes no arguments — it resolves the tenant exclusively
-    // from the session's activeTenantId, structurally preventing query-param override.
-    expect(mocks.getActiveTenant).toHaveBeenCalledWith();
-    // buildScreen1LivePayload is called with the authenticated tenant
-    expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tenant: expect.objectContaining({ id: "tenant-fca" }),
-      }),
-    );
-  });
-
-  it("query parameter cannot select a different tenant", async () => {
-    await renderPage({ date: "2026-07-25", tenantId: "tenant-other" });
-    // Still uses the session tenant — getActiveTenant() accepts no arguments at all.
-    expect(mocks.getActiveTenant).toHaveBeenCalledWith();
-    expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tenant: expect.objectContaining({ id: "tenant-fca" }),
-      }),
-    );
-  });
-
-  it("supports tomorrow date query parameter", async () => {
-    await renderPage({ date: "2026-07-25" });
-    expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
-      expect.objectContaining({
-        now: expect.any(Date),
-      }),
-    );
-    // Preview notice should appear
-    expect(screen.getByText(/Vorschau für/i)).toBeInTheDocument();
-  });
-
-  it("falls back to today when date query param is invalid", async () => {
-    await renderPage({ date: "invalid-date" });
-    // No preview notice
-    expect(screen.queryByText(/Vorschau für/i)).not.toBeInTheDocument();
-  });
-
-  it("falls back to today when date query param is empty", async () => {
-    await renderPage({});
-    // No preview notice
-    expect(screen.queryByText(/Vorschau für/i)).not.toBeInTheDocument();
-  });
-
-  it("calls notFound when tenant is not found", async () => {
-    mocks.getActiveTenant.mockResolvedValue(null);
-    await expect(renderPage()).rejects.toThrow("notFound");
-  });
-
-  it("calls notFound when tenant timezone is missing", async () => {
-    mocks.getActiveTenant.mockResolvedValue({
-      ...ACTIVE_TENANT,
-      timezone: null,
-    });
-    await expect(renderPage()).rejects.toThrow("notFound");
-  });
-
-  it("renders legacy notice mentioning /infoboard", async () => {
-    await renderPage();
-    expect(screen.getByText("Legacy-Display")).toBeInTheDocument();
-    expect(screen.getByText(/Das frühere Display/i)).toBeInTheDocument();
-  });
-
-  it("renders roadmap section with 'In Vorbereitung' items", async () => {
-    await renderPage();
-    expect(screen.getByText("Display 2 — Sportanlage")).toBeInTheDocument();
-    expect(screen.getByText("Ankündigungsleiste verwalten")).toBeInTheDocument();
-    expect(screen.getByText("Branding verwalten")).toBeInTheDocument();
-    expect(screen.getByText("Live-Aktualisierung und Verbindungsstatus")).toBeInTheDocument();
-  });
-
-  it("calls buildScreen1LivePayload, not legacy feed", async () => {
-    await renderPage();
-    // buildScreen1LivePayload must be called exactly once per render
-    expect(mocks.buildScreen1LivePayload).toHaveBeenCalledOnce();
-    // Since buildScreen1LivePayload is mocked, prisma is not called directly
-    expect(mocks.eventFindMany).not.toHaveBeenCalled();
-  });
-
-  describe("display theme toggle (INFOBOARD-INTEGRATION-01B)", () => {
-    it("renders the Dark/Light theme toggle", async () => {
-      await renderPage();
-      expect(screen.getByTestId("infoboard-theme-toggle")).toBeInTheDocument();
-      expect(screen.getByTestId("infoboard-theme-option-dark")).toBeInTheDocument();
-      expect(screen.getByTestId("infoboard-theme-option-light")).toBeInTheDocument();
-    });
-
-    it("marks DARK active when tenant.infoboardDisplayTheme is null (default)", async () => {
-      await renderPage();
-      expect(
-        screen.getByTestId("infoboard-theme-option-dark").getAttribute("aria-checked"),
-      ).toBe("true");
-    });
-
-    it("marks LIGHT active when tenant.infoboardDisplayTheme is 'LIGHT'", async () => {
-      mocks.getActiveTenant.mockResolvedValue({
-        ...ACTIVE_TENANT,
-        infoboardDisplayTheme: "LIGHT",
-      });
-      await renderPage();
-      expect(
-        screen.getByTestId("infoboard-theme-option-light").getAttribute("aria-checked"),
-      ).toBe("true");
-    });
-
-    it("passes tenant.infoboardDisplayTheme through to the live service tenant context", async () => {
-      mocks.getActiveTenant.mockResolvedValue({
-        ...ACTIVE_TENANT,
-        infoboardDisplayTheme: "LIGHT",
-      });
-      await renderPage();
-      expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant: expect.objectContaining({ infoboardDisplayTheme: "LIGHT" }),
-        }),
-      );
-    });
+    expect(mocks.getActiveTenant).toHaveBeenCalledOnce();
   });
 });

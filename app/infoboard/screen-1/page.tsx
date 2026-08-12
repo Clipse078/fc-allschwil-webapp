@@ -30,6 +30,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
+import { getInfoboardBySlug } from "@/lib/infoboard/queries";
+import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
   createCanonicalInfoboardSourceLoader,
@@ -106,9 +108,13 @@ export default async function InfoboardScreen1Page() {
   const now = new Date();
 
   // ── Build live payload ─────────────────────────────────────────────────────
+  // Load per-board config from DB (slug "screen-1") when available.
+  const board = await getInfoboardBySlug("screen-1", tenant.id);
+  const boardConfig = board ? buildBoardConfig(board) : null;
+
   const db = createPrismaDb();
   const loader = createCanonicalInfoboardSourceLoader(db);
-  const payload = await buildScreen1LivePayload({ tenant, now, loader });
+  const payload = await buildScreen1LivePayload({ tenant, now, loader, boardConfig });
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -119,6 +125,7 @@ export default async function InfoboardScreen1Page() {
       announcement={payload.announcement ?? undefined}
       eventPresentation={payload.eventPresentation}
       theme={payload.theme}
+      headerConfig={payload.headerConfig ?? undefined}
     />
   );
 }

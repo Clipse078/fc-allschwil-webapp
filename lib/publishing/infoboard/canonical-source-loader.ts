@@ -106,6 +106,7 @@ import type {
 import type { PublicationEventLoader, PublicationEventLoadInput } from "../policy/event-selection";
 import type { Screen1SourceEvent } from "./screen1-event-mapper";
 import type { PublishingEventStatus } from "../event-types";
+import { getPitchAllocationByCode } from "@/lib/facilities/pitches";
 
 // ── Injected policy-metadata database ──────────────────────────────────────
 
@@ -312,9 +313,13 @@ async function loadTrainingPolicyBySessionId(
 
 function toAllocationCandidate(
   ref: WeekplannerResourceRef | undefined,
-): { label: null; code: string; name: string; facilityName: string } | null {
+): { label: string | null; code: string; name: string; facilityName: string } | null {
   if (!ref) return null;
-  return { label: null, code: ref.code, name: ref.name, facilityName: ref.facilityName };
+  // Use the infoboardLabel from the FCA pitch registry when available.
+  // This converts codes like "KUNSTRASEN_2_A" to "KR 2 – Feld A" for TV readability.
+  const pitchEntry = getPitchAllocationByCode(ref.code);
+  const label = pitchEntry?.infoboardLabel ?? null;
+  return { label, code: ref.code, name: ref.name, facilityName: ref.facilityName };
 }
 
 /**

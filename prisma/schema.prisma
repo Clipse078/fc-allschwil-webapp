@@ -12,6 +12,13 @@ enum TenantStatus {
   ARCHIVED
 }
 
+// INFOBOARD-V2: status for tenant-managed Infoboard displays
+enum InfoboardStatus {
+  ACTIVE
+  DISABLED
+  DRAFT
+}
+
 enum NewsArticleStatus {
   DRAFT
   IN_REVIEW
@@ -567,6 +574,9 @@ model Tenant {
   roles             Role[]
   userRoles         UserRole[]
   auditLogs         AuditLog[]
+
+  // INFOBOARD-V2: unlimited tenant-managed Infoboard displays
+  infoboards        Infoboard[]
 
   @@index([status])
   @@index([name])
@@ -4294,4 +4304,65 @@ model WeekplannerPlanActivityOverride {
   @@unique([weekplannerPlanId, activityType, activityId])
   @@index([tenantId])
   @@index([weekplannerPlanId])
+}
+
+// ── INFOBOARD-V2: Unlimited tenant-managed Infoboard displays ─────────────────
+//
+// Each tenant can create unlimited named Infoboard displays.
+// Each has a stable kiosk URL slug (never changes on rename).
+//
+// Kiosk URL pattern: /infoboard/[slug]
+//
+// Per-board settings:
+//   - header (subtitle, time, date, weather toggles)
+//   - announcement bar (enabled, text, colors)
+//   - display theme (DARK / LIGHT, overrides Tenant.infoboardDisplayTheme)
+//   - template type (TAGESUEBERSICHT | ANLAGENUEBERSICHT)
+//
+// Tenant isolation: all queries must scope by tenantId.
+// Delete: permanent, no cascade to planning data.
+// ---------------------------------------------------------------------------
+model Infoboard {
+  id       String          @id @default(cuid())
+  tenantId String
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  // Identity
+  name String
+  /// Stable kiosk URL slug. Set at creation from slugified name.
+  /// NEVER changed on rename — kiosk devices use this as their stable URL.
+  /// e.g. "clubhaus-eingang" → /infoboard/clubhaus-eingang
+  slug String
+
+  status       InfoboardStatus @default(ACTIVE)
+  templateType String          @default("TAGESUEBERSICHT")
+
+  // Display theme: "DARK" | "LIGHT" | null (null → inherits Tenant.infoboardDisplayTheme)
+  displayTheme String?
+
+  // Header configuration
+  headerSubtitleEnabled Boolean @default(true)
+  /// null = use default ("Heute auf der Sportanlage")
+  headerSubtitleText    String?
+  headerShowTime        Boolean @default(true)
+  headerShowDate        Boolean @default(true)
+  headerShowWeather     Boolean @default(false)
+
+  // Announcement bar
+  announcementEnabled   Boolean @default(false)
+  announcementText      String?
+  announcementBgColor   String?
+  announcementTextColor String?
+
+  /// Display sequence within this tenant's Infoboard list (ascending).
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Slug is unique within a tenant (but not globally — two tenants may share
+  /// the same slug independently; the public URL includes tenant context).
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+  @@index([tenantId, sortOrder])
 }

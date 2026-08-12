@@ -589,9 +589,11 @@ describe("Training row", () => {
     expect(screen.getByText("TRAINING")).toBeTruthy();
   });
 
-  it("renders organizer/subtitle when provided", () => {
+  it("renders organizer/subtitle when provided for non-training events", () => {
+    // INFOBOARD-V2: Training events use TrainingGroupCard which does not show
+    // organizerDisplayName. Use OTHER type to test organizer display via EventCard.
     const feed = makeFeed({
-      current: [makeEvent({ organizerDisplayName: "FC Allschwil" })],
+      current: [makeEvent({ type: "OTHER", organizerDisplayName: "FC Allschwil" })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
@@ -1116,14 +1118,15 @@ describe("Target 5-team tournament allocation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("High-density — 6 simultaneous trainings (flat list)", () => {
-  it("all 6 teams remain individually visible", () => {
+  it("all 6 teams remain individually visible (club prefix stripped in V2)", () => {
+    // INFOBOARD-V2: "FC Allschwil" prefix is stripped since header establishes club identity.
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
-    expect(screen.getByText("FC Allschwil U8/U10 A")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil U8/U10 B")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil U12 A")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil U12 B")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil U14 A")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil D1")).toBeTruthy();
+    expect(screen.getByText("U8/U10 A")).toBeTruthy();
+    expect(screen.getByText("U8/U10 B")).toBeTruthy();
+    expect(screen.getByText("U12 A")).toBeTruthy();
+    expect(screen.getByText("U12 B")).toBeTruthy();
+    expect(screen.getByText("U14 A")).toBeTruthy();
+    expect(screen.getByText("D1")).toBeTruthy();
   });
 
   it("all 6 pitches remain visible", () => {
@@ -1767,14 +1770,16 @@ describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Unassigned pitch warning", () => {
-  it("shows NOCH NICHT ZUGETEILT when pitch is null", () => {
+  it("shows NICHT ZUGETEILT when pitch is null (training uses TrainingGroupCard in V2)", () => {
+    // INFOBOARD-V2: Solo trainings now render through TrainingGroupCard which shows
+    // "NICHT ZUGETEILT" (without "NOCH"). This is the canonical training card text.
     const feed = makeFeed({
       current: [makeEvent({ allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
     expect(screen.getByTestId("pitch-unassigned-warning")).toBeTruthy();
-    expect(screen.getByTestId("pitch-unassigned-warning").textContent).toContain("NOCH NICHT ZUGETEILT");
+    expect(screen.getByTestId("pitch-unassigned-warning").textContent).toContain("NICHT ZUGETEILT");
   });
 
   it("does not show unassigned pitch warning when pitch is present", () => {
@@ -1789,14 +1794,15 @@ describe("Unassigned pitch warning", () => {
 });
 
 describe("Unassigned dressing-room warning (training)", () => {
-  it("shows NOCH NICHT ZUGETEILT when training dressing room is null", () => {
+  it("shows NICHT ZUGETEILT when training dressing room is null (TrainingGroupCard in V2)", () => {
+    // INFOBOARD-V2: Solo trainings use TrainingGroupCard which uses "NICHT ZUGETEILT".
     const feed = makeFeed({
       current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
     expect(screen.getByTestId("dressing-room-unassigned-warning")).toBeTruthy();
-    expect(screen.getByTestId("dressing-room-unassigned-warning").textContent).toContain("NOCH NICHT ZUGETEILT");
+    expect(screen.getByTestId("dressing-room-unassigned-warning").textContent).toContain("NICHT ZUGETEILT");
   });
 
   it("does not show dressing-room warning when training has a room", () => {
@@ -1977,7 +1983,9 @@ describe("Match logo placement — beside team name, not in dressing room rows",
     expect(matchAlloc.querySelector("img")).toBeNull();
   });
 
-  it("no logo appears in training-allocation section even with branding", () => {
+  it("no logo appears in training group card even with branding (V2: all trainings use TrainingGroupCard)", () => {
+    // INFOBOARD-V2: Solo trainings now render through TrainingGroupCard (training-group testid),
+    // not through the old TrainingDestination (training-allocation testid).
     const feed = makeFeed({
       current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: "KR2", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
       isEmpty: false,
@@ -1988,8 +1996,9 @@ describe("Match logo placement — beside team name, not in dressing room rows",
         branding={{ clubLogoSrc: "/logo.png" }}
       />,
     );
-    const trainingAlloc = screen.getByTestId("training-allocation");
-    expect(trainingAlloc.querySelector("img")).toBeNull();
+    // TrainingGroupCard uses data-testid="training-group"
+    const trainingGroup = screen.getByTestId("training-group");
+    expect(trainingGroup.querySelector("img")).toBeNull();
   });
 });
 
@@ -2100,13 +2109,18 @@ describe("Training aggregation — same-start-time trainings collapse into one c
 });
 
 describe("Training aggregation — team, pitch, and kabine remain individually visible", () => {
-  it("all team names are visible inside the group card", () => {
+  it("team names are visible inside the group card with club prefix stripped (V2)", () => {
+    // INFOBOARD-V2: The club name (tenant.name = "FC Allschwil") is stripped from the
+    // start of team display names since the header already establishes club identity.
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
-    expect(screen.getByText("FC Allschwil D7 D1")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil D7 D2")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil Junioren E1")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil D9 D1")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil D9 D2")).toBeTruthy();
+    // Stripped: "FC Allschwil D7 D1" → "D7 D1"
+    expect(screen.getByText("D7 D1")).toBeTruthy();
+    expect(screen.getByText("D7 D2")).toBeTruthy();
+    expect(screen.getByText("Junioren E1")).toBeTruthy();
+    expect(screen.getByText("D9 D1")).toBeTruthy();
+    expect(screen.getByText("D9 D2")).toBeTruthy();
+    // Full names should NOT appear (they are stripped)
+    expect(screen.queryByText("FC Allschwil D7 D1")).toBeNull();
   });
 
   it("all pitch labels are visible inside group rows", () => {

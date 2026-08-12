@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(),
   eventFindMany: vi.fn().mockResolvedValue([]),
   facilityResourceFindMany: vi.fn().mockResolvedValue([]),
+  getInfoboardBySlug: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -60,6 +61,14 @@ vi.mock("@/lib/publishing/infoboard/screen1-live-service", async () => {
 
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
+}));
+
+vi.mock("@/lib/infoboard/queries", () => ({
+  getInfoboardBySlug: mocks.getInfoboardBySlug,
+}));
+
+vi.mock("@/lib/infoboard/board-config", () => ({
+  buildBoardConfig: vi.fn().mockReturnValue({}),
 }));
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -125,6 +134,7 @@ const MOCK_PAYLOAD = {
   },
   currentTimeIso: NOW_ISO,
   theme: "DARK" as const,
+  headerConfig: null,
 };
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -169,6 +169,57 @@ export async function buildInfoboardScreen1Feed(
     { horizonMs: SCREEN1_HORIZON_MS },
   );
 
+  // Step 3b: Minimum-card fill — DISPLAY-WINDOW-V2
+  //
+  // Rules (task spec §17):
+  //   1. Always include currently running activities.
+  //   2. Include upcoming activities within the next SCREEN1_HORIZON_HOURS hours.
+  //   3. If this produces fewer than MIN_DISPLAY_CARDS rendered display cards,
+  //      fill forward with the next upcoming activities later today.
+  //   4. Continue only up to normal display capacity.
+  //   5. Never reintroduce completed activities.
+  //   6. If no activities remain today, use empty state.
+  //
+  // "Grouped trainings count as one rendered card" — approximated here by
+  // counting eligible events in the fill bucket; the TrainingGroupCard
+  // grouping happens in the component. We fill based on event count and let
+  // the component collapse same-start trainings.
+  //
+  // This ensures a board at 09:00 is not empty when the first training starts
+  // at 16:00 — it shows the next relevant activities of the day.
+
+  const MIN_DISPLAY_CARDS = 3;
+
+  const windowEventCount =
+    grouped.current.length + grouped.next.length + grouped.later.length;
+
+  let fillEvents: (typeof selection.eligible)[number][] = [];
+
+  if (windowEventCount < MIN_DISPLAY_CARDS) {
+    // Count how many rendered cards we already have
+    // (approximate: current + next group as 1 + each later)
+    const alreadyShown = new Set([
+      ...grouped.current.map((e) => e.id),
+      ...grouped.next.map((e) => e.id),
+      ...grouped.later.map((e) => e.id),
+    ]);
+
+    // Find upcoming events today that are NOT already shown and have NOT completed
+    const todayFillCandidates = selection.eligible
+      .filter((e) => {
+        if (alreadyShown.has(e.id)) return false;
+        // Only future events (not completed)
+        if (e.startAt <= input.now) return false;
+        // Only today
+        return toLocalDateKey(e.startAt, input.timeZone) === displayDate;
+      })
+      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+    // Fill up to MIN_DISPLAY_CARDS total
+    const needed = MIN_DISPLAY_CARDS - windowEventCount;
+    fillEvents = todayFillCandidates.slice(0, Math.max(0, needed));
+  }
+
   // Step 4: Determine empty-state reason before mapping.
   // Check whether any eligible event falls on today's local calendar day,
   // regardless of whether it has already ended (used for DAY_COMPLETED).
@@ -178,7 +229,8 @@ export async function buildInfoboardScreen1Feed(
   const isEmpty =
     grouped.current.length === 0 &&
     grouped.next.length === 0 &&
-    grouped.later.length === 0;
+    grouped.later.length === 0 &&
+    fillEvents.length === 0;
 
   let emptyStateReason: EmptyStateReason | null = null;
   if (isEmpty) {
@@ -197,7 +249,10 @@ export async function buildInfoboardScreen1Feed(
     mapScreen1Event({ event, temporalBucket: "next" }),
   );
 
-  const later: InfoboardScreen1Event[] = grouped.later.map((event) =>
+  const later: InfoboardScreen1Event[] = [
+    ...grouped.later,
+    ...fillEvents,
+  ].map((event) =>
     mapScreen1Event({ event, temporalBucket: "later" }),
   );
 

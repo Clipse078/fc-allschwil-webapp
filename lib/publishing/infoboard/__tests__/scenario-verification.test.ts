@@ -74,16 +74,18 @@ describe("SCENARIO 1 — rolling 4-hour horizon", () => {
     expect(feed.later.some((e) => e.id === "in3h30")).toBe(true);
   });
 
-  it("event 5.5h away is excluded (beyond the 4-hour horizon)", async () => {
+  it("event 5.5h away is now filled in when window has fewer than 3 events (V2 fill)", async () => {
+    // INFOBOARD-V2: in1h + in3h30 are in the 4h window (2 events < MIN=3) → in5h30 is filled.
     const feed = await buildInfoboardScreen1Feed(makeLoader(events), { tenant: TENANT, timeZone: TZ, now });
     const all = [...feed.current, ...feed.next, ...feed.later];
-    expect(all.some((e) => e.id === "in5h30")).toBe(false);
+    expect(all.some((e) => e.id === "in5h30")).toBe(true);
   });
 
-  it("chronological ordering is preserved across next + later", async () => {
+  it("chronological ordering is preserved across next + later (including fill events)", async () => {
+    // INFOBOARD-V2: in5h30 is now included via fill, so ordering covers all 3 events.
     const feed = await buildInfoboardScreen1Feed(makeLoader(events), { tenant: TENANT, timeZone: TZ, now });
     const orderedIds = [...feed.next, ...feed.later].map((e) => e.id);
-    expect(orderedIds).toEqual(["in1h", "in3h30"]);
+    expect(orderedIds).toEqual(["in1h", "in3h30", "in5h30"]);
   });
 
   it("dashboard and public screen1 show identical event IDs", async () => {
@@ -116,7 +118,8 @@ describe("SCENARIO 2 — 4-hour boundary", () => {
     expect(all.some((e) => e.id === "exactly-4h")).toBe(true);
   });
 
-  it("event starting just beyond 4 hours from now is excluded", async () => {
+  it("event starting just beyond 4 hours from now is now filled in (V2: fill applies when < 3 cards)", async () => {
+    // INFOBOARD-V2: 0 events in the 4h window → fill adds this today-future event.
     const justBeyond = makeEvent(
       "just-beyond-4h",
       new Date("2026-07-25T14:00:01.000Z"),
@@ -126,10 +129,14 @@ describe("SCENARIO 2 — 4-hour boundary", () => {
       makeLoader([justBeyond]),
       { tenant: TENANT, timeZone: TZ, now },
     );
-    expect(feed.isEmpty).toBe(true);
+    expect(feed.isEmpty).toBe(false);
+    const all = [...feed.current, ...feed.next, ...feed.later];
+    expect(all.some((e) => e.id === "just-beyond-4h")).toBe(true);
   });
 
-  it("event 5 hours away (previously shown with no cutoff) is now excluded", async () => {
+  it("event 5 hours away is now filled in via V2 fill (no longer excluded)", async () => {
+    // INFOBOARD-V2: 0 events in the 4h window → fill adds this today-future event.
+    // Under the V1 strict cutoff this was excluded; V2 includes it to reach MIN=3.
     const fiveHoursAway = makeEvent(
       "5h-away",
       new Date("2026-07-25T15:00:00.000Z"),
@@ -140,9 +147,9 @@ describe("SCENARIO 2 — 4-hour boundary", () => {
       makeLoader([fiveHoursAway]),
       { tenant: TENANT, timeZone: TZ, now },
     );
-    expect(feed.isEmpty).toBe(true);
+    expect(feed.isEmpty).toBe(false);
     const all = [...feed.current, ...feed.next, ...feed.later];
-    expect(all.some((e) => e.id === "5h-away")).toBe(false);
+    expect(all.some((e) => e.id === "5h-away")).toBe(true);
   });
 });
 
