@@ -126,13 +126,13 @@ describe("NAV_SECTIONS static structure", () => {
     expect(trainingcenter?.href).toBe("/dashboard/training");
   });
 
-  it("Veranstaltungen points to /dashboard/events", () => {
+  it("Veranstaltungen points to /dashboard/veranstaltungen", () => {
     const betrieb = findSection("Betrieb");
     const planung = betrieb!.items.find((i) => i.key === "planung");
     const veranstaltungen = planung!.children?.find(
       (c) => c.key === "veranstaltungen",
     );
-    expect(veranstaltungen?.href).toBe("/dashboard/events");
+    expect(veranstaltungen?.href).toBe("/dashboard/veranstaltungen");
   });
 
   it("Anlagen & Ressourcen appears under Administration pointing to /dashboard/admin/facilities", () => {
@@ -278,12 +278,15 @@ describe("getVisibleNavSections permission filtering", () => {
     expect(planungItem).toBeUndefined();
   });
 
-  it("Events label is Veranstaltungen, not Events", () => {
+  it("Veranstaltungen nav entry points to /dashboard/veranstaltungen with label Veranstaltungen", () => {
     const sections = getVisibleNavSections([PERMISSIONS.EVENTS_VIEW]);
     const flat = flatItems(sections);
-    const eventsEntry = flat.find((i) => i.href === "/dashboard/events");
-    expect(eventsEntry?.label).toBe("Veranstaltungen");
-    // Ensure old label is gone
+    // CLUB-EVENTS-01: nav moved from /dashboard/events to the dedicated module
+    const veranstaltungenEntry = flat.find(
+      (i) => i.href === "/dashboard/veranstaltungen",
+    );
+    expect(veranstaltungenEntry?.label).toBe("Veranstaltungen");
+    // Ensure old generic-hub label is not present as a nav item
     const oldEntry = flat.find((i) => i.label === "Events");
     expect(oldEntry).toBeUndefined();
   });

@@ -269,9 +269,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
           },
           {
+            // CLUB-EVENTS-01: dedicated Veranstaltungen module for tenant-managed
+            // club events (type=OTHER). Route moved from /dashboard/events to the
+            // focused /dashboard/veranstaltungen module.
             key: "veranstaltungen",
             label: "Veranstaltungen",
-            href: "/dashboard/events",
+            href: "/dashboard/veranstaltungen",
             permissionKeys: [PERMISSIONS.EVENTS_VIEW, PERMISSIONS.EVENTS_MANAGE],
           },
           {
