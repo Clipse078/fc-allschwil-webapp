@@ -56,9 +56,9 @@ export default async function PlannerWeekPageRoute({
   const tenantContext = await getActiveTenant();
   if (!tenantContext) notFound();
 
-  const canManagePlans =
-    hasPermission(session, PERMISSIONS.TRAININGS_MANAGE) ||
-    hasPermission(session, PERMISSIONS.EVENTS_MANAGE);
+  const canManageTrainings = hasPermission(session, PERMISSIONS.TRAININGS_MANAGE);
+  const canManageEvents = hasPermission(session, PERMISSIONS.EVENTS_MANAGE);
+  const canManagePlans = canManageTrainings || canManageEvents;
 
   const timezone = tenantContext.timezone ?? TRAINING_DEFAULT_TIMEZONE;
   const params = (await searchParams) ?? {};
@@ -88,14 +88,25 @@ export default async function PlannerWeekPageRoute({
   // alternative plan is selected AND the caller can manage plans; the
   // Standardplan view and read-only viewers never pay this extra cost and
   // never see editing affordances.
+  // PLANNING-RESOURCE-UX-01 — canonical editing context is built once for
+  // Standardplan view (activePlan === null) when the caller can manage plans.
+  // Facility groups are shared between override and canonical editing contexts.
+  const facilityGroupsByAllocationGroup =
+    canManagePlans ? await buildFacilityGroupsByAllocationGroup(tenantContext.id) : null;
+
   const overrideEditing =
-    canManagePlans && activePlan
+    canManagePlans && activePlan && facilityGroupsByAllocationGroup
       ? {
           planId: activePlan.id,
           planName: activePlan.name,
           overridesByKey: await buildOverridesByKey(tenantContext.id, activePlan.id),
-          facilityGroupsByAllocationGroup: await buildFacilityGroupsByAllocationGroup(tenantContext.id),
+          facilityGroupsByAllocationGroup,
         }
+      : undefined;
+
+  const canonicalEditing =
+    canManagePlans && facilityGroupsByAllocationGroup
+      ? { canManageTrainings, canManageEvents, facilityGroupsByAllocationGroup }
       : undefined;
 
   return (
@@ -108,6 +119,7 @@ export default async function PlannerWeekPageRoute({
       activePlanId={activePlan?.id ?? null}
       canManagePlans={canManagePlans}
       overrideEditing={overrideEditing}
+      canonicalEditing={canonicalEditing}
     />
   );
 }

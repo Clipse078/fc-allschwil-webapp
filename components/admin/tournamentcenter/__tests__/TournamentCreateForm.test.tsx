@@ -147,8 +147,10 @@ describe("TournamentCreateForm — retry guard after partial failure", () => {
     );
     await fillMinimalRequiredFields();
 
-    fireEvent.change(screen.getByTestId("tournament-create-resource-add-select"), { target: { value: "res-pitch-a" } });
-    fireEvent.click(screen.getByTestId("tournament-create-resource-add-add-button"));
+    // PLANNING-RESOURCE-UX-01: visual picker card replaces dropdown.
+    // Click the pitch card to select it.
+    await waitFor(() => expect(screen.getByTestId("tournament-create-resource-card-res-pitch-a")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("tournament-create-resource-card-res-pitch-a"));
     await screen.findByText("Hauptplatz");
 
     fireEvent.click(screen.getByTestId("tournament-create-submit"));

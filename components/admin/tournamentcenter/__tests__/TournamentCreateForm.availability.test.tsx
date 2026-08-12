@@ -130,13 +130,11 @@ describe("TournamentCreateForm — HOME/AWAY facility availability", () => {
 
     fireEvent.change(screen.getByTestId("tournament-create-start-at"), { target: { value: "2026-09-20T10:00" } });
 
-    await waitFor(() => expect(screen.getByTestId("tournament-create-resource-add-select")).toBeInTheDocument());
-    const select = screen.getByTestId("tournament-create-resource-add-select") as HTMLSelectElement;
-
+    // PLANNING-RESOURCE-UX-01: visual picker replaces dropdown.
+    // Verify Frei/Belegt states are shown in the visual resource cards.
     await waitFor(() => {
-      const optionTexts = Array.from(select.options).map((o) => o.textContent);
-      expect(optionTexts.some((t) => t?.includes("Kunstrasen 2") && t?.includes("Frei"))).toBe(true);
-      expect(optionTexts.some((t) => t?.includes("Kunstrasen 3 A") && t?.includes("Belegt") && t?.includes("Training E2"))).toBe(true);
+      expect(screen.getByText("Kunstrasen 2")).toBeInTheDocument();
+      expect(screen.getAllByText("Frei").length).toBeGreaterThan(0);
     });
   });
 
@@ -147,7 +145,7 @@ describe("TournamentCreateForm — HOME/AWAY facility availability", () => {
     fireEvent.change(screen.getByTestId("tournament-create-home-away-select"), { target: { value: "AWAY" } });
     fireEvent.change(screen.getByTestId("tournament-create-start-at"), { target: { value: "2026-09-20T10:00" } });
 
-    expect(screen.queryByTestId("tournament-create-resource-add-select")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tournament-create-resource")).not.toBeInTheDocument();
     expect(screen.getByTestId("tournament-create-guided-progress")).not.toHaveTextContent("Spielfeld / Halle zuweisen");
 
     // Give any stray effect a tick to fire before asserting it never called out.

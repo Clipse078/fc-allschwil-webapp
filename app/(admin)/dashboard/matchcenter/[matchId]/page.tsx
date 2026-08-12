@@ -13,8 +13,11 @@ import { ToastProvider } from "@/components/ui/ToastProvider";
 import {
   getActiveResourceOptionsForTenant,
   getFacilityResourcesByCodesForTenant,
+  getFacilitiesForTenant,
   withRequiredCodes,
 } from "@/lib/facilities/queries";
+import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 
 type MatchcenterDetailPageProps = {
   params: Promise<{
@@ -80,10 +83,33 @@ export default async function MatchcenterDetailPage({
   // already persisted on this match (even archived/renamed-away) is merged
   // back in via withRequiredCodes() so existing allocations remain readable
   // and are never silently cleared.
-  const [activePitchOptions, activeDressingRoomOptions] = await Promise.all([
+  const [activePitchOptions, activeDressingRoomOptions, facilities] = await Promise.all([
     getActiveResourceOptionsForTenant(tenantId, "PITCH_HALL"),
     getActiveResourceOptionsForTenant(tenantId, "DRESSING_ROOM"),
+    getFacilitiesForTenant(tenantId),
   ]);
+
+  function buildFacilityGroups(group: "PITCH_HALL" | "DRESSING_ROOM"): FacilityGroup[] {
+    return facilities
+      .map((facility) => ({
+        facilityId: facility.id,
+        facilityName: facility.name,
+        resources: facility.resources
+          .filter((resource) => classifyFacilityResourceType(resource.type) === group)
+          .map((resource) => ({
+            id: resource.id,
+            name: resource.name,
+            code: resource.code,
+            type: resource.type,
+            facilityId: facility.id,
+            facilityName: facility.name,
+          })),
+      }))
+      .filter((fg) => fg.resources.length > 0);
+  }
+
+  const pitchHallFacilityGroups = buildFacilityGroups("PITCH_HALL");
+  const dressingRoomFacilityGroups = buildFacilityGroups("DRESSING_ROOM");
 
   const requiredPitchCodes = [match.operational.pitchCode];
   const requiredRoomCodes = [
@@ -120,6 +146,8 @@ export default async function MatchcenterDetailPage({
         canDelete={canDelete}
         pitchOptions={pitchOptions}
         dressingRoomOptions={dressingRoomOptions}
+        pitchHallFacilityGroups={pitchHallFacilityGroups}
+        dressingRoomFacilityGroups={dressingRoomFacilityGroups}
       />
     </ToastProvider>
   );

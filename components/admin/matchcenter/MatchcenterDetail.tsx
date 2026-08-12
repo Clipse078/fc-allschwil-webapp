@@ -33,6 +33,7 @@ import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMapp
 import MatchcenterDetailOperational from "@/components/admin/matchcenter/MatchcenterDetailOperational";
 import MatchLifecycleCard from "@/components/admin/matchcenter/MatchLifecycleCard";
 import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
@@ -48,6 +49,10 @@ type MatchcenterDetailProps = {
   pitchOptions?: FacilityResourceOption[];
   /** MASTERDATA-CONSISTENCY-02 — canonical dressing-room options for MatchcenterDetailOperational. */
   dressingRoomOptions?: FacilityResourceOption[];
+  /** PLANNING-RESOURCE-UX-01 — full facility groups for visual pickers. */
+  pitchHallFacilityGroups?: FacilityGroup[];
+  /** PLANNING-RESOURCE-UX-01 — full facility groups for visual dressing room pickers. */
+  dressingRoomFacilityGroups?: FacilityGroup[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -186,6 +191,8 @@ export default function MatchcenterDetail({
   canDelete = false,
   pitchOptions = [],
   dressingRoomOptions = [],
+  pitchHallFacilityGroups,
+  dressingRoomFacilityGroups,
 }: MatchcenterDetailProps) {
   const statusLabel =
     STATUS_LABELS[match.status] ?? match.status;
@@ -500,6 +507,8 @@ export default function MatchcenterDetail({
           currentPitchCode={match.operational.pitchCode}
           currentHomeDressingRoomCode={match.operational.homeDressingRoomCode}
           currentAwayDressingRoomCode={match.operational.awayDressingRoomCode}
+          pitchHallFacilityGroups={pitchHallFacilityGroups}
+          dressingRoomFacilityGroups={dressingRoomFacilityGroups}
           currentWebsiteVisible={match.visibility.websiteVisible}
           currentInfoboardVisible={match.visibility.infoboardVisible}
           matchDateIso={matchDateIso}

@@ -56,10 +56,11 @@ import type { FocusEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Check, Building2 } from "lucide-react";
 import {
-  FacilityResourceSelector,
   type FacilityGroup,
   type ResourceAvailabilityAnnotation,
 } from "@/components/admin/training/FacilityResourceSelector";
+import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
+import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 import {
   orchestrateMatchCreation,
   type MatchCreationPlan,
@@ -177,90 +178,6 @@ function GuidedStep({ index, title, hint, complete, collapsed, summary, onExpand
   );
 }
 
-function AvailabilityScanLine({ counts, ready }: { counts: { free: number; occupied: number }; ready: boolean }) {
-  if (!ready || counts.free + counts.occupied === 0) {
-    return <p className="text-xs text-[var(--text-2)]">Verfügbarkeit erscheint nach Start/Ende.</p>;
-  }
-  return (
-    <p className="text-xs">
-      <span className="font-medium text-emerald-600">{counts.free} frei</span>
-      <span className="text-[var(--text-2)]"> · </span>
-      <span className="font-medium text-rose-600">{counts.occupied} belegt</span>
-    </p>
-  );
-}
-
-function countAvailability(
-  facilityGroups: FacilityGroup[],
-  availability: Map<string, ResourceAvailabilityAnnotation>,
-): { free: number; occupied: number } {
-  let free = 0;
-  let occupied = 0;
-  for (const group of facilityGroups) {
-    for (const resource of group.resources) {
-      const annotation = availability.get(resource.id);
-      if (!annotation) continue;
-      if (annotation.status === "OCCUPIED") occupied += 1;
-      else free += 1;
-    }
-  }
-  return { free, occupied };
-}
-
-/** One Spielfeld/Halle or Garderobe "slot" — exactly zero or one resource, replaceable via remove + re-add. */
-function ResourceSlotField({
-  label,
-  slot,
-  facilityGroups,
-  availability,
-  onAdd,
-  onRemove,
-  testId,
-}: {
-  label: string;
-  slot: ResourceSlot | null;
-  facilityGroups: FacilityGroup[];
-  availability: Map<string, ResourceAvailabilityAnnotation>;
-  onAdd: (facilityResourceId: string) => Promise<void>;
-  onRemove: () => void;
-  testId: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <span className="fca-label">{label}</span>
-      {slot ? (
-        <div
-          className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
-          data-testid={`${testId}-row`}
-        >
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-[var(--foreground)]">{slot.facilityResourceName}</p>
-            <p className="truncate text-xs text-[var(--text-2)]">{slot.facilityName}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={`${slot.facilityResourceName} entfernen`}
-            data-testid={`${testId}-remove`}
-            className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
-          >
-            ×
-          </button>
-        </div>
-      ) : (
-        <FacilityResourceSelector
-          facilityGroups={facilityGroups}
-          allocatedResourceIds={new Set()}
-          onAdd={onAdd}
-          placeholder="Auswählen…"
-          addButtonLabel="Zuweisen"
-          availabilityByResourceId={availability}
-          testId={testId}
-        />
-      )}
-    </div>
-  );
-}
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -445,16 +362,16 @@ export default function MatchCreateForm({
   }, [homeAway, startAt, endAt]);
 
   const addPitchSlot = useCallback(
-    async (facilityResourceId: string) => setPitchSlot(resolveResourceSlot(pitchHallFacilityGroups, facilityResourceId)),
+    (facilityResourceId: string) => setPitchSlot(resolveResourceSlot(pitchHallFacilityGroups, facilityResourceId)),
     [pitchHallFacilityGroups],
   );
   const addHomeDressingRoomSlot = useCallback(
-    async (facilityResourceId: string) =>
+    (facilityResourceId: string) =>
       setHomeDressingRoomSlot(resolveResourceSlot(dressingRoomFacilityGroups, facilityResourceId)),
     [dressingRoomFacilityGroups],
   );
   const addAwayDressingRoomSlot = useCallback(
-    async (facilityResourceId: string) =>
+    (facilityResourceId: string) =>
       setAwayDressingRoomSlot(resolveResourceSlot(dressingRoomFacilityGroups, facilityResourceId)),
     [dressingRoomFacilityGroups],
   );
@@ -769,7 +686,7 @@ export default function MatchCreateForm({
         {homeAway === "HOME" ? (
           <>
             <div className="px-4 py-3">
-              <div className="mb-2.5 flex items-center gap-2.5">
+              <div className="mb-3 flex items-center gap-2.5">
                 <span
                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]"
                   aria-hidden
@@ -778,27 +695,24 @@ export default function MatchCreateForm({
                 </span>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-sm font-semibold text-[var(--foreground)]">Spielfeld / Halle</h2>
-                  <AvailabilityScanLine
-                    counts={countAvailability(pitchHallFacilityGroups, pitchAvailability)}
-                    ready={!!startAt}
-                  />
+                  <p className="text-xs text-[var(--text-2)]">Für Heimspiele — wähle den Platz direkt aus.</p>
                 </div>
               </div>
               <div className="pl-[2.125rem]">
-                <ResourceSlotField
-                  label="Spielfeld / Halle"
-                  slot={pitchSlot}
+                <VisualResourceAvailabilityPicker
                   facilityGroups={pitchHallFacilityGroups}
-                  availability={pitchAvailability}
-                  onAdd={addPitchSlot}
-                  onRemove={() => setPitchSlot(null)}
+                  selectedResourceIds={pitchSlot ? new Set([pitchSlot.facilityResourceId]) : new Set()}
+                  onSelect={addPitchSlot}
+                  onDeselect={() => setPitchSlot(null)}
+                  availabilityByResourceId={pitchAvailability}
+                  singleSelect
                   testId="match-create-pitch"
                 />
               </div>
             </div>
 
             <div className="px-4 py-3">
-              <div className="mb-2.5 flex items-center gap-2.5">
+              <div className="mb-3 flex items-center gap-2.5">
                 <span
                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]"
                   aria-hidden
@@ -806,30 +720,29 @@ export default function MatchCreateForm({
                   6
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-semibold text-[var(--foreground)]">Garderobe</h2>
-                  <AvailabilityScanLine
-                    counts={countAvailability(dressingRoomFacilityGroups, dressingRoomAvailability)}
-                    ready={!!startAt}
-                  />
+                  <h2 className="text-sm font-semibold text-[var(--foreground)]">Garderoben</h2>
+                  <p className="text-xs text-[var(--text-2)]">Heim- und Gastkabine zuweisen.</p>
                 </div>
               </div>
-              <div className="grid gap-3 pl-[2.125rem] md:grid-cols-2">
-                <ResourceSlotField
-                  label={`Heimteam${selectedTeam ? ` (${selectedTeam.name})` : ""}`}
-                  slot={homeDressingRoomSlot}
+              <div className="space-y-4 pl-[2.125rem]">
+                <VisualDressingRoomPicker
                   facilityGroups={dressingRoomFacilityGroups}
-                  availability={dressingRoomAvailability}
-                  onAdd={addHomeDressingRoomSlot}
-                  onRemove={() => setHomeDressingRoomSlot(null)}
+                  selectedResourceIds={homeDressingRoomSlot ? new Set([homeDressingRoomSlot.facilityResourceId]) : new Set()}
+                  onSelect={addHomeDressingRoomSlot}
+                  onDeselect={() => setHomeDressingRoomSlot(null)}
+                  availabilityByResourceId={dressingRoomAvailability}
+                  label={`Heimkabine${selectedTeam ? ` (${selectedTeam.name})` : ""}`}
+                  singleSelect
                   testId="match-create-home-dressing-room"
                 />
-                <ResourceSlotField
-                  label={`Gastteam${opponentName ? ` (${opponentName})` : ""}`}
-                  slot={awayDressingRoomSlot}
+                <VisualDressingRoomPicker
                   facilityGroups={dressingRoomFacilityGroups}
-                  availability={dressingRoomAvailability}
-                  onAdd={addAwayDressingRoomSlot}
-                  onRemove={() => setAwayDressingRoomSlot(null)}
+                  selectedResourceIds={awayDressingRoomSlot ? new Set([awayDressingRoomSlot.facilityResourceId]) : new Set()}
+                  onSelect={addAwayDressingRoomSlot}
+                  onDeselect={() => setAwayDressingRoomSlot(null)}
+                  availabilityByResourceId={dressingRoomAvailability}
+                  label={`Gastkabine${opponentName ? ` (${opponentName})` : ""}`}
+                  singleSelect
                   testId="match-create-away-dressing-room"
                 />
               </div>

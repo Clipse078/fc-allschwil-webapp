@@ -71,10 +71,11 @@ import type { FocusEvent, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CalendarDays, Check, Repeat } from "lucide-react";
 import {
-  FacilityResourceSelector,
   type FacilityGroup,
   type ResourceAvailabilityAnnotation,
 } from "@/components/admin/training/FacilityResourceSelector";
+import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
+import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 import { weekdayFromDate, zonedTimeToUtc } from "@/lib/training/recurrence";
 import type { Weekday } from "@/lib/training/types";
 
@@ -164,43 +165,6 @@ function addDaysToDateKey(dateKey: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Counts Frei/Belegt across a group's resources for the compact scan-line above each selector. */
-function countAvailability(
-  facilityGroups: FacilityGroup[],
-  availability: Map<string, ResourceAvailabilityAnnotation>,
-): { free: number; occupied: number } {
-  let free = 0;
-  let occupied = 0;
-  for (const group of facilityGroups) {
-    for (const resource of group.resources) {
-      const annotation = availability.get(resource.id);
-      if (!annotation) continue;
-      if (annotation.status === "OCCUPIED") occupied += 1;
-      else free += 1;
-    }
-  }
-  return { free, occupied };
-}
-
-/**
- * PLANNING-CREATION-UX-01B-C1 — compact, highly scannable Frei/Belegt count
- * line shown above each resource selector (e.g. "2 frei · 1 belegt"),
- * derived from the same live availability map the selector's per-option
- * annotations already use (lib/facilities/availability-service.ts via
- * GET /api/facilities/availability) — no separate computation/engine.
- */
-function AvailabilityScanLine({ counts, ready }: { counts: { free: number; occupied: number }; ready: boolean }) {
-  if (!ready || counts.free + counts.occupied === 0) {
-    return <p className="text-xs text-[var(--text-2)]">Verfügbarkeit erscheint nach Tag &amp; Zeit.</p>;
-  }
-  return (
-    <p className="text-xs">
-      <span className="font-medium text-emerald-600">{counts.free} frei</span>
-      <span className="text-[var(--text-2)]"> · </span>
-      <span className="font-medium text-rose-600">{counts.occupied} belegt</span>
-    </p>
-  );
-}
 
 /**
  * PLANNING-CREATION-UX-01B-C1 — collapses a step to a one-line summary once
@@ -345,28 +309,30 @@ export default function TrainingSeriesCreateForm({
   );
 
   const addResourceDraft = useCallback(
-    async (facilityResourceId: string) => {
+    (facilityResourceId: string) => {
+      if (allocatedResourceIds.has(facilityResourceId)) return;
       const display = resolveResourceDisplay(pitchHallFacilityGroups, facilityResourceId);
       setResources((prev) => [
         ...prev,
         { localId: nextLocalId("resource"), facilityResourceId, facilityResourceName: display.name, facilityName: display.facilityName },
       ]);
     },
-    [pitchHallFacilityGroups],
+    [pitchHallFacilityGroups, allocatedResourceIds],
   );
   const removeResourceDraft = useCallback((localId: string) => {
     setResources((prev) => prev.filter((r) => r.localId !== localId));
   }, []);
 
   const addDressingRoomDraft = useCallback(
-    async (facilityResourceId: string) => {
+    (facilityResourceId: string) => {
+      if (allocatedDressingRoomIds.has(facilityResourceId)) return;
       const display = resolveResourceDisplay(dressingRoomFacilityGroups, facilityResourceId);
       setDressingRooms((prev) => [
         ...prev,
         { localId: nextLocalId("dressing-room"), facilityResourceId, facilityResourceName: display.name, facilityName: display.facilityName },
       ]);
     },
-    [dressingRoomFacilityGroups],
+    [dressingRoomFacilityGroups, allocatedDressingRoomIds],
   );
   const removeDressingRoomDraft = useCallback((localId: string) => {
     setDressingRooms((prev) => prev.filter((r) => r.localId !== localId));
@@ -706,95 +672,51 @@ export default function TrainingSeriesCreateForm({
         </div>
 
         <div className="px-4 py-3">
-          <div className="mb-2.5 flex items-center gap-2.5">
+          <div className="mb-3 flex items-center gap-2.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]" aria-hidden>
               4
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-semibold text-[var(--foreground)]">Spielfeld / Halle</h2>
-              <AvailabilityScanLine counts={countAvailability(pitchHallFacilityGroups, pitchAvailability)} ready={!!date && timesValid} />
+              <p className="text-xs text-[var(--text-2)]">Wähle den passenden Platz direkt aus.</p>
             </div>
           </div>
-          <div className="space-y-2.5 pl-[2.125rem]">
-            {resources.length > 0 ? (
-              <ul className="space-y-1.5" data-testid="training-create-resource-list">
-                {resources.map((resource) => (
-                  <li
-                    key={resource.localId}
-                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[var(--foreground)]">{resource.facilityResourceName}</p>
-                      <p className="truncate text-xs text-[var(--text-2)]">{resource.facilityName}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeResourceDraft(resource.localId)}
-                      aria-label={`${resource.facilityResourceName} entfernen`}
-                      className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            <FacilityResourceSelector
+          <div className="pl-[2.125rem]">
+            <VisualResourceAvailabilityPicker
               facilityGroups={pitchHallFacilityGroups}
-              allocatedResourceIds={allocatedResourceIds}
-              onAdd={addResourceDraft}
-              placeholder="Spielfeld / Halle auswählen…"
-              addButtonLabel="Zuweisen"
+              selectedResourceIds={allocatedResourceIds}
+              onSelect={addResourceDraft}
+              onDeselect={(id) => {
+                const row = resources.find((r) => r.facilityResourceId === id);
+                if (row) removeResourceDraft(row.localId);
+              }}
               availabilityByResourceId={pitchAvailability}
-              testId="training-create-resource-add"
+              testId="training-create-resource"
             />
           </div>
         </div>
 
         <div className="px-4 py-3">
-          <div className="mb-2.5 flex items-center gap-2.5">
+          <div className="mb-3 flex items-center gap-2.5">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.7rem] font-semibold text-[var(--text-2)]" aria-hidden>
               5
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-sm font-semibold text-[var(--foreground)]">Garderobe</h2>
-              <AvailabilityScanLine counts={countAvailability(dressingRoomFacilityGroups, dressingRoomAvailability)} ready={!!date && timesValid} />
+              <p className="text-xs text-[var(--text-2)]">Garderobe für dieses Training zuweisen.</p>
             </div>
           </div>
-          <div className="space-y-2.5 pl-[2.125rem]">
-            {dressingRooms.length > 0 ? (
-              <ul className="space-y-1.5" data-testid="training-create-dressing-room-list">
-                {dressingRooms.map((room) => (
-                  <li
-                    key={room.localId}
-                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[var(--foreground)]">{room.facilityResourceName}</p>
-                      <p className="truncate text-xs text-[var(--text-2)]">{room.facilityName}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeDressingRoomDraft(room.localId)}
-                      aria-label={`${room.facilityResourceName} entfernen`}
-                      className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            <FacilityResourceSelector
+          <div className="pl-[2.125rem]">
+            <VisualDressingRoomPicker
               facilityGroups={dressingRoomFacilityGroups}
-              allocatedResourceIds={allocatedDressingRoomIds}
-              onAdd={addDressingRoomDraft}
-              placeholder="Garderobe auswählen…"
-              addButtonLabel="Zuweisen"
+              selectedResourceIds={allocatedDressingRoomIds}
+              onSelect={addDressingRoomDraft}
+              onDeselect={(id) => {
+                const row = dressingRooms.find((r) => r.facilityResourceId === id);
+                if (row) removeDressingRoomDraft(row.localId);
+              }}
               availabilityByResourceId={dressingRoomAvailability}
-              testId="training-create-dressing-room-add"
+              testId="training-create-dressing-room"
             />
           </div>
         </div>
