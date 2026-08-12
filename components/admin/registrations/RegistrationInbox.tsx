@@ -257,6 +257,11 @@ type Props = {
   tenantSlug: string;
   initialRegistrations: RegistrationListItem[];
   canEdit: boolean;
+  /**
+   * ADMIN-DELETE-03B: effective PERMISSIONS.REGISTRATIONS_DELETE authority.
+   * When false/absent the permanent-delete section in the drawer is hidden.
+   */
+  canDelete?: boolean;
   locale?: string;
   timezone?: string;
   assignableUsers?: AssignableUser[];
@@ -271,6 +276,7 @@ export default function RegistrationInbox({
   tenantSlug,
   initialRegistrations,
   canEdit,
+  canDelete = false,
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers = [],
@@ -398,6 +404,14 @@ export default function RegistrationInbox({
   }, []);
 
   const handleClose = useCallback(() => {
+    setSelectedRegistration(null);
+  }, []);
+
+  // ADMIN-DELETE-03B: remove the permanently deleted item from the local list
+  // and close the drawer. router.refresh() in RegistrationDeleteControl already
+  // triggers a server revalidation so the list stays in sync after navigation.
+  const handleDeleted = useCallback((deletedId: string) => {
+    setRegistrations((prev) => prev.filter((r) => r.id !== deletedId));
     setSelectedRegistration(null);
   }, []);
 
@@ -641,12 +655,14 @@ export default function RegistrationInbox({
           registration={selectedRegistration}
           tenantSlug={tenantSlug}
           canEdit={canEdit}
+          canDelete={canDelete}
           locale={locale}
           timezone={timezone}
           assignableUsers={assignableUsers}
           targetGroups={targetGroups}
           onClose={handleClose}
           onUpdate={handleUpdate}
+          onDeleted={handleDeleted}
         />
       )}
     </div>

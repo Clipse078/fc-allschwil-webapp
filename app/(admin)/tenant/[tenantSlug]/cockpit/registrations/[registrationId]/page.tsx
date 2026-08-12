@@ -26,8 +26,11 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
 
   // Permission is evaluated against the EXACT tenant resolved from the URL,
   // not the caller's own default tenant.
+  // ADMIN-DELETE-03B: include REGISTRATIONS_DELETE so a delegated user who
+  // holds registrations.delete without registrations.view/edit can still reach
+  // this page to exercise the permanent-delete action.
   const session = await requireAnyPermission(
-    [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+    [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT, PERMISSIONS.REGISTRATIONS_DELETE],
     tenantId,
   );
 

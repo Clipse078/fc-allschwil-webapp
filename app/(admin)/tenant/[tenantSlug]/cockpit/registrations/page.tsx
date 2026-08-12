@@ -25,8 +25,11 @@ export default async function TenantRegistrationsPage({ params }: Props) {
 
   // Permission is evaluated against the EXACT tenant resolved from the URL,
   // not the caller's own default tenant.
+  // ADMIN-DELETE-03B: include REGISTRATIONS_DELETE so a delegated user who
+  // holds registrations.delete without registrations.view/edit can still reach
+  // this page to exercise the permanent-delete action.
   const session = await requireAnyPermission(
-    [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+    [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT, PERMISSIONS.REGISTRATIONS_DELETE],
     tenantId,
   );
 
@@ -48,6 +51,11 @@ export default async function TenantRegistrationsPage({ params }: Props) {
   ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
+  // ADMIN-DELETE-03B: permanent delete authority — deliberately separate from
+  // canEdit (registrations.edit authorizes status/workflow mutations but must
+  // never imply permanent deletion). Club Admins can receive this permission
+  // through canonical Roles & Permissions.
+  const canDelete = hasPermission(session, PERMISSIONS.REGISTRATIONS_DELETE);
   // REGISTRATION-01F — Goal 9: "Assigned to me" filter needs the viewer's own user id.
   const currentUserId = session.user?.effectiveUserId ?? session.user?.id ?? null;
 
@@ -57,6 +65,7 @@ export default async function TenantRegistrationsPage({ params }: Props) {
         tenantSlug={tenantSlug}
         initialRegistrations={registrations}
         canEdit={canEdit}
+        canDelete={canDelete}
         locale={tenantContext.locale ?? undefined}
         timezone={tenantContext.timezone ?? undefined}
         assignableUsers={assignableUsers}

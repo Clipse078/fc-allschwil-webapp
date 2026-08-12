@@ -24,6 +24,19 @@ type Props = {
    * are unaffected by this control.
    */
   canDelete: boolean;
+  /**
+   * Optional callback invoked after successful permanent deletion instead of
+   * navigating away. Used by the Cockpit drawer context to close the drawer
+   * and remove the item from the list without a full page navigation.
+   * When absent the component navigates to the cockpit registrations list.
+   */
+  onDeleted?: () => void;
+  /**
+   * When true, suppresses the outer sce-detail-section container and renders
+   * only the button. Used by contexts that provide their own visual framing
+   * (e.g. the Cockpit drawer's danger zone).
+   */
+  compact?: boolean;
 };
 
 /**
@@ -44,6 +57,8 @@ export default function RegistrationDeleteControl({
   registrationId,
   registrationLabel,
   canDelete,
+  onDeleted,
+  compact = false,
 }: Props) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -97,8 +112,13 @@ export default function RegistrationDeleteControl({
       }
 
       setConfirming(false);
-      router.push(`/tenant/${tenantSlug}/cockpit/registrations`);
-      router.refresh();
+      if (onDeleted) {
+        onDeleted();
+        router.refresh();
+      } else {
+        router.push(`/tenant/${tenantSlug}/cockpit/registrations`);
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
     } finally {
@@ -114,27 +134,38 @@ export default function RegistrationDeleteControl({
 
   return (
     <>
-      <div className="sce-detail-section">
-        <div className="sce-detail-section-header">
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-            Endgültig löschen
-          </p>
+      {compact ? (
+        <Button
+          variant="danger"
+          size="sm"
+          iconLeft={<Trash2 className="h-3.5 w-3.5" />}
+          onClick={openConfirmation}
+        >
+          Endgültig löschen
+        </Button>
+      ) : (
+        <div className="sce-detail-section">
+          <div className="sce-detail-section-header">
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+              Endgültig löschen
+            </p>
+          </div>
+          <div className="sce-detail-section-body flex flex-col gap-3">
+            <p className="text-xs text-[var(--text-2)]">
+              Entfernt die Anmeldung unwiderruflich aus der Datenbank.
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </p>
+            <Button
+              variant="danger"
+              size="sm"
+              iconLeft={<Trash2 className="h-3.5 w-3.5" />}
+              onClick={openConfirmation}
+            >
+              Löschen
+            </Button>
+          </div>
         </div>
-        <div className="sce-detail-section-body flex flex-col gap-3">
-          <p className="text-xs text-[var(--text-2)]">
-            Entfernt die Anmeldung unwiderruflich aus der Datenbank.
-            Diese Aktion kann nicht rückgängig gemacht werden.
-          </p>
-          <Button
-            variant="danger"
-            size="sm"
-            iconLeft={<Trash2 className="h-3.5 w-3.5" />}
-            onClick={openConfirmation}
-          >
-            Löschen
-          </Button>
-        </div>
-      </div>
+      )}
 
       <Dialog
         open={confirming}

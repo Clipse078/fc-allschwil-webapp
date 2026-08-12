@@ -62,6 +62,7 @@ import {
 } from "@/lib/registrations/status";
 import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
+import RegistrationDeleteControl from "./RegistrationDeleteControl";
 
 const NOT_PROVIDED = "Nicht angegeben";
 
@@ -75,12 +76,22 @@ type Props = {
   registration: RegistrationListItem | null;
   tenantSlug: string;
   canEdit: boolean;
+  /**
+   * ADMIN-DELETE-03B: effective PERMISSIONS.REGISTRATIONS_DELETE authority.
+   * When false/absent the permanent-delete section is hidden.
+   */
+  canDelete?: boolean;
   locale?: string;
   timezone?: string;
   assignableUsers?: AssignableUser[];
   targetGroups?: TargetGroupOption[];
   onClose: () => void;
   onUpdate: (updated: RegistrationListItem) => void;
+  /**
+   * Called after successful permanent deletion. Closes the drawer and removes
+   * the deleted item from the parent list without a full-page navigation.
+   */
+  onDeleted?: (deletedId: string) => void;
 };
 
 // ── Display constants (Lucide icons replace emojis) ───────────────────────────
@@ -367,12 +378,14 @@ export default function RegistrationDetailDrawer({
   registration: initialRegistration,
   tenantSlug,
   canEdit,
+  canDelete = false,
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers = [],
   targetGroups = [],
   onClose,
   onUpdate,
+  onDeleted,
 }: Props) {
   const [registration, setRegistration] = useState(initialRegistration);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -850,7 +863,7 @@ export default function RegistrationDetailDrawer({
               admin-relevant fields only (ID, timestamps, source, tenant,
               duplicate reference). Never expose raw internal implementation
               details. */}
-          <div className="px-6 pt-5 pb-8">
+          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
             <SectionLabel icon={Hash}>Systemdaten</SectionLabel>
             <div className="grid gap-4 sm:grid-cols-2">
               <DataRow label="Registrierungs-ID">
@@ -889,6 +902,35 @@ export default function RegistrationDetailDrawer({
               <LabeledField label="Sprache" value={fields.technical.locale} />
             </div>
           </div>
+
+          {/* ADMIN-DELETE-03B: permanent deletion danger zone — only shown when
+              the caller holds registrations.delete for this tenant. Visually
+              separated at the bottom of the scrollable area so it stays out of
+              the normal workflow path. */}
+          {canDelete && (
+            <div className="px-6 pt-5 pb-8">
+              <div className="rounded-[var(--radius-lg)] border border-red-200 bg-red-50/60 p-4">
+                <p className="text-[0.69rem] font-semibold uppercase tracking-[0.1em] text-red-600 mb-2">
+                  Endgültig löschen
+                </p>
+                <p className="text-xs text-red-700 mb-3">
+                  Entfernt die Anmeldung unwiderruflich aus der Datenbank.
+                  Diese Aktion kann nicht rückgängig gemacht werden.
+                </p>
+                <RegistrationDeleteControl
+                  tenantSlug={tenantSlug}
+                  registrationId={registration.id}
+                  registrationLabel={`${registration.firstName} ${registration.lastName}`}
+                  canDelete={canDelete}
+                  compact
+                  onDeleted={() => {
+                    onDeleted?.(registration.id);
+                    onClose();
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
