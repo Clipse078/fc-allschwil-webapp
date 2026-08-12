@@ -17,8 +17,12 @@
  * sign-in time — see lib/auth/session-context.ts), though the authoritative
  * resolver-backed checks (hasTenantDeletionAuthority) take effect immediately.
  *
- * DO NOT execute against STAGE as part of the ADMIN-DELETE-03B implementation
- * task — that is a separate, deliberate operational step.
+ * POST-MERGE-C2: this script was executed against STAGE on 2026-08-12 to
+ * backfill the missing registrations.delete Permission row and RolePermission
+ * grants that PR #377 added to seed.ts but never applied to the live database.
+ * After apply: FC Allschwil Club Admin (club_admin__fc-allschwil) holds
+ * registrations.delete → "Endgültig löschen" action is now visible in the
+ * Registrations Cockpit drawer for authorized users.
  */
 
 import { prisma } from "@/lib/db/prisma";
