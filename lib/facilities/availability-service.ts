@@ -158,7 +158,7 @@ async function findTrainingConflicts(
     for (const allocation of effectiveAllocations) {
       conflicts.push({
         resourceId: allocation.facilityResourceId,
-        label: `Training ${session.trainingSeries.title}`,
+        label: session.trainingSeries.title,
         startAt: effectiveStart,
         endAt: effectiveEnd,
         sourceType: "TRAINING",
@@ -210,7 +210,7 @@ async function findMatchConflicts(
       continue;
     }
 
-    const label = `Match ${event.opponentName ? `vs. ${event.opponentName}` : event.title}`;
+    const label = event.opponentName ? `vs. ${event.opponentName}` : event.title;
     const effectiveStart = event.startAt;
     const effectiveEnd = event.endAt ?? event.startAt;
 
@@ -263,7 +263,7 @@ async function findTournamentConflicts(
       }
       conflicts.push({
         resourceId: row.facilityResourceId,
-        label: `Turnier ${row.event.title}`,
+        label: row.event.title,
         startAt: row.event.startAt,
         endAt: row.event.endAt ?? row.event.startAt,
         sourceType: "TOURNAMENT",
@@ -313,7 +313,7 @@ async function findTournamentConflicts(
       participant.event.title;
     conflicts.push({
       resourceId: row.facilityResourceId,
-      label: `Turnier ${participant.event.title} · ${participantLabel}`,
+      label: `${participantLabel} · ${participant.event.title}`,
       startAt: participant.event.startAt,
       endAt: participant.event.endAt ?? participant.event.startAt,
       sourceType: "TOURNAMENT",
@@ -353,6 +353,7 @@ export async function getResourceAvailability(
       id: true,
       name: true,
       code: true,
+      type: true,
       facilityId: true,
       facility: { select: { name: true } },
     },
@@ -375,6 +376,61 @@ export async function getResourceAvailability(
     const existing = conflictsByResourceId.get(conflict.resourceId);
     if (!existing || conflict.startAt.getTime() < existing.startAt.getTime()) {
       conflictsByResourceId.set(conflict.resourceId, conflict);
+    }
+  }
+
+  // FULL/HALF pitch derived availability rules (PLANNING-RESOURCE-UX-01-C2):
+  //   - FULL_PITCH occupied → all sibling HALF_PITCH in the same facility unavailable
+  //   - Any HALF_PITCH occupied → sibling FULL_PITCH in the same facility unavailable
+  //   - A occupied → B may remain free (and vice versa)
+  // Only applies to PITCH_HALL group where both resource types can coexist.
+  if (group === "PITCH_HALL") {
+    // Group resources by facility
+    const byFacility = new Map<string, typeof resources>();
+    for (const r of resources) {
+      const list = byFacility.get(r.facilityId) ?? [];
+      list.push(r);
+      byFacility.set(r.facilityId, list);
+    }
+
+    for (const facilityResources of byFacility.values()) {
+      const fullPitches = facilityResources.filter((r) => r.type === "FULL_PITCH");
+      const halfPitches = facilityResources.filter((r) => r.type === "HALF_PITCH");
+
+      // Only apply rules when both FULL and HALF resources exist in the facility
+      if (fullPitches.length === 0 || halfPitches.length === 0) continue;
+
+      for (const full of fullPitches) {
+        const fullConflict = conflictsByResourceId.get(full.id);
+        if (fullConflict) {
+          // FULL occupied → derive HALF as unavailable (unless already marked)
+          for (const half of halfPitches) {
+            if (!conflictsByResourceId.has(half.id)) {
+              conflictsByResourceId.set(half.id, {
+                ...fullConflict,
+                resourceId: half.id,
+                label: `${fullConflict.label} (ganzes Feld belegt)`,
+              });
+            }
+          }
+        }
+      }
+
+      // Any HALF occupied → derive FULL as unavailable
+      const occupiedHalves = halfPitches.filter((h) => conflictsByResourceId.has(h.id));
+      if (occupiedHalves.length > 0) {
+        for (const full of fullPitches) {
+          if (!conflictsByResourceId.has(full.id)) {
+            // Use the earliest occupying half's conflict as the representative
+            const representative = conflictsByResourceId.get(occupiedHalves[0]!.id)!;
+            conflictsByResourceId.set(full.id, {
+              ...representative,
+              resourceId: full.id,
+              label: `${representative.label} (Hälfte belegt)`,
+            });
+          }
+        }
+      }
     }
   }
 

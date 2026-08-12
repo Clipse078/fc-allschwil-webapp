@@ -7,26 +7,17 @@
  * Planning family (TrainingCenter / MatchCenter / TournamentCenter /
  * Wochenplaner).
  *
- * Replaces the dropdown-based FacilityResourceSelector with:
- *   1. A compact availability summary ("3 verfügbar · 4 belegt") shown as
- *      soon as date/time are known.
- *   2. "Empfohlene Spielfelder" — the top 2–3 free resources as prominent
- *      visual cards with football-pitch representation.
- *   3. "Alle Spielfelder" — the complete list, occupied resources remain
- *      visible with team/activity/time, never hidden.
- *   4. Consistent Frei / Belegt / Ausgewählt states, derived from the same
- *      availability map already produced by useFacilityAvailability /
- *      lib/facilities/availability-service.ts — no second engine.
- *
- * This component is additive: all data comes from props (FacilityGroup[],
- * availabilityByResourceId Map) that every existing create-form already
- * computes. No additional fetching is introduced here.
+ * PLANNING-RESOURCE-UX-01-C2 — corrective UX pass:
+ *   - Resources grouped per facility (FULL + HALF_PITCH siblings visually
+ *     associated under one facility header, not shown as unrelated cards).
+ *   - Occupied cards compact (no large pitch visual, concise conflict label).
+ *   - Hall resources rendered with neutral visual when facilityType="INDOOR_HALL".
+ *   - Compact mode for narrow contexts (Wochenplaner editor).
  *
  * Conflict detection semantics (full/half pitch):
- *   - The availability-service already surfaces whole-pitch conflicts
- *     caused by either half being allocated — the per-resource status
- *     from that service is the authoritative conflict signal.
- *   - The picker renders them consistently without any second conflict pass.
+ *   The availability-service now enforces cross-resource FULL/HALF relationships
+ *   server-side — the per-resource status from that service is the authoritative
+ *   conflict signal. The picker renders them consistently without a second pass.
  */
 
 import { useMemo, useCallback } from "react";
@@ -82,6 +73,11 @@ export type VisualResourceAvailabilityPickerProps = {
    * Shown when the tenant has no resources of this type.
    */
   emptyMessage?: string;
+  /**
+   * PLANNING-RESOURCE-UX-01-C2 — when true, use narrower compact card layout
+   * (for Wochenplaner editor context). Default false.
+   */
+  compact?: boolean;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -107,8 +103,7 @@ function availabilityState(
  * Deterministic recommendation order:
  * 1. Free (non-occupied) resources first.
  * 2. Within free: HALF_PITCH before FULL_PITCH (avoids wasting a whole
- *    pitch when halves are available) — unless the caller has already
- *    selected a full-pitch context.
+ *    pitch when halves are available).
  * 3. Facility sort order, then name (preserved from DB ordering in facilityGroups).
  */
 function recommendFreeResources(
@@ -129,7 +124,6 @@ function recommendFreeResources(
   }
 
   free.sort((a, b) => {
-    // Prefer HALF_PITCH (less wasteful)
     if (a.type !== b.type) {
       if (a.type === "HALF_PITCH") return -1;
       if (b.type === "HALF_PITCH") return 1;
@@ -144,6 +138,7 @@ function recommendFreeResources(
 
 type ResourceCardProps = {
   facilityName: string;
+  facilityType?: string;
   resourceName: string;
   resourceId: string;
   resourceType: FacilityResourceType;
@@ -154,10 +149,12 @@ type ResourceCardProps = {
   onSelect: () => void;
   onDeselect: () => void;
   testId?: string;
+  compact?: boolean;
 };
 
 function ResourceCard({
   facilityName,
+  facilityType,
   resourceName,
   resourceId,
   resourceType,
@@ -168,6 +165,7 @@ function ResourceCard({
   onSelect,
   onDeselect,
   testId,
+  compact = false,
 }: ResourceCardProps) {
   const state = availabilityState(annotation, isSelected);
   const isFree = annotation?.status === "FREE";
@@ -185,6 +183,12 @@ function ResourceCard({
       ? `${formatClockTime(annotation.conflictStartAt)}–${formatClockTime(annotation.conflictEndAt)}`
       : null;
 
+  // Truncate the conflict label to max ~30 chars for display
+  const rawLabel = annotation?.conflictLabel ?? null;
+  const conflictLabel = rawLabel && rawLabel.length > 32
+    ? rawLabel.slice(0, 30) + "…"
+    : rawLabel;
+
   const borderClass = isSelected
     ? "border-[var(--sce-primary)] ring-1 ring-[var(--sce-primary)]"
     : isFree
@@ -201,84 +205,100 @@ function ResourceCard({
 
   const isClickable = !disabled && !isOccupied;
 
+  // Occupied cards: compact horizontal layout — no large pitch visual
+  if (isOccupied) {
+    return (
+      <div
+        data-testid={testId ? `${testId}-card-${resourceId}` : undefined}
+        className={cn(
+          "relative flex w-full items-start gap-2 rounded-lg border px-2.5 py-2",
+          borderClass,
+          bgClass,
+        )}
+        title={rawLabel ?? undefined}
+      >
+        <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-rose-500 inline-block" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold leading-tight text-[var(--foreground)] truncate">{resourceName}</p>
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600">Belegt</span>
+          {conflictLabel && (
+            <p className="text-[10px] leading-tight text-rose-700 truncate">{conflictLabel}</p>
+          )}
+          {conflictTime && (
+            <p className="text-[10px] text-rose-600">{conflictTime}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={handleClick}
-      disabled={disabled || isOccupied}
+      disabled={disabled}
       data-testid={testId ? `${testId}-card-${resourceId}` : undefined}
       aria-pressed={isSelected}
-      aria-label={`${resourceName} ${isSelected ? "ausgewählt" : isFree ? "Frei" : isOccupied ? "Belegt" : ""}`}
+      aria-label={`${resourceName} ${isSelected ? "ausgewählt" : isFree ? "Frei" : ""}`}
       className={cn(
-        "group relative flex w-full flex-col rounded-xl border p-3 text-left transition-all",
+        "group relative flex w-full flex-col rounded-xl border p-2.5 text-left transition-all",
         borderClass,
         bgClass,
         isClickable ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1" : "cursor-default",
-        disabled && !isOccupied && "opacity-50",
+        disabled && "opacity-50",
       )}
     >
       {/* Recommended badge */}
       {isRecommended && (
-        <span className="absolute -top-2 left-3 inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-          <Star className="h-2.5 w-2.5" />
+        <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">
+          <Star className="h-2 w-2" />
           Empfohlen
         </span>
       )}
 
       {/* Selected check */}
       {isSelected && (
-        <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--sce-primary)] text-white">
-          <Check className="h-3 w-3" />
+        <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--sce-primary)] text-white">
+          <Check className="h-2.5 w-2.5" />
         </span>
       )}
 
-      {/* Pitch visual */}
-      <div className="mb-2 flex justify-center">
-        <PitchVisual resourceType={resourceType} resourceName={resourceName} state={state} />
+      {/* Pitch/hall visual — compact size */}
+      <div className="mb-1.5 flex justify-center">
+        <PitchVisual
+          resourceType={resourceType}
+          resourceName={resourceName}
+          state={state}
+          compact
+          facilityType={facilityType}
+        />
       </div>
 
-      {/* Names */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{facilityName}</p>
-      <p className="mt-0.5 text-sm font-semibold leading-tight text-[var(--foreground)]">{resourceName}</p>
+      {/* Resource name only (facility shown as section header above) */}
+      <p className="text-xs font-semibold leading-tight text-[var(--foreground)] truncate">{resourceName}</p>
 
       {/* Status */}
-      <div className="mt-1.5">
+      <div className="mt-1">
         {isNeutral && (
-          <p className="text-xs text-[var(--muted)]">Verfügbarkeit nach Zeit</p>
+          <p className="text-[10px] text-[var(--muted)]">Zeit wählen</p>
         )}
         {isFree && !isSelected && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
             Frei
           </span>
         )}
         {isSelected && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--sce-primary)]">
-            <Check className="h-3 w-3" />
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--sce-primary)]">
+            <Check className="h-2.5 w-2.5" />
             Ausgewählt
           </span>
-        )}
-        {isOccupied && (
-          <div>
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 inline-block" />
-              Belegt
-            </span>
-            {annotation?.conflictLabel && (
-              <p className="mt-0.5 text-[11px] leading-tight text-rose-700 font-medium truncate" title={annotation.conflictLabel}>
-                {annotation.conflictLabel}
-              </p>
-            )}
-            {conflictTime && (
-              <p className="text-[11px] text-rose-600">{conflictTime}</p>
-            )}
-          </div>
         )}
       </div>
 
       {/* Action hint */}
       {isFree && !isSelected && !disabled && (
-        <p className="mt-2 text-[11px] font-medium text-[var(--sce-primary)] opacity-0 transition-opacity group-hover:opacity-100">
+        <p className="mt-1 text-[10px] font-medium text-[var(--sce-primary)] opacity-0 transition-opacity group-hover:opacity-100">
           Auswählen →
         </p>
       )}
@@ -336,6 +356,113 @@ function AvailabilitySummary({
   );
 }
 
+// ── FacilitySection ───────────────────────────────────────────────────────────
+
+/**
+ * Renders one facility group with a header and a grid of resource cards.
+ * Groups FULL_PITCH + HALF_PITCH siblings visually under one facility banner.
+ */
+type FacilitySectionProps = {
+  group: FacilityGroup;
+  selectedResourceIds: Set<string>;
+  availabilityByResourceId: Map<string, ResourceAvailabilityAnnotation>;
+  recommendedIds: Set<string>;
+  disabled: boolean;
+  onSelect: (id: string) => void;
+  onDeselect: (id: string) => void;
+  testId?: string;
+  compact?: boolean;
+};
+
+function FacilitySection({
+  group,
+  selectedResourceIds,
+  availabilityByResourceId,
+  recommendedIds,
+  disabled,
+  onSelect,
+  onDeselect,
+  testId,
+  compact = false,
+}: FacilitySectionProps) {
+  const freeResources = group.resources.filter(
+    (r) => availabilityByResourceId.get(r.id)?.status === "FREE" && !recommendedIds.has(r.id),
+  );
+  const occupiedResources = group.resources.filter((r) => availabilityByResourceId.get(r.id)?.status === "OCCUPIED");
+  const neutralResources = group.resources.filter((r) => !availabilityByResourceId.has(r.id));
+
+  // Show occupied resources first in a compact horizontal list, then free/neutral as cards
+  // Recommended resources are excluded from freeResources (shown in the strip above).
+  const selectableResources = [...freeResources, ...neutralResources];
+
+  return (
+    <div className="space-y-2">
+      {/* Facility header */}
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          {group.facilityName}
+        </p>
+        {group.facilityType === "INDOOR_HALL" && (
+          <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Halle
+          </span>
+        )}
+      </div>
+
+      {/* Occupied: compact horizontal strip */}
+      {occupiedResources.length > 0 && (
+        <div className="space-y-1">
+          {occupiedResources.map((r) => (
+            <ResourceCard
+              key={r.id}
+              facilityName={group.facilityName}
+              facilityType={group.facilityType ?? r.facilityType}
+              resourceName={r.name}
+              resourceId={r.id}
+              resourceType={r.type}
+              annotation={availabilityByResourceId.get(r.id)}
+              isSelected={selectedResourceIds.has(r.id)}
+              isRecommended={false}
+              disabled={disabled}
+              onSelect={() => onSelect(r.id)}
+              onDeselect={() => onDeselect(r.id)}
+              testId={testId}
+              compact={compact}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Selectable: card grid */}
+      {selectableResources.length > 0 && (
+        <div className={cn(
+          "grid gap-2",
+          compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3",
+        )}>
+          {selectableResources.map((r) => (
+            <ResourceCard
+              key={r.id}
+              facilityName={group.facilityName}
+              facilityType={group.facilityType ?? r.facilityType}
+              resourceName={r.name}
+              resourceId={r.id}
+              resourceType={r.type}
+              annotation={availabilityByResourceId.get(r.id)}
+              isSelected={selectedResourceIds.has(r.id)}
+              isRecommended={recommendedIds.has(r.id)}
+              disabled={disabled}
+              onSelect={() => onSelect(r.id)}
+              onDeselect={() => onDeselect(r.id)}
+              testId={testId}
+              compact={compact}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function VisualResourceAvailabilityPicker({
@@ -350,6 +477,7 @@ export function VisualResourceAvailabilityPicker({
   recommendedLabel = "Empfohlene Spielfelder",
   allResourcesLabel = "Alle Spielfelder",
   emptyMessage = "Keine Spielfelder / Hallen konfiguriert.",
+  compact = false,
 }: VisualResourceAvailabilityPickerProps) {
   const allResources = useMemo(
     () => facilityGroups.flatMap((fg) => fg.resources),
@@ -366,16 +494,6 @@ export function VisualResourceAvailabilityPicker({
     [facilityGroups, availabilityByResourceId, hasAvailabilityData, maxRecommended],
   );
 
-  const recommendedResources = useMemo(
-    () => allResources.filter((r) => recommendedIds.has(r.id)),
-    [allResources, recommendedIds],
-  );
-
-  const nonRecommendedResources = useMemo(
-    () => allResources.filter((r) => !recommendedIds.has(r.id)),
-    [allResources, recommendedIds],
-  );
-
   if (allResources.length === 0) {
     return <p className="text-sm text-[var(--muted)] italic">{emptyMessage}</p>;
   }
@@ -387,81 +505,67 @@ export function VisualResourceAvailabilityPicker({
         <AvailabilitySummary facilityGroups={facilityGroups} availability={availabilityByResourceId} />
       </div>
 
-      {/* Recommended resources */}
-      {hasAvailabilityData && recommendedResources.length > 0 && (
-        <div>
+      {/* Recommended strip — only shown when availability data is present */}
+      {hasAvailabilityData && recommendedIds.size > 0 && (
+        <div data-testid={testId ? `${testId}-recommended` : undefined}>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             {recommendedLabel}
           </p>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" data-testid={testId ? `${testId}-recommended` : undefined}>
-            {recommendedResources.map((resource) => (
-              <ResourceCard
-                key={resource.id}
-                facilityName={resource.facilityName}
-                resourceName={resource.name}
-                resourceId={resource.id}
-                resourceType={resource.type}
-                annotation={availabilityByResourceId.get(resource.id)}
-                isSelected={selectedResourceIds.has(resource.id)}
-                isRecommended={true}
-                disabled={disabled}
-                onSelect={() => onSelect(resource.id)}
-                onDeselect={() => onDeselect(resource.id)}
-                testId={testId}
-              />
-            ))}
+          <div className={cn(
+            "grid gap-2",
+            compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3",
+          )}>
+            {facilityGroups.flatMap((fg) =>
+              fg.resources
+                .filter((r) => recommendedIds.has(r.id))
+                .map((r) => (
+                  <ResourceCard
+                    key={r.id}
+                    facilityName={fg.facilityName}
+                    facilityType={fg.facilityType ?? r.facilityType}
+                    resourceName={r.name}
+                    resourceId={r.id}
+                    resourceType={r.type}
+                    annotation={availabilityByResourceId.get(r.id)}
+                    isSelected={selectedResourceIds.has(r.id)}
+                    isRecommended={true}
+                    disabled={disabled}
+                    onSelect={() => onSelect(r.id)}
+                    onDeselect={() => onDeselect(r.id)}
+                    testId={testId}
+                    compact={compact}
+                  />
+                ))
+            )}
           </div>
         </div>
       )}
 
-      {/* All resources (non-recommended) — only rendered when there IS availability data */}
-      {hasAvailabilityData && nonRecommendedResources.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            {recommendedResources.length > 0 ? allResourcesLabel : "Spielfelder / Hallen"}
+      {/* All resources — grouped per facility, with facility hierarchy */}
+      <div
+        className="space-y-4"
+        data-testid={testId ? `${testId}-all` : undefined}
+      >
+        {hasAvailabilityData && recommendedIds.size > 0 && (
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            {allResourcesLabel}
           </p>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" data-testid={testId ? `${testId}-all` : undefined}>
-            {nonRecommendedResources.map((resource) => (
-              <ResourceCard
-                key={resource.id}
-                facilityName={resource.facilityName}
-                resourceName={resource.name}
-                resourceId={resource.id}
-                resourceType={resource.type}
-                annotation={availabilityByResourceId.get(resource.id)}
-                isSelected={selectedResourceIds.has(resource.id)}
-                isRecommended={false}
-                disabled={disabled}
-                onSelect={() => onSelect(resource.id)}
-                onDeselect={() => onDeselect(resource.id)}
-                testId={testId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* No availability data yet — show all resources as neutral */}
-      {!hasAvailabilityData && allResources.length > 0 && (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" data-testid={testId ? `${testId}-all` : undefined}>
-          {allResources.map((resource) => (
-            <ResourceCard
-              key={resource.id}
-              facilityName={resource.facilityName}
-              resourceName={resource.name}
-              resourceId={resource.id}
-              resourceType={resource.type}
-              annotation={availabilityByResourceId.get(resource.id)}
-              isSelected={selectedResourceIds.has(resource.id)}
-              isRecommended={false}
-              disabled={disabled}
-              onSelect={() => onSelect(resource.id)}
-              onDeselect={() => onDeselect(resource.id)}
-              testId={testId}
-            />
-          ))}
-        </div>
-      )}
+        )}
+        {facilityGroups.map((fg) => (
+          <FacilitySection
+            key={fg.facilityId}
+            group={fg}
+            selectedResourceIds={selectedResourceIds}
+            availabilityByResourceId={availabilityByResourceId}
+            recommendedIds={recommendedIds}
+            disabled={disabled}
+            onSelect={onSelect}
+            onDeselect={onDeselect}
+            testId={testId}
+            compact={compact}
+          />
+        ))}
+      </div>
     </div>
   );
 }

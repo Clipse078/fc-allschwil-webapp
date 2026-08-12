@@ -94,6 +94,7 @@ export default async function MatchcenterDetailPage({
       .map((facility) => ({
         facilityId: facility.id,
         facilityName: facility.name,
+        facilityType: facility.type as string,
         resources: facility.resources
           .filter((resource) => classifyFacilityResourceType(resource.type) === group)
           .map((resource) => ({
@@ -103,6 +104,7 @@ export default async function MatchcenterDetailPage({
             type: resource.type,
             facilityId: facility.id,
             facilityName: facility.name,
+            facilityType: facility.type as string,
           })),
       }))
       .filter((fg) => fg.resources.length > 0);

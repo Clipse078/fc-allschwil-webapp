@@ -13,11 +13,23 @@ export type ResourceOption = {
   type: FacilityResourceType;
   facilityId: string;
   facilityName: string;
+  /**
+   * PLANNING-RESOURCE-UX-01-C2 — optional facility-level type (e.g. "PITCH",
+   * "INDOOR_HALL") for MVP visual differentiation in PitchVisual. Allows
+   * rendering a neutral hall visual for FULL_PITCH/HALF_PITCH resources that
+   * belong to an indoor hall facility, without a schema change.
+   */
+  facilityType?: string;
 };
 
 export type FacilityGroup = {
   facilityId: string;
   facilityName: string;
+  /**
+   * PLANNING-RESOURCE-UX-01-C2 — optional facility-level type for visual
+   * grouping and correct icon rendering in visual pickers.
+   */
+  facilityType?: string;
   resources: ResourceOption[];
 };
 

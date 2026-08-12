@@ -6,16 +6,14 @@
  * PLANNING-RESOURCE-UX-01 — shared visual dressing-room picker for the
  * complete Planning family.
  *
- * Uses the same availability-first language as VisualResourceAvailabilityPicker:
- *   - Free rooms shown with green status
- *   - Occupied rooms remain visible with team/activity/time
- *   - Selected rooms shown with primary brand accent + check
+ * PLANNING-RESOURCE-UX-01-C2 — corrective UX pass:
+ *   - Occupied rooms: compact single-row display (name + "Belegt" + context),
+ *     no longer rendered as large cards — fits more rooms in narrow columns.
+ *   - Free rooms: clear card, easy to select.
+ *   - Compact mode for Wochenplaner editor context.
  *
  * MatchCenter: pass `label` as "Heimkabine" or "Gastkabine" to semantically
- * distinguish the two assignment slots — the shared component renders them
- * identically, the caller differentiates via label.
- *
- * No pitch SVG — dressing rooms use a compact room icon layout.
+ * distinguish the two assignment slots.
  */
 
 import { useCallback } from "react";
@@ -43,6 +41,8 @@ export type VisualDressingRoomPickerProps = {
   testId?: string;
   /** Empty state message when tenant has no dressing rooms configured. */
   emptyMessage?: string;
+  /** Compact layout for narrow contexts (Wochenplaner editor). */
+  compact?: boolean;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -55,9 +55,52 @@ function formatClockTime(iso: string): string {
   }
 }
 
-// ── DressingRoomCard ──────────────────────────────────────────────────────────
+// ── OccupiedRoomChip — very compact occupied display ──────────────────────────
 
-type DressingRoomCardProps = {
+function OccupiedRoomChip({
+  resourceName,
+  resourceId,
+  annotation,
+  testId,
+}: {
+  resourceName: string;
+  resourceId: string;
+  annotation: ResourceAvailabilityAnnotation | undefined;
+  testId?: string;
+}) {
+  const conflictTime =
+    annotation?.conflictStartAt && annotation?.conflictEndAt
+      ? `${formatClockTime(annotation.conflictStartAt)}–${formatClockTime(annotation.conflictEndAt)}`
+      : null;
+
+  const rawLabel = annotation?.conflictLabel ?? null;
+  const shortLabel = rawLabel && rawLabel.length > 28 ? rawLabel.slice(0, 26) + "…" : rawLabel;
+
+  return (
+    <div
+      data-testid={testId ? `${testId}-card-${resourceId}` : undefined}
+      className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/60 px-2.5 py-1.5"
+      title={rawLabel ?? undefined}
+    >
+      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500 inline-block" />
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-xs font-semibold text-[var(--foreground)]">{resourceName}</span>
+          <span className="text-[10px] font-medium text-rose-600">Belegt</span>
+        </div>
+        {(shortLabel || conflictTime) && (
+          <p className="text-[10px] text-rose-700 leading-tight truncate">
+            {[shortLabel, conflictTime].filter(Boolean).join(" · ")}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── FreeRoomCard ──────────────────────────────────────────────────────────────
+
+type FreeRoomCardProps = {
   resourceName: string;
   resourceId: string;
   annotation: ResourceAvailabilityAnnotation | undefined;
@@ -66,9 +109,10 @@ type DressingRoomCardProps = {
   onSelect: () => void;
   onDeselect: () => void;
   testId?: string;
+  compact?: boolean;
 };
 
-function DressingRoomCard({
+function FreeRoomCard({
   resourceName,
   resourceId,
   annotation,
@@ -77,114 +121,89 @@ function DressingRoomCard({
   onSelect,
   onDeselect,
   testId,
-}: DressingRoomCardProps) {
+  compact = false,
+}: FreeRoomCardProps) {
   const isFree = annotation?.status === "FREE";
-  const isOccupied = annotation?.status === "OCCUPIED";
   const isNeutral = !annotation;
 
-  const conflictTime =
-    annotation?.conflictStartAt && annotation?.conflictEndAt
-      ? `${formatClockTime(annotation.conflictStartAt)}–${formatClockTime(annotation.conflictEndAt)}`
-      : null;
-
   const handleClick = useCallback(() => {
-    if (disabled || isOccupied) return;
+    if (disabled) return;
     if (isSelected) onDeselect();
     else onSelect();
-  }, [disabled, isOccupied, isSelected, onSelect, onDeselect]);
+  }, [disabled, isSelected, onSelect, onDeselect]);
 
   const borderClass = isSelected
     ? "border-[var(--sce-primary)] ring-1 ring-[var(--sce-primary)]"
     : isFree
       ? "border-emerald-300 hover:border-emerald-400"
-      : isOccupied
-        ? "border-rose-200"
-        : "border-[var(--border)]";
+      : "border-[var(--border)]";
 
   const bgClass = isSelected
     ? "bg-blue-50"
-    : isOccupied
-      ? "bg-rose-50/50"
-      : "bg-[var(--surface)]";
-
-  const isClickable = !disabled && !isOccupied;
+    : "bg-[var(--surface)]";
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      disabled={disabled || isOccupied}
+      disabled={disabled}
       data-testid={testId ? `${testId}-card-${resourceId}` : undefined}
       aria-pressed={isSelected}
-      aria-label={`${resourceName} ${isSelected ? "ausgewählt" : isFree ? "Frei" : isOccupied ? "Belegt" : ""}`}
+      aria-label={`${resourceName} ${isSelected ? "ausgewählt" : isFree ? "Frei" : ""}`}
       className={cn(
-        "group relative flex w-full flex-col items-center rounded-xl border p-3 text-center transition-all",
+        "group relative flex flex-col items-center rounded-xl border text-center transition-all",
+        compact ? "px-2 py-1.5" : "p-3",
         borderClass,
         bgClass,
-        isClickable
-          ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1"
-          : "cursor-default",
-        disabled && !isOccupied && "opacity-50",
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1",
       )}
     >
       {/* Selected check */}
       {isSelected && (
-        <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--sce-primary)] text-white">
+        <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--sce-primary)] text-white">
           <Check className="h-2.5 w-2.5" />
         </span>
       )}
 
-      {/* Room icon */}
+      {/* Room icon — compact or normal */}
       <div
         className={cn(
-          "mb-2 flex h-10 w-10 items-center justify-center rounded-lg border-2",
+          "flex items-center justify-center rounded-lg border-2",
+          compact ? "mb-1 h-8 w-8" : "mb-2 h-10 w-10",
           isSelected
             ? "border-[var(--sce-primary)] bg-blue-100 text-[var(--sce-primary)]"
             : isFree
               ? "border-emerald-300 bg-emerald-50 text-emerald-600"
-              : isOccupied
-                ? "border-rose-200 bg-rose-50 text-rose-500"
-                : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)]",
+              : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)]",
         )}
       >
-        <DoorOpen className="h-5 w-5" />
+        <DoorOpen className={compact ? "h-4 w-4" : "h-5 w-5"} />
       </div>
 
       {/* Room name */}
-      <p className="text-sm font-semibold text-[var(--foreground)] leading-tight">{resourceName}</p>
+      <p className={cn(
+        "font-semibold text-[var(--foreground)] leading-tight",
+        compact ? "text-xs" : "text-sm",
+      )}>
+        {resourceName}
+      </p>
 
       {/* Status */}
-      <div className="mt-1.5 min-h-[1.25rem]">
+      <div className="mt-1 min-h-[1rem]">
         {isNeutral && (
-          <p className="text-[11px] text-[var(--muted)]">Verfügbarkeit nach Zeit</p>
+          <p className="text-[10px] text-[var(--muted)]">Zeit wählen</p>
         )}
         {isFree && !isSelected && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
             Frei
           </span>
         )}
         {isSelected && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--sce-primary)]">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--sce-primary)]">
             <Check className="h-2.5 w-2.5" />
-            Ausgewählt
+            Gewählt
           </span>
-        )}
-        {isOccupied && (
-          <div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 inline-block" />
-              Belegt
-            </span>
-            {annotation?.conflictLabel && (
-              <p className="mt-0.5 text-[10px] leading-tight text-rose-700 truncate" title={annotation.conflictLabel}>
-                {annotation.conflictLabel}
-              </p>
-            )}
-            {conflictTime && (
-              <p className="text-[10px] text-rose-600">{conflictTime}</p>
-            )}
-          </div>
         )}
       </div>
     </button>
@@ -246,6 +265,7 @@ export function VisualDressingRoomPicker({
   singleSelect = false,
   testId,
   emptyMessage = "Keine Garderoben konfiguriert.",
+  compact = false,
 }: VisualDressingRoomPickerProps) {
   const allResources = facilityGroups.flatMap((fg) => fg.resources);
   const hasAvailabilityData = availabilityByResourceId.size > 0;
@@ -256,7 +276,6 @@ export function VisualDressingRoomPicker({
 
   const handleSelect = (resourceId: string) => {
     if (singleSelect) {
-      // Deselect all others first (single-select mode for Heimkabine/Gastkabine)
       for (const id of selectedResourceIds) {
         if (id !== resourceId) onDeselect(id);
       }
@@ -264,8 +283,15 @@ export function VisualDressingRoomPicker({
     onSelect(resourceId);
   };
 
+  const freeAndNeutral = allResources.filter(
+    (r) => availabilityByResourceId.get(r.id)?.status !== "OCCUPIED",
+  );
+  const occupied = allResources.filter(
+    (r) => availabilityByResourceId.get(r.id)?.status === "OCCUPIED",
+  );
+
   return (
-    <div className="space-y-3" data-testid={testId}>
+    <div className="space-y-2.5" data-testid={testId}>
       {label && (
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{label}</p>
@@ -279,24 +305,48 @@ export function VisualDressingRoomPicker({
         <AvailabilitySummary facilityGroups={facilityGroups} availability={availabilityByResourceId} />
       )}
 
-      <div
-        className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
-        data-testid={testId ? `${testId}-grid` : undefined}
-      >
-        {allResources.map((resource) => (
-          <DressingRoomCard
-            key={resource.id}
-            resourceName={resource.name}
-            resourceId={resource.id}
-            annotation={availabilityByResourceId.get(resource.id)}
-            isSelected={selectedResourceIds.has(resource.id)}
-            disabled={disabled}
-            onSelect={() => handleSelect(resource.id)}
-            onDeselect={() => onDeselect(resource.id)}
-            testId={testId}
-          />
-        ))}
-      </div>
+      {/* Occupied rooms — compact chip list */}
+      {occupied.length > 0 && (
+        <div className="space-y-1" data-testid={testId ? `${testId}-occupied` : undefined}>
+          {occupied.map((r) => (
+            <OccupiedRoomChip
+              key={r.id}
+              resourceName={r.name}
+              resourceId={r.id}
+              annotation={availabilityByResourceId.get(r.id)}
+              testId={testId}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Free / neutral rooms — card grid */}
+      {freeAndNeutral.length > 0 && (
+        <div
+          className={cn(
+            "grid gap-2",
+            compact
+              ? "grid-cols-3 sm:grid-cols-4"
+              : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5",
+          )}
+          data-testid={testId ? `${testId}-grid` : undefined}
+        >
+          {freeAndNeutral.map((resource) => (
+            <FreeRoomCard
+              key={resource.id}
+              resourceName={resource.name}
+              resourceId={resource.id}
+              annotation={availabilityByResourceId.get(resource.id)}
+              isSelected={selectedResourceIds.has(resource.id)}
+              disabled={disabled}
+              onSelect={() => handleSelect(resource.id)}
+              onDeselect={() => onDeselect(resource.id)}
+              testId={testId}
+              compact={compact}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
