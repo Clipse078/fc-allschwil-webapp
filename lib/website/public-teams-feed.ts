@@ -25,14 +25,35 @@ import { prisma } from "@/lib/db/prisma";
 import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 import type {
   PublicTeamListItem,
+  PublicTeamOrgUnit,
   PublicTeamDetail,
   PublicSquadMember,
   PublicTrainerMember,
   PublicTeamTrainingSession,
 } from "@/lib/website/types";
 
-// Local type matching the Prisma select shape, used to avoid implicit `any`
-// on the map callback (Prisma client must be generated for full inference).
+// ---------------------------------------------------------------------------
+// Local types matching the Prisma select shape
+// ---------------------------------------------------------------------------
+
+type OrgUnitRow = {
+  isPrimary: boolean;
+  displayOrder: number;
+  orgUnit: {
+    id: string;
+    name: string;
+    key: string;
+    sortOrder: number;
+  };
+};
+
+type TeamSeasonRow = {
+  displayName: string;
+  shortName: string | null;
+  season: { key: string; name: string };
+  orgUnits: OrgUnitRow[];
+};
+
 type TeamRow = {
   id: string;
   name: string;
@@ -40,11 +61,7 @@ type TeamRow = {
   category: string;
   genderGroup: string | null;
   ageGroup: string | null;
-  teamSeasons: Array<{
-    displayName: string;
-    shortName: string | null;
-    season: { key: string; name: string };
-  }>;
+  teamSeasons: TeamSeasonRow[];
 };
 
 export type GetPublicTeamsInput = {
@@ -55,10 +72,21 @@ export type GetPublicTeamsInput = {
 
 /**
  * Returns website-visible active teams for the given tenant with their
- * active-season display names.
+ * active-season display names and canonical OrgUnit grouping.
  *
- * Results are ordered by category, sortOrder, then name — consistent with
- * the admin teams list ordering.
+ * Active-season enforcement: only teams with a TeamSeason in the canonical
+ * active season are returned. Teams belonging exclusively to historical/inactive
+ * seasons are excluded from the public teams directory.
+ *
+ * OrgUnit grouping: the primary OrgUnit (TeamSeasonOrgUnit.isPrimary = true)
+ * for the active season is included in the response. FCA website consumers must
+ * group/filter by `orgUnit.name` and `orgUnit.key` — not by the deprecated
+ * `category` enum.
+ *
+ * Results are sorted in application code after fetching:
+ *   1. OrgUnit.sortOrder (primary OrgUnit ascending; teams with no OrgUnit last)
+ *   2. Team.sortOrder ascending
+ *   3. Team.name ascending
  */
 export async function getPublicTeams(
   input: GetPublicTeamsInput,
@@ -68,13 +96,17 @@ export async function getPublicTeams(
   // the admin Teams UI/TrainingCenter for the same Team.
   const seasonWhere = currentTeamSeasonWhere(input.seasonKey);
 
+  // Active-season filter: `some: seasonWhere` ensures only teams with a
+  // TeamSeason in the canonical active season are included. Teams that exist
+  // only in historical seasons are excluded from the public directory.
   const teams = await prisma.team.findMany({
     where: {
       tenantId: input.tenantId,
       isActive: true,
       websiteVisible: true,
+      teamSeasons: { some: seasonWhere },
     },
-    orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     select: {
       id: true,
       name: true,
@@ -82,6 +114,7 @@ export async function getPublicTeams(
       category: true,
       genderGroup: true,
       ageGroup: true,
+      sortOrder: true,
       teamSeasons: {
         where: seasonWhere,
         orderBy: { createdAt: "desc" },
@@ -90,13 +123,42 @@ export async function getPublicTeams(
           displayName: true,
           shortName: true,
           season: { select: { key: true, name: true } },
+          // TEAM-CORE-02: canonical OrgUnit grouping via TeamSeasonOrgUnit
+          orgUnits: {
+            orderBy: [{ isPrimary: "desc" }, { displayOrder: "asc" }],
+            take: 1,
+            select: {
+              isPrimary: true,
+              displayOrder: true,
+              orgUnit: {
+                select: {
+                  id: true,
+                  name: true,
+                  key: true,
+                  sortOrder: true,
+                },
+              },
+            },
+          },
         },
       },
     },
   });
 
-  return (teams as TeamRow[]).map((team) => {
+  const mapped = (teams as (TeamRow & { sortOrder: number })[]).map((team) => {
     const activeSeason = team.teamSeasons[0] ?? null;
+    const primaryOrgUnitLink = activeSeason?.orgUnits[0] ?? null;
+
+    const orgUnit: PublicTeamOrgUnit | null = primaryOrgUnitLink
+      ? {
+          id: primaryOrgUnitLink.orgUnit.id,
+          name: primaryOrgUnitLink.orgUnit.name,
+          key: primaryOrgUnitLink.orgUnit.key,
+          sortOrder: primaryOrgUnitLink.orgUnit.sortOrder,
+          isPrimary: primaryOrgUnitLink.isPrimary,
+        }
+      : null;
+
     return {
       id: team.id,
       name: team.name,
@@ -107,8 +169,25 @@ export async function getPublicTeams(
       displayName: activeSeason?.displayName ?? team.name,
       shortName: activeSeason?.shortName ?? null,
       season: activeSeason?.season ?? null,
+      orgUnit,
+      // Keep _sortKey for application-level secondary sort; dropped before return
+      _orgUnitSortOrder: orgUnit?.sortOrder ?? Number.MAX_SAFE_INTEGER,
+      _teamSortOrder: team.sortOrder,
     };
   });
+
+  // Sort by OrgUnit.sortOrder (canonical grouping order), then team.sortOrder, then name
+  mapped.sort((a, b) => {
+    if (a._orgUnitSortOrder !== b._orgUnitSortOrder) {
+      return a._orgUnitSortOrder - b._orgUnitSortOrder;
+    }
+    if (a._teamSortOrder !== b._teamSortOrder) {
+      return a._teamSortOrder - b._teamSortOrder;
+    }
+    return a.name.localeCompare(b.name, "de");
+  });
+
+  return mapped.map(({ _orgUnitSortOrder: _o, _teamSortOrder: _t, ...item }) => item);
 }
 
 // ---------------------------------------------------------------------------
