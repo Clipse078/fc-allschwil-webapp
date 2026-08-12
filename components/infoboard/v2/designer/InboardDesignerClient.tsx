@@ -4,25 +4,22 @@
  * components/infoboard/v2/designer/InboardDesignerClient.tsx
  *
  * Infoboard Designer — 3-panel layout:
- *   LEFT   Widget palette (widget types + enable/disable)
- *   CENTER 16:9 live preview (same renderer as public kiosk)
- *   RIGHT  Contextual settings for the selected widget
+ *   LEFT   Widget palette (~210px) — widget types + enable/disable
+ *   CENTER Live 16:9 preview (1fr) — same renderer as kiosk, visual focus
+ *   RIGHT  Contextual settings (~300px) for the selected widget
  *
  * Design principles (Škoda-like, controlled customisation):
- *   - Users choose what is shown, where, how large, which variant
- *   - SportClubEvo retains guardrails: layout stays readable and premium
- *   - No free-form pixel canvas; controlled 12-column grid model
+ *   - Preview is the dominant workspace; panels serve it
  *   - Changes reflect immediately in the live preview
+ *   - Settings are compact, contextual, grouped
+ *   - Selected widget state is unmistakable
+ *   - Save state is always visible and accurate
  *
- * State:
- *   - layout: InboardLayout (widget instances with enabled, position, settings)
- *   - selectedWidgetType: which widget's settings are shown in the right panel
- *   - dirty: whether unsaved changes exist
- *   - saving: PATCH in progress
- *
- * Persistence:
- *   - Saves layoutJson (full widget config) + flat fields (for kiosk compat)
- *   - Single PATCH /api/infoboards/[id] on "Speichern"
+ * Save states:
+ *   Unsaved  → amber "Ungespeichert" badge + disabled save button highlighted
+ *   Saving   → button text "Speichert…" + spinner, button disabled
+ *   Saved    → button text "Gespeichert ✓" + CheckCircle, badge cleared
+ *   Failed   → error banner, button re-enabled
  */
 
 import { useState, useCallback } from "react";
@@ -35,6 +32,7 @@ import {
   CheckCircle,
   Circle,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 import { InboardLivePreview } from "../InboardLivePreview";
@@ -146,23 +144,23 @@ export function InboardDesignerClient({
     setSaveError(null);
 
     // Derive flat fields from widget settings (keeps kiosk compat)
-    const headerSettings = findWidget(layout, "HEADER")
+    const hSettings = findWidget(layout, "HEADER")
       ?.settings as HeaderWidgetSettings | undefined;
-    const announcementWidget = findWidget(layout, "ANNOUNCEMENT");
-    const annSettings = announcementWidget?.settings as AnnouncementWidgetSettings | undefined;
-    const announcementEnabled = announcementWidget?.enabled ?? false;
+    const annWidget = findWidget(layout, "ANNOUNCEMENT");
+    const aSettings = annWidget?.settings as AnnouncementWidgetSettings | undefined;
+    const announcementEnabled = annWidget?.enabled ?? false;
 
     const payload = {
       layoutJson: JSON.stringify(layout),
-      // Sync flat fields with widget settings
-      headerSubtitleEnabled: headerSettings?.subtitleEnabled ?? true,
-      headerSubtitleText: headerSettings?.subtitleText ?? null,
-      headerShowTime: headerSettings?.showTime ?? true,
-      headerShowDate: headerSettings?.showDate ?? true,
+      // Sync flat fields so kiosk renderer always has current values
+      headerSubtitleEnabled: hSettings?.subtitleEnabled ?? true,
+      headerSubtitleText: hSettings?.subtitleText ?? null,
+      headerShowTime: hSettings?.showTime ?? true,
+      headerShowDate: hSettings?.showDate ?? true,
       announcementEnabled,
-      announcementText: announcementEnabled ? (annSettings?.text ?? null) : null,
-      announcementBgColor: announcementEnabled ? (annSettings?.bgColor ?? null) : null,
-      announcementTextColor: announcementEnabled ? (annSettings?.textColor ?? null) : null,
+      announcementText: announcementEnabled ? (aSettings?.text ?? null) : null,
+      announcementBgColor: announcementEnabled ? (aSettings?.bgColor ?? null) : null,
+      announcementTextColor: announcementEnabled ? (aSettings?.textColor ?? null) : null,
     };
 
     try {
@@ -193,25 +191,53 @@ export function InboardDesignerClient({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Designer toolbar */}
-      <div className="flex items-center justify-between gap-3 min-h-[36px]">
+    <div className="flex flex-col gap-3">
+
+      {/* ── Toolbar ────────────────────────────────────────────────────── */}
+      <div
+        className="flex items-center justify-between gap-3 min-h-[36px]"
+        role="toolbar"
+        aria-label="Designer-Steuerung"
+      >
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />
           <span className="text-[0.8rem] font-medium text-[var(--text-2)]">Designer</span>
-          {dirty && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 text-[0.68rem] font-medium text-amber-600">
+          {dirty && !saving && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-amber-400/10 border border-amber-400/25 px-2 py-0.5 text-[0.68rem] font-semibold text-amber-600"
+              aria-live="polite"
+              aria-label="Ungespeicherte Änderungen vorhanden"
+            >
               Ungespeichert
+            </span>
+          )}
+          {saving && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 border border-blue-400/20 px-2 py-0.5 text-[0.68rem] font-medium text-blue-600">
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Speichert…
+            </span>
+          )}
+          {saved && !dirty && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-400/20 px-2 py-0.5 text-[0.68rem] font-medium text-emerald-600">
+              <CheckCircle className="h-3 w-3" aria-hidden="true" />
+              Gespeichert
             </span>
           )}
         </div>
         <button
           onClick={() => void handleSave()}
           disabled={saving || !dirty}
-          className="fca-button-primary inline-flex items-center gap-1.5 text-[0.78rem] disabled:opacity-40"
+          aria-label="Änderungen speichern"
+          className={`inline-flex items-center gap-1.5 text-[0.78rem] rounded-[var(--radius-md)] px-3 py-1.5 font-medium transition-colors disabled:opacity-40 ${
+            dirty && !saving
+              ? "fca-button-primary ring-2 ring-[var(--sce-primary)]/30 ring-offset-1"
+              : "fca-button-primary"
+          }`}
           data-testid="designer-save-button"
         >
-          {saved ? (
+          {saving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : saved ? (
             <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
           ) : (
             <Save className="h-3.5 w-3.5" aria-hidden="true" />
@@ -220,28 +246,38 @@ export function InboardDesignerClient({
         </button>
       </div>
 
+      {/* Save error banner */}
       {saveError && (
-        <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2">
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2"
+        >
           <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0" aria-hidden="true" />
           <p className="text-[0.78rem] text-red-700">{saveError}</p>
         </div>
       )}
 
-      {/* 3-panel layout */}
-      <div className="grid grid-cols-[200px_1fr_260px] gap-4 items-start min-h-[420px]">
+      {/* ── 3-panel Designer workspace ─────────────────────────────────── */}
+      {/*
+        LEFT  ~210px  — widget palette (compact control surface)
+        CENTER 1fr    — 16:9 live preview (visual focus / dominant)
+        RIGHT ~300px  — contextual settings panel
+      */}
+      <div className="grid grid-cols-[210px_1fr_300px] gap-4 items-start">
 
-        {/* ── LEFT: Widget palette ────────────────────────────────────────── */}
+        {/* ── LEFT: Widget palette ──────────────────────────────────────── */}
         <aside
           className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
           aria-label="Widget-Auswahl"
           data-testid="widget-palette"
         >
-          <div className="px-3 py-2.5 border-b border-[var(--border)] bg-[var(--surface-3)]">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+          <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-3)]">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
               Widgets
             </p>
           </div>
-          <ul className="py-1.5" role="list">
+
+          <ul className="py-1" role="list">
             {WIDGET_ORDER.map((type) => {
               const widget = findWidget(layout, type);
               const isEnabled = widget?.enabled ?? true;
@@ -251,29 +287,34 @@ export function InboardDesignerClient({
                 <li key={type}>
                   <button
                     onClick={() => setSelectedWidget(type)}
-                    className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                    className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left transition-all ${
                       isSelected
-                        ? "bg-[var(--sce-primary)]/8 border-l-2 border-[var(--sce-primary)]"
-                        : "border-l-2 border-transparent hover:bg-[var(--surface-3)]"
-                    } ${!isEnabled ? "opacity-50" : ""}`}
+                        ? "bg-[var(--sce-primary)]/10 border-l-[3px] border-[var(--sce-primary)] shadow-[inset_0_0_0_1px_var(--sce-primary-light,rgba(var(--sce-primary-rgb,59,130,246),0.15))]"
+                        : "border-l-[3px] border-transparent hover:bg-[var(--surface-3)] hover:border-[var(--border)]"
+                    }`}
                     aria-pressed={isSelected}
+                    aria-current={isSelected ? "true" : undefined}
                     data-testid={`widget-palette-item-${type.toLowerCase()}`}
                   >
-                    <div className={`mt-0.5 shrink-0 ${isSelected ? "text-[var(--sce-primary)]" : "text-[var(--muted)]"}`}>
+                    <div className={`mt-0.5 shrink-0 transition-colors ${
+                      isSelected ? "text-[var(--sce-primary)]" : "text-[var(--muted)]"
+                    }`}>
                       {WIDGET_ICON[type]}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-[0.8rem] font-medium truncate ${isSelected ? "text-[var(--sce-primary)]" : "text-[var(--foreground)]"}`}>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-[0.8rem] font-semibold truncate transition-colors ${
+                          isSelected ? "text-[var(--sce-primary)]" : "text-[var(--foreground)]"
+                        }`}>
                           {WIDGET_LABELS[type]}
                         </span>
                         {!isEnabled && (
-                          <span className="shrink-0 text-[0.62rem] font-medium text-[var(--muted)] bg-[var(--surface-3)] border border-[var(--border)] rounded px-1 py-0.5 leading-none">
+                          <span className="shrink-0 text-[0.6rem] font-semibold tracking-wide text-[var(--muted)] bg-[var(--surface-3)] border border-[var(--border)] rounded px-1 py-0.5 leading-none uppercase">
                             AUS
                           </span>
                         )}
                       </div>
-                      <p className="text-[0.68rem] text-[var(--muted)] mt-0.5 leading-snug line-clamp-2">
+                      <p className="text-[0.67rem] text-[var(--muted)] mt-0.5 leading-snug line-clamp-2">
                         {WIDGET_DESCRIPTIONS[type]}
                       </p>
                     </div>
@@ -283,73 +324,88 @@ export function InboardDesignerClient({
             })}
           </ul>
 
-          {/* Widget enabled/disabled toggle for selected */}
+          {/* Widget enable/disable toggle for selected widget */}
           {selectedWidget && (
             <div className="px-3 py-2.5 border-t border-[var(--border)] bg-[var(--surface-3)]">
               {(() => {
                 const widget = findWidget(layout, selectedWidget);
                 const isEnabled = widget?.enabled ?? true;
-                const isLocked = selectedWidget === "ACTIVITIES"; // Activities always on
+                const isLocked = selectedWidget === "ACTIVITIES";
+                const toggleId = `widget-toggle-${selectedWidget.toLowerCase()}`;
                 return (
-                  <label className={`flex items-center gap-2 ${isLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                    <input
-                      type="checkbox"
-                      checked={isEnabled}
+                  <div className={`flex items-center gap-2 ${isLocked ? "opacity-50" : ""}`}>
+                    <button
+                      role="switch"
+                      id={toggleId}
+                      aria-checked={isEnabled}
+                      aria-label={`${WIDGET_LABELS[selectedWidget]} ${isEnabled ? "deaktivieren" : "aktivieren"}`}
                       disabled={isLocked}
-                      onChange={(e) => setWidgetEnabled(selectedWidget, e.target.checked)}
-                      className="sr-only"
-                    />
-                    <div
-                      className={`h-4 w-7 rounded-full transition-colors relative ${
-                        isEnabled ? "bg-[var(--sce-primary)]" : "bg-[var(--surface-3)] border border-[var(--border)]"
+                      onClick={() => !isLocked && setWidgetEnabled(selectedWidget, !isEnabled)}
+                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] ${
+                        isLocked ? "cursor-not-allowed" : "cursor-pointer"
+                      } ${
+                        isEnabled ? "bg-[var(--sce-primary)]" : "bg-[var(--border)] border border-[var(--border)]"
                       }`}
                     >
-                      <div
-                        className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${
-                          isEnabled ? "translate-x-3" : "translate-x-0.5"
+                      <span
+                        className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                          isEnabled ? "translate-x-3.5" : "translate-x-0.5"
                         }`}
                       />
-                    </div>
-                    <span className="text-[0.72rem] text-[var(--foreground)]">
-                      {isEnabled ? "Aktiv" : "Deaktiviert"}
-                    </span>
+                    </button>
+                    <label
+                      htmlFor={toggleId}
+                      className={`text-[0.72rem] select-none ${
+                        isLocked ? "cursor-not-allowed text-[var(--muted)]" : "cursor-pointer text-[var(--foreground)]"
+                      }`}
+                    >
+                      {isLocked
+                        ? "Immer aktiv"
+                        : isEnabled
+                          ? "Aktiv"
+                          : "Deaktiviert"}
+                    </label>
                     {isLocked && (
                       <Circle className="h-3 w-3 text-[var(--muted)]" aria-hidden="true" />
                     )}
-                  </label>
+                  </div>
                 );
               })()}
             </div>
           )}
         </aside>
 
-        {/* ── CENTER: Live preview ────────────────────────────────────────── */}
-        <div className="space-y-2">
+        {/* ── CENTER: Live preview (dominant) ───────────────────────────── */}
+        <div className="space-y-1.5 min-w-0">
           <InboardLivePreview
             theme={board.displayTheme as "DARK" | "LIGHT" | null}
             headerConfig={previewHeaderConfig}
             announcement={previewAnnouncement}
             className="border border-[var(--border)] shadow-sm"
           />
-          <p className="text-center text-[0.68rem] text-[var(--muted)]">
-            Vorschau — Beispieldaten · Kiosk-Anzeige kann leicht abweichen
+          <p className="text-center text-[0.66rem] text-[var(--muted)]">
+            Vorschau · Beispieldaten — Kiosk-Anzeige verwendet Echtdaten
           </p>
         </div>
 
-        {/* ── RIGHT: Widget settings ──────────────────────────────────────── */}
+        {/* ── RIGHT: Widget settings ────────────────────────────────────── */}
         <aside
           className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
           aria-label="Widget-Einstellungen"
           data-testid="widget-settings-panel"
         >
           <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-3)] flex items-center gap-2">
-            <span className="text-[var(--muted)]">{WIDGET_ICON[selectedWidget]}</span>
+            <span className={`transition-colors ${
+              selectedWidget ? "text-[var(--sce-primary)]" : "text-[var(--muted)]"
+            }`}>
+              {WIDGET_ICON[selectedWidget]}
+            </span>
             <p className="text-[0.78rem] font-semibold text-[var(--foreground)]">
               {WIDGET_LABELS[selectedWidget]}
             </p>
           </div>
 
-          <div className="p-4">
+          <div className="p-4 overflow-y-auto max-h-[calc(100vh-320px)]">
             {selectedWidget === "HEADER" && (
               <HeaderWidgetPanel
                 settings={
@@ -387,6 +443,7 @@ export function InboardDesignerClient({
             )}
           </div>
         </aside>
+
       </div>
     </div>
   );
