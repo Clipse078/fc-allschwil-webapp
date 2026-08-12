@@ -33,6 +33,7 @@ export default async function NewTrainingSeriesPage() {
       .map((f) => ({
         facilityId: f.id,
         facilityName: f.name,
+        facilityType: f.type as string,
         resources: f.resources
           .filter((r) => r.status !== "ARCHIVED" && types.includes(r.type))
           .map((r) => ({
@@ -42,6 +43,7 @@ export default async function NewTrainingSeriesPage() {
             type: r.type,
             facilityId: f.id,
             facilityName: f.name,
+            facilityType: f.type as string,
           })),
       }))
       .filter((fg) => fg.resources.length > 0);

@@ -757,6 +757,18 @@ export default function WochenplanBoard({
     return getWochenplanConflicts(events.map(toConflictEvent));
   }, [events]);
 
+  // PLANNING-RESOURCE-UX-01-C2 — week-level attention count derived from
+  // already-loaded board events: entries with missing required allocations.
+  const incompleteCount = useMemo(() => {
+    return events.filter((event) => {
+      const missingPitch = !event.allocation.pitchCode;
+      if (event.eventType === "MATCH") {
+        return missingPitch || !event.allocation.homeDressingRoomCode || !event.allocation.awayDressingRoomCode;
+      }
+      return missingPitch;
+    }).length;
+  }, [events]);
+
   const roomConflicts = useMemo(() => {
     return getRoomConflictPairs(events);
   }, [events]);
@@ -904,6 +916,19 @@ export default function WochenplanBoard({
           {saveError}
         </div>
       ) : null}
+
+      {/* Week-level attention summary — shown when incomplete entries exist */}
+      {incompleteCount > 0 ? (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-amber-800 text-xs font-bold">
+            {incompleteCount}
+          </span>
+          {incompleteCount === 1
+            ? "1 Eintrag benötigt Planung"
+            : `${incompleteCount} Einträge benötigen Planung`}
+        </div>
+      ) : null}
+
       <WochenplanPublishBar
         hasUnsavedChanges={hasUnsavedChanges}
         isSaving={isSaving}

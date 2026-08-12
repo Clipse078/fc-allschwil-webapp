@@ -38,10 +38,10 @@ import { getResourceAvailability } from "../availability-service";
 
 const TENANT_A = "tenant-a";
 
-const PITCH_1 = { id: "res-1", name: "Kunstrasen 2", code: "KUNSTRASEN_2", facilityId: "fac-1", facility: { name: "Sportanlage" } };
-const PITCH_2 = { id: "res-2", name: "Kunstrasen 3 A", code: "KUNSTRASEN_3_A", facilityId: "fac-1", facility: { name: "Sportanlage" } };
-const PITCH_3 = { id: "res-3", name: "Hauptplatz", code: "STADION", facilityId: "fac-1", facility: { name: "Sportanlage" } };
-const ROOM_1 = { id: "room-1", name: "Garderobe E1", code: "E1", facilityId: "fac-2", facility: { name: "Garderobentrakt" } };
+const PITCH_1 = { id: "res-1", name: "Kunstrasen 2", code: "KUNSTRASEN_2", type: "FULL_PITCH", facilityId: "fac-1", facility: { name: "Sportanlage" } };
+const PITCH_2 = { id: "res-2", name: "Kunstrasen 3 A", code: "KUNSTRASEN_3_A", type: "HALF_PITCH", facilityId: "fac-1", facility: { name: "Sportanlage" } };
+const PITCH_3 = { id: "res-3", name: "Hauptplatz", code: "STADION", type: "FULL_PITCH", facilityId: "fac-1", facility: { name: "Sportanlage" } };
+const ROOM_1 = { id: "room-1", name: "Garderobe E1", code: "E1", type: "DRESSING_ROOM", facilityId: "fac-2", facility: { name: "Garderobentrakt" } };
 
 const START = "2026-08-10T16:00:00.000Z";
 const END = "2026-08-10T18:00:00.000Z";
@@ -95,12 +95,14 @@ describe("getResourceAvailability — occupied by training", () => {
       group: "PITCH_HALL",
     });
 
-    const free = result.find((r) => r.resourceId === "res-1");
-    const occupied = result.find((r) => r.resourceId === "res-2");
-    expect(free?.status).toBe("FREE");
-    expect(occupied?.status).toBe("OCCUPIED");
-    expect(occupied?.conflictSourceType).toBe("TRAINING");
-    expect(occupied?.conflictLabel).toContain("E2");
+    const fullPitch = result.find((r) => r.resourceId === "res-1");
+    const halfPitch = result.find((r) => r.resourceId === "res-2");
+    // Half (res-2) is directly occupied; the FULL sibling (res-1) is derived
+    // as occupied because any HALF_PITCH occupied → FULL_PITCH unavailable.
+    expect(halfPitch?.status).toBe("OCCUPIED");
+    expect(halfPitch?.conflictSourceType).toBe("TRAINING");
+    expect(halfPitch?.conflictLabel).toContain("E2");
+    expect(fullPitch?.status).toBe("OCCUPIED"); // derived from half being occupied
   });
 
   it("honors an occurrence-level override, ignoring the series default for that occurrence", async () => {
@@ -128,8 +130,11 @@ describe("getResourceAvailability — occupied by training", () => {
       group: "PITCH_HALL",
     });
 
+    // res-1 (FULL_PITCH) is directly occupied by the session override.
+    // res-2 (HALF_PITCH in the same facility) is derived as OCCUPIED because
+    // a FULL_PITCH sibling being occupied makes its halves unavailable.
     expect(result.find((r) => r.resourceId === "res-1")?.status).toBe("OCCUPIED");
-    expect(result.find((r) => r.resourceId === "res-2")?.status).toBe("FREE");
+    expect(result.find((r) => r.resourceId === "res-2")?.status).toBe("OCCUPIED");
   });
 });
 
@@ -391,5 +396,93 @@ describe("getResourceAvailability — archived resource excluded", () => {
         }),
       }),
     );
+  });
+});
+
+// ── FULL/HALF pitch derived availability rules ────────────────────────────────
+
+const FULL_PITCH_RES = { id: "full-1", name: "Kunstrasen 2", code: "KR2", type: "FULL_PITCH", facilityId: "fac-kr2", facility: { name: "Kunstrasen 2" } };
+const HALF_A_RES = { id: "half-a", name: "Kunstrasen 2 A", code: "KR2_A", type: "HALF_PITCH", facilityId: "fac-kr2", facility: { name: "Kunstrasen 2" } };
+const HALF_B_RES = { id: "half-b", name: "Kunstrasen 2 B", code: "KR2_B", type: "HALF_PITCH", facilityId: "fac-kr2", facility: { name: "Kunstrasen 2" } };
+
+describe("getResourceAvailability — FULL/HALF derived availability rules", () => {
+  it("marks HALF_PITCH siblings as OCCUPIED when FULL_PITCH is occupied (FULL → A/B unavailable)", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([FULL_PITCH_RES, HALF_A_RES, HALF_B_RES]);
+    mocks.trainingSessionFindMany.mockResolvedValue([
+      {
+        id: "session-x",
+        startAt: new Date("2026-08-10T17:00:00.000Z"),
+        endAt: new Date("2026-08-10T18:00:00.000Z"),
+        overrideStartAt: null,
+        overrideEndAt: null,
+        trainingSeries: {
+          title: "1. Mannschaft",
+          allocations: [{ facilityResourceId: "full-1", facilityResource: { type: "FULL_PITCH" } }],
+        },
+        sessionAllocations: [],
+      },
+    ]);
+
+    const result = await getResourceAvailability({ tenantId: TENANT_A, startAt: START, endAt: END, group: "PITCH_HALL" });
+
+    const full = result.find((r) => r.resourceId === "full-1");
+    const halfA = result.find((r) => r.resourceId === "half-a");
+    const halfB = result.find((r) => r.resourceId === "half-b");
+    expect(full?.status).toBe("OCCUPIED");
+    expect(halfA?.status).toBe("OCCUPIED");
+    expect(halfB?.status).toBe("OCCUPIED");
+    // Derived label should mention the underlying conflict
+    expect(halfA?.conflictLabel).toContain("1. Mannschaft");
+  });
+
+  it("marks FULL_PITCH as OCCUPIED when a HALF_PITCH sibling is occupied (A occupied → FULL unavailable)", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([FULL_PITCH_RES, HALF_A_RES, HALF_B_RES]);
+    mocks.trainingSessionFindMany.mockResolvedValue([
+      {
+        id: "session-y",
+        startAt: new Date("2026-08-10T17:00:00.000Z"),
+        endAt: new Date("2026-08-10T18:00:00.000Z"),
+        overrideStartAt: null,
+        overrideEndAt: null,
+        trainingSeries: {
+          title: "D1",
+          allocations: [{ facilityResourceId: "half-a", facilityResource: { type: "HALF_PITCH" } }],
+        },
+        sessionAllocations: [],
+      },
+    ]);
+
+    const result = await getResourceAvailability({ tenantId: TENANT_A, startAt: START, endAt: END, group: "PITCH_HALL" });
+
+    const full = result.find((r) => r.resourceId === "full-1");
+    const halfA = result.find((r) => r.resourceId === "half-a");
+    const halfB = result.find((r) => r.resourceId === "half-b");
+    // Half A is directly occupied; FULL is derived unavailable; Half B remains free
+    expect(halfA?.status).toBe("OCCUPIED");
+    expect(full?.status).toBe("OCCUPIED");
+    expect(halfB?.status).toBe("FREE");
+  });
+
+  it("leaves HALF_PITCH sibling free when only the other half is occupied (A occupied → B remains free)", async () => {
+    mocks.facilityResourceFindMany.mockResolvedValue([FULL_PITCH_RES, HALF_A_RES, HALF_B_RES]);
+    mocks.trainingSessionFindMany.mockResolvedValue([
+      {
+        id: "session-z",
+        startAt: new Date("2026-08-10T17:00:00.000Z"),
+        endAt: new Date("2026-08-10T18:00:00.000Z"),
+        overrideStartAt: null,
+        overrideEndAt: null,
+        trainingSeries: {
+          title: "D2",
+          allocations: [{ facilityResourceId: "half-a", facilityResource: { type: "HALF_PITCH" } }],
+        },
+        sessionAllocations: [],
+      },
+    ]);
+
+    const result = await getResourceAvailability({ tenantId: TENANT_A, startAt: START, endAt: END, group: "PITCH_HALL" });
+
+    expect(result.find((r) => r.resourceId === "half-a")?.status).toBe("OCCUPIED");
+    expect(result.find((r) => r.resourceId === "half-b")?.status).toBe("FREE");
   });
 });

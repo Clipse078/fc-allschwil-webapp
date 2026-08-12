@@ -22,6 +22,7 @@ import {
 } from "@/lib/matchcenter/view-model";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 
 type MatchcenterPageProps = {
   searchParams?: Promise<{
@@ -91,32 +92,34 @@ export default async function MatchcenterPage({
   };
 
   return (
-    <div className="max-w-[1400px] space-y-8">
-      <AdminSectionHeader
-        eyebrow="Spielbetrieb"
-        title="Matchcenter"
-        description="Zentrale Spielplanung und operative Matchvorbereitung."
-        actions={
-          <Link
-            href="/dashboard/matchcenter/new"
-            className="fca-button-primary"
-          >
-            <Plus className="h-4 w-4" />
-            Match erstellen
-          </Link>
-        }
-      />
+    <ToastProvider>
+      <div className="max-w-[1400px] space-y-8">
+        <AdminSectionHeader
+          eyebrow="Spielbetrieb"
+          title="Matchcenter"
+          description="Zentrale Spielplanung und operative Matchvorbereitung."
+          actions={
+            <Link
+              href="/dashboard/matchcenter/new"
+              className="fca-button-primary"
+            >
+              <Plus className="h-4 w-4" />
+              Match erstellen
+            </Link>
+          }
+        />
 
-      <MatchcenterOverview
-        matches={matches}
-        tab={tab}
-        actionFilter={actionFilter}
-        wochenplanFilter={wochenplanFilter}
-        monthWindow={monthWindow}
-        timezone={timezone}
-        locale={locale}
-        canManage={canManage}
-      />
-    </div>
+        <MatchcenterOverview
+          matches={matches}
+          tab={tab}
+          actionFilter={actionFilter}
+          wochenplanFilter={wochenplanFilter}
+          monthWindow={monthWindow}
+          timezone={timezone}
+          locale={locale}
+          canManage={canManage}
+        />
+      </div>
+    </ToastProvider>
   );
 }

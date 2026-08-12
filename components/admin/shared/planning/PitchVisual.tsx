@@ -35,6 +35,12 @@ export type PitchVisualProps = {
   siblingState?: PitchVisualState;
   /** Compact/small rendering (used in "Deine Auswahl" summary). Default false. */
   compact?: boolean;
+  /**
+   * PLANNING-RESOURCE-UX-01-C2 — facility-level type (e.g. "INDOOR_HALL").
+   * When "INDOOR_HALL", renders a neutral hall visual regardless of resource
+   * type — prevents football-pitch markings from appearing on indoor halls.
+   */
+  facilityType?: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -181,23 +187,30 @@ function HalfPitchSvg({
 
 // ── Public Component ──────────────────────────────────────────────────────────
 
-export function PitchVisual({ resourceType, resourceName, state, siblingState, compact = false }: PitchVisualProps) {
+export function PitchVisual({ resourceType, resourceName, state, siblingState, compact = false, facilityType }: PitchVisualProps) {
   const w = compact ? 72 : 120;
   const h = compact ? 44 : 74;
 
-  if (resourceType === "FULL_PITCH") {
+  // MVP hall fallback: indoor-hall facilities must not display football-pitch markings,
+  // even when their resource type is FULL_PITCH or HALF_PITCH.
+  const isIndoorHall = facilityType === "INDOOR_HALL";
+
+  if (!isIndoorHall && resourceType === "FULL_PITCH") {
     return <FullPitchSvg state={state} w={w} h={h} />;
   }
 
-  if (resourceType === "HALF_PITCH") {
+  if (!isIndoorHall && resourceType === "HALF_PITCH") {
     const side = detectHalfSide(resourceName);
     return <HalfPitchSvg side={side} state={state} siblingState={siblingState} w={w} h={h} />;
   }
 
-  // Indoor hall or OTHER — render as a simple rectangle
+  // Indoor hall or OTHER — neutral facility/hall visual (no football markings).
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="block" aria-hidden>
       <rect x={1} y={1} width={w - 2} height={h - 2} fill={STATE_FILL[state]} stroke={STATE_STROKE[state]} strokeWidth={1.5} rx={4} />
+      {/* Simple court lines — basketball/volleyball-style neutral markings */}
+      <line x1={w / 2} y1={4} x2={w / 2} y2={h - 4} stroke={STATE_MARKING[state]} strokeWidth={0.8} />
+      <rect x={w * 0.22} y={4} width={w * 0.56} height={h - 8} fill="none" stroke={STATE_MARKING[state]} strokeWidth={0.8} rx={2} />
       <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="middle" fontSize={compact ? 9 : 11} fill={STATE_STROKE[state]} fontWeight="600">
         Halle
       </text>
