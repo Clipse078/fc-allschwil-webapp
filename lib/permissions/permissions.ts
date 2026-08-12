@@ -83,11 +83,12 @@ export const PERMISSIONS = {
 
   WORKSPACE_VIEW: "workspace.view",
   WORKSPACE_MANAGE: "workspace.manage",
-  // ADMIN-DELETE-03A: canonical permanent-deletion permission for Workspace
-  // Documents. Deliberately separate from WORKSPACE_MANAGE — holding "manage"
-  // (upload/archive/restore) must never implicitly grant permanent deletion.
-  // Follows the "<module>.delete" convention established by TEAMS_DELETE
-  // (ADMIN-DELETE-01A) and extended through ADMIN-DELETE-02A/ADMIN-DELETE-SEASON-01.
+  // ADMIN-DELETE-03A / ADMIN-DELETE-WORKSPACE-01: canonical permanent-deletion
+  // permission for Workspace content (documents and folders). Deliberately
+  // separate from WORKSPACE_MANAGE — holding "manage" (upload/archive/restore)
+  // must never implicitly grant permanent deletion. Follows the
+  // "<module>.delete" convention established by TEAMS_DELETE (ADMIN-DELETE-01A)
+  // and extended through ADMIN-DELETE-02A/ADMIN-DELETE-SEASON-01.
   WORKSPACE_DELETE: "workspace.delete",
 
   TRAININGS_VIEW: "trainings.view",

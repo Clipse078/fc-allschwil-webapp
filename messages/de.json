@@ -74,6 +74,22 @@
       "errorGeneric": "Der Ordner konnte nicht wiederhergestellt werden."
     },
 
+    "deleteFolder": {
+      "buttonLabel": "Ordner endgültig löschen",
+      "deletingLabel": "Wird gelöscht …",
+      "dialogTitle": "Ordner endgültig löschen",
+      "dialogDescription": "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden.",
+      "warningMessage": "«{name}» wird endgültig gelöscht.",
+      "impactSubfoldersSingular": "1 Unterordner wird ebenfalls gelöscht.",
+      "impactSubfoldersPlural": "{count} Unterordner werden ebenfalls gelöscht.",
+      "impactDocumentsSingular": "1 Dokument verliert die Ordnerzuordnung (das Dokument selbst bleibt erhalten).",
+      "impactDocumentsPlural": "{count} Dokumente verlieren die Ordnerzuordnung (die Dokumente selbst bleiben erhalten).",
+      "cancelButton": "Abbrechen",
+      "confirmButton": "Endgültig löschen",
+      "loadingImpact": "Wird geprüft …",
+      "errorGeneric": "Der Ordner konnte nicht gelöscht werden."
+    },
+
     "archivedFolders": {
       "sectionTitle": "Archivierte Ordner",
       "sectionDescription": "Stellen Sie archivierte Ordner wieder her, um sie in die aktive Struktur zurückzuführen.",
