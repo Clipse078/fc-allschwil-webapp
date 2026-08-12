@@ -8,23 +8,21 @@
  * Serves any tenant Infoboard by its stable kiosk URL slug.
  * The slug was set at creation time and never changes on rename.
  *
- * Tenant resolution:
- *   - Uses DEFAULT_TENANT_KEY (fc-allschwil) for single-tenant deployment.
- *   - Future: resolve from subdomain/custom domain mapping.
+ * Tenant resolution (resolveKioskTenant):
+ *   1. Subdomain of the Host request header
+ *   2. KIOSK_DEFAULT_TENANT_KEY env var
+ *   3. DEFAULT_TENANT_KEY platform constant (local/dev fallback)
  *
- * Architecture:
- *   - Server component. No "use client", no effects, no fetch.
- *   - Loads Infoboard row by slug + tenantId.
- *   - Applies per-board config (theme, announcement, header settings).
- *   - Renders InfoboardScreen1 for TAGESUEBERSICHT template.
- *   - Disabled boards return notFound().
+ * The same slug resolves correctly per tenant — lookups are always
+ * scoped to (tenantId, slug). No cross-tenant leakage.
+ *
+ * Only ACTIVE boards are served. DRAFT and DISABLED → 404.
  */
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db/prisma";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
-import { resolveKioskTenantKey } from "@/lib/infoboard/kiosk-tenant";
+import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
@@ -35,6 +33,7 @@ import {
   buildScreen1LivePayload,
   type Screen1TenantContext,
 } from "@/lib/publishing/infoboard/screen1-live-service";
+import { prisma } from "@/lib/db/prisma";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -42,9 +41,7 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  return {
-    title: `Infoboard — ${slug}`,
-  };
+  return { title: `Infoboard — ${slug}` };
 }
 
 function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
@@ -67,29 +64,18 @@ function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
 export default async function InfoboardSlugPage({ params }: PageProps) {
   const { slug } = await params;
 
-  // Resolve tenant from kiosk tenant key (env-configurable, defaults to platform default)
-  const tenantRow = await prisma.tenant.findFirst({
-    where: { key: resolveKioskTenantKey(), status: "ACTIVE" },
-    select: {
-      id: true,
-      key: true,
-      name: true,
-      timezone: true,
-      logoUrl: true,
-      infoboardDisplayTheme: true,
-    },
-  });
-
+  // Resolve tenant from request hostname → env var → platform default.
+  // Returns null for unknown/inactive tenants.
+  const tenantRow = await resolveKioskTenant();
   if (!tenantRow || !tenantRow.timezone) {
     notFound();
   }
 
-  // Load the specific Infoboard by slug
+  // Resolve board strictly by (tenantId, slug) — no cross-tenant leakage.
   const board = await getInfoboardBySlug(slug, tenantRow.id);
 
   // Only ACTIVE boards are publicly accessible.
-  // DISABLED and DRAFT boards return 404 — kiosk devices must not show
-  // configuration work-in-progress or decommissioned displays.
+  // DISABLED and DRAFT → 404 (no kiosk should display work-in-progress).
   if (!board || board.status !== "ACTIVE") {
     notFound();
   }

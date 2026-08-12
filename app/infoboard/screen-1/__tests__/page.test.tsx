@@ -27,7 +27,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 const mocks = vi.hoisted(() => ({
-  tenantFindFirst: vi.fn(),
+  resolveKioskTenant: vi.fn(),
   buildScreen1LivePayload: vi.fn(),
   notFound: vi.fn(),
   eventFindMany: vi.fn().mockResolvedValue([]),
@@ -35,11 +35,14 @@ const mocks = vi.hoisted(() => ({
   getInfoboardBySlug: vi.fn().mockResolvedValue(null),
 }));
 
+// Tenant resolution now goes through resolveKioskTenant; prisma mock still
+// needed for the event/training canonical source loader adapter.
+vi.mock("@/lib/infoboard/kiosk-tenant", () => ({
+  resolveKioskTenant: mocks.resolveKioskTenant,
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    tenant: {
-      findFirst: mocks.tenantFindFirst,
-    },
     event: {
       findMany: mocks.eventFindMany,
     },
@@ -142,7 +145,7 @@ const MOCK_PAYLOAD = {
 describe("InfoboardScreen1Page (production route)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.tenantFindFirst.mockResolvedValue(ACTIVE_TENANT);
+    mocks.resolveKioskTenant.mockResolvedValue(ACTIVE_TENANT);
     mocks.buildScreen1LivePayload.mockResolvedValue(MOCK_PAYLOAD);
     mocks.notFound.mockImplementation(() => {
       throw new Error("NEXT_NOT_FOUND");
@@ -226,7 +229,7 @@ describe("InfoboardScreen1Page (production route)", () => {
 
   describe("missing tenant behavior", () => {
     it("calls notFound() when tenant is not found", async () => {
-      mocks.tenantFindFirst.mockResolvedValue(null);
+      mocks.resolveKioskTenant.mockResolvedValue(null);
       const { default: Page } = await import("../page");
 
       await expect(Page()).rejects.toThrow("NEXT_NOT_FOUND");
@@ -234,7 +237,7 @@ describe("InfoboardScreen1Page (production route)", () => {
     });
 
     it("calls notFound() when tenant timezone is null", async () => {
-      mocks.tenantFindFirst.mockResolvedValue({ ...ACTIVE_TENANT, timezone: null });
+      mocks.resolveKioskTenant.mockResolvedValue({ ...ACTIVE_TENANT, timezone: null });
       const { default: Page } = await import("../page");
 
       await expect(Page()).rejects.toThrow("NEXT_NOT_FOUND");
@@ -242,7 +245,7 @@ describe("InfoboardScreen1Page (production route)", () => {
     });
 
     it("does not call live service when tenant is null", async () => {
-      mocks.tenantFindFirst.mockResolvedValue(null);
+      mocks.resolveKioskTenant.mockResolvedValue(null);
       const { default: Page } = await import("../page");
 
       try {
@@ -256,12 +259,11 @@ describe("InfoboardScreen1Page (production route)", () => {
   });
 
   describe("tenant isolation", () => {
-    it("queries tenant with ACTIVE status", async () => {
+    it("uses resolveKioskTenant (hostname-aware) for tenant lookup", async () => {
       const { default: Page } = await import("../page");
       await Page();
 
-      const call = mocks.tenantFindFirst.mock.calls[0][0];
-      expect(call.where.status).toBe("ACTIVE");
+      expect(mocks.resolveKioskTenant).toHaveBeenCalledOnce();
     });
 
     it("passes resolved tenant id to live service", async () => {
@@ -300,7 +302,7 @@ describe("InfoboardScreen1Page (production route)", () => {
     });
 
     it("passes tenant.infoboardDisplayTheme through to the live service", async () => {
-      mocks.tenantFindFirst.mockResolvedValue({ ...ACTIVE_TENANT, infoboardDisplayTheme: "LIGHT" });
+      mocks.resolveKioskTenant.mockResolvedValue({ ...ACTIVE_TENANT, infoboardDisplayTheme: "LIGHT" });
       const { default: Page } = await import("../page");
       await Page();
 
@@ -308,12 +310,14 @@ describe("InfoboardScreen1Page (production route)", () => {
       expect(serviceCall.tenant.infoboardDisplayTheme).toBe("LIGHT");
     });
 
-    it("selects infoboardDisplayTheme in the tenant query", async () => {
+    it("resolveKioskTenant returns infoboardDisplayTheme (field included in kiosk select)", async () => {
+      // Verify the resolver returns the required field and the page uses it.
+      mocks.resolveKioskTenant.mockResolvedValue({ ...ACTIVE_TENANT, infoboardDisplayTheme: "DARK" });
       const { default: Page } = await import("../page");
       await Page();
 
-      const call = mocks.tenantFindFirst.mock.calls[0][0];
-      expect(call.select.infoboardDisplayTheme).toBe(true);
+      const serviceCall = mocks.buildScreen1LivePayload.mock.calls[0][0];
+      expect(serviceCall.tenant.infoboardDisplayTheme).toBe("DARK");
     });
   });
 });

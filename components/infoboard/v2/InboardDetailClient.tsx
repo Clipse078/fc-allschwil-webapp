@@ -39,8 +39,7 @@ export function InboardDetailClient({ board: initialBoard, tenantName }: Inboard
   const [headerSubtitleText, setHeaderSubtitleText] = useState(board.headerSubtitleText ?? "");
   const [headerShowTime, setHeaderShowTime] = useState(board.headerShowTime);
   const [headerShowDate, setHeaderShowDate] = useState(board.headerShowDate);
-  // headerShowWeather is stored in the DB but the weather widget is not yet rendered.
-  // The toggle is intentionally hidden from the UI until the widget is implemented.
+  // headerShowWeather: stored in DB, widget not yet rendered — no UI control.
   const [announcementEnabled, setAnnouncementEnabled] = useState(board.announcementEnabled);
   const [announcementText, setAnnouncementText] = useState(board.announcementText ?? "");
   const [announcementBgColor, setAnnouncementBgColor] = useState(board.announcementBgColor ?? "#1e3a5f");
@@ -55,11 +54,12 @@ export function InboardDetailClient({ board: initialBoard, tenantName }: Inboard
     setSaveError(null);
 
     const payload: Record<string, unknown> = {};
-    if (activeTab === "uebersicht" || activeTab === "anzeige") {
+    if (activeTab === "uebersicht") {
       payload.name = name;
-      payload.templateType = templateType;
     }
     if (activeTab === "anzeige") {
+      payload.name = name;
+      payload.templateType = templateType;
       payload.displayTheme = displayTheme;
       payload.headerSubtitleEnabled = headerSubtitleEnabled;
       payload.headerSubtitleText = headerSubtitleEnabled ? (headerSubtitleText || null) : null;
