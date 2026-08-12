@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, MapPin, Trophy } from "lucide-react";
+import { CalendarDays, MapPin, Shield, Trophy } from "lucide-react";
 import type { TournamentDto } from "@/lib/tournaments/types";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 
@@ -56,6 +56,34 @@ export default function TournamentArchivRow({ tournament, locale, timezone }: To
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5" />
             {tournament.location}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+        {tournament.team ? (
+          <span
+            className="inline-flex items-center gap-1.5"
+            data-testid={`tournament-archiv-team-${tournament.id}`}
+          >
+            <Shield className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              <span className="font-medium text-[var(--foreground)]">Mannschaft:</span>{" "}
+              {tournament.team.name}
+            </span>
+          </span>
+        ) : null}
+
+        {tournament.organizerName ? (
+          <span
+            className="inline-flex items-center gap-1.5"
+            data-testid={`tournament-archiv-organizer-${tournament.id}`}
+          >
+            <Trophy className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              <span className="font-medium text-[var(--foreground)]">Veranstalter:</span>{" "}
+              {tournament.organizerName}
+            </span>
           </span>
         ) : null}
       </div>
