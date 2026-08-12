@@ -192,11 +192,37 @@ export type TrainingsData = {
 // sortOrder, tenantId, createdAt, updatedAt, internal squad detail.
 // ---------------------------------------------------------------------------
 
+/**
+ * Canonical OrgUnit grouping for a team in the active season.
+ *
+ * Sourced from the TeamSeason → TeamSeasonOrgUnit → OrgUnit graph (TEAM-CORE-02).
+ * `isPrimary` is true when this is the designated primary grouping for the team.
+ * `sortOrder` reflects the OrgUnit's canonical ordering within the tenant.
+ *
+ * The deprecated `category` enum is kept for backward-compatibility; new consumers
+ * should group/filter by `orgUnit.name` / `orgUnit.key` instead.
+ */
+export type PublicTeamOrgUnit = {
+  /** Stable OrgUnit identifier (CUID). */
+  id: string;
+  /** Display name, e.g. "Aktive", "Junioren", "Frauen". */
+  name: string;
+  /** Tenant-scoped URL-safe key, e.g. "aktive", "junioren". */
+  key: string;
+  /** Canonical sort position within the tenant — use for ordering groups. */
+  sortOrder: number;
+  /** True when this is the primary OrgUnit for this team in the active season. */
+  isPrimary: boolean;
+};
+
 export type PublicTeamListItem = {
   id: string;
   name: string;
   slug: string;
-  /** TeamCategory enum value */
+  /**
+   * @deprecated Legacy TeamCategory enum (AKTIVE | JUNIOREN | FRAUEN | …).
+   * Retained for backward compatibility. New consumers must use `orgUnit` for grouping.
+   */
   category: string;
   genderGroup: string | null;
   ageGroup: string | null;
@@ -204,6 +230,17 @@ export type PublicTeamListItem = {
   displayName: string;
   shortName: string | null;
   season: { key: string; name: string } | null;
+  /**
+   * Primary OrgUnit assignment for this team in the active season.
+   *
+   * Sourced from TeamSeason → TeamSeasonOrgUnit (where isPrimary = true) → OrgUnit.
+   * Null when the team has no TeamSeasonOrgUnit assignment for the active season,
+   * or when no primary OrgUnit is set (all assignments have isPrimary = false).
+   *
+   * The FCA website must use this field for team grouping/filtering.
+   * Do NOT infer grouping from `category` or team name patterns.
+   */
+  orgUnit: PublicTeamOrgUnit | null;
 };
 
 export type TeamsData = {

@@ -611,21 +611,35 @@ GET /api/public/fc-allschwil/website/teams
 }
 ```
 
-#### Data shape — `data.teams[]` (post-migration)
+#### Data shape — `data.teams[]`
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Team ID. |
-| `name` | string | Base team name. |
+| `name` | string | Tenant-managed canonical team name. |
 | `slug` | string | URL-safe team slug. |
-| `category` | string | `AKTIVE` \| `JUNIOREN` \| `FRAUEN` \| `KINDERFUSSBALL` \| `SENIOREN` \| `TRAININGSGRUPPE` |
+| `category` | string | **@deprecated** Legacy enum: `AKTIVE` \| `JUNIOREN` \| `FRAUEN` \| `KINDERFUSSBALL` \| `SENIOREN` \| `TRAININGSGRUPPE`. Kept for backward-compat; use `orgUnit` for grouping. |
 | `genderGroup` | string \| null | Gender group label. |
 | `ageGroup` | string \| null | Age group label (e.g. `"U16"`). |
 | `displayName` | string | Season display name from TeamSeason, or `name` as fallback. |
 | `shortName` | string \| null | Short label, e.g. `"1M"`. |
-| `season` | object \| null | Active season info, null if no matching TeamSeason. |
+| `season` | object \| null | Active season info, null when team has no active-season TeamSeason. |
 | `season.key` | string | Season key. |
 | `season.name` | string | Season display name. |
+| `orgUnit` | object \| null | **Canonical OrgUnit grouping** for this team in the active season. Sourced from `TeamSeasonOrgUnit` (TEAM-CORE-02). Null when no OrgUnit is assigned. |
+| `orgUnit.id` | string | OrgUnit ID. |
+| `orgUnit.name` | string | Display name, e.g. `"Aktive"`, `"Junioren"`, `"Frauen"`. |
+| `orgUnit.key` | string | Tenant-scoped URL-safe key, e.g. `"aktive"`, `"junioren"`. |
+| `orgUnit.sortOrder` | number | Canonical sort order for this OrgUnit — use for ordering groups. |
+| `orgUnit.isPrimary` | boolean | True when this is the primary OrgUnit for the team in the active season. |
+
+**Active-season enforcement** (WEBSITE-CONSUMERS-01): Only teams with a `TeamSeason` in the canonical active season (`Season.isActive = true`) are returned. Teams belonging exclusively to historical/inactive seasons are excluded.
+
+**Ordering**: Teams are sorted by `orgUnit.sortOrder` ascending (teams without OrgUnit last), then `team.sortOrder`, then `team.name`.
+
+**Website grouping guidance**: The FCA website `/teams` directory must group teams by `orgUnit.name` (using `orgUnit.key` for stable filtering), not by the deprecated `category` enum.
+
+**Season rollover**: Automatic. When `Season.isActive` changes in SportClubEvo, this endpoint returns the new season's teams without website-code changes.
 
 ---
 
@@ -911,12 +925,21 @@ type PublicTeamListItem = {
   id: string;
   name: string;
   slug: string;
+  /** @deprecated — use orgUnit for grouping */
   category: string;
   genderGroup: string | null;
   ageGroup: string | null;
   displayName: string;
   shortName: string | null;
   season: { key: string; name: string } | null;
+  /** Canonical OrgUnit grouping from TeamSeasonOrgUnit (TEAM-CORE-02). null when unassigned. */
+  orgUnit: {
+    id: string;
+    name: string;
+    key: string;
+    sortOrder: number;
+    isPrimary: boolean;
+  } | null;
 };
 ```
 
