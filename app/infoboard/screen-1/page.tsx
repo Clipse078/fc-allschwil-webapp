@@ -23,13 +23,16 @@
  *   - No "use client", no useEffect, no fetch.
  *   - No preview fixture imports.
  *   - No hardcoded tenant ID or domain.
- *   - Prisma used at this composition boundary only.
+ *   - Tenant resolved via resolveKioskTenant() (hostname → env → default).
+ *   - Prisma used at this boundary only for the canonical event loader adapter.
  */
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
-import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
+import { getInfoboardBySlug } from "@/lib/infoboard/queries";
+import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
+import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
   createCanonicalInfoboardSourceLoader,
@@ -67,20 +70,8 @@ function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
 
 export default async function InfoboardScreen1Page() {
   // ── Resolve tenant ─────────────────────────────────────────────────────────
-  // Uses the default tenant key for the single-tenant kiosk deployment.
-  // Future: resolve from subdomain/custom domain once the domain→tenant
-  // mapping table is introduced (see resolveTenantFromRequest TODO).
-  const tenantRow = await prisma.tenant.findFirst({
-    where: { key: DEFAULT_TENANT_KEY, status: "ACTIVE" },
-    select: {
-      id: true,
-      key: true,
-      name: true,
-      timezone: true,
-      logoUrl: true,
-      infoboardDisplayTheme: true,
-    },
-  });
+  // Resolves from request hostname → KIOSK_DEFAULT_TENANT_KEY → DEFAULT_TENANT_KEY.
+  const tenantRow = await resolveKioskTenant();
 
   if (!tenantRow) {
     notFound();
@@ -106,9 +97,13 @@ export default async function InfoboardScreen1Page() {
   const now = new Date();
 
   // ── Build live payload ─────────────────────────────────────────────────────
+  // Load per-board config from DB (slug "screen-1") when available.
+  const board = await getInfoboardBySlug("screen-1", tenant.id);
+  const boardConfig = board ? buildBoardConfig(board) : null;
+
   const db = createPrismaDb();
   const loader = createCanonicalInfoboardSourceLoader(db);
-  const payload = await buildScreen1LivePayload({ tenant, now, loader });
+  const payload = await buildScreen1LivePayload({ tenant, now, loader, boardConfig });
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -119,6 +114,7 @@ export default async function InfoboardScreen1Page() {
       announcement={payload.announcement ?? undefined}
       eventPresentation={payload.eventPresentation}
       theme={payload.theme}
+      headerConfig={payload.headerConfig ?? undefined}
     />
   );
 }

@@ -89,6 +89,23 @@ export type Screen1TenantContext = InfoboardTenantRef & {
 };
 
 /**
+ * Per-Infoboard configuration that overrides tenant-level defaults.
+ * Supplied by the Infoboard DB record when rendering a specific board.
+ */
+export type InfoboardBoardConfig = {
+  /** Override display theme. null = inherit from tenant. */
+  readonly displayTheme?: string | null;
+  /** Announcement bar configuration. null = no announcement. */
+  readonly announcement?: InfoboardAnnouncementPresentation | null;
+  /** Header subtitle config */
+  readonly headerSubtitleEnabled?: boolean;
+  readonly headerSubtitleText?: string | null;
+  readonly headerShowTime?: boolean;
+  readonly headerShowDate?: boolean;
+  readonly headerShowWeather?: boolean;
+};
+
+/**
  * Branding payload returned in the live payload.
  * structurally compatible with InfoboardScreen1Branding from the component.
  */
@@ -114,6 +131,16 @@ export type InfoboardScreen1LivePayload = {
    * influence feed content in any way; see resolveInfoboardDisplayTheme().
    */
   readonly theme: InfoboardDisplayTheme;
+  /**
+   * Per-board header configuration for the InfoboardScreen1 component.
+   * Null when no per-board config is available (uses component defaults).
+   */
+  readonly headerConfig: {
+    readonly subtitleEnabled: boolean;
+    readonly subtitleText: string | null;
+    readonly showTime: boolean;
+    readonly showDate: boolean;
+  } | null;
 };
 
 // ── Branding resolver ─────────────────────────────────────────────────────────
@@ -158,8 +185,10 @@ export async function buildScreen1LivePayload(params: {
   readonly tenant: Screen1TenantContext;
   readonly now: Date;
   readonly loader: PublicationEventLoader<Screen1SourceEvent>;
+  /** Optional per-board overrides (INFOBOARD-V2). */
+  readonly boardConfig?: InfoboardBoardConfig | null;
 }): Promise<InfoboardScreen1LivePayload> {
-  const { tenant, now, loader } = params;
+  const { tenant, now, loader, boardConfig } = params;
 
   // ── Bounded date window ───────────────────────────────────────────────────
   // No server-local midnight calculation. Fixed UTC offsets relative to `now`.
@@ -191,10 +220,9 @@ export async function buildScreen1LivePayload(params: {
   const eventPresentation: readonly InfoboardEventPresentationExtension[] = [];
 
   // ── Announcement ─────────────────────────────────────────────────────────
-  // No persisted announcement setting exists in the current schema.
-  // Return null. When a tenant announcement setting is introduced, resolve it
-  // here and return InfoboardAnnouncementPresentation.
-  const announcement: InfoboardAnnouncementPresentation | null = null;
+  // Per-board announcement from boardConfig (INFOBOARD-V2), or null.
+  const announcement: InfoboardAnnouncementPresentation | null =
+    boardConfig?.announcement ?? null;
 
   // ── Branding ──────────────────────────────────────────────────────────────
   const branding: InfoboardScreen1Branding = {
@@ -203,9 +231,24 @@ export async function buildScreen1LivePayload(params: {
   };
 
   // ── Display theme ────────────────────────────────────────────────────────
-  // Presentation only — resolved from the persisted preference, defaulting
-  // to DARK. Never influences the feed built above.
-  const theme = resolveInfoboardDisplayTheme(tenant.infoboardDisplayTheme);
+  // Per-board displayTheme takes priority over tenant-level preference.
+  // Presentation only — never influences the feed built above.
+  const effectiveTheme =
+    boardConfig?.displayTheme !== undefined
+      ? boardConfig.displayTheme
+      : tenant.infoboardDisplayTheme;
+  const theme = resolveInfoboardDisplayTheme(effectiveTheme);
+
+  // ── Header config ─────────────────────────────────────────────────────────
+  const headerConfig =
+    boardConfig !== null && boardConfig !== undefined
+      ? {
+          subtitleEnabled: boardConfig.headerSubtitleEnabled !== false,
+          subtitleText: boardConfig.headerSubtitleText ?? null,
+          showTime: boardConfig.headerShowTime !== false,
+          showDate: boardConfig.headerShowDate !== false,
+        }
+      : null;
 
   return {
     feed,
@@ -214,5 +257,6 @@ export async function buildScreen1LivePayload(params: {
     branding,
     currentTimeIso: now.toISOString(),
     theme,
+    headerConfig,
   };
 }

@@ -32,6 +32,12 @@ export type PitchAllocationOption = {
   mode: PitchMode;
   label: string;
   websiteLabel: string;
+  /**
+   * Human-readable label for Infoboard kiosk display.
+   * Uses abbreviated form for TV readability at distance.
+   * e.g. "KUNSTRASEN_2_A" → "KR 2 – Feld A"
+   */
+  infoboardLabel: string;
   usage: "MATCH_TOURNAMENT_ONLY" | "TRAINING_ONLY" | "ALL";
 };
 
@@ -63,6 +69,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "FULL",
     label: "Stadion",
     websiteLabel: "Stadion",
+    infoboardLabel: "Stadion",
     usage: "ALL",
   },
   {
@@ -71,6 +78,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "HALF_A",
     label: "Stadion A",
     websiteLabel: "Stadion A",
+    infoboardLabel: "Stadion – Feld A",
     usage: "TRAINING_ONLY",
   },
   {
@@ -79,6 +87,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "HALF_B",
     label: "Stadion B",
     websiteLabel: "Stadion B",
+    infoboardLabel: "Stadion – Feld B",
     usage: "TRAINING_ONLY",
   },
   {
@@ -87,6 +96,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "FULL",
     label: "Kunstrasen 2",
     websiteLabel: "Kunstrasen 2",
+    infoboardLabel: "KR 2",
     usage: "ALL",
   },
   {
@@ -95,6 +105,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "HALF_A",
     label: "Kunstrasen 2 A",
     websiteLabel: "Kunstrasen 2 A",
+    infoboardLabel: "KR 2 – Feld A",
     usage: "TRAINING_ONLY",
   },
   {
@@ -103,6 +114,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "HALF_B",
     label: "Kunstrasen 2 B",
     websiteLabel: "Kunstrasen 2 B",
+    infoboardLabel: "KR 2 – Feld B",
     usage: "TRAINING_ONLY",
   },
   {
@@ -111,6 +123,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "FULL",
     label: "Kunstrasen 3",
     websiteLabel: "Kunstrasen 3",
+    infoboardLabel: "KR 3",
     usage: "ALL",
   },
   {
@@ -119,6 +132,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "HALF_A",
     label: "Kunstrasen 3 A",
     websiteLabel: "Kunstrasen 3 A",
+    infoboardLabel: "KR 3 – Feld A",
     usage: "TRAINING_ONLY",
   },
   {
@@ -127,6 +141,7 @@ export const FCA_PITCH_ALLOCATIONS: PitchAllocationOption[] = [
     mode: "HALF_B",
     label: "Kunstrasen 3 B",
     websiteLabel: "Kunstrasen 3 B",
+    infoboardLabel: "KR 3 – Feld B",
     usage: "TRAINING_ONLY",
   },
 ];

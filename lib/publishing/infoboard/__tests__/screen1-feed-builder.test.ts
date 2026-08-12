@@ -847,11 +847,14 @@ describe("buildInfoboardScreen1Feed — rolling 4-hour horizon selection logic",
     expect(feed.later.map((e) => e.id)).toEqual(["e2"]);
   });
 
-  it("upcoming event 6 hours away is excluded (beyond the 4-hour horizon)", async () => {
+  it("upcoming event 6 hours away is included via min-3-card fill (V2: fill forward when window < 3)", async () => {
+    // INFOBOARD-V2: When the 4h window has fewer than MIN_DISPLAY_CARDS (3) events,
+    // fill forward with upcoming events from later today. An event 6h away is
+    // therefore now included when it is the only event of the day.
     const nowMidnight = new Date("2026-07-23T00:00:00.000Z");  // 02:00 Zurich
     const lateEvent = makeEvent({
       id: "late-event",
-      startAt: new Date("2026-07-23T06:00:00.000Z"),   // 6h after nowMidnight
+      startAt: new Date("2026-07-23T06:00:00.000Z"),   // 6h after nowMidnight, same day in Zurich
       endAt: new Date("2026-07-23T07:30:00.000Z"),
     });
     const feed = await buildInfoboardScreen1Feed(
@@ -859,19 +862,23 @@ describe("buildInfoboardScreen1Feed — rolling 4-hour horizon selection logic",
       makeInput({ now: nowMidnight }),
     );
     const all = [...feed.current, ...feed.next, ...feed.later];
-    expect(all.some((e) => e.id === "late-event")).toBe(false);
-    expect(feed.isEmpty).toBe(true);
+    // With fill, the event is now visible (0 events in 4h window → fill kicks in)
+    expect(all.some((e) => e.id === "late-event")).toBe(true);
+    expect(feed.isEmpty).toBe(false);
   });
 
-  it("a 3rd upcoming event beyond 4h is excluded while the earlier two remain", async () => {
+  it("a 3rd upcoming event beyond 4h is now filled in when window has fewer than 3 cards (V2)", async () => {
+    // INFOBOARD-V2: e1 and e2 are within the 4h window (2 events < MIN=3).
+    // e3 is beyond 4h but is today → fill kicks in and adds e3 to 'later'.
     const e1 = makeEvent({ id: "e1", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:00:00.000Z") }); // 1h away
     const e2 = makeEvent({ id: "e2", startAt: new Date("2026-07-23T18:00:00.000Z"), endAt: new Date("2026-07-23T19:00:00.000Z") }); // 2h away
-    const e3 = makeEvent({ id: "e3", startAt: new Date("2026-07-23T21:00:00.000Z"), endAt: new Date("2026-07-23T22:00:00.000Z") }); // 5h away — beyond horizon
+    const e3 = makeEvent({ id: "e3", startAt: new Date("2026-07-23T21:00:00.000Z"), endAt: new Date("2026-07-23T22:00:00.000Z") }); // 5h away — beyond 4h horizon but filled
     const feed = await buildInfoboardScreen1Feed(makeLoader([e1, e2, e3]), makeInput());
     expect(feed.next.map((e) => e.id)).toEqual(["e1"]);
-    expect(feed.later.map((e) => e.id)).toEqual(["e2"]);
+    // e2 is in later (from 4h window), e3 is also in later (from fill)
     const all = [...feed.current, ...feed.next, ...feed.later];
-    expect(all.some((e) => e.id === "e3")).toBe(false);
+    expect(all.some((e) => e.id === "e3")).toBe(true);
+    expect(all.length).toBe(3); // exactly at MIN_DISPLAY_CARDS
   });
 
   it("all active events remain included even when there are more than 2", async () => {
@@ -885,8 +892,9 @@ describe("buildInfoboardScreen1Feed — rolling 4-hour horizon selection logic",
     expect(feed.current.some((e) => e.id === "a3")).toBe(true);
   });
 
-  it("before the first event of the day: only activities within the 4-hour horizon render", async () => {
-    // now = 08:00 Zurich (06:00 UTC). Events at +3h, +4h (inclusive boundary), +5h (excluded).
+  it("before the first event of the day: 4h window events appear; 5h event is filled in to reach MIN_DISPLAY_CARDS (V2)", async () => {
+    // INFOBOARD-V2: now = 08:00 Zurich (06:00 UTC). Events at +3h, +4h (inclusive), +5h.
+    // in3h and in4h are in the 4h window (2 events < MIN=3) → in5h is filled in.
     const nowMorning = new Date("2026-07-23T06:00:00.000Z");
     const eIn3h = makeEvent({ id: "in3h", startAt: new Date("2026-07-23T09:00:00.000Z"), endAt: new Date("2026-07-23T10:30:00.000Z") });
     const eIn4h = makeEvent({ id: "in4h", startAt: new Date("2026-07-23T10:00:00.000Z"), endAt: new Date("2026-07-23T11:30:00.000Z") });
@@ -897,22 +905,25 @@ describe("buildInfoboardScreen1Feed — rolling 4-hour horizon selection logic",
     );
     expect(feed.current).toHaveLength(0);
     expect(feed.next.map((e) => e.id)).toEqual(["in3h"]);
-    expect(feed.later.map((e) => e.id)).toEqual(["in4h"]);
     const all = [...feed.current, ...feed.next, ...feed.later];
-    expect(all.some((e) => e.id === "in5h")).toBe(false);
+    // in4h from window + in5h from fill → total 3
+    expect(all.some((e) => e.id === "in4h")).toBe(true);
+    expect(all.some((e) => e.id === "in5h")).toBe(true);
+    expect(all.length).toBe(3);
   });
 
-  it("across a large gap beyond 4 hours: the upcoming event is excluded", async () => {
-    // now = 12:00 Zurich (10:00 UTC); single event at 17:00 Zurich = 15:00 UTC (5h away)
+  it("across a large gap beyond 4 hours: the upcoming event is now filled in (V2: min-3-card fill)", async () => {
+    // INFOBOARD-V2: now = 12:00 Zurich (10:00 UTC); single event at 17:00 Zurich = 15:00 UTC (5h away).
+    // With 0 events in the 4h window, the fill adds this event (it is from today).
     const nowMidday = new Date("2026-07-23T10:00:00.000Z");
     const e1700 = makeEvent({ id: "17h", startAt: new Date("2026-07-23T15:00:00.000Z"), endAt: new Date("2026-07-23T16:45:00.000Z") });
     const feed = await buildInfoboardScreen1Feed(
       makeLoader([e1700]),
       makeInput({ now: nowMidday }),
     );
-    expect(feed.isEmpty).toBe(true);
+    expect(feed.isEmpty).toBe(false);
     const all = [...feed.current, ...feed.next, ...feed.later];
-    expect(all.some((e) => e.id === "17h")).toBe(false);
+    expect(all.some((e) => e.id === "17h")).toBe(true);
   });
 
   it("after final event of the day: empty feed with DAY_COMPLETED reason", async () => {
@@ -937,10 +948,10 @@ describe("buildInfoboardScreen1Feed — rolling 4-hour horizon selection logic",
     expect(feed.emptyStateReason).toBe("NO_EVENTS_TODAY");
   });
 
-  it("a same-local-day event far beyond the 4-hour horizon is excluded (calendar-day rule no longer applies)", async () => {
-    // now = 2026-07-23T22:00:00Z = 00:00 Jul 24 Zurich. Under the previous
-    // "same calendar day" rule this event (19h away, but same local day)
-    // would have been shown. The rolling horizon now excludes it.
+  it("a same-local-day event far beyond the 4-hour horizon is now filled in via fill (V2)", async () => {
+    // INFOBOARD-V2: now = 2026-07-23T22:00:00Z = 00:00 Jul 24 Zurich. Display date = 2026-07-24.
+    // The event is 19h away (beyond 4h) but is the only event of the day (same displayDate) →
+    // fill kicks in with 0 events in the window. Event IS included.
     const nowMidnight = new Date("2026-07-23T22:00:00.000Z");
     const sameDayFarEvent = makeEvent({
       id: "same-day-far",
@@ -952,7 +963,9 @@ describe("buildInfoboardScreen1Feed — rolling 4-hour horizon selection logic",
       makeInput({ now: nowMidnight }),
     );
     const all = [...feed.current, ...feed.next, ...feed.later];
-    expect(all.some((e) => e.id === "same-day-far")).toBe(false);
+    // V2: fill is active (0 events in 4h window, event is today) → event included
+    expect(all.some((e) => e.id === "same-day-far")).toBe(true);
+    expect(feed.isEmpty).toBe(false);
   });
 
   it("Europe/Zurich boundary: an event just after local midnight within the horizon is still included", async () => {
@@ -1014,17 +1027,18 @@ describe("buildInfoboardScreen1Feed — rolling 4-hour horizon selection logic",
     expect(dashboardIds).toEqual(screen1Ids);
   });
 
-  it("dashboard counters derive from canonical feed: counts match feed bucket lengths, beyond-horizon events excluded", async () => {
-    // Verifies that no dashboard-only filter re-runs different eligibility.
+  it("dashboard counters derive from canonical feed: V2 fill means 3 events visible when 2 in window + 1 fill", async () => {
+    // INFOBOARD-V2: Verifies that no dashboard-only filter re-runs different eligibility.
+    // e1 and e2 are in the 4h window (2 events < MIN=3), e3 is filled.
     const events = [
       makeEvent({ id: "e1", startAt: new Date("2026-07-23T17:00:00.000Z"), endAt: new Date("2026-07-23T18:00:00.000Z") }), // 1h away
       makeEvent({ id: "e2", startAt: new Date("2026-07-23T18:00:00.000Z"), endAt: new Date("2026-07-23T19:00:00.000Z") }), // 2h away
-      makeEvent({ id: "e3", startAt: new Date("2026-07-23T21:00:00.000Z"), endAt: new Date("2026-07-23T22:00:00.000Z") }), // 5h away — excluded
+      makeEvent({ id: "e3", startAt: new Date("2026-07-23T21:00:00.000Z"), endAt: new Date("2026-07-23T22:00:00.000Z") }), // 5h away — filled in V2
     ];
     const feed = await buildInfoboardScreen1Feed(makeLoader(events), makeInput());
     expect(feed.next).toHaveLength(1);
-    expect(feed.later).toHaveLength(1);
+    // e2 in window + e3 from fill both go into later
     const visibleToday = feed.current.length + feed.next.length + feed.later.length;
-    expect(visibleToday).toBe(2);
+    expect(visibleToday).toBe(3);
   });
 });

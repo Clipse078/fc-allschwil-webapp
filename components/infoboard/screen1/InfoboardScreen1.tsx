@@ -81,6 +81,16 @@ export type InfoboardScreen1Props = {
    * via the rendered `data-theme` attribute.
    */
   theme?: InfoboardDisplayTheme;
+  /**
+   * Per-board header configuration (INFOBOARD-V2).
+   * Controls subtitle, time, date, weather visibility and subtitle text.
+   */
+  headerConfig?: {
+    readonly subtitleEnabled?: boolean;
+    readonly subtitleText?: string | null;
+    readonly showTime?: boolean;
+    readonly showDate?: boolean;
+  };
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -201,15 +211,15 @@ function buildFlatList(feed: InfoboardScreen1Feed): FlatEvent[] {
 
 /**
  * Groups TRAINING events that share an identical startAt ISO string into a
- * single TrainingGroupCard display item.  Non-training events and solitary
- * trainings are returned as individual "event" items.
+ * single training-group display item.
  *
- * Two or more trainings at the same startAt are collapsed; one training at a
- * unique startAt is kept as a plain EventCard so existing layout and tests
- * are unaffected.
+ * ALL trainings — including solo ones — use the training-group card so the
+ * visual language is consistent regardless of how many teams share a start
+ * time. This satisfies the "one training and six simultaneous trainings
+ * should feel like the same component" requirement.
  */
 function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
-  // First pass: bucket training events by startAt
+  // First pass: bucket ALL training events by startAt
   const trainingByStart = new Map<string, FlatEvent[]>();
   for (const item of flatList) {
     if (item.event.type === "TRAINING") {
@@ -234,17 +244,36 @@ function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
       emitted.add(key);
 
       const group = trainingByStart.get(key)!;
-      if (group.length >= 2) {
-        result.push({ kind: "training-group", items: group, temporal: item.temporal });
-      } else {
-        result.push({ kind: "event", item });
-      }
+      // All training groups (including solo) use training-group card.
+      result.push({ kind: "training-group", items: group, temporal: item.temporal });
     } else {
       result.push({ kind: "event", item });
     }
   }
 
   return result;
+}
+
+/**
+ * Strips a club name prefix from a team display name for Infoboard rendering.
+ *
+ * Example: "FC ALLSCHWIL JUNIOREN D-9 D1" → "JUNIOREN D-9 D1"
+ *
+ * The club identity is already established in the header, so repeating it
+ * on every training row is redundant. This is a presentation-only
+ * transformation — canonical team names are never mutated.
+ *
+ * Matching is case-insensitive. Returns the original name when no match.
+ */
+function stripClubPrefix(teamName: string, clubName: string): string {
+  if (!clubName) return teamName;
+  const prefixLower = clubName.toUpperCase();
+  const nameLower = teamName.toUpperCase();
+  if (nameLower.startsWith(prefixLower)) {
+    const stripped = teamName.slice(clubName.length).trimStart();
+    return stripped.length > 0 ? stripped : teamName;
+  }
+  return teamName;
 }
 
 /** Accent color key for card left stripe and current-event tint. */
@@ -463,6 +492,8 @@ type TrainingGroupCardProps = {
   items: FlatEvent[];
   timeZone: string;
   cardCount: number;
+  /** Club name for prefix stripping from team display names. */
+  clubName: string;
 };
 
 /**
@@ -484,6 +515,7 @@ function TrainingGroupCard({
   items,
   timeZone,
   cardCount,
+  clubName,
 }: TrainingGroupCardProps): ReactElement {
   const first = items[0];
   const temporal = first.temporal;
@@ -524,7 +556,7 @@ function TrainingGroupCard({
         </time>
         {commonEndTime !== null && (
           <span className={styles.eventEndTime} aria-label="Bis">
-            –{commonEndTime}
+            bis {commonEndTime}
           </span>
         )}
       </div>
@@ -557,12 +589,15 @@ function TrainingGroupCard({
               className={styles.trainingGroupTeamRow}
               data-testid="training-group-row"
             >
-              {/* TEAM */}
+              {/* TEAM — club prefix stripped for readability */}
               <span className={styles.trainingGroupTeamName}>
-                {it.event.teamDisplayName ?? it.event.displayTitle}
+                {stripClubPrefix(
+                  it.event.teamDisplayName ?? it.event.displayTitle,
+                  clubName,
+                )}
                 {rowEndTime !== null && (
                   <span className={styles.trainingGroupRowEndTime} aria-label="Bis">
-                    {" "}–{rowEndTime}
+                    {" "}bis {rowEndTime}
                   </span>
                 )}
               </span>
@@ -660,7 +695,7 @@ function EventCard({
         </time>
         {endTime !== null && (
           <span className={styles.eventEndTime} aria-label="Bis">
-            –{endTime}
+            bis {endTime}
           </span>
         )}
       </div>
@@ -806,10 +841,22 @@ export function InfoboardScreen1({
   eventPresentation,
   currentTimeIso,
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
+  headerConfig,
 }: InfoboardScreen1Props): ReactElement {
   const { tenant, current, next, later } = feed;
   const timeZone = tenant.timezone;
   const themeAttr = theme.toLowerCase();
+
+  // Header visibility settings (per-board config or defaults)
+  const showTime = headerConfig?.showTime !== false;
+  const showDate = headerConfig?.showDate !== false;
+  const subtitleEnabled = headerConfig?.subtitleEnabled !== false;
+  const subtitleText =
+    headerConfig?.subtitleText?.trim() ||
+    "HEUTE AUF DER SPORTANLAGE";
+
+  // Club name for prefix stripping (presentation-only)
+  const clubNameUpper = tenant.name.toUpperCase();
 
   const flatList = buildFlatList(feed);
   const displayList = buildDisplayList(flatList);
@@ -867,25 +914,31 @@ export function InfoboardScreen1({
 
         {/* Center zone: current time + date */}
         <div className={styles.headerCenter} data-testid="header-center">
-          {currentTime !== null && headerWeekday !== null ? (
+          {showTime && currentTime !== null && headerWeekday !== null ? (
             <>
               <div className={styles.headerTimeBlock}>
-                <time
-                  className={styles.headerCurrentTime}
-                  dateTime={currentTimeIso!}
-                >
-                  {currentTime}
-                </time>
-                <span className={styles.headerTimeSeparator} aria-hidden="true">|</span>
-                <div className={styles.headerDateBlock}>
-                  <span className={styles.headerWeekday}>{headerWeekday}</span>
-                  <span className={styles.headerDateLine}>{headerDateLine}</span>
-                </div>
+                {showTime && (
+                  <time
+                    className={styles.headerCurrentTime}
+                    dateTime={currentTimeIso!}
+                  >
+                    {currentTime}
+                  </time>
+                )}
+                {showTime && showDate && (
+                  <span className={styles.headerTimeSeparator} aria-hidden="true">|</span>
+                )}
+                {showDate && (
+                  <div className={styles.headerDateBlock}>
+                    <span className={styles.headerWeekday}>{headerWeekday}</span>
+                    <span className={styles.headerDateLine}>{headerDateLine}</span>
+                  </div>
+                )}
               </div>
             </>
-          ) : (
+          ) : showDate ? (
             <span className={styles.headerDateFallback}>{headerDateLine}</span>
-          )}
+          ) : null}
         </div>
 
         {/* Right zone: Alexa-safe — intentionally empty */}
@@ -896,10 +949,12 @@ export function InfoboardScreen1({
         />
       </header>
 
-      {/* ── Board title ──────────────────────────────────────────────────── */}
-      <div className={styles.boardTitle} data-testid="board-title">
-        <span className={styles.boardTitleText}>HEUTE AUF DER SPORTANLAGE</span>
-      </div>
+      {/* ── Board subtitle ──────────────────────────────────────────────── */}
+      {subtitleEnabled && (
+        <div className={styles.boardTitle} data-testid="board-title">
+          <span className={styles.boardTitleText}>{subtitleText.toUpperCase()}</span>
+        </div>
+      )}
 
       {/* ── Main: event list ─────────────────────────────────────────────── */}
       <main className={styles.main}>
@@ -927,6 +982,7 @@ export function InfoboardScreen1({
                       items={displayItem.items}
                       timeZone={timeZone}
                       cardCount={visibleDisplayList.length}
+                      clubName={clubNameUpper}
                     />
                   );
                 }
