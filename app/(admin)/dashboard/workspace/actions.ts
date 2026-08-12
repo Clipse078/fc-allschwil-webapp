@@ -5,6 +5,11 @@ import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { normalizeWorkspaceFolderName } from "@/lib/workspace/folder-service";
+import {
+  deleteWorkspaceFolderPermanently,
+  getWorkspaceFolderDeletionImpact,
+  WorkspaceFolderDeleteServiceError,
+} from "@/lib/workspace/folder-delete-service";
 
 const MAX_FOLDER_NAME_LENGTH = 120;
 const DISPLAY_ORDER_STEP = 10;
@@ -23,7 +28,8 @@ export type WorkspaceFolderErrorCode =
   | "WORKSPACE_FOLDER_RENAME_FAILED"
   | "WORKSPACE_FOLDER_MOVE_FAILED"
   | "WORKSPACE_FOLDER_ARCHIVE_FAILED"
-  | "WORKSPACE_FOLDER_RESTORE_FAILED";
+  | "WORKSPACE_FOLDER_RESTORE_FAILED"
+  | "WORKSPACE_FOLDER_DELETE_FAILED";
 
 export type WorkspaceFolderActionSuccess<T = void> = {
   ok: true;
@@ -893,6 +899,150 @@ export async function moveWorkspaceFolderAction(
       ok: false,
       code: "WORKSPACE_FOLDER_MOVE_FAILED",
       message: "The folder could not be moved. Please try again.",
+    };
+  }
+}
+
+// ── ADMIN-DELETE-WORKSPACE-01: Permanent folder deletion ──────────────────────
+
+export type FolderDeletionImpactData = {
+  descendantFolderCount: number;
+  documentCount: number;
+};
+
+/**
+ * Returns the deletion impact for a folder without mutating any data.
+ * Requires WORKSPACE_DELETE permission.
+ */
+export async function getWorkspaceFolderDeletionImpactAction(
+  formData: FormData,
+): Promise<WorkspaceFolderActionResult<FolderDeletionImpactData>> {
+  let session;
+
+  try {
+    session = await requirePermission(PERMISSIONS.WORKSPACE_DELETE);
+  } catch {
+    return {
+      ok: false,
+      code: "WORKSPACE_FORBIDDEN",
+      message: "You do not have permission to delete folders.",
+    };
+  }
+
+  const tenantId = session.user?.activeTenantId;
+
+  if (!tenantId) {
+    return {
+      ok: false,
+      code: "WORKSPACE_FORBIDDEN",
+      message: "Authenticated tenant is required.",
+    };
+  }
+
+  const folderId = normalizeFolderId(formData.get("folderId"));
+
+  if (!folderId) {
+    return {
+      ok: false,
+      code: "WORKSPACE_FOLDER_NOT_FOUND",
+      message: "Folder is required.",
+    };
+  }
+
+  const impact = await getWorkspaceFolderDeletionImpact(tenantId, folderId);
+
+  if (!impact) {
+    return {
+      ok: false,
+      code: "WORKSPACE_FOLDER_NOT_FOUND",
+      message: "Folder was not found.",
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      descendantFolderCount: impact.descendantFolderCount,
+      documentCount: impact.documentCount,
+    },
+  };
+}
+
+/**
+ * Permanently deletes a WorkspaceFolder and its entire descendant subtree.
+ * Requires WORKSPACE_DELETE permission.
+ *
+ * Documents in the deleted folder(s) will have their folderId set to null by
+ * the DB constraint (onDelete: SetNull) — they are not deleted.
+ */
+export async function deleteWorkspaceFolderPermanentlyAction(
+  formData: FormData,
+): Promise<WorkspaceFolderActionResult<void>> {
+  let session;
+
+  try {
+    session = await requirePermission(PERMISSIONS.WORKSPACE_DELETE);
+  } catch {
+    return {
+      ok: false,
+      code: "WORKSPACE_FORBIDDEN",
+      message: "You do not have permission to delete folders.",
+    };
+  }
+
+  const tenantId = session.user?.activeTenantId;
+
+  if (!tenantId) {
+    return {
+      ok: false,
+      code: "WORKSPACE_FORBIDDEN",
+      message: "Authenticated tenant is required.",
+    };
+  }
+
+  const folderId = normalizeFolderId(formData.get("folderId"));
+
+  if (!folderId) {
+    return {
+      ok: false,
+      code: "WORKSPACE_FOLDER_NOT_FOUND",
+      message: "Folder is required.",
+    };
+  }
+
+  try {
+    await deleteWorkspaceFolderPermanently(tenantId, folderId);
+
+    revalidatePath("/dashboard/workspace");
+    return { ok: true, data: undefined };
+  } catch (error) {
+    if (error instanceof WorkspaceFolderDeleteServiceError) {
+      if (error.code === "FOLDER_NOT_FOUND") {
+        return {
+          ok: false,
+          code: "WORKSPACE_FOLDER_NOT_FOUND",
+          message: "Folder was not found.",
+        };
+      }
+
+      if (error.code === "TENANT_FORBIDDEN") {
+        return {
+          ok: false,
+          code: "WORKSPACE_FORBIDDEN",
+          message: "Access denied.",
+        };
+      }
+    }
+
+    console.error(
+      "[workspace-actions] deleteWorkspaceFolderPermanently failed",
+      error,
+    );
+
+    return {
+      ok: false,
+      code: "WORKSPACE_FOLDER_DELETE_FAILED",
+      message: "The folder could not be deleted. Please try again.",
     };
   }
 }

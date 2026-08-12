@@ -12,6 +12,7 @@ import { CreateSubfolderForm } from "@/components/admin/workspace/CreateSubfolde
 import { RenameFolderForm } from "@/components/admin/workspace/RenameFolderForm";
 import { MoveFolderForm } from "@/components/admin/workspace/MoveFolderForm";
 import { ArchiveFolderButton } from "@/app/(admin)/dashboard/workspace/ArchiveFolderButton";
+import { DeleteFolderButton } from "@/app/(admin)/dashboard/workspace/DeleteFolderButton";
 import { RestoreFolderButton } from "@/app/(admin)/dashboard/workspace/RestoreFolderButton";
 import { WorkspaceClientShell } from "@/components/admin/workspace/WorkspaceClientShell";
 import { hasPermission } from "@/lib/permissions/has-permission";
@@ -237,6 +238,14 @@ export default async function WorkspacePage({
                       {t("folders.cannotArchiveNote")}
                     </p>
                   </div>
+                  {canDelete ? (
+                    <div className="border-t border-[var(--border)] pt-3">
+                      <DeleteFolderButton
+                        folderId={selectedFolder.id}
+                        folderName={selectedFolder.name}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ) : undefined
             }
@@ -320,10 +329,18 @@ export default async function WorkspacePage({
                   </p>
                 </div>
 
-                <RestoreFolderButton
-                  folderId={folder.id}
-                  folderName={folder.name}
-                />
+                <div className="flex shrink-0 items-center gap-2">
+                  <RestoreFolderButton
+                    folderId={folder.id}
+                    folderName={folder.name}
+                  />
+                  {canDelete ? (
+                    <DeleteFolderButton
+                      folderId={folder.id}
+                      folderName={folder.name}
+                    />
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
