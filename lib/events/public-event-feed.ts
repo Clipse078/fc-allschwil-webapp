@@ -63,6 +63,13 @@ export type GetPublicEventsInput = {
    * TOURNAMENT_EVENT_TYPES, CLUB_EVENT_TYPES) rather than raw string literals.
    */
   eventTypes?: string[] | null;
+  /**
+   * Override the upper bound for limit normalisation.
+   * The season-scope Wochenplan feed (scope=season) passes SEASON_SCOPE_MAX_LIMIT
+   * so that a full season's worth of events can be returned in a single request.
+   * Do NOT set this on default/weekly queries.
+   */
+  maxLimit?: number | null;
 };
 
 export type PublicEventItem = {
@@ -158,12 +165,20 @@ type PublicEventQueryRow = {
     ageGroup: string | null;
   } | null;
 };
-function normalizeLimit(value?: number | null) {
+/**
+ * Maximum limit for a single-week/default query.
+ * Season-scope queries use SEASON_SCOPE_MAX_LIMIT to cover a full season.
+ */
+const DEFAULT_MAX_LIMIT = 250;
+/** Upper bound for season-scope Wochenplan queries (full active season). */
+export const SEASON_SCOPE_MAX_LIMIT = 500;
+
+function normalizeLimit(value?: number | null, max = DEFAULT_MAX_LIMIT) {
   if (!value || Number.isNaN(value)) {
     return 100;
   }
 
-  return Math.max(1, Math.min(250, value));
+  return Math.max(1, Math.min(max, value));
 }
 
 function buildSurfaceWhere(surface: PublicEventSurface) {
@@ -222,7 +237,7 @@ function toPublicEventItem(event: PublicEventQueryRow): PublicEventItem {
 }
 
 export async function getPublicEvents(input: GetPublicEventsInput): Promise<PublicEventItem[]> {
-  const limit = normalizeLimit(input.limit);
+  const limit = normalizeLimit(input.limit, input.maxLimit ?? DEFAULT_MAX_LIMIT);
 
   const where: Record<string, unknown> = {
     ...buildSurfaceWhere(input.surface),
