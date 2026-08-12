@@ -62,12 +62,16 @@ type Props = {
   /**
    * The canonical current-season TeamSeason id (lib/teams/current-season.ts).
    * Null when this Team has no TeamSeason in the canonical current season —
-   * competition editing is disabled in that case (TEAMCENTER-UX-01C: never
-   * target a stale/historical TeamSeason from this surface).
+   * competition/orgUnit editing is disabled in that case (TEAMCENTER-UX-01C).
    */
   currentTeamSeasonId: string | null;
   /** participationType of the current-season TeamSeason, if any. */
   currentParticipationType: string | null;
+  /**
+   * TEAM-SEASON-ORGUNIT-01: primary OrgUnit of the current-season TeamSeason.
+   * Null when no primary OrgUnit is assigned for the current season.
+   */
+  currentSeasonOrgUnit: OrgUnitOption | null;
   canManage: boolean;
   onSaved?: (team: Team) => void;
 };
@@ -121,6 +125,7 @@ export default function TeamSettingsCard({
   availableCompetitions,
   currentTeamSeasonId,
   currentParticipationType,
+  currentSeasonOrgUnit,
   canManage,
   onSaved,
 }: Props) {
@@ -134,6 +139,12 @@ export default function TeamSettingsCard({
   const [competitionSaving, setCompetitionSaving] = useState(false);
   const [competitionMessage, setCompetitionMessage] = useState<string | null>(null);
   const [competitionError, setCompetitionError] = useState<string | null>(null);
+
+  // TEAM-SEASON-ORGUNIT-01: season-scoped OrgUnit state (separate save action).
+  const [seasonOrgUnitId, setSeasonOrgUnitId] = useState<string>(currentSeasonOrgUnit?.id ?? "");
+  const [seasonOrgUnitSaving, setSeasonOrgUnitSaving] = useState(false);
+  const [seasonOrgUnitMessage, setSeasonOrgUnitMessage] = useState<string | null>(null);
+  const [seasonOrgUnitError, setSeasonOrgUnitError] = useState<string | null>(null);
 
   const genderGroupOptions =
     form.genderGroup && !GENDER_GROUP_OPTIONS.includes(form.genderGroup)
@@ -181,6 +192,45 @@ export default function TeamSettingsCard({
       );
     } finally {
       setCompetitionSaving(false);
+    }
+  }
+
+  async function handleSeasonOrgUnitChange(nextOrgUnitId: string) {
+    if (!canManage || !currentTeamSeasonId) {
+      return;
+    }
+
+    const previousOrgUnitId = seasonOrgUnitId;
+    setSeasonOrgUnitId(nextOrgUnitId);
+    setSeasonOrgUnitSaving(true);
+    setSeasonOrgUnitMessage(null);
+    setSeasonOrgUnitError(null);
+
+    try {
+      const response = await fetch(
+        `/api/teams/${form.id}/team-seasons/${currentTeamSeasonId}/org-units`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orgUnitId: nextOrgUnitId || null }),
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Organisationseinheit konnte nicht gespeichert werden.");
+      }
+
+      setSeasonOrgUnitMessage(data?.message ?? "Organisationseinheit erfolgreich gespeichert.");
+      router.refresh();
+    } catch (err) {
+      setSeasonOrgUnitId(previousOrgUnitId);
+      setSeasonOrgUnitError(
+        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.",
+      );
+    } finally {
+      setSeasonOrgUnitSaving(false);
     }
   }
 
@@ -372,28 +422,58 @@ export default function TeamSettingsCard({
           </label>
         </FormSection>
 
-        <FormSection title="Organisation">
-          <label className="block space-y-1.5 md:col-span-2">
-            <span className={labelClass}>Organisationseinheit</span>
-            <select
-              value={form.orgUnitId ?? ""}
-              disabled={!canManage}
-              onChange={(event) =>
-                updateField("orgUnitId", event.target.value || null)
-              }
-              className={fieldClass}
-            >
-              <option value="">— keine Verknüpfung —</option>
-              {availableOrgUnits.map((ou) => (
-                <option key={ou.id} value={ou.id}>
-                  {ou.name} ({ou.key})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-[var(--muted)]">
-              Optionale Verknüpfung mit einer Organisationseinheit des aktiven Mandanten.
-            </p>
-          </label>
+        {/* TEAM-SEASON-ORGUNIT-01: season-scoped OrgUnit assignment.
+            Persisted as TeamSeasonOrgUnit (not Team.orgUnitId).
+            Saved immediately on change — mirrors the competition pattern. */}
+        <FormSection
+          title="Organisation"
+          description={
+            !currentTeamSeasonId
+              ? "Keine aktuelle Saison — Organisationseinheit kann erst nach Saisonzuordnung gepflegt werden."
+              : undefined
+          }
+        >
+          <div className="md:col-span-2 space-y-1.5">
+            <span className={labelClass}>
+              Organisationseinheit
+              {currentTeamSeasonId ? (
+                <span className="ml-1.5 font-normal text-[var(--muted)] normal-case tracking-normal">
+                  (saisonal)
+                </span>
+              ) : null}
+            </span>
+            {canManage && currentTeamSeasonId ? (
+              <>
+                <select
+                  value={seasonOrgUnitId}
+                  disabled={seasonOrgUnitSaving}
+                  onChange={(event) => handleSeasonOrgUnitChange(event.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">— keine Zuordnung —</option>
+                  {availableOrgUnits.map((ou) => (
+                    <option key={ou.id} value={ou.id}>
+                      {ou.name} ({ou.key})
+                    </option>
+                  ))}
+                </select>
+                {seasonOrgUnitMessage ? (
+                  <p className="text-xs font-medium text-emerald-600">{seasonOrgUnitMessage}</p>
+                ) : null}
+                {seasonOrgUnitError ? (
+                  <p className="text-xs font-medium text-[var(--sce-danger)]">{seasonOrgUnitError}</p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-[var(--foreground)]">
+                {currentSeasonOrgUnit ? (
+                  `${currentSeasonOrgUnit.name} (${currentSeasonOrgUnit.key})`
+                ) : (
+                  <span className="text-[var(--muted)]">Keine Einheit zugeordnet</span>
+                )}
+              </p>
+            )}
+          </div>
         </FormSection>
 
         {/* TEAMCENTER-UX-01B/C: Liga/Wettbewerb — strictly sourced from

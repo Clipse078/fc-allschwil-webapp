@@ -533,6 +533,160 @@ export async function setTeamSeasonCompetition(
   return { ok: true, competition };
 }
 
+// ---------------------------------------------------------------------------
+// TeamSeasonOrgUnit — post-creation OrgUnit (re-)assignment
+// ---------------------------------------------------------------------------
+
+export type SetTeamSeasonOrgUnitInput = {
+  /** Tenant context. Always sourced from the trusted session, never client input. */
+  tenantId: string;
+  /** The permanent Team identity that must own teamSeasonId. */
+  teamId: string;
+  /** The TeamSeason whose primary OrgUnit is being (re-)assigned. */
+  teamSeasonId: string;
+  /** New primary OrgUnit, or null to clear the primary assignment. */
+  orgUnitId: string | null;
+};
+
+export type SetTeamSeasonOrgUnitResult =
+  | { ok: true; orgUnit: { id: string; name: string; key: string } | null }
+  | { ok: false; code: SetTeamSeasonOrgUnitErrorCode; message: string };
+
+export type SetTeamSeasonOrgUnitErrorCode =
+  | "TEAM_SEASON_NOT_FOUND"
+  | "TEAM_SEASON_TENANT_MISMATCH"
+  | "ORG_UNIT_NOT_FOUND"
+  | "ORG_UNIT_TENANT_MISMATCH"
+  | "ORG_UNIT_NOT_ACTIVE"
+  | "UNKNOWN_ERROR";
+
+/**
+ * (Re-)assigns — or clears — the primary OrgUnit for an existing TeamSeason.
+ *
+ * TEAM-SEASON-ORGUNIT-01: mirrors the setTeamSeasonCompetition pattern.
+ * This is the only post-creation write path for TeamSeasonOrgUnit.
+ *
+ * When orgUnitId is provided:
+ *   - Demotes any existing primary row for this TeamSeason.
+ *   - Creates or promotes the target row as primary, with displayOrder 0.
+ * When orgUnitId is null:
+ *   - Demotes all primary rows (clears primary assignment).
+ *
+ * Non-primary rows (additional OrgUnit memberships) are never destroyed.
+ * The legacy Team.orgUnitId field is intentionally left unchanged.
+ */
+export async function setTeamSeasonOrgUnit(
+  input: SetTeamSeasonOrgUnitInput,
+): Promise<SetTeamSeasonOrgUnitResult> {
+  const teamSeason = await prisma.teamSeason.findUnique({
+    where: { id: input.teamSeasonId },
+    select: {
+      id: true,
+      teamId: true,
+      team: { select: { tenantId: true } },
+    },
+  });
+
+  if (!teamSeason || teamSeason.teamId !== input.teamId) {
+    return {
+      ok: false,
+      code: "TEAM_SEASON_NOT_FOUND",
+      message: "Team-Saison nicht gefunden.",
+    };
+  }
+
+  if (teamSeason.team.tenantId && teamSeason.team.tenantId !== input.tenantId) {
+    return {
+      ok: false,
+      code: "TEAM_SEASON_TENANT_MISMATCH",
+      message: "Die Team-Saison gehört nicht zum Mandanten.",
+    };
+  }
+
+  const orgUnitId = input.orgUnitId?.trim() || null;
+
+  let orgUnit: { id: string; name: string; key: string } | null = null;
+
+  if (orgUnitId) {
+    const found = await prisma.orgUnit.findFirst({
+      where: { id: orgUnitId, tenantId: input.tenantId },
+      select: { id: true, name: true, key: true, status: true },
+    });
+
+    if (!found) {
+      const anyOrgUnit = await prisma.orgUnit.findUnique({
+        where: { id: orgUnitId },
+        select: { id: true },
+      });
+
+      return anyOrgUnit
+        ? {
+            ok: false,
+            code: "ORG_UNIT_TENANT_MISMATCH",
+            message: "Die Organisationseinheit gehört nicht zum aktiven Mandanten.",
+          }
+        : { ok: false, code: "ORG_UNIT_NOT_FOUND", message: "Organisationseinheit nicht gefunden." };
+    }
+
+    if (!ACTIVE_ORG_UNIT_STATUSES.includes(found.status as OrgUnitStatus)) {
+      return {
+        ok: false,
+        code: "ORG_UNIT_NOT_ACTIVE",
+        message: `Die Organisationseinheit '${found.name}' ist nicht aktiv (Status: ${found.status}). Archivierte Einheiten können nicht zugewiesen werden.`,
+      };
+    }
+
+    orgUnit = { id: found.id, name: found.name, key: found.key };
+  }
+
+  try {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Demote any existing primary row for this TeamSeason.
+      await tx.teamSeasonOrgUnit.updateMany({
+        where: { teamSeasonId: input.teamSeasonId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+
+      if (orgUnitId) {
+        const existing = await tx.teamSeasonOrgUnit.findUnique({
+          where: {
+            teamSeasonId_orgUnitId: {
+              teamSeasonId: input.teamSeasonId,
+              orgUnitId,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (existing) {
+          await tx.teamSeasonOrgUnit.update({
+            where: { id: existing.id },
+            data: { isPrimary: true, displayOrder: 0 },
+          });
+        } else {
+          await tx.teamSeasonOrgUnit.create({
+            data: {
+              tenantId: input.tenantId,
+              teamSeasonId: input.teamSeasonId,
+              orgUnitId,
+              isPrimary: true,
+              displayOrder: 0,
+            },
+          });
+        }
+      }
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      code: "UNKNOWN_ERROR",
+      message: err instanceof Error ? err.message : "Unbekannter Fehler.",
+    };
+  }
+
+  return { ok: true, orgUnit };
+}
+
 /**
  * Validates that a TeamExternalMapping's teamSeasonId is consistent with
  * its teamId.

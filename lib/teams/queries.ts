@@ -251,6 +251,22 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
               },
             },
           },
+          // TEAM-SEASON-ORGUNIT-01: canonical season-scoped OrgUnit assignment.
+          orgUnits: {
+            where: { isPrimary: true },
+            take: 1,
+            select: {
+              isPrimary: true,
+              orgUnit: {
+                select: {
+                  id: true,
+                  name: true,
+                  key: true,
+                  type: true,
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -275,6 +291,9 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
   // TeamSeasonCompetition -> Competition relation of the active season.
   // Never fabricated/manual.
   const primaryCompetition = activeSeasonEntry?.competitions[0]?.competition ?? null;
+
+  // TEAM-SEASON-ORGUNIT-01: canonical season-scoped OrgUnit for the current season.
+  const currentSeasonOrgUnit = activeSeasonEntry?.orgUnits?.[0]?.orgUnit ?? null;
 
   // TEAM-IDENTITY-01: canonical naming contract — see lib/teams/team-naming.ts.
   const namingInput = {
@@ -313,6 +332,10 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     // TRAINING/DEVELOPMENT/... TeamSeason must not be offered a competition
     // picker that silently no-ops or 400s on save.
     currentParticipationType: activeSeasonEntry?.participationType ?? null,
+    // TEAM-SEASON-ORGUNIT-01: primary OrgUnit for the current season.
+    currentSeasonOrgUnit: currentSeasonOrgUnit
+      ? { id: currentSeasonOrgUnit.id, name: currentSeasonOrgUnit.name, key: currentSeasonOrgUnit.key, type: currentSeasonOrgUnit.type }
+      : null,
     competition: primaryCompetition
       ? {
           id: primaryCompetition.id,

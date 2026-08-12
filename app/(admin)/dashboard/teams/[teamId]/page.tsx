@@ -140,10 +140,12 @@ export default async function TeamDetailPage({ params }: Props) {
                     icon: <Shield className="h-3.5 w-3.5" />,
                   },
                   {
+                    // TEAM-SEASON-ORGUNIT-01: show canonical season OrgUnit;
+                    // fall back to legacy orgUnit when no season assignment exists.
                     label: "Organisationseinheit",
-                    value: team.orgUnit?.name,
-                    href: team.orgUnit
-                      ? `/dashboard/org-units/${team.orgUnit.id}`
+                    value: team.currentSeasonOrgUnit?.name ?? team.orgUnit?.name,
+                    href: (team.currentSeasonOrgUnit ?? team.orgUnit)
+                      ? `/dashboard/org-units/${(team.currentSeasonOrgUnit ?? team.orgUnit)!.id}`
                       : undefined,
                     icon: <Building2 className="h-3.5 w-3.5" />,
                     emptyText: "Keine Einheit verknüpft",
