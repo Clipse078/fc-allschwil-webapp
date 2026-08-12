@@ -28,6 +28,7 @@ import {
   PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS,
   PREVIEW_FIXTURE_HIGH_DENSITY_6,
   PREVIEW_TARGET_TOURNAMENT_EXTENSIONS,
+  PREVIEW_FIXTURE_TRAINING_GROUPS,
 } from "@/components/infoboard/screen1/screen1-preview-fixture";
 import type {
   InfoboardScreen1Feed,
@@ -444,9 +445,9 @@ describe("Event list — flat model", () => {
 
   it("events from current, next, and later all appear in one flat list", () => {
     const feed = makeFeed({
-      current: [makeEvent({ id: "c1", teamDisplayName: "Current Team" })],
-      next: [makeEvent({ id: "n1", teamDisplayName: "Next Team" })],
-      later: [makeEvent({ id: "l1", teamDisplayName: "Later Team" })],
+      current: [makeEvent({ id: "c1", teamDisplayName: "Current Team", startAt: "2026-09-12T08:00:00.000Z" })],
+      next: [makeEvent({ id: "n1", teamDisplayName: "Next Team", startAt: "2026-09-12T09:00:00.000Z" })],
+      later: [makeEvent({ id: "l1", teamDisplayName: "Later Team", startAt: "2026-09-12T10:00:00.000Z" })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
@@ -1145,10 +1146,10 @@ describe("High-density — 6 simultaneous trainings (flat list)", () => {
     expect(screen.getByText("Kabine F")).toBeTruthy();
   });
 
-  it("renders 6 event rows", () => {
+  it("renders 1 aggregated group card (6 simultaneous trainings → 1 card)", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
     const rows = screen.getAllByTestId("event-row");
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(1);
   });
 });
 
@@ -1731,9 +1732,9 @@ describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
 
   it("theme prop does not change which events are rendered", () => {
     const feed = makeFeed({
-      current: [makeEvent({ id: "c1" })],
-      next: [makeEvent({ id: "n1" })],
-      later: [makeEvent({ id: "l1" })],
+      current: [makeEvent({ id: "c1", startAt: "2026-09-12T08:00:00.000Z" })],
+      next: [makeEvent({ id: "n1", startAt: "2026-09-12T09:00:00.000Z" })],
+      later: [makeEvent({ id: "l1", startAt: "2026-09-12T10:00:00.000Z" })],
       isEmpty: false,
     });
 
@@ -1925,7 +1926,7 @@ describe("Card-based layout — no table-row appearance", () => {
   it("event list carries data-count attribute reflecting number of rendered events", () => {
     render(
       <InfoboardScreen1
-        feed={makeFeed({ current: [makeEvent({ id: "c1" })], next: [makeEvent({ id: "n1" })], isEmpty: false })}
+        feed={makeFeed({ current: [makeEvent({ id: "c1", startAt: "2026-09-12T08:00:00.000Z" })], next: [makeEvent({ id: "n1", startAt: "2026-09-12T09:00:00.000Z" })], isEmpty: false })}
       />,
     );
     const eventList = screen.getByTestId("event-list");
@@ -2006,9 +2007,9 @@ describe("Adaptive event count marker", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed({
-          current: [makeEvent({ id: "a" })],
-          next: [makeEvent({ id: "b" })],
-          later: [makeEvent({ id: "c" })],
+          current: [makeEvent({ id: "a", startAt: "2026-09-12T08:00:00.000Z" })],
+          next: [makeEvent({ id: "b", startAt: "2026-09-12T09:00:00.000Z" })],
+          later: [makeEvent({ id: "c", startAt: "2026-09-12T10:00:00.000Z" })],
           isEmpty: false,
         })}
       />,
@@ -2054,5 +2055,189 @@ describe("Alexa safe zone — INFOBOARD-04B", () => {
     );
     const safe = screen.getByTestId("alexa-safe-zone");
     expect(safe.textContent?.trim()).toBe("");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Training group card — aggregation (spec-required focused tests) ───────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Training aggregation — same-start-time trainings collapse into one card", () => {
+  it("two trainings at the same startAt produce one event-row card, not two", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "tr-a", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Team Alpha" }),
+        makeEvent({ id: "tr-b", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Team Beta" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(1);
+  });
+
+  it("five trainings at the same startAt produce one event-row card (PREVIEW_FIXTURE_HIGH_DENSITY_6 sub-set)", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "x1", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T1" }),
+        makeEvent({ id: "x2", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T2" }),
+        makeEvent({ id: "x3", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T3" }),
+        makeEvent({ id: "x4", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T4" }),
+        makeEvent({ id: "x5", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T5" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(1);
+  });
+
+  it("PREVIEW_FIXTURE_TRAINING_GROUPS: 3 start-times → 3 rendered cards (group A + match + group B)", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(3);
+  });
+});
+
+describe("Training aggregation — team, pitch, and kabine remain individually visible", () => {
+  it("all team names are visible inside the group card", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    expect(screen.getByText("FC Allschwil D7 D1")).toBeTruthy();
+    expect(screen.getByText("FC Allschwil D7 D2")).toBeTruthy();
+    expect(screen.getByText("FC Allschwil Junioren E1")).toBeTruthy();
+    expect(screen.getByText("FC Allschwil D9 D1")).toBeTruthy();
+    expect(screen.getByText("FC Allschwil D9 D2")).toBeTruthy();
+  });
+
+  it("all pitch labels are visible inside group rows", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.textContent).toContain("KUNSTRASEN 3_A");
+    expect(root.textContent).toContain("KUNSTRASEN 3_B");
+    expect(root.textContent).toContain("KUNSTRASEN 2_A");
+  });
+
+  it("all kabine values are visible inside group rows", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    const root = screen.getByTestId("infoboard-screen1-root");
+    expect(root.textContent).toContain("Kabine 3");
+    expect(root.textContent).toContain("Kabine 4");
+  });
+
+  it("group card data-testid=training-group is present for each aggregated time slot", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    const groups = screen.getAllByTestId("training-group");
+    expect(groups).toHaveLength(2);
+  });
+
+  it("each team in the group has its own training-group-row", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    const groupRows = screen.getAllByTestId("training-group-row");
+    // group A (3 teams) + group B (2 teams) = 5 rows
+    expect(groupRows).toHaveLength(5);
+  });
+});
+
+describe("Training aggregation — different start times stay as separate cards", () => {
+  it("two trainings with different startAt values produce two separate event-row cards", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "tr-c", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Team C" }),
+        makeEvent({ id: "tr-d", startAt: "2026-09-12T16:15:00.000Z", teamDisplayName: "Team D" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(2);
+  });
+
+  it("three trainings at three distinct start times produce three separate cards", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "t1", startAt: "2026-09-12T14:00:00.000Z", teamDisplayName: "Early Team" }),
+        makeEvent({ id: "t2", startAt: "2026-09-12T15:00:00.000Z", teamDisplayName: "Mid Team" }),
+        makeEvent({ id: "t3", startAt: "2026-09-12T16:00:00.000Z", teamDisplayName: "Late Team" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(3);
+  });
+});
+
+describe("Training aggregation — non-training activities are not merged", () => {
+  it("a MATCH at the same startAt as trainings is NOT merged into the training group", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "m1", type: "MATCH", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Match Team", opponentDisplayName: "Opponent" }),
+        makeEvent({ id: "tr1", type: "TRAINING", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Training Team A" }),
+        makeEvent({ id: "tr2", type: "TRAINING", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Training Team B" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    // Match renders as individual EventCard, trainings as one group → 2 cards
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(2);
+    // Match identity still visible
+    expect(screen.getByText("Match Team")).toBeTruthy();
+    expect(screen.getByText("Opponent")).toBeTruthy();
+  });
+
+  it("a TOURNAMENT at the same startAt as trainings remains a separate card", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "tour1", type: "TOURNAMENT", startAt: "2026-09-12T15:15:00.000Z", displayTitle: "Summer Cup", teamDisplayName: "FC Test" }),
+        makeEvent({ id: "tr3", type: "TRAINING", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Training A" }),
+        makeEvent({ id: "tr4", type: "TRAINING", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Training B" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(2);
+  });
+
+  it("PREVIEW_FIXTURE_TRAINING_GROUPS: the match card is not inside a training-group testid", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    const groups = screen.getAllByTestId("training-group");
+    for (const group of groups) {
+      expect(group.textContent).not.toContain("FC Binningen E1");
+    }
+  });
+});
+
+describe("Training aggregation — missing allocation warning remains visible", () => {
+  it("a team with null pitch inside a group shows the unassigned pitch warning", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "gr1", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Has Pitch", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } }),
+        makeEvent({ id: "gr2", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "No Pitch", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine B", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("pitch-unassigned-warning")).toBeTruthy();
+  });
+
+  it("a team with null dressing room inside a group shows the unassigned kabine warning", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "gr3", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Has Room", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } }),
+        makeEvent({ id: "gr4", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "No Room", allocation: { pitchLabel: "KR2", homeDressingRoomLabel: null, awayDressingRoomLabel: null, refereeDressingRoomLabel: null } }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("dressing-room-unassigned-warning")).toBeTruthy();
+  });
+
+  it("PREVIEW_FIXTURE_TRAINING_GROUPS: E1 (no kabine) shows dressing-room warning in the group", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
+    const warnings = screen.getAllByTestId("dressing-room-unassigned-warning");
+    // E1 in group A + D9 D2 in group B = at least 2 warnings
+    expect(warnings.length).toBeGreaterThanOrEqual(2);
   });
 });
