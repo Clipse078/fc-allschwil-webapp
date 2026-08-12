@@ -3,9 +3,22 @@
  */
 
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
+
+// MatchcenterWochenplanBulkPanel (rendered inside MatchcenterOverview when
+// there are Spielplanung rows) uses useRouter and useToast. Mock them so the
+// tests can render without a live App Router or toast provider.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({
+    toast: { success: vi.fn(), danger: vi.fn() },
+  }),
+}));
 
 const DEFAULT_MONTH_WINDOW = {
   param: "2026-08",
@@ -93,6 +106,7 @@ function renderOverview(
   props: Partial<{
     tab: "SPIELPLANUNG" | "RESULTATE";
     actionFilter: "ALLE" | "OFFEN" | "ERLEDIGT";
+    wochenplanFilter: "ALLE" | "IM_WOCHENPLAN" | "NICHT_IM_WOCHENPLAN";
   }> = {},
 ) {
   return render(
@@ -100,6 +114,7 @@ function renderOverview(
       matches={matches}
       tab={props.tab ?? "SPIELPLANUNG"}
       actionFilter={props.actionFilter ?? "ALLE"}
+      wochenplanFilter={props.wochenplanFilter ?? "ALLE"}
       monthWindow={DEFAULT_MONTH_WINDOW}
     />,
   );

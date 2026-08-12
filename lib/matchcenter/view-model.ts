@@ -17,6 +17,10 @@ import {
 
 export type MatchcenterActionFilter = "ALLE" | "OFFEN" | "ERLEDIGT";
 export type MatchcenterTab = "SPIELPLANUNG" | "RESULTATE";
+export type MatchcenterWochenplanFilter =
+  | "ALLE"
+  | "IM_WOCHENPLAN"
+  | "NICHT_IM_WOCHENPLAN";
 
 export type MatchcenterRowViewModel = {
   match: MatchcenterMatchSummary;
@@ -55,6 +59,23 @@ export function normalizeMatchcenterActionFilter(
   return isValidActionFilter(upper) ? upper : "ALLE";
 }
 
+function isValidWochenplanFilter(
+  value: string,
+): value is MatchcenterWochenplanFilter {
+  return (
+    value === "ALLE" ||
+    value === "IM_WOCHENPLAN" ||
+    value === "NICHT_IM_WOCHENPLAN"
+  );
+}
+
+export function normalizeMatchcenterWochenplanFilter(
+  value: string | null | undefined,
+): MatchcenterWochenplanFilter {
+  const upper = value?.trim().toUpperCase() ?? "";
+  return isValidWochenplanFilter(upper) ? upper : "ALLE";
+}
+
 export function normalizeMatchcenterTab(
   value: string | null | undefined,
 ): MatchcenterTab {
@@ -74,14 +95,30 @@ export function normalizeMatchcenterTab(
  */
 export function buildMatchcenterViewModel(
   matches: readonly MatchcenterMatchSummary[],
-  options: { actionFilter?: MatchcenterActionFilter } = {},
+  options: {
+    actionFilter?: MatchcenterActionFilter;
+    wochenplanFilter?: MatchcenterWochenplanFilter;
+  } = {},
 ): MatchcenterViewModel {
   const actionFilter = options.actionFilter ?? "ALLE";
+  const wochenplanFilter = options.wochenplanFilter ?? "ALLE";
+
+  // Apply wochenplan publication filter before partitioning into
+  // Spielplanung/Resultate so KPIs reflect the filtered set.
+  const wochenplanFiltered = matches.filter((match) => {
+    if (wochenplanFilter === "IM_WOCHENPLAN") {
+      return match.visibility.wochenplanVisible === true;
+    }
+    if (wochenplanFilter === "NICHT_IM_WOCHENPLAN") {
+      return match.visibility.wochenplanVisible === false;
+    }
+    return true;
+  });
 
   const upcoming: MatchcenterRowViewModel[] = [];
   const completed: MatchcenterMatchSummary[] = [];
 
-  for (const match of matches) {
+  for (const match of wochenplanFiltered) {
     if (isMatchCompleted(match)) {
       completed.push(match);
       continue;

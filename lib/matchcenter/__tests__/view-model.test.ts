@@ -3,6 +3,7 @@ import {
   buildMatchcenterViewModel,
   normalizeMatchcenterActionFilter,
   normalizeMatchcenterTab,
+  normalizeMatchcenterWochenplanFilter,
 } from "../view-model";
 import type { MatchcenterMatchSummary, MatchcenterSide } from "../types";
 
@@ -239,5 +240,141 @@ describe("normalizeMatchcenterTab", () => {
   it("defaults to SPIELPLANUNG for anything else", () => {
     expect(normalizeMatchcenterTab(undefined)).toBe("SPIELPLANUNG");
     expect(normalizeMatchcenterTab("garbage")).toBe("SPIELPLANUNG");
+  });
+});
+
+// ── PUB-WEEKPLAN-VISIBILITY-01 — Wochenplan filter ──────────────────────────
+
+describe("normalizeMatchcenterWochenplanFilter", () => {
+  it("accepts IM_WOCHENPLAN case-insensitively", () => {
+    expect(normalizeMatchcenterWochenplanFilter("im_wochenplan")).toBe("IM_WOCHENPLAN");
+    expect(normalizeMatchcenterWochenplanFilter("IM_WOCHENPLAN")).toBe("IM_WOCHENPLAN");
+  });
+
+  it("accepts NICHT_IM_WOCHENPLAN case-insensitively", () => {
+    expect(normalizeMatchcenterWochenplanFilter("nicht_im_wochenplan")).toBe("NICHT_IM_WOCHENPLAN");
+    expect(normalizeMatchcenterWochenplanFilter("NICHT_IM_WOCHENPLAN")).toBe("NICHT_IM_WOCHENPLAN");
+  });
+
+  it("defaults to ALLE for missing or invalid values", () => {
+    expect(normalizeMatchcenterWochenplanFilter(undefined)).toBe("ALLE");
+    expect(normalizeMatchcenterWochenplanFilter(null)).toBe("ALLE");
+    expect(normalizeMatchcenterWochenplanFilter("garbage")).toBe("ALLE");
+  });
+
+  it("accepts ALLE explicitly", () => {
+    expect(normalizeMatchcenterWochenplanFilter("alle")).toBe("ALLE");
+    expect(normalizeMatchcenterWochenplanFilter("ALLE")).toBe("ALLE");
+  });
+});
+
+describe("buildMatchcenterViewModel — wochenplanFilter", () => {
+  function makeWochenplanMatch(
+    id: string,
+    wochenplanVisible: boolean,
+    extra: Partial<MatchcenterMatchSummary> = {},
+  ): MatchcenterMatchSummary {
+    return createMatch({
+      id,
+      visibility: {
+        websiteVisible: true,
+        // infoboardVisible=true keeps HOME matches READY (assessMatchOperationalState
+        // requires it for home-match operational completeness).
+        infoboardVisible: true,
+        homepageVisible: false,
+        wochenplanVisible,
+        trainingsplanVisible: false,
+        teamPageVisible: false,
+      },
+      ...extra,
+    });
+  }
+
+  it("ALLE returns all matches regardless of wochenplanVisible", () => {
+    const visible = makeWochenplanMatch("m-vis", true);
+    const hidden = makeWochenplanMatch("m-hid", false);
+
+    const vm = buildMatchcenterViewModel([visible, hidden], {
+      wochenplanFilter: "ALLE",
+    });
+
+    const ids = vm.spielplanung.map((r) => r.match.id).sort();
+    expect(ids).toEqual(["m-hid", "m-vis"]);
+  });
+
+  it("IM_WOCHENPLAN returns only wochenplanVisible=true matches", () => {
+    const visible = makeWochenplanMatch("m-vis", true);
+    const hidden = makeWochenplanMatch("m-hid", false);
+
+    const vm = buildMatchcenterViewModel([visible, hidden], {
+      wochenplanFilter: "IM_WOCHENPLAN",
+    });
+
+    expect(vm.spielplanung.map((r) => r.match.id)).toEqual(["m-vis"]);
+    expect(vm.kpis.anstehend).toBe(1);
+  });
+
+  it("NICHT_IM_WOCHENPLAN returns only wochenplanVisible=false matches", () => {
+    const visible = makeWochenplanMatch("m-vis", true);
+    const hidden = makeWochenplanMatch("m-hid", false);
+
+    const vm = buildMatchcenterViewModel([visible, hidden], {
+      wochenplanFilter: "NICHT_IM_WOCHENPLAN",
+    });
+
+    expect(vm.spielplanung.map((r) => r.match.id)).toEqual(["m-hid"]);
+    expect(vm.kpis.anstehend).toBe(1);
+  });
+
+  it("wochenplanFilter=IM_WOCHENPLAN with no matching matches returns empty Spielplanung", () => {
+    const hidden = makeWochenplanMatch("m-hid", false);
+
+    const vm = buildMatchcenterViewModel([hidden], {
+      wochenplanFilter: "IM_WOCHENPLAN",
+    });
+
+    expect(vm.spielplanung).toEqual([]);
+    expect(vm.kpis.anstehend).toBe(0);
+  });
+
+  it("wochenplanFilter applies to Resultate as well as Spielplanung", () => {
+    const visibleCompleted = makeWochenplanMatch("m-vis-done", true, {
+      status: "COMPLETED",
+    });
+    const hiddenCompleted = makeWochenplanMatch("m-hid-done", false, {
+      status: "COMPLETED",
+    });
+
+    const vm = buildMatchcenterViewModel([visibleCompleted, hiddenCompleted], {
+      wochenplanFilter: "IM_WOCHENPLAN",
+    });
+
+    expect(vm.resultate.map((m) => m.id)).toEqual(["m-vis-done"]);
+    expect(vm.kpis.resultate).toBe(1);
+  });
+
+  it("combining wochenplanFilter with actionFilter narrows the list correctly", () => {
+    const openAndVisible = makeWochenplanMatch("m-open-vis", true, {
+      operational: {
+        pitchCode: null,
+        homeDressingRoomCode: null,
+        awayDressingRoomCode: null,
+        meetingTime: null,
+        remarks: null,
+      },
+    });
+    const readyAndVisible = makeWochenplanMatch("m-ready-vis", true);
+    const readyAndHidden = makeWochenplanMatch("m-ready-hid", false);
+
+    const vm = buildMatchcenterViewModel(
+      [openAndVisible, readyAndVisible, readyAndHidden],
+      {
+        wochenplanFilter: "IM_WOCHENPLAN",
+        actionFilter: "ERLEDIGT",
+      },
+    );
+
+    // IM_WOCHENPLAN keeps the 2 visible ones; ERLEDIGT of those keeps only ready
+    expect(vm.spielplanung.map((r) => r.match.id)).toEqual(["m-ready-vis"]);
   });
 });
