@@ -29,6 +29,9 @@ import {
 } from "@/lib/facilities/resource-options";
 import { useFacilityAvailability } from "@/hooks/use-facility-availability";
 import { formatAvailabilitySuffix } from "@/components/admin/training/FacilityResourceSelector";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
+import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -87,6 +90,18 @@ export type MatchcenterDetailOperationalProps = {
    * Replaces the static FCA_DRESSING_ROOMS registry.
    */
   dressingRoomOptions?: FacilityResourceOption[];
+  /**
+   * PLANNING-RESOURCE-UX-01 — when provided, pitch/hall visual card pickers
+   * replace the legacy code-based <select>. The same availability data is
+   * reused; resources are keyed by their canonical code since Match still
+   * persists pitchCode / dressingRoomCode on Event.
+   */
+  pitchHallFacilityGroups?: FacilityGroup[];
+  /**
+   * PLANNING-RESOURCE-UX-01 — when provided, dressing-room visual card
+   * pickers replace the legacy code-based <select>.
+   */
+  dressingRoomFacilityGroups?: FacilityGroup[];
 };
 
 // ── Readiness helpers ─────────────────────────────────────────────────────────
@@ -195,6 +210,19 @@ function formatTeamLabel(team: TeamItem): string {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+/**
+ * Transforms FacilityGroup[] to use the resource's `code` as its `id`, so that
+ * the visual pickers (which are ID-keyed) can be driven by code-keyed
+ * availability without a separate ID-keyed fetch. Match events still persist
+ * resource codes on Event — this mapping is purely a UI adaptation.
+ */
+function facilityGroupsWithCodeAsId(groups: FacilityGroup[]): FacilityGroup[] {
+  return groups.map((fg) => ({
+    ...fg,
+    resources: fg.resources.map((r) => ({ ...r, id: r.code })),
+  }));
+}
+
 export default function MatchcenterDetailOperational({
   matchId,
   homeAway,
@@ -213,9 +241,24 @@ export default function MatchcenterDetailOperational({
   canManage,
   pitchOptions = [],
   dressingRoomOptions = [],
+  pitchHallFacilityGroups,
+  dressingRoomFacilityGroups,
 }: MatchcenterDetailOperationalProps) {
   const router = useRouter();
   const { toast } = useToast();
+
+  // PLANNING-RESOURCE-UX-01 — code-as-ID groups for the visual pickers.
+  // Match events persist resource codes, so we transform groups to use `code`
+  // as the picker's "ID" — onSelect returns the code, which we store directly.
+  const pitchGroupsByCode = useMemo(
+    () => (pitchHallFacilityGroups ? facilityGroupsWithCodeAsId(pitchHallFacilityGroups) : null),
+    [pitchHallFacilityGroups],
+  );
+  const dressingRoomGroupsByCode = useMemo(
+    () => (dressingRoomFacilityGroups ? facilityGroupsWithCodeAsId(dressingRoomFacilityGroups) : null),
+    [dressingRoomFacilityGroups],
+  );
+  const useVisualPickers = Boolean(pitchGroupsByCode);
 
   // RESOURCE-AVAILABILITY-UX-01 — same live availability foundation as the
   // guided create forms (lib/facilities/availability-service.ts via
@@ -547,34 +590,43 @@ export default function MatchcenterDetailOperational({
         title="Sportanlage und Spielfeld"
         description="Spielfeldwahl für dieses Match"
       >
-        <label className="block space-y-2">
-          <span className="fca-label">
-            <Volleyball className="inline h-3.5 w-3.5 align-text-bottom" />{" "}
-            Spielfeld
-          </span>
-
-          <select
-            value={pitchCode}
-            onChange={(e) => setPitchCode(e.target.value)}
+        {useVisualPickers && pitchGroupsByCode ? (
+          <VisualResourceAvailabilityPicker
+            facilityGroups={pitchGroupsByCode}
+            selectedResourceIds={pitchCode ? new Set([pitchCode]) : new Set()}
+            onSelect={(code) => setPitchCode(code)}
+            onDeselect={() => setPitchCode("")}
+            availabilityByResourceId={pitchAvailabilityByCode}
             disabled={!canManage || saving}
-            className="fca-select"
-            data-testid="pitch-assignment-select"
-          >
-            <option value="">— Kein Spielfeld zugeordnet —</option>
-            {effectivePitchOptions.map((opt) => (
-              <option key={opt.code} value={opt.code}>
-                {opt.name}
-                {formatAvailabilitySuffix(pitchAvailabilityByCode.get(opt.code))}
-              </option>
-            ))}
-          </select>
-
-          {!pitchCode.trim() && (
-            <p className="text-xs text-amber-700">
-              Spielfeld fehlt.
-            </p>
-          )}
-        </label>
+            singleSelect
+            testId="pitch-assignment"
+          />
+        ) : (
+          <label className="block space-y-2">
+            <span className="fca-label">
+              <Volleyball className="inline h-3.5 w-3.5 align-text-bottom" />{" "}
+              Spielfeld
+            </span>
+            <select
+              value={pitchCode}
+              onChange={(e) => setPitchCode(e.target.value)}
+              disabled={!canManage || saving}
+              className="fca-select"
+              data-testid="pitch-assignment-select"
+            >
+              <option value="">— Kein Spielfeld zugeordnet —</option>
+              {effectivePitchOptions.map((opt) => (
+                <option key={opt.code} value={opt.code}>
+                  {opt.name}
+                  {formatAvailabilitySuffix(pitchAvailabilityByCode.get(opt.code))}
+                </option>
+              ))}
+            </select>
+            {!pitchCode.trim() && (
+              <p className="text-xs text-amber-700">Spielfeld fehlt.</p>
+            )}
+          </label>
+        )}
       </SectionCard>
 
       {/* D5 — Dressing Room Assignment */}
@@ -582,65 +634,83 @@ export default function MatchcenterDetailOperational({
         title="Garderobenzuteilung"
         description="Garderobenzuteilung für Heim- und Gastteam"
       >
-        <div className="space-y-4">
-          <label className="block space-y-2">
-            <span className="fca-label">
-              <Shirt className="inline h-3.5 w-3.5 align-text-bottom" />{" "}
-              Garderobe Heimteam ({homeDisplayName})
-            </span>
-
-            <select
-              value={homeDressingRoomCode}
-              onChange={(e) => setHomeDressingRoomCode(e.target.value)}
+        {useVisualPickers && dressingRoomGroupsByCode ? (
+          <div className="space-y-4">
+            <VisualDressingRoomPicker
+              facilityGroups={dressingRoomGroupsByCode}
+              selectedResourceIds={homeDressingRoomCode ? new Set([homeDressingRoomCode]) : new Set()}
+              onSelect={(code) => setHomeDressingRoomCode(code)}
+              onDeselect={() => setHomeDressingRoomCode("")}
+              availabilityByResourceId={dressingRoomAvailabilityByCode}
               disabled={!canManage || saving}
-              className="fca-select"
-              data-testid="home-dressing-room-select"
-            >
-              <option value="">— Keine Garderobe zugeordnet —</option>
-              {effectiveDressingRoomOptions.map((room) => (
-                <option key={room.code} value={room.code}>
-                  {room.name}
-                  {formatAvailabilitySuffix(dressingRoomAvailabilityByCode.get(room.code))}
-                </option>
-              ))}
-            </select>
-
-            {!homeDressingRoomCode.trim() && (
-              <p className="text-xs text-amber-700">
-                Garderobe Heimteam fehlt.
-              </p>
-            )}
-          </label>
-
-          <label className="block space-y-2">
-            <span className="fca-label">
-              <Shirt className="inline h-3.5 w-3.5 align-text-bottom" />{" "}
-              Garderobe Gastteam ({awayDisplayName})
-            </span>
-
-            <select
-              value={awayDressingRoomCode}
-              onChange={(e) => setAwayDressingRoomCode(e.target.value)}
+              label={`Heimkabine (${homeDisplayName})`}
+              singleSelect
+              testId="home-dressing-room"
+            />
+            <VisualDressingRoomPicker
+              facilityGroups={dressingRoomGroupsByCode}
+              selectedResourceIds={awayDressingRoomCode ? new Set([awayDressingRoomCode]) : new Set()}
+              onSelect={(code) => setAwayDressingRoomCode(code)}
+              onDeselect={() => setAwayDressingRoomCode("")}
+              availabilityByResourceId={dressingRoomAvailabilityByCode}
               disabled={!canManage || saving}
-              className="fca-select"
-              data-testid="away-dressing-room-select"
-            >
-              <option value="">— Keine Garderobe zugeordnet —</option>
-              {effectiveDressingRoomOptions.map((room) => (
-                <option key={room.code} value={room.code}>
-                  {room.name}
-                  {formatAvailabilitySuffix(dressingRoomAvailabilityByCode.get(room.code))}
-                </option>
-              ))}
-            </select>
-
-            {!awayDressingRoomCode.trim() && (
-              <p className="text-xs text-amber-700">
-                Garderobe Gastteam fehlt.
-              </p>
-            )}
-          </label>
-        </div>
+              label={`Gastkabine (${awayDisplayName})`}
+              singleSelect
+              testId="away-dressing-room"
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <label className="block space-y-2">
+              <span className="fca-label">
+                <Shirt className="inline h-3.5 w-3.5 align-text-bottom" />{" "}
+                Garderobe Heimteam ({homeDisplayName})
+              </span>
+              <select
+                value={homeDressingRoomCode}
+                onChange={(e) => setHomeDressingRoomCode(e.target.value)}
+                disabled={!canManage || saving}
+                className="fca-select"
+                data-testid="home-dressing-room-select"
+              >
+                <option value="">— Keine Garderobe zugeordnet —</option>
+                {effectiveDressingRoomOptions.map((room) => (
+                  <option key={room.code} value={room.code}>
+                    {room.name}
+                    {formatAvailabilitySuffix(dressingRoomAvailabilityByCode.get(room.code))}
+                  </option>
+                ))}
+              </select>
+              {!homeDressingRoomCode.trim() && (
+                <p className="text-xs text-amber-700">Garderobe Heimteam fehlt.</p>
+              )}
+            </label>
+            <label className="block space-y-2">
+              <span className="fca-label">
+                <Shirt className="inline h-3.5 w-3.5 align-text-bottom" />{" "}
+                Garderobe Gastteam ({awayDisplayName})
+              </span>
+              <select
+                value={awayDressingRoomCode}
+                onChange={(e) => setAwayDressingRoomCode(e.target.value)}
+                disabled={!canManage || saving}
+                className="fca-select"
+                data-testid="away-dressing-room-select"
+              >
+                <option value="">— Keine Garderobe zugeordnet —</option>
+                {effectiveDressingRoomOptions.map((room) => (
+                  <option key={room.code} value={room.code}>
+                    {room.name}
+                    {formatAvailabilitySuffix(dressingRoomAvailabilityByCode.get(room.code))}
+                  </option>
+                ))}
+              </select>
+              {!awayDressingRoomCode.trim() && (
+                <p className="text-xs text-amber-700">Garderobe Gastteam fehlt.</p>
+              )}
+            </label>
+          </div>
+        )}
       </SectionCard>
 
       {/* D6 — Publication */}

@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+﻿import { useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -31,6 +32,7 @@ import { WeekplannerActivityTimeOverrideEditor } from "./WeekplannerActivityTime
 import { WeekplannerActivityOverridePanel } from "./WeekplannerActivityOverridePanel";
 import { WeekplannerOverridePanelProvider } from "./WeekplannerOverridePanelContext";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import { WeekplannerCanonicalPlanningEditor } from "./WeekplannerCanonicalPlanningEditor";
 
 /**
  * WEEKPLANNER-01B — populated only when an alternative plan is selected AND
@@ -55,6 +57,16 @@ const CANONICAL_MODULE_HREF: Record<WeekplannerItem["type"], { label: string; hr
   TOURNAMENT: { label: "TournamentCenter", href: "/dashboard/tournamentcenter" },
 };
 
+/**
+ * PLANNING-RESOURCE-UX-01 — Standardplan canonical editing context.
+ * When present and canEdit is true, each Standardplan WeekplannerCard gains
+ * a "Planung bearbeiten" button that opens the WeekplannerCanonicalPlanningEditor.
+ */
+type CanonicalEditingContext = {
+  canEdit: boolean;
+  facilityGroupsByAllocationGroup: { PITCH_HALL: FacilityGroup[]; DRESSING_ROOM: FacilityGroup[] };
+};
+
 type WeekPlannerPageProps = {
   week: WeekplannerWeek;
   /** URL "week" param that resolves to the current Europe/Zurich week — powers the "Heute" button. */
@@ -68,6 +80,8 @@ type WeekPlannerPageProps = {
   /** WEEKPLANNER-01B — whether the current user can create/rename/archive/delete plans and edit overrides. */
   canManagePlans?: boolean;
   overrideEditing?: OverrideEditingContext;
+  /** PLANNING-RESOURCE-UX-01 — enables canonical editing of Standardplan items directly from Wochenplaner. */
+  canonicalEditing?: CanonicalEditingContext;
 };
 
 const TYPE_META: Record<
@@ -237,6 +251,7 @@ function WeekplannerCard({
   timezone,
   planName,
   overrideEditing,
+  canonicalEditing,
 }: {
   item: WeekplannerItem;
   locale: string;
@@ -244,12 +259,18 @@ function WeekplannerCard({
   /** The currently selected alternative plan's display name, e.g. "Schlechtwetterplan" — null for the Standardplan. Shown even for read-only viewers. */
   planName?: string | null;
   overrideEditing?: OverrideEditingContext;
+  canonicalEditing?: CanonicalEditingContext;
 }) {
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
   const hasConflict = item.conflicts.length > 0;
   const activityId = activityIdOf(item);
   const activityKey = `${item.type}:${activityId}`;
+
+  // PLANNING-RESOURCE-UX-01 — Standardplan canonical editor state
+  const [showCanonicalEditor, setShowCanonicalEditor] = useState(false);
+  const isStandardplan = !planName;
+  const showCanonicalEditButton = isStandardplan && canonicalEditing?.canEdit;
 
   const timeEditor = overrideEditing ? (
     <WeekplannerActivityTimeOverrideEditor
@@ -435,6 +456,31 @@ function WeekplannerCard({
       )}
 
       <ConflictBadge item={item} />
+
+      {/* PLANNING-RESOURCE-UX-01 — Standardplan canonical edit button + inline editor */}
+      {showCanonicalEditButton && (
+        <div className="mt-2.5">
+          {showCanonicalEditor ? null : (
+            <button
+              type="button"
+              onClick={() => setShowCanonicalEditor(true)}
+              className="text-xs font-medium text-[var(--sce-primary)] hover:underline"
+              data-testid={`weekplanner-canonical-edit-${item.type.toLowerCase()}`}
+            >
+              Planung bearbeiten
+            </button>
+          )}
+          {showCanonicalEditor && canonicalEditing && (
+            <WeekplannerCanonicalPlanningEditor
+              item={item}
+              facilityGroupsByAllocationGroup={canonicalEditing.facilityGroupsByAllocationGroup}
+              timezone={timezone}
+              onClose={() => setShowCanonicalEditor(false)}
+              onSaved={() => setShowCanonicalEditor(false)}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -455,12 +501,14 @@ function DayColumn({
   timezone,
   planName,
   overrideEditing,
+  canonicalEditing,
 }: {
   day: WeekplannerDay;
   locale: string;
   timezone: string;
   planName?: string | null;
   overrideEditing?: OverrideEditingContext;
+  canonicalEditing?: CanonicalEditingContext;
 }) {
   const today = isToday(day.dayKey, timezone);
 
@@ -504,6 +552,7 @@ function DayColumn({
               timezone={timezone}
               planName={planName}
               overrideEditing={overrideEditing}
+              canonicalEditing={canonicalEditing}
             />
           ))
         )}
@@ -521,6 +570,7 @@ export default function WeekPlannerPage({
   activePlanId = null,
   canManagePlans = false,
   overrideEditing,
+  canonicalEditing,
 }: WeekPlannerPageProps) {
   const totalItems = week.days.reduce((sum, day) => sum + day.items.length, 0);
   const conflictCount = week.days.reduce(
@@ -556,7 +606,9 @@ export default function WeekPlannerPage({
         >
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" />
           <span>
-            Standardplan aktiv — Platz- und Garderobenzuteilungen sind hier nur lesbar. Um sie zu ändern, öffnen Sie{" "}
+            {canonicalEditing?.canEdit
+              ? "Standardplan — Planungsdaten direkt bearbeitbar (\"Planung bearbeiten\" auf jedem Eintrag) oder über "
+              : "Standardplan aktiv — Platz- und Garderobenzuteilungen sind hier nur lesbar. Um sie zu ändern, öffnen Sie "}
             <Link href={CANONICAL_MODULE_HREF.TRAINING.href} className="font-semibold text-[var(--sce-primary)] hover:underline">
               {CANONICAL_MODULE_HREF.TRAINING.label}
             </Link>
@@ -644,6 +696,7 @@ export default function WeekPlannerPage({
                   timezone={timezone}
                   planName={planName}
                   overrideEditing={overrideEditing}
+                  canonicalEditing={activePlanId === null ? canonicalEditing : undefined}
                 />
               ))}
             </div>

@@ -31,10 +31,11 @@ import { useRouter } from "next/navigation";
 import { Building2, Loader2, Plus, Shirt, Trash2, UserRound, UsersRound } from "lucide-react";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import {
-  FacilityResourceSelector,
   type FacilityGroup,
   type ResourceAvailabilityAnnotation,
 } from "@/components/admin/training/FacilityResourceSelector";
+import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
+import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 import {
   orchestrateTournamentCreation,
   type TournamentCreationOrchestrationResult,
@@ -353,7 +354,7 @@ export default function TournamentCreateForm({
     setParticipants((prev) => prev.filter((p) => p.localId !== localId));
   }, []);
 
-  const addDressingRoomDraft = useCallback(async (participantLocalId: string, facilityResourceId: string) => {
+  const addDressingRoomDraft = useCallback((participantLocalId: string, facilityResourceId: string) => {
     const display = resolveResourceDisplay(dressingRoomFacilityGroups, facilityResourceId);
     setParticipants((prev) =>
       prev.map((p) =>
@@ -382,7 +383,7 @@ export default function TournamentCreateForm({
 
   const allocatedResourceIds = useMemo(() => new Set(resources.map((r) => r.facilityResourceId)), [resources]);
 
-  const addResourceDraft = useCallback(async (facilityResourceId: string) => {
+  const addResourceDraft = useCallback((facilityResourceId: string) => {
     const display = resolveResourceDisplay(pitchHallFacilityGroups, facilityResourceId);
     setResources((prev) => [
       ...prev,
@@ -824,33 +825,11 @@ export default function TournamentCreateForm({
                         Garderobe
                       </p>
 
-                      {participant.dressingRooms.length > 0 && (
-                        <ul className="mb-2 flex flex-wrap gap-1.5">
-                          {participant.dressingRooms.map((room) => (
-                            <li
-                              key={room.facilityResourceId}
-                              className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-xs text-[var(--text-2)]"
-                            >
-                              {room.facilityResourceName}
-                              <button
-                                type="button"
-                                onClick={() => removeDressingRoomDraft(participant.localId, room.facilityResourceId)}
-                                aria-label={`Garderobe ${room.facilityResourceName} entfernen`}
-                                className="text-[var(--muted)] hover:text-rose-600"
-                              >
-                                ×
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-
-                      <FacilityResourceSelector
+                      <VisualDressingRoomPicker
                         facilityGroups={dressingRoomFacilityGroups}
-                        allocatedResourceIds={new Set(participant.dressingRooms.map((d) => d.facilityResourceId))}
-                        onAdd={(resourceId) => addDressingRoomDraft(participant.localId, resourceId)}
-                        placeholder="Garderobe auswählen…"
-                        addButtonLabel="Zuweisen"
+                        selectedResourceIds={new Set(participant.dressingRooms.map((d) => d.facilityResourceId))}
+                        onSelect={(resourceId) => addDressingRoomDraft(participant.localId, resourceId)}
+                        onDeselect={(resourceId) => removeDressingRoomDraft(participant.localId, resourceId)}
                         availabilityByResourceId={dressingRoomAvailability}
                         testId={`tournament-create-participant-${participant.localId}-dressing-room`}
                       />
@@ -951,48 +930,17 @@ export default function TournamentCreateForm({
           title="3 · Spielfeld / Halle"
           description="Ein Heimturnier kann mehr als ein Spielfeld bzw. mehr als eine Halle belegen. Verfügbarkeit wird live für Start–Ende angezeigt."
         >
-          <div className="space-y-4">
-            {resources.length === 0 ? (
-              <div className="rounded-lg border-2 border-dashed border-[var(--border)] py-6 text-center">
-                <p className="text-sm text-[var(--text-2)]">Noch kein Spielfeld / keine Halle zugewiesen.</p>
-              </div>
-            ) : (
-              <ul className="space-y-2" data-testid="tournament-create-resource-list">
-                {resources.map((resource) => (
-                  <li
-                    key={resource.localId}
-                    className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">{resource.facilityResourceName}</p>
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--text-2)]">
-                        <Building2 className="h-3 w-3" aria-hidden />
-                        {resource.facilityName}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeResourceDraft(resource.localId)}
-                      aria-label={`${resource.facilityResourceName} entfernen`}
-                      className="shrink-0 rounded p-1 text-[var(--muted)] transition hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <FacilityResourceSelector
-              facilityGroups={pitchHallFacilityGroups}
-              allocatedResourceIds={allocatedResourceIds}
-              onAdd={addResourceDraft}
-              placeholder="Spielfeld / Halle auswählen…"
-              addButtonLabel="Zuweisen"
-              availabilityByResourceId={pitchAvailability}
-              testId="tournament-create-resource-add"
-            />
-          </div>
+          <VisualResourceAvailabilityPicker
+            facilityGroups={pitchHallFacilityGroups}
+            selectedResourceIds={allocatedResourceIds}
+            onSelect={addResourceDraft}
+            onDeselect={(id) => {
+              const row = resources.find((r) => r.facilityResourceId === id);
+              if (row) removeResourceDraft(row.localId);
+            }}
+            availabilityByResourceId={pitchAvailability}
+            testId="tournament-create-resource"
+          />
         </SectionCard>
       )}
 
