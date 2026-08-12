@@ -4354,6 +4354,11 @@ model Infoboard {
   announcementBgColor   String?
   announcementTextColor String?
 
+  /// Designer layout JSON (InboardLayout v1).
+  /// Stores widget instances: type, enabled, position, size, variant, settings.
+  /// null = use getDefaultLayout() derived from flat fields.
+  layoutJson String?
+
   /// Display sequence within this tenant's Infoboard list (ascending).
   sortOrder Int @default(0)
 

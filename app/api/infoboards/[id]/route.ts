@@ -152,6 +152,24 @@ export async function PATCH(
         : String(body.announcementTextColor);
   }
 
+  // Layout JSON (Designer)
+  if ("layoutJson" in body) {
+    if (body.layoutJson !== null && typeof body.layoutJson !== "string") {
+      return NextResponse.json(
+        { error: "layoutJson muss ein String oder null sein." },
+        { status: 422 },
+      );
+    }
+    // Basic size guard (1 MB)
+    if (typeof body.layoutJson === "string" && body.layoutJson.length > 1_048_576) {
+      return NextResponse.json(
+        { error: "layoutJson ist zu groß (max. 1 MB)." },
+        { status: 422 },
+      );
+    }
+    input.layoutJson = body.layoutJson as string | null;
+  }
+
   // Validate: announcement requires text when enabled
   const willBeEnabled =
     input.announcementEnabled !== undefined

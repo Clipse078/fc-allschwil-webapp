@@ -163,6 +163,9 @@ export async function updateInfoboard(
       ...(input.announcementTextColor !== undefined && {
         announcementTextColor: input.announcementTextColor,
       }),
+      ...(input.layoutJson !== undefined && {
+        layoutJson: input.layoutJson,
+      }),
       ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
     },
   }) as unknown as Promise<InboardRow>;
@@ -218,6 +221,7 @@ export async function duplicateInfoboard(
       announcementText: source.announcementText,
       announcementBgColor: source.announcementBgColor,
       announcementTextColor: source.announcementTextColor,
+      layoutJson: source.layoutJson,
       sortOrder: nextSortOrder,
     },
   }) as unknown as Promise<InboardRow>;
