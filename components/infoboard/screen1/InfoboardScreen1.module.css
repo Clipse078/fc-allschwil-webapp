@@ -677,8 +677,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: var(--ib-footer-height);
-  padding: 0 var(--ib-sp-8);
+  min-height: var(--ib-footer-height);
+  padding: var(--ib-sp-2) var(--ib-sp-8);
   background: var(--ib-header-bg);
   border-top: 1px solid var(--ib-border);
   flex-shrink: 0;
@@ -742,6 +742,30 @@
   .tickerTrackAnimated {
     animation: none;
   }
+}
+
+/*
+ * Reduced-motion variant: no overflow clipping, text wraps so the full
+ * message is always visible regardless of length.
+ */
+.tickerViewportReduced {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  /* no overflow: hidden — let content expand */
+}
+
+.tickerTrackReduced {
+  white-space: normal;
+  word-break: break-word;
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib-fs-footer);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: inherit;
+  line-height: 1.4;
 }
 
 .footerRight {

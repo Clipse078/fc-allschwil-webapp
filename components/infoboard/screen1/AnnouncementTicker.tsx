@@ -5,33 +5,34 @@
  *
  * Client component for the announcement bar scrolling text.
  *
- * Behavior:
- *   - Short text that fits within the viewport → rendered static (no animation).
- *   - Text that overflows → scrolls horizontally at constant speed, seamless loop.
- *   - Overflow is detected via getBoundingClientRect (scrollWidth > viewportWidth).
- *   - Respects prefers-reduced-motion: no animation when motion is reduced.
- *   - Single line only (white-space: nowrap), no ellipsis, no wrapping.
- *   - The fixed icon stays outside this component (in the parent Footer).
- *   - No <marquee>; uses CSS @keyframes with translateX.
+ * Normal mode:
+ *   - Short text that fits → static (no animation, no overflow).
+ *   - Text that overflows → horizontal scroll, seamless loop (CSS @keyframes).
+ *   - Overflow detected via getBoundingClientRect.
+ *   - ResizeObserver re-evaluates whenever the viewport width changes.
  *
- * Seamless loop technique:
- *   When overflow is detected, a second (aria-hidden) copy is appended inside the
- *   same flex track, separated by a fixed gap. The track animates from
- *   translateX(0) → translateX(-(firstCopyWidth + gap)). When the first copy
- *   exits the viewport, the second copy is at the same visual position as the
- *   first was at the start, producing a seamless loop.
+ * prefers-reduced-motion mode:
+ *   - No animation, no overflow clipping.
+ *   - Text wraps naturally so the full message is always accessible.
+ *   - Icon and colors are unchanged (both live on the parent Footer).
+ *
+ * Seamless loop technique (normal mode):
+ *   Two copies of the text are placed in the same inline-flex track, separated
+ *   by a fixed gap. The track animates translateX(0) →
+ *   translateX(-(firstCopyWidth + gap)). When the first copy exits, the second
+ *   copy occupies the exact start position → seamless.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./InfoboardScreen1.module.css";
 
 /** Gap (px) between the end of one text repetition and the start of the next. */
 const GAP_PX = 96;
 
-/** Scroll speed in pixels per second. Tuned for TV-distance readability. */
+/** Scroll speed in pixels per second — tuned for TV-distance readability. */
 const SPEED_PX_PER_S = 70;
 
-/** Minimum animation duration in seconds (protects against very short overflows). */
+/** Minimum animation duration in seconds (guards against very short overflows). */
 const MIN_DURATION_S = 10;
 
 type AnnouncementTickerProps = {
@@ -41,23 +42,36 @@ type AnnouncementTickerProps = {
 export function AnnouncementTicker({ text }: AnnouncementTickerProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const firstCopyRef = useRef<HTMLSpanElement>(null);
+
   const [shouldScroll, setShouldScroll] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [cssVars, setCssVars] = useState<React.CSSProperties>({});
 
-  useEffect(() => {
+  /**
+   * Core measurement function — reads current DOM geometry and updates state.
+   *
+   * Stable ref-based function (no React state dependencies) so it can safely
+   * be used as a ResizeObserver callback without re-subscribing on every render.
+   */
+  const measure = useCallback(() => {
     const viewport = viewportRef.current;
     const firstCopy = firstCopyRef.current;
     if (!viewport || !firstCopy) return;
 
-    const mq = typeof window !== "undefined"
-      ? window.matchMedia?.("(prefers-reduced-motion: reduce)")
-      : null;
+    const mq =
+      typeof window !== "undefined"
+        ? window.matchMedia?.("(prefers-reduced-motion: reduce)")
+        : null;
 
     if (mq?.matches) {
+      // Reduced-motion: disable animation; let text wrap freely.
+      setReducedMotion(true);
       setShouldScroll(false);
       setCssVars({});
       return;
     }
+
+    setReducedMotion(false);
 
     const textW = firstCopy.getBoundingClientRect().width;
     const viewportW = viewport.getBoundingClientRect().width;
@@ -74,17 +88,47 @@ export function AnnouncementTicker({ text }: AnnouncementTickerProps) {
       setShouldScroll(false);
       setCssVars({});
     }
-  }, [text]);
+  }, []); // stable — only uses refs and window APIs
+
+  /** Re-measure when text changes. */
+  useEffect(() => {
+    measure();
+  }, [text, measure]);
+
+  /**
+   * ResizeObserver — re-evaluates overflow whenever the viewport resizes.
+   * Handles font-load, orientation-change, and panel-resize scenarios.
+   * Falls back gracefully if ResizeObserver is unavailable.
+   */
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver(() => {
+      measure();
+    });
+    ro.observe(viewport);
+    return () => {
+      ro.disconnect();
+    };
+  }, [measure]);
 
   return (
     <div
       ref={viewportRef}
-      className={styles.tickerViewport}
+      className={
+        reducedMotion ? styles.tickerViewportReduced : styles.tickerViewport
+      }
       data-testid="announcement-ticker-viewport"
+      data-reduced-motion={reducedMotion ? "true" : undefined}
     >
       <span
         className={
-          shouldScroll ? styles.tickerTrackAnimated : styles.tickerTrackStatic
+          reducedMotion
+            ? styles.tickerTrackReduced
+            : shouldScroll
+              ? styles.tickerTrackAnimated
+              : styles.tickerTrackStatic
         }
         style={cssVars}
         data-testid="announcement-ticker-track"
@@ -93,7 +137,7 @@ export function AnnouncementTicker({ text }: AnnouncementTickerProps) {
         <span ref={firstCopyRef} data-testid="announcement-ticker-text">
           {text}
         </span>
-        {shouldScroll && (
+        {!reducedMotion && shouldScroll && (
           <span aria-hidden="true" data-testid="announcement-ticker-clone">
             {text}
           </span>

@@ -18,7 +18,7 @@
  */
 
 import { render, screen, act } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { AnnouncementTicker } from "@/components/infoboard/screen1/AnnouncementTicker";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import type { InfoboardScreen1Feed } from "@/lib/publishing/event-types";
@@ -186,7 +186,7 @@ describe("AnnouncementTicker — prefers-reduced-motion", () => {
   });
 
   it("does NOT activate ticker when reduced motion is preferred, even if text overflows", async () => {
-    mockMatchMedia(true); // reduced motion ON
+    mockMatchMedia(true);
     mockBoundingRects({ viewportWidth: 300, textWidth: 900 });
     await act(async () => {
       render(
@@ -204,6 +204,175 @@ describe("AnnouncementTicker — prefers-reduced-motion", () => {
       render(<AnnouncementTicker text="Lesbare Meldung" />);
     });
     expect(screen.getByTestId("announcement-ticker-text").textContent).toBe("Lesbare Meldung");
+  });
+
+  it("viewport is in reduced-motion mode (data-reduced-motion=true) when motion is reduced", async () => {
+    mockMatchMedia(true);
+    mockBoundingRects({ viewportWidth: 300, textWidth: 900 });
+    await act(async () => {
+      render(<AnnouncementTicker text="Langer überquellender Text" />);
+    });
+    const viewport = screen.getByTestId("announcement-ticker-viewport");
+    expect(viewport.getAttribute("data-reduced-motion")).toBe("true");
+  });
+
+  it("does not render a clone copy in reduced-motion mode", async () => {
+    mockMatchMedia(true);
+    mockBoundingRects({ viewportWidth: 300, textWidth: 900 });
+    await act(async () => {
+      render(<AnnouncementTicker text="Langer überquellender Text" />);
+    });
+    expect(screen.queryByTestId("announcement-ticker-clone")).toBeNull();
+  });
+});
+
+// ── Resize tests ──────────────────────────────────────────────────────────────
+
+/**
+ * Sets up a minimal ResizeObserver mock and returns a function that simulates
+ * a resize event (i.e. fires the callback that the component registered).
+ */
+function mockResizeObserver(): {
+  triggerResize: () => Promise<void>;
+  disconnectSpy: Mock;
+} {
+  let capturedCallback: ResizeObserverCallback | null = null;
+  const disconnectSpy = vi.fn();
+
+  vi.stubGlobal(
+    "ResizeObserver",
+    class MockResizeObserver {
+      constructor(cb: ResizeObserverCallback) {
+        capturedCallback = cb;
+      }
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = disconnectSpy;
+    },
+  );
+
+  return {
+    triggerResize: async () => {
+      await act(async () => {
+        capturedCallback?.(
+          [] as unknown as ResizeObserverEntry[],
+          null as unknown as ResizeObserver,
+        );
+      });
+    },
+    disconnectSpy,
+  };
+}
+
+describe("AnnouncementTicker — ResizeObserver", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("enables ticker when viewport shrinks to cause overflow (fitting → overflowing)", async () => {
+    mockMatchMedia(false);
+    const { triggerResize } = mockResizeObserver();
+
+    // Dynamic widths updated by reference for resize simulation
+    let currentViewportWidth = 800;
+    let currentTextWidth = 200;
+
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        const testId = this.dataset?.testid ?? "";
+        let width = 0;
+        if (testId === "announcement-ticker-viewport") width = currentViewportWidth;
+        else if (testId === "announcement-ticker-text") width = currentTextWidth;
+        return {
+          width,
+          height: 40,
+          top: 0,
+          left: 0,
+          bottom: 40,
+          right: width,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      },
+    );
+
+    // Initial render: text fits
+    await act(async () => {
+      render(<AnnouncementTicker text="Test Meldung" />);
+    });
+    expect(
+      screen.getByTestId("announcement-ticker-track").getAttribute("data-scrolling"),
+    ).toBe("false");
+
+    // Viewport shrinks so text now overflows
+    currentViewportWidth = 50;
+    await triggerResize();
+
+    expect(
+      screen.getByTestId("announcement-ticker-track").getAttribute("data-scrolling"),
+    ).toBe("true");
+  });
+
+  it("disables ticker when viewport grows so text fits again (overflowing → fitting)", async () => {
+    mockMatchMedia(false);
+    const { triggerResize } = mockResizeObserver();
+
+    let currentViewportWidth = 50;
+    let currentTextWidth = 900;
+
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        const testId = this.dataset?.testid ?? "";
+        let width = 0;
+        if (testId === "announcement-ticker-viewport") width = currentViewportWidth;
+        else if (testId === "announcement-ticker-text") width = currentTextWidth;
+        return {
+          width,
+          height: 40,
+          top: 0,
+          left: 0,
+          bottom: 40,
+          right: width,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      },
+    );
+
+    // Initial render: text overflows → ticker active
+    await act(async () => {
+      render(<AnnouncementTicker text="Sehr langer Text" />);
+    });
+    expect(
+      screen.getByTestId("announcement-ticker-track").getAttribute("data-scrolling"),
+    ).toBe("true");
+
+    // Viewport grows (or text becomes shorter) → no overflow
+    currentViewportWidth = 2000;
+    await triggerResize();
+
+    expect(
+      screen.getByTestId("announcement-ticker-track").getAttribute("data-scrolling"),
+    ).toBe("false");
+    expect(screen.queryByTestId("announcement-ticker-clone")).toBeNull();
+  });
+
+  it("disconnects the ResizeObserver on unmount", async () => {
+    mockMatchMedia(false);
+    const { disconnectSpy } = mockResizeObserver();
+    mockBoundingRects({ viewportWidth: 800, textWidth: 200 });
+
+    let unmount: () => void;
+    await act(async () => {
+      const result = render(<AnnouncementTicker text="Test" />);
+      unmount = result.unmount;
+    });
+
+    unmount!();
+    expect(disconnectSpy).toHaveBeenCalledOnce();
   });
 });
 
