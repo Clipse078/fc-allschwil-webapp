@@ -56,9 +56,9 @@ export default async function PlannerWeekPageRoute({
   const tenantContext = await getActiveTenant();
   if (!tenantContext) notFound();
 
-  const canManagePlans =
-    hasPermission(session, PERMISSIONS.TRAININGS_MANAGE) ||
-    hasPermission(session, PERMISSIONS.EVENTS_MANAGE);
+  const canManageTrainings = hasPermission(session, PERMISSIONS.TRAININGS_MANAGE);
+  const canManageEvents = hasPermission(session, PERMISSIONS.EVENTS_MANAGE);
+  const canManagePlans = canManageTrainings || canManageEvents;
 
   const timezone = tenantContext.timezone ?? TRAINING_DEFAULT_TIMEZONE;
   const params = (await searchParams) ?? {};
@@ -106,7 +106,7 @@ export default async function PlannerWeekPageRoute({
 
   const canonicalEditing =
     canManagePlans && facilityGroupsByAllocationGroup
-      ? { canEdit: true, facilityGroupsByAllocationGroup }
+      ? { canManageTrainings, canManageEvents, facilityGroupsByAllocationGroup }
       : undefined;
 
   return (

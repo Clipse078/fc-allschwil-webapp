@@ -59,11 +59,16 @@ const CANONICAL_MODULE_HREF: Record<WeekplannerItem["type"], { label: string; hr
 
 /**
  * PLANNING-RESOURCE-UX-01 — Standardplan canonical editing context.
- * When present and canEdit is true, each Standardplan WeekplannerCard gains
- * a "Planung bearbeiten" button that opens the WeekplannerCanonicalPlanningEditor.
+ * When present, each Standardplan WeekplannerCard checks entity-specific
+ * permissions before showing "Planung bearbeiten", so users are never offered
+ * an action that will 403.
+ *
+ * canManageTrainings — caller holds TRAININGS_MANAGE (Training editing).
+ * canManageEvents    — caller holds EVENTS_MANAGE (Match/Tournament editing).
  */
 type CanonicalEditingContext = {
-  canEdit: boolean;
+  canManageTrainings: boolean;
+  canManageEvents: boolean;
   facilityGroupsByAllocationGroup: { PITCH_HALL: FacilityGroup[]; DRESSING_ROOM: FacilityGroup[] };
 };
 
@@ -267,10 +272,16 @@ function WeekplannerCard({
   const activityId = activityIdOf(item);
   const activityKey = `${item.type}:${activityId}`;
 
-  // PLANNING-RESOURCE-UX-01 — Standardplan canonical editor state
+  // PLANNING-RESOURCE-UX-01 — Standardplan canonical editor state.
+  // Gate by entity type: only offer the button when the caller actually has
+  // the permission to mutate this specific canonical entity.
   const [showCanonicalEditor, setShowCanonicalEditor] = useState(false);
   const isStandardplan = !planName;
-  const showCanonicalEditButton = isStandardplan && canonicalEditing?.canEdit;
+  const canEditThisItem =
+    canonicalEditing &&
+    ((item.type === "TRAINING" && canonicalEditing.canManageTrainings) ||
+      ((item.type === "MATCH" || item.type === "TOURNAMENT") && canonicalEditing.canManageEvents));
+  const showCanonicalEditButton = isStandardplan && canEditThisItem;
 
   const timeEditor = overrideEditing ? (
     <WeekplannerActivityTimeOverrideEditor
@@ -606,7 +617,7 @@ export default function WeekPlannerPage({
         >
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" />
           <span>
-            {canonicalEditing?.canEdit
+            {canonicalEditing
               ? "Standardplan — Planungsdaten direkt bearbeitbar (\"Planung bearbeiten\" auf jedem Eintrag) oder über "
               : "Standardplan aktiv — Platz- und Garderobenzuteilungen sind hier nur lesbar. Um sie zu ändern, öffnen Sie "}
             <Link href={CANONICAL_MODULE_HREF.TRAINING.href} className="font-semibold text-[var(--sce-primary)] hover:underline">
