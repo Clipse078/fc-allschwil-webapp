@@ -246,10 +246,12 @@ export async function deleteInfoboard(
 
 export async function countInfoboards(
   tenantId: string,
-): Promise<{ total: number; active: number }> {
-  const [total, active] = await Promise.all([
+): Promise<{ total: number; active: number; draft: number; disabled: number }> {
+  const [total, active, draft, disabled] = await Promise.all([
     prisma.infoboard.count({ where: { tenantId } }),
     prisma.infoboard.count({ where: { tenantId, status: "ACTIVE" } }),
+    prisma.infoboard.count({ where: { tenantId, status: "DRAFT" } }),
+    prisma.infoboard.count({ where: { tenantId, status: "DISABLED" } }),
   ]);
-  return { total, active };
+  return { total, active, draft, disabled };
 }

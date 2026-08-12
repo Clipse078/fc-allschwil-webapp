@@ -15,21 +15,28 @@ import { InboardCard } from "./InboardCard";
 import { CreateInboardDialog } from "./CreateInboardDialog";
 import { DeleteInboardDialog } from "./DeleteInboardDialog";
 
+type StatusFilter = "all" | "active" | "draft" | "disabled";
+
 type InboardOverviewProps = {
   boards: InfoboardListItem[];
   totalCount: number;
   activeCount: number;
+  draftCount: number;
+  disabledCount: number;
 };
 
 export function InboardOverview({
   boards: initialBoards,
   totalCount,
   activeCount,
+  draftCount,
+  disabledCount,
 }: InboardOverviewProps) {
   const router = useRouter();
   const [boards, setBoards] = useState(initialBoards);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   async function handleDuplicate(id: string) {
     const res = await fetch(`/api/infoboards/${id}/duplicate`, { method: "POST" });
@@ -58,18 +65,56 @@ export function InboardOverview({
     }
   }
 
+  const filteredBoards = boards.filter((b) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "active") return b.status === "ACTIVE";
+    if (statusFilter === "draft") return b.status === "DRAFT";
+    if (statusFilter === "disabled") return b.status === "DISABLED";
+    return true;
+  });
+
+  const chips: { id: StatusFilter; label: string; count: number }[] = [
+    { id: "all", label: "Alle", count: totalCount },
+    { id: "active", label: "Aktiv", count: activeCount },
+    { id: "draft", label: "Entwürfe", count: draftCount },
+    { id: "disabled", label: "Inaktiv", count: disabledCount },
+  ];
+
   return (
     <>
-      {/* Summary + CTA */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-[var(--text-2)]">
-          {totalCount === 0
-            ? "Keine Infoboards"
-            : `${totalCount} ${totalCount === 1 ? "Infoboard" : "Infoboards"} · ${activeCount} aktiv`}
-        </p>
+      {/* Header row: status chips + CTA */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Status filter chips */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {chips.map((chip) => (
+            <button
+              key={chip.id}
+              onClick={() => setStatusFilter(chip.id)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.75rem] font-medium transition-colors ${
+                statusFilter === chip.id
+                  ? "bg-[var(--sce-primary)] text-white"
+                  : "bg-[var(--surface-3)] text-[var(--text-2)] hover:bg-[var(--border)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {chip.label}
+              {chip.count > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none ${
+                    statusFilter === chip.id
+                      ? "bg-white/20 text-white"
+                      : "bg-[var(--border)] text-[var(--muted)]"
+                  }`}
+                >
+                  {chip.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         <button
           onClick={() => setCreateOpen(true)}
-          className="fca-button-primary inline-flex items-center gap-2"
+          className="fca-button-primary inline-flex items-center gap-2 shrink-0"
         >
           <Plus className="h-3.5 w-3.5" />
           Infoboard erstellen
@@ -95,17 +140,46 @@ export function InboardOverview({
           </button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {boards.map((board) => (
-            <InboardCard
-              key={board.id}
-              board={board}
-              onDuplicate={handleDuplicate}
-              onDelete={(id, name) => setDeleteTarget({ id, name })}
-              onToggleStatus={handleToggleStatus}
-            />
-          ))}
-        </div>
+        <>
+          {filteredBoards.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--surface)] py-10">
+              <p className="text-sm text-[var(--muted)]">
+                Keine Infoboards in dieser Kategorie.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredBoards.map((board) => (
+                <InboardCard
+                  key={board.id}
+                  board={board}
+                  onDuplicate={handleDuplicate}
+                  onDelete={(id, name) => setDeleteTarget({ id, name })}
+                  onToggleStatus={handleToggleStatus}
+                />
+              ))}
+              {/* "Infoboard erstellen" tile — only on "all" filter */}
+              {statusFilter === "all" && (
+                <button
+                  onClick={() => setCreateOpen(true)}
+                  className="group flex flex-col items-center justify-center gap-2 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--surface)] p-5 text-center transition-colors hover:border-[var(--sce-primary)] hover:bg-[var(--surface-3)] min-h-[180px]"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-[var(--border)] group-hover:border-[var(--sce-primary)] transition-colors">
+                    <Plus className="h-4 w-4 text-[var(--muted)] group-hover:text-[var(--sce-primary)] transition-colors" />
+                  </div>
+                  <div>
+                    <p className="text-[0.82rem] font-medium text-[var(--text-2)] group-hover:text-[var(--foreground)] transition-colors">
+                      Infoboard erstellen
+                    </p>
+                    <p className="mt-0.5 text-[0.72rem] text-[var(--muted)]">
+                      Neue Anzeige anlegen
+                    </p>
+                  </div>
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* Modals */}
