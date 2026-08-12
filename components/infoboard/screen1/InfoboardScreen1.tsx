@@ -107,6 +107,18 @@ type FlatEvent = {
   temporal: TemporalBucket;
 };
 
+/**
+ * A displayable unit in the rendered card list.
+ *
+ *   "event"          — a single non-training event (or single training at a
+ *                      unique start time), rendered with the standard EventCard.
+ *   "training-group" — two or more TRAINING events sharing the same startAt,
+ *                      collapsed into one aggregate TrainingGroupCard.
+ */
+type DisplayItem =
+  | { kind: "event"; item: FlatEvent }
+  | { kind: "training-group"; items: FlatEvent[]; temporal: TemporalBucket };
+
 // ── Time / date formatting ────────────────────────────────────────────────────
 
 function formatTime(isoString: string, timeZone: string): string {
@@ -184,6 +196,54 @@ function buildFlatList(feed: InfoboardScreen1Feed): FlatEvent[] {
   for (const event of feed.later) {
     result.push({ event, temporal: "later" });
   }
+  return result;
+}
+
+/**
+ * Groups TRAINING events that share an identical startAt ISO string into a
+ * single TrainingGroupCard display item.  Non-training events and solitary
+ * trainings are returned as individual "event" items.
+ *
+ * Two or more trainings at the same startAt are collapsed; one training at a
+ * unique startAt is kept as a plain EventCard so existing layout and tests
+ * are unaffected.
+ */
+function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
+  // First pass: bucket training events by startAt
+  const trainingByStart = new Map<string, FlatEvent[]>();
+  for (const item of flatList) {
+    if (item.event.type === "TRAINING") {
+      const key = item.event.startAt;
+      let bucket = trainingByStart.get(key);
+      if (bucket === undefined) {
+        bucket = [];
+        trainingByStart.set(key, bucket);
+      }
+      bucket.push(item);
+    }
+  }
+
+  // Second pass: emit display items preserving original list order
+  const emitted = new Set<string>();
+  const result: DisplayItem[] = [];
+
+  for (const item of flatList) {
+    if (item.event.type === "TRAINING") {
+      const key = item.event.startAt;
+      if (emitted.has(key)) continue; // already emitted as part of a group
+      emitted.add(key);
+
+      const group = trainingByStart.get(key)!;
+      if (group.length >= 2) {
+        result.push({ kind: "training-group", items: group, temporal: item.temporal });
+      } else {
+        result.push({ kind: "event", item });
+      }
+    } else {
+      result.push({ kind: "event", item });
+    }
+  }
+
   return result;
 }
 
@@ -397,6 +457,154 @@ function TournamentDestination({
   );
 }
 
+// ── Training group card ───────────────────────────────────────────────────────
+
+type TrainingGroupCardProps = {
+  items: FlatEvent[];
+  timeZone: string;
+  cardCount: number;
+};
+
+/**
+ * Aggregated card for two or more TRAINING events sharing the same start time.
+ *
+ * Layout:
+ *   LEFT ZONE  — JETZT / ALS NÄCHSTES status label + start time + shared end
+ *                time (shown once when all trainings end at the same time).
+ *   BODY ZONE  — spans the event + destination columns; renders a column-header
+ *                row followed by one compact row per team (TEAM | PLATZ | KABINE).
+ *
+ * Invariants (matching EventCard):
+ *   - data-testid="event-row" is preserved so row counts remain testable.
+ *   - Missing pitch/dressing-room → NICHT ZUGETEILT warning (amber).
+ *   - No referee data rendered.
+ *   - No club shirt colours from the mockup — no canonical data source.
+ */
+function TrainingGroupCard({
+  items,
+  timeZone,
+  cardCount,
+}: TrainingGroupCardProps): ReactElement {
+  const first = items[0];
+  const temporal = first.temporal;
+  const startAt = first.event.startAt;
+  const startTime = formatTime(startAt, timeZone);
+  const label = statusLabel(temporal);
+  const stripe = stripeKey(temporal, "TRAINING");
+
+  // Shared end time: display once in the LEFT ZONE when all trainings share
+  // the same endAt.  When end times differ, show per-row in the BODY ZONE.
+  const firstEndAt = first.event.endAt;
+  const allSameEnd = items.every((it) => it.event.endAt === firstEndAt);
+  const commonEndTime =
+    allSameEnd && firstEndAt !== null ? formatTime(firstEndAt, timeZone) : null;
+
+  return (
+    <li
+      className={styles.eventCard}
+      data-testid="event-row"
+      data-type="TRAINING"
+      data-temporal={temporal}
+      data-stripe={stripe}
+      data-event-count={cardCount}
+    >
+      {/* ── LEFT ZONE: Status + Time ─────────────────────────────────── */}
+      <div className={styles.cardTimeZone}>
+        {label !== null && (
+          <span
+            className={styles.statusLabel}
+            data-testid={`status-label-${temporal}`}
+            data-status={temporal === "current" ? "current" : "next"}
+          >
+            {label}
+          </span>
+        )}
+        <time className={styles.eventTime} dateTime={startAt}>
+          {startTime}
+        </time>
+        {commonEndTime !== null && (
+          <span className={styles.eventEndTime} aria-label="Bis">
+            –{commonEndTime}
+          </span>
+        )}
+      </div>
+
+      {/* ── BODY ZONE: group header + per-team rows ───────────────────── */}
+      <div className={styles.trainingGroupBody} data-testid="training-group">
+        {/* Column headers */}
+        <div className={styles.trainingGroupColHeaders} aria-hidden="true">
+          <span
+            className={styles.trainingGroupTypeBadge}
+            data-event-type="TRAINING"
+          >
+            TRAINING
+          </span>
+          <span className={styles.trainingGroupColLabel}>PLATZ</span>
+          <span className={styles.trainingGroupColLabel}>KABINE</span>
+        </div>
+
+        {/* One row per team */}
+        {items.map((it) => {
+          const { pitchLabel, homeDressingRoomLabel } = it.event.allocation;
+          const rowEndAt = it.event.endAt;
+          const rowEndTime =
+            !allSameEnd && rowEndAt !== null
+              ? formatTime(rowEndAt, timeZone)
+              : null;
+          return (
+            <div
+              key={it.event.id}
+              className={styles.trainingGroupTeamRow}
+              data-testid="training-group-row"
+            >
+              {/* TEAM */}
+              <span className={styles.trainingGroupTeamName}>
+                {it.event.teamDisplayName ?? it.event.displayTitle}
+                {rowEndTime !== null && (
+                  <span className={styles.trainingGroupRowEndTime} aria-label="Bis">
+                    {" "}–{rowEndTime}
+                  </span>
+                )}
+              </span>
+
+              {/* PLATZ */}
+              {pitchLabel !== null ? (
+                <span
+                  className={styles.trainingGroupPitchValue}
+                  data-testid="pitch-value"
+                >
+                  {pitchLabel}
+                </span>
+              ) : (
+                <span
+                  className={styles.dressingRoomMissing}
+                  data-testid="pitch-unassigned-warning"
+                >
+                  NICHT ZUGETEILT
+                </span>
+              )}
+
+              {/* KABINE */}
+              {homeDressingRoomLabel !== null ? (
+                <span className={styles.trainingGroupRoomValue}>
+                  {homeDressingRoomLabel}
+                </span>
+              ) : (
+                <span
+                  className={styles.dressingRoomMissing}
+                  data-testid="dressing-room-unassigned-warning"
+                >
+                  NICHT ZUGETEILT
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </li>
+  );
+}
+
 // ── Event card ────────────────────────────────────────────────────────────────
 
 type EventCardProps = {
@@ -604,13 +812,14 @@ export function InfoboardScreen1({
   const themeAttr = theme.toLowerCase();
 
   const flatList = buildFlatList(feed);
-  const totalEvents = flatList.length;
+  const displayList = buildDisplayList(flatList);
+  const totalCards = displayList.length;
 
   const overflowCount =
-    totalEvents > PROTOTYPE_CAPACITY ? totalEvents - PROTOTYPE_CAPACITY : 0;
-  const visibleList = overflowCount > 0
-    ? flatList.slice(0, PROTOTYPE_CAPACITY)
-    : flatList;
+    totalCards > PROTOTYPE_CAPACITY ? totalCards - PROTOTYPE_CAPACITY : 0;
+  const visibleDisplayList = overflowCount > 0
+    ? displayList.slice(0, PROTOTYPE_CAPACITY)
+    : displayList;
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
@@ -626,7 +835,7 @@ export function InfoboardScreen1({
       ? formatDateLine(currentTimeIso, timeZone)
       : formatDisplayDate(feed.displayDate);
 
-  // Suppress unused-variable warning for later/next (used only in flatList).
+  // Suppress unused-variable warning for later/next (used only in displayList).
   void current; void next; void later;
 
   return (
@@ -708,9 +917,20 @@ export function InfoboardScreen1({
               className={styles.eventList}
               role="list"
               data-testid="event-list"
-              data-count={visibleList.length}
+              data-count={visibleDisplayList.length}
             >
-              {visibleList.map((item) => {
+              {visibleDisplayList.map((displayItem) => {
+                if (displayItem.kind === "training-group") {
+                  return (
+                    <TrainingGroupCard
+                      key={displayItem.items.map((it) => it.event.id).join(":")}
+                      items={displayItem.items}
+                      timeZone={timeZone}
+                      cardCount={visibleDisplayList.length}
+                    />
+                  );
+                }
+                const { item } = displayItem;
                 const extension = findEventExtension(item.event.id, eventPresentation);
                 const allocs = extension?.participantAllocations;
                 const participantAllocations =
@@ -722,7 +942,7 @@ export function InfoboardScreen1({
                     timeZone={timeZone}
                     clubLogoSrc={clubLogoSrc}
                     participantAllocations={participantAllocations}
-                    eventCount={visibleList.length}
+                    eventCount={visibleDisplayList.length}
                   />
                 );
               })}

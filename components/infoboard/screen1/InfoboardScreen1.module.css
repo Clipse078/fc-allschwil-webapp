@@ -810,3 +810,122 @@
     --ib-fs-dest-room:   clamp(0.85rem, 1.1vw, 1.5rem);
   }
 }
+
+/* ─── Training group card body ────────────────────────────────────────────── */
+
+/*
+ * The body zone spans grid columns 2 and 3 of the parent .eventCard grid,
+ * replacing the separate center + destination zones used by EventCard.
+ * Column proportions inside the body: TEAM (1fr) | PLATZ (30%) | KABINE (20%).
+ * The proportions are intentionally generous for PLATZ to accommodate long
+ * pitch names (e.g. "KUNSTRASEN 2_B").
+ */
+.trainingGroupBody {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
+  border-left: 1px solid var(--ib-border);
+  min-width: 0;
+  gap: 0;
+}
+
+/* Shared 3-column grid used by both the header row and every team row */
+.trainingGroupColHeaders,
+.trainingGroupTeamRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(70px, 30%, 260px) clamp(50px, 20%, 180px);
+  gap: var(--ib-sp-3);
+  align-items: center;
+}
+
+/* ── Header row ───────────────────────────────────────────────────────────── */
+
+.trainingGroupColHeaders {
+  padding-bottom: var(--ib-sp-1);
+  margin-bottom: var(--ib-sp-1);
+  border-bottom: 1px solid var(--ib-border-strong);
+}
+
+.trainingGroupTypeBadge {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib-fs-event-type);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--ib-training-soft);
+}
+
+.trainingGroupColLabel {
+  font-size: var(--ib-fs-dest-label);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ib-text-dim);
+  line-height: 1;
+}
+
+/* ── Team row ─────────────────────────────────────────────────────────────── */
+
+.trainingGroupTeamRow {
+  padding: clamp(2px, 0.35vh, 6px) 0;
+  border-top: 1px solid rgba(99, 135, 175, 0.08);
+}
+
+.trainingGroupTeamName {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: clamp(0.9rem, 1.2vw, 1.7rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ib-text);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: baseline;
+  gap: var(--ib-sp-2);
+  min-width: 0;
+}
+
+.trainingGroupRowEndTime {
+  font-size: var(--ib-fs-event-end-time);
+  color: var(--ib-text-muted);
+  font-weight: 400;
+  flex-shrink: 0;
+}
+
+.trainingGroupPitchValue {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: clamp(0.85rem, 1.1vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ib-text);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trainingGroupRoomValue {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: clamp(0.85rem, 1.1vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ib-text);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Light theme: row separators use the light palette */
+.root[data-theme="light"] .trainingGroupTeamRow {
+  border-top-color: rgba(60, 48, 32, 0.06);
+}
+

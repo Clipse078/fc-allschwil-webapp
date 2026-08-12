@@ -797,3 +797,181 @@ export const PREVIEW_FIXTURE_MISSING_ALLOCATION: InfoboardScreen1Feed = {
   isEmpty: false,
   emptyStateReason: null,
 };
+
+// ── Training group fixture ─────────────────────────────────────────────────────
+
+/**
+ * Fixture for testing training aggregation (same-start-time grouping).
+ *
+ * Scenario:
+ *   GROUP A — 3 trainings at 17:15 Zurich (15:15Z), CURRENT:
+ *     D7 D1 → KUNSTRASEN 3_A | Kabine 3
+ *     D7 D2 → KUNSTRASEN 3_B | Kabine 4
+ *     E1    → KUNSTRASEN 2_A | null (missing dressing room)
+ *
+ *   SINGLE MATCH — 16:00 Zurich (14:00Z), NEXT (must NOT be grouped):
+ *     FC Allschwil E1 vs FC Binningen E1
+ *
+ *   GROUP B — 2 trainings at 18:45 Zurich (16:45Z), LATER:
+ *     D9 D1 → KUNSTRASEN 3_A | Kabine 3
+ *     D9 D2 → KUNSTRASEN 3_B | null (missing dressing room)
+ *
+ * Expected rendered cards: 3 (group A + match + group B).
+ */
+export const PREVIEW_FIXTURE_TRAINING_GROUPS: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T13:30:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+
+  current: [
+    {
+      id: "tg-d7-d1",
+      type: "TRAINING",
+      displayTitle: "FC Allschwil D7 D1",
+      teamDisplayName: "FC Allschwil D7 D1",
+      opponentDisplayName: null,
+      organizerDisplayName: null,
+      competitionLabel: null,
+      startAt: "2026-09-12T15:15:00.000Z",
+      endAt: "2026-09-12T16:45:00.000Z",
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KUNSTRASEN 3_A",
+        homeDressingRoomLabel: "Kabine 3",
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+    {
+      id: "tg-d7-d2",
+      type: "TRAINING",
+      displayTitle: "FC Allschwil D7 D2",
+      teamDisplayName: "FC Allschwil D7 D2",
+      opponentDisplayName: null,
+      organizerDisplayName: null,
+      competitionLabel: null,
+      startAt: "2026-09-12T15:15:00.000Z",
+      endAt: "2026-09-12T16:45:00.000Z",
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KUNSTRASEN 3_B",
+        homeDressingRoomLabel: "Kabine 4",
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+    {
+      id: "tg-e1",
+      type: "TRAINING",
+      displayTitle: "FC Allschwil Junioren E1",
+      teamDisplayName: "FC Allschwil Junioren E1",
+      opponentDisplayName: null,
+      organizerDisplayName: null,
+      competitionLabel: null,
+      startAt: "2026-09-12T15:15:00.000Z",
+      endAt: "2026-09-12T16:45:00.000Z",
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KUNSTRASEN 2_A",
+        homeDressingRoomLabel: null,
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+
+  next: [
+    {
+      id: "tg-match",
+      type: "MATCH",
+      displayTitle: "FC Allschwil E1 – FC Binningen E1",
+      teamDisplayName: "FC Allschwil E1",
+      opponentDisplayName: "FC Binningen E1",
+      organizerDisplayName: null,
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T14:00:00.000Z",
+      endAt: "2026-09-12T15:45:00.000Z",
+      meetingTime: null,
+      status: "SCHEDULED",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "next",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "Stadion",
+        homeDressingRoomLabel: "Kabine E1",
+        awayDressingRoomLabel: "Kabine E2",
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+
+  later: [
+    {
+      id: "tg-d9-d1",
+      type: "TRAINING",
+      displayTitle: "FC Allschwil D9 D1",
+      teamDisplayName: "FC Allschwil D9 D1",
+      opponentDisplayName: null,
+      organizerDisplayName: null,
+      competitionLabel: null,
+      startAt: "2026-09-12T16:45:00.000Z",
+      endAt: "2026-09-12T18:15:00.000Z",
+      meetingTime: null,
+      status: "SCHEDULED",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "later",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KUNSTRASEN 3_A",
+        homeDressingRoomLabel: "Kabine 3",
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+    {
+      id: "tg-d9-d2",
+      type: "TRAINING",
+      displayTitle: "FC Allschwil D9 D2",
+      teamDisplayName: "FC Allschwil D9 D2",
+      opponentDisplayName: null,
+      organizerDisplayName: null,
+      competitionLabel: null,
+      startAt: "2026-09-12T16:45:00.000Z",
+      endAt: "2026-09-12T18:15:00.000Z",
+      meetingTime: null,
+      status: "SCHEDULED",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "later",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KUNSTRASEN 3_B",
+        homeDressingRoomLabel: null,
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+
+  isEmpty: false,
+  emptyStateReason: null,
+};
