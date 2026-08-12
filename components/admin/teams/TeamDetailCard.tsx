@@ -100,6 +100,8 @@ type Team = {
   // case rather than silently targeting a stale/historical TeamSeason.
   currentTeamSeasonId?: string | null;
   currentParticipationType?: string | null;
+  // TEAM-SEASON-ORGUNIT-01: primary OrgUnit for the current season.
+  currentSeasonOrgUnit?: OrgUnitOption | null;
   teamSeasons: TeamSeasonItem[];
 };
 
@@ -169,6 +171,7 @@ export default function TeamDetailCard({
         availableCompetitions={availableCompetitions}
         currentTeamSeasonId={team.currentTeamSeasonId ?? null}
         currentParticipationType={team.currentParticipationType ?? null}
+        currentSeasonOrgUnit={team.currentSeasonOrgUnit ?? null}
         canManage={canManage}
         onSaved={handleTeamSaved}
       />

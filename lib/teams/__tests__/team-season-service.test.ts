@@ -20,12 +20,12 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     team: { findUnique: vi.fn() },
     season: { findUnique: vi.fn() },
-    orgUnit: { findMany: vi.fn() },
+    orgUnit: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() },
     teamSeason: {
       findUnique: vi.fn(),
       create: vi.fn(),
     },
-    teamSeasonOrgUnit: { createMany: vi.fn() },
+    teamSeasonOrgUnit: { createMany: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -36,6 +36,7 @@ import {
   createCanonicalTeamSeason,
   validateMappingTeamSeasonConsistency,
   writeTeamSeasonInTx,
+  setTeamSeasonOrgUnit,
   type WriteTeamSeasonInTxInput,
 } from "../team-season-service";
 
@@ -534,6 +535,170 @@ describe("writeTeamSeasonInTx — shared canonical write primitive", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.teamSeasonId).toBe(TEAM_SEASON_ID);
+    }
+  });
+});
+
+// ── D. setTeamSeasonOrgUnit ────────────────────────────────────────────────────
+
+describe("setTeamSeasonOrgUnit", () => {
+  const TEAM_SEASON_ID_2 = "team-season-02-id";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Default: TeamSeason found, belongs to tenant
+    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue({
+      id: TEAM_SEASON_ID_2,
+      teamId: TEAM_ID,
+      team: { tenantId: TENANT_A },
+    } as never);
+
+    // Default: OrgUnit found and active
+    vi.mocked(prisma.orgUnit.findFirst).mockResolvedValue({
+      id: ORG_UNIT_ID_1,
+      name: "Aktive",
+      key: "aktive",
+      status: "ACTIVE",
+    } as never);
+
+    // Default: no existing TSOU row
+    vi.mocked(prisma.teamSeasonOrgUnit.findUnique).mockResolvedValue(null);
+
+    // $transaction executes the callback
+    vi.mocked(prisma.$transaction).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) => {
+        const txMock = {
+          teamSeasonOrgUnit: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+            findUnique: vi.fn().mockResolvedValue(null),
+            create: vi.fn().mockResolvedValue({ id: "new-tsou-id" }),
+            update: vi.fn().mockResolvedValue({ id: "existing-tsou-id" }),
+          },
+        };
+        return fn(txMock);
+      },
+    );
+  });
+
+  it("TEAM-SEASON-ORGUNIT-01: returns ok=true and orgUnit when assigning a valid OrgUnit", async () => {
+    const result = await setTeamSeasonOrgUnit({
+      tenantId: TENANT_A,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID_2,
+      orgUnitId: ORG_UNIT_ID_1,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.orgUnit).toEqual({ id: ORG_UNIT_ID_1, name: "Aktive", key: "aktive" });
+    }
+  });
+
+  it("TEAM-SEASON-ORGUNIT-01: returns ok=true with null orgUnit when clearing (null)", async () => {
+    const result = await setTeamSeasonOrgUnit({
+      tenantId: TENANT_A,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID_2,
+      orgUnitId: null,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.orgUnit).toBeNull();
+    }
+  });
+
+  it("TEAM-SEASON-ORGUNIT-01: returns TEAM_SEASON_NOT_FOUND when TeamSeason does not exist", async () => {
+    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue(null);
+
+    const result = await setTeamSeasonOrgUnit({
+      tenantId: TENANT_A,
+      teamId: TEAM_ID,
+      teamSeasonId: "nonexistent",
+      orgUnitId: ORG_UNIT_ID_1,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("TEAM_SEASON_NOT_FOUND");
+    }
+  });
+
+  it("TEAM-SEASON-ORGUNIT-01: returns TEAM_SEASON_TENANT_MISMATCH when TeamSeason belongs to a different tenant", async () => {
+    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue({
+      id: TEAM_SEASON_ID_2,
+      teamId: TEAM_ID,
+      team: { tenantId: TENANT_B },
+    } as never);
+
+    const result = await setTeamSeasonOrgUnit({
+      tenantId: TENANT_A,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID_2,
+      orgUnitId: ORG_UNIT_ID_1,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("TEAM_SEASON_TENANT_MISMATCH");
+    }
+  });
+
+  it("TEAM-SEASON-ORGUNIT-01: returns ORG_UNIT_NOT_FOUND when OrgUnit does not exist", async () => {
+    vi.mocked(prisma.orgUnit.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.orgUnit.findUnique).mockResolvedValue(null);
+
+    const result = await setTeamSeasonOrgUnit({
+      tenantId: TENANT_A,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID_2,
+      orgUnitId: "nonexistent-ou",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ORG_UNIT_NOT_FOUND");
+    }
+  });
+
+  it("TEAM-SEASON-ORGUNIT-01: returns ORG_UNIT_TENANT_MISMATCH when OrgUnit belongs to different tenant", async () => {
+    vi.mocked(prisma.orgUnit.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.orgUnit.findUnique).mockResolvedValue({
+      id: ORG_UNIT_ID_1,
+    } as never);
+
+    const result = await setTeamSeasonOrgUnit({
+      tenantId: TENANT_A,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID_2,
+      orgUnitId: ORG_UNIT_ID_1,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ORG_UNIT_TENANT_MISMATCH");
+    }
+  });
+
+  it("TEAM-SEASON-ORGUNIT-01: returns ORG_UNIT_NOT_ACTIVE when OrgUnit is archived", async () => {
+    vi.mocked(prisma.orgUnit.findFirst).mockResolvedValue({
+      id: ORG_UNIT_ID_1,
+      name: "Archived Unit",
+      key: "archived",
+      status: "ARCHIVED",
+    } as never);
+
+    const result = await setTeamSeasonOrgUnit({
+      tenantId: TENANT_A,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID_2,
+      orgUnitId: ORG_UNIT_ID_1,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ORG_UNIT_NOT_ACTIVE");
     }
   });
 });
