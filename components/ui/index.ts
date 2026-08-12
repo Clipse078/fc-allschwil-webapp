@@ -39,6 +39,9 @@ export type { LoadingSkeletonProps, LoadingSkeletonVariant } from "./LoadingSkel
 export { Dialog } from "./Dialog";
 export type { DialogProps, DialogSize } from "./Dialog";
 
+export { Sheet } from "./Sheet";
+export type { SheetProps } from "./Sheet";
+
 export { Toast } from "./Toast";
 export type { ToastItem, ToastVariant } from "./Toast";
 

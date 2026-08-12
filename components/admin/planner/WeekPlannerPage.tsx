@@ -34,25 +34,19 @@ import { WeekplannerActivityTimeOverrideEditor } from "./WeekplannerActivityTime
 import { WeekplannerActivityOverridePanel } from "./WeekplannerActivityOverridePanel";
 import { WeekplannerOverridePanelProvider } from "./WeekplannerOverridePanelContext";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
-import { WeekplannerCanonicalPlanningEditor } from "./WeekplannerCanonicalPlanningEditor";
+import { WeekplannerPlanningSheet } from "./WeekplannerPlanningSheet";
 
 /**
  * WEEKPLANNER-01B — populated only when an alternative plan is selected AND
- * the caller can manage plans. Threads the per-item override editing
- * context down to each WeekplannerCard. Omitted entirely for the
- * Standardplan (no plan selected) or a read-only viewer — the card renders
- * exactly as it did in 01A in both cases.
+ * the caller can manage plans.
  */
 type OverrideEditingContext = {
   planId: string;
-  /** WEEKPLANNER-01C — the active plan's display name, e.g. "Schlechtwetterplan", shown in override badges. */
   planName: string;
-  /** Keyed via lib/weekplanner/plan-override-key.ts#planOverrideKey — one entry per overridden group. */
   overridesByKey: Record<string, WeekplannerOverrideRow[]>;
   facilityGroupsByAllocationGroup: { PITCH_HALL: FacilityGroup[]; DRESSING_ROOM: FacilityGroup[] };
 };
 
-/** WEEKPLANNER-01C — canonical module each item type's Standardplan allocations are actually owned/edited by. */
 const CANONICAL_MODULE_HREF: Record<WeekplannerItem["type"], { label: string; href: string }> = {
   TRAINING: { label: "TrainingCenter", href: "/dashboard/training" },
   MATCH: { label: "Matchcenter", href: "/dashboard/matchcenter" },
@@ -61,12 +55,6 @@ const CANONICAL_MODULE_HREF: Record<WeekplannerItem["type"], { label: string; hr
 
 /**
  * PLANNING-RESOURCE-UX-01 — Standardplan canonical editing context.
- * When present, each Standardplan WeekplannerCard checks entity-specific
- * permissions before showing "Planung bearbeiten", so users are never offered
- * an action that will 403.
- *
- * canManageTrainings — caller holds TRAININGS_MANAGE (Training editing).
- * canManageEvents    — caller holds EVENTS_MANAGE (Match/Tournament editing).
  */
 type CanonicalEditingContext = {
   canManageTrainings: boolean;
@@ -76,18 +64,13 @@ type CanonicalEditingContext = {
 
 type WeekPlannerPageProps = {
   week: WeekplannerWeek;
-  /** URL "week" param that resolves to the current Europe/Zurich week — powers the "Heute" button. */
   todayParam: string;
   locale?: string;
   timezone?: string;
-  /** WEEKPLANNER-01B — active (non-archived) plans for this tenant+week. Never includes a "Standardplan" row. */
   plans?: WeekplannerPlanDto[];
-  /** WEEKPLANNER-01B — the currently selected alternative plan, or null for the Standardplan. */
   activePlanId?: string | null;
-  /** WEEKPLANNER-01B — whether the current user can create/rename/archive/delete plans and edit overrides. */
   canManagePlans?: boolean;
   overrideEditing?: OverrideEditingContext;
-  /** PLANNING-RESOURCE-UX-01 — enables canonical editing of Standardplan items directly from Wochenplaner. */
   canonicalEditing?: CanonicalEditingContext;
 };
 
@@ -151,10 +134,11 @@ function ResourceChips({
   icon: typeof MapPin;
   refs: WeekplannerResourceRef[];
   emptyLabel?: string;
-  /** WEEKPLANNER-01B — true when the currently selected plan overrides this group. Adds a subtle "angepasst" marker. */
   overridden?: boolean;
 }) {
   if (refs.length === 0) {
+    // Empty label is now handled by IncompletePlanningBadge for required resources.
+    // Retain display only for non-required contexts (training dressing rooms).
     return emptyLabel ? (
       <span className="inline-flex items-center gap-1 text-[11px] text-[var(--muted)]">
         <Icon className="h-3 w-3" />
@@ -184,7 +168,6 @@ function ResourceChips({
   );
 }
 
-/** True when the currently selected plan overrides ANY part (time and/or resources) of this item. Always false for the Standardplan. */
 function isItemOverridden(item: WeekplannerItem): boolean {
   const resourceOverridden =
     item.pitchOverridden ||
@@ -193,14 +176,6 @@ function isItemOverridden(item: WeekplannerItem): boolean {
   return item.timeOverridden || resourceOverridden;
 }
 
-/**
- * WEEKPLANNER-01D — restrained "Standard: 17:00–18:00 · Kunstrasen 2 · E2"
- * secondary summary, built purely from the item's untouched canonical
- * (never-overridden) fields — see WeekplannerItemBase's canonicalStartAt/
- * canonicalEndAt/canonicalPitchAllocations/canonicalDressingRoomAllocations
- * doc comments. TOURNAMENT dressing rooms are per-participant (not shown
- * here) — this stays deliberately restrained, not an exhaustive diff.
- */
 function formatStandardSummary(item: WeekplannerItem, locale: string, timeZone: string): string {
   const parts = [formatTimeRange(item.canonicalStartAt, item.canonicalEndAt, locale, timeZone)];
   for (const ref of item.canonicalPitchAllocations) parts.push(ref.name);
@@ -208,7 +183,6 @@ function formatStandardSummary(item: WeekplannerItem, locale: string, timeZone: 
   return parts.join(" · ");
 }
 
-/** WEEKPLANNER-01D — one restrained, consolidated "<Plan> angepasst" indicator + "Standard: …" line, replacing the previous per-group "angepasst" tags. */
 function OverrideIndicator({
   item,
   planName,
@@ -247,7 +221,77 @@ function ConflictBadge({ item }: { item: WeekplannerItem }) {
   );
 }
 
-/** Resolves the canonical activityId for an item — TrainingSession.id (TRAINING) or Event.id (MATCH/TOURNAMENT). */
+/**
+ * PLANNING-UX-C3 — AMBER urgency badge for incomplete planning.
+ *
+ * Returns the list of missing required resources for an item based on the
+ * effective allocations for the current plan view:
+ *   TRAINING:   pitch required
+ *   MATCH HOME: pitch + home dressing room + away dressing room
+ *   TOURNAMENT: pitch required
+ *
+ * The Weekplanner only surfaces HOME matches and HOME tournaments
+ * (WeekplannerMatchItem.homeAway === "HOME"), so away-match false-positive
+ * flagging is structurally impossible.
+ */
+function getMissingAllocations(item: WeekplannerItem): string[] {
+  const missing: string[] = [];
+
+  if (item.pitchAllocations.length === 0) {
+    missing.push("Spielfeld");
+  }
+
+  if (item.type === "MATCH") {
+    if (item.dressingRoomAllocations.length === 0) {
+      missing.push("Heimkabine");
+    }
+    if (item.awayDressingRoomAllocations.length === 0) {
+      missing.push("Gastkabine");
+    }
+  }
+
+  return missing;
+}
+
+/**
+ * PLANNING-UX-C3 — compact amber attention treatment for cards with
+ * incomplete planning. Aggregates all missing resources into one badge
+ * rather than showing per-resource noise.
+ */
+function IncompletePlanningBadge({
+  missing,
+  onEdit,
+}: {
+  missing: string[];
+  onEdit?: () => void;
+}) {
+  if (missing.length === 0) return null;
+
+  return (
+    <div
+      className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5"
+      data-testid="weekplanner-incomplete-badge"
+    >
+      <div className="flex items-start gap-1.5">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold text-amber-800">Planung unvollständig</p>
+          <p className="text-[11px] text-amber-700">{missing.join(" · ")}</p>
+        </div>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="ml-auto shrink-0 text-[11px] font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900"
+          >
+            Bearbeiten
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function activityIdOf(item: WeekplannerItem): string {
   return item.type === "TRAINING" ? item.trainingSessionId : item.eventId;
 }
@@ -259,14 +303,16 @@ function WeekplannerCard({
   planName,
   overrideEditing,
   canonicalEditing,
+  onEdit,
 }: {
   item: WeekplannerItem;
   locale: string;
   timezone: string;
-  /** The currently selected alternative plan's display name, e.g. "Schlechtwetterplan" — null for the Standardplan. Shown even for read-only viewers. */
   planName?: string | null;
   overrideEditing?: OverrideEditingContext;
   canonicalEditing?: CanonicalEditingContext;
+  /** PLANNING-UX-C3 — opens the Sheet editor for this item. Undefined = editing not available. */
+  onEdit?: (item: WeekplannerItem) => void;
 }) {
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
@@ -274,16 +320,15 @@ function WeekplannerCard({
   const activityId = activityIdOf(item);
   const activityKey = `${item.type}:${activityId}`;
 
-  // PLANNING-RESOURCE-UX-01 — Standardplan canonical editor state.
-  // Gate by entity type: only offer the button when the caller actually has
-  // the permission to mutate this specific canonical entity.
-  const [showCanonicalEditor, setShowCanonicalEditor] = useState(false);
   const isStandardplan = !planName;
   const canEditThisItem =
     canonicalEditing &&
     ((item.type === "TRAINING" && canonicalEditing.canManageTrainings) ||
       ((item.type === "MATCH" || item.type === "TOURNAMENT") && canonicalEditing.canManageEvents));
-  const showCanonicalEditButton = isStandardplan && canEditThisItem;
+  const showCanonicalEditButton = isStandardplan && canEditThisItem && !!onEdit;
+
+  // PLANNING-UX-C3 — incomplete planning detection
+  const missingAllocations = isStandardplan ? getMissingAllocations(item) : [];
 
   const timeEditor = overrideEditing ? (
     <WeekplannerActivityTimeOverrideEditor
@@ -325,7 +370,7 @@ function WeekplannerCard({
           <p className="text-sm font-semibold text-[var(--foreground)]">{item.teamNames[0] ?? item.title}</p>
           <p className="mt-0.5 text-xs text-[var(--text-2)]">{item.title}</p>
           <div className="mt-2 space-y-1">
-            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" overridden={item.pitchOverridden} />
+            <ResourceChips icon={MapPin} refs={item.pitchAllocations} overridden={item.pitchOverridden} />
             <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} overridden={item.dressingRoomOverridden} />
           </div>
           {planName && <OverrideIndicator item={item} planName={planName} locale={locale} timezone={timezone} />}
@@ -369,9 +414,9 @@ function WeekplannerCard({
             {item.teamNames[0] ?? item.title} <span className="text-[var(--text-2)]">vs.</span> {item.opponentName ?? "TBD"}
           </p>
           <div className="mt-2 space-y-1">
-            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" overridden={item.pitchOverridden} />
-            <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} emptyLabel="Heimkabine offen" overridden={item.dressingRoomOverridden} />
-            <ResourceChips icon={DoorOpen} refs={item.awayDressingRoomAllocations} emptyLabel="Gastkabine offen" />
+            <ResourceChips icon={MapPin} refs={item.pitchAllocations} overridden={item.pitchOverridden} />
+            <ResourceChips icon={DoorOpen} refs={item.dressingRoomAllocations} overridden={item.dressingRoomOverridden} />
+            <ResourceChips icon={DoorOpen} refs={item.awayDressingRoomAllocations} />
           </div>
           {planName && <OverrideIndicator item={item} planName={planName} locale={locale} timezone={timezone} />}
           {overrideEditing && (
@@ -415,7 +460,7 @@ function WeekplannerCard({
             <p className="mt-0.5 text-xs text-[var(--text-2)]">{item.teamNames.join(", ")}</p>
           )}
           <div className="mt-2 space-y-1">
-            <ResourceChips icon={MapPin} refs={item.pitchAllocations} emptyLabel="Kein Platz zugewiesen" overridden={item.pitchOverridden} />
+            <ResourceChips icon={MapPin} refs={item.pitchAllocations} overridden={item.pitchOverridden} />
             {item.participantAllocations.map((participant) =>
               participant.dressingRoomAllocations.length > 0 ? (
                 <div key={participant.participantId} className="flex flex-wrap items-center gap-1.5">
@@ -470,28 +515,23 @@ function WeekplannerCard({
 
       <ConflictBadge item={item} />
 
-      {/* PLANNING-RESOURCE-UX-01 — Standardplan canonical edit button + inline editor */}
-      {showCanonicalEditButton && (
+      {/* PLANNING-UX-C3 — amber incomplete planning badge */}
+      <IncompletePlanningBadge
+        missing={missingAllocations}
+        onEdit={showCanonicalEditButton ? () => onEdit?.(item) : undefined}
+      />
+
+      {/* PLANNING-UX-C3 — "Planung bearbeiten" button (shown when no incomplete badge or as supplementary) */}
+      {showCanonicalEditButton && missingAllocations.length === 0 && (
         <div className="mt-2.5">
-          {showCanonicalEditor ? null : (
-            <button
-              type="button"
-              onClick={() => setShowCanonicalEditor(true)}
-              className="text-xs font-medium text-[var(--sce-primary)] hover:underline"
-              data-testid={`weekplanner-canonical-edit-${item.type.toLowerCase()}`}
-            >
-              Planung bearbeiten
-            </button>
-          )}
-          {showCanonicalEditor && canonicalEditing && (
-            <WeekplannerCanonicalPlanningEditor
-              item={item}
-              facilityGroupsByAllocationGroup={canonicalEditing.facilityGroupsByAllocationGroup}
-              timezone={timezone}
-              onClose={() => setShowCanonicalEditor(false)}
-              onSaved={() => setShowCanonicalEditor(false)}
-            />
-          )}
+          <button
+            type="button"
+            onClick={() => onEdit?.(item)}
+            className="text-xs font-medium text-[var(--sce-primary)] hover:underline"
+            data-testid={`weekplanner-canonical-edit-${item.type.toLowerCase()}`}
+          >
+            Planung bearbeiten
+          </button>
         </div>
       )}
     </div>
@@ -515,6 +555,7 @@ function DayColumn({
   planName,
   overrideEditing,
   canonicalEditing,
+  onEdit,
 }: {
   day: WeekplannerDay;
   locale: string;
@@ -522,6 +563,7 @@ function DayColumn({
   planName?: string | null;
   overrideEditing?: OverrideEditingContext;
   canonicalEditing?: CanonicalEditingContext;
+  onEdit?: (item: WeekplannerItem) => void;
 }) {
   const today = isToday(day.dayKey, timezone);
 
@@ -566,6 +608,7 @@ function DayColumn({
               planName={planName}
               overrideEditing={overrideEditing}
               canonicalEditing={canonicalEditing}
+              onEdit={onEdit}
             />
           ))
         )}
@@ -590,10 +633,31 @@ export default function WeekPlannerPage({
     (sum, day) => sum + day.items.filter((item) => item.conflicts.length > 0).length,
     0,
   );
-  // WEEKPLANNER-01D — the active alternative plan's display name, shown by
-  // OverrideIndicator for EVERY viewer (not just managers) — informational,
-  // not an editing affordance.
+
+  // PLANNING-UX-C3 — incomplete planning count (Standardplan only)
+  const isStandardplan = activePlanId === null;
+  const incompleteCount = isStandardplan
+    ? week.days.reduce(
+        (sum, day) =>
+          sum + day.items.filter((item) => getMissingAllocations(item).length > 0).length,
+        0,
+      )
+    : 0;
+
   const planName = activePlanId ? plans.find((p) => p.id === activePlanId)?.name ?? null : null;
+
+  // PLANNING-UX-C3 — lifted Sheet state: one active editing item at most.
+  const [editingItem, setEditingItem] = useState<WeekplannerItem | null>(null);
+
+  const canEdit = !!canonicalEditing;
+
+  function handleEdit(item: WeekplannerItem) {
+    if (!canonicalEditing) return;
+    const canEditThisItem =
+      (item.type === "TRAINING" && canonicalEditing.canManageTrainings) ||
+      ((item.type === "MATCH" || item.type === "TOURNAMENT") && canonicalEditing.canManageEvents);
+    if (canEditThisItem) setEditingItem(item);
+  }
 
   return (
     <div className="space-y-6">
@@ -679,6 +743,7 @@ export default function WeekPlannerPage({
         </div>
       </SectionCard>
 
+      {/* PLANNING-UX-C3 — RED: Doppelbelegung. Semantically distinct from AMBER below. */}
       {conflictCount > 0 && (
         <div
           className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700"
@@ -686,6 +751,17 @@ export default function WeekPlannerPage({
         >
           <AlertTriangle className="h-4 w-4" />
           {conflictCount} {conflictCount === 1 ? "Eintrag" : "Einträge"} mit Doppelbelegung diese Woche
+        </div>
+      )}
+
+      {/* PLANNING-UX-C3 — AMBER: incomplete planning (Standardplan only). Never classified as Doppelbelegung. */}
+      {incompleteCount > 0 && (
+        <div
+          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700"
+          data-testid="weekplanner-incomplete-summary"
+        >
+          <AlertTriangle className="h-4 w-4" />
+          {incompleteCount} {incompleteCount === 1 ? "Eintrag benötigt" : "Einträge benötigen"} Planung diese Woche
         </div>
       )}
 
@@ -710,11 +786,23 @@ export default function WeekPlannerPage({
                   planName={planName}
                   overrideEditing={overrideEditing}
                   canonicalEditing={activePlanId === null ? canonicalEditing : undefined}
+                  onEdit={canEdit && activePlanId === null ? handleEdit : undefined}
                 />
               ))}
             </div>
           </WeekplannerOverridePanelProvider>
         </div>
+      )}
+
+      {/* PLANNING-UX-C3 — Sheet overlay for canonical editing workspace */}
+      {canonicalEditing && (
+        <WeekplannerPlanningSheet
+          item={editingItem}
+          facilityGroupsByAllocationGroup={canonicalEditing.facilityGroupsByAllocationGroup}
+          timezone={timezone}
+          onClose={() => setEditingItem(null)}
+          onSaved={() => setEditingItem(null)}
+        />
       )}
     </div>
   );
