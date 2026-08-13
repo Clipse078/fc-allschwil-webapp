@@ -125,6 +125,7 @@ export default async function MatchcenterPage({
           locale={locale}
           canManage={canManage}
           currentMonthParam={currentMonthParam}
+          tenantLogoUrl={tenantContext.logoUrl}
         />
       </div>
     </ToastProvider>
