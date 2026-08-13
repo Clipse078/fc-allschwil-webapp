@@ -33,6 +33,7 @@ import {
   RoleValidationError,
 } from "@/lib/roles/errors";
 import { findLockedPermissionRemovals, isProtectedRole } from "@/lib/roles/protected";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 const AUDIT_MODULE_KEY = "roles";
 
@@ -465,4 +466,163 @@ export async function removeTenantRoleAssignment(
   });
 
   return { removed: true };
+}
+
+// ---------------------------------------------------------------------------
+// USER-ADMIN-02C — Bulk role sync for user detail page
+// ---------------------------------------------------------------------------
+
+export type SetTenantUserRolesInput = {
+  tenantId: string;
+  userId: string;
+  /** Desired full set of TENANT role IDs for this user in this tenant. */
+  roleIds: readonly string[];
+  actorUserId: string;
+};
+
+export type SetTenantUserRolesResult = {
+  /** Names of roles newly assigned in this call. */
+  assigned: string[];
+  /** Names of roles removed in this call. */
+  removed: string[];
+};
+
+/**
+ * Syncs the TENANT-scoped roles for a user within a tenant to exactly the
+ * given `roleIds` set, adding and removing in a single transaction.
+ *
+ * Safety invariants:
+ *  - All requested role IDs must be TENANT-scoped and owned by `tenantId`;
+ *    cross-tenant or PLATFORM role IDs are rejected with RoleNotFoundError.
+ *  - Archived roles are rejected (ArchivedRoleError).
+ *  - Assignment and removal are permitted regardless of TenantMembership.isActive
+ *    so admins can manage roles for inactive members (preserving roles for later
+ *    reactivation). TenantMembership.isActive is NEVER modified.
+ *  - Only the canonical Club Admin role (`club_admin__<tenantKey>`) is protected
+ *    from last-holder removal (LastRequiredAdminError). All other isSystem roles
+ *    are not last-holder-protected here. Uses getTenantClubAdminRoleKey — no
+ *    fuzzy name matching.
+ *  - PLATFORM UserRole records (tenantId: null) and other-tenant assignments
+ *    are never touched — only TENANT rows for this exact tenant.
+ */
+export async function setTenantUserRoles(
+  input: SetTenantUserRolesInput,
+): Promise<SetTenantUserRolesResult> {
+  const { tenantId, userId, roleIds, actorUserId } = input;
+
+  // 1. Verify the user has a TenantMembership in this tenant (any state).
+  const membership = await prisma.tenantMembership.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { isActive: true },
+  });
+  if (!membership) throw new RoleUserNotFoundError();
+
+  // 2. Validate requested role IDs: must be TENANT-scoped, belong to this
+  //    tenant, and not archived. Cross-tenant or PLATFORM IDs yield the same
+  //    error as "not found" — no existence leakage.
+  const deduped = Array.from(new Set(roleIds));
+
+  const validRoles =
+    deduped.length > 0
+      ? await prisma.role.findMany({
+          where: { id: { in: deduped }, scope: "TENANT", tenantId },
+          select: { id: true, name: true, isSystem: true, isArchived: true },
+        })
+      : [];
+
+  if (validRoles.length !== deduped.length) {
+    throw new RoleNotFoundError();
+  }
+
+  const archivedRole = validRoles.find((r) => r.isArchived);
+  if (archivedRole) {
+    throw new ArchivedRoleError(
+      `Die Rolle "${archivedRole.name}" ist archiviert und kann nicht zugewiesen werden.`,
+    );
+  }
+
+  // 3. Fetch the current TENANT-scoped assignments for this user in this tenant.
+  const current = await prisma.userRole.findMany({
+    where: { tenantId, userId, role: { scope: "TENANT", tenantId } },
+    select: {
+      id: true,
+      roleId: true,
+      role: { select: { id: true, key: true, name: true } },
+    },
+  });
+
+  const currentRoleIds = new Set(current.map((ur) => ur.roleId));
+  const requestedSet = new Set(deduped);
+
+  const toAdd = deduped.filter((id) => !currentRoleIds.has(id));
+  const toRemove = current.filter((ur) => !requestedSet.has(ur.roleId));
+
+  // 4. Last-Club-Admin guard: protect only the canonical Club Admin role
+  //    (`club_admin__<tenantKey>`). Other isSystem roles are not protected here.
+  //    Uses getTenantClubAdminRoleKey — no fuzzy name matching.
+  if (toRemove.length > 0) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { key: true },
+    });
+    if (tenant) {
+      const clubAdminRoleKey = getTenantClubAdminRoleKey(tenant.key);
+      for (const ur of toRemove) {
+        if (ur.role.key === clubAdminRoleKey) {
+          const otherActiveClubAdmins = await prisma.userRole.count({
+            where: {
+              tenantId,
+              userId: { not: userId },
+              role: { key: clubAdminRoleKey },
+              user: { tenantMemberships: { some: { tenantId, isActive: true } } },
+            },
+          });
+          if (otherActiveClubAdmins === 0) {
+            throw new LastRequiredAdminError(
+              `"${ur.role.name}" kann diesem Benutzer nicht entzogen werden — er/sie ist der letzte aktive Club Admin dieses Mandanten.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // 6. Apply additions and removals atomically.
+  if (toAdd.length > 0 || toRemove.length > 0) {
+    await prisma.$transaction([
+      ...toRemove.map((ur) => prisma.userRole.delete({ where: { id: ur.id } })),
+      ...toAdd.map((roleId) =>
+        prisma.userRole.create({ data: { userId, roleId, tenantId } }),
+      ),
+    ]);
+  }
+
+  // 7. Emit per-change audit entries (best-effort).
+  const addedRoles = validRoles.filter((r) => toAdd.includes(r.id));
+  for (const role of addedRoles) {
+    await logAction({
+      actorUserId,
+      moduleKey: AUDIT_MODULE_KEY,
+      entityType: "UserRole",
+      entityId: `${userId}:${role.id}`,
+      action: "USER_ASSIGNED",
+      afterJson: { tenantId, roleId: role.id, roleName: role.name, userId },
+    });
+  }
+
+  for (const ur of toRemove) {
+    await logAction({
+      actorUserId,
+      moduleKey: AUDIT_MODULE_KEY,
+      entityType: "UserRole",
+      entityId: `${userId}:${ur.roleId}`,
+      action: "USER_REMOVED",
+      beforeJson: { tenantId, roleId: ur.roleId, roleName: ur.role.name, userId },
+    });
+  }
+
+  return {
+    assigned: addedRoles.map((r) => r.name),
+    removed: toRemove.map((ur) => ur.role.name),
+  };
 }

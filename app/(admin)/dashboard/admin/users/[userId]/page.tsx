@@ -11,10 +11,12 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantUserDetail } from "@/lib/users/queries";
+import { getTenantRolesOverview } from "@/lib/roles/tenant-queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import MembershipAccessControl from "@/components/admin/users/MembershipAccessControl";
+import TenantRoleAssignmentControl from "@/components/admin/users/TenantRoleAssignmentControl";
 
 type Props = {
   params: Promise<{ userId: string }>;
@@ -28,14 +30,6 @@ function formatDate(date: Date): string {
   });
 }
 
-function getRoleBadgeClass(roleKey: string): string {
-  const k = roleKey.toLowerCase();
-  if (k.includes("superadmin") || k.includes("super_admin")) return "sce-role-badge sce-role-badge-admin";
-  if (k.includes("admin")) return "sce-role-badge sce-role-badge-admin";
-  if (k.includes("trainer")) return "sce-role-badge sce-role-badge-trainer";
-  if (k.includes("staff")) return "sce-role-badge sce-role-badge-staff";
-  return "sce-role-badge sce-role-badge-member";
-}
 
 export default async function AdminUserDetailPage({ params }: Props) {
   const session = await requireAnyPermission([
@@ -48,8 +42,15 @@ export default async function AdminUserDetailPage({ params }: Props) {
 
   const { userId } = await params;
 
-  const membership = await getTenantUserDetail(tenantId, userId);
+  const [membership, allTenantRoles] = await Promise.all([
+    getTenantUserDetail(tenantId, userId),
+    getTenantRolesOverview(tenantId),
+  ]);
   if (!membership) notFound();
+
+  const availableRoles = allTenantRoles
+    .filter((r) => !r.isArchived)
+    .map((r) => ({ id: r.id, name: r.name, isSystem: r.isSystem }));
 
   const user = membership.user;
   const displayName = `${user.firstName} ${user.lastName}`;
@@ -144,13 +145,13 @@ export default async function AdminUserDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Tenant roles — read-only */}
+          {/* Tenant roles — manageable with users.manage */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-[var(--muted)]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Club-Rollen
+                  Rollen
                 </p>
                 {user.userRoles.length > 0 ? (
                   <span className="sce-count-badge">{user.userRoles.length}</span>
@@ -158,19 +159,12 @@ export default async function AdminUserDetailPage({ params }: Props) {
               </div>
             </div>
             <div className="sce-detail-section-body">
-              {user.userRoles.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {user.userRoles.map(({ role }) => (
-                    <span key={role.id} className={getRoleBadgeClass(role.key)}>
-                      {role.name}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-[var(--muted)]">
-                  Keine Club-Rollen zugewiesen.
-                </p>
-              )}
+              <TenantRoleAssignmentControl
+                userId={userId}
+                availableRoles={availableRoles}
+                initialRoleIds={user.userRoles.map((ur) => ur.role.id)}
+                canManage={canManage}
+              />
             </div>
           </div>
         </div>
