@@ -15,6 +15,15 @@ import { CenterSummaryStrip } from "@/components/centers/CenterSummaryStrip";
 import MatchcenterResultRow from "./MatchcenterResultRow";
 import MatchcenterWochenplanBulkPanel from "./MatchcenterWochenplanBulkPanel";
 
+// WOCHENPLAN_FILTERS — used by the Resultate tab filter (Spielplanung filters
+// are now rendered inside MatchcenterWochenplanBulkPanel for C2 unified toolbar)
+const WOCHENPLAN_FILTERS_RESULTATE: { key: MatchcenterWochenplanFilter; label: string }[] =
+  [
+    { key: "ALLE", label: "Alle" },
+    { key: "IM_WOCHENPLAN", label: "Im Wochenplan" },
+    { key: "NICHT_IM_WOCHENPLAN", label: "Nicht im Wochenplan" },
+  ];
+
 export type MatchcenterMonthWindowLike = {
   param: string;
   label: string;
@@ -45,21 +54,6 @@ type MatchcenterOverviewProps = {
 const TABS: { key: MatchcenterTab; label: string }[] = [
   { key: "SPIELPLANUNG", label: "Spielplanung" },
   { key: "RESULTATE", label: "Resultate" },
-];
-
-const ACTION_FILTERS: { key: MatchcenterActionFilter; label: string }[] = [
-  { key: "ALLE", label: "Alle" },
-  { key: "OFFEN", label: "Offen" },
-  { key: "ERLEDIGT", label: "Erledigt" },
-];
-
-const WOCHENPLAN_FILTERS: {
-  key: MatchcenterWochenplanFilter;
-  label: string;
-}[] = [
-  { key: "ALLE", label: "Alle" },
-  { key: "IM_WOCHENPLAN", label: "Im Wochenplan" },
-  { key: "NICHT_IM_WOCHENPLAN", label: "Nicht im Wochenplan" },
 ];
 
 function buildHref(
@@ -233,88 +227,62 @@ export default function MatchcenterOverview({
 
       {tab === "SPIELPLANUNG" ? (
         <>
-          {/* ── Filter toolbar ─────────────────────────────────────────────── */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Quick operational filter */}
-            <div
-              className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
-              role="group"
-              aria-label="Aktionsfilter"
-            >
-              {ACTION_FILTERS.map((item) => {
-                const isActive = item.key === actionFilter;
-                return (
-                  <Link
-                    key={item.key}
-                    href={buildHref(basePath, {
-                      tab,
-                      month: monthWindow.param,
-                      actionFilter: item.key,
-                      wochenplanFilter,
-                    })}
-                    data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
-                    aria-current={isActive ? "true" : undefined}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                      isActive
-                        ? "bg-[var(--foreground)] text-white"
-                        : "text-[var(--text-2)] hover:text-[var(--foreground)]",
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Wochenplan filter */}
-            <div
-              className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
-              role="group"
-              aria-label="Wochenplan-Filter"
-            >
-              {WOCHENPLAN_FILTERS.map((item) => {
-                const isActive = item.key === wochenplanFilter;
-                return (
-                  <Link
-                    key={item.key}
-                    href={buildHref(basePath, {
-                      tab,
-                      month: monthWindow.param,
-                      actionFilter,
-                      wochenplanFilter: item.key,
-                    })}
-                    data-testid={`matchcenter-wochenplan-filter-${item.key.toLowerCase()}`}
-                    aria-current={isActive ? "true" : undefined}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                      isActive
-                        ? "bg-[var(--foreground)] text-white"
-                        : "text-[var(--text-2)] hover:text-[var(--foreground)]",
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── Match list ─────────────────────────────────────────────────── */}
+          {/* ── Match list (filter toolbar is inside BulkPanel — C2) ──────── */}
           {viewModel.spielplanung.length === 0 ? (
-            <SectionCard noPadding>
-              <EmptyState
-                icon={<Volleyball className="h-8 w-8" />}
-                heading="Keine Matches gefunden"
-                description="Für den ausgewählten Monat und Filter gibt es keine anstehenden Spiele."
-                action={
-                  <Link href="/dashboard/events/matches/new" className="fca-button-primary">
-                    <Plus className="h-4 w-4" />
-                    Match erstellen
-                  </Link>
-                }
-              />
-            </SectionCard>
+            <>
+              {/* Empty state still needs a minimal filter strip for navigation */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div
+                  className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
+                  role="group"
+                  aria-label="Status"
+                >
+                  {(
+                    [
+                      { key: "ALLE" as const, label: "Alle" },
+                      { key: "OFFEN" as const, label: "Offen" },
+                      { key: "ERLEDIGT" as const, label: "Bereit" },
+                    ] as { key: MatchcenterActionFilter; label: string }[]
+                  ).map((item) => {
+                    const isActive = item.key === actionFilter;
+                    return (
+                      <Link
+                        key={item.key}
+                        href={buildHref(basePath, {
+                          tab,
+                          month: monthWindow.param,
+                          actionFilter: item.key,
+                          wochenplanFilter,
+                        })}
+                        data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
+                        aria-current={isActive ? "true" : undefined}
+                        className={cn(
+                          "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                          isActive
+                            ? "bg-[var(--foreground)] text-white"
+                            : "text-[var(--text-2)] hover:text-[var(--foreground)]",
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+              <SectionCard noPadding>
+                <EmptyState
+                  icon={<Volleyball className="h-8 w-8" />}
+                  heading="Keine Matches gefunden"
+                  description="Für den ausgewählten Monat und Filter gibt es keine anstehenden Spiele."
+                  action={
+                    <Link href="/dashboard/events/matches/new" className="fca-button-primary">
+                      <Plus className="h-4 w-4" />
+                      Match erstellen
+                    </Link>
+                  }
+                />
+              </SectionCard>
+            </>
           ) : (
             <MatchcenterWochenplanBulkPanel
               rows={viewModel.spielplanung}
@@ -322,6 +290,11 @@ export default function MatchcenterOverview({
               timezone={timezone}
               canManage={canManage}
               tenantLogoUrl={tenantLogoUrl}
+              basePath={basePath}
+              tab={tab}
+              monthParam={monthWindow.param}
+              actionFilter={actionFilter}
+              wochenplanFilter={wochenplanFilter}
             />
           )}
         </>
@@ -329,11 +302,11 @@ export default function MatchcenterOverview({
         <>
           {/* ── Wochenplan filter for Resultate ──────────────────────────── */}
           <div
-            className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5 self-start"
+            className="flex items-center gap-0.5 self-start rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
             role="group"
             aria-label="Wochenplan-Filter"
           >
-            {WOCHENPLAN_FILTERS.map((item) => {
+            {WOCHENPLAN_FILTERS_RESULTATE.map((item) => {
               const isActive = item.key === wochenplanFilter;
               return (
                 <Link

@@ -2,16 +2,17 @@
 
 /**
  * PUB-WEEKPLAN-VISIBILITY-01 — MatchCenter Wochenplan Bulk Panel
- * MATCHCENTER-UX-03 — Premium match list with matchday grouping and inspector
+ * MATCHCENTER-UX-03-C2 — Premium match list: unified control toolbar
  *
  * Client component that wraps the Spielplanung match list with:
+ *   - Unified control toolbar: Status | Wochenplan | Ansicht + Wochenplan verwalten
  *   - Per-match Wochenplan publication indicator
  *   - Multi-select bulk management mode
  *   - Checkbox selection per match row
  *   - Contextual bulk action bar
  *   - Matchday grouping (CenterDateGroup)
  *   - Match inspector (MatchInspector via Sheet)
- *   - Density toggle (comfortable / compact)
+ *   - Density toggle (Komfortabel / Kompakt)
  *   - Optimistic UI update after mutation
  *
  * Uses POST /api/matchcenter/bulk-wochenplan-visibility.
@@ -20,6 +21,7 @@
 
 import { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Eye,
   EyeOff,
@@ -33,8 +35,48 @@ import { CenterDateGroup } from "@/components/centers/CenterDateGroup";
 import { MatchCard, type MatchCardDensity } from "./MatchCard";
 import { MatchInspector } from "./MatchInspector";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
-import type { MatchcenterRowViewModel } from "@/lib/matchcenter/view-model";
+import type {
+  MatchcenterRowViewModel,
+  MatchcenterActionFilter,
+  MatchcenterTab,
+  MatchcenterWochenplanFilter,
+} from "@/lib/matchcenter/view-model";
 import { cn } from "@/lib/cn";
+
+// ── Filter constants ─────────────────────────────────────────────────────────
+
+const ACTION_FILTERS: { key: MatchcenterActionFilter; label: string }[] = [
+  { key: "ALLE", label: "Alle" },
+  { key: "OFFEN", label: "Offen" },
+  { key: "ERLEDIGT", label: "Bereit" },
+];
+
+const WOCHENPLAN_FILTERS: { key: MatchcenterWochenplanFilter; label: string }[] = [
+  { key: "ALLE", label: "Alle" },
+  { key: "IM_WOCHENPLAN", label: "Im Wochenplan" },
+  { key: "NICHT_IM_WOCHENPLAN", label: "Nicht im Wochenplan" },
+];
+
+function buildHref(
+  basePath: string,
+  params: {
+    tab: MatchcenterTab;
+    month: string;
+    actionFilter: MatchcenterActionFilter;
+    wochenplanFilter: MatchcenterWochenplanFilter;
+  },
+): string {
+  const search = new URLSearchParams();
+  search.set("tab", params.tab.toLowerCase());
+  search.set("month", params.month);
+  if (params.tab === "SPIELPLANUNG") {
+    search.set("filter", params.actionFilter.toLowerCase());
+  }
+  if (params.wochenplanFilter !== "ALLE") {
+    search.set("wochenplan", params.wochenplanFilter.toLowerCase());
+  }
+  return `${basePath}?${search.toString()}`;
+}
 
 // ── Day-grouping utility ─────────────────────────────────────────────────────
 
@@ -109,6 +151,16 @@ type MatchcenterWochenplanBulkPanelProps = {
    * MATCHCENTER-UX-03-C1.
    */
   tenantLogoUrl?: string | null;
+  /**
+   * Filter/navigation props threaded from the server component.
+   * Used to render the unified Status | Wochenplan | Ansicht control toolbar.
+   * MATCHCENTER-UX-03-C2.
+   */
+  basePath: string;
+  tab: MatchcenterTab;
+  monthParam: string;
+  actionFilter: MatchcenterActionFilter;
+  wochenplanFilter: MatchcenterWochenplanFilter;
 };
 
 export default function MatchcenterWochenplanBulkPanel({
@@ -117,6 +169,11 @@ export default function MatchcenterWochenplanBulkPanel({
   timezone,
   canManage,
   tenantLogoUrl = null,
+  basePath,
+  tab,
+  monthParam,
+  actionFilter,
+  wochenplanFilter,
 }: MatchcenterWochenplanBulkPanelProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -202,15 +259,91 @@ export default function MatchcenterWochenplanBulkPanel({
   const selectedCount = selectedIds.size;
   const allSelected = selectedCount > 0 && selectedCount === rows.length;
 
+  const filterLinkClass = (active: boolean) =>
+    cn(
+      "rounded-md px-3 py-1.5 text-xs font-medium transition",
+      active
+        ? "bg-[var(--foreground)] text-white"
+        : "text-[var(--text-2)] hover:text-[var(--foreground)]",
+    );
+
+  const densityButtonClass = (active: boolean) =>
+    cn(
+      "rounded-md px-2.5 py-1 text-xs font-medium transition",
+      active
+        ? "bg-[var(--foreground)] text-white"
+        : "text-[var(--text-2)] hover:text-[var(--foreground)]",
+    );
+
   return (
     <div className="space-y-2">
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      {/* ── Unified control toolbar ─────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Density toggle */}
+        {/* Status group: Alle · Offen · Bereit */}
         <div
-          className="flex rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
+          className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
           role="group"
-          aria-label="Darstellung"
+          aria-label="Status"
+        >
+          {ACTION_FILTERS.map((item) => {
+            const isActive = item.key === actionFilter;
+            return (
+              <Link
+                key={item.key}
+                href={buildHref(basePath, {
+                  tab,
+                  month: monthParam,
+                  actionFilter: item.key,
+                  wochenplanFilter,
+                })}
+                data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
+                aria-current={isActive ? "true" : undefined}
+                className={filterLinkClass(isActive)}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Separator */}
+        <span className="h-4 w-px bg-[var(--border)]" aria-hidden="true" />
+
+        {/* Wochenplan group: Alle · Im Wochenplan · Nicht im Wochenplan */}
+        <div
+          className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
+          role="group"
+          aria-label="Wochenplan"
+        >
+          {WOCHENPLAN_FILTERS.map((item) => {
+            const isActive = item.key === wochenplanFilter;
+            return (
+              <Link
+                key={item.key}
+                href={buildHref(basePath, {
+                  tab,
+                  month: monthParam,
+                  actionFilter,
+                  wochenplanFilter: item.key,
+                })}
+                data-testid={`matchcenter-wochenplan-filter-${item.key.toLowerCase()}`}
+                aria-current={isActive ? "true" : undefined}
+                className={filterLinkClass(isActive)}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Separator */}
+        <span className="h-4 w-px bg-[var(--border)]" aria-hidden="true" />
+
+        {/* Ansicht group: Komfortabel · Kompakt */}
+        <div
+          className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
+          role="group"
+          aria-label="Ansicht"
         >
           {(["comfortable", "compact"] as MatchCardDensity[]).map((d) => (
             <button
@@ -218,44 +351,17 @@ export default function MatchcenterWochenplanBulkPanel({
               type="button"
               onClick={() => setDensity(d)}
               aria-pressed={density === d}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition",
-                density === d
-                  ? "bg-[var(--foreground)] text-white"
-                  : "text-[var(--text-2)] hover:text-[var(--foreground)]",
-              )}
+              className={densityButtonClass(density === d)}
             >
               {d === "comfortable" ? "Komfortabel" : "Kompakt"}
             </button>
           ))}
         </div>
 
-        {/* Wochenplan bulk management */}
+        {/* Wochenplan management actions */}
         {canManage && (
-          <>
-            {!isSelecting ? (
-              <button
-                type="button"
-                onClick={() => setIsSelecting(true)}
-                data-testid="matchcenter-bulk-toggle"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-              >
-                <SquareCheck className="h-3.5 w-3.5" />
-                Wochenplan verwalten
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={exitSelectionMode}
-                data-testid="matchcenter-bulk-exit"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
-              >
-                <X className="h-3.5 w-3.5" />
-                Auswahl beenden
-              </button>
-            )}
-
-            {isSelecting && (
+          <div className="ml-auto flex items-center gap-2">
+            {isSelecting ? (
               <>
                 <button
                   type="button"
@@ -268,9 +374,28 @@ export default function MatchcenterWochenplanBulkPanel({
                 <span className="text-xs text-[var(--muted)]">
                   {selectedCount} ausgewählt
                 </span>
+                <button
+                  type="button"
+                  onClick={exitSelectionMode}
+                  data-testid="matchcenter-bulk-exit"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Auswahl beenden
+                </button>
               </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSelecting(true)}
+                data-testid="matchcenter-bulk-toggle"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+              >
+                <SquareCheck className="h-3.5 w-3.5" />
+                Wochenplan verwalten
+              </button>
             )}
-          </>
+          </div>
         )}
       </div>
 
