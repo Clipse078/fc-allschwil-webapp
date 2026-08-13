@@ -2,12 +2,16 @@
 
 /**
  * PUB-WEEKPLAN-VISIBILITY-01 — MatchCenter Wochenplan Bulk Panel
+ * MATCHCENTER-UX-03 — Premium match list with matchday grouping and inspector
  *
- * Client component that wraps the Spielplanung list with:
+ * Client component that wraps the Spielplanung match list with:
  *   - Per-match Wochenplan publication indicator
- *   - Multi-select mode toggle ("Wochenplan verwalten")
+ *   - Multi-select bulk management mode
  *   - Checkbox selection per match row
- *   - Contextual bulk action bar (Im Wochenplan / Aus Wochenplan)
+ *   - Contextual bulk action bar
+ *   - Matchday grouping (CenterDateGroup)
+ *   - Match inspector (MatchInspector via Sheet)
+ *   - Density toggle (comfortable / compact)
  *   - Optimistic UI update after mutation
  *
  * Uses POST /api/matchcenter/bulk-wochenplan-visibility.
@@ -17,314 +21,82 @@
 import { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CalendarDays,
-  CheckCircle2,
-  CircleAlert,
-  Clock3,
   Eye,
   EyeOff,
   Loader2,
-  MapPin,
-  Radio,
   SquareCheck,
-  SquareMinus,
   X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/page/SectionCard";
-import MatchTeamLogo from "./MatchTeamLogo";
-import { getMatchcenterResultLabel, isMatchLive } from "@/lib/matchcenter/match-lifecycle";
-import { resolveMatchcenterCompactSideName } from "@/lib/matchcenter/team-display";
+import { CenterDateGroup } from "@/components/centers/CenterDateGroup";
+import { MatchCard, type MatchCardDensity } from "./MatchCard";
+import { MatchInspector } from "./MatchInspector";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
 import type { MatchcenterRowViewModel } from "@/lib/matchcenter/view-model";
 import { cn } from "@/lib/cn";
 
-// ── Status display maps (mirrored from MatchcenterSpielplanungRow) ──────────
+// ── Day-grouping utility ─────────────────────────────────────────────────────
 
-const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: "Geplant",
-  LIVE: "Live",
-  POSTPONED: "Verschoben",
-  CANCELED: "Abgesagt",
-  CANCELLED: "Abgesagt",
-  DRAFT: "Entwurf",
-  ARCHIVED: "Archiviert",
+type DayGroup = {
+  dayKey: string;
+  label: string;
+  rows: MatchcenterRowViewModel[];
 };
 
-const STATUS_VARIANTS: Record<string, "info" | "success" | "warning" | "danger" | "outline"> = {
-  SCHEDULED: "info",
-  LIVE: "success",
-  POSTPONED: "warning",
-  CANCELED: "danger",
-  CANCELLED: "danger",
-  DRAFT: "outline",
-  ARCHIVED: "outline",
-};
-
-function formatMatchDate(value: Date, locale: string, timezone: string): string {
-  return new Intl.DateTimeFormat(locale, {
+function formatDayGroupLabel(date: Date, locale: string, timezone: string): string {
+  const weekday = new Intl.DateTimeFormat(locale, {
     weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
     timeZone: timezone,
-  }).format(value);
+  })
+    .format(date)
+    .replace(/\.$/, "")
+    .toUpperCase();
+
+  const day = new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    timeZone: timezone,
+  }).format(date);
+
+  const month = new Intl.DateTimeFormat(locale, {
+    month: "long",
+    timeZone: timezone,
+  })
+    .format(date)
+    .toUpperCase();
+
+  return `${weekday}, ${day}. ${month}`;
 }
 
-// ── Wochenplan publication badge ────────────────────────────────────────────
+function groupByCalendarDay(
+  rows: MatchcenterRowViewModel[],
+  locale: string,
+  timezone: string,
+): DayGroup[] {
+  const groups = new Map<string, { date: Date; rows: MatchcenterRowViewModel[] }>();
 
-function WochenplanBadge({ visible }: { visible: boolean }) {
-  if (visible) {
-    return (
-      <span
-        className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-700"
-        data-testid="wochenplan-badge-visible"
-        title="Im Wochenplan"
-      >
-        <Eye className="h-2.5 w-2.5" aria-hidden="true" />
-        Im Wochenplan
-      </span>
-    );
+  for (const row of rows) {
+    const dayKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(row.match.startAt);
+
+    if (!groups.has(dayKey)) {
+      groups.set(dayKey, { date: row.match.startAt, rows: [] });
+    }
+    groups.get(dayKey)!.rows.push(row);
   }
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--muted)]"
-      data-testid="wochenplan-badge-hidden"
-      title="Nicht im Wochenplan"
-    >
-      <EyeOff className="h-2.5 w-2.5" aria-hidden="true" />
-      Nicht im Wochenplan
-    </span>
-  );
+
+  return Array.from(groups.entries()).map(([dayKey, group]) => ({
+    dayKey,
+    label: formatDayGroupLabel(group.date, locale, timezone),
+    rows: group.rows,
+  }));
 }
 
-// ── Per-row component ───────────────────────────────────────────────────────
-
-type BulkRowProps = {
-  match: MatchcenterMatchSummary;
-  assessment: MatchcenterRowViewModel["assessment"];
-  locale: string;
-  timezone: string;
-  isSelecting: boolean;
-  isSelected: boolean;
-  onToggle: (id: string) => void;
-};
-
-function BulkRow({
-  match,
-  assessment,
-  locale,
-  timezone,
-  isSelecting,
-  isSelected,
-  onToggle,
-}: BulkRowProps) {
-  const normalizedHomeAway = match.homeAway?.trim().toUpperCase() ?? null;
-  const homeAwayLabel =
-    normalizedHomeAway === "HOME"
-      ? "Heimspiel"
-      : normalizedHomeAway === "AWAY"
-        ? "Auswärtsspiel"
-        : null;
-
-  const statusLabel = STATUS_LABELS[match.status] ?? match.status;
-  const statusVariant = STATUS_VARIANTS[match.status] ?? "info";
-  const live = isMatchLive(match);
-  const liveScore = getMatchcenterResultLabel(match);
-
-  const homeName = resolveMatchcenterCompactSideName(match.home);
-  const awayName = resolveMatchcenterCompactSideName(match.away);
-
-  return (
-    <article
-      data-testid={`matchcenter-spielplanung-row-${match.id}`}
-      className={cn(
-        "relative grid gap-3 px-5 py-4 transition",
-        isSelecting ? "cursor-pointer select-none" : "hover:bg-[var(--surface-2)]",
-        isSelecting && isSelected && "bg-emerald-50 hover:bg-emerald-50",
-        isSelecting && !isSelected && "hover:bg-[var(--surface-2)]",
-      )}
-      onClick={isSelecting ? () => onToggle(match.id) : undefined}
-    >
-      {/* Selection checkbox (only in selection mode) */}
-      {isSelecting && (
-        <div
-          className="absolute left-3 top-1/2 z-10 -translate-y-1/2"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(match.id);
-          }}
-        >
-          {isSelected ? (
-            <SquareCheck
-              className="h-5 w-5 text-emerald-600"
-              aria-label={`${match.title} abgewählt`}
-              data-testid={`matchcenter-bulk-checkbox-${match.id}`}
-            />
-          ) : (
-            <SquareMinus
-              className="h-5 w-5 text-[var(--border-strong)]"
-              aria-label={`${match.title} auswählen`}
-              data-testid={`matchcenter-bulk-checkbox-${match.id}`}
-            />
-          )}
-        </div>
-      )}
-
-      <div
-        className={cn(
-          "min-w-0 lg:col-span-1",
-          isSelecting && "pl-8",
-        )}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={statusVariant} size="sm">
-            {live ? <Radio className="h-3 w-3" /> : null}
-            {statusLabel}
-          </Badge>
-
-          {homeAwayLabel ? (
-            <Badge
-              variant={normalizedHomeAway === "HOME" ? "success" : "default"}
-              size="sm"
-              data-testid={`matchcenter-homeaway-${match.id}`}
-            >
-              {homeAwayLabel}
-            </Badge>
-          ) : null}
-
-          {match.competitionLabel ? (
-            <span className="text-xs font-medium text-[var(--muted)]">
-              {match.competitionLabel}
-            </span>
-          ) : null}
-
-          {live && liveScore ? (
-            <span
-              data-testid={`matchcenter-live-score-${match.id}`}
-              className="rounded-md bg-[var(--foreground)] px-2 py-0.5 text-xs font-bold tabular-nums text-white"
-            >
-              {liveScore}
-            </span>
-          ) : null}
-
-          {/* Wochenplan publication indicator */}
-          <WochenplanBadge visible={match.visibility.wochenplanVisible} />
-        </div>
-
-        <div className="mt-2 flex min-w-0 items-center gap-2">
-          <MatchTeamLogo
-            label={homeName}
-            emphasized={match.home.isOwnTeam}
-            logoUrl={match.home.externalLogoUrl}
-          />
-          <p
-            className={
-              match.home.isOwnTeam
-                ? "min-w-0 truncate text-sm font-semibold text-[var(--foreground)]"
-                : "min-w-0 truncate text-sm text-[var(--foreground)]"
-            }
-          >
-            {homeName}
-          </p>
-
-          <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            vs
-          </span>
-
-          <MatchTeamLogo
-            label={awayName}
-            emphasized={match.away.isOwnTeam}
-            logoUrl={match.away.externalLogoUrl}
-          />
-          <p
-            className={
-              match.away.isOwnTeam
-                ? "min-w-0 truncate text-sm font-semibold text-[var(--foreground)]"
-                : "min-w-0 truncate text-sm text-[var(--foreground)]"
-            }
-          >
-            {awayName}
-          </p>
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
-          <span className="inline-flex items-center gap-1.5">
-            <CalendarDays className="h-3.5 w-3.5" />
-            {formatMatchDate(match.startAt, locale, timezone)}
-          </span>
-
-          {match.location ? (
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" />
-              {match.location}
-            </span>
-          ) : null}
-
-          {match.operational.meetingTime ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Clock3 className="h-3.5 w-3.5" />
-              Treffpunkt{" "}
-              {new Intl.DateTimeFormat(locale, {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: timezone,
-              }).format(match.operational.meetingTime)}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div
-        className="flex shrink-0 flex-col items-start gap-1.5 lg:items-end"
-        data-testid={`matchcenter-action-${match.id}`}
-      >
-        {assessment.status === "READY" ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Bereit
-          </span>
-        ) : assessment.status === "AWAY" ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Auswärtsspiel
-          </span>
-        ) : assessment.status === "OPEN" ? (
-          <>
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-              <CircleAlert className="h-3.5 w-3.5" />
-              {assessment.actionCount === 1
-                ? "1 Aufgabe offen"
-                : `${assessment.actionCount} Aufgaben offen`}
-            </span>
-            <div className="flex flex-wrap justify-end gap-1">
-              {assessment.actions.map((action) => (
-                <Badge key={action.key} variant="warning" size="sm">
-                  {action.label}
-                </Badge>
-              ))}
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      {/* Full-row nav link — only active when NOT in selection mode */}
-      {!isSelecting && (
-        <a
-          href={`/dashboard/matchcenter/${match.id}`}
-          aria-label={`Details zu ${match.title} anzeigen`}
-          className="absolute inset-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2"
-        >
-          <span className="sr-only">Details zu {match.title} anzeigen</span>
-        </a>
-      )}
-    </article>
-  );
-}
-
-// ── Main bulk panel ─────────────────────────────────────────────────────────
+// ── Main component ───────────────────────────────────────────────────────────
 
 type MatchcenterWochenplanBulkPanelProps = {
   rows: MatchcenterRowViewModel[];
@@ -345,6 +117,14 @@ export default function MatchcenterWochenplanBulkPanel({
 
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [inspectorMatchId, setInspectorMatchId] = useState<string | null>(null);
+  const [density, setDensity] = useState<MatchCardDensity>("comfortable");
+
+  const dayGroups = groupByCalendarDay(rows, locale, timezone);
+
+  const inspectorMatch: MatchcenterMatchSummary | null = inspectorMatchId
+    ? (rows.find((r) => r.match.id === inspectorMatchId)?.match ?? null)
+    : null;
 
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -375,7 +155,6 @@ export default function MatchcenterWochenplanBulkPanel({
     if (selectedIds.size === 0) return;
 
     const ids = Array.from(selectedIds);
-    const label = wochenplanVisible ? "Im Wochenplan" : "Aus Wochenplan";
 
     try {
       const res = await fetch("/api/matchcenter/bulk-wochenplan-visibility", {
@@ -417,51 +196,78 @@ export default function MatchcenterWochenplanBulkPanel({
   const allSelected = selectedCount > 0 && selectedCount === rows.length;
 
   return (
-    <div className="space-y-3">
-      {/* Wochenplan management toolbar ──────────────────────────────────────── */}
-      {canManage && (
-        <div className="flex items-center gap-2">
-          {!isSelecting ? (
+    <div className="space-y-2">
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Density toggle */}
+        <div
+          className="flex rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
+          role="group"
+          aria-label="Darstellung"
+        >
+          {(["comfortable", "compact"] as MatchCardDensity[]).map((d) => (
             <button
+              key={d}
               type="button"
-              onClick={() => setIsSelecting(true)}
-              data-testid="matchcenter-bulk-toggle"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+              onClick={() => setDensity(d)}
+              aria-pressed={density === d}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition",
+                density === d
+                  ? "bg-[var(--foreground)] text-white"
+                  : "text-[var(--text-2)] hover:text-[var(--foreground)]",
+              )}
             >
-              <SquareCheck className="h-3.5 w-3.5" />
-              Wochenplan verwalten
+              {d === "comfortable" ? "Komfortabel" : "Kompakt"}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={exitSelectionMode}
-              data-testid="matchcenter-bulk-exit"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
-            >
-              <X className="h-3.5 w-3.5" />
-              Auswahl beenden
-            </button>
-          )}
+          ))}
+        </div>
 
-          {isSelecting && (
-            <>
+        {/* Wochenplan bulk management */}
+        {canManage && (
+          <>
+            {!isSelecting ? (
               <button
                 type="button"
-                onClick={allSelected ? clearSelection : selectAll}
-                data-testid="matchcenter-bulk-select-all"
-                className="text-xs font-medium text-[var(--text-2)] underline-offset-2 hover:underline"
+                onClick={() => setIsSelecting(true)}
+                data-testid="matchcenter-bulk-toggle"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
               >
-                {allSelected ? "Alle abwählen" : "Alle auswählen"}
+                <SquareCheck className="h-3.5 w-3.5" />
+                Wochenplan verwalten
               </button>
-              <span className="text-xs text-[var(--muted)]">
-                {selectedCount} ausgewählt
-              </span>
-            </>
-          )}
-        </div>
-      )}
+            ) : (
+              <button
+                type="button"
+                onClick={exitSelectionMode}
+                data-testid="matchcenter-bulk-exit"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+              >
+                <X className="h-3.5 w-3.5" />
+                Auswahl beenden
+              </button>
+            )}
 
-      {/* Bulk action bar ─────────────────────────────────────────────────────── */}
+            {isSelecting && (
+              <>
+                <button
+                  type="button"
+                  onClick={allSelected ? clearSelection : selectAll}
+                  data-testid="matchcenter-bulk-select-all"
+                  className="text-xs font-medium text-[var(--text-2)] underline-offset-2 hover:underline"
+                >
+                  {allSelected ? "Alle abwählen" : "Alle auswählen"}
+                </button>
+                <span className="text-xs text-[var(--muted)]">
+                  {selectedCount} ausgewählt
+                </span>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Bulk action bar ───────────────────────────────────────────────── */}
       {isSelecting && selectedCount > 0 && (
         <div
           className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
@@ -469,7 +275,10 @@ export default function MatchcenterWochenplanBulkPanel({
           role="region"
           aria-label="Bulk-Aktionen"
         >
-          <span className="text-sm font-semibold text-emerald-900" data-testid="matchcenter-bulk-count">
+          <span
+            className="text-sm font-semibold text-emerald-900"
+            data-testid="matchcenter-bulk-count"
+          >
             {selectedCount} {selectedCount === 1 ? "Spiel ausgewählt" : "Spiele ausgewählt"}
           </span>
 
@@ -507,26 +316,49 @@ export default function MatchcenterWochenplanBulkPanel({
         </div>
       )}
 
-      {/* Match list ──────────────────────────────────────────────────────────── */}
+      {/* ── Match list with matchday grouping ──────────────────────────── */}
       <SectionCard noPadding>
-        <div
-          className="divide-y divide-[var(--border)]"
-          data-testid="matchcenter-spielplanung-list"
-        >
-          {rows.map((row) => (
-            <BulkRow
-              key={row.match.id}
-              match={row.match}
-              assessment={row.assessment}
-              locale={locale}
-              timezone={timezone}
-              isSelecting={isSelecting}
-              isSelected={selectedIds.has(row.match.id)}
-              onToggle={toggleSelection}
-            />
+        <div data-testid="matchcenter-spielplanung-list">
+          {dayGroups.map((group, groupIdx) => (
+            <div key={group.dayKey}>
+              <div className={cn("px-5", groupIdx === 0 ? "pt-4" : "pt-2")}>
+                <CenterDateGroup
+                  label={group.label}
+                  count={group.rows.length}
+                  countNoun={group.rows.length === 1 ? "Spiel" : "Spiele"}
+                />
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {group.rows.map((row) => (
+                  <MatchCard
+                    key={row.match.id}
+                    match={row.match}
+                    assessment={row.assessment}
+                    locale={locale}
+                    timezone={timezone}
+                    density={density}
+                    isSelecting={isSelecting}
+                    isSelected={selectedIds.has(row.match.id)}
+                    onToggleSelect={toggleSelection}
+                    onInspect={(id) => setInspectorMatchId(id)}
+                  />
+                ))}
+              </div>
+              {groupIdx < dayGroups.length - 1 && (
+                <div className="border-t border-[var(--border)]" />
+              )}
+            </div>
           ))}
         </div>
       </SectionCard>
+
+      {/* ── Match Inspector ────────────────────────────────────────────── */}
+      <MatchInspector
+        match={inspectorMatch}
+        locale={locale}
+        timezone={timezone}
+        onClose={() => setInspectorMatchId(null)}
+      />
     </div>
   );
 }
