@@ -185,13 +185,23 @@ export default function LoginForm() {
               </div>
 
               <div>
-                <label
-                  htmlFor="password"
-                  className="mb-1.5 block text-[0.8125rem] font-medium"
-                  style={{ color: "#374151" }}
-                >
-                  Passwort
-                </label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label
+                    htmlFor="password"
+                    className="block text-[0.8125rem] font-medium"
+                    style={{ color: "#374151" }}
+                  >
+                    Passwort
+                  </label>
+                  <a
+                    href="/forgot-password"
+                    className="text-[0.75rem] font-medium transition-colors"
+                    style={{ color: "#FF6A00" }}
+                    tabIndex={-1}
+                  >
+                    Passwort vergessen?
+                  </a>
+                </div>
 
                 <input
                   id="password"
