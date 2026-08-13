@@ -48,6 +48,37 @@ vi.mock("../InboardLivePreview", () => ({
   ),
 }));
 
+// Mock the canvas so existing tests can keep testing the 3-panel shell
+// without needing pointer-event / ResizeObserver infrastructure.
+vi.mock("../designer/InboardDesignerCanvas", () => ({
+  InboardDesignerCanvas: ({
+    headerConfig,
+    announcement,
+    mode,
+    selectedWidget,
+    onWidgetSelect,
+    onLayoutChange,
+  }: Record<string, unknown>) => (
+    <div
+      data-testid="live-preview-mock"
+      data-mode={String(mode)}
+      data-selected={String(selectedWidget)}
+      data-subtitle-enabled={String((headerConfig as Record<string, unknown>)?.subtitleEnabled)}
+      data-announcement={String((announcement as Record<string, unknown>)?.enabled ?? false)}
+      data-canvas-overlay="true"
+      // Expose callbacks for interaction tests
+      data-on-widget-select={typeof onWidgetSelect === "function" ? "fn" : ""}
+      onClick={() => {
+        // Allow tests to simulate canvas widget selection
+        if (typeof onWidgetSelect === "function") {
+          (onWidgetSelect as (t: string) => void)("ACTIVITIES");
+        }
+      }}
+      data-on-layout-change={typeof onLayoutChange === "function" ? "fn" : ""}
+    />
+  ),
+}));
+
 vi.mock(
   "@/components/infoboard/screen1/AnnouncementTicker",
   () => ({
@@ -376,6 +407,225 @@ describe("InboardDesignerClient — accessibility", () => {
     await waitFor(() => {
       expect(activitiesItem.getAttribute("aria-pressed")).toBe("true");
       expect(headerItem.getAttribute("aria-pressed")).toBe("false");
+    });
+  });
+});
+
+// ── Designer-02: Edit / Preview mode ─────────────────────────────────────────
+
+describe("InboardDesignerClient — Edit/Preview mode toggle", () => {
+  it("renders Bearbeiten and Vorschau buttons", async () => {
+    await renderDesigner();
+    expect(screen.getByTestId("mode-btn-edit")).toBeTruthy();
+    expect(screen.getByTestId("mode-btn-preview")).toBeTruthy();
+  });
+
+  it("Bearbeiten is pressed by default", async () => {
+    await renderDesigner();
+    const editBtn = screen.getByTestId("mode-btn-edit");
+    expect(editBtn.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("clicking Vorschau switches mode", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("mode-btn-preview"));
+    await waitFor(() => {
+      expect(screen.getByTestId("mode-btn-preview").getAttribute("aria-pressed")).toBe("true");
+      expect(screen.getByTestId("mode-btn-edit").getAttribute("aria-pressed")).toBe("false");
+    });
+  });
+
+  it("canvas receives mode=preview when Vorschau is active", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("mode-btn-preview"));
+    await waitFor(() => {
+      const canvas = screen.getByTestId("live-preview-mock");
+      expect(canvas.getAttribute("data-mode")).toBe("preview");
+    });
+  });
+
+  it("canvas receives mode=edit when Bearbeiten is active", async () => {
+    await renderDesigner();
+    // Default is edit
+    const canvas = screen.getByTestId("live-preview-mock");
+    expect(canvas.getAttribute("data-mode")).toBe("edit");
+  });
+
+  it("switching back to Bearbeiten restores edit mode", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("mode-btn-preview"));
+    fireEvent.click(screen.getByTestId("mode-btn-edit"));
+    await waitFor(() => {
+      expect(screen.getByTestId("mode-btn-edit").getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+});
+
+// ── Designer-02: Canvas ↔ palette ↔ settings selection sync ──────────────────
+
+describe("InboardDesignerClient — selection sync", () => {
+  it("canvas selection syncs to palette (canvas click selects ACTIVITIES)", async () => {
+    await renderDesigner();
+    // Canvas mock fires onWidgetSelect("ACTIVITIES") on click
+    fireEvent.click(screen.getByTestId("live-preview-mock"));
+    await waitFor(() => {
+      const activitiesItem = screen.getByTestId("widget-palette-item-activities");
+      expect(activitiesItem.getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+
+  it("palette selection syncs to settings panel header", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("widget-palette-item-announcement"));
+    await waitFor(() => {
+      expect(screen.getByText(/Hinweisleiste aktivieren/)).toBeTruthy();
+    });
+  });
+
+  it("canvas receives the selected widget from palette click", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("widget-palette-item-announcement"));
+    await waitFor(() => {
+      const canvas = screen.getByTestId("live-preview-mock");
+      expect(canvas.getAttribute("data-selected")).toBe("ANNOUNCEMENT");
+    });
+  });
+});
+
+// ── Designer-02: Enable / Disable ─────────────────────────────────────────────
+
+describe("InboardDesignerClient — enable/disable widget", () => {
+  it("disabling ANNOUNCEMENT marks dirty", async () => {
+    const savedLayout = {
+      version: 1,
+      widgets: [
+        {
+          id: "w-header", type: "HEADER", enabled: true,
+          position: { col: 0, row: 0 }, width: 12, height: 1,
+          variant: "default",
+          settings: { subtitleEnabled: true, subtitleText: null, showTime: true, showDate: true },
+        },
+        {
+          id: "w-activities", type: "ACTIVITIES", enabled: true,
+          position: { col: 0, row: 1 }, width: 12, height: 8,
+          variant: "default", settings: {},
+        },
+        {
+          id: "w-announcement", type: "ANNOUNCEMENT", enabled: true,
+          position: { col: 0, row: 9 }, width: 12, height: 1,
+          variant: "default",
+          settings: { text: "Test", bgColor: null, textColor: null },
+        },
+      ],
+    };
+    await renderDesigner({ layoutJson: JSON.stringify(savedLayout), announcementEnabled: true });
+
+    // Select announcement widget first
+    fireEvent.click(screen.getByTestId("widget-palette-item-announcement"));
+
+    // Toggle the enable/disable switch
+    const toggleSwitch = screen.getByRole("switch", { name: /Hinweisleiste/ });
+    fireEvent.click(toggleSwitch);
+
+    await waitFor(() => {
+      expect(screen.getByText("Ungespeichert")).toBeTruthy();
+    });
+  });
+
+  it("enabling a disabled widget selects it in the palette", async () => {
+    await renderDesigner({ announcementEnabled: false });
+
+    // Select announcement
+    fireEvent.click(screen.getByTestId("widget-palette-item-announcement"));
+
+    // Announcement is disabled; toggle to enable
+    const toggleSwitch = screen.getByRole("switch", { name: /Hinweisleiste/ });
+    fireEvent.click(toggleSwitch);
+
+    await waitFor(() => {
+      // After enabling, announcement should be selected
+      const annItem = screen.getByTestId("widget-palette-item-announcement");
+      expect(annItem.getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+
+  it("ACTIVITIES toggle is locked (cannot disable)", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("widget-palette-item-activities"));
+    const toggle = screen.getByRole("switch", { name: /Tagesübersicht/ });
+    expect((toggle as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+// ── Designer-02: Layout reset ─────────────────────────────────────────────────
+
+describe("InboardDesignerClient — layout reset", () => {
+  it("renders 'Layout zurücksetzen' button", async () => {
+    await renderDesigner();
+    expect(screen.getByTestId("layout-reset-button")).toBeTruthy();
+  });
+
+  it("clicking reset shows confirmation UI", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("layout-reset-button"));
+    await waitFor(() => {
+      expect(screen.getByTestId("layout-reset-confirm")).toBeTruthy();
+      expect(screen.getByTestId("layout-reset-cancel")).toBeTruthy();
+    });
+  });
+
+  it("cancelling reset hides confirmation UI", async () => {
+    await renderDesigner();
+    fireEvent.click(screen.getByTestId("layout-reset-button"));
+    fireEvent.click(screen.getByTestId("layout-reset-cancel"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("layout-reset-confirm")).toBeNull();
+    });
+  });
+
+  it("confirming reset marks dirty", async () => {
+    const savedLayout = {
+      version: 1,
+      widgets: [
+        {
+          id: "w-header", type: "HEADER", enabled: true,
+          position: { col: 0, row: 0 }, width: 12, height: 1,
+          variant: "default",
+          settings: { subtitleEnabled: true, subtitleText: null, showTime: true, showDate: true },
+        },
+        {
+          id: "w-activities", type: "ACTIVITIES", enabled: true,
+          position: { col: 0, row: 1 }, width: 12, height: 8,
+          variant: "default", settings: {},
+        },
+        {
+          id: "w-announcement", type: "ANNOUNCEMENT", enabled: false,
+          position: { col: 0, row: 9 }, width: 12, height: 1,
+          variant: "default", settings: { text: null, bgColor: null, textColor: null },
+        },
+      ],
+    };
+    await renderDesigner({ layoutJson: JSON.stringify(savedLayout) });
+
+    fireEvent.click(screen.getByTestId("layout-reset-button"));
+    fireEvent.click(screen.getByTestId("layout-reset-confirm"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Ungespeichert")).toBeTruthy();
+    });
+  });
+
+  it("reset selects HEADER widget", async () => {
+    await renderDesigner();
+    // First select ACTIVITIES
+    fireEvent.click(screen.getByTestId("widget-palette-item-activities"));
+
+    fireEvent.click(screen.getByTestId("layout-reset-button"));
+    fireEvent.click(screen.getByTestId("layout-reset-confirm"));
+
+    await waitFor(() => {
+      const headerItem = screen.getByTestId("widget-palette-item-header");
+      expect(headerItem.getAttribute("aria-pressed")).toBe("true");
     });
   });
 });
