@@ -491,8 +491,8 @@ export async function runConsolidation(
         }
 
         for (const ur of dup.userRoles) {
-          const existing = await tx.userRole.findUnique({
-            where: { userId_roleId: { userId: ur.userId, roleId: canonical.id } },
+          const existing = await tx.userRole.findFirst({
+            where: { userId: ur.userId, roleId: canonical.id, orgUnitId: null },
             select: { id: true },
           });
           if (!existing) {

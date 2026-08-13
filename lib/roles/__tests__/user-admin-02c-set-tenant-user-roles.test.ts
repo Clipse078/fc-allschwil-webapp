@@ -129,8 +129,8 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     expect(result.assigned).toEqual([role.name]);
     expect(result.removed).toEqual([]);
 
-    const ur = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+    const ur = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: role.id, orgUnitId: null },
     });
     expect(ur).not.toBeNull();
     expect(ur?.tenantId).toBe(tenantA.id);
@@ -155,13 +155,13 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     expect(result.removed).toEqual([roleToRemove.name]);
     expect(result.assigned).toEqual([]);
 
-    const removed = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: roleToRemove.id } },
+    const removed = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: roleToRemove.id, orgUnitId: null },
     });
     expect(removed).toBeNull();
 
-    const kept = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: roleToKeep.id } },
+    const kept = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: roleToKeep.id, orgUnitId: null },
     });
     expect(kept).not.toBeNull();
   });
@@ -228,8 +228,8 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     });
 
     expect(result.assigned).toEqual([role.name]);
-    const ur = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+    const ur = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: role.id, orgUnitId: null },
     });
     expect(ur).not.toBeNull();
   });
@@ -249,8 +249,8 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     });
 
     expect(result.removed).toEqual([role.name]);
-    const ur = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+    const ur = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: role.id, orgUnitId: null },
     });
     expect(ur).toBeNull();
   });
@@ -339,8 +339,8 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     });
 
     expect(result.removed).toEqual(["Club Admin"]);
-    const ur = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: userA.id, roleId: caRole.id } },
+    const ur = await prisma.userRole.findFirst({
+      where: { userId: userA.id, roleId: caRole.id, orgUnitId: null },
     });
     expect(ur).toBeNull();
   });
@@ -365,8 +365,8 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     });
 
     expect(result.removed).toEqual([systemRole.name]);
-    const ur = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: systemRole.id } },
+    const ur = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: systemRole.id, orgUnitId: null },
     });
     expect(ur).toBeNull();
   });
@@ -409,8 +409,8 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
       actorUserId: "actor-test",
     });
 
-    const tenantBAssignment = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: roleB.id } },
+    const tenantBAssignment = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: roleB.id, orgUnitId: null },
     });
     expect(tenantBAssignment).not.toBeNull();
     expect(tenantBAssignment?.tenantId).toBe(tenantB.id);

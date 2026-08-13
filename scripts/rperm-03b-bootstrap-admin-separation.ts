@@ -1081,8 +1081,8 @@ export async function runExecute(
     result.platformUserId = platformUser.id;
 
     // Step 6: Assign super_admin role (platform, tenantId=null)
-    const existingPlatformRole = await tx.userRole.findUnique({
-      where: { userId_roleId: { userId: platformUser.id, roleId: superAdminRole.id } },
+    const existingPlatformRole = await tx.userRole.findFirst({
+      where: { userId: platformUser.id, roleId: superAdminRole.id, orgUnitId: null },
       select: { id: true, tenantId: true },
     });
 
@@ -1170,9 +1170,11 @@ export async function runExecute(
     }
 
     // Step 10: Assign tenant Club Admin role
-    const existingClubAdminRole = await tx.userRole.findUnique({
+    const existingClubAdminRole = await tx.userRole.findFirst({
       where: {
-        userId_roleId: { userId: clubAdminUser.id, roleId: tenantClubAdminRole.id },
+        userId: clubAdminUser.id,
+        roleId: tenantClubAdminRole.id,
+        orgUnitId: null,
       },
       select: { id: true, tenantId: true },
     });
@@ -1236,8 +1238,8 @@ export async function runExecute(
     });
 
     // Postcondition 3: Platform user has super_admin assignment
-    const platformSuperAdminAssignment = await tx.userRole.findUnique({
-      where: { userId_roleId: { userId: platformUser.id, roleId: superAdminRole.id } },
+    const platformSuperAdminAssignment = await tx.userRole.findFirst({
+      where: { userId: platformUser.id, roleId: superAdminRole.id, orgUnitId: null },
       select: { id: true, tenantId: true },
     });
     result.postconditions.push({
@@ -1294,9 +1296,11 @@ export async function runExecute(
     });
 
     // Postcondition 8: Club admin has tenant Club Admin role
-    const clubAdminRoleAssignment = await tx.userRole.findUnique({
+    const clubAdminRoleAssignment = await tx.userRole.findFirst({
       where: {
-        userId_roleId: { userId: clubAdminUser.id, roleId: tenantClubAdminRole.id },
+        userId: clubAdminUser.id,
+        roleId: tenantClubAdminRole.id,
+        orgUnitId: null,
       },
       select: { id: true, tenantId: true },
     });
