@@ -498,6 +498,7 @@ describe("token security invariants", () => {
 
 describe("password-reset email content", () => {
   const RESET_URL = "https://stage.sportclubevo.app/reset-password?token=abc123";
+  const APP_BASE_URL = "https://stage.sportclubevo.app";
   const EXPIRY = 60;
 
   let email: ReturnType<typeof buildPasswordResetEmail>;
@@ -507,6 +508,7 @@ describe("password-reset email content", () => {
       resetUrl: RESET_URL,
       recipientEmail: "user@example.com",
       expiryMinutes: EXPIRY,
+      appBaseUrl: APP_BASE_URL,
     });
   });
 
@@ -551,5 +553,21 @@ describe("password-reset email content", () => {
 
   it("PR-23: HTML is lang=de (German)", () => {
     expect(email.html).toContain('lang="de"');
+  });
+
+  it("PR-23: HTML contains logo <img> tag with alt=SportClubEvo", () => {
+    expect(email.html).toMatch(/<img[^>]+alt="SportClubEvo"/);
+  });
+
+  it("PR-23: logo src is an absolute HTTPS URL derived from appBaseUrl", () => {
+    const match = email.html.match(/<img[^>]+src="([^"]+)"/);
+    expect(match).not.toBeNull();
+    const src = match![1];
+    expect(src).toBe(`${APP_BASE_URL}/images/branding/sportclubevo_logo.png`);
+    expect(src).toMatch(/^https:\/\//);
+  });
+
+  it("PR-23: logo src does not contain localhost", () => {
+    expect(email.html).not.toMatch(/src="[^"]*localhost/);
   });
 });

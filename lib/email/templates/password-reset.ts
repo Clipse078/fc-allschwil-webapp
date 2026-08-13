@@ -9,6 +9,11 @@ export type PasswordResetEmailData = {
   resetUrl: string;
   recipientEmail: string;
   expiryMinutes: number;
+  /** Absolute HTTPS base URL (e.g. "https://clubmanager.fcallschwil.ch").
+   *  Used to build the absolute logo image URL for email clients.
+   *  Must not end with a slash. Omit only in unit-test contexts where
+   *  the template is validated without a running deployment. */
+  appBaseUrl?: string;
 };
 
 export function buildPasswordResetEmail(data: PasswordResetEmailData): {
@@ -16,7 +21,13 @@ export function buildPasswordResetEmail(data: PasswordResetEmailData): {
   html: string;
   text: string;
 } {
-  const { resetUrl, expiryMinutes } = data;
+  const { resetUrl, expiryMinutes, appBaseUrl } = data;
+
+  // Absolute logo URL — required for email clients (no relative paths allowed).
+  // Falls back to an empty string only when appBaseUrl is absent (test contexts).
+  const logoUrl = appBaseUrl
+    ? `${appBaseUrl}/images/branding/sportclubevo_logo.png`
+    : "";
 
   const subject = "Passwort zurücksetzen — SportClubEvo";
 
@@ -35,10 +46,14 @@ export function buildPasswordResetEmail(data: PasswordResetEmailData): {
 
           <!-- Header -->
           <tr>
-            <td style="padding:32px 40px 24px;border-bottom:1px solid #F3F4F6;">
-              <span style="font-size:1.1rem;font-weight:700;color:#111827;letter-spacing:-0.01em;">
-                SportClub<span style="color:#FF6A00;">Evo</span>
-              </span>
+            <td style="padding:24px 40px;border-bottom:1px solid #F3F4F6;">
+              <img
+                src="${logoUrl}"
+                alt="SportClubEvo"
+                width="147"
+                height="32"
+                style="display:block;width:147px;height:32px;border:0;outline:none;"
+              />
             </td>
           </tr>
 
