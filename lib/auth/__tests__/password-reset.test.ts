@@ -22,6 +22,8 @@
  *   PR-19  missing EMAIL_FROM throws MailConfigurationError
  *   PR-20  missing APP_BASE_URL causes internal error (opaque external response)
  *   PR-21  sendMail never logs raw token or reset URL
+ *   PR-22  localhost URL rejected by requireAppBaseUrl
+ *   PR-23  password-reset email contains branding, expiry, CTA, ignore notice
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -36,6 +38,7 @@ import {
 import { verifyPassword } from "../password";
 import { checkRateLimit } from "../rate-limit";
 import { sendMail, MailConfigurationError } from "../../email/mailer";
+import { buildPasswordResetEmail } from "../../email/templates/password-reset";
 
 // ── Prisma mock helpers ─────────────────────────────────────────────────────
 
@@ -385,73 +388,91 @@ describe("sendMail — mail configuration enforcement", () => {
   });
 });
 
+/**
+ * Mirrors requireAppBaseUrl() from app/api/auth/forgot-password/route.ts.
+ * Tested inline since Next.js route modules require a full server runtime context.
+ * Keep in sync with the route implementation.
+ */
+function requireAppBaseUrl(): string {
+  const url =
+    process.env.APP_BASE_URL?.trim().replace(/\/$/, "") ||
+    process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
+
+  if (!url) {
+    throw new Error(
+      "APP_BASE_URL (or NEXTAUTH_URL) is not configured. Cannot construct password reset URL.",
+    );
+  }
+
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?($|\/)/.test(url)) {
+    throw new Error(
+      "APP_BASE_URL resolves to localhost. Password reset emails require a publicly routable URL.",
+    );
+  }
+
+  return url;
+}
+
 describe("forgot-password route — canonical base URL requirement", () => {
-  /**
-   * PR-20: When neither APP_BASE_URL nor NEXTAUTH_URL is set, the route must
-   * fail internally (no reset URL can be constructed) while returning the
-   * opaque success response externally. This is tested indirectly via the
-   * requireAppBaseUrl() helper extracted from the route.
-   *
-   * We test the helper directly since Next.js route handlers are not trivially
-   * unit-testable without a full runtime mock.
-   */
-  it("PR-20: requireAppBaseUrl throws when both APP_BASE_URL and NEXTAUTH_URL are absent", () => {
-    const originalAppBaseUrl = process.env.APP_BASE_URL;
-    const originalNextauthUrl = process.env.NEXTAUTH_URL;
+  const savedEnv: Record<string, string | undefined> = {};
 
-    try {
+  beforeEach(() => {
+    savedEnv.APP_BASE_URL = process.env.APP_BASE_URL;
+    savedEnv.NEXTAUTH_URL = process.env.NEXTAUTH_URL;
+    delete process.env.APP_BASE_URL;
+    delete process.env.NEXTAUTH_URL;
+  });
+
+  afterEach(() => {
+    if (savedEnv.APP_BASE_URL !== undefined) {
+      process.env.APP_BASE_URL = savedEnv.APP_BASE_URL;
+    } else {
       delete process.env.APP_BASE_URL;
+    }
+    if (savedEnv.NEXTAUTH_URL !== undefined) {
+      process.env.NEXTAUTH_URL = savedEnv.NEXTAUTH_URL;
+    } else {
       delete process.env.NEXTAUTH_URL;
-
-      // Inline the helper logic to test it without importing the route module
-      // (route modules require Next.js server context).
-      const requireAppBaseUrl = () => {
-        const url =
-          process.env.APP_BASE_URL?.trim().replace(/\/$/, "") ||
-          process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
-        if (!url) {
-          throw new Error(
-            "APP_BASE_URL (or NEXTAUTH_URL) is not configured. Cannot construct password reset URL.",
-          );
-        }
-        return url;
-      };
-
-      expect(() => requireAppBaseUrl()).toThrow(/APP_BASE_URL.*not configured/);
-    } finally {
-      if (originalAppBaseUrl !== undefined) process.env.APP_BASE_URL = originalAppBaseUrl;
-      if (originalNextauthUrl !== undefined) process.env.NEXTAUTH_URL = originalNextauthUrl;
     }
   });
 
-  it("PR-20: requireAppBaseUrl returns APP_BASE_URL when set", () => {
-    const originalAppBaseUrl = process.env.APP_BASE_URL;
+  it("PR-20: throws when both APP_BASE_URL and NEXTAUTH_URL are absent", () => {
+    expect(() => requireAppBaseUrl()).toThrow(/APP_BASE_URL.*not configured/);
+  });
+
+  it("PR-20: returns APP_BASE_URL when set to a routable URL", () => {
     process.env.APP_BASE_URL = "https://stage.sportclubevo.app";
-
-    try {
-      const url =
-        process.env.APP_BASE_URL?.trim().replace(/\/$/, "") ||
-        process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
-      expect(url).toBe("https://stage.sportclubevo.app");
-    } finally {
-      if (originalAppBaseUrl !== undefined) {
-        process.env.APP_BASE_URL = originalAppBaseUrl;
-      } else {
-        delete process.env.APP_BASE_URL;
-      }
-    }
+    expect(requireAppBaseUrl()).toBe("https://stage.sportclubevo.app");
   });
 
-  it("PR-20: localhost is never used as production reset URL base", () => {
-    // Verify that the route does not contain a localhost fallback string.
-    // This is a static code assertion via the known route implementation.
-    const routeSource = `
-      const appBaseUrl =
-        process.env.APP_BASE_URL?.trim().replace(/\\/$/, "") ||
-        process.env.NEXTAUTH_URL?.trim().replace(/\\/$/, "");
-      if (!appBaseUrl) throw new Error("...");
-    `;
-    expect(routeSource).not.toContain("localhost");
+  it("PR-20: falls back to NEXTAUTH_URL when APP_BASE_URL is absent", () => {
+    process.env.NEXTAUTH_URL = "https://fcallschwil.sportclubevo.com";
+    expect(requireAppBaseUrl()).toBe("https://fcallschwil.sportclubevo.com");
+  });
+
+  it("PR-20: strips trailing slash from APP_BASE_URL", () => {
+    process.env.APP_BASE_URL = "https://stage.sportclubevo.app/";
+    expect(requireAppBaseUrl()).toBe("https://stage.sportclubevo.app");
+  });
+
+  it("PR-22: throws when APP_BASE_URL is localhost (http)", () => {
+    process.env.APP_BASE_URL = "http://localhost:3000";
+    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
+  });
+
+  it("PR-22: throws when APP_BASE_URL is localhost (https)", () => {
+    process.env.APP_BASE_URL = "https://localhost";
+    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
+  });
+
+  it("PR-22: throws when APP_BASE_URL is 127.0.0.1", () => {
+    process.env.APP_BASE_URL = "http://127.0.0.1:3000";
+    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
+  });
+
+  it("PR-22: throws when NEXTAUTH_URL falls back to localhost", () => {
+    process.env.NEXTAUTH_URL = "http://localhost:3000";
+    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
   });
 });
 
@@ -472,5 +493,63 @@ describe("token security invariants", () => {
     // Raw token must not appear to be a SHA-256 hex string itself
     // (it's a random hex, but 64 chars — this just documents the distinction).
     expect(storedHash).toBe(hashResetToken(rawToken));
+  });
+});
+
+describe("password-reset email content", () => {
+  const RESET_URL = "https://stage.sportclubevo.app/reset-password?token=abc123";
+  const EXPIRY = 60;
+
+  let email: ReturnType<typeof buildPasswordResetEmail>;
+
+  beforeEach(() => {
+    email = buildPasswordResetEmail({
+      resetUrl: RESET_URL,
+      recipientEmail: "user@example.com",
+      expiryMinutes: EXPIRY,
+    });
+  });
+
+  it("PR-23: subject contains SportClubEvo branding", () => {
+    expect(email.subject).toContain("SportClubEvo");
+  });
+
+  it("PR-23: subject references password reset", () => {
+    expect(email.subject.toLowerCase()).toMatch(/passwort/);
+  });
+
+  it("PR-23: HTML contains SportClubEvo branding", () => {
+    expect(email.html).toContain("SportClubEvo");
+  });
+
+  it("PR-23: HTML contains the reset CTA link", () => {
+    expect(email.html).toContain(RESET_URL);
+  });
+
+  it("PR-23: HTML contains 60-minute expiry indication", () => {
+    expect(email.html).toContain("60");
+    expect(email.html.toLowerCase()).toMatch(/minut/);
+  });
+
+  it("PR-23: HTML contains ignore-this-email notice", () => {
+    // Must tell user to ignore if they did not request the reset.
+    expect(email.html.toLowerCase()).toMatch(/ignorier|nicht angefordert/);
+  });
+
+  it("PR-23: plain-text version contains reset URL", () => {
+    expect(email.text).toContain(RESET_URL);
+  });
+
+  it("PR-23: plain-text version contains expiry indication", () => {
+    expect(email.text).toContain("60");
+    expect(email.text.toLowerCase()).toMatch(/minut/);
+  });
+
+  it("PR-23: plain-text version contains ignore notice", () => {
+    expect(email.text.toLowerCase()).toMatch(/ignorier|nicht angefordert/);
+  });
+
+  it("PR-23: HTML is lang=de (German)", () => {
+    expect(email.html).toContain('lang="de"');
   });
 });

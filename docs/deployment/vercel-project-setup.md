@@ -32,13 +32,13 @@ Set these in both Vercel projects with project-specific values:
 - `DATABASE_URL`
 - `DIRECT_URL`
 
+Required for password reset (USER-ADMIN-01):
+
+- `RESEND_API_KEY` — Resend API key (re_...) from resend.com
+- `EMAIL_FROM` — Verified sender; production value: `SportClubEvo <noreply@mail.sportclubevo.com>`
+
 Optional now, likely needed later:
 
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_USER`
-- `SMTP_PASSWORD`
-- `SMTP_FROM`
 - `CRON_SECRET`
 - `TWILIO_ACCOUNT_SID`
 - `TWILIO_AUTH_TOKEN`

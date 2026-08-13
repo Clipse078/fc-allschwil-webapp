@@ -4,8 +4,21 @@
  * Required server-side environment variables (never NEXT_PUBLIC_):
  *
  *   RESEND_API_KEY   Resend API key (re_...) from resend.com
- *   EMAIL_FROM       Sender address, e.g. "SportClubEvo <noreuter@yourdomain.com>"
- *                    Domain must be verified in the Resend dashboard.
+ *   EMAIL_FROM       Verified sender address.
+ *                    Production canonical value:
+ *                      SportClubEvo <noreply@mail.sportclubevo.com>
+ *                    The sending domain (mail.sportclubevo.com) must be
+ *                    verified in the Resend dashboard with SPF, DKIM,
+ *                    and the optional Resend CNAME tracking record.
+ *
+ * TRACKING (click / open):
+ *   The Resend SDK v6 does not expose per-email tracking toggles —
+ *   these are domain-level settings only.
+ *   Operator action required to disable tracking:
+ *     1. Go to Resend dashboard → Domains → mail.sportclubevo.com → Settings.
+ *     2. Disable "Click Tracking" and "Open Tracking".
+ *   This applies to all emails sent from the domain, including password-reset.
+ *   No code change can substitute for this dashboard action.
  *
  * Missing configuration throws MailConfigurationError — the caller is
  * responsible for treating this as an operational failure while keeping

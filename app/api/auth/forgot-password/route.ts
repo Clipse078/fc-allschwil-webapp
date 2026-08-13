@@ -40,7 +40,13 @@ function getClientIp(req: NextRequest): string {
 /**
  * Returns the canonical application base URL from environment configuration.
  * Prefers APP_BASE_URL, falls back to NEXTAUTH_URL.
- * Throws if neither is configured so the caller can log the operational failure.
+ *
+ * Throws if:
+ *   - Neither APP_BASE_URL nor NEXTAUTH_URL is configured.
+ *   - The resolved URL points to localhost or 127.0.0.1 (not a routable
+ *     production URL; reset links sent to that address are unusable).
+ *
+ * The caller must catch and log the error; the external response stays opaque.
  */
 function requireAppBaseUrl(): string {
   const url =
@@ -50,6 +56,12 @@ function requireAppBaseUrl(): string {
   if (!url) {
     throw new Error(
       "APP_BASE_URL (or NEXTAUTH_URL) is not configured. Cannot construct password reset URL.",
+    );
+  }
+
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?($|\/)/.test(url)) {
+    throw new Error(
+      "APP_BASE_URL resolves to localhost. Password reset emails require a publicly routable URL.",
     );
   }
 
