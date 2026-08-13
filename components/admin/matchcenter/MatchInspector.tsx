@@ -361,10 +361,16 @@ export function MatchInspector({
           </div>
         )}
 
-        {/* ── Away match note (§15 — generic, no hardcoded tenant name) ─── */}
-        {isAway && (
-          <div className="rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text-2)]">
-            Auswärtsspiel — keine Heimressourcen erforderlich.
+        {/* ── Away match: venue context only (no explanatory copy — C2) ─── */}
+        {isAway && match.location && (
+          <div className="space-y-1">
+            <h3 className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
+              Auswärtsspiel
+            </h3>
+            <div className="flex items-start gap-2 text-sm">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden="true" />
+              <span className="text-[var(--foreground)]">{match.location}</span>
+            </div>
           </div>
         )}
       </div>
