@@ -34,6 +34,12 @@ type MatchcenterOverviewProps = {
   canManage?: boolean;
   /** Current month param — used to build "Heute" navigation link. */
   currentMonthParam?: string;
+  /**
+   * Canonical tenant/club logo URL (Tenant.logoUrl).
+   * Threaded to MatchCard, MatchInspector, and MatchcenterResultRow for
+   * own-club identity resolution — MATCHCENTER-UX-03-C1.
+   */
+  tenantLogoUrl?: string | null;
 };
 
 const TABS: { key: MatchcenterTab; label: string }[] = [
@@ -88,6 +94,7 @@ export default function MatchcenterOverview({
   locale = "de-CH",
   canManage = false,
   currentMonthParam,
+  tenantLogoUrl = null,
 }: MatchcenterOverviewProps) {
   const viewModel = buildMatchcenterViewModel(matches, {
     actionFilter,
@@ -314,6 +321,7 @@ export default function MatchcenterOverview({
               locale={locale}
               timezone={timezone}
               canManage={canManage}
+              tenantLogoUrl={tenantLogoUrl}
             />
           )}
         </>
@@ -371,6 +379,7 @@ export default function MatchcenterOverview({
                     match={match}
                     locale={locale}
                     timezone={timezone}
+                    tenantLogoUrl={tenantLogoUrl}
                   />
                 ))}
               </div>

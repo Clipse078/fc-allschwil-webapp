@@ -1,19 +1,22 @@
 "use client";
 
 /**
- * MatchInspector — MATCHCENTER-UX-03 §10
+ * MatchInspector — MATCHCENTER-UX-03-C1
  *
  * Context-preserving right-side inspector panel for match detail review.
- * Uses the existing SCE Sheet primitive. Operators can inspect a match
- * without losing their position in the month list.
+ * Uses the existing SCE Sheet primitive.
  *
- * Contains:
- *  - Large club identities (bare logos, 80px)
- *  - VS / result
- *  - Competition, date/time, venue, home/away
- *  - Operational readiness / allocations
- *  - Wochenplan state
- *  - "Match bearbeiten" link (routes to canonical detail page)
+ * Visual top section:
+ *   [OWN-CLUB LOGO]     VS / result     [OPPONENT LOGO]
+ *   Team name                           Team name
+ *   Date · kickoff
+ *   Venue
+ *
+ * Own-club identity: resolveClubIdentityLogoUrl() — same canonical rule as
+ * MatchCard. Internal teams show the tenant/club logo; external opponents show
+ * the Club Directory logo.
+ *
+ * Note: hardcoded "FCA-Ressourcen" reference removed — §15 generic away note.
  */
 
 import Link from "next/link";
@@ -31,6 +34,7 @@ import {
 } from "lucide-react";
 import { Sheet } from "@/components/ui/Sheet";
 import { ClubLogo } from "@/components/admin/club-directory/ClubLogo";
+import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
 import { resolveMatchcenterCompactSideName } from "@/lib/matchcenter/team-display";
 import { getMatchcenterResultLabel, isMatchLive } from "@/lib/matchcenter/match-lifecycle";
 import { assessMatchOperationalState } from "@/lib/matchcenter/operational-state";
@@ -96,10 +100,21 @@ type MatchInspectorProps = {
   match: MatchcenterMatchSummary | null;
   locale: string;
   timezone: string;
+  /**
+   * Canonical tenant/club logo URL (Tenant.logoUrl).
+   * Passed from the page server component via MatchcenterWochenplanBulkPanel.
+   */
+  tenantLogoUrl?: string | null;
   onClose: () => void;
 };
 
-export function MatchInspector({ match, locale, timezone, onClose }: MatchInspectorProps) {
+export function MatchInspector({
+  match,
+  locale,
+  timezone,
+  tenantLogoUrl = null,
+  onClose,
+}: MatchInspectorProps) {
   if (!match) return null;
 
   const homeName = resolveMatchcenterCompactSideName(match.home);
@@ -110,6 +125,10 @@ export function MatchInspector({ match, locale, timezone, onClose }: MatchInspec
   const live = isMatchLive(match);
   const result = getMatchcenterResultLabel(match);
   const assessment = assessMatchOperationalState(match);
+
+  // Canonical logo resolution — same rule as MatchCard
+  const homeLogoUrl = resolveClubIdentityLogoUrl(match.home, tenantLogoUrl);
+  const awayLogoUrl = resolveClubIdentityLogoUrl(match.away, tenantLogoUrl);
 
   const dateStr = formatDateTime(match.startAt, locale, timezone);
   const meetingTimeStr = match.operational.meetingTime
@@ -178,37 +197,39 @@ export function MatchInspector({ match, locale, timezone, onClose }: MatchInspec
       footer={footer}
     >
       <div className="space-y-6">
-        {/* ── Club identity ──────────────────────────────────────────────── */}
-        <div className="flex items-center justify-around gap-4 rounded-xl bg-[var(--surface-2)] px-4 py-5">
-          {/* Home */}
-          <div className="flex flex-1 flex-col items-center gap-2 text-center">
+        {/* ── Club identity — dominant, bare logos, 80px ──────────────────── */}
+        <div className="flex items-center justify-around gap-4 pt-2">
+          {/* Home identity */}
+          <div className="flex flex-1 flex-col items-center gap-3 text-center">
             <ClubLogo
-              logoUrl={match.home.externalLogoUrl ?? null}
+              logoUrl={homeLogoUrl}
               name={homeName}
               size="xl"
               bare
             />
             <span
               className={cn(
-                "text-sm leading-tight",
-                match.home.isOwnTeam ? "font-semibold text-[var(--foreground)]" : "text-[var(--text-2)]",
+                "text-sm leading-snug",
+                match.home.isOwnTeam
+                  ? "font-semibold text-[var(--foreground)]"
+                  : "text-[var(--text-2)]",
               )}
             >
               {homeName}
             </span>
           </div>
 
-          {/* VS / result */}
+          {/* VS / score */}
           <div className="flex shrink-0 flex-col items-center gap-1">
             {live && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[0.65rem] font-bold text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[0.6rem] font-bold text-white">
                 <Radio className="h-2.5 w-2.5" aria-hidden="true" />
                 Live
               </span>
             )}
             <span
               className={cn(
-                "text-xl font-bold",
+                "text-2xl font-bold",
                 result ? "text-[var(--foreground)]" : "text-[var(--muted)]",
               )}
             >
@@ -216,18 +237,20 @@ export function MatchInspector({ match, locale, timezone, onClose }: MatchInspec
             </span>
           </div>
 
-          {/* Away */}
-          <div className="flex flex-1 flex-col items-center gap-2 text-center">
+          {/* Away identity */}
+          <div className="flex flex-1 flex-col items-center gap-3 text-center">
             <ClubLogo
-              logoUrl={match.away.externalLogoUrl ?? null}
+              logoUrl={awayLogoUrl}
               name={awayName}
               size="xl"
               bare
             />
             <span
               className={cn(
-                "text-sm leading-tight",
-                match.away.isOwnTeam ? "font-semibold text-[var(--foreground)]" : "text-[var(--text-2)]",
+                "text-sm leading-snug",
+                match.away.isOwnTeam
+                  ? "font-semibold text-[var(--foreground)]"
+                  : "text-[var(--text-2)]",
               )}
             >
               {awayName}
@@ -237,7 +260,7 @@ export function MatchInspector({ match, locale, timezone, onClose }: MatchInspec
 
         {/* ── Match details ─────────────────────────────────────────────── */}
         <div className="space-y-3">
-          <h3 className="text-[0.65rem] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">
+          <h3 className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
             Spielinformationen
           </h3>
 
@@ -282,7 +305,7 @@ export function MatchInspector({ match, locale, timezone, onClose }: MatchInspec
 
         {/* ── Wochenplan ────────────────────────────────────────────────── */}
         <div className="space-y-2">
-          <h3 className="text-[0.65rem] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">
+          <h3 className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
             Wochenplan
           </h3>
           <div className="flex items-center gap-2 text-sm">
@@ -304,7 +327,7 @@ export function MatchInspector({ match, locale, timezone, onClose }: MatchInspec
         {isHome && homeReadiness.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-[0.65rem] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">
+              <h3 className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
                 Matchvorbereitung
               </h3>
               <span
@@ -338,10 +361,10 @@ export function MatchInspector({ match, locale, timezone, onClose }: MatchInspec
           </div>
         )}
 
-        {/* ── Away match note ───────────────────────────────────────────── */}
+        {/* ── Away match note (§15 — generic, no hardcoded tenant name) ─── */}
         {isAway && (
           <div className="rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text-2)]">
-            Auswärtsspiel — keine FCA-Ressourcen erforderlich.
+            Auswärtsspiel — keine Heimressourcen erforderlich.
           </div>
         )}
       </div>
