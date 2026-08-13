@@ -1,5 +1,62 @@
 ﻿import { prisma } from "@/lib/db/prisma";
 
+/**
+ * Returns all TenantMembership records for the given tenant, enriched with
+ * user account data and the user's tenant-scoped role assignments.
+ *
+ * Tenant isolation: `tenantId` MUST originate from the authenticated session
+ * (`session.user.activeTenantId`), never from client input.
+ *
+ * Security: passwordHash, reset tokens, and session data are never selected.
+ */
+export async function getTenantUsersListData(tenantId: string) {
+  const memberships = await prisma.tenantMembership.findMany({
+    where: { tenantId },
+    orderBy: [{ isActive: "desc" }, { user: { lastName: "asc" } }],
+    select: {
+      isActive: true,
+      joinedAt: true,
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          isActive: true,
+          lastLoginAt: true,
+          userRoles: {
+            where: { tenantId },
+            select: {
+              role: {
+                select: { id: true, name: true, key: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return memberships.map((m) => ({
+    userId: m.user.id,
+    firstName: m.user.firstName,
+    lastName: m.user.lastName,
+    name: `${m.user.firstName} ${m.user.lastName}`,
+    email: m.user.email,
+    userIsActive: m.user.isActive,
+    membershipIsActive: m.isActive,
+    joinedAt: m.joinedAt,
+    lastLoginAt: m.user.lastLoginAt ?? null,
+    roles: m.user.userRoles.map((ur) => ({
+      id: ur.role.id,
+      name: ur.role.name,
+      key: ur.role.key,
+    })),
+  }));
+}
+
+export type TenantUserItem = Awaited<ReturnType<typeof getTenantUsersListData>>[number];
+
 export async function getUsersListData() {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },

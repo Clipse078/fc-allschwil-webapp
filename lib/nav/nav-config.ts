@@ -344,6 +344,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Administration",
         href: "/dashboard/admin/branding",
         permissionKeys: [
+          PERMISSIONS.USERS_VIEW,
           PERMISSIONS.USERS_MANAGE,
           PERMISSIONS.SEASONS_VIEW,
           PERMISSIONS.SEASONS_MANAGE,
@@ -389,10 +390,14 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
           {
+            // USER-ADMIN-02A: tenant-scoped Benutzer overview.
+            // Gated by USERS_VIEW | USERS_MANAGE so Club Admins with
+            // view-only rights can also reach the page. The page itself
+            // enforces the same live permission check via requireAnyPermission.
             key: "admin-users",
             label: "Benutzer",
-            href: "/dashboard/users",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+            href: "/dashboard/admin/users",
+            permissionKeys: [PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE],
           },
           {
             key: "admin-roles",
