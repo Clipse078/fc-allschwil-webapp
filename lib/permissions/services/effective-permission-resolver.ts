@@ -342,11 +342,15 @@ async function resolveTenantPermissions(
   // ORG-ACCESS-01: orgUnitId: null restricts to tenant-wide assignments only.
   // Scoped assignments (orgUnitId set) carry permissions only within their
   // specific OrgUnit scope and must not bleed into tenant-wide checks.
+  // ORG-ACCESS-01-C1 defense-in-depth: also require scopeMode: null so that
+  // any malformed row with orgUnitId=null + scopeMode set cannot grant
+  // tenant-wide access even if one were somehow persisted.
   const userRoles = await prisma.userRole.findMany({
     where: {
       userId,
       tenantId,
       orgUnitId: null,
+      scopeMode: null,
       role: {
         scope: "TENANT",
         tenantId,

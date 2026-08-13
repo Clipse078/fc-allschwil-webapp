@@ -471,11 +471,13 @@ describe("OrgUnitPermissionResolver.hasPermissionInOrgUnit", () => {
       const resolver = new EffectivePermissionResolver(prisma);
       await resolver.hasPermission({ userId: USER_ID, permission: PERM, tenantId: TENANT_ID });
 
-      // Assert the tenant userRole query includes orgUnitId: null
+      // Assert the tenant userRole query includes orgUnitId: null AND scopeMode: null
+      // (ORG-ACCESS-01-C1: both filters required for malformed-state defense)
       expect(userRoleFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             orgUnitId: null,
+            scopeMode: null,
           }),
         }),
       );

@@ -808,7 +808,7 @@ model UserRole {
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   tenant  Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  orgUnit OrgUnit? @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  orgUnit OrgUnit? @relation(fields: [orgUnitId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([roleId])
   @@index([tenantId])
