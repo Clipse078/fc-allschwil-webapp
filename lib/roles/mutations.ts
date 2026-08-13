@@ -33,6 +33,7 @@ import {
   RoleValidationError,
 } from "@/lib/roles/errors";
 import { findLockedPermissionRemovals, isProtectedRole } from "@/lib/roles/protected";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 const AUDIT_MODULE_KEY = "roles";
 
@@ -494,10 +495,13 @@ export type SetTenantUserRolesResult = {
  *  - All requested role IDs must be TENANT-scoped and owned by `tenantId`;
  *    cross-tenant or PLATFORM role IDs are rejected with RoleNotFoundError.
  *  - Archived roles are rejected (ArchivedRoleError).
- *  - Assignment is blocked for inactive memberships (InactiveMembershipError).
- *  - Removing the last active holder of a protected (isSystem) role is
- *    blocked (LastRequiredAdminError).
- *  - TenantMembership.isActive is never touched.
+ *  - Assignment and removal are permitted regardless of TenantMembership.isActive
+ *    so admins can manage roles for inactive members (preserving roles for later
+ *    reactivation). TenantMembership.isActive is NEVER modified.
+ *  - Only the canonical Club Admin role (`club_admin__<tenantKey>`) is protected
+ *    from last-holder removal (LastRequiredAdminError). All other isSystem roles
+ *    are not last-holder-protected here. Uses getTenantClubAdminRoleKey — no
+ *    fuzzy name matching.
  *  - PLATFORM UserRole records (tenantId: null) and other-tenant assignments
  *    are never touched — only TENANT rows for this exact tenant.
  */
@@ -543,7 +547,7 @@ export async function setTenantUserRoles(
     select: {
       id: true,
       roleId: true,
-      role: { select: { id: true, name: true, isSystem: true } },
+      role: { select: { id: true, key: true, name: true } },
     },
   });
 
@@ -553,26 +557,32 @@ export async function setTenantUserRoles(
   const toAdd = deduped.filter((id) => !currentRoleIds.has(id));
   const toRemove = current.filter((ur) => !requestedSet.has(ur.roleId));
 
-  // 4. Block assignment when membership is inactive (mirrors assignTenantRoleToUser).
-  if (toAdd.length > 0 && !membership.isActive) {
-    throw new InactiveMembershipError();
-  }
-
-  // 5. Last-active-holder guard: check before any write.
-  for (const ur of toRemove) {
-    if (isProtectedRole(ur.role)) {
-      const otherActiveAssignees = await prisma.userRole.count({
-        where: {
-          roleId: ur.roleId,
-          tenantId,
-          userId: { not: userId },
-          user: { tenantMemberships: { some: { tenantId, isActive: true } } },
-        },
-      });
-      if (otherActiveAssignees === 0) {
-        throw new LastRequiredAdminError(
-          `"${ur.role.name}" kann diesem Benutzer nicht entzogen werden — er/sie ist der letzte aktive Träger dieser systemkritischen Rolle in diesem Mandanten.`,
-        );
+  // 4. Last-Club-Admin guard: protect only the canonical Club Admin role
+  //    (`club_admin__<tenantKey>`). Other isSystem roles are not protected here.
+  //    Uses getTenantClubAdminRoleKey — no fuzzy name matching.
+  if (toRemove.length > 0) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { key: true },
+    });
+    if (tenant) {
+      const clubAdminRoleKey = getTenantClubAdminRoleKey(tenant.key);
+      for (const ur of toRemove) {
+        if (ur.role.key === clubAdminRoleKey) {
+          const otherActiveClubAdmins = await prisma.userRole.count({
+            where: {
+              tenantId,
+              userId: { not: userId },
+              role: { key: clubAdminRoleKey },
+              user: { tenantMemberships: { some: { tenantId, isActive: true } } },
+            },
+          });
+          if (otherActiveClubAdmins === 0) {
+            throw new LastRequiredAdminError(
+              `"${ur.role.name}" kann diesem Benutzer nicht entzogen werden — er/sie ist der letzte aktive Club Admin dieses Mandanten.`,
+            );
+          }
+        }
       }
     }
   }

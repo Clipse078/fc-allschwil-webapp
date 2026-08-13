@@ -5,29 +5,34 @@
  * own randomly-suffixed fixtures and tears them down in afterAll.
  *
  * Covers:
- *   SR-01  Lists current tenant roles (read path via getTenantRolesOverview)
- *   SR-02  Assigns a tenant role to a user
+ *   SR-01  getTenantRolesOverview scope: active + archived for this tenant only
+ *   SR-02  Assigns a tenant role to a user with active membership
  *   SR-03  Removes a tenant role from a user
  *   SR-04  Cross-tenant role ID is rejected (RoleNotFoundError)
  *   SR-05  PLATFORM-scoped role ID is rejected (RoleNotFoundError)
  *   SR-06  Cross-tenant user (no TenantMembership) is rejected (RoleUserNotFoundError)
- *   SR-07  Assignment blocked for inactive membership (InactiveMembershipError)
- *   SR-08  Last active holder of a protected (isSystem) role cannot be removed
- *          (LastRequiredAdminError)
- *   SR-09  Removing own last-admin role is blocked when no other active holder
- *   SR-10  Other tenant's TENANT roles are untouched after sync
- *   SR-11  PLATFORM UserRole records are untouched after sync
- *   SR-12  TenantMembership.isActive unchanged after role assignment/removal
- *   SR-13  Duplicate assignment (already-assigned role in roleIds) is idempotent
- *   SR-14  Removal succeeds when another active holder of a protected role exists
+ *   SR-07  Role can be ASSIGNED to inactive membership (no InactiveMembershipError)
+ *   SR-08  Role can be REMOVED from inactive membership
+ *   SR-09  Inactive membership remains inactive after role assignment
+ *   SR-10  Inactive membership remains inactive after role removal
+ *   SR-11  Last canonical Club Admin cannot be removed (LastRequiredAdminError)
+ *   SR-12  Club Admin can be removed when another active Club Admin exists
+ *   SR-13  Last holder of a non-Club-Admin isSystem role CAN be removed
+ *   SR-14  Self removing own last Club Admin role is blocked (no other active CA)
+ *   SR-15  Other tenant's TENANT roles are untouched after sync
+ *   SR-16  PLATFORM UserRole records are untouched after sync
+ *   SR-17  TenantMembership.isActive unchanged after role assignment/removal
+ *          with active membership
+ *   SR-18  Duplicate role in roleIds is idempotent
+ *   SR-19  Archived role in roleIds is rejected (ArchivedRoleError)
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setTenantUserRoles } from "@/lib/roles/mutations";
 import { getTenantRolesOverview } from "@/lib/roles/tenant-queries";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 import {
   ArchivedRoleError,
-  InactiveMembershipError,
   LastRequiredAdminError,
   RoleNotFoundError,
   RoleUserNotFoundError,
@@ -41,6 +46,22 @@ import {
   createTestUser,
   prisma,
 } from "./test-helpers";
+
+/** Creates the canonical Club Admin role for a tenant (matching getTenantClubAdminRoleKey). */
+async function createClubAdminRole(tenantId: string, tenantKey: string) {
+  return prisma.role.upsert({
+    where: { key: getTenantClubAdminRoleKey(tenantKey) },
+    create: {
+      key: getTenantClubAdminRoleKey(tenantKey),
+      name: "Club Admin",
+      scope: "TENANT",
+      tenantId,
+      isSystem: true,
+      isArchived: false,
+    },
+    update: {},
+  });
+}
 
 describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
   let tenantA: { id: string; key: string };
@@ -84,13 +105,10 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     const overview = await getTenantRolesOverview(tenantA.id);
     const ids = overview.map((r) => r.id);
 
-    // Includes both active and archived for this tenant
     expect(ids).toContain(roleA.id);
     expect(ids).toContain(archivedA.id);
-    // Does NOT include other tenants or PLATFORM roles
     expect(ids).not.toContain(roleB.id);
     expect(ids).not.toContain(platformRole.id);
-    // The caller (API route / page) filters archived; verify the flag is present
     const archivedRow = overview.find((r) => r.id === archivedA.id);
     expect(archivedRow?.isArchived).toBe(true);
   });
@@ -123,16 +141,9 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     createdUserIds.push(user.id);
     await createTestMembership(tenantA.id, user.id, true);
     const roleToKeep = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR03 Keep" });
-    const roleToRemove = await createTenantRoleFixture({
-      tenantId: tenantA.id,
-      name: "SR03 Remove",
-    });
+    const roleToRemove = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR03 Remove" });
     await assignUserRoleFixture({ userId: user.id, roleId: roleToKeep.id, tenantId: tenantA.id });
-    await assignUserRoleFixture({
-      userId: user.id,
-      roleId: roleToRemove.id,
-      tenantId: tenantA.id,
-    });
+    await assignUserRoleFixture({ userId: user.id, roleId: roleToRemove.id, tenantId: tenantA.id });
 
     const result = await setTenantUserRoles({
       tenantId: tenantA.id,
@@ -159,10 +170,7 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     const user = await createTestUser("sr04");
     createdUserIds.push(user.id);
     await createTestMembership(tenantA.id, user.id, true);
-    const roleTenantB = await createTenantRoleFixture({
-      tenantId: tenantB.id,
-      name: "SR04 TenantB Role",
-    });
+    const roleTenantB = await createTenantRoleFixture({ tenantId: tenantB.id, name: "SR04 TenantB Role" });
 
     await expect(
       setTenantUserRoles({
@@ -192,7 +200,6 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
   it("SR-06: user with no TenantMembership in this tenant is rejected", async () => {
     const user = await createTestUser("sr06");
     createdUserIds.push(user.id);
-    // No membership in tenantA
     const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR06 Role" });
 
     await expect(
@@ -205,36 +212,106 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     ).rejects.toBeInstanceOf(RoleUserNotFoundError);
   });
 
-  it("SR-07: assigning a role to a user with inactive membership is blocked", async () => {
+  // ── Correction 2: inactive membership allows role changes ─────────────────
+
+  it("SR-07: role can be ASSIGNED to a user with inactive membership", async () => {
     const user = await createTestUser("sr07");
     createdUserIds.push(user.id);
-    await createTestMembership(tenantA.id, user.id, false);
+    await createTestMembership(tenantA.id, user.id, false); // inactive
     const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR07 Role" });
 
-    await expect(
-      setTenantUserRoles({
-        tenantId: tenantA.id,
-        userId: user.id,
-        roleIds: [role.id],
-        actorUserId: "actor-test",
-      }),
-    ).rejects.toBeInstanceOf(InactiveMembershipError);
+    const result = await setTenantUserRoles({
+      tenantId: tenantA.id,
+      userId: user.id,
+      roleIds: [role.id],
+      actorUserId: "actor-test",
+    });
+
+    expect(result.assigned).toEqual([role.name]);
+    const ur = await prisma.userRole.findUnique({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+    });
+    expect(ur).not.toBeNull();
   });
 
-  it("SR-08: removing the last active holder of a protected (isSystem) role is blocked", async () => {
+  it("SR-08: role can be REMOVED from a user with inactive membership", async () => {
     const user = await createTestUser("sr08");
     createdUserIds.push(user.id);
-    await createTestMembership(tenantA.id, user.id, true);
-    const systemRole = await createTenantRoleFixture({
+    await createTestMembership(tenantA.id, user.id, false); // inactive
+    const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR08 Role" });
+    await assignUserRoleFixture({ userId: user.id, roleId: role.id, tenantId: tenantA.id });
+
+    const result = await setTenantUserRoles({
       tenantId: tenantA.id,
-      name: "SR08 System Role",
-      isSystem: true,
+      userId: user.id,
+      roleIds: [],
+      actorUserId: "actor-test",
     });
-    await assignUserRoleFixture({ userId: user.id, roleId: systemRole.id, tenantId: tenantA.id });
+
+    expect(result.removed).toEqual([role.name]);
+    const ur = await prisma.userRole.findUnique({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+    });
+    expect(ur).toBeNull();
+  });
+
+  it("SR-09: inactive membership remains inactive after role assignment", async () => {
+    const user = await createTestUser("sr09");
+    createdUserIds.push(user.id);
+    await createTestMembership(tenantA.id, user.id, false);
+    const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR09 Role" });
+
+    await setTenantUserRoles({
+      tenantId: tenantA.id,
+      userId: user.id,
+      roleIds: [role.id],
+      actorUserId: "actor-test",
+    });
+
+    const mem = await prisma.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId: tenantA.id, userId: user.id } },
+      select: { isActive: true },
+    });
+    expect(mem?.isActive).toBe(false);
+  });
+
+  it("SR-10: inactive membership remains inactive after role removal", async () => {
+    const user = await createTestUser("sr10");
+    createdUserIds.push(user.id);
+    await createTestMembership(tenantA.id, user.id, false);
+    const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR10 Role" });
+    await assignUserRoleFixture({ userId: user.id, roleId: role.id, tenantId: tenantA.id });
+
+    await setTenantUserRoles({
+      tenantId: tenantA.id,
+      userId: user.id,
+      roleIds: [],
+      actorUserId: "actor-test",
+    });
+
+    const mem = await prisma.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId: tenantA.id, userId: user.id } },
+      select: { isActive: true },
+    });
+    expect(mem?.isActive).toBe(false);
+  });
+
+  // ── Correction 1: canonical Club Admin last-holder protection ─────────────
+  // Each test uses its own tenant to avoid key-uniqueness collisions between
+  // tests sharing the same canonical club_admin__<tenantKey> role.
+
+  it("SR-11: removing the last active canonical Club Admin is blocked (LastRequiredAdminError)", async () => {
+    const tenant = await createTestTenant("sr11ca");
+    createdTenantIds.push(tenant.id);
+    const user = await createTestUser("sr11");
+    createdUserIds.push(user.id);
+    await createTestMembership(tenant.id, user.id, true);
+    const caRole = await createClubAdminRole(tenant.id, tenant.key);
+    await assignUserRoleFixture({ userId: user.id, roleId: caRole.id, tenantId: tenant.id });
 
     await expect(
       setTenantUserRoles({
-        tenantId: tenantA.id,
+        tenantId: tenant.id,
         userId: user.id,
         roleIds: [],
         actorUserId: "actor-test",
@@ -242,20 +319,70 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     ).rejects.toBeInstanceOf(LastRequiredAdminError);
   });
 
-  it("SR-09: actor removing own last protected role (no other active holder) is blocked", async () => {
-    const actor = await createTestUser("sr09-actor");
-    createdUserIds.push(actor.id);
-    await createTestMembership(tenantA.id, actor.id, true);
+  it("SR-12: Club Admin can be removed when another active Club Admin exists", async () => {
+    const tenant = await createTestTenant("sr12ca");
+    createdTenantIds.push(tenant.id);
+    const userA = await createTestUser("sr12a");
+    const userB = await createTestUser("sr12b");
+    createdUserIds.push(userA.id, userB.id);
+    await createTestMembership(tenant.id, userA.id, true);
+    await createTestMembership(tenant.id, userB.id, true);
+    const caRole = await createClubAdminRole(tenant.id, tenant.key);
+    await assignUserRoleFixture({ userId: userA.id, roleId: caRole.id, tenantId: tenant.id });
+    await assignUserRoleFixture({ userId: userB.id, roleId: caRole.id, tenantId: tenant.id });
+
+    const result = await setTenantUserRoles({
+      tenantId: tenant.id,
+      userId: userA.id,
+      roleIds: [],
+      actorUserId: "actor-test",
+    });
+
+    expect(result.removed).toEqual(["Club Admin"]);
+    const ur = await prisma.userRole.findUnique({
+      where: { userId_roleId: { userId: userA.id, roleId: caRole.id } },
+    });
+    expect(ur).toBeNull();
+  });
+
+  it("SR-13: last holder of a non-Club-Admin isSystem role CAN be removed", async () => {
+    const user = await createTestUser("sr13");
+    createdUserIds.push(user.id);
+    await createTestMembership(tenantA.id, user.id, true);
     const systemRole = await createTenantRoleFixture({
       tenantId: tenantA.id,
-      name: "SR09 System Role",
+      name: "SR13 Other System Role",
       isSystem: true,
     });
-    await assignUserRoleFixture({ userId: actor.id, roleId: systemRole.id, tenantId: tenantA.id });
+    await assignUserRoleFixture({ userId: user.id, roleId: systemRole.id, tenantId: tenantA.id });
+
+    // No LastRequiredAdminError — this is not the canonical Club Admin role
+    const result = await setTenantUserRoles({
+      tenantId: tenantA.id,
+      userId: user.id,
+      roleIds: [],
+      actorUserId: "actor-test",
+    });
+
+    expect(result.removed).toEqual([systemRole.name]);
+    const ur = await prisma.userRole.findUnique({
+      where: { userId_roleId: { userId: user.id, roleId: systemRole.id } },
+    });
+    expect(ur).toBeNull();
+  });
+
+  it("SR-14: self removing own last Club Admin role is blocked (no other active CA)", async () => {
+    const tenant = await createTestTenant("sr14ca");
+    createdTenantIds.push(tenant.id);
+    const actor = await createTestUser("sr14");
+    createdUserIds.push(actor.id);
+    await createTestMembership(tenant.id, actor.id, true);
+    const caRole = await createClubAdminRole(tenant.id, tenant.key);
+    await assignUserRoleFixture({ userId: actor.id, roleId: caRole.id, tenantId: tenant.id });
 
     await expect(
       setTenantUserRoles({
-        tenantId: tenantA.id,
+        tenantId: tenant.id,
         userId: actor.id,
         roleIds: [],
         actorUserId: actor.id,
@@ -263,20 +390,18 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     ).rejects.toBeInstanceOf(LastRequiredAdminError);
   });
 
-  it("SR-10: TENANT roles from another tenant are untouched after sync", async () => {
-    const user = await createTestUser("sr10");
+  it("SR-15: other tenant's TENANT roles are untouched after sync", async () => {
+    const user = await createTestUser("sr15");
     createdUserIds.push(user.id);
     await createTestMembership(tenantA.id, user.id, true);
     await createTestMembership(tenantB.id, user.id, true);
 
-    const roleA = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR10 TenantA" });
-    const roleB = await createTenantRoleFixture({ tenantId: tenantB.id, name: "SR10 TenantB" });
+    const roleA = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR15 TenantA" });
+    const roleB = await createTenantRoleFixture({ tenantId: tenantB.id, name: "SR15 TenantB" });
 
-    // Assign both roles
     await assignUserRoleFixture({ userId: user.id, roleId: roleA.id, tenantId: tenantA.id });
     await assignUserRoleFixture({ userId: user.id, roleId: roleB.id, tenantId: tenantB.id });
 
-    // Sync tenantA roles to empty — should NOT touch tenantB's assignment
     await setTenantUserRoles({
       tenantId: tenantA.id,
       userId: user.id,
@@ -291,19 +416,17 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     expect(tenantBAssignment?.tenantId).toBe(tenantB.id);
   });
 
-  it("SR-11: PLATFORM UserRole records are untouched after sync", async () => {
-    const user = await createTestUser("sr11");
+  it("SR-16: PLATFORM UserRole records are untouched after sync", async () => {
+    const user = await createTestUser("sr16");
     createdUserIds.push(user.id);
     await createTestMembership(tenantA.id, user.id, true);
 
-    // Assign platform role directly (not via setTenantUserRoles)
     const platformUserRole = await prisma.userRole.create({
       data: { userId: user.id, roleId: platformRole.id, tenantId: null },
     });
 
-    const roleA = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR11 Role" });
+    const roleA = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR16 Role" });
 
-    // Sync tenantA roles (not including the platform role id, which would fail validation anyway)
     await setTenantUserRoles({
       tenantId: tenantA.id,
       userId: user.id,
@@ -316,15 +439,14 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     });
     expect(platformStillAssigned).not.toBeNull();
 
-    // Cleanup platform userRole
     await prisma.userRole.delete({ where: { id: platformUserRole.id } });
   });
 
-  it("SR-12: TenantMembership.isActive is unchanged after role assignment and removal", async () => {
-    const user = await createTestUser("sr12");
+  it("SR-17: TenantMembership.isActive unchanged after role changes with active membership", async () => {
+    const user = await createTestUser("sr17");
     createdUserIds.push(user.id);
     await createTestMembership(tenantA.id, user.id, true);
-    const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR12 Role" });
+    const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR17 Role" });
 
     await setTenantUserRoles({
       tenantId: tenantA.id,
@@ -353,14 +475,13 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     expect(mem?.isActive).toBe(true);
   });
 
-  it("SR-13: duplicate role in roleIds (already assigned) is idempotent — no second UserRole row", async () => {
-    const user = await createTestUser("sr13");
+  it("SR-18: duplicate role in roleIds (already assigned) is idempotent", async () => {
+    const user = await createTestUser("sr18");
     createdUserIds.push(user.id);
     await createTestMembership(tenantA.id, user.id, true);
-    const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR13 Role" });
+    const role = await createTenantRoleFixture({ tenantId: tenantA.id, name: "SR18 Role" });
     await assignUserRoleFixture({ userId: user.id, roleId: role.id, tenantId: tenantA.id });
 
-    // Syncing with the already-assigned role should be a no-op
     const result = await setTenantUserRoles({
       tenantId: tenantA.id,
       userId: user.id,
@@ -371,50 +492,17 @@ describe("USER-ADMIN-02C — setTenantUserRoles (live DB)", () => {
     expect(result.assigned).toEqual([]);
     expect(result.removed).toEqual([]);
 
-    const rows = await prisma.userRole.findMany({
-      where: { userId: user.id, roleId: role.id },
-    });
+    const rows = await prisma.userRole.findMany({ where: { userId: user.id, roleId: role.id } });
     expect(rows).toHaveLength(1);
   });
 
-  it("SR-14: removal succeeds when another active holder of a protected role exists", async () => {
-    const userA = await createTestUser("sr14a");
-    const userB = await createTestUser("sr14b");
-    createdUserIds.push(userA.id, userB.id);
-    await createTestMembership(tenantA.id, userA.id, true);
-    await createTestMembership(tenantA.id, userB.id, true);
-
-    const systemRole = await createTenantRoleFixture({
-      tenantId: tenantA.id,
-      name: "SR14 System Role",
-      isSystem: true,
-    });
-    await assignUserRoleFixture({ userId: userA.id, roleId: systemRole.id, tenantId: tenantA.id });
-    await assignUserRoleFixture({ userId: userB.id, roleId: systemRole.id, tenantId: tenantA.id });
-
-    // userA removes the protected role — allowed because userB still holds it
-    const result = await setTenantUserRoles({
-      tenantId: tenantA.id,
-      userId: userA.id,
-      roleIds: [],
-      actorUserId: "actor-test",
-    });
-
-    expect(result.removed).toEqual([systemRole.name]);
-
-    const ur = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: userA.id, roleId: systemRole.id } },
-    });
-    expect(ur).toBeNull();
-  });
-
-  it("SR-15: archived role in roleIds is rejected (ArchivedRoleError)", async () => {
-    const user = await createTestUser("sr15");
+  it("SR-19: archived role in roleIds is rejected (ArchivedRoleError)", async () => {
+    const user = await createTestUser("sr19");
     createdUserIds.push(user.id);
     await createTestMembership(tenantA.id, user.id, true);
     const archivedRole = await createTenantRoleFixture({
       tenantId: tenantA.id,
-      name: "SR15 Archived",
+      name: "SR19 Archived",
       isArchived: true,
     });
 
