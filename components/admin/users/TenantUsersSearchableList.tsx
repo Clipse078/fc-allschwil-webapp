@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search, Users, UserX } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
@@ -216,9 +217,10 @@ export default function TenantUsersSearchableList({ initialUsers, currentUserId 
             const accountOnly = user.membershipIsActive && !user.userIsActive;
 
             return (
-              <div
+              <Link
                 key={user.userId}
-                className={`flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[1fr_140px_1fr_140px] md:items-center md:gap-4 ${
+                href={`/dashboard/admin/users/${user.userId}`}
+                className={`flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[1fr_140px_1fr_140px] md:items-center md:gap-4 hover:bg-[var(--surface-2)] transition-colors ${
                   !isLast ? "border-b border-[var(--border)]" : ""
                 }`}
               >
@@ -275,7 +277,7 @@ export default function TenantUsersSearchableList({ initialUsers, currentUserId 
                     <AdminStatusPill label="Inaktiv" tone="muted" />
                   )}
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

@@ -134,6 +134,48 @@ export async function getUserDetailData(userId: string) {
  * assignable; only their per-tenant materialized roles (see
  * prisma/seed.ts) are, and those are TENANT-scoped anyway.
  */
+/**
+ * Returns the TenantMembership + User data for a single user within a tenant.
+ *
+ * Tenant isolation: `tenantId` MUST originate from the authenticated session
+ * (`session.user.activeTenantId`), never from client input.
+ *
+ * Returns `null` when the user is not a member of the given tenant — callers
+ * must treat `null` as a 404/notFound, not as a permission error.
+ *
+ * Security: passwordHash, reset tokens, and session data are never selected.
+ */
+export async function getTenantUserDetail(tenantId: string, userId: string) {
+  return prisma.tenantMembership.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: {
+      id: true,
+      isActive: true,
+      joinedAt: true,
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          isActive: true,
+          lastLoginAt: true,
+          userRoles: {
+            where: { tenantId },
+            select: {
+              role: {
+                select: { id: true, name: true, key: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export type TenantUserDetail = NonNullable<Awaited<ReturnType<typeof getTenantUserDetail>>>;
+
 export async function getPlatformRolesListData() {
   return prisma.role.findMany({
     where: { scope: "PLATFORM", isArchived: false, isTemplate: false },
