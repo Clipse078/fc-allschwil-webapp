@@ -339,10 +339,14 @@ async function resolveTenantPermissions(
   // Step 2: resolve role permissions for this tenant.
   // role.tenantId = tenantId ensures the role is actually owned by this tenant,
   // not just referenced via a cross-tenant UserRole assignment.
+  // ORG-ACCESS-01: orgUnitId: null restricts to tenant-wide assignments only.
+  // Scoped assignments (orgUnitId set) carry permissions only within their
+  // specific OrgUnit scope and must not bleed into tenant-wide checks.
   const userRoles = await prisma.userRole.findMany({
     where: {
       userId,
       tenantId,
+      orgUnitId: null,
       role: {
         scope: "TENANT",
         tenantId,

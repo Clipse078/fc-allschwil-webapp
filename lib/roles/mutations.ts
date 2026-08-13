@@ -378,8 +378,13 @@ export async function assignTenantRoleToUser(
   if (!membership) throw new RoleUserNotFoundError();
   if (!membership.isActive) throw new InactiveMembershipError();
 
-  const existing = await prisma.userRole.findUnique({
-    where: { userId_roleId: { userId: input.userId, roleId: role.id } },
+  // ORG-ACCESS-01: look up tenant-wide assignment only (orgUnitId IS NULL).
+  // Scoped assignments (orgUnitId set) are a separate concept and do not
+  // conflict with tenant-wide ones. The old @@unique([userId, roleId]) is
+  // replaced by partial indexes — findUnique({ where: { userId_roleId } })
+  // is no longer available; use findFirst with explicit orgUnitId: null.
+  const existing = await prisma.userRole.findFirst({
+    where: { userId: input.userId, roleId: role.id, orgUnitId: null },
     select: { id: true, tenantId: true },
   });
 
@@ -428,8 +433,10 @@ export async function removeTenantRoleAssignment(
 ): Promise<{ removed: boolean }> {
   const role = await loadOwnedTenantRole(input.tenantId, input.roleId);
 
-  const existing = await prisma.userRole.findUnique({
-    where: { userId_roleId: { userId: input.userId, roleId: role.id } },
+  // ORG-ACCESS-01: look up tenant-wide assignment only (orgUnitId IS NULL).
+  // Scoped assignments are managed separately and are never touched by this function.
+  const existing = await prisma.userRole.findFirst({
+    where: { userId: input.userId, roleId: role.id, orgUnitId: null },
     select: { id: true, tenantId: true },
   });
 
@@ -443,6 +450,7 @@ export async function removeTenantRoleAssignment(
       where: {
         roleId: role.id,
         tenantId: input.tenantId,
+        orgUnitId: null,
         userId: { not: input.userId },
         user: { tenantMemberships: { some: { tenantId: input.tenantId, isActive: true } } },
       },
@@ -541,9 +549,12 @@ export async function setTenantUserRoles(
     );
   }
 
-  // 3. Fetch the current TENANT-scoped assignments for this user in this tenant.
+  // 3. Fetch the current TENANT-scoped TENANT-WIDE assignments for this user in this tenant.
+  // ORG-ACCESS-01: only consider orgUnitId=null rows here; scoped assignments
+  // (orgUnitId set) are a separate concept and must not be clobbered by
+  // this bulk-sync operation.
   const current = await prisma.userRole.findMany({
-    where: { tenantId, userId, role: { scope: "TENANT", tenantId } },
+    where: { tenantId, userId, orgUnitId: null, role: { scope: "TENANT", tenantId } },
     select: {
       id: true,
       roleId: true,
@@ -573,6 +584,7 @@ export async function setTenantUserRoles(
             where: {
               tenantId,
               userId: { not: userId },
+              orgUnitId: null,
               role: { key: clubAdminRoleKey },
               user: { tenantMemberships: { some: { tenantId, isActive: true } } },
             },

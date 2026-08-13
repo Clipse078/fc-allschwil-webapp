@@ -77,6 +77,14 @@ enum RoleScope {
   TENANT
 }
 
+// ORG-ACCESS-01: Scope mode for OrgUnit-scoped role assignments.
+// THIS_ORG_UNIT          — permission applies only to the exact OrgUnit.
+// THIS_ORG_UNIT_AND_DESCENDANTS — permission applies to the OrgUnit and all descendants.
+enum OrgUnitScopeMode {
+  THIS_ORG_UNIT
+  THIS_ORG_UNIT_AND_DESCENDANTS
+}
+
 // RPERM-02: Distinguishes platform-wide permissions from tenant-scoped ones.
 enum PermissionScope {
   PLATFORM
@@ -783,16 +791,29 @@ model UserRole {
   roleId    String
   createdAt DateTime @default(now())
 
-  // RPERM-02: optional tenant scope for future tenant-aware role assignments
+  // RPERM-02: optional tenant scope for tenant-aware role assignments
   tenantId String?
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  role   Role    @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  // ORG-ACCESS-01: OrgUnit-scoped assignment fields.
+  // orgUnitId = null means tenant-wide assignment (existing behavior).
+  // orgUnitId set + scopeMode defines the OrgUnit scope for this assignment.
+  // PLATFORM roles must never carry an OrgUnit scope (enforced at service layer).
+  // Cross-tenant OrgUnit assignment is rejected at service layer.
+  // Uniqueness is enforced via two partial DB indexes (see migration):
+  //   (userId, roleId) WHERE orgUnitId IS NULL  — one tenant-wide row per role
+  //   (userId, roleId, orgUnitId) WHERE orgUnitId IS NOT NULL — one scoped row per (role, orgUnit)
+  orgUnitId  String?
+  scopeMode  OrgUnitScopeMode?
 
-  @@unique([userId, roleId])
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant  Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  orgUnit OrgUnit? @relation(fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
   @@index([roleId])
   @@index([tenantId])
+  @@index([orgUnitId])
+  @@index([userId, tenantId])
 }
 
 model RolePermission {
@@ -1641,6 +1662,8 @@ model OrgUnit {
   teams              Team[]
   // TEAM-CORE-02: canonical many-to-many seasonal team assignment
   teamSeasonOrgUnits TeamSeasonOrgUnit[]
+  // ORG-ACCESS-01: scoped role assignments targeting this OrgUnit
+  userRoles          UserRole[]
 
   @@unique([tenantId, key])
   @@index([tenantId])

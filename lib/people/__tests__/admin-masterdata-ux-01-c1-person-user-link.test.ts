@@ -202,8 +202,8 @@ describe("ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking (live DB)", () =
     const membershipBefore = await prisma.tenantMembership.findUnique({
       where: { tenantId_userId: { tenantId: tenantA.id, userId: user.id } },
     });
-    const userRoleBefore = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+    const userRoleBefore = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: role.id, orgUnitId: null },
     });
 
     const result = await unlinkPersonFromUser({ personId: person.id });
@@ -226,8 +226,8 @@ describe("ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking (live DB)", () =
     });
     expect(membershipAfter).toEqual(membershipBefore);
 
-    const userRoleAfter = await prisma.userRole.findUnique({
-      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+    const userRoleAfter = await prisma.userRole.findFirst({
+      where: { userId: user.id, roleId: role.id, orgUnitId: null },
     });
     expect(userRoleAfter).toEqual(userRoleBefore);
     expect(userRoleAfter).not.toBeNull();

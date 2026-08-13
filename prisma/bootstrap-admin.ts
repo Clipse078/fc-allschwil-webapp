@@ -132,19 +132,16 @@ async function main() {
     },
   });
 
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: adminUser.id,
-        roleId: superAdminRole.id,
-      },
-    },
-    update: {},
-    create: {
-      userId: adminUser.id,
-      roleId: superAdminRole.id,
-    },
+  // ORG-ACCESS-01: upsert replaced by findFirst+create since @@unique([userId, roleId])
+  // was removed; uniqueness is now enforced by partial DB indexes.
+  const existingSuperAdminRole = await prisma.userRole.findFirst({
+    where: { userId: adminUser.id, roleId: superAdminRole.id, orgUnitId: null },
   });
+  if (!existingSuperAdminRole) {
+    await prisma.userRole.create({
+      data: { userId: adminUser.id, roleId: superAdminRole.id },
+    });
+  }
 
   // RPERM-04: TenantMembership is the canonical source of tenant context —
   // no runtime code should ever derive it from User.tenantId again.
@@ -158,20 +155,16 @@ async function main() {
     },
   });
 
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: adminUser.id,
-        roleId: tenantClubAdminRole.id,
-      },
-    },
-    update: {},
-    create: {
-      userId: adminUser.id,
-      roleId: tenantClubAdminRole.id,
-      tenantId: tenant.id,
-    },
+  // ORG-ACCESS-01: upsert replaced by findFirst+create since @@unique([userId, roleId])
+  // was removed; uniqueness is now enforced by partial DB indexes.
+  const existingClubAdminRole = await prisma.userRole.findFirst({
+    where: { userId: adminUser.id, roleId: tenantClubAdminRole.id, orgUnitId: null },
   });
+  if (!existingClubAdminRole) {
+    await prisma.userRole.create({
+      data: { userId: adminUser.id, roleId: tenantClubAdminRole.id, tenantId: tenant.id },
+    });
+  }
 
   console.log("Bootstrap admin complete.");
   console.log("Email:", adminUser.email);
