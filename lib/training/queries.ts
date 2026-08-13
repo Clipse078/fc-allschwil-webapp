@@ -37,6 +37,13 @@ export type TrainingSeriesRow = {
   recurrenceDays: { weekday: string; startsAt: string | null; endsAt: string | null }[];
   /// TRAININGCENTER-03A: count of canonical TrainingSession rows generated for this series.
   _count?: { sessions: number };
+  // ORG-ACCESS-03: planning workflow stage.
+  planningStage: string;
+  planningSubmittedAt: Date | null;
+  planningSubmittedById: string | null;
+  planningValidatedAt: Date | null;
+  planningValidatedById: string | null;
+  createdByUserId: string | null;
 };
 
 export const trainingSeriesInclude = {
@@ -49,7 +56,22 @@ export const trainingSeriesInclude = {
   },
 } as const;
 
+// ORG-ACCESS-03: planning fields selected alongside trainingSeriesInclude.
+export const trainingSeriesPlanningSelect = {
+  planningStage: true,
+  planningSubmittedAt: true,
+  planningSubmittedById: true,
+  planningValidatedAt: true,
+  planningValidatedById: true,
+  createdByUserId: true,
+} as const;
+
 // ── Queries ───────────────────────────────────────────────────────────────────
+
+// ORG-ACCESS-03: planning fields added to the base include for all queries.
+const trainingSeriesFullInclude = {
+  ...trainingSeriesInclude,
+} as const;
 
 /** Returns a TrainingSeries by id, scoped to the tenant. */
 export async function findTrainingSeriesById(
@@ -58,7 +80,7 @@ export async function findTrainingSeriesById(
 ): Promise<TrainingSeriesRow | null> {
   return prisma.trainingSeries.findFirst({
     where: { id: seriesId, tenantId },
-    include: trainingSeriesInclude,
+    include: trainingSeriesFullInclude,
   }) as Promise<TrainingSeriesRow | null>;
 }
 
@@ -79,7 +101,7 @@ export async function findAllTrainingSeries(
       ...(teamSeasonId ? { teamSeasonId } : {}),
       ...(status ? { status } : !includeArchived ? { NOT: { status: "ARCHIVED" } } : {}),
     },
-    include: trainingSeriesInclude,
+    include: trainingSeriesFullInclude,
     orderBy: [{ teamSeasonId: "asc" }, { title: "asc" }],
   }) as Promise<TrainingSeriesRow[]>;
 }

@@ -70,8 +70,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
-import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createPlanningAuthorizationPolicy } from "@/lib/planning/planning-authorization-policy";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import { logAction } from "@/lib/audit/log-action";
 import {
@@ -131,19 +131,51 @@ function parseDateOrNull(value: unknown): { ok: true; value: Date | null } | { o
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
-  const access = await requireApiAnyPermission([PERMISSIONS.EVENTS_MANAGE]);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+  // ORG-ACCESS-03: accept tenant-wide coordinators AND OrgUnit-scoped users.
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const tenantId = access.session.user.activeTenantId;
+  const tenantId = session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json({ error: "Tenant context is required." }, { status: 403 });
+  }
+
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  if (!userId) {
+    return NextResponse.json({ error: "User identity required." }, { status: 403 });
   }
 
   const { tournamentId } = await params;
   if (!tournamentId?.trim()) {
     return NextResponse.json({ error: "tournamentId is required." }, { status: 400 });
+  }
+
+  // ORG-ACCESS-03: load the tournament for scope check before processing body.
+  const existingTournament = await prisma.event.findFirst({
+    where: { id: tournamentId, tenantId, type: "TOURNAMENT" },
+    select: { id: true, source: true, teamId: true, reviewStage: true },
+  });
+  if (!existingTournament) {
+    return NextResponse.json({ error: "Turnier nicht gefunden." }, { status: 404 });
+  }
+
+  const planningPolicy = createPlanningAuthorizationPolicy(prisma);
+  const canEdit = await planningPolicy.canEditPlanningRecord(
+    { userId, tenantId },
+    "tournament",
+    {
+      teamId: existingTournament.teamId,
+      planningStage: existingTournament.reviewStage,
+      source: existingTournament.source,
+    },
+  );
+  if (!canEdit) {
+    return NextResponse.json(
+      { error: "Keine Berechtigung zum Bearbeiten dieses Turniers." },
+      { status: 403 },
+    );
   }
 
   let body: Record<string, unknown>;

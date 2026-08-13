@@ -256,11 +256,16 @@ export default function MatchCreateForm({
     async function loadTeams() {
       setLoadingTeams(true);
       try {
-        const res = await fetch("/api/teams", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as TeamOption[] | { error?: string } | null;
+        // ORG-ACCESS-03: use writable-teams endpoint so scoped users see only
+        // teams within their OrgUnit write scope; coordinators get all teams.
+        const res = await fetch("/api/planning/writable-teams?domain=match", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as
+          | { teams?: TeamOption[] }
+          | { error?: string }
+          | null;
         if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? "Teams konnten nicht geladen werden.");
         if (!active) return;
-        setTeamOptions(Array.isArray(data) ? data.filter((t) => t.isActive) : []);
+        setTeamOptions((data as { teams?: TeamOption[] } | null)?.teams ?? []);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
       } finally {
@@ -522,21 +527,27 @@ export default function MatchCreateForm({
         >
           <label className="block space-y-1">
             <span className="fca-label">Team</span>
-            <select
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-              className="fca-select"
-              required
-              disabled={loadingTeams}
-              data-testid="match-create-team-select"
-            >
-              <option value="">{loadingTeams ? "Teams laden…" : "— Auswählen —"}</option>
-              {teamOptions.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {formatTeamLabel(t)}
-                </option>
-              ))}
-            </select>
+            {!loadingTeams && teamOptions.length === 0 ? (
+              <p className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                Kein Team mit Schreibzugriff verfügbar. Bitte wenden Sie sich an die Koordination.
+              </p>
+            ) : (
+              <select
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                className="fca-select"
+                required
+                disabled={loadingTeams}
+                data-testid="match-create-team-select"
+              >
+                <option value="">{loadingTeams ? "Teams laden…" : "— Auswählen —"}</option>
+                {teamOptions.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {formatTeamLabel(t)}
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
         </GuidedStep>
 

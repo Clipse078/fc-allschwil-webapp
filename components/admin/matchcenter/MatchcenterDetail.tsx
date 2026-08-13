@@ -34,6 +34,8 @@ import MatchcenterDetailOperational from "@/components/admin/matchcenter/Matchce
 import MatchLifecycleCard from "@/components/admin/matchcenter/MatchLifecycleCard";
 import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
+import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWorkflowActionsClient";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
@@ -53,6 +55,15 @@ type MatchcenterDetailProps = {
   pitchHallFacilityGroups?: FacilityGroup[];
   /** PLANNING-RESOURCE-UX-01 — full facility groups for visual dressing room pickers. */
   dressingRoomFacilityGroups?: FacilityGroup[];
+  /**
+   * ORG-ACCESS-03: planning workflow action visibility.
+   * canSubmitPlanning: scoped user may submit this DRAFT record.
+   * canValidatePlanning: coordinator may validate/reopen this record.
+   * isProtectedSource: SFV/provider record — no scoped mutation controls shown.
+   */
+  canSubmitPlanning?: boolean;
+  canValidatePlanning?: boolean;
+  isProtectedSource?: boolean;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -193,6 +204,9 @@ export default function MatchcenterDetail({
   dressingRoomOptions = [],
   pitchHallFacilityGroups,
   dressingRoomFacilityGroups,
+  canSubmitPlanning = false,
+  canValidatePlanning = false,
+  isProtectedSource = false,
 }: MatchcenterDetailProps) {
   const statusLabel =
     STATUS_LABELS[match.status] ?? match.status;
@@ -814,6 +828,22 @@ export default function MatchcenterDetail({
               value={valueOrFallback(match.reviewNotes)}
             />
           </dl>
+          {/* ORG-ACCESS-03: planning workflow actions for MANUAL matches */}
+          {!isProtectedSource && (
+            <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-[var(--muted)]">Planungsstatus:</span>
+                <PlanningWorkflowBadge stage={match.reviewStage} size="sm" />
+              </div>
+              <PlanningWorkflowActionsClient
+                recordId={match.id}
+                domain="match"
+                planningStage={match.reviewStage}
+                isCoordinator={canValidatePlanning}
+                isProtectedSource={isProtectedSource}
+              />
+            </div>
+          )}
         </SectionCard>
       </DetailPagePattern>
     </PageShell>

@@ -12,25 +12,25 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// ORG-ACCESS-03: route now uses auth() + planning policy instead of requireApiAnyPermission.
 const mocks = vi.hoisted(() => ({
-  requireApiAnyPermission: vi.fn(),
+  auth: vi.fn(),
+  canEditPlanningRecord: vi.fn(),
+  eventFindFirst: vi.fn(),
   updateTournament: vi.fn(),
   cancelTournament: vi.fn(),
   restoreTournament: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-any-permission", () => ({
-  requireApiAnyPermission: mocks.requireApiAnyPermission,
+vi.mock("@/auth", () => ({
+  auth: mocks.auth,
 }));
 
-// ADMIN-DELETE-02A: route.ts now also exports a DELETE handler that imports
-// "@/auth" at module scope. This suite only exercises PATCH, but the mock
-// is still required so importing the route module doesn't pull in the real
-// next-auth initialization (see app/api/tournaments/[tournamentId]/
-// __tests__/admin-delete-02a-route.test.ts for the DELETE-specific suite).
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
+vi.mock("@/lib/planning/planning-authorization-policy", () => ({
+  createPlanningAuthorizationPolicy: () => ({
+    canEditPlanningRecord: mocks.canEditPlanningRecord,
+  }),
 }));
 
 vi.mock("@/lib/tournaments/tournament-service", () => ({
@@ -41,6 +41,13 @@ vi.mock("@/lib/tournaments/tournament-service", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
+}));
+
+// ORG-ACCESS-03: tournament route now loads the event for scope check.
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    event: { findFirst: mocks.eventFindFirst },
+  },
 }));
 
 import { PATCH } from "../route";
@@ -66,21 +73,27 @@ function makeContext(tournamentId = "tournament-test-1"): RouteContext {
   return { params: Promise.resolve({ tournamentId }) };
 }
 
-const VALID_SESSION = {
-  ok: true,
-  status: 200,
-  error: null,
-  session: {
-    user: { id: "user-1", activeTenantId: "tenant-1" },
-  },
+const VALID_AUTH_SESSION = {
+  user: { id: "user-1", activeTenantId: "tenant-1" },
 };
 
 const VALID_TOURNAMENT = { id: "tournament-test-1", title: "E1 Hallenturnier", status: "SCHEDULED" };
 
+// ORG-ACCESS-03: event needs source/teamId/reviewStage for scope check.
+const VALID_EVENT_ROW = {
+  id: "tournament-test-1",
+  source: "MANUAL",
+  teamId: "team-fca",
+  reviewStage: "DRAFT",
+};
+
 describe("PATCH /api/tournaments/[tournamentId]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireApiAnyPermission.mockResolvedValue(VALID_SESSION);
+    // ORG-ACCESS-03: auth() and planning policy replace requireApiAnyPermission.
+    mocks.auth.mockResolvedValue(VALID_AUTH_SESSION);
+    mocks.canEditPlanningRecord.mockResolvedValue(true);
+    mocks.eventFindFirst.mockResolvedValue(VALID_EVENT_ROW);
     mocks.updateTournament.mockResolvedValue(VALID_TOURNAMENT);
     mocks.cancelTournament.mockResolvedValue({ ...VALID_TOURNAMENT, status: "CANCELLED" });
     mocks.restoreTournament.mockResolvedValue({ ...VALID_TOURNAMENT, status: "SCHEDULED" });
@@ -89,26 +102,21 @@ describe("PATCH /api/tournaments/[tournamentId]", () => {
   // ── Authentication / permission ──────────────────────────────────────────────
 
   it("returns 401 when not authenticated", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({ ok: false, status: 401, error: "Unauthorized", session: null });
+    mocks.auth.mockResolvedValue(null);
 
     const res = await PATCH(makeRequest({ title: "X" }), makeContext());
     expect(res.status).toBe(401);
   });
 
-  it("returns 403 when permission is insufficient", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden", session: null });
+  it("returns 403 when planning policy denies edit (no scope for team)", async () => {
+    mocks.canEditPlanningRecord.mockResolvedValue(false);
 
     const res = await PATCH(makeRequest({ title: "X" }), makeContext());
     expect(res.status).toBe(403);
   });
 
   it("returns 403 when tenantId is missing from session", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: null,
-      session: { user: { id: "user-1", activeTenantId: null } },
-    });
+    mocks.auth.mockResolvedValue({ user: { id: "user-1", activeTenantId: null } });
 
     const res = await PATCH(makeRequest({ title: "X" }), makeContext());
     expect(res.status).toBe(403);

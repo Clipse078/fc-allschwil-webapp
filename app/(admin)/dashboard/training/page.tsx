@@ -60,6 +60,10 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
   if (!tenantContext) notFound();
 
   const canManage = hasPermission(session, PERMISSIONS.TRAININGS_MANAGE);
+  // ORG-ACCESS-03: canCreate is broader than canManage — includes users with
+  // TRAININGS_VIEW at tenant level who may have OrgUnit-scoped write capability.
+  // The create page will show a "no teams" message if no writable teams exist.
+  const canCreate = canManage || hasPermission(session, PERMISSIONS.TRAININGS_VIEW);
   // ADMIN-DELETE-02A-C1: permanent "Endgültig löschen" gating in the actual
   // Serien-Verwaltung list — deliberately independent of trainings.manage
   // (manage alone must never authorize permanent deletion).
@@ -80,7 +84,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
           title="TrainingCenter"
           description="Kalender und Serien-Verwaltung für alle Trainingsserien."
           actions={
-            canManage ? (
+            canCreate ? (
               <Link href="/dashboard/training/new" className="fca-button-primary inline-flex items-center gap-1.5 text-sm">
                 <Plus className="h-3.5 w-3.5" />
                 Neue Trainingsserie
@@ -93,6 +97,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
           allSeries={allSeries}
           showArchived={showArchived}
           canManage={canManage}
+          isCoordinator={canManage}
           canDelete={canDelete}
         />
       </div>

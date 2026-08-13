@@ -518,20 +518,26 @@ export default function TrainingSeriesCreateForm({
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block space-y-1 md:col-span-2">
               <span className="fca-label">Team / Saison</span>
-              <select
-                value={teamSeasonId}
-                onChange={(e) => setTeamSeasonId(e.target.value)}
-                className="fca-select"
-                required
-                data-testid="training-create-team-season-select"
-              >
-                <option value="">— Auswählen —</option>
-                {teamSeasons.map((ts) => (
-                  <option key={ts.id} value={ts.id}>
-                    {ts.teamName} · {ts.seasonName}
-                  </option>
-                ))}
-              </select>
+              {teamSeasons.length === 0 ? (
+                <p className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                  Kein Team mit Schreibzugriff verfügbar. Bitte wenden Sie sich an die Koordination.
+                </p>
+              ) : (
+                <select
+                  value={teamSeasonId}
+                  onChange={(e) => setTeamSeasonId(e.target.value)}
+                  className="fca-select"
+                  required
+                  data-testid="training-create-team-season-select"
+                >
+                  <option value="">— Auswählen —</option>
+                  {teamSeasons.map((ts) => (
+                    <option key={ts.id} value={ts.id}>
+                      {ts.teamName} · {ts.seasonName}
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
 
             <label className="block space-y-1 md:col-span-2">

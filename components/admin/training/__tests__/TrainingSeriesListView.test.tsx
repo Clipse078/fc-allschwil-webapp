@@ -42,6 +42,13 @@ function makeSeries(overrides: Partial<TrainingSeriesDto> = {}): TrainingSeriesD
     sessionCount: 8,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    // ORG-ACCESS-03: planning workflow fields.
+    planningStage: "APPROVED",
+    planningSubmittedAt: null,
+    planningSubmittedById: null,
+    planningValidatedAt: null,
+    planningValidatedById: null,
+    createdByUserId: null,
     ...overrides,
   };
 }

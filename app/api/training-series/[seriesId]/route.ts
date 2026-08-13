@@ -16,23 +16,59 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db/prisma";
+import { createPlanningAuthorizationPolicy } from "@/lib/planning/planning-authorization-policy";
 import { updateTrainingSeries, archiveTrainingSeries, getTrainingSeries } from "@/lib/training/training-service";
 import { generateTrainingSessions } from "@/lib/training/session-generation-service";
 import { TrainingSeriesNotFoundError, TrainingSeriesValidationError, TrainingSeriesConflictError } from "@/lib/training/errors";
 import { parseWeekdaySchedules, parseRequiredDate } from "@/lib/training/series-request-helpers";
+import type { PlanningRecord } from "@/lib/planning/planning-authorization-policy";
 
 type Params = { params: Promise<{ seriesId: string }> };
 
 export async function PUT(request: NextRequest, { params }: Params) {
-  const auth = await requireApiAnyPermission([PERMISSIONS.TRAININGS_MANAGE]);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  // ORG-ACCESS-03: accept tenant-wide coordinators AND OrgUnit-scoped users.
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const tenantId = auth.session.user?.activeTenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
 
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  if (!userId) return NextResponse.json({ error: "User identity required" }, { status: 403 });
+
   const { seriesId } = await params;
+
+  // ORG-ACCESS-03: load the series to check edit authorization.
+  const existingSeries = await prisma.trainingSeries.findFirst({
+    where: { id: seriesId, tenantId },
+    select: {
+      id: true,
+      planningStage: true,
+      teamSeason: { select: { teamId: true } },
+    },
+  });
+  if (!existingSeries) {
+    return NextResponse.json({ error: "Trainingsserie nicht gefunden." }, { status: 404 });
+  }
+
+  const planningRecord: PlanningRecord = {
+    teamId: existingSeries.teamSeason?.teamId ?? null,
+    planningStage: existingSeries.planningStage,
+  };
+  const planningPolicy = createPlanningAuthorizationPolicy(prisma);
+  const canEdit = await planningPolicy.canEditPlanningRecord(
+    { userId, tenantId },
+    "training",
+    planningRecord,
+  );
+  if (!canEdit) {
+    return NextResponse.json(
+      { error: "Keine Berechtigung zum Bearbeiten dieser Trainingsserie." },
+      { status: 403 },
+    );
+  }
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
@@ -93,13 +129,47 @@ export async function PUT(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {
-  const auth = await requireApiAnyPermission([PERMISSIONS.TRAININGS_MANAGE]);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  // ORG-ACCESS-03: archive is an edit-level action — same scope as PUT.
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const tenantId = auth.session.user?.activeTenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
 
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  if (!userId) return NextResponse.json({ error: "User identity required" }, { status: 403 });
+
   const { seriesId } = await params;
+
+  // Scope check: user must be coordinator or have edit rights on DRAFT records.
+  const existingSeries = await prisma.trainingSeries.findFirst({
+    where: { id: seriesId, tenantId },
+    select: {
+      id: true,
+      planningStage: true,
+      teamSeason: { select: { teamId: true } },
+    },
+  });
+  if (!existingSeries) {
+    return NextResponse.json({ error: "Trainingsserie nicht gefunden." }, { status: 404 });
+  }
+
+  const planningRecord: PlanningRecord = {
+    teamId: existingSeries.teamSeason?.teamId ?? null,
+    planningStage: existingSeries.planningStage,
+  };
+  const planningPolicy = createPlanningAuthorizationPolicy(prisma);
+  const canEdit = await planningPolicy.canEditPlanningRecord(
+    { userId, tenantId },
+    "training",
+    planningRecord,
+  );
+  if (!canEdit) {
+    return NextResponse.json(
+      { error: "Keine Berechtigung zum Archivieren dieser Trainingsserie." },
+      { status: 403 },
+    );
+  }
 
   try {
     const series = await archiveTrainingSeries(tenantId, seriesId);

@@ -2,14 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TournamentCreateForm from "@/components/admin/tournamentcenter/TournamentCreateForm";
-import { requirePermission } from "@/lib/permissions/require-permission";
+import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { getFacilitiesForTenant } from "@/lib/facilities/queries";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 
 export default async function NewTournamentCenterPage() {
-  await requirePermission(PERMISSIONS.EVENTS_MANAGE);
+  // ORG-ACCESS-03: broaden gate to also allow EVENTS_VIEW so scoped users
+  // can reach this page; backend enforces 403 for unauthorized teams.
+  await requireAnyPermission([PERMISSIONS.EVENTS_MANAGE, PERMISSIONS.EVENTS_VIEW]);
 
   const tenantContext = await getActiveTenant();
   if (!tenantContext) notFound();

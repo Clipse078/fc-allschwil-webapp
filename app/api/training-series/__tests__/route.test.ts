@@ -25,8 +25,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
 
+// ORG-ACCESS-03: route now uses auth() + planning policy instead of requireApiAnyPermission.
 const mocks = vi.hoisted(() => ({
-  requireApiAnyPermission: vi.fn(),
+  auth: vi.fn(),
+  canCreateForTeamSeason: vi.fn(),
+  logAction: vi.fn(),
   createTrainingSeries: vi.fn(),
   getTrainingSeries: vi.fn(),
   generateTrainingSessions: vi.fn(),
@@ -34,8 +37,18 @@ const mocks = vi.hoisted(() => ({
   deleteTrainingSeriesPermanently: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-any-permission", () => ({
-  requireApiAnyPermission: mocks.requireApiAnyPermission,
+vi.mock("@/auth", () => ({
+  auth: mocks.auth,
+}));
+
+vi.mock("@/lib/planning/planning-authorization-policy", () => ({
+  createPlanningAuthorizationPolicy: () => ({
+    canCreateForTeamSeason: mocks.canCreateForTeamSeason,
+  }),
+}));
+
+vi.mock("@/lib/audit/log-action", () => ({
+  logAction: mocks.logAction,
 }));
 
 vi.mock("@/lib/training/training-service", () => ({
@@ -82,17 +95,9 @@ const VALID_BODY = {
   ],
 };
 
+// ORG-ACCESS-03: auth() returns Session shape directly (no ok/status).
 function makeAuthOk() {
-  return {
-    ok: true as const,
-    status: 200,
-    error: null,
-    session: { user: { id: "user-1", activeTenantId: TENANT_A } },
-  };
-}
-
-function makeAuthFail(status = 401) {
-  return { ok: false as const, status, error: "Unauthorized", session: null };
+  return { user: { id: "user-1", activeTenantId: TENANT_A } };
 }
 
 function makeSeriesDto(overrides: Record<string, unknown> = {}) {
@@ -131,7 +136,15 @@ function makePostRequest(body: unknown): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk());
+  // ORG-ACCESS-03: auth() and planning policy replace requireApiAnyPermission.
+  mocks.auth.mockResolvedValue(makeAuthOk());
+  mocks.canCreateForTeamSeason.mockResolvedValue({
+    allowed: true,
+    isCoordinator: true,
+    isScoped: false,
+    teamId: "team-e1",
+  });
+  mocks.logAction.mockResolvedValue(undefined);
   mocks.createTrainingSeries.mockResolvedValue(makeSeriesDto());
   mocks.generateTrainingSessions.mockResolvedValue({
     trainingSeriesId: SERIES_ID,
@@ -149,24 +162,25 @@ beforeEach(() => {
 
 describe("A. POST /api/training-series — auth", () => {
   it("A1. returns 401 when unauthenticated", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthFail());
+    mocks.auth.mockResolvedValue(null);
     const res = await POST(makePostRequest(VALID_BODY));
     expect(res.status).toBe(401);
   });
 
-  it("A2. returns 403 when forbidden (e.g. trainings.view only)", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden", session: null });
+  it("A2. returns 403 when planning policy denies creation (no scope for team)", async () => {
+    mocks.canCreateForTeamSeason.mockResolvedValue({
+      allowed: false,
+      isCoordinator: false,
+      isScoped: false,
+      teamId: null,
+      reason: "Keine Schreibberechtigung.",
+    });
     const res = await POST(makePostRequest(VALID_BODY));
     expect(res.status).toBe(403);
   });
 
   it("A3. returns 400 when tenant context missing", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: null,
-      session: { user: { id: "user-1", activeTenantId: undefined } },
-    });
+    mocks.auth.mockResolvedValue({ user: { id: "user-1", activeTenantId: undefined } });
     const res = await POST(makePostRequest(VALID_BODY));
     expect(res.status).toBe(400);
   });

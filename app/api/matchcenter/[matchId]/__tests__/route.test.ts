@@ -21,28 +21,25 @@ import {
   vi,
 } from "vitest";
 
+// ORG-ACCESS-03: route now uses auth() + planning policy instead of requireApiAnyPermission.
 const mocks = vi.hoisted(() => ({
-  requireApiAnyPermission: vi.fn(),
+  auth: vi.fn(),
+  canEditPlanningRecord: vi.fn(),
   eventFindFirst: vi.fn(),
   teamFindFirst: vi.fn(),
   eventUpdate: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
-vi.mock(
-  "@/lib/permissions/require-api-any-permission",
-  () => ({
-    requireApiAnyPermission: mocks.requireApiAnyPermission,
-  }),
-);
-
-// ADMIN-DELETE-02A: route.ts now also exports a DELETE handler that imports
-// "@/auth" at module scope. This suite only exercises PATCH, but the mock
-// is still required so importing the route module doesn't pull in the real
-// next-auth initialization (see app/api/matchcenter/[matchId]/__tests__/
-// admin-delete-02a-route.test.ts for the DELETE-specific test suite).
 vi.mock("@/auth", () => ({
-  auth: vi.fn(),
+  auth: mocks.auth,
+}));
+
+// ORG-ACCESS-03: mock the planning policy to grant edit access by default.
+vi.mock("@/lib/planning/planning-authorization-policy", () => ({
+  createPlanningAuthorizationPolicy: () => ({
+    canEditPlanningRecord: mocks.canEditPlanningRecord,
+  }),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -84,19 +81,21 @@ function makeContext(matchId = "match-test-1"): RouteContext {
   };
 }
 
-const VALID_SESSION = {
-  ok: true,
-  status: 200,
-  error: null,
-  session: {
-    user: {
-      id: "user-1",
-      activeTenantId: "tenant-1",
-    },
+// ORG-ACCESS-03: auth() returns Session shape (not requireApiAnyPermission shape).
+const VALID_AUTH_SESSION = {
+  user: {
+    id: "user-1",
+    activeTenantId: "tenant-1",
   },
 };
 
-const VALID_EVENT = { id: "match-test-1" };
+// ORG-ACCESS-03: event now includes source/teamId/reviewStage for scope check.
+const VALID_EVENT = {
+  id: "match-test-1",
+  source: "MANUAL",
+  teamId: "team-fca",
+  reviewStage: "DRAFT",
+};
 const VALID_TEAM = { id: "team-fca" };
 
 const VALID_UPDATED_EVENT = {
@@ -112,7 +111,9 @@ const VALID_UPDATED_EVENT = {
 describe("PATCH /api/matchcenter/[matchId]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireApiAnyPermission.mockResolvedValue(VALID_SESSION);
+    // ORG-ACCESS-03: auth() replaces requireApiAnyPermission for this route.
+    mocks.auth.mockResolvedValue(VALID_AUTH_SESSION);
+    mocks.canEditPlanningRecord.mockResolvedValue(true);
     mocks.eventFindFirst.mockResolvedValue(VALID_EVENT);
     mocks.teamFindFirst.mockResolvedValue(VALID_TEAM);
     mocks.eventUpdate.mockResolvedValue(VALID_UPDATED_EVENT);
@@ -121,12 +122,7 @@ describe("PATCH /api/matchcenter/[matchId]", () => {
   // ── Authentication ────────────────────────────────────────────────────────
 
   it("returns 401 when not authenticated", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({
-      ok: false,
-      status: 401,
-      error: "Unauthorized",
-      session: null,
-    });
+    mocks.auth.mockResolvedValue(null);
 
     const res = await PATCH(
       makeRequest({ pitchCode: "STADION" }),
@@ -136,13 +132,8 @@ describe("PATCH /api/matchcenter/[matchId]", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 403 when permission is insufficient (read-only)", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({
-      ok: false,
-      status: 403,
-      error: "Forbidden",
-      session: null,
-    });
+  it("returns 403 when planning policy denies edit (no scope for team)", async () => {
+    mocks.canEditPlanningRecord.mockResolvedValue(false);
 
     const res = await PATCH(
       makeRequest({ pitchCode: "STADION" }),
@@ -153,15 +144,10 @@ describe("PATCH /api/matchcenter/[matchId]", () => {
   });
 
   it("returns 403 when tenantId is missing from session", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: null,
-      session: {
-        user: {
-          id: "user-1",
-          activeTenantId: null,
-        },
+    mocks.auth.mockResolvedValue({
+      user: {
+        id: "user-1",
+        activeTenantId: null,
       },
     });
 

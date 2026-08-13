@@ -205,11 +205,16 @@ export default function TournamentCreateForm({
     async function loadTeams() {
       setLoadingTeams(true);
       try {
-        const res = await fetch("/api/teams", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as TeamOption[] | { error?: string } | null;
+        // ORG-ACCESS-03: use writable-teams endpoint so scoped users see only
+        // teams within their OrgUnit write scope; coordinators get all teams.
+        const res = await fetch("/api/planning/writable-teams?domain=tournament", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as
+          | { teams?: TeamOption[] }
+          | { error?: string }
+          | null;
         if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? "Teams konnten nicht geladen werden.");
         if (!active) return;
-        setTeamOptions(Array.isArray(data) ? data.filter((t) => t.isActive) : []);
+        setTeamOptions((data as { teams?: TeamOption[] } | null)?.teams ?? []);
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
       } finally {
@@ -843,12 +848,18 @@ export default function TournamentCreateForm({
           <div className="space-y-3 rounded-lg border border-dashed border-[var(--border)] p-4">
             <p className="text-sm font-medium text-[var(--text-2)]">Team hinzufügen</p>
 
+            {!loadingTeams && teamOptions.length === 0 ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                Kein Team mit Schreibzugriff verfügbar. Bitte wenden Sie sich an die Koordination.
+              </p>
+            ) : null}
+
             <div className="grid gap-3 md:grid-cols-2">
               <div className="flex gap-2">
                 <select
                   value={selectedTeamId}
                   onChange={(e) => setSelectedTeamId(e.target.value)}
-                  disabled={loadingTeams}
+                  disabled={loadingTeams || teamOptions.length === 0}
                   data-testid="tournament-create-add-team-select"
                   className="fca-select flex-1"
                 >

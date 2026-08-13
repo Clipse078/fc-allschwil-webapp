@@ -12,6 +12,8 @@ import type { FacilityGroup } from "@/components/admin/training/FacilityResource
 import TournamentParticipantsEditor from "@/components/admin/tournamentcenter/TournamentParticipantsEditor";
 import TournamentResourceAllocationEditor from "@/components/admin/tournamentcenter/TournamentResourceAllocationEditor";
 import { useFacilityAvailability } from "@/hooks/use-facility-availability";
+import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
+import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWorkflowActionsClient";
 
 type DeletionImpact = { key: string; label: string; count: number };
 
@@ -46,6 +48,13 @@ type TournamentEditFormProps = {
   pitchHallFacilityGroups: FacilityGroup[];
   /** Non-archived DRESSING_ROOM resources, grouped by facility — for the per-participant Garderobe editor. */
   dressingRoomFacilityGroups: FacilityGroup[];
+  /**
+   * ORG-ACCESS-03: planning workflow flags.
+   * isCoordinatorForPlanning: true when user holds tenant-wide events.manage.
+   * isProtectedSource: true for SFV/provider records — no workflow UI.
+   */
+  isCoordinatorForPlanning?: boolean;
+  isProtectedSource?: boolean;
 };
 
 export default function TournamentEditForm({
@@ -54,6 +63,8 @@ export default function TournamentEditForm({
   canDelete = false,
   pitchHallFacilityGroups,
   dressingRoomFacilityGroups,
+  isCoordinatorForPlanning = false,
+  isProtectedSource = false,
 }: TournamentEditFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -507,6 +518,20 @@ export default function TournamentEditForm({
           >
             Endgültig löschen
           </Button>
+        )}
+
+        {/* ORG-ACCESS-03: planning workflow actions for manual tournaments */}
+        {!isProtectedSource && (
+          <div className="flex items-center gap-2 border-l border-[var(--border)] pl-3">
+            <PlanningWorkflowBadge stage={tournament.reviewStage} size="sm" />
+            <PlanningWorkflowActionsClient
+              recordId={tournament.id}
+              domain="tournament"
+              planningStage={tournament.reviewStage}
+              isCoordinator={isCoordinatorForPlanning}
+              isProtectedSource={isProtectedSource}
+            />
+          </div>
         )}
       </div>
 

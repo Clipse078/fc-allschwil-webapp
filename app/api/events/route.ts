@@ -1,12 +1,15 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import { logAction } from "@/lib/audit/log-action";
 import { resolveEventReviewDecision } from "@/lib/workflow/event-review-policy";
+import { createPlanningAuthorizationPolicy } from "@/lib/planning/planning-authorization-policy";
+import type { PlanningDomain } from "@/lib/planning/planning-authorization-policy";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 
 const ALLOWED_TYPES = ["MATCH", "TOURNAMENT", "TRAINING", "OTHER"] as const;
 const ALLOWED_SOURCES = ["CLUBCORNER_FVNWS", "MANUAL", "CSV_EXCEL_IMPORT"] as const;
@@ -103,11 +106,21 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireApiPermission(PERMISSIONS.EVENTS_MANAGE);
-
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+  // ORG-ACCESS-03: accept tenant-wide coordinators AND OrgUnit-scoped users for
+  // MATCH and TOURNAMENT creation. The planning policy performs the combined
+  // permission + OrgUnit scope check after we know the requested teamId.
+  // Other event types (TRAINING, OTHER, VACATION_PERIOD) remain coordinator-only.
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const actorTenantId = session.user?.activeTenantId ?? null;
+  if (!actorTenantId) {
+    return NextResponse.json({ error: "Tenant context required" }, { status: 403 });
+  }
+
+  const actorUserId = session.user.effectiveUserId ?? session.user.id ?? null;
 
   try {
     const body = await request.json();
@@ -221,6 +234,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Ungültige Event-Quelle." }, { status: 400 });
     }
 
+    // ORG-ACCESS-03: scope check for MATCH and TOURNAMENT creation.
+    // OTHER / TRAINING / VACATION_PERIOD remain coordinator-only (no OrgUnit scope path).
+    let isScopedCreate = false;
+    if (type === "MATCH" || type === "TOURNAMENT") {
+      const domain: PlanningDomain = type === "MATCH" ? "match" : "tournament";
+      const planningPolicy = createPlanningAuthorizationPolicy(prisma);
+      if (!actorUserId) {
+        return NextResponse.json({ error: "User identity required" }, { status: 403 });
+      }
+      const canCreate = await planningPolicy.canCreateForTeam(
+        { userId: actorUserId, tenantId: actorTenantId },
+        domain,
+        teamId,
+      );
+      if (!canCreate.allowed) {
+        return NextResponse.json(
+          { error: canCreate.reason ?? "Keine Schreibberechtigung für dieses Team." },
+          { status: 403 },
+        );
+      }
+      isScopedCreate = canCreate.isScoped;
+    } else {
+      // Non-planning event types: require tenant-wide EVENTS_MANAGE.
+      const resolver = createEffectivePermissionResolver(prisma);
+      const { platform, tenant } = await resolver.getEffectivePermissions({
+        userId: actorUserId ?? "",
+        tenantId: actorTenantId,
+      });
+      if (!actorUserId || (!platform.includes(PERMISSIONS.EVENTS_MANAGE) && !tenant.includes(PERMISSIONS.EVENTS_MANAGE))) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     if (!ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
       return NextResponse.json({ error: "Ungültiger Event-Status." }, { status: 400 });
     }
@@ -306,18 +352,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const session = access.session;
-    const actorUserId =
-      session?.user?.effectiveUserId ??
-      session?.user?.id ??
-      null;
-    // TOURNAMENTCENTER-01: previously omitted, leaving every manually created
-    // Event (including tournaments) with tenantId=null — a tenant-isolation
-    // gap that made new events invisible to tenant-scoped consumers such as
-    // TournamentCenter/Matchcenter (see lib/matchcenter/query-service.ts,
-    // lib/tournaments/queries.ts, both of which require a non-null tenantId).
-    const actorTenantId = session?.user?.activeTenantId ?? null;
-
+    // TOURNAMENTCENTER-01: tenantId comes from the authenticated session, never from input.
     const hasLeadingEventCapability =
       hasPermission(session, PERMISSIONS.EVENTS_PUBLISH_WEBSITE) ||
       hasPermission(session, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD);
@@ -331,9 +366,16 @@ export async function POST(request: NextRequest) {
       canReviewSeries: hasLeadingEventCapability,
     });
 
-    const initialReviewStage = eventReviewDecision.allowsDirectExecution
-      ? "APPROVED"
-      : "SUBMITTED";
+    // ORG-ACCESS-03: planning initial stage for MATCH/TOURNAMENT.
+    // Scoped users start as DRAFT (editable until submitted).
+    // Coordinators (tenant-wide) remain APPROVED (direct management, existing behavior).
+    // Other event types retain the existing review-stage logic.
+    const initialReviewStage =
+      (type === "MATCH" || type === "TOURNAMENT") && isScopedCreate
+        ? "DRAFT"
+        : eventReviewDecision.allowsDirectExecution
+          ? "APPROVED"
+          : "SUBMITTED";
 
     const reviewRequestedAt = eventReviewDecision.requiresReview ? new Date() : null;
     const reviewedAt = eventReviewDecision.allowsDirectExecution ? new Date() : null;
