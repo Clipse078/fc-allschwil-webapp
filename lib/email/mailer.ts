@@ -1,0 +1,93 @@
+/**
+ * SportClubEvo — outbound email via Resend.
+ *
+ * Required server-side environment variables (never NEXT_PUBLIC_):
+ *
+ *   RESEND_API_KEY   Resend API key (re_...) from resend.com
+ *   EMAIL_FROM       Verified sender address.
+ *                    Production canonical value:
+ *                      SportClubEvo <noreply@mail.sportclubevo.com>
+ *                    The sending domain (mail.sportclubevo.com) must be
+ *                    verified in the Resend dashboard with SPF, DKIM,
+ *                    and the optional Resend CNAME tracking record.
+ *
+ * TRACKING (click / open):
+ *   The Resend SDK v6 does not expose per-email tracking toggles —
+ *   these are domain-level settings only.
+ *   Operator action required to disable tracking:
+ *     1. Go to Resend dashboard → Domains → mail.sportclubevo.com → Settings.
+ *     2. Disable "Click Tracking" and "Open Tracking".
+ *   This applies to all emails sent from the domain, including password-reset.
+ *   No code change can substitute for this dashboard action.
+ *
+ * Missing configuration throws MailConfigurationError — the caller is
+ * responsible for treating this as an operational failure while keeping
+ * the external API response opaque.
+ *
+ * Why Resend instead of generic SMTP/Nodemailer:
+ *   - Single API key vs five SMTP env vars.
+ *   - No peer-dependency conflicts (Nodemailer@9 conflicts with next-auth@beta).
+ *   - Serverless/Vercel-native HTTP transport; no persistent SMTP connection.
+ *   - Free tier covers SportClubEvo transactional volume.
+ *
+ * Dev/test must mock this module explicitly — there is no silent stdout fallback.
+ */
+
+import { Resend } from "resend";
+
+export type MailMessage = {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+};
+
+/**
+ * Thrown when required email configuration (RESEND_API_KEY or EMAIL_FROM)
+ * is absent or empty. Callers should log this as an operational/configuration
+ * failure without exposing details to the end user.
+ */
+export class MailConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MailConfigurationError";
+  }
+}
+
+/**
+ * Sends a transactional email via Resend.
+ *
+ * Throws MailConfigurationError when RESEND_API_KEY or EMAIL_FROM is missing.
+ * Throws on delivery failure (Resend API error).
+ *
+ * Never logs the message body, reset tokens, or reset URLs.
+ */
+export async function sendMail(message: MailMessage): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    throw new MailConfigurationError(
+      "RESEND_API_KEY is not configured. Email delivery is unavailable.",
+    );
+  }
+
+  const from = process.env.EMAIL_FROM?.trim();
+  if (!from) {
+    throw new MailConfigurationError(
+      "EMAIL_FROM is not configured. Email delivery is unavailable.",
+    );
+  }
+
+  const resend = new Resend(apiKey);
+
+  const { error } = await resend.emails.send({
+    from,
+    to: message.to,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+  });
+
+  if (error) {
+    throw new Error(`Resend delivery error: ${error.name} — ${error.message}`);
+  }
+}
