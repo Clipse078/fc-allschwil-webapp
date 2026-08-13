@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
 import TeamLifecycleCard from "@/components/admin/teams/TeamLifecycleCard";
+import ScopedResponsibilitiesCard from "@/components/admin/shared/ScopedResponsibilitiesCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -10,6 +11,12 @@ import { getTeamDetailData } from "@/lib/teams/queries";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getEligibleCompetitions } from "@/lib/competitions/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
+import { getEligibleTenantMembers } from "@/lib/roles/tenant-queries";
+import {
+  getScopedAssignmentsForOrgUnit,
+} from "@/lib/roles/scoped-mutations";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
+import { prisma } from "@/lib/db/prisma";
 import { PageShell } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
 import { Badge, Card } from "@/components/ui";
@@ -72,6 +79,30 @@ export default async function TeamDetailPage({ params }: Props) {
   if (!team) {
     notFound();
   }
+
+  // ORG-ACCESS-02: resolve the team's canonical OrgUnit for scoped assignments.
+  // Uses the canonical current-season OrgUnit (TEAM-SEASON-ORGUNIT-01) with
+  // legacy orgUnit as fallback — same logic as the property grid above.
+  const teamOrgUnit = team.currentSeasonOrgUnit ?? team.orgUnit ?? null;
+  const teamOrgUnitId = teamOrgUnit?.id ?? null;
+
+  const [teamScopedAssignments, teamEligibleUsers, teamRolesForResponsibilities] =
+    teamOrgUnitId
+      ? await Promise.all([
+          getScopedAssignmentsForOrgUnit(tenantId, teamOrgUnitId),
+          getEligibleTenantMembers(tenantId),
+          prisma.role.findMany({
+            where: {
+              scope: "TENANT",
+              tenantId,
+              isArchived: false,
+              key: { not: getTenantClubAdminRoleKey(tenant.key) },
+            },
+            orderBy: { name: "asc" },
+            select: { id: true, key: true, name: true, isSystem: true },
+          }),
+        ])
+      : [[], [], []];
 
   const categoryLabel = CATEGORY_LABELS[team.category] ?? team.category;
   // TEAMCENTER-UX-01C: consume the canonical current-season TeamSeason
@@ -231,6 +262,35 @@ export default async function TeamDetailPage({ params }: Props) {
           }))}
           canManage={canManage}
         />
+
+        {/* ORG-ACCESS-02: Personen & Zuständigkeiten for this team's OrgUnit. */}
+        {teamOrgUnitId ? (
+          <ScopedResponsibilitiesCard
+            orgUnitId={teamOrgUnitId}
+            orgUnitName={teamOrgUnit!.name}
+            initialAssignments={teamScopedAssignments}
+            availableRoles={teamRolesForResponsibilities}
+            eligibleUsers={teamEligibleUsers}
+            showScopeModeSelector={false}
+            canManage={canManage}
+          />
+        ) : (
+          <div className="sce-detail-section">
+            <div className="sce-detail-section-header">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-[var(--muted)]" />
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  Personen &amp; Zuständigkeiten
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-8 text-center">
+              <p className="text-sm text-[var(--muted)]">
+                Kein Bereich zugeordnet. Zuerst eine Organisationseinheit verknüpfen.
+              </p>
+            </div>
+          </div>
+        )}
       </DetailPagePattern>
     </PageShell>
   );

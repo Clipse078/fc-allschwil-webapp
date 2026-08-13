@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
+  Building2,
   Calendar,
   Mail,
   Shield,
@@ -12,11 +13,13 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantUserDetail } from "@/lib/users/queries";
 import { getTenantRolesOverview } from "@/lib/roles/tenant-queries";
+import { getScopedAssignmentsForUser } from "@/lib/roles/scoped-mutations";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import MembershipAccessControl from "@/components/admin/users/MembershipAccessControl";
 import TenantRoleAssignmentControl from "@/components/admin/users/TenantRoleAssignmentControl";
+import ScopedRolesSummary from "@/components/admin/users/ScopedRolesSummary";
 
 type Props = {
   params: Promise<{ userId: string }>;
@@ -42,9 +45,10 @@ export default async function AdminUserDetailPage({ params }: Props) {
 
   const { userId } = await params;
 
-  const [membership, allTenantRoles] = await Promise.all([
+  const [membership, allTenantRoles, scopedAssignments] = await Promise.all([
     getTenantUserDetail(tenantId, userId),
     getTenantRolesOverview(tenantId),
+    getScopedAssignmentsForUser(tenantId, userId),
   ]);
   if (!membership) notFound();
 
@@ -145,26 +149,40 @@ export default async function AdminUserDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Tenant roles — manageable with users.manage */}
+          {/* Rollen & Zuständigkeiten — ORG-ACCESS-02 consolidated view */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-[var(--muted)]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Rollen
+                  Rollen &amp; Zuständigkeiten
                 </p>
-                {user.userRoles.length > 0 ? (
-                  <span className="sce-count-badge">{user.userRoles.length}</span>
-                ) : null}
+                <span className="sce-count-badge">
+                  {user.userRoles.length + scopedAssignments.length}
+                </span>
               </div>
             </div>
-            <div className="sce-detail-section-body">
-              <TenantRoleAssignmentControl
-                userId={userId}
-                availableRoles={availableRoles}
-                initialRoleIds={user.userRoles.map((ur) => ur.role.id)}
-                canManage={canManage}
-              />
+            <div className="sce-detail-section-body space-y-5">
+              {/* Sub-section: Clubweit (tenant-wide roles — manageable) */}
+              <div>
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+                  Clubweit
+                </p>
+                <TenantRoleAssignmentControl
+                  userId={userId}
+                  availableRoles={availableRoles}
+                  initialRoleIds={user.userRoles.map((ur) => ur.role.id)}
+                  canManage={canManage}
+                />
+              </div>
+
+              {/* Sub-section: Bereiche (scoped — read-only here per spec) */}
+              <div>
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+                  Bereiche
+                </p>
+                <ScopedRolesSummary assignments={scopedAssignments} />
+              </div>
             </div>
           </div>
         </div>

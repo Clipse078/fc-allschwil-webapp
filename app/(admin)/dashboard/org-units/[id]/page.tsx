@@ -17,10 +17,16 @@ import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
 import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { canAccessOrgUnit, canManageOrgUnit } from "@/lib/visibility/org-unit-access";
+import { getEligibleTenantMembers } from "@/lib/roles/tenant-queries";
+import {
+  getScopedAssignmentsForOrgUnit,
+} from "@/lib/roles/scoped-mutations";
+import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipManagementCard";
 import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
 import OrgUnitArchiveButton from "@/components/admin/org/OrgUnitArchiveButton";
 import OrgUnitRestoreButton from "@/components/admin/org/OrgUnitRestoreButton";
+import ScopedResponsibilitiesCard from "@/components/admin/shared/ScopedResponsibilitiesCard";
 import { PageShell, SectionCard } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
 import { Badge, Card } from "@/components/ui";
@@ -105,6 +111,26 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   if (!unit) notFound();
   // Tenant guard: null tenantId = pre-migration residue; allow (backwards-compat).
   if (unit.tenantId !== null && tenant && unit.tenantId !== tenant.id) notFound();
+
+  // ORG-ACCESS-02: load scoped responsibilities and eligible users in parallel.
+  const [scopedAssignments, eligibleUsers, tenantRolesForResponsibilities] =
+    tenant
+      ? await Promise.all([
+          getScopedAssignmentsForOrgUnit(tenant.id, id),
+          getEligibleTenantMembers(tenant.id),
+          prisma.role.findMany({
+            where: {
+              scope: "TENANT",
+              tenantId: tenant.id,
+              isArchived: false,
+              // Exclude the canonical Club Admin role (must remain tenant-wide only).
+              key: { not: getTenantClubAdminRoleKey(tenant.key) },
+            },
+            orderBy: { name: "asc" },
+            select: { id: true, key: true, name: true, isSystem: true },
+          }),
+        ])
+      : [[], [], []];
 
   // Sibling list for reorder controls (same parentId, same tenant).
   const siblings = tenant
@@ -439,6 +465,17 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
           initialMemberships={unit.memberships}
           roles={roles}
           seasons={seasons}
+        />
+
+        {/* ORG-ACCESS-02: Scoped role responsibilities */}
+        <ScopedResponsibilitiesCard
+          orgUnitId={unit.id}
+          orgUnitName={unit.name}
+          initialAssignments={scopedAssignments}
+          availableRoles={tenantRolesForResponsibilities}
+          eligibleUsers={eligibleUsers}
+          showScopeModeSelector={true}
+          canManage={canManage}
         />
       </DetailPagePattern>
     </PageShell>
