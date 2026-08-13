@@ -1,18 +1,26 @@
 /**
- * Simple in-process sliding-window rate limiter.
+ * Best-effort in-process sliding-window rate limiter.
  *
- * Suitable for the password-reset endpoint where the goal is abuse
- * protection without adding an external dependency (Redis, Upstash, etc.).
+ * Classification: BEST-EFFORT — NOT robust distributed rate limiting.
  *
- * Limitations:
- *   - Not shared across serverless function instances. Use a persistent
- *     store (Redis) for stricter enforcement in multi-instance deployments.
+ * Limitations (known and accepted for this slice):
+ *   - State is NOT shared across Vercel serverless function instances.
+ *     A high-volume attacker can bypass this limiter by distributing
+ *     requests across different cold-start instances.
  *   - State is lost on process restart.
  *
- * These limitations are acceptable for the password-reset use-case: the
- * opaque response design and email delivery delay already provide the
- * primary abuse protection; the rate limiter prevents high-volume
- * enumeration from a single origin.
+ * Why this is retained rather than removed:
+ *   - Provides lightweight protection against single-origin burst abuse
+ *     even within a single instance lifetime.
+ *   - The primary abuse controls are the opaque response design and the
+ *     email delivery delay — the rate limiter is additive, not primary.
+ *   - Introducing a shared store (Redis/Upstash) solely for this endpoint
+ *     is disproportionate without existing infrastructure.
+ *
+ * Follow-up required for production-grade distributed abuse protection:
+ *   Move to a durable shared rate-limit store (e.g. Upstash Redis via
+ *   @upstash/ratelimit) once Vercel Redis infrastructure is in place.
+ *   Track as a USER-ADMIN security follow-up slice.
  */
 
 type Bucket = {
@@ -30,7 +38,7 @@ export type RateLimitResult =
  * Check whether a given key has exceeded the allowed number of requests
  * within the sliding window.
  *
- * @param key        Identifier, typically IP address or email.
+ * @param key        Identifier, typically IP address.
  * @param limit      Maximum requests per window (default 5).
  * @param windowMs   Window duration in ms (default 15 minutes).
  */

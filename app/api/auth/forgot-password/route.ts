@@ -7,17 +7,22 @@
  *   - Opaque response: always returns the same 200 JSON regardless of
  *     whether the email exists — never reveals user enumeration.
  *   - Rate limiting: 5 requests per IP per 15-minute window.
+ *     NOTE: best-effort only — in-process store is not shared across
+ *     Vercel serverless instances. See rate-limit.ts for details.
  *   - Token: raw token is never logged; only the SHA-256 hash is stored.
- *   - APP_BASE_URL: reset URL is constructed from the canonical env var.
+ *   - Reset URL: constructed from APP_BASE_URL (preferred) or NEXTAUTH_URL.
+ *     If neither is configured, email delivery fails internally (operational
+ *     error) while the external response remains opaque.
+ *   - Missing RESEND_API_KEY or EMAIL_FROM: email delivery fails internally
+ *     (MailConfigurationError) while the external response remains opaque.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { createPasswordResetToken } from "@/lib/auth/password-reset";
+import { createPasswordResetToken, TOKEN_EXPIRY_MS } from "@/lib/auth/password-reset";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
-import { sendMail } from "@/lib/email/mailer";
+import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildPasswordResetEmail } from "@/lib/email/templates/password-reset";
-import { TOKEN_EXPIRY_MS } from "@/lib/auth/password-reset";
 
 const OPAQUE_SUCCESS = {
   message:
@@ -32,8 +37,27 @@ function getClientIp(req: NextRequest): string {
   );
 }
 
+/**
+ * Returns the canonical application base URL from environment configuration.
+ * Prefers APP_BASE_URL, falls back to NEXTAUTH_URL.
+ * Throws if neither is configured so the caller can log the operational failure.
+ */
+function requireAppBaseUrl(): string {
+  const url =
+    process.env.APP_BASE_URL?.trim().replace(/\/$/, "") ||
+    process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
+
+  if (!url) {
+    throw new Error(
+      "APP_BASE_URL (or NEXTAUTH_URL) is not configured. Cannot construct password reset URL.",
+    );
+  }
+
+  return url;
+}
+
 export async function POST(req: NextRequest) {
-  // Rate-limit by IP.
+  // Best-effort rate limiting by IP. Not shared across serverless instances.
   const ip = getClientIp(req);
   const rateCheck = checkRateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000);
   if (!rateCheck.allowed) {
@@ -52,7 +76,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ungültige E-Mail-Adresse." }, { status: 400 });
   }
 
-  // Look up the user — but never reveal the result to the caller.
+  // Look up the user — never reveal the result to the caller.
   let userId: string | null = null;
   let userEmail: string | null = null;
 
@@ -67,21 +91,20 @@ export async function POST(req: NextRequest) {
       userEmail = user.email;
     }
   } catch (err) {
-    console.error("[forgot-password] user lookup error", err instanceof Error ? err.message : String(err));
+    console.error(
+      "[forgot-password] user lookup error",
+      err instanceof Error ? err.message : String(err),
+    );
     return NextResponse.json(OPAQUE_SUCCESS, { status: 200 });
   }
 
-  // If the user exists and is active, create a token and send the email.
-  // Any failure is caught and silently discarded to preserve opacity.
+  // If the user exists and is active, create a token and attempt delivery.
+  // All internal failures are caught and logged without exposing token values,
+  // reset URLs, or account existence to the caller.
   if (userId && userEmail) {
     try {
       const rawToken = await createPasswordResetToken(prisma, userId);
-
-      const appBaseUrl =
-        process.env.APP_BASE_URL?.trim().replace(/\/$/, "") ??
-        process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "") ??
-        "http://localhost:3000";
-
+      const appBaseUrl = requireAppBaseUrl();
       const resetUrl = `${appBaseUrl}/reset-password?token=${rawToken}`;
       const expiryMinutes = Math.round(TOKEN_EXPIRY_MS / 60000);
 
@@ -93,11 +116,19 @@ export async function POST(req: NextRequest) {
 
       await sendMail({ to: userEmail, subject, html, text });
     } catch (err) {
-      console.error(
-        "[forgot-password] token/email error for email prefix",
-        (userEmail ?? "").slice(0, 3) + "***",
-        err instanceof Error ? err.message : String(err),
-      );
+      const isConfigError = err instanceof MailConfigurationError;
+      const emailPrefix = (userEmail ?? "").slice(0, 3) + "***";
+
+      if (isConfigError) {
+        // Operational/configuration failure — visible in logs, not to caller.
+        console.error("[forgot-password] mail configuration error:", (err as Error).message);
+      } else {
+        console.error(
+          "[forgot-password] token/email error for prefix",
+          emailPrefix,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
     }
   }
 

@@ -1,21 +1,26 @@
 /**
- * SportClubEvo — outbound email via nodemailer / SMTP.
+ * SportClubEvo — outbound email via Resend.
  *
- * Required environment variables (server-side only, never NEXT_PUBLIC_):
+ * Required server-side environment variables (never NEXT_PUBLIC_):
  *
- *   SMTP_HOST        SMTP server hostname, e.g. smtp.sendgrid.net
- *   SMTP_PORT        SMTP port (default 587)
- *   SMTP_SECURE      "true" for port 465 TLS; omit or "false" for STARTTLS (port 587)
- *   SMTP_USER        SMTP auth username
- *   SMTP_PASS        SMTP auth password / API key
- *   EMAIL_FROM       Sender address, e.g. "SportClubEvo <noreply@yourdomain.com>"
+ *   RESEND_API_KEY   Resend API key (re_...) from resend.com
+ *   EMAIL_FROM       Sender address, e.g. "SportClubEvo <noreuter@yourdomain.com>"
+ *                    Domain must be verified in the Resend dashboard.
  *
- * In local/CI environments where SMTP_HOST is absent the mailer logs the
- * email to stdout instead of sending it (safe for automated tests, safe for
- * development without a real SMTP account).
+ * Missing configuration throws MailConfigurationError — the caller is
+ * responsible for treating this as an operational failure while keeping
+ * the external API response opaque.
+ *
+ * Why Resend instead of generic SMTP/Nodemailer:
+ *   - Single API key vs five SMTP env vars.
+ *   - No peer-dependency conflicts (Nodemailer@9 conflicts with next-auth@beta).
+ *   - Serverless/Vercel-native HTTP transport; no persistent SMTP connection.
+ *   - Free tier covers SportClubEvo transactional volume.
+ *
+ * Dev/test must mock this module explicitly — there is no silent stdout fallback.
  */
 
-import nodemailer, { type Transporter } from "nodemailer";
+import { Resend } from "resend";
 
 export type MailMessage = {
   to: string;
@@ -24,54 +29,52 @@ export type MailMessage = {
   text?: string;
 };
 
-function buildTransporter(): Transporter | null {
-  const host = process.env.SMTP_HOST?.trim();
-  if (!host) {
-    return null;
+/**
+ * Thrown when required email configuration (RESEND_API_KEY or EMAIL_FROM)
+ * is absent or empty. Callers should log this as an operational/configuration
+ * failure without exposing details to the end user.
+ */
+export class MailConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MailConfigurationError";
   }
-
-  const port = parseInt(process.env.SMTP_PORT?.trim() ?? "587", 10);
-  const secure = process.env.SMTP_SECURE?.trim() === "true";
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: {
-      user: process.env.SMTP_USER?.trim(),
-      pass: process.env.SMTP_PASS?.trim(),
-    },
-  });
 }
 
 /**
- * Sends a transactional email.
+ * Sends a transactional email via Resend.
  *
- * - In production (SMTP_HOST configured): sends via SMTP.
- * - In development / CI (SMTP_HOST absent): logs to stdout and returns
- *   a mock success — never throws, never reveals token data beyond the
- *   recipient address.
+ * Throws MailConfigurationError when RESEND_API_KEY or EMAIL_FROM is missing.
+ * Throws on delivery failure (Resend API error).
  *
- * Throws on SMTP delivery failure (caller should handle gracefully).
+ * Never logs the message body, reset tokens, or reset URLs.
  */
 export async function sendMail(message: MailMessage): Promise<void> {
-  const from = process.env.EMAIL_FROM?.trim() ?? "SportClubEvo <noreply@sportclubevo.app>";
-  const transporter = buildTransporter();
-
-  if (!transporter) {
-    // Development / CI fallback: print to stdout (never includes token values).
-    console.log(
-      "[mailer:dev] Would send email",
-      JSON.stringify({ to: message.to, subject: message.subject }),
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    throw new MailConfigurationError(
+      "RESEND_API_KEY is not configured. Email delivery is unavailable.",
     );
-    return;
   }
 
-  await transporter.sendMail({
+  const from = process.env.EMAIL_FROM?.trim();
+  if (!from) {
+    throw new MailConfigurationError(
+      "EMAIL_FROM is not configured. Email delivery is unavailable.",
+    );
+  }
+
+  const resend = new Resend(apiKey);
+
+  const { error } = await resend.emails.send({
     from,
     to: message.to,
     subject: message.subject,
     html: message.html,
     text: message.text,
   });
+
+  if (error) {
+    throw new Error(`Resend delivery error: ${error.name} — ${error.message}`);
+  }
 }

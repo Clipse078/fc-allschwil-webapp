@@ -5,9 +5,16 @@
  *
  * Validates the reset token and updates the user's password.
  * On success, sets passwordChangedAt so existing JWT sessions can be
- * detected as stale by future requests.
+ * detected as stale by future middleware/auth checks.
  *
  * Password policy: minimum 12 characters.
+ *
+ * SESSION INVALIDATION NOTE:
+ *   passwordChangedAt is stored but existing JWT sessions are NOT actively
+ *   invalidated on password reset in this slice. JWTs remain valid until
+ *   natural expiry. Robust stale-session enforcement (checking
+ *   passwordChangedAt against the JWT iat/session timestamp on every
+ *   request) is tracked as a follow-up USER-ADMIN security slice.
  */
 
 import { NextRequest, NextResponse } from "next/server";
