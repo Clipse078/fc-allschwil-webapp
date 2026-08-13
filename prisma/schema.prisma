@@ -3428,6 +3428,26 @@ model TrainingSeries {
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
+  // ORG-ACCESS-03: Planning workflow stage.
+  // DRAFT      = Entwurf      — editable by scoped creator or coordinator.
+  // SUBMITTED  = Eingereicht  — locked for scoped creator, awaiting coordinator validation.
+  // APPROVED   = Validiert    — locked for scoped creator; coordinator retains management authority.
+  // Existing rows (created before ORG-ACCESS-03 by coordinators) are set to
+  // APPROVED via the migration to preserve their coordinator-authoritative status.
+  // New rows start as DRAFT when created by a scoped user, or APPROVED when
+  // created directly by a tenant-wide coordinator.
+  planningStage         ReviewWorkflowStage @default(DRAFT)
+  /// Set when a scoped user submits this series for coordinator validation.
+  planningSubmittedAt   DateTime?
+  /// User ID of the scoped submitter. Null for coordinator-created or unsubmitted series.
+  planningSubmittedById String?
+  /// Set when a coordinator validates (approves) this series.
+  planningValidatedAt   DateTime?
+  /// User ID of the coordinator who validated. Null until validated.
+  planningValidatedById String?
+  /// User who created this series — for workflow auditability.
+  createdByUserId       String?
+
   tenant          Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   teamSeason      TeamSeason                    @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   recurrenceDays  TrainingSeriesRecurrenceDay[]
@@ -3440,6 +3460,7 @@ model TrainingSeries {
   @@index([teamSeasonId])
   @@index([tenantId, status])
   @@index([teamSeasonId, status])
+  @@index([planningStage])
 }
 
 // ---------------------------------------------------------------------------

@@ -84,6 +84,13 @@ function toDto(row: TrainingSeriesRow): TrainingSeriesDto {
     sessionCount: row._count?.sessions ?? 0,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    // ORG-ACCESS-03: planning workflow stage
+    planningStage: row.planningStage ?? "APPROVED",
+    planningSubmittedAt: row.planningSubmittedAt?.toISOString() ?? null,
+    planningSubmittedById: row.planningSubmittedById ?? null,
+    planningValidatedAt: row.planningValidatedAt?.toISOString() ?? null,
+    planningValidatedById: row.planningValidatedById ?? null,
+    createdByUserId: row.createdByUserId ?? null,
   };
 }
 
@@ -294,6 +301,9 @@ export async function createTrainingSeries(
         validFrom: input.validFrom ?? null,
         validUntil: input.validUntil ?? null,
         archivedAt: null,
+        // ORG-ACCESS-03: set planning stage and creator.
+        planningStage: input.planningStage ?? "DRAFT",
+        createdByUserId: input.createdByUserId ?? null,
         recurrenceDays: {
           create: uniqueWeekdays.map((weekday) => ({
             weekday,

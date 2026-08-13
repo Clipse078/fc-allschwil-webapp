@@ -76,6 +76,14 @@ export interface TrainingSeriesDto {
   sessionCount: number;
   createdAt: string;
   updatedAt: string;
+  // ORG-ACCESS-03: planning workflow stage.
+  // DRAFT = Entwurf, SUBMITTED = Eingereicht, APPROVED = Validiert.
+  planningStage: string;
+  planningSubmittedAt: string | null;
+  planningSubmittedById: string | null;
+  planningValidatedAt: string | null;
+  planningValidatedById: string | null;
+  createdByUserId: string | null;
 }
 
 /** Public shape for a tenant-defined training plan. */
@@ -152,6 +160,10 @@ export interface CreateTrainingSeriesInput {
   weekdayTimes?: WeekdayTimeOverrideInput[];
   validFrom?: Date | null;
   validUntil?: Date | null;
+  // ORG-ACCESS-03: planning workflow stage. Set by the route based on coordinator/scoped path.
+  planningStage?: "DRAFT" | "APPROVED";
+  /** User ID of the creator — for workflow auditability. */
+  createdByUserId?: string | null;
 }
 
 export interface UpdateTrainingSeriesInput {

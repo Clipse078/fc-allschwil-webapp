@@ -58,9 +58,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
-import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { createPlanningAuthorizationPolicy } from "@/lib/planning/planning-authorization-policy";
 import { logAction } from "@/lib/audit/log-action";
 import {
   MatchNotFoundError,
@@ -92,17 +92,23 @@ const ALLOWED_BOOLEAN_KEYS = [
 ] as const;
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
-  const access = await requireApiAnyPermission([PERMISSIONS.EVENTS_MANAGE]);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+  // ORG-ACCESS-03: accept tenant-wide coordinators AND OrgUnit-scoped users.
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const tenantId = access.session.user.activeTenantId;
+  const tenantId = session.user.activeTenantId;
   if (!tenantId) {
     return NextResponse.json(
       { error: "Tenant context is required." },
       { status: 403 },
     );
+  }
+
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  if (!userId) {
+    return NextResponse.json({ error: "User identity required." }, { status: 403 });
   }
 
   const { matchId } = await params;
@@ -117,16 +123,34 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  // Confirm the event exists and belongs to this tenant
+  // Load the event — include source, teamId, reviewStage for scope checks.
   const event = await prisma.event.findFirst({
     where: { id: matchId, tenantId, type: "MATCH" },
-    select: { id: true },
+    select: { id: true, source: true, teamId: true, reviewStage: true },
   });
 
   if (!event) {
     return NextResponse.json(
       { error: "Match nicht gefunden." },
       { status: 404 },
+    );
+  }
+
+  // ORG-ACCESS-03: enforce OrgUnit scope and SFV protection.
+  const planningPolicy = createPlanningAuthorizationPolicy(prisma);
+  const canEdit = await planningPolicy.canEditPlanningRecord(
+    { userId, tenantId },
+    "match",
+    {
+      teamId: event.teamId,
+      planningStage: event.reviewStage,
+      source: event.source,
+    },
+  );
+  if (!canEdit) {
+    return NextResponse.json(
+      { error: "Keine Berechtigung zum Bearbeiten dieses Spiels." },
+      { status: 403 },
     );
   }
 

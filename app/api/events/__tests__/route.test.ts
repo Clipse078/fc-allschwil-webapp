@@ -16,23 +16,36 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// ORG-ACCESS-03: route now uses auth() + planning policy instead of requireApiPermission.
 const mocks = vi.hoisted(() => ({
-  requireApiPermission: vi.fn(),
-  requireApiAnyPermission: vi.fn(),
+  auth: vi.fn(),
+  canCreateForTeam: vi.fn(),
   seasonFindUnique: vi.fn(),
   teamFindUnique: vi.fn(),
   eventCreate: vi.fn(),
   auditLogCreate: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/auth", () => ({
+  auth: mocks.auth,
 }));
 
-// GET (not under test here) also uses this at module scope — must be mocked
-// too, otherwise the real module pulls in @/auth -> next-auth at import time.
+// GET (not under test here) still uses requireApiAnyPermission — must be mocked.
 vi.mock("@/lib/permissions/require-api-any-permission", () => ({
-  requireApiAnyPermission: mocks.requireApiAnyPermission,
+  requireApiAnyPermission: vi.fn().mockResolvedValue({ ok: false, status: 401, error: "Unauthorized", session: null }),
+}));
+
+vi.mock("@/lib/planning/planning-authorization-policy", () => ({
+  createPlanningAuthorizationPolicy: () => ({
+    canCreateForTeam: mocks.canCreateForTeam,
+  }),
+}));
+
+// Mock effective permission resolver for non-planning types (not used in these tests, but imported).
+vi.mock("@/lib/permissions/services/effective-permission-resolver", () => ({
+  createEffectivePermissionResolver: () => ({
+    getEffectivePermissions: vi.fn().mockResolvedValue({ platform: [], tenant: [] }),
+  }),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -58,16 +71,12 @@ function makeRequest(body: unknown): NextRequest {
   });
 }
 
-const VALID_SESSION = {
-  ok: true,
-  status: 200,
-  error: null,
-  session: {
-    user: {
-      id: "user-1",
-      activeTenantId: "tenant-1",
-      permissionKeys: [],
-    },
+// ORG-ACCESS-03: auth() returns Session shape directly.
+const VALID_AUTH_SESSION = {
+  user: {
+    id: "user-1",
+    activeTenantId: "tenant-1",
+    permissionKeys: [],
   },
 };
 
@@ -84,7 +93,13 @@ const VALID_BODY = {
 describe("POST /api/events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireApiPermission.mockResolvedValue(VALID_SESSION);
+    // ORG-ACCESS-03: auth() and planning policy replace requireApiPermission.
+    mocks.auth.mockResolvedValue(VALID_AUTH_SESSION);
+    mocks.canCreateForTeam.mockResolvedValue({
+      allowed: true,
+      isCoordinator: true,
+      isScoped: false,
+    });
     mocks.seasonFindUnique.mockResolvedValue({ id: "season-1", key: "2026-27", name: "2026/27" });
     mocks.teamFindUnique.mockResolvedValue({ id: "team-1" });
     mocks.eventCreate.mockResolvedValue({
@@ -93,9 +108,9 @@ describe("POST /api/events", () => {
       type: "TOURNAMENT",
       source: "MANUAL",
       status: "SCHEDULED",
-      reviewStage: "SUBMITTED",
-      reviewRequestedAt: new Date(),
-      reviewedAt: null,
+      reviewStage: "APPROVED",
+      reviewRequestedAt: null,
+      reviewedAt: new Date(),
       seasonId: "season-1",
       teamId: "team-1",
       startAt: new Date("2026-09-05T10:00:00.000Z"),
@@ -120,21 +135,28 @@ describe("POST /api/events", () => {
   });
 
   it("sets tenantId to null when the session has no active tenant (legacy/platform-only actor)", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: null,
-      session: { user: { id: "user-1", activeTenantId: null, permissionKeys: [] } },
-    });
+    // ORG-ACCESS-03: no tenantId → 403 (tenant context required for planning scope check).
+    mocks.auth.mockResolvedValue({ user: { id: "user-1", activeTenantId: null, permissionKeys: [] } });
 
-    await POST(makeRequest(VALID_BODY));
-
-    const call = mocks.eventCreate.mock.calls[0]![0] as { data: Record<string, unknown> };
-    expect(call.data.tenantId).toBeNull();
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(403);
   });
 
-  it("returns 401/403 without creating an Event when unauthorized", async () => {
-    mocks.requireApiPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden", session: null });
+  it("returns 401 when not authenticated", async () => {
+    mocks.auth.mockResolvedValue(null);
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(401);
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 without creating an Event when planning policy denies creation", async () => {
+    mocks.canCreateForTeam.mockResolvedValue({
+      allowed: false,
+      isCoordinator: false,
+      isScoped: false,
+      reason: "Keine Berechtigung.",
+    });
 
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(403);

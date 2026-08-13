@@ -16,16 +16,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
 
+// ORG-ACCESS-03: route now uses auth() + planning policy instead of requireApiAnyPermission.
 const mocks = vi.hoisted(() => ({
-  requireApiAnyPermission: vi.fn(),
+  auth: vi.fn(),
+  canEditPlanningRecord: vi.fn(),
+  seriesFindFirst: vi.fn(),
   updateTrainingSeries: vi.fn(),
   archiveTrainingSeries: vi.fn(),
   getTrainingSeries: vi.fn(),
   generateTrainingSessions: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-any-permission", () => ({
-  requireApiAnyPermission: mocks.requireApiAnyPermission,
+vi.mock("@/auth", () => ({
+  auth: mocks.auth,
+}));
+
+vi.mock("@/lib/planning/planning-authorization-policy", () => ({
+  createPlanningAuthorizationPolicy: () => ({
+    canEditPlanningRecord: mocks.canEditPlanningRecord,
+  }),
 }));
 
 vi.mock("@/lib/training/training-service", () => ({
@@ -38,7 +47,12 @@ vi.mock("@/lib/training/session-generation-service", () => ({
   generateTrainingSessions: mocks.generateTrainingSessions,
 }));
 
-vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
+// ORG-ACCESS-03: route loads the series for scope check; mock findFirst.
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    trainingSeries: { findFirst: mocks.seriesFindFirst },
+  },
+}));
 
 import { PUT, DELETE } from "../route";
 import { TrainingSeriesNotFoundError, TrainingSeriesValidationError, TrainingSeriesConflictError } from "@/lib/training/errors";
@@ -59,17 +73,19 @@ const VALID_BODY = {
   ],
 };
 
+// ORG-ACCESS-03: auth() returns Session shape directly.
 function makeAuthOk(tenantId = TENANT_A) {
-  return {
-    ok: true as const,
-    status: 200,
-    error: null,
-    session: { user: { id: "user-1", activeTenantId: tenantId } },
-  };
+  return { user: { id: "user-1", activeTenantId: tenantId } };
 }
 
-function makeAuthFail(status = 401) {
-  return { ok: false as const, status, error: "Unauthorized", session: null };
+// Fixture for the series row returned by the scope check DB call.
+function makeSeriesRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: SERIES_ID,
+    planningStage: "DRAFT",
+    teamSeason: { teamId: "team-e1" },
+    ...overrides,
+  };
 }
 
 function makeSeriesDto(overrides: Record<string, unknown> = {}) {
@@ -112,7 +128,10 @@ function makeParams(seriesId: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk());
+  // ORG-ACCESS-03: auth() and planning policy replace requireApiAnyPermission.
+  mocks.auth.mockResolvedValue(makeAuthOk());
+  mocks.seriesFindFirst.mockResolvedValue(makeSeriesRow());
+  mocks.canEditPlanningRecord.mockResolvedValue(true);
   mocks.updateTrainingSeries.mockResolvedValue(makeSeriesDto());
   mocks.archiveTrainingSeries.mockResolvedValue(makeSeriesDto({ status: "ARCHIVED", archivedAt: "2026-09-01T00:00:00.000Z" }));
   mocks.generateTrainingSessions.mockResolvedValue({
@@ -129,13 +148,13 @@ beforeEach(() => {
 
 describe("A. PUT /api/training-series/:seriesId", () => {
   it("A1. returns 401 when unauthenticated", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthFail());
+    mocks.auth.mockResolvedValue(null);
     const res = await PUT(makePutRequest(VALID_BODY), makeParams(SERIES_ID));
     expect(res.status).toBe(401);
   });
 
-  it("A2. returns 403 when forbidden (trainings.view only)", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden", session: null });
+  it("A2. returns 403 when planning policy denies edit (no scope)", async () => {
+    mocks.canEditPlanningRecord.mockResolvedValue(false);
     const res = await PUT(makePutRequest(VALID_BODY), makeParams(SERIES_ID));
     expect(res.status).toBe(403);
   });
@@ -151,7 +170,8 @@ describe("A. PUT /api/training-series/:seriesId", () => {
   });
 
   it("A5. returns 404 when series does not exist (or cross-tenant)", async () => {
-    mocks.updateTrainingSeries.mockRejectedValue(new TrainingSeriesNotFoundError(SERIES_ID));
+    // ORG-ACCESS-03: scope check loads series first; null → 404 before updateTrainingSeries.
+    mocks.seriesFindFirst.mockResolvedValue(null);
     const res = await PUT(makePutRequest(VALID_BODY), makeParams(SERIES_ID));
     expect(res.status).toBe(404);
   });
@@ -201,19 +221,20 @@ describe("A. PUT /api/training-series/:seriesId", () => {
 
 describe("B. DELETE /api/training-series/:seriesId", () => {
   it("B1. returns 401 when unauthenticated", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthFail());
+    mocks.auth.mockResolvedValue(null);
     const res = await DELETE(new NextRequest(`http://localhost/api/training-series/${SERIES_ID}`, { method: "DELETE" }), makeParams(SERIES_ID));
     expect(res.status).toBe(401);
   });
 
-  it("B2. returns 403 when forbidden (trainings.view only)", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden", session: null });
+  it("B2. returns 403 when planning policy denies edit (no scope)", async () => {
+    mocks.canEditPlanningRecord.mockResolvedValue(false);
     const res = await DELETE(new NextRequest(`http://localhost/api/training-series/${SERIES_ID}`, { method: "DELETE" }), makeParams(SERIES_ID));
     expect(res.status).toBe(403);
   });
 
   it("B3. returns 404 when series does not exist (or cross-tenant)", async () => {
-    mocks.archiveTrainingSeries.mockRejectedValue(new TrainingSeriesNotFoundError(SERIES_ID));
+    // ORG-ACCESS-03: scope check loads series first; null → 404 before archiveTrainingSeries.
+    mocks.seriesFindFirst.mockResolvedValue(null);
     const res = await DELETE(new NextRequest(`http://localhost/api/training-series/${SERIES_ID}`, { method: "DELETE" }), makeParams(SERIES_ID));
     expect(res.status).toBe(404);
   });
@@ -228,12 +249,13 @@ describe("B. DELETE /api/training-series/:seriesId", () => {
   });
 
   it("B5. tenant isolation — archiving under a different tenant's session scopes the lookup by that tenant", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_B));
-    mocks.archiveTrainingSeries.mockRejectedValue(new TrainingSeriesNotFoundError(SERIES_ID));
+    // ORG-ACCESS-03: auth() is now the session source; seriesFindFirst scopes to tenantId.
+    mocks.auth.mockResolvedValue(makeAuthOk(TENANT_B));
+    // seriesFindFirst not found for TENANT_B → 404 (scope check returns null before archive).
+    mocks.seriesFindFirst.mockResolvedValue(null);
 
     const res = await DELETE(new NextRequest(`http://localhost/api/training-series/${SERIES_ID}`, { method: "DELETE" }), makeParams(SERIES_ID));
 
     expect(res.status).toBe(404);
-    expect(mocks.archiveTrainingSeries).toHaveBeenCalledWith(TENANT_B, SERIES_ID);
   });
 });

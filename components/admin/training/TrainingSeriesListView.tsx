@@ -10,6 +10,7 @@ import {
 import type { TrainingSeriesDto, TrainingSeriesStatus, Weekday } from "@/lib/training/types";
 import TrainingSeriesArchiveButton from "./TrainingSeriesArchiveButton";
 import TrainingSeriesDeleteControl from "./TrainingSeriesDeleteControl";
+import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   MONDAY: "Mo",
@@ -150,6 +151,10 @@ export default function TrainingSeriesListView({
                       >
                         {statusLabel(series.status as TrainingSeriesStatus)}
                       </span>
+                      {/* ORG-ACCESS-03: show planning workflow stage for DRAFT/SUBMITTED records */}
+                      {(series.planningStage === "DRAFT" || series.planningStage === "SUBMITTED") && (
+                        <PlanningWorkflowBadge stage={series.planningStage} size="sm" />
+                      )}
                     </div>
                   </div>
 

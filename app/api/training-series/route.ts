@@ -66,12 +66,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createPlanningAuthorizationPolicy } from "@/lib/planning/planning-authorization-policy";
 import { createTrainingSeries, getTrainingSeries } from "@/lib/training/training-service";
 import { generateTrainingSessions } from "@/lib/training/session-generation-service";
 import { createTrainingAllocation } from "@/lib/training/training-allocation-service";
 import { deleteTrainingSeriesPermanently } from "@/lib/training/training-lifecycle-service";
+import { logAction } from "@/lib/audit/log-action";
 import {
   TrainingSeriesValidationError,
   TrainingSeriesConflictError,
@@ -89,6 +92,7 @@ import {
   parseFacilityResourceIds,
 } from "@/lib/training/series-request-helpers";
 
+
 /**
  * Maps an allocation-validation error to the HTTP status the standalone
  * POST /api/training-series/:id/allocations endpoint already uses for the
@@ -105,11 +109,19 @@ function allocationErrorStatus(err: unknown): number {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireApiAnyPermission([PERMISSIONS.TRAININGS_MANAGE]);
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  // ORG-ACCESS-03: accept both tenant-wide coordinators AND OrgUnit-scoped users.
+  // The planning policy performs the combined permission + OrgUnit scope check
+  // after we know which teamSeasonId (and therefore team + OrgUnit) is requested.
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  const tenantId = auth.session.user?.activeTenantId;
+  const tenantId = session.user?.activeTenantId;
   if (!tenantId) return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
+
+  const userId = session.user.effectiveUserId ?? session.user.id;
+  if (!userId) return NextResponse.json({ error: "User identity required" }, { status: 403 });
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
@@ -119,6 +131,19 @@ export async function POST(request: NextRequest) {
   const teamSeasonId = typeof body.teamSeasonId === "string" ? body.teamSeasonId.trim() : "";
   if (!teamSeasonId) {
     return NextResponse.json({ error: "teamSeasonId is required" }, { status: 400 });
+  }
+
+  // ORG-ACCESS-03: scope check — must have write authorization for this TeamSeason's team.
+  const planningPolicy = createPlanningAuthorizationPolicy(prisma);
+  const canCreate = await planningPolicy.canCreateForTeamSeason(
+    { userId, tenantId },
+    teamSeasonId,
+  );
+  if (!canCreate.allowed) {
+    return NextResponse.json(
+      { error: canCreate.reason ?? "Keine Schreibberechtigung für dieses Team." },
+      { status: 403 },
+    );
   }
 
   const title = typeof body.title === "string" ? body.title.trim() : "";
@@ -145,6 +170,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // ORG-ACCESS-03: coordinator-created records are directly APPROVED (authoritative).
+    // Scoped user records start as DRAFT (editable until submitted).
+    const planningStage = canCreate.isCoordinator ? "APPROVED" : "DRAFT";
+
     const created = await createTrainingSeries(tenantId, {
       teamSeasonId,
       title,
@@ -156,6 +185,8 @@ export async function POST(request: NextRequest) {
       weekdayTimes: schedules.value.weekdayTimes,
       validFrom: validFrom.value,
       validUntil: validUntil.value,
+      planningStage,
+      createdByUserId: userId,
     });
 
     const generation = await generateTrainingSessions(tenantId, created.id, {
@@ -189,6 +220,21 @@ export async function POST(request: NextRequest) {
     }
 
     const series = await getTrainingSeries(tenantId, created.id);
+
+    await logAction({
+      actorUserId: userId,
+      moduleKey: "training",
+      entityType: "TrainingSeries",
+      entityId: created.id,
+      action: canCreate.isCoordinator ? "CREATE_DIRECT" : "CREATE_DRAFT",
+      afterJson: {
+        teamSeasonId,
+        title,
+        planningStage,
+        isCoordinator: canCreate.isCoordinator,
+        isScoped: canCreate.isScoped,
+      },
+    });
 
     return NextResponse.json({ series, generation }, { status: 201 });
   } catch (err) {
