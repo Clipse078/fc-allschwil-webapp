@@ -153,6 +153,8 @@ The authorize function logs exactly which step failed:
 - `no user found for email prefix` — email not found (wrong email or casing)
 - `user inactive` — `isActive = false`
 - `bcrypt comparison failed — wrong password or stale hash` — password mismatch
+- `lastLoginAt update failed (non-fatal)` — non-blocking DB write error; login proceeds
+- `session-context build failed — tenant/permission/role query threw` — Prisma error after password check; login returns null
 
 ### Step F — Confirm NEXTAUTH_SECRET is set and consistent
 

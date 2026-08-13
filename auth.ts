@@ -103,26 +103,46 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           return null;
         }
 
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() },
-        });
+        // lastLoginAt is informational — a failure must never block a valid login.
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+          });
+        } catch (updateErr) {
+          console.error(
+            "[auth] authorize: lastLoginAt update failed (non-fatal)",
+            updateErr instanceof Error ? updateErr.message : String(updateErr),
+          );
+        }
 
         // RPERM-04: tenant context and effective permissions are resolved via
         // the single canonical model (TenantMembership + EffectivePermissionResolver),
         // not via User.tenantId or a naive flatten of every assigned role's permissions.
-        const tenantContext = await resolveTenantMembershipContext(prisma, user.id);
-        const permissionKeys = await resolveSessionPermissionKeys(
-          prisma,
-          user.id,
-          tenantContext.activeTenantId,
-        );
+        let tenantContext: Awaited<ReturnType<typeof resolveTenantMembershipContext>>;
+        let permissionKeys: string[];
+        let roleKeys: string[];
 
-        const userRoles = await prisma.userRole.findMany({
-          where: { userId: user.id },
-          select: { role: { select: { key: true } } },
-        });
-        const roleKeys = Array.from(new Set(userRoles.map((ur) => ur.role.key)));
+        try {
+          tenantContext = await resolveTenantMembershipContext(prisma, user.id);
+          permissionKeys = await resolveSessionPermissionKeys(
+            prisma,
+            user.id,
+            tenantContext.activeTenantId,
+          );
+
+          const userRoles = await prisma.userRole.findMany({
+            where: { userId: user.id },
+            select: { role: { select: { key: true } } },
+          });
+          roleKeys = Array.from(new Set(userRoles.map((ur) => ur.role.key)));
+        } catch (sessionErr) {
+          console.error(
+            "[auth] authorize: session-context build failed — tenant/permission/role query threw",
+            sessionErr instanceof Error ? sessionErr.message : String(sessionErr),
+          );
+          return null;
+        }
 
         const authUser: SessionUserShape = {
           id: user.id,
