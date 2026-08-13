@@ -4,6 +4,7 @@ import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
 import { getMatchcenterResultLabel } from "@/lib/matchcenter/match-lifecycle";
 import { resolveMatchcenterCompactSideName } from "@/lib/matchcenter/team-display";
 import { ClubLogo } from "@/components/admin/club-directory/ClubLogo";
+import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
 
 function formatMatchDate(value: Date, locale: string, timezone: string): string {
   return new Intl.DateTimeFormat(locale, {
@@ -18,6 +19,11 @@ type MatchcenterResultRowProps = {
   match: MatchcenterMatchSummary;
   locale: string;
   timezone: string;
+  /**
+   * Canonical tenant/club logo URL (Tenant.logoUrl).
+   * Used for internal (isOwnTeam) sides — MATCHCENTER-UX-03-C1.
+   */
+  tenantLogoUrl?: string | null;
 };
 
 /**
@@ -33,6 +39,7 @@ export default function MatchcenterResultRow({
   match,
   locale,
   timezone,
+  tenantLogoUrl = null,
 }: MatchcenterResultRowProps) {
   const result = getMatchcenterResultLabel(match);
   const normalizedHomeAway = match.homeAway?.trim().toUpperCase() ?? null;
@@ -45,6 +52,10 @@ export default function MatchcenterResultRow({
 
   const homeName = resolveMatchcenterCompactSideName(match.home);
   const awayName = resolveMatchcenterCompactSideName(match.away);
+
+  // Canonical logo resolution — same rule as MatchCard and MatchInspector
+  const homeLogoUrl = resolveClubIdentityLogoUrl(match.home, tenantLogoUrl);
+  const awayLogoUrl = resolveClubIdentityLogoUrl(match.away, tenantLogoUrl);
 
   return (
     <article
@@ -65,7 +76,7 @@ export default function MatchcenterResultRow({
             {homeName}
           </p>
           <ClubLogo
-            logoUrl={match.home.externalLogoUrl ?? null}
+            logoUrl={homeLogoUrl}
             name={homeName}
             size="md"
             bare
@@ -84,7 +95,7 @@ export default function MatchcenterResultRow({
         {/* Away side */}
         <div className="flex min-w-0 items-center gap-3">
           <ClubLogo
-            logoUrl={match.away.externalLogoUrl ?? null}
+            logoUrl={awayLogoUrl}
             name={awayName}
             size="md"
             bare

@@ -11,6 +11,7 @@ import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
 import type { MatchcenterOperationalAssessment } from "@/lib/matchcenter/operational-state";
 import { getMatchcenterResultLabel, isMatchLive } from "@/lib/matchcenter/match-lifecycle";
 import { resolveMatchcenterCompactSideName } from "@/lib/matchcenter/team-display";
+import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import MatchTeamLogo from "./MatchTeamLogo";
 
@@ -50,6 +51,8 @@ type MatchcenterSpielplanungRowProps = {
   assessment: MatchcenterOperationalAssessment;
   locale: string;
   timezone: string;
+  /** Canonical tenant/club logo URL — MATCHCENTER-UX-03-C1. */
+  tenantLogoUrl?: string | null;
 };
 
 export default function MatchcenterSpielplanungRow({
@@ -57,6 +60,7 @@ export default function MatchcenterSpielplanungRow({
   assessment,
   locale,
   timezone,
+  tenantLogoUrl = null,
 }: MatchcenterSpielplanungRowProps) {
   const normalizedHomeAway = match.homeAway?.trim().toUpperCase() ?? null;
   const homeAwayLabel =
@@ -73,6 +77,8 @@ export default function MatchcenterSpielplanungRow({
 
   const homeName = resolveMatchcenterCompactSideName(match.home);
   const awayName = resolveMatchcenterCompactSideName(match.away);
+  const homeLogoUrl = resolveClubIdentityLogoUrl(match.home, tenantLogoUrl);
+  const awayLogoUrl = resolveClubIdentityLogoUrl(match.away, tenantLogoUrl);
 
   return (
     <article
@@ -117,7 +123,7 @@ export default function MatchcenterSpielplanungRow({
           <MatchTeamLogo
             label={homeName}
             emphasized={match.home.isOwnTeam}
-            logoUrl={match.home.externalLogoUrl}
+            logoUrl={homeLogoUrl}
           />
           <p
             className={
@@ -136,7 +142,7 @@ export default function MatchcenterSpielplanungRow({
           <MatchTeamLogo
             label={awayName}
             emphasized={match.away.isOwnTeam}
-            logoUrl={match.away.externalLogoUrl}
+            logoUrl={awayLogoUrl}
           />
           <p
             className={

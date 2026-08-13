@@ -103,6 +103,12 @@ type MatchcenterWochenplanBulkPanelProps = {
   locale: string;
   timezone: string;
   canManage: boolean;
+  /**
+   * Canonical tenant/club logo URL (Tenant.logoUrl).
+   * Threaded down to MatchCard and MatchInspector for own-club identity.
+   * MATCHCENTER-UX-03-C1.
+   */
+  tenantLogoUrl?: string | null;
 };
 
 export default function MatchcenterWochenplanBulkPanel({
@@ -110,6 +116,7 @@ export default function MatchcenterWochenplanBulkPanel({
   locale,
   timezone,
   canManage,
+  tenantLogoUrl = null,
 }: MatchcenterWochenplanBulkPanelProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -337,6 +344,7 @@ export default function MatchcenterWochenplanBulkPanel({
                     locale={locale}
                     timezone={timezone}
                     density={density}
+                    tenantLogoUrl={tenantLogoUrl}
                     isSelecting={isSelecting}
                     isSelected={selectedIds.has(row.match.id)}
                     onToggleSelect={toggleSelection}
@@ -357,6 +365,7 @@ export default function MatchcenterWochenplanBulkPanel({
         match={inspectorMatch}
         locale={locale}
         timezone={timezone}
+        tenantLogoUrl={tenantLogoUrl}
         onClose={() => setInspectorMatchId(null)}
       />
     </div>
