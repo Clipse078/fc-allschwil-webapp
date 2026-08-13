@@ -170,9 +170,13 @@ export class OrgUnitPermissionResolver {
 
     if (userRoles.length === 0) return false;
 
-    // Fast path: any tenant-wide assignment (orgUnitId IS NULL) → granted for
-    // all OrgUnits in the tenant.
-    if (userRoles.some((ur) => ur.orgUnitId === null)) {
+    // Fast path: a genuine tenant-wide assignment (orgUnitId IS NULL AND scopeMode IS NULL)
+    // grants access for all OrgUnits in the tenant.
+    // Defense-in-depth: a malformed row where orgUnitId=null but scopeMode is set
+    // (e.g. left behind by a SET NULL cascade) MUST NOT be treated as tenant-wide.
+    // With the Cascade FK this state cannot arise from normal OrgUnit deletion, but
+    // we guard here regardless so no persisted anomaly can ever escalate privileges.
+    if (userRoles.some((ur) => ur.orgUnitId === null && ur.scopeMode === null)) {
       return true;
     }
 
