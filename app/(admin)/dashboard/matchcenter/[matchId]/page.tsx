@@ -77,6 +77,19 @@ export default async function MatchcenterDetailPage({
   // of events.manage (manage alone must never authorize deletion).
   const canDelete = hasPermission(session, PERMISSIONS.MATCHES_DELETE);
 
+  // ORG-ACCESS-03: planning workflow action visibility.
+  // Coordinator = tenant-wide EVENTS_MANAGE → can validate/reopen.
+  // Scoped user = no tenant-wide EVENTS_MANAGE → can submit DRAFT manual records.
+  // Provider-owned records (SFV/CLUBCORNER_FVNWS/CSV_EXCEL_IMPORT) are never
+  // exposed to scoped mutation regardless of stage.
+  const PROTECTED_SOURCES = new Set(["SFV", "CLUBCORNER_FVNWS", "CSV_EXCEL_IMPORT"]);
+  const isProtectedSource = PROTECTED_SOURCES.has(match.source.eventSource);
+  // isCoordinator drives validate/reopen; submit is shown for non-coordinator
+  // on DRAFT records (the actual authz check happens server-side in the endpoint).
+  const isCoordinatorForPlanning = canManageMappings;
+  const canSubmitPlanning = !isProtectedSource && !canManageMappings && match.reviewStage === "DRAFT";
+  const canValidatePlanning = !isProtectedSource && canManageMappings;
+
   // MASTERDATA-CONSISTENCY-02 — canonical, tenant-scoped, active resource
   // options for the operational pitch/dressing-room selectors, replacing the
   // static FCA_PITCH_ALLOCATIONS / FCA_DRESSING_ROOMS registries. Any code
@@ -150,6 +163,9 @@ export default async function MatchcenterDetailPage({
         dressingRoomOptions={dressingRoomOptions}
         pitchHallFacilityGroups={pitchHallFacilityGroups}
         dressingRoomFacilityGroups={dressingRoomFacilityGroups}
+        canSubmitPlanning={canSubmitPlanning}
+        canValidatePlanning={canValidatePlanning}
+        isProtectedSource={isProtectedSource}
       />
     </ToastProvider>
   );

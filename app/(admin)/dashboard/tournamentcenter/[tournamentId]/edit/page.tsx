@@ -33,6 +33,9 @@ export default async function TournamentEditPage({ params }: Props) {
   // ADMIN-DELETE-02A: permanent "Löschen" gating — deliberately independent
   // of canManage/events.manage.
   const canDelete = hasPermission(session, PERMISSIONS.TOURNAMENTS_DELETE);
+
+  // ORG-ACCESS-03: planning workflow flags for the edit form.
+  const PROTECTED_SOURCES = new Set(["SFV", "CLUBCORNER_FVNWS", "CSV_EXCEL_IMPORT"]);
   const { tournamentId } = await params;
 
   let tournament;
@@ -42,6 +45,8 @@ export default async function TournamentEditPage({ params }: Props) {
     if (err instanceof TournamentNotFoundError) notFound();
     throw err;
   }
+
+  const isProtectedSource = PROTECTED_SOURCES.has(tournament.source);
 
   const facilities = await getFacilitiesForTenant(tenantContext.id);
 
@@ -94,6 +99,8 @@ export default async function TournamentEditPage({ params }: Props) {
             canDelete={canDelete}
             pitchHallFacilityGroups={pitchHallFacilityGroups}
             dressingRoomFacilityGroups={dressingRoomFacilityGroups}
+            isCoordinatorForPlanning={canManage}
+            isProtectedSource={isProtectedSource}
           />
         </div>
       </div>

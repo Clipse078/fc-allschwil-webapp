@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -7,25 +8,45 @@ import { getFacilitiesForTenant } from "@/lib/facilities/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TrainingSeriesCreateForm from "@/components/admin/training/TrainingSeriesCreateForm";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import { prisma } from "@/lib/db/prisma";
+import { createPlanningAuthorizationPolicy } from "@/lib/planning/planning-authorization-policy";
 
 export default async function NewTrainingSeriesPage() {
-  const session = await requireAnyPermission([PERMISSIONS.TRAININGS_MANAGE]);
+  // ORG-ACCESS-03: broaden gate to also allow TRAININGS_VIEW so scoped users
+  // (who have trainings.manage at OrgUnit scope only, plus trainings.view at
+  // tenant level) can reach this create page. The backend enforces 403 if
+  // the submitted teamSeason is outside their write scope.
+  const session = await requireAnyPermission([
+    PERMISSIONS.TRAININGS_MANAGE,
+    PERMISSIONS.TRAININGS_VIEW,
+  ]);
 
   const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
-  // PLANNING-CREATION-UX-01B: TrainingCenter has exactly one permission tier
-  // today (trainings.manage — also the gate above) and no draft/pending
-  // review state (see lib/training/create-training-series-orchestration.ts
-  // doc comment). `canValidateDirectly` is wired from that EXISTING
-  // permission rather than inventing a new one, so the guided form's final
-  // action reflects the real lifecycle instead of a fabricated review queue.
+  const userId = session.user?.effectiveUserId ?? session.user?.id;
+  if (!userId) notFound();
+
+  // PLANNING-CREATION-UX-01B: canValidateDirectly is true for tenant-wide
+  // trainings.manage holders (coordinators). Scoped users start records as DRAFT.
   const canValidateDirectly = hasPermission(session, PERMISSIONS.TRAININGS_MANAGE);
 
-  const [teamSeasons, facilities] = await Promise.all([
+  const policy = createPlanningAuthorizationPolicy(prisma);
+
+  const [teamSeasons, facilities, writableTeamIds] = await Promise.all([
     findTeamSeasonsForTenant(tenantId),
     getFacilitiesForTenant(tenantId),
+    // ORG-ACCESS-03: compute writable team IDs for this user.
+    // Coordinators get all teams; scoped users get only their OrgUnit-covered teams.
+    policy.getWritableTeamIds({ userId, tenantId }, "training"),
   ]);
+
+  // ORG-ACCESS-03: filter teamSeasons to those the user may write.
+  // For coordinators, writableTeamIds covers all teams so no filtering effect.
+  const writableTeamIdSet = new Set(writableTeamIds);
+  const filteredTeamSeasons = writableTeamIds.length > 0
+    ? teamSeasons.filter((ts) => writableTeamIdSet.has(ts.teamId))
+    : [];
 
   function facilityGroupsForTypes(types: readonly string[]): FacilityGroup[] {
     return facilities
@@ -61,7 +82,7 @@ export default async function NewTrainingSeriesPage() {
       />
 
       <TrainingSeriesCreateForm
-        teamSeasons={teamSeasons.map((ts) => ({ id: ts.id, teamId: ts.teamId, teamName: ts.teamName, seasonName: ts.seasonName }))}
+        teamSeasons={filteredTeamSeasons.map((ts) => ({ id: ts.id, teamId: ts.teamId, teamName: ts.teamName, seasonName: ts.seasonName }))}
         pitchHallFacilityGroups={pitchHallFacilityGroups}
         dressingRoomFacilityGroups={dressingRoomFacilityGroups}
         canValidateDirectly={canValidateDirectly}

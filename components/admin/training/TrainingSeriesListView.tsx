@@ -11,6 +11,7 @@ import type { TrainingSeriesDto, TrainingSeriesStatus, Weekday } from "@/lib/tra
 import TrainingSeriesArchiveButton from "./TrainingSeriesArchiveButton";
 import TrainingSeriesDeleteControl from "./TrainingSeriesDeleteControl";
 import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
+import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWorkflowActionsClient";
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   MONDAY: "Mo",
@@ -56,6 +57,14 @@ type Props = {
   showArchived: boolean;
   canManage: boolean;
   /**
+   * ORG-ACCESS-03: true when the user holds tenant-wide trainings.manage
+   * (coordinator path). Used to decide which workflow action buttons to show:
+   * - isCoordinator: false (scoped user) → show "Einreichen" for DRAFT records
+   * - isCoordinator: true (coordinator)  → show "Validieren" / "Wiedereröffnen"
+   * Matches canManage when that is sourced from hasPermission(TRAININGS_MANAGE).
+   */
+  isCoordinator?: boolean;
+  /**
    * ADMIN-DELETE-02A-C1: effective PERMISSIONS.TRAININGS_DELETE authority.
    * Deliberately independent of canManage/trainings.manage — permanent
    * deletion is a separate authority from create/edit/archive, and must
@@ -78,6 +87,7 @@ export default function TrainingSeriesListView({
   allSeries,
   showArchived,
   canManage,
+  isCoordinator = canManage,
   canDelete = false,
   basePath = "/dashboard/training",
 }: Props) {
@@ -151,14 +161,15 @@ export default function TrainingSeriesListView({
                       >
                         {statusLabel(series.status as TrainingSeriesStatus)}
                       </span>
-                      {/* ORG-ACCESS-03: show planning workflow stage for DRAFT/SUBMITTED records */}
-                      {(series.planningStage === "DRAFT" || series.planningStage === "SUBMITTED") && (
+                      {/* ORG-ACCESS-03: show planning workflow stage badge */}
+                      {(series.planningStage === "DRAFT" || series.planningStage === "SUBMITTED" ||
+                        (series.planningStage === "APPROVED" && !isCoordinator)) && (
                         <PlanningWorkflowBadge stage={series.planningStage} size="sm" />
                       )}
                     </div>
                   </div>
 
-                  {(canManage || canDelete) && (
+                  {(canManage || canDelete || series.planningStage === "DRAFT") && (
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
                       {canManage && series.status !== "ARCHIVED" && (
                         <>
@@ -178,6 +189,15 @@ export default function TrainingSeriesListView({
                           </Link>
                           <TrainingSeriesArchiveButton seriesId={series.id} seriesTitle={series.title} />
                         </>
+                      )}
+                      {/* ORG-ACCESS-03: planning workflow action buttons */}
+                      {series.status !== "ARCHIVED" && (
+                        <PlanningWorkflowActionsClient
+                          recordId={series.id}
+                          domain="training"
+                          planningStage={series.planningStage}
+                          isCoordinator={isCoordinator}
+                        />
                       )}
                       {/*
                         ADMIN-DELETE-02A-C1: permanent delete requires effective

@@ -58,6 +58,9 @@ function installFetchMock() {
     if (url === "/api/teams") {
       return jsonResponse([{ id: "team-1", name: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }]);
     }
+    if (url === "/api/planning/writable-teams?domain=match") {
+      return jsonResponse({ teams: [{ id: "team-1", name: "1. Mannschaft", displayName: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }] });
+    }
     if (url === "/api/club-directory/teams") {
       return jsonResponse({
         teams: [
@@ -232,5 +235,60 @@ describe("MatchCreateForm — submission lifecycle copy + orchestration", () => 
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/dashboard/matchcenter?submitted=1"));
     expect(patchCalls).toHaveLength(0);
+  });
+});
+
+// ORG-ACCESS-03-C1: writable-teams picker integration
+describe("MatchCreateForm — ORG-ACCESS-03 writable-teams picker", () => {
+  it("shows German no-teams message when writable-teams returns empty list", async () => {
+    // Override the writable-teams mock to return empty
+    const emptyTeamsMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/seasons") {
+        return { ok: true, status: 200, json: async () => ({ seasons: [{ id: "s1", key: "2025-2026", name: "Saison 2025/2026", isActive: true }] }) } as Response;
+      }
+      if (url === "/api/planning/writable-teams?domain=match") {
+        return { ok: true, status: 200, json: async () => ({ teams: [] }) } as Response;
+      }
+      if (url === "/api/club-directory/teams") {
+        return { ok: true, status: 200, json: async () => ({ teams: [] }) } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", emptyTeamsMock);
+
+    render(<MatchCreateForm pitchHallFacilityGroups={[]} dressingRoomFacilityGroups={[]} canValidateDirectly={false} />);
+
+    // Wait for teams to load (empty)
+    await waitFor(() => {
+      expect(screen.queryByText("Teams laden…")).not.toBeInTheDocument();
+    });
+
+    // Should show German message instead of the select
+    expect(screen.queryByTestId("match-create-team-select")).not.toBeInTheDocument();
+    expect(screen.getByText(/Kein Team mit Schreibzugriff verfügbar/)).toBeInTheDocument();
+  });
+
+  it("shows the team select when writable-teams returns results", async () => {
+    // Standard mock with one team
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/seasons") {
+        return { ok: true, status: 200, json: async () => ({ seasons: [{ id: "s1", key: "2025-2026", name: "Saison 2025/2026", isActive: true }] }) } as Response;
+      }
+      if (url === "/api/planning/writable-teams?domain=match") {
+        return { ok: true, status: 200, json: async () => ({ teams: [{ id: "team-1", name: "1. Mannschaft", displayName: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }] }) } as Response;
+      }
+      if (url === "/api/club-directory/teams") {
+        return { ok: true, status: 200, json: async () => ({ teams: [] }) } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    }));
+
+    render(<MatchCreateForm pitchHallFacilityGroups={[]} dressingRoomFacilityGroups={[]} canValidateDirectly={false} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("match-create-team-select")).not.toBeDisabled();
+    });
+    expect(screen.getByTestId("match-create-team-select")).toBeInTheDocument();
+    expect(screen.queryByText(/Kein Team mit Schreibzugriff/)).not.toBeInTheDocument();
   });
 });

@@ -11,7 +11,7 @@
  * Scoped user: only teams whose canonical OrgUnit is covered by their scope.
  * Unauthenticated / no planning permission: empty list.
  *
- * Response: { teams: { id, name, displayName }[] }
+ * Response: { teams: { id, name, displayName, ageGroup, genderGroup, isActive }[] }
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -65,6 +65,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       id: true,
       name: true,
       shortName: true,
+      ageGroup: true,
+      genderGroup: true,
+      isActive: true,
       sortOrder: true,
     },
     orderBy: { sortOrder: "asc" },
@@ -74,6 +77,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     id: t.id,
     name: t.name,
     displayName: t.shortName ?? t.name,
+    ageGroup: t.ageGroup ?? null,
+    genderGroup: t.genderGroup ?? null,
+    isActive: t.isActive,
   }));
 
   return NextResponse.json({ teams: result });

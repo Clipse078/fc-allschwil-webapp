@@ -55,6 +55,9 @@ function installFetchMock() {
     if (url === "/api/teams") {
       return jsonResponse([{ id: "team-1", name: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }]);
     }
+    if (url === "/api/planning/writable-teams?domain=tournament") {
+      return jsonResponse({ teams: [{ id: "team-1", name: "1. Mannschaft", displayName: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }] });
+    }
     if (url === "/api/club-directory/clubs") {
       return jsonResponse({ clubs: [] });
     }

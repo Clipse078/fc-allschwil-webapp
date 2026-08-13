@@ -9,7 +9,14 @@ import { getFacilitiesForTenant } from "@/lib/facilities/queries";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 
 export default async function NewMatchCenterPage() {
-  const session = await requireAnyPermission([PERMISSIONS.EVENTS_MANAGE]);
+  // ORG-ACCESS-03: broaden gate to also allow EVENTS_VIEW so scoped users
+  // (who have events.manage at OrgUnit scope only, plus events.view at
+  // tenant level) can reach this create page. The backend enforces 403
+  // if the submitted team is outside their write scope.
+  const session = await requireAnyPermission([
+    PERMISSIONS.EVENTS_MANAGE,
+    PERMISSIONS.EVENTS_VIEW,
+  ]);
 
   const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
