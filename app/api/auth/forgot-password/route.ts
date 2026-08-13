@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
         resetUrl,
         recipientEmail: userEmail,
         expiryMinutes,
+        appBaseUrl,
       });
 
       await sendMail({ to: userEmail, subject, html, text });
