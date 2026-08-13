@@ -203,13 +203,13 @@ describe("MatchcenterOverview — Spielplanung", () => {
     expect(screen.getByText("FC Basel E1")).toBeTruthy();
   });
 
-  it("links each Spielplanung row to its detail page", () => {
+  it("renders the Spielplanung row with the correct match testid", () => {
     renderOverview([createMatch()]);
 
-    const link = screen.getByRole("link", {
-      name: "Details zu FC Allschwil – Gegner anzeigen",
-    });
-    expect(link).toHaveAttribute("href", "/dashboard/matchcenter/match-1");
+    // MATCHCENTER-UX-03: card click opens the inspector (not direct link navigation).
+    // The inspector provides "Match bearbeiten" navigation; the card itself is a
+    // clickable region that opens the inspector panel.
+    expect(screen.getByTestId("matchcenter-spielplanung-row-match-1")).toBeTruthy();
   });
 
   it("A. an upcoming SCHEDULED match never renders a score", () => {
@@ -231,7 +231,7 @@ describe("MatchcenterOverview — Spielplanung", () => {
     ).toBeTruthy();
   });
 
-  it("E. shows the open action count and compact chips for a future HOME match with missing setup", () => {
+  it("E. shows the open action count and missing-item labels for a HOME match with missing setup", () => {
     renderOverview([
       createMatch({
         operational: {
@@ -245,8 +245,11 @@ describe("MatchcenterOverview — Spielplanung", () => {
     ]);
 
     expect(screen.getByText("2 Aufgaben offen")).toBeTruthy();
+    // Missing items are shown as labels
     expect(screen.getByText("Spielfeld")).toBeTruthy();
     expect(screen.getByText("Heimkabine")).toBeTruthy();
+    // MATCHCENTER-UX-03: ready items (Gastkabine=G2) are NOT shown for OPEN matches
+    // (only the missing items are surfaced as actionable labels)
     expect(screen.queryByText("Gastkabine")).toBeNull();
   });
 
@@ -373,8 +376,10 @@ describe("MatchcenterOverview — Spielplanung", () => {
       { actionFilter: "OFFEN" },
     );
 
-    expect(screen.getByTestId("matchcenter-filter-offen")).toHaveClass(
-      "border-[var(--sce-primary)]",
+    // MATCHCENTER-UX-03: active filter is indicated by aria-current (not CSS class).
+    expect(screen.getByTestId("matchcenter-filter-offen")).toHaveAttribute(
+      "aria-current",
+      "true",
     );
     expect(
       screen.getByTestId("matchcenter-spielplanung-row-match-open"),

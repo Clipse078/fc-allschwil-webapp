@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { CalendarDays, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
 import { getMatchcenterResultLabel } from "@/lib/matchcenter/match-lifecycle";
 import { resolveMatchcenterCompactSideName } from "@/lib/matchcenter/team-display";
-import { Badge } from "@/components/ui/Badge";
-import MatchTeamLogo from "./MatchTeamLogo";
+import { ClubLogo } from "@/components/admin/club-directory/ClubLogo";
 
 function formatMatchDate(value: Date, locale: string, timezone: string): string {
   return new Intl.DateTimeFormat(locale, {
@@ -27,6 +26,8 @@ type MatchcenterResultRowProps = {
  * Uses an explicit 3-column grid (home team / score / away team) so the
  * score stays geometrically centered regardless of team-name length —
  * MATCHCENTER-UX-01 §11/§19 ("stable central score column").
+ *
+ * MATCHCENTER-UX-03: uses ClubLogo with bare=true for dominant logo display.
  */
 export default function MatchcenterResultRow({
   match,
@@ -51,42 +52,49 @@ export default function MatchcenterResultRow({
       data-testid={`matchcenter-result-row-${match.id}`}
       className="relative px-5 py-4 transition hover:bg-[var(--surface-2)]"
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-        <div className="flex min-w-0 items-center justify-end gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
+        {/* Home side */}
+        <div className="flex min-w-0 items-center justify-end gap-3">
           <p
             className={
               match.home.isOwnTeam
                 ? "min-w-0 truncate text-right text-sm font-semibold text-[var(--foreground)]"
-                : "min-w-0 truncate text-right text-sm text-[var(--foreground)]"
+                : "min-w-0 truncate text-right text-sm text-[var(--text-2)]"
             }
           >
             {homeName}
           </p>
-          <MatchTeamLogo
-            label={homeName}
-            emphasized={match.home.isOwnTeam}
-            logoUrl={match.home.externalLogoUrl}
+          <ClubLogo
+            logoUrl={match.home.externalLogoUrl ?? null}
+            name={homeName}
+            size="md"
+            bare
+            className="shrink-0"
           />
         </div>
 
+        {/* Score */}
         <div
-          className="shrink-0 rounded-lg bg-[var(--foreground)] px-3 py-1 text-center text-sm font-bold tabular-nums text-white"
+          className="shrink-0 rounded-lg bg-[var(--foreground)] px-3 py-1.5 text-center text-sm font-bold tabular-nums text-white"
           data-testid={`matchcenter-result-${match.id}`}
         >
           {result ?? "–"}
         </div>
 
-        <div className="flex min-w-0 items-center gap-2">
-          <MatchTeamLogo
-            label={awayName}
-            emphasized={match.away.isOwnTeam}
-            logoUrl={match.away.externalLogoUrl}
+        {/* Away side */}
+        <div className="flex min-w-0 items-center gap-3">
+          <ClubLogo
+            logoUrl={match.away.externalLogoUrl ?? null}
+            name={awayName}
+            size="md"
+            bare
+            className="shrink-0"
           />
           <p
             className={
               match.away.isOwnTeam
                 ? "min-w-0 truncate text-sm font-semibold text-[var(--foreground)]"
-                : "min-w-0 truncate text-sm text-[var(--foreground)]"
+                : "min-w-0 truncate text-sm text-[var(--text-2)]"
             }
           >
             {awayName}
@@ -95,24 +103,21 @@ export default function MatchcenterResultRow({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
-        <span className="inline-flex items-center gap-1.5">
-          <CalendarDays className="h-3.5 w-3.5" />
+        <time dateTime={match.startAt.toISOString()}>
           {formatMatchDate(match.startAt, locale, timezone)}
-        </span>
+        </time>
 
         {match.competitionLabel ? <span>{match.competitionLabel}</span> : null}
 
         {match.location ? (
           <span className="inline-flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5" />
+            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
             {match.location}
           </span>
         ) : null}
 
         {homeAwayLabel ? (
-          <Badge variant="outline" size="sm">
-            {homeAwayLabel}
-          </Badge>
+          <span className="font-medium text-[var(--text-2)]">{homeAwayLabel}</span>
         ) : null}
       </div>
 

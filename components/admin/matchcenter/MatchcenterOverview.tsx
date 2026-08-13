@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus, Volleyball } from "lucide-react";
+import { Plus, Volleyball } from "lucide-react";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
 import {
   buildMatchcenterViewModel,
@@ -10,6 +10,8 @@ import {
 import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/ui/page/EmptyState";
 import { SectionCard } from "@/components/ui/page/SectionCard";
+import { CenterPeriodNavigation } from "@/components/centers/CenterPeriodNavigation";
+import { CenterSummaryStrip } from "@/components/centers/CenterSummaryStrip";
 import MatchcenterResultRow from "./MatchcenterResultRow";
 import MatchcenterWochenplanBulkPanel from "./MatchcenterWochenplanBulkPanel";
 
@@ -30,6 +32,8 @@ type MatchcenterOverviewProps = {
   timezone?: string;
   locale?: string;
   canManage?: boolean;
+  /** Current month param — used to build "Heute" navigation link. */
+  currentMonthParam?: string;
 };
 
 const TABS: { key: MatchcenterTab; label: string }[] = [
@@ -83,15 +87,85 @@ export default function MatchcenterOverview({
   timezone = "Europe/Zurich",
   locale = "de-CH",
   canManage = false,
+  currentMonthParam,
 }: MatchcenterOverviewProps) {
   const viewModel = buildMatchcenterViewModel(matches, {
     actionFilter,
     wochenplanFilter,
   });
 
+  // Build "Heute" href that navigates to today's month with filters preserved
+  const todayHref = currentMonthParam
+    ? buildHref(basePath, { tab, month: currentMonthParam, actionFilter, wochenplanFilter })
+    : undefined;
+
+  // Summary strip metrics (actionable: Offen and Erledigt link to filters)
+  const summaryMetrics =
+    tab === "SPIELPLANUNG"
+      ? [
+          {
+            key: "anstehend",
+            label: "Anstehend",
+            value: viewModel.kpis.anstehend,
+            tone: "default" as const,
+            "data-testid": "matchcenter-kpi-anstehend",
+          },
+          {
+            key: "offen",
+            label: "Offen",
+            value: viewModel.kpis.offen,
+            tone: "amber" as const,
+            href: buildHref(basePath, {
+              tab,
+              month: monthWindow.param,
+              actionFilter: "OFFEN",
+              wochenplanFilter,
+            }),
+            active: actionFilter === "OFFEN",
+            "data-testid": "matchcenter-kpi-offen",
+          },
+          {
+            key: "bereit",
+            label: "Bereit",
+            value: viewModel.kpis.bereit,
+            tone: "emerald" as const,
+            href: buildHref(basePath, {
+              tab,
+              month: monthWindow.param,
+              actionFilter: "ERLEDIGT",
+              wochenplanFilter,
+            }),
+            active: actionFilter === "ERLEDIGT",
+            "data-testid": "matchcenter-kpi-bereit",
+          },
+          {
+            key: "resultate",
+            label: "Resultate",
+            value: viewModel.kpis.resultate,
+            tone: "muted" as const,
+            "data-testid": "matchcenter-kpi-resultate",
+          },
+        ]
+      : [
+          {
+            key: "anstehend",
+            label: "Anstehend",
+            value: viewModel.kpis.anstehend,
+            tone: "muted" as const,
+            "data-testid": "matchcenter-kpi-anstehend",
+          },
+          {
+            key: "resultate",
+            label: "Resultate",
+            value: viewModel.kpis.resultate,
+            tone: "default" as const,
+            "data-testid": "matchcenter-kpi-resultate",
+          },
+        ];
+
   return (
-    <div className="space-y-5">
-      {/* Spielplanung / Resultate ────────────────────────────────────────── */}
+    <div className="space-y-4">
+      {/* ── Spielplanung / Resultate tabs ──────────────────────────────────── */}
       <div
         role="tablist"
         aria-label="Matchcenter-Bereiche"
@@ -124,110 +198,102 @@ export default function MatchcenterOverview({
         })}
       </div>
 
-      {/* Month navigation ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5">
-        <Link
-          href={buildHref(basePath, {
+      {/* ── Period navigation + summary strip ─────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <CenterPeriodNavigation
+          label={monthWindow.label}
+          previousHref={buildHref(basePath, {
             tab,
             month: monthWindow.previousParam,
             actionFilter,
             wochenplanFilter,
           })}
-          aria-label="Vorheriger Monat"
-          data-testid="matchcenter-month-previous"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-
-        <span
-          className="text-sm font-semibold text-[var(--foreground)]"
-          data-testid="matchcenter-month-label"
-        >
-          {monthWindow.label}
-        </span>
-
-        <Link
-          href={buildHref(basePath, {
+          nextHref={buildHref(basePath, {
             tab,
             month: monthWindow.nextParam,
             actionFilter,
             wochenplanFilter,
           })}
-          aria-label="Nächster Monat"
-          data-testid="matchcenter-month-next"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Link>
+          todayHref={todayHref}
+          data-testid-label="matchcenter-month-label"
+          data-testid-previous="matchcenter-month-previous"
+          data-testid-next="matchcenter-month-next"
+        />
       </div>
 
-      {/* Operational summary ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard label="Anstehend" value={viewModel.kpis.anstehend} tone="default" />
-        <SummaryCard label="Offen" value={viewModel.kpis.offen} tone="amber" />
-        <SummaryCard label="Bereit" value={viewModel.kpis.bereit} tone="emerald" />
-        <SummaryCard label="Resultate" value={viewModel.kpis.resultate} tone="default" />
-      </div>
+      {/* ── Operational summary ─────────────────────────────────────────────── */}
+      <CenterSummaryStrip metrics={summaryMetrics} />
 
       {tab === "SPIELPLANUNG" ? (
         <>
-          {/* Operational action filter ───────────────────────────────────── */}
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Aktionsfilter">
-            {ACTION_FILTERS.map((item) => {
-              const isActive = item.key === actionFilter;
-              return (
-                <Link
-                  key={item.key}
-                  href={buildHref(basePath, {
-                    tab,
-                    month: monthWindow.param,
-                    actionFilter: item.key,
-                    wochenplanFilter,
-                  })}
-                  data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
-                  className={cn(
-                    "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
-                    isActive
-                      ? "border-[var(--sce-primary)] bg-[var(--sce-primary-light)] text-[var(--sce-primary)]"
-                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+          {/* ── Filter toolbar ─────────────────────────────────────────────── */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Quick operational filter */}
+            <div
+              className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
+              role="group"
+              aria-label="Aktionsfilter"
+            >
+              {ACTION_FILTERS.map((item) => {
+                const isActive = item.key === actionFilter;
+                return (
+                  <Link
+                    key={item.key}
+                    href={buildHref(basePath, {
+                      tab,
+                      month: monthWindow.param,
+                      actionFilter: item.key,
+                      wochenplanFilter,
+                    })}
+                    data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
+                    aria-current={isActive ? "true" : undefined}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                      isActive
+                        ? "bg-[var(--foreground)] text-white"
+                        : "text-[var(--text-2)] hover:text-[var(--foreground)]",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Wochenplan filter */}
+            <div
+              className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5"
+              role="group"
+              aria-label="Wochenplan-Filter"
+            >
+              {WOCHENPLAN_FILTERS.map((item) => {
+                const isActive = item.key === wochenplanFilter;
+                return (
+                  <Link
+                    key={item.key}
+                    href={buildHref(basePath, {
+                      tab,
+                      month: monthWindow.param,
+                      actionFilter,
+                      wochenplanFilter: item.key,
+                    })}
+                    data-testid={`matchcenter-wochenplan-filter-${item.key.toLowerCase()}`}
+                    aria-current={isActive ? "true" : undefined}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                      isActive
+                        ? "bg-[var(--foreground)] text-white"
+                        : "text-[var(--text-2)] hover:text-[var(--foreground)]",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Wochenplan publication filter ───────────────────────────────── */}
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Wochenplan-Filter">
-            <span className="text-xs font-medium text-[var(--muted)]">Wochenplan:</span>
-            {WOCHENPLAN_FILTERS.map((item) => {
-              const isActive = item.key === wochenplanFilter;
-              return (
-                <Link
-                  key={item.key}
-                  href={buildHref(basePath, {
-                    tab,
-                    month: monthWindow.param,
-                    actionFilter,
-                    wochenplanFilter: item.key,
-                  })}
-                  data-testid={`matchcenter-wochenplan-filter-${item.key.toLowerCase()}`}
-                  className={cn(
-                    "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
-                    isActive
-                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Spielplanung list with bulk wochenplan management ───────────── */}
+          {/* ── Match list ─────────────────────────────────────────────────── */}
           {viewModel.spielplanung.length === 0 ? (
             <SectionCard noPadding>
               <EmptyState
@@ -253,9 +319,12 @@ export default function MatchcenterOverview({
         </>
       ) : (
         <>
-          {/* Wochenplan publication filter for Resultate ─────────────────── */}
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Wochenplan-Filter">
-            <span className="text-xs font-medium text-[var(--muted)]">Wochenplan:</span>
+          {/* ── Wochenplan filter for Resultate ──────────────────────────── */}
+          <div
+            className="flex items-center gap-0.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5 self-start"
+            role="group"
+            aria-label="Wochenplan-Filter"
+          >
             {WOCHENPLAN_FILTERS.map((item) => {
               const isActive = item.key === wochenplanFilter;
               return (
@@ -268,11 +337,12 @@ export default function MatchcenterOverview({
                     wochenplanFilter: item.key,
                   })}
                   data-testid={`matchcenter-wochenplan-filter-resultate-${item.key.toLowerCase()}`}
+                  aria-current={isActive ? "true" : undefined}
                   className={cn(
-                    "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
+                    "rounded-md px-3 py-1.5 text-xs font-medium transition",
                     isActive
-                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                      ? "bg-[var(--foreground)] text-white"
+                      : "text-[var(--text-2)] hover:text-[var(--foreground)]",
                   )}
                 >
                   {item.label}
@@ -291,7 +361,10 @@ export default function MatchcenterOverview({
             </SectionCard>
           ) : (
             <SectionCard noPadding>
-              <div className="divide-y divide-[var(--border)]" data-testid="matchcenter-resultate-list">
+              <div
+                className="divide-y divide-[var(--border)]"
+                data-testid="matchcenter-resultate-list"
+              >
                 {viewModel.resultate.map((match) => (
                   <MatchcenterResultRow
                     key={match.id}
@@ -305,35 +378,6 @@ export default function MatchcenterOverview({
           )}
         </>
       )}
-    </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "default" | "amber" | "emerald";
-}) {
-  const toneClass =
-    tone === "amber"
-      ? "text-amber-600"
-      : tone === "emerald"
-        ? "text-emerald-600"
-        : "text-[var(--blue)]";
-
-  return (
-    <div className="sce-kpi-card p-4" data-testid={`matchcenter-kpi-${label.toLowerCase()}`}>
-      <p className="sce-data-label">{label}</p>
-      <p
-        className={cn("mt-1.5 text-[1.75rem] font-bold leading-none tracking-tight", toneClass)}
-        style={{ fontFamily: "var(--font-display)" }}
-      >
-        {value}
-      </p>
     </div>
   );
 }

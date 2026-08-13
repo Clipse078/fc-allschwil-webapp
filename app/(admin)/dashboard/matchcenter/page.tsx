@@ -61,6 +61,12 @@ export default async function MatchcenterPage({
     timeZone: timezone,
   });
 
+  // Current month param for the "Heute" navigation shortcut.
+  // Computed separately from the selected month so navigating to a past/future
+  // month still shows the correct "go back to today" target.
+  const currentMonthWindow = resolveMatchcenterMonthWindow({ timeZone: timezone });
+  const currentMonthParam = currentMonthWindow.param;
+
   /*
    * Prisma's generic delegate return type cannot structurally satisfy the
    * deliberately narrow MatchcenterQueryDatabase test contract, although the
@@ -118,6 +124,7 @@ export default async function MatchcenterPage({
           timezone={timezone}
           locale={locale}
           canManage={canManage}
+          currentMonthParam={currentMonthParam}
         />
       </div>
     </ToastProvider>
