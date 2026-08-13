@@ -361,22 +361,20 @@ export function MatchCard({
               bare
               className="shrink-0"
             />
-            <div className="min-w-0">
-              <span
-                className={cn(
-                  "block min-w-0 truncate leading-tight",
-                  isComfortable
-                    ? match.home.isOwnTeam
-                      ? "text-base font-bold text-[var(--foreground)]"
-                      : "text-base font-medium text-[var(--text-2)]"
-                    : match.home.isOwnTeam
-                      ? "text-sm font-semibold text-[var(--foreground)]"
-                      : "text-sm font-normal text-[var(--text-2)]",
-                )}
-              >
-                {homeName}
-              </span>
-            </div>
+            <span
+              className={cn(
+                "min-w-0 truncate leading-tight",
+                isComfortable
+                  ? match.home.isOwnTeam
+                    ? "text-base font-bold text-[var(--foreground)]"
+                    : "text-base font-medium text-[var(--text-2)]"
+                  : match.home.isOwnTeam
+                    ? "text-sm font-semibold text-[var(--foreground)]"
+                    : "text-sm font-normal text-[var(--text-2)]",
+              )}
+            >
+              {homeName}
+            </span>
           </div>
 
           {/* VS / score center */}
@@ -392,24 +390,22 @@ export function MatchCard({
             </span>
           </div>
 
-          {/* Away side */}
+          {/* Away side — mirror of home: name floats right, logo at far right */}
           <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-            <div className="min-w-0">
-              <span
-                className={cn(
-                  "block min-w-0 truncate text-right leading-tight",
-                  isComfortable
-                    ? match.away.isOwnTeam
-                      ? "text-base font-bold text-[var(--foreground)]"
-                      : "text-base font-medium text-[var(--text-2)]"
-                    : match.away.isOwnTeam
-                      ? "text-sm font-semibold text-[var(--foreground)]"
-                      : "text-sm font-normal text-[var(--text-2)]",
-                )}
-              >
-                {awayName}
-              </span>
-            </div>
+            <span
+              className={cn(
+                "min-w-0 truncate text-right leading-tight",
+                isComfortable
+                  ? match.away.isOwnTeam
+                    ? "text-base font-bold text-[var(--foreground)]"
+                    : "text-base font-medium text-[var(--text-2)]"
+                  : match.away.isOwnTeam
+                    ? "text-sm font-semibold text-[var(--foreground)]"
+                    : "text-sm font-normal text-[var(--text-2)]",
+              )}
+            >
+              {awayName}
+            </span>
             <ClubLogo
               logoUrl={awayLogoUrl}
               name={awayName}
