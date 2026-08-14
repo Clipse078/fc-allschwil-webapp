@@ -36,6 +36,7 @@ import {
 import type { InboardRow } from "@/lib/infoboard/types";
 import { STATUS_META, TEMPLATE_LABELS, infoboardKioskUrl } from "@/lib/infoboard/types";
 import { InboardDesignerClient } from "./designer/InboardDesignerClient";
+import { AnlageplanDesignerClient } from "./designer/anlageplan/AnlageplanDesignerClient";
 
 // ── Tab model ─────────────────────────────────────────────────────────────────
 
@@ -364,14 +365,24 @@ export function InboardDetailClient({
         {/* ── DESIGNER ───────────────────────────────────────────────────── */}
         {activeTab === "designer" && (
           <div data-testid="tab-content-designer">
-            <InboardDesignerClient
-              board={board}
-              tenantName={tenantName}
-              onBoardChange={(updated) => {
-                setBoard(updated);
-                router.refresh();
-              }}
-            />
+            {board.templateType === "ANLAGENUEBERSICHT" ? (
+              <AnlageplanDesignerClient
+                board={board}
+                onBoardChange={(updated) => {
+                  setBoard(updated);
+                  router.refresh();
+                }}
+              />
+            ) : (
+              <InboardDesignerClient
+                board={board}
+                tenantName={tenantName}
+                onBoardChange={(updated) => {
+                  setBoard(updated);
+                  router.refresh();
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -453,6 +464,7 @@ export function InboardDetailClient({
                       className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
                     >
                       <option value="TAGESUEBERSICHT">Tagesübersicht</option>
+                      <option value="ANLAGENUEBERSICHT">Anlagenübersicht (Anlageplan)</option>
                     </select>
                   </div>
                 </div>

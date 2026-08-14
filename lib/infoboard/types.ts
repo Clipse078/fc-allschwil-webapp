@@ -30,6 +30,10 @@ export type InboardRow = {
   announcementTextColor: string | null;
   /** Designer layout JSON (InboardLayout v1). null = use default derived from flat fields. */
   layoutJson: string | null;
+  /** Anlageplan: Vercel Blob CDN URL of the background site-plan image. null = not uploaded. */
+  anlageplanBackgroundUrl: string | null;
+  /** Anlageplan: AnlageplanConfig v1 JSON. null = no config yet. */
+  anlageplanJson: string | null;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -85,6 +89,10 @@ export type UpdateInfoboardInput = {
   announcementTextColor?: string | null;
   /** Designer layout JSON (InboardLayout v1). */
   layoutJson?: string | null;
+  /** Anlageplan: Vercel Blob CDN URL of uploaded background image. */
+  anlageplanBackgroundUrl?: string | null;
+  /** Anlageplan: AnlageplanConfig v1 JSON. */
+  anlageplanJson?: string | null;
   sortOrder?: number;
 };
 

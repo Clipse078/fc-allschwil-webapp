@@ -17,6 +17,10 @@
  * scoped to (tenantId, slug). No cross-tenant leakage.
  *
  * Only ACTIVE boards are served. DRAFT and DISABLED → 404.
+ *
+ * INFOBOARD-MAP-01:
+ *   Boards with templateType ANLAGENUEBERSICHT render InfoboardAnlageplan
+ *   instead of InfoboardScreen1.
  */
 
 import type { Metadata } from "next";
@@ -25,6 +29,7 @@ import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
+import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   createCanonicalInfoboardSourceLoader,
   type CanonicalInfoboardPolicyDatabase,
@@ -33,7 +38,17 @@ import {
   buildScreen1LivePayload,
   type Screen1TenantContext,
 } from "@/lib/publishing/infoboard/screen1-live-service";
+import {
+  buildAnlageplanLivePayload,
+} from "@/lib/publishing/infoboard/anlageplan-live-service";
+import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
 import { prisma } from "@/lib/db/prisma";
+
+// ── FCA branding constants ─────────────────────────────────────────────────────
+
+const FC_ALLSCHWIL_TENANT_KEY = "fc-allschwil";
+const FC_ALLSCHWIL_LOGO_SRC = "/images/logos/fc-allschwil.png";
+const PRODUCT_LOGO_SRC = "/images/branding/sportclubevo_logo.png";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -44,7 +59,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: `Infoboard — ${slug}` };
 }
 
-function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
+function createPrismaDb(): CanonicalInfoboardPolicyDatabase & {
+  facilityResource: {
+    findMany: (args: {
+      where: Record<string, unknown>;
+      orderBy?: ReadonlyArray<Record<string, unknown>>;
+      select: Record<string, unknown>;
+    }) => Promise<ReadonlyArray<Record<string, unknown>>>;
+  };
+} {
   return {
     event: {
       findMany: (args) =>
@@ -58,6 +81,12 @@ function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
           args as Parameters<typeof prisma.trainingSession.findMany>[0],
         ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["trainingSession"]["findMany"]>,
     },
+    facilityResource: {
+      findMany: (args) =>
+        prisma.facilityResource.findMany(
+          args as Parameters<typeof prisma.facilityResource.findMany>[0],
+        ) as unknown as Promise<ReadonlyArray<Record<string, unknown>>>,
+    },
   };
 }
 
@@ -65,7 +94,6 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
   const { slug } = await params;
 
   // Resolve tenant from request hostname → env var → platform default.
-  // Returns null for unknown/inactive tenants.
   const tenantRow = await resolveKioskTenant();
   if (!tenantRow || !tenantRow.timezone) {
     notFound();
@@ -75,11 +103,54 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
   const board = await getInfoboardBySlug(slug, tenantRow.id);
 
   // Only ACTIVE boards are publicly accessible.
-  // DISABLED and DRAFT → 404 (no kiosk should display work-in-progress).
   if (!board || board.status !== "ACTIVE") {
     notFound();
   }
 
+  const now = new Date();
+  const db = createPrismaDb();
+
+  // ── ANLAGENUEBERSICHT branch ───────────────────────────────────────────────
+  if (board.templateType === "ANLAGENUEBERSICHT") {
+    const anlageplanTenant: Screen2TenantContext = {
+      id: tenantRow.id,
+      key: tenantRow.key,
+      name: tenantRow.name,
+      timezone: tenantRow.timezone,
+      logoUrl: tenantRow.logoUrl,
+      infoboardDisplayTheme: tenantRow.infoboardDisplayTheme,
+    };
+
+    const payload = await buildAnlageplanLivePayload({
+      board,
+      tenant: anlageplanTenant,
+      now,
+      database: db as unknown as import("@/lib/publishing/infoboard/anlageplan-live-service").AnlageplanSourceDatabase,
+    });
+
+    const clubLogoSrc = tenantRow.logoUrl
+      ? tenantRow.logoUrl
+      : tenantRow.key === FC_ALLSCHWIL_TENANT_KEY
+        ? FC_ALLSCHWIL_LOGO_SRC
+        : null;
+
+    return (
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={{
+          clubLogoSrc,
+          productLogoSrc: PRODUCT_LOGO_SRC,
+          clubName: tenantRow.key === FC_ALLSCHWIL_TENANT_KEY ? "FC ALLSCHWIL" : tenantRow.name,
+          facilityName:
+            tenantRow.key === FC_ALLSCHWIL_TENANT_KEY
+              ? "SPORTANLAGE IM BRÜEL"
+              : undefined,
+        }}
+      />
+    );
+  }
+
+  // ── TAGESUEBERSICHT branch (default) ──────────────────────────────────────
   const tenant: Screen1TenantContext = {
     id: tenantRow.id,
     key: tenantRow.key,
@@ -89,8 +160,6 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
     infoboardDisplayTheme: tenantRow.infoboardDisplayTheme,
   };
 
-  const now = new Date();
-  const db = createPrismaDb();
   const loader = createCanonicalInfoboardSourceLoader(db);
   const boardConfig = buildBoardConfig(board);
 

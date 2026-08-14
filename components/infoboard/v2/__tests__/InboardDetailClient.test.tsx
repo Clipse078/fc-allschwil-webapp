@@ -82,6 +82,8 @@ const BOARD = {
   announcementBgColor: null,
   announcementTextColor: null,
   layoutJson: null,
+  anlageplanBackgroundUrl: null,
+  anlageplanJson: null,
   sortOrder: 0,
   createdAt: new Date("2026-08-01"),
   updatedAt: new Date("2026-08-01"),
