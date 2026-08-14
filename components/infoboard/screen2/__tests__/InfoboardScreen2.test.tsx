@@ -68,6 +68,8 @@ function makePitch(overrides: Partial<PitchOccupancy> = {}): PitchOccupancy {
     code: "P-TEST",
     displayLabel: "Testplatz",
     facilityName: "Test Facility",
+    facilityId: "fac-test",
+    resourceType: "FULL_PITCH",
     state: "FREE_NOW",
     hasAllocationConflict: false,
     currentEvent: null,

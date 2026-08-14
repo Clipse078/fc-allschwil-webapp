@@ -55,12 +55,17 @@ const FC_ALLSCHWIL_TENANT_KEY = "fc-allschwil";
 
 /**
  * Row returned by the pitch inventory query.
- * Extends Screen1FacilityResourceRow with sortOrder and facilityName.
+ * Extends Screen1FacilityResourceRow with sortOrder, facilityId, type, and
+ * the parent facility data needed for hierarchy grouping.
  */
 export type Screen2PitchRow = Screen1FacilityResourceRow & {
   readonly sortOrder: number;
-  readonly facilityName?: string | null;
-  readonly facilityId?: string;
+  readonly type: string;
+  readonly facilityId: string;
+  readonly facility: {
+    readonly id: string;
+    readonly name: string;
+  };
 };
 
 /** Row returned by the dressing-room inventory query. */
@@ -135,7 +140,9 @@ const PITCH_SELECT = {
   code: true,
   name: true,
   sortOrder: true,
-  facility: { select: { name: true } },
+  type: true,
+  facilityId: true,
+  facility: { select: { id: true, name: true } },
 } as const;
 
 const DRESSING_ROOM_SELECT = {
@@ -195,7 +202,7 @@ export async function buildScreen2LivePayload(params: {
   // ── Resolve facility name ───────────────────────────────────────────────────
   // Prefer the DB facility name; fall back to caller-supplied override.
   const resolvedFacilityName =
-    (pitchRows[0] as any)?.facility?.name ??
+    pitchRows[0]?.facility?.name ??
     params.facilityName ??
     tenant.name;
 
@@ -203,7 +210,9 @@ export async function buildScreen2LivePayload(params: {
   const pitches = pitchRows.map((row) => ({
     code: row.code,
     name: row.name,
-    facilityName: (row as any)?.facility?.name ?? resolvedFacilityName,
+    facilityName: row.facility?.name ?? resolvedFacilityName,
+    facilityId: row.facilityId,
+    resourceType: (row.type === "HALF_PITCH" ? "HALF_PITCH" : "FULL_PITCH") as "FULL_PITCH" | "HALF_PITCH",
   }));
 
   // ── Map dressing-room rows to ConfiguredDressingRoom ───────────────────────
@@ -235,7 +244,7 @@ export async function buildScreen2LivePayload(params: {
     loader,
   });
 
-  // ── Override facilityName in feed if pitches were loaded ──────────────────
+  // ── Resolve final facility name for the feed header ──────────────────────
   const feedWithFacility: InfoboardScreen2Feed = {
     ...feed,
     facilityName: resolvedFacilityName,
