@@ -170,6 +170,40 @@ export async function PATCH(
     input.layoutJson = body.layoutJson as string | null;
   }
 
+  // Anlageplan JSON (INFOBOARD-MAP-01)
+  if ("anlageplanJson" in body) {
+    if (body.anlageplanJson !== null && typeof body.anlageplanJson !== "string") {
+      return NextResponse.json(
+        { error: "anlageplanJson muss ein String oder null sein." },
+        { status: 422 },
+      );
+    }
+    if (
+      typeof body.anlageplanJson === "string" &&
+      body.anlageplanJson.length > 2_097_152
+    ) {
+      return NextResponse.json(
+        { error: "anlageplanJson ist zu groß (max. 2 MB)." },
+        { status: 422 },
+      );
+    }
+    input.anlageplanJson = body.anlageplanJson as string | null;
+  }
+
+  // Anlageplan background URL (set by the background upload route)
+  if ("anlageplanBackgroundUrl" in body) {
+    if (
+      body.anlageplanBackgroundUrl !== null &&
+      typeof body.anlageplanBackgroundUrl !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "anlageplanBackgroundUrl muss ein String oder null sein." },
+        { status: 422 },
+      );
+    }
+    input.anlageplanBackgroundUrl = body.anlageplanBackgroundUrl as string | null;
+  }
+
   // Validate: announcement requires text when enabled
   const willBeEnabled =
     input.announcementEnabled !== undefined

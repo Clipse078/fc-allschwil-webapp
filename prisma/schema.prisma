@@ -4435,6 +4435,16 @@ model Infoboard {
   /// null = use getDefaultLayout() derived from flat fields.
   layoutJson String?
 
+  // ── Anlageplan (INFOBOARD-MAP-01) ─────────────────────────────────────────
+  /// Vercel Blob CDN URL of the uploaded site-plan background image.
+  /// null = no image uploaded. Only relevant for templateType ANLAGENUEBERSICHT.
+  anlageplanBackgroundUrl String?
+
+  /// AnlageplanConfig v1 JSON: map elements (ResourceZone + Marker) with
+  /// normalized coordinates. null = no config yet (empty canvas).
+  /// See lib/infoboard/anlageplan-types.ts.
+  anlageplanJson String?
+
   /// Display sequence within this tenant's Infoboard list (ascending).
   sortOrder Int @default(0)
 

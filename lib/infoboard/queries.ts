@@ -166,6 +166,12 @@ export async function updateInfoboard(
       ...(input.layoutJson !== undefined && {
         layoutJson: input.layoutJson,
       }),
+      ...(input.anlageplanBackgroundUrl !== undefined && {
+        anlageplanBackgroundUrl: input.anlageplanBackgroundUrl,
+      }),
+      ...(input.anlageplanJson !== undefined && {
+        anlageplanJson: input.anlageplanJson,
+      }),
       ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
     },
   }) as unknown as Promise<InboardRow>;
