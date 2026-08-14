@@ -110,6 +110,13 @@ export type Screen1SourceEvent = {
   /** Explicit source-level opponent name fallback (e.g. Event.opponentName). */
   readonly opponentFallbackName?: string | null;
 
+  /**
+   * Canonical opponent crest URL resolved from ExternalTeam.logoUrl →
+   * ExternalClub.logoUrl. Populated by the canonical source loader when a
+   * MatchExternalMapping with an awayExternalTeam exists. Null otherwise.
+   */
+  readonly opponentLogoUrl?: string | null;
+
   // ── Organizer ─────────────────────────────────────────────────────────────
   /** Event.organizerName — passed through directly to organizerDisplayName. */
   readonly organizerName?: string | null;
@@ -291,6 +298,7 @@ export function mapScreen1Event(
     displayTitle: event.title,
     teamDisplayName,
     opponentDisplayName,
+    opponentLogoUrl: event.opponentLogoUrl ?? null,
     organizerDisplayName: event.organizerName ?? null,
     competitionLabel,
     startAt: event.startAt.toISOString(),

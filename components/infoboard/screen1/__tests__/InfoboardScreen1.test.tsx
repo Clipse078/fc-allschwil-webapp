@@ -73,6 +73,7 @@ function makeEvent(
     displayTitle: "Test Training",
     teamDisplayName: "Test Team",
     opponentDisplayName: null,
+    opponentLogoUrl: null,
     organizerDisplayName: null,
     competitionLabel: null,
     startAt: "2026-09-12T08:00:00.000Z",
@@ -1966,6 +1967,43 @@ describe("Match logo placement — beside team name, not in dressing room rows",
     );
     const homeRow = screen.getByTestId("match-home-team-row");
     expect(homeRow.querySelector("img")).not.toBeNull();
+  });
+
+  it("away team logo renders when opponentLogoUrl is set", () => {
+    const feed = makeFeed({
+      current: [makeEvent({
+        type: "MATCH",
+        teamDisplayName: "FC Home",
+        opponentDisplayName: "FC Schwarz-Weiss A",
+        opponentLogoUrl: "https://cdn.example.com/fc-schwarz-weiss.png",
+        allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null },
+      })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} branding={{ clubLogoSrc: "/logo.png" }} />);
+    const awayRow = screen.getByTestId("match-away-team-row");
+    const logo = awayRow.querySelector("img[data-testid='away-team-logo']");
+    expect(logo).not.toBeNull();
+    expect(logo?.getAttribute("src")).toBe("https://cdn.example.com/fc-schwarz-weiss.png");
+  });
+
+  it("away team renders placeholder (no img) when opponentLogoUrl is null", () => {
+    const feed = makeFeed({
+      current: [makeEvent({
+        type: "MATCH",
+        teamDisplayName: "FC Home",
+        opponentDisplayName: "FC Away",
+        opponentLogoUrl: null,
+        allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null },
+      })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} branding={{ clubLogoSrc: "/logo.png" }} />);
+    const awayRow = screen.getByTestId("match-away-team-row");
+    const logo = awayRow.querySelector("img[data-testid='away-team-logo']");
+    expect(logo).toBeNull();
+    const placeholder = awayRow.querySelector("[data-testid='away-team-logo-placeholder']");
+    expect(placeholder).not.toBeNull();
   });
 
   it("no logo anywhere inside match-allocation (destination zone)", () => {

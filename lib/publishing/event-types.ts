@@ -65,6 +65,12 @@ export type InfoboardScreen1Event = {
   displayTitle: string;
   teamDisplayName: string | null;
   opponentDisplayName: string | null;
+  /**
+   * Canonical opponent club crest URL resolved from ExternalTeam.logoUrl →
+   * ExternalClub.logoUrl. Null when no Club Directory crest is available.
+   * Never a white-background tile — only the clean canonical transparent PNG.
+   */
+  opponentLogoUrl: string | null;
   /** Organizer name for external/municipal events. */
   organizerDisplayName: string | null;
   competitionLabel: string | null;

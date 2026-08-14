@@ -714,9 +714,24 @@ function EventCard({
             </div>
             {/* VS separator */}
             <span className={styles.vsLabel} aria-hidden="true">vs.</span>
-            {/* Away team (no logo available in current data model) */}
+            {/* Away team — canonical ExternalClub transparent PNG crest when available */}
             {event.opponentDisplayName !== null && (
               <div className={styles.matchTeamRow} data-testid="match-away-team-row">
+                {event.opponentLogoUrl !== null ? (
+                  <img
+                    src={event.opponentLogoUrl}
+                    alt=""
+                    className={styles.teamLogo}
+                    aria-hidden="true"
+                    data-testid="away-team-logo"
+                  />
+                ) : (
+                  <div
+                    className={styles.teamLogoPlaceholder}
+                    aria-hidden="true"
+                    data-testid="away-team-logo-placeholder"
+                  />
+                )}
                 <span className={styles.eventTeamOpponent}>
                   {event.opponentDisplayName}
                 </span>

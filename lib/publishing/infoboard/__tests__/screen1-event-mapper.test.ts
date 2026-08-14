@@ -588,3 +588,26 @@ describe("mapScreen1Event — event type variants", () => {
     expect(result.type).toBe("TOURNAMENT");
   });
 });
+
+// ── Opponent logo URL pass-through ────────────────────────────────────────────
+
+describe("mapScreen1Event — opponentLogoUrl", () => {
+  it("passes through a non-null opponentLogoUrl to the DTO", () => {
+    const result = mapScreen1Event(makeInput({
+      type: "MATCH",
+      homeAway: "HOME",
+      opponentLogoUrl: "https://cdn.example.com/fc-schwarz-weiss.png",
+    }));
+    expect(result.opponentLogoUrl).toBe("https://cdn.example.com/fc-schwarz-weiss.png");
+  });
+
+  it("passes through null opponentLogoUrl when not set", () => {
+    const result = mapScreen1Event(makeInput({ type: "MATCH", homeAway: "HOME" }));
+    expect(result.opponentLogoUrl).toBeNull();
+  });
+
+  it("TRAINING events always have opponentLogoUrl null", () => {
+    const result = mapScreen1Event(makeInput({ type: "TRAINING", homeAway: null }));
+    expect(result.opponentLogoUrl).toBeNull();
+  });
+});
