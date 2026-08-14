@@ -73,8 +73,10 @@ export async function linkPersonToUser(input: LinkPersonToUserInput): Promise<Li
     throw new UserNotEligibleError();
   }
 
-  const alreadyLinkedTo = await prisma.person.findUnique({
-    where: { userId: input.userId },
+  // INVITE-01: userId is now per-tenant unique (@@unique([tenantId, userId])),
+  // not globally unique. Check within this tenant only.
+  const alreadyLinkedTo = await prisma.person.findFirst({
+    where: { userId: input.userId, tenantId: input.tenantId },
     select: { id: true },
   });
   if (alreadyLinkedTo) throw new UserAlreadyLinkedError();

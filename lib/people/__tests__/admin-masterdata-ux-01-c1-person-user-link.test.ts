@@ -63,10 +63,11 @@ describe("ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking (live DB)", () =
     await prisma.$disconnect();
   });
 
-  async function createUnlinkedPerson(label: string) {
+  // INVITE-01: Person.tenantId is NOT NULL; always supply tenantA for test fixtures.
+  async function createUnlinkedPerson(label: string, tenantId?: string) {
     const suffix = uniqueSuffix();
     const person = await prisma.person.create({
-      data: { firstName: "Test", lastName: `Person-${label}-${suffix}` },
+      data: { firstName: "Test", lastName: `Person-${label}-${suffix}`, tenantId: tenantId ?? tenantA.id },
       select: { id: true },
     });
     createdPersonIds.push(person.id);

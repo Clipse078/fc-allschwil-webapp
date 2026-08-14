@@ -9,10 +9,11 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// INVITE-01: Person.userId is now per-tenant unique; queries use findFirst.
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     person: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }));
@@ -21,28 +22,28 @@ import { prisma } from "@/lib/db/prisma";
 import { getPersonFirstNameByUserId } from "@/lib/people/queries";
 
 const mockPrisma = prisma as unknown as {
-  person: { findUnique: ReturnType<typeof vi.fn> };
+  person: { findFirst: ReturnType<typeof vi.fn> };
 };
 
 describe("getPersonFirstNameByUserId", () => {
   beforeEach(() => {
-    mockPrisma.person.findUnique.mockReset();
+    mockPrisma.person.findFirst.mockReset();
   });
 
   it("returns the linked Person's trimmed first name", async () => {
-    mockPrisma.person.findUnique.mockResolvedValueOnce({ firstName: "  Michael  " });
+    mockPrisma.person.findFirst.mockResolvedValueOnce({ firstName: "  Michael  " });
 
     const result = await getPersonFirstNameByUserId("user-1");
 
     expect(result).toBe("Michael");
-    expect(mockPrisma.person.findUnique).toHaveBeenCalledWith({
+    expect(mockPrisma.person.findFirst).toHaveBeenCalledWith({
       where: { userId: "user-1" },
       select: { firstName: true },
     });
   });
 
   it("returns null when the User has no linked Person", async () => {
-    mockPrisma.person.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.person.findFirst.mockResolvedValueOnce(null);
 
     const result = await getPersonFirstNameByUserId("user-2");
 
@@ -50,7 +51,7 @@ describe("getPersonFirstNameByUserId", () => {
   });
 
   it("returns null when the linked Person's first name is blank/whitespace", async () => {
-    mockPrisma.person.findUnique.mockResolvedValueOnce({ firstName: "   " });
+    mockPrisma.person.findFirst.mockResolvedValueOnce({ firstName: "   " });
 
     const result = await getPersonFirstNameByUserId("user-3");
 

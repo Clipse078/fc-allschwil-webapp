@@ -9,10 +9,11 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// INVITE-01: Person.userId is now per-tenant unique; queries use findFirst.
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     person: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }));
@@ -21,16 +22,16 @@ import { prisma } from "@/lib/db/prisma";
 import { getPersonNameByUserId } from "@/lib/people/queries";
 
 const mockPrisma = prisma as unknown as {
-  person: { findUnique: ReturnType<typeof vi.fn> };
+  person: { findFirst: ReturnType<typeof vi.fn> };
 };
 
 describe("getPersonNameByUserId", () => {
   beforeEach(() => {
-    mockPrisma.person.findUnique.mockReset();
+    mockPrisma.person.findFirst.mockReset();
   });
 
   it("returns the linked Person's trimmed first and last name", async () => {
-    mockPrisma.person.findUnique.mockResolvedValueOnce({
+    mockPrisma.person.findFirst.mockResolvedValueOnce({
       firstName: "  Michael  ",
       lastName: "  Duijster  ",
     });
@@ -38,14 +39,14 @@ describe("getPersonNameByUserId", () => {
     const result = await getPersonNameByUserId("user-1");
 
     expect(result).toEqual({ firstName: "Michael", lastName: "Duijster" });
-    expect(mockPrisma.person.findUnique).toHaveBeenCalledWith({
+    expect(mockPrisma.person.findFirst).toHaveBeenCalledWith({
       where: { userId: "user-1" },
       select: { firstName: true, lastName: true },
     });
   });
 
   it("returns null when the User has no linked Person", async () => {
-    mockPrisma.person.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.person.findFirst.mockResolvedValueOnce(null);
 
     const result = await getPersonNameByUserId("user-2");
 
@@ -53,7 +54,7 @@ describe("getPersonNameByUserId", () => {
   });
 
   it("returns null when the linked Person's first name is blank/whitespace", async () => {
-    mockPrisma.person.findUnique.mockResolvedValueOnce({ firstName: "   ", lastName: "Duijster" });
+    mockPrisma.person.findFirst.mockResolvedValueOnce({ firstName: "   ", lastName: "Duijster" });
 
     const result = await getPersonNameByUserId("user-3");
 
@@ -61,7 +62,7 @@ describe("getPersonNameByUserId", () => {
   });
 
   it("returns an empty last name string when the Person has no last name", async () => {
-    mockPrisma.person.findUnique.mockResolvedValueOnce({ firstName: "Michael", lastName: null });
+    mockPrisma.person.findFirst.mockResolvedValueOnce({ firstName: "Michael", lastName: null });
 
     const result = await getPersonNameByUserId("user-4");
 

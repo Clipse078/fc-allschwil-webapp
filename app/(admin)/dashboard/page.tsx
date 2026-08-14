@@ -209,8 +209,13 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
   // name over session.user.firstName (the raw User.firstName column), which
   // for some bootstrapped tenant accounts holds the club name instead of a
   // person's name. See lib/dashboard/greeting.ts for the resolution rule.
+  // INVITE-01: pass activeTenantId so lookup is scoped to the current tenant
+  // (Person.userId is now per-tenant unique, not globally unique).
   const linkedPersonFirstName = session?.user?.id
-    ? await getPersonFirstNameByUserId(session.user.id)
+    ? await getPersonFirstNameByUserId(
+        session.user.id,
+        session.user.activeTenantId ?? undefined,
+      )
     : null;
   const firstName = resolveDashboardFirstName({
     linkedPersonFirstName,
