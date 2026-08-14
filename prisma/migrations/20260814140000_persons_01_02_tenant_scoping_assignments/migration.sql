@@ -56,13 +56,15 @@ CREATE INDEX "OrgUnitMembership_personId_status_idx" ON "OrgUnitMembership"("per
 -- grantableByAdmin = true — consistent with other .delete permissions.
 -- module = 'PEOPLE', scope = 'TENANT'.
 -- Uses ON CONFLICT DO NOTHING to be idempotent if re-run.
-INSERT INTO "Permission" ("id", "key", "name", "module", "scope", "grantableByAdmin")
+INSERT INTO "Permission" ("id", "key", "name", "module", "scope", "grantableByAdmin", "createdAt", "updatedAt")
 VALUES (
   gen_random_uuid()::text,
   'people.delete',
   'Permanently delete persons',
   'PEOPLE',
   'TENANT',
-  true
+  true,
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
 )
 ON CONFLICT ("key") DO NOTHING;
